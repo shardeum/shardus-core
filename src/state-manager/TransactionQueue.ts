@@ -2287,18 +2287,25 @@ class TransactionQueue {
               consensusNodeIds = []
               correspondingAccNodes = []
 
-              let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
-              if (ourLocalConsensusIndex === -1) {
-                continue
+              // let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
+              // if (ourLocalConsensusIndex === -1) {
+              //   continue
+              // }
+              if(queueEntry.ourExGroupIndex === -1){
+                throw new Error('tellCorrespondingNodesFinalData: should never get here.  our sending node must be in the execution group')
               }
+              
+
+              let ourLocalExecutionSetIndex = queueEntry.ourExGroupIndex
+              let sendingIndexSize = queueEntry.executionIdSet.size
 
               // must add one to each lookup index!
-              let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex + 1)
-              let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
+              let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(sendingIndexSize, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalExecutionSetIndex + 1)
+              let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(sendingIndexSize, remoteHomeNode.edgeNodes.length, ourLocalExecutionSetIndex + 1)
 
               let patchIndicies = []
               if (remoteHomeNode.patchedOnNodes.length > 0) {
-                patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.patchedOnNodes.length, ourLocalConsensusIndex + 1)
+                patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(sendingIndexSize, remoteHomeNode.patchedOnNodes.length, ourLocalExecutionSetIndex + 1)
               }
 
               // for each remote node lets save it's id
