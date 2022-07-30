@@ -1638,42 +1638,46 @@ class ShardFunctions {
   }
 
   /**
-   * @param {number} size1
-   * @param {number} size2
-   * @param {number} index1
+   * debug wrapper with exception handling for fastStableCorrespondingIndicies:
+   * @param {number} fromListSize
+   * @param {number} toListSize
+   * @param {number} fromListIndex
    */
-  static debugFastStableCorrespondingIndicies(size1: number, size2: number, index1: number): number[] {
+  static debugFastStableCorrespondingIndicies(fromListSize: number, toListSize: number, fromListIndex: number): number[] {
     let results = [] as number[]
     try {
-      results = ShardFunctions.fastStableCorrespondingIndicies(size1, size2, index1)
+      results = ShardFunctions.fastStableCorrespondingIndicies(fromListSize, toListSize, fromListIndex)
     } catch (ex) {
-      throw new Error(`stack overflow fastStableCorrespondingIndicies( ${size1},  ${size2}, ${index1} )`)
+      throw new Error(`stack overflow fastStableCorrespondingIndicies( ${fromListSize},  ${toListSize}, ${fromListIndex} )`)
     }
 
     return results
   }
 
   /**
-   * @param {number} size1
-   * @param {number} size2
-   * @param {number} index1
+   * Takes a list size of a from array and a list size of a to array.
+   * uses the passed in index into list one to determine a list of indicies
+   * that the from node would need to send a corresponding message to.
+   * @param {number} fromListSize
+   * @param {number} toListSize
+   * @param {number} fromListIndex
    */
-  static fastStableCorrespondingIndicies(size1: number, size2: number, index1: number): number[] {
+  static fastStableCorrespondingIndicies(fromListSize: number, toListSize: number, fromListIndex: number): number[] {
     const results = [] as number[]
-    if (size1 >= size2) {
-      let value = Math.round((index1 / size1) * size2)
+    if (fromListSize >= toListSize) {
+      let value = Math.round((fromListIndex / fromListSize) * toListSize)
       if (value === 0) {
         value = 1
       }
       results.push(value)
     } else {
-      const targetIndex = Math.round(index1 * (size2 / size1))
-      const range = Math.round(size2 / size1)
+      const targetIndex = Math.round(fromListIndex * (toListSize / fromListSize))
+      const range = Math.round(toListSize / fromListSize)
       const start = Math.max(1, targetIndex - range)
-      const stop = Math.min(size2, targetIndex + range)
+      const stop = Math.min(toListSize, targetIndex + range)
       for (let i = start; i <= stop; i++) {
-        const res = ShardFunctions.fastStableCorrespondingIndicies(size2, size1, i)
-        if (res[0] === index1) {
+        const res = ShardFunctions.fastStableCorrespondingIndicies(toListSize, fromListSize, i)
+        if (res[0] === fromListIndex) {
           results.push(i)
         }
       }

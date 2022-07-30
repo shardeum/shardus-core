@@ -1025,7 +1025,7 @@ class TransactionQueue {
           //USE the first key in the list of all keys.  Applications much carefully sort this list
           //so that we start in the optimal shard.  This will matter less when shard hopping is implemented
           txQueueEntry.executionShardKey = txQueueEntry.txKeys.allKeys[0]
-          if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction set executionShardKey tx:${txQueueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(txQueueEntry.executionShardKey))}  `)
+          if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction set executionShardKey tx:${txQueueEntry.logID} ts:${timestamp} executionShardKey: ${utils.stringifyReduce(txQueueEntry.executionShardKey)}  `)
 
           // we were doing this in queueEntryGetTransactionGroup.  moved it earlier.
           let { homePartition } = ShardFunctions.addressToPartition(this.stateManager.currentCycleShardData.shardGlobals, txQueueEntry.executionShardKey)
@@ -1846,6 +1846,7 @@ class TransactionQueue {
         }
       }
 
+      //todo refactor this to where we insert the tx
       if(queueEntry.globalModification === false && this.executeInOneShard && key === queueEntry.executionShardKey){
         //queueEntry.executionGroup = homeNode.consensusNodeForOurNodeFull.slice()
         let executionKeys = []
@@ -2273,99 +2274,84 @@ class TransactionQueue {
     let totalShares = 0
     for (let key of keysToShare) {
       if (wrappedStates[key] != null) {
+        let accountHomeNode = queueEntry.homeNodes[key]
+        edgeNodeIds = []
+        consensusNodeIds = []
+        correspondingAccNodes = []
 
-        for (let key2 of queueEntry.uniqueKeys) {
-          if (key !== key2) {
-            //let localHomeNode = queueEntry.homeNodes[key]
-            let remoteHomeNode = queueEntry.homeNodes[key2]
+        if(queueEntry.ourExGroupIndex === -1){
+          throw new Error('tellCorrespondingNodesFinalData: should never get here.  our sending node must be in the execution group')
+        }
+        
+        let ourLocalExecutionSetIndex = queueEntry.ourExGroupIndex
+        let sendingIndexSize = queueEntry.executionIdSet.size
 
-            //if (key !== queueEntry.executionShardKey) {
-              //let remoteHomeNode = ShardFunctions.findHomeNode(this.stateManager.currentCycleShardData.shardGlobals, key, this.stateManager.currentCycleShardData.parititionShardDataMap)
-              //let remoteHomeNode = ShardFunctions.findHomeNode(this.stateManager.currentCycleShardData.shardGlobals, key2, this.stateManager.currentCycleShardData.parititionShardDataMap)
+        let consensusListSize = accountHomeNode.consensusNodeForOurNodeFull.length
+        let edgeListSize = accountHomeNode.edgeNodes.length
+        let pachedListSize = accountHomeNode.patchedOnNodes.length
 
-              edgeNodeIds = []
-              consensusNodeIds = []
-              correspondingAccNodes = []
+        // must add one to each lookup index!
+        let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(sendingIndexSize, consensusListSize, ourLocalExecutionSetIndex + 1)
+        let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(sendingIndexSize, edgeListSize, ourLocalExecutionSetIndex + 1)
 
-              // let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
-              // if (ourLocalConsensusIndex === -1) {
-              //   continue
-              // }
-              if(queueEntry.ourExGroupIndex === -1){
-                throw new Error('tellCorrespondingNodesFinalData: should never get here.  our sending node must be in the execution group')
-              }
-              
+        let patchIndicies = []
+        if (accountHomeNode.patchedOnNodes.length > 0) {
+          patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(sendingIndexSize, pachedListSize, ourLocalExecutionSetIndex + 1)
+        }
 
-              let ourLocalExecutionSetIndex = queueEntry.ourExGroupIndex
-              let sendingIndexSize = queueEntry.executionIdSet.size
-
-              // must add one to each lookup index!
-              let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(sendingIndexSize, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalExecutionSetIndex + 1)
-              let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(sendingIndexSize, remoteHomeNode.edgeNodes.length, ourLocalExecutionSetIndex + 1)
-
-              let patchIndicies = []
-              if (remoteHomeNode.patchedOnNodes.length > 0) {
-                patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(sendingIndexSize, remoteHomeNode.patchedOnNodes.length, ourLocalExecutionSetIndex + 1)
-              }
-
-              // for each remote node lets save it's id
-              for (let index of indicies) {
-                let node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-                if (node != null && node.id !== ourNodeData.node.id) {
-                  nodesToSendTo[node.id] = node
-                  consensusNodeIds.push(node.id)
-                }
-              }
-              for (let index of edgeIndicies) {
-                let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-                if (node != null && node.id !== ourNodeData.node.id) {
-                  nodesToSendTo[node.id] = node
-                  edgeNodeIds.push(node.id)
-                }
-              }
-
-              for (let index of patchIndicies) {
-                let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-                if (node != null && node.id !== ourNodeData.node.id) {
-                  nodesToSendTo[node.id] = node
-                  //edgeNodeIds.push(node.id)
-                }
-              }
-
-              //correspondingAccNodes = Object.values(nodesToSendTo)
-
-              for(let [accountID, node] of Object.entries(nodesToSendTo)){
-                let keyPair = accountID + key
-                if(node != null && doOnceNodeAccPair.has(keyPair) === false){
-                  doOnceNodeAccPair.add(keyPair)
-                  correspondingAccNodes.push(node)
-                }
-              }
-
-              //how can we be making so many calls??
-              if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${JSON.stringify(indicies)} edgeIndicies:${JSON.stringify(edgeIndicies)} patchIndicies:${JSON.stringify(patchIndicies)}  doOnceNodeAccPair: ${JSON.stringify([...doOnceNodeAccPair.keys()])} `)
-
-              let dataToSend:Shardus.WrappedResponse[] = []
-              dataToSend.push(datas[key]) // only sending just this one key at a time
-              message = { stateList: dataToSend, txid: queueEntry.acceptedTx.txId }
-              if (correspondingAccNodes.length > 0) {
-                let remoteRelation = ShardFunctions.getNodeRelation(remoteHomeNode, this.stateManager.currentCycleShardData.ourNode.id)
-                let localRelation = ShardFunctions.getNodeRelation(localHomeNode, this.stateManager.currentCycleShardData.ourNode.id)
-                if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
-
-                // Filter nodes before we send tell()
-                let filteredNodes = this.stateManager.filterValidNodesForInternalMessage(correspondingAccNodes, 'tellCorrespondingNodesFinalData', true, true)
-                if (filteredNodes.length === 0) {
-                  if (logFlags.error) this.mainLogger.error('tellCorrespondingNodesFinalData: filterValidNodesForInternalMessage no valid nodes left to try')
-                  //return null
-                  continue
-                }
-                let filterdCorrespondingAccNodes = filteredNodes
-                this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
-                totalShares++
-              }
-            //}
+        // for each remote node lets save it's id
+        for (let index of indicies) {
+          let node = accountHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+          if (node != null && node.id !== ourNodeData.node.id) {
+            nodesToSendTo[node.id] = node
+            consensusNodeIds.push(node.id)
           }
+        }
+        for (let index of edgeIndicies) {
+          let node = accountHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+          if (node != null && node.id !== ourNodeData.node.id) {
+            nodesToSendTo[node.id] = node
+            edgeNodeIds.push(node.id)
+          }
+        }
+
+        for (let index of patchIndicies) {
+          let node = accountHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+          if (node != null && node.id !== ourNodeData.node.id) {
+            nodesToSendTo[node.id] = node
+            //edgeNodeIds.push(node.id)
+          }
+        }
+
+        for(let [accountID, node] of Object.entries(nodesToSendTo)){
+          let keyPair = accountID + key
+          if(node != null && doOnceNodeAccPair.has(keyPair) === false){
+            doOnceNodeAccPair.add(keyPair)
+            correspondingAccNodes.push(node)
+          }
+        }
+
+        //how can we be making so many calls??
+        if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${JSON.stringify(indicies)} edgeIndicies:${JSON.stringify(edgeIndicies)} patchIndicies:${JSON.stringify(patchIndicies)}  doOnceNodeAccPair: ${JSON.stringify([...doOnceNodeAccPair.keys()])} ourLocalExecutionSetIndex:${ourLocalExecutionSetIndex} sendingIndexSize:${sendingIndexSize} consensusListSize:${consensusListSize} edgeListSize:${edgeListSize} pachedListSize:${pachedListSize}`)
+
+        let dataToSend:Shardus.WrappedResponse[] = []
+        dataToSend.push(datas[key]) // only sending just this one key at a time
+        message = { stateList: dataToSend, txid: queueEntry.acceptedTx.txId }
+        if (correspondingAccNodes.length > 0) {
+          let remoteRelation = ShardFunctions.getNodeRelation(accountHomeNode, this.stateManager.currentCycleShardData.ourNode.id)
+          let localRelation = ShardFunctions.getNodeRelation(localHomeNode, this.stateManager.currentCycleShardData.ourNode.id)
+          if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
+
+          // Filter nodes before we send tell()
+          let filteredNodes = this.stateManager.filterValidNodesForInternalMessage(correspondingAccNodes, 'tellCorrespondingNodesFinalData', true, true)
+          if (filteredNodes.length === 0) {
+            if (logFlags.error) this.mainLogger.error('tellCorrespondingNodesFinalData: filterValidNodesForInternalMessage no valid nodes left to try')
+            //return null
+            continue
+          }
+          let filterdCorrespondingAccNodes = filteredNodes
+          this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
+          totalShares++
         }
       }
     }
