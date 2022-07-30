@@ -932,10 +932,18 @@ class TransactionConsenus {
     if(appendWorked === false){
       nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote appendFailed')
     }
-    // share the vote via gossip
+    // share the vote via gossip?
     let sender = null
-    // TODO need to migrate to execution group and then corresponding node tell the receipt at the end
-    let consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)   //.queueEntryGetConsensusGroup(queueEntry)
+
+    let consensusGroup = []
+    if(this.stateManager.transactionQueue.executeInOneShard === true){
+      //only share with the exection group
+      consensusGroup = queueEntry.executionGroup
+    } else {
+      //sharing with the entire transaction group actually..
+      consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)  
+    }
+
     if (consensusGroup.length >= 1) {
       // should consider only forwarding in some cases?
       this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup)

@@ -240,7 +240,7 @@ class TransactionQueue {
           return
         }
         if (transactionGroup.length > 1) {
-          this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `spread_tx_to_group to neighbors`, transactionGroup)
+          this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `spread_tx_to_group transactionGroup:`, transactionGroup)
           respondSize = await this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup, false)
         }
       } finally {
@@ -1855,8 +1855,8 @@ class TransactionQueue {
             executionKeys.push(utils.makeShortHash(node.id) + `:${node.externalPort}`)
           }
         }
-        if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionKeys:${JSON.stringify(executionKeys)}`)
-        if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('queueEntryGetTransactionGroup', `queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionKeys:${JSON.stringify(executionKeys)}`)
+        if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionGroup:${JSON.stringify(executionKeys)}`)
+        if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('queueEntryGetTransactionGroup', `queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionGroup:${JSON.stringify(executionKeys)}`)
       }
 
 
@@ -1993,7 +1993,7 @@ class TransactionQueue {
    * -sends account data to the correct involved nodees
    * -loads locally available data into the queue entry
    */
-  async tellCorrespondingNodes(queueEntry: QueueEntry) {
+  async tellCorrespondingNodesOld(queueEntry: QueueEntry) {
     if (this.stateManager.currentCycleShardData == null) {
       throw new Error('tellCorrespondingNodes: currentCycleShardData == null')
     }
@@ -2211,6 +2211,228 @@ class TransactionQueue {
     }
   }
 
+
+  /**
+   * tellCorrespondingNodes
+   * @param queueEntry
+   * -sends account data to the correct involved nodees
+   * -loads locally available data into the queue entry
+   */
+   async tellCorrespondingNodes(queueEntry: QueueEntry) {
+    if (this.stateManager.currentCycleShardData == null) {
+      throw new Error('tellCorrespondingNodes: currentCycleShardData == null')
+    }
+    if (queueEntry.uniqueKeys == null) {
+      throw new Error('tellCorrespondingNodes: queueEntry.uniqueKeys == null')
+    }
+    // Report data to corresponding nodes
+    let ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
+    // let correspondingEdgeNodes = []
+    let correspondingAccNodes: Shardus.Node[] = []
+    let dataKeysWeHave = []
+    let dataValuesWeHave = []
+    let datas: { [accountID: string]: Shardus.WrappedResponse } = {}
+    let remoteShardsByKey: { [accountID: string]: StateManagerTypes.shardFunctionTypes.NodeShardData } = {} // shard homenodes that we do not have the data for.
+    let loggedPartition = false
+    for (let key of queueEntry.uniqueKeys) {
+      ///   test here
+      // let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
+      // todo : if this works maybe a nicer or faster version could be used
+      let hasKey = false
+      let homeNode = queueEntry.homeNodes[key]
+      if (homeNode.node.id === ourNodeData.node.id) {
+        hasKey = true
+      } else {
+
+        //perf todo: this seems like a slow calculation, coult improve this
+        for (let node of homeNode.nodeThatStoreOurParitionFull) {
+          if (node.id === ourNodeData.node.id) {
+            hasKey = true
+            break
+          }
+        }
+      }
+
+      // HOMENODEMATHS tellCorrespondingNodes patch the value of hasKey
+      // did we get patched in
+      if (queueEntry.patchedOnNodes.has(ourNodeData.node.id)) {
+        hasKey = true
+      }
+
+      // for(let patchedNodeID of queueEntry.patchedOnNodes.values()){
+      // }
+
+      let isGlobalKey = false
+      //intercept that we have this data rather than requesting it.
+      if (this.stateManager.accountGlobals.isGlobalAccount(key)) {
+        hasKey = true
+        isGlobalKey = true
+        if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', queueEntry.logID, `tellCorrespondingNodes - has`)
+      }
+
+      if (hasKey === false) {
+        if (loggedPartition === false) {
+          loggedPartition = true
+          if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull.map((v) => v.id))}`)
+          if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: full: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull)}`)
+        }
+        if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false  key: ${utils.stringifyReduce(key)}`)
+      }
+
+      if (hasKey) {
+        // TODO PERF is it possible that this query could be used to update our in memory cache? (this would save us from some slow look ups) later on
+        //    when checking timestamps.. alternatively maybe there is a away we can note the timestamp with what is returned here in the queueEntry data
+        //    and not have to deal with the cache.
+        // todo old: Detect if our node covers this paritition..  need our partition data
+
+        this.profiler.profileSectionStart('process_dapp.getRelevantData')
+        this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
+        let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
+        this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
+        this.profiler.profileSectionEnd('process_dapp.getRelevantData')
+
+        //only queue this up to share if it is not a global account. global accounts dont need to be shared.
+
+        // not sure if it is correct to update timestamp like this.
+        // if(data.timestamp === 0){
+        //   data.timestamp = queueEntry.acceptedTx.timestamp
+        // }
+
+        //if this is not freshly created data then we need to make a backup copy of it!!
+        //This prevents us from changing data before the commiting phase
+        if (data.accountCreated == false) {
+          data = utils.deepCopy(data)
+        }
+
+        if (isGlobalKey === false) {
+          datas[key] = data
+          dataKeysWeHave.push(key)
+          dataValuesWeHave.push(data)
+        }
+
+        queueEntry.localKeys[key] = true
+        // add this data to our own queue entry!!
+        this.queueEntryAddData(queueEntry, data)
+      } else {
+        remoteShardsByKey[key] = queueEntry.homeNodes[key]
+      }
+    }
+    if (queueEntry.globalModification === true) {
+      if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', queueEntry.logID, `tellCorrespondingNodes - globalModification = true, not telling other nodes`)
+      return
+    }
+
+    let message
+    let edgeNodeIds = []
+    let consensusNodeIds = []
+
+    let nodesToSendTo: StringNodeObjectMap = {}
+    let doOnceNodeAccPair = new Set<string>() //can skip  node+acc if it happens more than once.
+
+    for (let key of queueEntry.uniqueKeys) {
+      if (datas[key] != null) {
+        for (let key2 of queueEntry.uniqueKeys) {
+          if (key !== key2) {
+            let localHomeNode = queueEntry.homeNodes[key]
+            let remoteHomeNode = queueEntry.homeNodes[key2]
+
+            let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
+            if (ourLocalConsensusIndex === -1) {
+              continue
+            }
+
+            edgeNodeIds = []
+            consensusNodeIds = []
+            correspondingAccNodes = []
+
+            let ourSendingGroupSize = localHomeNode.consensusNodeForOurNodeFull.length
+
+            let targetConsensusGroupSize = remoteHomeNode.consensusNodeForOurNodeFull.length
+            let targetEdgeGroupSize = remoteHomeNode.edgeNodes.length
+            let pachedListSize = remoteHomeNode.patchedOnNodes.length
+
+            // must add one to each lookup index!
+            let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(ourSendingGroupSize, targetConsensusGroupSize, ourLocalConsensusIndex + 1)
+            let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(ourSendingGroupSize, targetEdgeGroupSize, ourLocalConsensusIndex + 1)
+
+            let patchIndicies = []
+            if (remoteHomeNode.patchedOnNodes.length > 0) {
+              patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(ourSendingGroupSize, remoteHomeNode.patchedOnNodes.length, ourLocalConsensusIndex + 1)
+            }
+
+            // for each remote node lets save it's id
+            for (let index of indicies) {
+              let node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+              //only send data to the execution group
+              if(queueEntry.executionIdSet.has(remoteHomeNode.node.id) === false){
+                continue
+              }
+              if (node != null && node.id !== ourNodeData.node.id) {
+                nodesToSendTo[node.id] = node
+                consensusNodeIds.push(node.id)
+              }
+            }
+            for (let index of edgeIndicies) {
+              let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+              //only send data to the execution group
+              if(queueEntry.executionIdSet.has(remoteHomeNode.node.id) === false){
+                continue
+              }
+              if (node != null && node.id !== ourNodeData.node.id) {
+                nodesToSendTo[node.id] = node
+                edgeNodeIds.push(node.id)
+              }
+            }
+
+            for (let index of patchIndicies) {
+              let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+              //only send data to the execution group
+              if(queueEntry.executionIdSet.has(remoteHomeNode.node.id) === false){
+                continue
+              }
+              if (node != null && node.id !== ourNodeData.node.id) {
+                nodesToSendTo[node.id] = node
+                //edgeNodeIds.push(node.id)
+              }
+            }
+
+            let dataToSend = []
+            dataToSend.push(datas[key]) // only sending just this one key at a time
+            message = { stateList: dataToSend, txid: queueEntry.acceptedTx.txId }
+
+            //build correspondingAccNodes, but filter out nodeid, account key pairs we have seen before
+            for(let [accountID, node] of Object.entries(nodesToSendTo)){
+              let keyPair = accountID + key
+              if(node != null && doOnceNodeAccPair.has(keyPair) === false){
+                doOnceNodeAccPair.add(keyPair)
+                correspondingAccNodes.push(node)
+              }
+            }
+
+            if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', queueEntry.logID, `tellCorrespondingNodes nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${JSON.stringify(indicies)} edgeIndicies:${JSON.stringify(edgeIndicies)} patchIndicies:${JSON.stringify(patchIndicies)}  doOnceNodeAccPair: ${JSON.stringify([...doOnceNodeAccPair.keys()])} ourLocalConsensusIndex:${ourLocalConsensusIndex} ourSendingGroupSize:${ourSendingGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} pachedListSize:${pachedListSize}`)
+
+            if (correspondingAccNodes.length > 0) {
+              let remoteRelation = ShardFunctions.getNodeRelation(remoteHomeNode, this.stateManager.currentCycleShardData.ourNode.id)
+              let localRelation = ShardFunctions.getNodeRelation(localHomeNode, this.stateManager.currentCycleShardData.ourNode.id)
+              if (logFlags.playback) this.logger.playbackLogNote('shrd_tellCorrespondingNodes', `${queueEntry.acceptedTx.txId}`, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
+
+              // Filter nodes before we send tell()
+              let filteredNodes = this.stateManager.filterValidNodesForInternalMessage(correspondingAccNodes, 'tellCorrespondingNodes', true, true)
+              if (filteredNodes.length === 0) {
+                if (logFlags.error) this.mainLogger.error('tellCorrespondingNodes: filterValidNodesForInternalMessage no valid nodes left to try')
+                return null
+              }
+              let filterdCorrespondingAccNodes = filteredNodes
+
+              // TODO Perf: need a tellMany enhancement.  that will minimize signing and stringify required!
+              this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_state', message)
+            }
+          }
+        }
+      }
+    }
+  }
+
   /**
    * After a reciept is formed, use this to send updated account data to shards that did not execute a change
    * @param queueEntry
@@ -2273,6 +2495,9 @@ class TransactionQueue {
     //let uniqueAccountsShared = 0
     let totalShares = 0
     for (let key of keysToShare) {
+      nodesToSendTo = {}
+      doOnceNodeAccPair = new Set<string>()
+
       if (wrappedStates[key] != null) {
         let accountHomeNode = queueEntry.homeNodes[key]
         edgeNodeIds = []
@@ -2284,19 +2509,19 @@ class TransactionQueue {
         }
         
         let ourLocalExecutionSetIndex = queueEntry.ourExGroupIndex
-        let sendingIndexSize = queueEntry.executionIdSet.size
+        let ourSendingGroupSize = queueEntry.executionIdSet.size
 
         let consensusListSize = accountHomeNode.consensusNodeForOurNodeFull.length
         let edgeListSize = accountHomeNode.edgeNodes.length
         let pachedListSize = accountHomeNode.patchedOnNodes.length
 
         // must add one to each lookup index!
-        let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(sendingIndexSize, consensusListSize, ourLocalExecutionSetIndex + 1)
-        let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(sendingIndexSize, edgeListSize, ourLocalExecutionSetIndex + 1)
+        let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(ourSendingGroupSize, consensusListSize, ourLocalExecutionSetIndex + 1)
+        let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(ourSendingGroupSize, edgeListSize, ourLocalExecutionSetIndex + 1)
 
         let patchIndicies = []
         if (accountHomeNode.patchedOnNodes.length > 0) {
-          patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(sendingIndexSize, pachedListSize, ourLocalExecutionSetIndex + 1)
+          patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(ourSendingGroupSize, pachedListSize, ourLocalExecutionSetIndex + 1)
         }
 
         // for each remote node lets save it's id
@@ -2332,7 +2557,7 @@ class TransactionQueue {
         }
 
         //how can we be making so many calls??
-        if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${JSON.stringify(indicies)} edgeIndicies:${JSON.stringify(edgeIndicies)} patchIndicies:${JSON.stringify(patchIndicies)}  doOnceNodeAccPair: ${JSON.stringify([...doOnceNodeAccPair.keys()])} ourLocalExecutionSetIndex:${ourLocalExecutionSetIndex} sendingIndexSize:${sendingIndexSize} consensusListSize:${consensusListSize} edgeListSize:${edgeListSize} pachedListSize:${pachedListSize}`)
+        if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${JSON.stringify(indicies)} edgeIndicies:${JSON.stringify(edgeIndicies)} patchIndicies:${JSON.stringify(patchIndicies)}  doOnceNodeAccPair: ${JSON.stringify([...doOnceNodeAccPair.keys()])} ourLocalExecutionSetIndex:${ourLocalExecutionSetIndex} ourSendingGroupSize:${ourSendingGroupSize} consensusListSize:${consensusListSize} edgeListSize:${edgeListSize} pachedListSize:${pachedListSize}`)
 
         let dataToSend:Shardus.WrappedResponse[] = []
         dataToSend.push(datas[key]) // only sending just this one key at a time
@@ -2923,7 +3148,15 @@ class TransactionQueue {
                 // TODO re-evaluate if it is correct for us to share info for a global modifing TX.
                 //if(queueEntry.globalModification === false) {
                 let awaitStart = Date.now() 
-                await this.tellCorrespondingNodes(queueEntry)
+
+                if(this.executeInOneShard === true){
+                  await this.tellCorrespondingNodes(queueEntry)
+                } else {
+                  //specific fixes were needed for tellCorrespondingNodes.  tellCorrespondingNodesOld is the old version before fixes
+                  await this.tellCorrespondingNodesOld(queueEntry)
+                }
+                
+                
                 this.updateSimpleStatsObject(processStats.awaitStats, 'tellCorrespondingNodes', Date.now() - awaitStart)
 
                 if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_processing', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${this.processQueue_debugAccountData(queueEntry, app)}`)

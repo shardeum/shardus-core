@@ -3010,6 +3010,17 @@ class StateManager {
     return true
   }
 
+  /**
+   * This takes a lists of nodes and test which are safe/smart to send to.
+   * The node list is updated once per cycle but this function can take into nodes that may have been reported down but are 
+   * recently up again.  
+   * @param nodeList 
+   * @param debugMsg 
+   * @param checkForNodeDown 
+   * @param checkForNodeLost 
+   * @param checkIsUpRecent 
+   * @returns A list of filtered nodes based on the settings passed in
+   */
   filterValidNodesForInternalMessage(nodeList: Shardus.Node[], debugMsg: string, checkForNodeDown: boolean = true, checkForNodeLost: boolean = true, checkIsUpRecent: boolean = true): Shardus.Node[] {
     let filteredNodes = []
 

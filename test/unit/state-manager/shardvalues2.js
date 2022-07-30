@@ -490,6 +490,12 @@ for (let i = 0; i < testIterations; i++) {
   //ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
 
 
+  let testIndex = 4
+  let testSendSize = 5
+  let testDestSize = 5
+ 
+  let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(testSendSize, testDestSize, testIndex + 1)
+  console.log(`debug:${testIndex} ${JSON.stringify(indicies)}`)
 
   let debugKey = txDebugKeys[1]
   let remoteHomeNode = ShardFunctions.findHomeNode(shardGlobals, debugKey, parititionShardDataMap)
