@@ -2500,6 +2500,15 @@ class TransactionQueue {
 
       if (wrappedStates[key] != null) {
         let accountHomeNode = queueEntry.homeNodes[key]
+
+        if(accountHomeNode == null){
+          accountHomeNode = ShardFunctions.findHomeNode(this.stateManager.currentCycleShardData.shardGlobals, key, this.stateManager.currentCycleShardData.parititionShardDataMap)
+          nestedCountersInstance.countEvent('stateManager', 'fetch missing home info')
+        }
+        if(accountHomeNode == null){
+          throw new Error('tellCorrespondingNodesFinalData: should never get here.  accountHomeNode == null')
+        }
+
         edgeNodeIds = []
         consensusNodeIds = []
         correspondingAccNodes = []
