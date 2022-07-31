@@ -945,10 +945,7 @@ class TransactionConsenus {
     }
 
     if (consensusGroup.length >= 1) {
-      // should consider only forwarding in some cases?
       this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup)
-      // TODO STATESHARDING4 ENDPOINTS this needs to change from gossip to a tell
-      //this.p2p.sendGossipIn('spread_appliedVote', ourVote, '', sender, consensusGroup)
 
       if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)}`)
       if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)} `)

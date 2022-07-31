@@ -76,6 +76,7 @@ class TransactionRepair {
     let updatedAccountAndHashes = []
     let localUpdatedAccountAndHashes = []
     let localAccUsed = 0
+    let skipNonStored = 0
 
     let allKeys = []
     let repairFix = true
@@ -127,8 +128,20 @@ class TransactionRepair {
       let upToDateAccounts: { [id: string]: boolean }  = {}
 
       this.profiler.profileSectionEnd('repair_init')
+      
+      //TODO!! figure out if we need to check shard data from different cycle!!!
+      //there are several place like this in the code. search for testAddressInRange
+      let nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardData
 
       for(let i=0; i<appliedVote.account_id.length; i++){
+        let accountID = appliedVote.account_id[i]
+        //only check for stored keys.  TODO task. make sure nodeShardData is from correct cycle!
+        //TODO is there a better way/time to build this knowlege set?
+        if(ShardFunctions.testAddressInRange(accountID, nodeShardData.storedPartitions) === false){   
+          skipNonStored++ 
+          continue
+        }
+
         voteHashMap.set(appliedVote.account_id[i], appliedVote.account_state_hash_after[i])
       }
 
@@ -609,6 +622,11 @@ class TransactionRepair {
 
         let allGood = false
         let repairsGoodCount = 0
+
+        //todo need to fix up the definition of all good.
+        //we wont have account hashes for everything in a sharded context!
+        //need a keylist of stored accounts only.. or filter the
+        //keylist sooner!
         for (let key of keysList) {
           let hashObj = this.stateManager.accountCache.getAccountHash(key)
           if(hashObj == null){
@@ -628,17 +646,19 @@ class TransactionRepair {
         
         queueEntry.hasValidFinalData = true
 
-        let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)}  localUpdatedAccountAndHashes:${utils.stringifyReduce(localUpdatedAccountAndHashes)} state:${queueEntry.state} counters:${utils.stringifyReduce({ requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, numUpToDateAccounts, repairsGoodCount})}`
+        let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)}  localUpdatedAccountAndHashes:${utils.stringifyReduce(localUpdatedAccountAndHashes)} state:${queueEntry.state} counters:${utils.stringifyReduce({ requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, numUpToDateAccounts, repairsGoodCount, skipNonStored})}`
         if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_success', queueEntry.logID, repairLogString)
         this.mainLogger.debug('shrd_repairToMatchReceipt_success ' + repairLogString)
         nestedCountersInstance.countEvent('repair1', 'success')
         nestedCountersInstance.countEvent('repair1', `success: req:${requestsMade} apl:${dataApplied} localAccUsed:${localAccUsed} key count:${voteHashMap.size} allGood:${allGood}`)
         nestedCountersInstance.countEvent('repair1', `success: key count:${voteHashMap.size}`)
         nestedCountersInstance.countEvent('repair1', `success: state:${queueEntry.state} allGood:${allGood}`)
+        nestedCountersInstance.countEvent('repair1', `success: state:${queueEntry.state} allGood:${allGood} skipNonStored:${skipNonStored}`)
+        
 
       } else {
         queueEntry.repairFailed = true
-        this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} state:${queueEntry.state} counters:${utils.stringifyReduce({requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash})}  keys ${utils.stringifyReduce(allKeys)}  `)        
+        this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} state:${queueEntry.state} counters:${utils.stringifyReduce({requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, skipNonStored})}  keys ${utils.stringifyReduce(allKeys)}  `)        
         nestedCountersInstance.countEvent('repair1', 'failed')
         nestedCountersInstance.countEvent('repair1', `failed: key count:${voteHashMap.size}`)
         nestedCountersInstance.countEvent('repair1', `failed state:${queueEntry.state}`)
