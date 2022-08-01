@@ -1047,7 +1047,6 @@ class TransactionQueue {
             txQueueEntry.executionIdSet.add(node.id)
             if (node.id === ourID) {
               txQueueEntry.ourExGroupIndex = idx
-              break
             }
           }
 
@@ -1368,6 +1367,24 @@ class TransactionQueue {
     }
     return false
   }
+
+  queueEntryListMissingData(queueEntry: QueueEntry): string[] {
+    if (queueEntry.hasAll === true) {
+      return []
+    }
+    if (queueEntry.uniqueKeys == null) {
+      throw new Error(`queueEntryListMissingData (queueEntry.uniqueKeys == null)`)
+    }
+    let missingAccounts = []
+    for (let key of queueEntry.uniqueKeys) {
+      if (queueEntry.collectedData[key] == null) {
+        missingAccounts.push(key)
+      } 
+    }
+
+    return missingAccounts
+  }
+
 
   /**
    * queueEntryRequestMissingData
@@ -3200,8 +3217,15 @@ class TransactionQueue {
 
             if(this.queueTimingFixes === true){
               if (txAge > timeM2_5) {
+                let isBlocked = this.processQueue_accountSeen(seenAccounts, queueEntry)
                 //need to review this in context of sharding
-                nestedCountersInstance.countEvent('txExpired', `> M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification}`)
+                nestedCountersInstance.countEvent('txExpired', `> M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} isBlocked:${isBlocked}`)
+                let missingAccounts = this.queueEntryListMissingData(queueEntry)
+                if (logFlags.playback) {
+                  this.logger.playbackLogNote('txExpired>M2.5', `${shortID}`, `> M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} isBlocked:${isBlocked} missing:${utils.stringifyReduce(missingAccounts)}`)
+                }
+                //Log as error also.. can comment this out later
+                if (logFlags.error) this.mainLogger.error(`txExpired > M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} isBlocked:${isBlocked} missing:${utils.stringifyReduce(missingAccounts)}`)
                 this.setTXExpired(queueEntry, currentIndex, 'm2.5 awaiting data' )
                 continue
               }    
