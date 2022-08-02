@@ -397,7 +397,18 @@ class Shardus extends EventEmitter {
           'Archiver has registered its public key',
           ARCHIVER_PUBLIC_KEY
         )
+        for (const [key, value] of Object.entries(connectedSockets)) {
+          if (value === ARCHIVER_PUBLIC_KEY) {
+            delete connectedSockets[key]
+          }
+        }
+        if (Object.keys(connectedSockets).length > 1) {
+          console.log('There are already 2 archiver connected for data transfer!')
+          socket.disconnect();
+          return
+        }
         connectedSockets[socket.id] = ARCHIVER_PUBLIC_KEY
+        console.log('connectedSockets', connectedSockets)
       })
       socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
         console.log(
@@ -405,6 +416,7 @@ class Shardus extends EventEmitter {
         )
         console.log('connectedSockets', connectedSockets)
         Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
+        delete connectedSockets[socket.id]
       })
     })
     this.network.on('timeout', (node) => {
