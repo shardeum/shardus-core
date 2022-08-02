@@ -150,7 +150,7 @@ export interface App {
    *
    * Returns whether tx pass or failed validation plus the reason why
    */
-  validate(tx: OpaqueTransaction): { success: boolean; reason: string }
+  validate(tx: OpaqueTransaction): { success: boolean; reason: string, status: number }
 
   /**
    * Cracks open the transaction and returns its timestamp, id (hash), and any
@@ -532,6 +532,7 @@ export interface IncomingTransactionResult {
   reason: string
   /** The timestamp for the result */
   txnTimestamp?: number
+  status?: number
 }
 
 export enum ServerMode {

@@ -866,11 +866,16 @@ class Shardus extends EventEmitter {
    *
    * {
    *   success: boolean,
-   *   reason: string
+   *   reason: string,
+   *   staus: number
    * }
    *
    */
-  async put(tx: ShardusTypes.OpaqueTransaction, set = false, global = false) {
+  async put(
+    tx: ShardusTypes.OpaqueTransaction,
+    set = false,
+    global = false
+  ): Promise<{ success: boolean; reason: string; status: number }> {
     const noConsensus = set || global
 
     // Check if Consensor is ready to receive txs before processing it further
@@ -890,7 +895,7 @@ class Shardus extends EventEmitter {
         'rejected',
         '!dataSyncMainPhaseComplete'
       )
-      return { success: false, reason: 'Node is still syncing.' }
+      return { success: false, reason: 'Node is still syncing.', status:500 }
     }
     if (!this.stateManager.hasCycleShardData()) {
       this.statistics.incrementCounter('txRejected')
@@ -898,6 +903,7 @@ class Shardus extends EventEmitter {
       return {
         success: false,
         reason: 'Not ready to accept transactions, shard calculations pending',
+        status: 500
       }
     }
     if (set === false) {
@@ -915,6 +921,7 @@ class Shardus extends EventEmitter {
           return {
             success: false,
             reason: 'Network conditions to allow transactions are not met.',
+            status: 500,
           }
         }
       }
@@ -925,6 +932,7 @@ class Shardus extends EventEmitter {
         return {
           success: false,
           reason: 'Network conditions to allow app init via set',
+          status: 500,
         }
       }
     }
@@ -932,7 +940,7 @@ class Shardus extends EventEmitter {
       this.statistics.incrementCounter('txRejected')
       nestedCountersInstance.countEvent('loadRelated', 'txRejected')
       nestedCountersInstance.countEvent('rejected', 'isOverloaded')
-      return { success: false, reason: 'Maximum load exceeded.' }
+      return { success: false, reason: 'Maximum load exceeded.', status:500 }
     }
 
     try {
@@ -957,6 +965,7 @@ class Shardus extends EventEmitter {
         return {
           success: false,
           reason: 'Transaction timestamp cannot be determined.',
+          status: 500
         }
       }
       let timestampedTx
@@ -980,7 +989,13 @@ class Shardus extends EventEmitter {
 
       // Perform fast validation of the transaction fields
       const validateResult = this.app.validate(timestampedTx)
-      if (validateResult.success === false) return validateResult
+      if (validateResult.success === false) {
+        // 400 is a code for bad tx or client faulty
+        validateResult.status = validateResult.status
+          ? validateResult.status
+          : 400
+        return validateResult
+      }
 
       // Ask App to crack open tx and return timestamp, id (hash), and keys
       const { timestamp, id, keys } = this.app.crack(timestampedTx)
@@ -993,17 +1008,22 @@ class Shardus extends EventEmitter {
         txExpireTimeMs = 2 * 10 * 1000 //todo consider if this should be a config.
       }
 
-      if (inRangeOfCurrentTime(timestamp, txExpireTimeMs, txExpireTimeMs) === false) {
+      if (
+        inRangeOfCurrentTime(timestamp, txExpireTimeMs, txExpireTimeMs) ===
+        false
+      ) {
         this.shardus_fatal(
           `put_txExpired`,
-          `Transaction Expired: timestamp:${timestamp} now:${Date.now()} diff(now-ts):${Date.now() - timestamp}  ${utils.stringifyReduce(tx)} `
+          `Transaction Expired: timestamp:${timestamp} now:${Date.now()} diff(now-ts):${
+            Date.now() - timestamp
+          }  ${utils.stringifyReduce(tx)} `
         )
         this.statistics.incrementCounter('txRejected')
         nestedCountersInstance.countEvent(
           'rejected',
           '_isTransactionTimestampExpired'
         )
-        return { success: false, reason: 'Transaction Expired' }
+        return { success: false, reason: 'Transaction Expired', status: 400 }
       }
 
       this.profiler.profileSectionStart('put')
@@ -1048,6 +1068,7 @@ class Shardus extends EventEmitter {
         reason: `Failed to process transaction: ${utils.stringifyReduce(
           tx
         )} ${err}`,
+        status: 500 // 500 status code means transaction is generally failed 
       }
     } finally {
       this.profiler.profileSectionEnd('put')
@@ -1059,7 +1080,11 @@ class Shardus extends EventEmitter {
       )
     }
 
-    return { success: true, reason: 'Transaction queued, poll for results.' }
+    return {
+      success: true,
+      reason: 'Transaction queued, poll for results.',
+      status: 200, // 200 status code means transaction is generally successful
+    }
   }
 
   /**
