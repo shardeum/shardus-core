@@ -388,6 +388,7 @@ class Shardus extends EventEmitter {
     this.io = (await this.network.setup(Network.ipInfo)) as SocketIO.Server
     Context.setIOContext(this.io)
     let connectedSockets = {}
+    let maxArchiversSupport = 2
     this.io.on('connection', (socket: any) => {
       console.log(
         `Archive server has subscribed to this node with socket id ${socket.id}!`
@@ -402,8 +403,10 @@ class Shardus extends EventEmitter {
             delete connectedSockets[key]
           }
         }
-        if (Object.keys(connectedSockets).length > 1) {
-          console.log('There are already 2 archiver connected for data transfer!')
+        if (Object.keys(connectedSockets).length >= maxArchiversSupport) {
+          console.log(
+            `There are already ${maxArchiversSupport} archivers connected for data transfer!`
+          )
           socket.disconnect();
           return
         }
