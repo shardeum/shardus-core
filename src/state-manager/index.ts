@@ -1383,6 +1383,20 @@ class StateManager {
       res.write(result)
       res.end()
     })
+
+    //a debug nodelist so tools can map nodes to the shortIDs that we use
+    Context.network.registerExternalGet('nodelist_debug', isDebugModeMiddleware, (req, res) => {
+      let debugNodeList = []
+      for(let node of activeByIdOrder){
+        let nodeEntry = {
+          id:utils.makeShortHash(node.id), 
+          ip:node.externalIp,
+          port:node.externalPort
+        }
+        debugNodeList.push(nodeEntry)
+      }
+      res.json(debugNodeList)
+    })
     
   }
 

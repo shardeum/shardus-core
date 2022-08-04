@@ -158,42 +158,42 @@ class Profiler {
         if (this.statisticsInstance) {
           const injectedTpsReport =
             this.statisticsInstance.getMultiStatReport('txInjected')
-          res.write('\n=> Node Injected TPS \n')
+          res.write('\n=> Node Injected TPS')
           res.write(`\n Avg: ${injectedTpsReport.avg} `)
           res.write(`\n Max: ${injectedTpsReport.max} `)
-          res.write(`\n Vals: ${injectedTpsReport.allVals} `)
+          res.write(`\n Vals: ${injectedTpsReport.allVals} \n`)
           this.statisticsInstance.clearRing('txInjected')
 
           const processedTpsReport =
             this.statisticsInstance.getMultiStatReport('txApplied')
-          res.write('\n=> Node Applied TPS \n')
+          res.write('\n=> Node Applied TPS')
           res.write(`\n Avg: ${processedTpsReport.avg} `)
           res.write(`\n Max: ${processedTpsReport.max} `)
-          res.write(`\n Vals: ${processedTpsReport.allVals} `)
+          res.write(`\n Vals: ${processedTpsReport.allVals} \n`)
           this.statisticsInstance.clearRing('txApplied')
 
           const rejectedTpsReport =
             this.statisticsInstance.getMultiStatReport('txRejected')
-          res.write('\n=> Node Rejected TPS \n')
+          res.write('\n=> Node Rejected TPS')
           res.write(`\n Avg: ${rejectedTpsReport.avg} `)
           res.write(`\n Max: ${rejectedTpsReport.max} `)
-          res.write(`\n Vals: ${rejectedTpsReport.allVals} `)
+          res.write(`\n Vals: ${rejectedTpsReport.allVals} \n`)
           this.statisticsInstance.clearRing('txRejected')
 
           const networkTimeoutReport =
             this.statisticsInstance.getMultiStatReport('networkTimeout')
-          res.write('\n=> Network Timeout / sec \n')
+          res.write('\n=> Network Timeout / sec ')
           res.write(`\n Avg: ${networkTimeoutReport.avg} `)
           res.write(`\n Max: ${networkTimeoutReport.max} `)
-          res.write(`\n Vals: ${networkTimeoutReport.allVals} `)
+          res.write(`\n Vals: ${networkTimeoutReport.allVals} \n`)
           this.statisticsInstance.clearRing('networkTimeout')
 
           const lostNodeTimeoutReport =
             this.statisticsInstance.getMultiStatReport('lostNodeTimeout')
-          res.write('\n=> LostNode Timeout / sec \n')
+          res.write('\n=> LostNode Timeout / sec ')
           res.write(`\n Avg: ${lostNodeTimeoutReport.avg} `)
           res.write(`\n Max: ${lostNodeTimeoutReport.max} `)
-          res.write(`\n Vals: ${lostNodeTimeoutReport.allVals} `)
+          res.write(`\n Vals: ${lostNodeTimeoutReport.allVals} \n`)
           this.statisticsInstance.clearRing('lostNodeTimeout')
         }
 
