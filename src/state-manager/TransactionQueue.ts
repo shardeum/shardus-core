@@ -3772,7 +3772,7 @@ class TransactionQueue {
                 }
 
                 if(this.config.p2p.experimentalSnapshot) this.addReceiptToForward(queueEntry)
-                // console.log('commit commit', queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
+                console.log('commit commit', queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
 
                 if (hasReceiptFail) {
                   // endpoint to allow dapp to execute something that depends on a transaction failing
@@ -3979,7 +3979,7 @@ class TransactionQueue {
     // const receipt = this.stateManager.getReceipt(queueEntry)
     // const status = receipt.result === true ? 'applied' : 'rejected'
     const status = this.stateManager.getReceiptResult(queueEntry) === true ? 'applied' : 'rejected'
-    
+
     let txHash = queueEntry.acceptedTx.txId
     let txResultFullHash = this.crypto.hash({ tx: queueEntry.acceptedTx.data, status, netId })
     let txIdShort = utils.short(txHash)
@@ -3989,14 +3989,35 @@ class TransactionQueue {
       tx: { ...queueEntry.acceptedTx },
       cycle: queueEntry.cycleToRecordOn,
       result: { txIdShort, txResult },
-      accounts: queueEntry.preApplyTXResult.applyResponse.accountData.map(acc => {
-        let accountCopy = {...acc}
-        delete accountCopy.localCache
-        return accountCopy
-      }),
-      receipt : queueEntry.preApplyTXResult.applyResponse.appReceiptData || null
+      accounts: [],
+      receipt: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
     }
 
+    let accountsToAdd: WrappedResponses = {}
+
+    for (const account of Object.values(queueEntry.collectedData)) {
+      let accountCopy = {
+        accountId: account.accountId,
+        data: account.data,
+        timestamp: account.timestamp,
+        stateId: account.stateId,
+      } as Shardus.WrappedResponse
+      accountsToAdd[account.accountId] = accountCopy
+    }
+
+    // This will override with corrected value if the account are also in accountWrites
+    for (const account of queueEntry.preApplyTXResult.applyResponse.accountWrites) {
+      accountsToAdd[account.accountId] = {
+        accountId: account.accountId,
+        data: account.data.data,
+        timestamp: account.timestamp,
+        stateId: account.data.stateId,
+      } as Shardus.WrappedResponse
+    }
+
+    txReceiptToPass.accounts = [...Object.values(accountsToAdd)]
+    // console.log('txReceiptToPass', txReceiptToPass.tx.txId, txReceiptToPass)
+    
     // console.log('App Receipt', queueEntry.preApplyTXResult.applyResponse.appReceiptData)
     // console.log('App Receipt Data Hash', queueEntry.preApplyTXResult.applyResponse.appReceiptDataHash)
     

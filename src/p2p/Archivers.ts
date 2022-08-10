@@ -262,6 +262,7 @@ async function forwardReceipts() {
   responses.RECEIPT = stateManager.transactionQueue.getReceiptsToForward()
   if (recipients.size > 0) {
     for (const receipt of responses.RECEIPT) {
+      // console.log('forwarded receipt', receipt.tx.txId)
       if (!stateManager.transactionQueue.forwardedReceipts.has(receipt.tx.txId)) {
         stateManager.transactionQueue.forwardedReceipts.set(receipt.tx.txId, true)
       }
