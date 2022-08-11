@@ -3109,14 +3109,52 @@ class TransactionQueue {
             }
           }
 
+
+
+          //if(extendedTimeoutLogic === true){
+          
+          //}
+          let isConsensing = queueEntry.state === 'consensing'
+          //let isCommiting = queueEntry.state === 'commiting'
+          let isAwaitingFinalData = queueEntry.state === 'await final data'
+          let isInExecutionHome = queueEntry.isInExecutionHome
+          //note this wont work with old receipts but we can depricate old receipts soon
+          let receipt2 = this.stateManager.getReceipt2(queueEntry)
+          let hasReceipt = receipt2 != null  
+
+          let extraTime = 0          
+          //let cantExpire = false
+          let matchingReceipt = false
+
+
+          if(isInExecutionHome && isConsensing && hasReceipt === false){
+            //give a bit of extra time to wait for votes to come in
+            extraTime = timeM * 0.5
+          }
+
+          //this should cover isCommiting
+          if(isInExecutionHome && hasReceipt){
+            matchingReceipt = this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, null)
+            //give even more time
+            extraTime = timeM
+          }
+
+          if(isAwaitingFinalData){
+            if(hasReceipt){
+              extraTime = timeM2 * 1.5
+            } else {
+              extraTime = timeM
+            }
+          }
+
           //Have a hard cap where we expire and remove TXs after time > M3
-          if (txAge > timeM3) {
-            this.statemanager_fatal(`txExpired3 > M3. general case`, `txExpired txAge > timeM3 general case ` + `txid: ${shortID} state: ${queueEntry.state} hasAll:${queueEntry.hasAll} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+          if (txAge > timeM3 + extraTime) {
+            this.statemanager_fatal(`txExpired3 > M3. general case`, `txExpired txAge > timeM3 general case ` + `txid: ${shortID} state: ${queueEntry.state} hasAll:${queueEntry.hasAll} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}  hasReceipt:${hasReceipt} matchingReceipt:${matchingReceipt} isInExecutionHome:${isInExecutionHome}`)
             if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
             //if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
-            nestedCountersInstance.countEvent('txExpired', `> M3. general case state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} `)
-            nestedCountersInstance.countEvent('txExpired', `> M3. general case sieveT:${queueEntry.txSieveTime}`)
+            nestedCountersInstance.countEvent('txExpired', `> M3. general case state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} hasReceipt:${hasReceipt} matchingReceipt:${matchingReceipt} isInExecutionHome:${isInExecutionHome}`)
+            nestedCountersInstance.countEvent('txExpired', `> M3. general case sieveT:${queueEntry.txSieveTime} extraTime:${extraTime}`)
             
             this.setTXExpired(queueEntry, currentIndex, 'm3 general')
             continue

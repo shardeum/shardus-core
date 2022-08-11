@@ -84,6 +84,8 @@ class TransactionRepair {
     let voteHashMap:Map<string,string> = new Map()
     let localReadyRepairs:Map<string, Shardus.WrappedResponse> = new Map()
 
+    let nonStoredKeys = []
+
     try {
       this.stateManager.dataRepairsStarted++
 
@@ -139,6 +141,7 @@ class TransactionRepair {
         //TODO is there a better way/time to build this knowlege set?
         if(ShardFunctions.testAddressInRange(accountID, nodeShardData.storedPartitions) === false){   
           skipNonStored++ 
+          nonStoredKeys.push(accountID)
           continue
         }
 
@@ -627,13 +630,18 @@ class TransactionRepair {
         //we wont have account hashes for everything in a sharded context!
         //need a keylist of stored accounts only.. or filter the
         //keylist sooner!
+        let badHashKeys = []
+        let noHashKeys = []
         for (let key of keysList) {
           let hashObj = this.stateManager.accountCache.getAccountHash(key)
           if(hashObj == null){
+            noHashKeys.push(key)
             continue
           }
           if(hashObj.h === voteHashMap.get(key)){
             repairsGoodCount++
+          } else {
+            badHashKeys.push(key)
           }
         }
 
@@ -655,6 +663,7 @@ class TransactionRepair {
         nestedCountersInstance.countEvent('repair1', `success: state:${queueEntry.state} allGood:${allGood}`)
         nestedCountersInstance.countEvent('repair1', `success: state:${queueEntry.state} allGood:${allGood} skipNonStored:${skipNonStored}`)
         
+        if (logFlags.error && allGood === false) this.mainLogger.error(`repair1 success: req:${requestsMade} apl:${dataApplied} localAccUsed:${localAccUsed} key count:${voteHashMap.size} allGood:${allGood} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)} localUpdatedAccountAndHashes:${utils.stringifyReduce(localUpdatedAccountAndHashes)} badHashKeys:${utils.stringifyReduce(badHashKeys)} noHashKeys:${utils.stringifyReduce(noHashKeys)} nonStoredKeys:${utils.stringifyReduce(nonStoredKeys)}`)
 
       } else {
         queueEntry.repairFailed = true
