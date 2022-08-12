@@ -16,6 +16,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { potentiallyRemoved } from '../p2p/NodeList'
 import * as CycleChain from '../p2p/CycleChain'
 import { QueueEntry, AppliedVote, AccountHashCache, RequestStateForTxResp, AppliedReceipt, RequestTxResp, RequestReceiptForTxResp, AppliedReceipt2, WrappedResponses } from './state-manager-types'
+import { stat } from 'fs'
 
 class TransactionRepair {
   app: Shardus.App
@@ -66,17 +67,38 @@ class TransactionRepair {
 
     queueEntry.repairStarted = true
 
-    let requestObjectCount = 0
-    let requestsMade = 0
-    let responseFails = 0
-    let dataRecieved = 0
-    let dataApplied = 0
-    let failedHash = 0
-    let numUpToDateAccounts = 0
+    //let requestObjectCount = 0
+    //let requestsMade = 0
+    //let responseFails = 0
+    //let dataRecieved = 0
+    //let dataApplied = 0
+    //let failedHash = 0
+    //let numUpToDateAccounts = 0
     let updatedAccountAndHashes = []
     let localUpdatedAccountAndHashes = []
-    let localAccUsed = 0
-    let skipNonStored = 0
+
+    //let localAccUsed = 0
+    //let localAccSkipped = 0
+    //let skipNonStored = 0
+
+    let stats = { 
+      requestObjectCount:0,
+      requestsMade:0,
+      responseFails:0,
+      dataRecieved:0,
+      dataApplied:0,
+      failedHash:0, 
+      numUpToDateAccounts:0, 
+      repairsGoodCount:0, 
+      skipNonStored:0,
+      localAccUsed:0,
+      localAccSkipped:0,
+      rLoop1:0,
+      rLoop2:0,
+      rLoop3:0,
+      rLoop4:0,
+      rangeErr:0
+    }
 
     let allKeys = []
     let repairFix = true
@@ -140,7 +162,7 @@ class TransactionRepair {
         //only check for stored keys.  TODO task. make sure nodeShardData is from correct cycle!
         //TODO is there a better way/time to build this knowlege set?
         if(ShardFunctions.testAddressInRange(accountID, nodeShardData.storedPartitions) === false){   
-          skipNonStored++ 
+          stats.skipNonStored++ 
           nonStoredKeys.push(accountID)
           continue
         }
@@ -162,6 +184,7 @@ class TransactionRepair {
       }
 
       //if we have some pre applied data that results in the correct states we can use it instead of asking other nodeds for data
+      //This will only work if the node was in the execution group
       if(repairFix){
         let applyResponse = queueEntry?.preApplyTXResult?.applyResponse
         if(applyResponse != null){
@@ -189,10 +212,10 @@ class TransactionRepair {
 
                 if(failedHashes.length === 0){
                   //dataApplied++
-                  localAccUsed++
+                  stats.localAccUsed++
                   nestedCountersInstance.countEvent('repair1', `q.repair applied cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
                 } else {
-                  failedHash++
+                  stats.failedHash++
                   this.statemanager_fatal(`repairToMatchReceipt_failedhash 2`, ` tx:${txLogID}  failed:${failedHashes[0]} acc:${shortKey}`)
                 }
 
@@ -207,20 +230,26 @@ class TransactionRepair {
         }
       }
 
+      //TODO could look at forwarded data to see if there is any to use
+
+
       // STEP 1
       // Build a list of request objects
       for (let key of keysList) {
+        stats.rLoop1++
 
         if(localReadyRepairs.has(key)){
+          stats.localAccSkipped++
           continue //can skip this data, we already have it
         }
 
         let coveredKey = false
-
         let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(key)
         let shortKey = utils.stringifyReduce(key)
         //It modifying global.
         for (let i = 0; i < voters.length; i++) {
+          stats.rLoop2++
+
           let voter = voters[i]
           let node = this.stateManager.p2p.state.getNodeByPubKey(voter.owner)
           if(node == null){
@@ -228,6 +257,7 @@ class TransactionRepair {
           }
           let node_id = node.id
           for (let j = 0; j < appliedVote.account_id.length; j++) {
+            stats.rLoop3++
             let id = appliedVote.account_id[j]
             let hash = appliedVote.account_state_hash_after[j]
             if (id === key && hash != null) {
@@ -240,7 +270,7 @@ class TransactionRepair {
               if(hashObj != null){
                 if(hashObj.h === hash){
                   upToDateAccounts[id] = true
-                  numUpToDateAccounts++
+                  stats.numUpToDateAccounts++
                   if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `account ${shortKey} already up to date our: cached:${utils.stringifyReduce(hashObj)}`)
                   break
                 }
@@ -263,6 +293,7 @@ class TransactionRepair {
                 }
                 continue //we already have this request ready to go
               }
+              stats.rLoop4++
 
               coveredKey = true
               if (node_id === this.stateManager.currentCycleShardData.ourNode.id) {
@@ -271,6 +302,7 @@ class TransactionRepair {
                 continue
               }
               if (this.stateManager.currentCycleShardData.nodeShardDataMap.has(node_id) === false) {
+                //node is not listed as available in the lattest node shard data map
                 if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `this.stateManager.currentCycleShardData.nodeShardDataMap.has(node_id) === false ${utils.stringifyReduce(node_id)}  acc:${shortKey}`)
                 continue
               }
@@ -281,17 +313,24 @@ class TransactionRepair {
                 if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `nodeShardInfo == null ${utils.stringifyReduce(node_id)}  acc:${shortKey}`)
                 continue
               }
-              // if the account is not global check if it is in range.
-              if (isGlobal === false && ShardFunctions.testAddressInRange(id, nodeShardInfo.storedPartitions) == false) {
-                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `address not in range ${utils.stringifyReduce(nodeShardInfo.storedPartitions)}  acc:${shortKey}`)
-                continue
+              
+              //only need to check for account being in range if the node is not in the execution group?
+              if(queueEntry.executionIdSet.has(node_id) === false){
+                // if the account is not global check if it is in range.
+                if (isGlobal === false && ShardFunctions.testAddressInRange(id, nodeShardInfo.storedPartitions) == false) {
+                  if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `address not in range ${utils.stringifyReduce(nodeShardInfo.storedPartitions)}  acc:${shortKey}`)
+                  stats.rangeErr++
+                  continue
+                }                
               }
+
               let objectToSet = { appliedVote, voteIndex: j, accountHash: hash, accountId: id, nodeShardInfo, alternates: [] }
               if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `setting key ${utils.stringifyReduce(key)} ${utils.stringifyReduce(objectToSet)}  acc:${shortKey}`)
               requestObjects[key] = objectToSet
               allKeys.push(key)
-              requestObjectCount++
+              stats.requestObjectCount++
             } else {
+
             }
           }
         }
@@ -404,7 +443,7 @@ class TransactionRepair {
                 this.profiler.profileSectionStart('repair_asking_for_data')
                 nestedCountersInstance.countEvent('repair1', 'asking')
               
-                requestsMade++
+                stats.requestsMade++
                 let message = { key: requestObject.accountId, hash: requestObject.accountHash, txid: queueEntry.acceptedTx.txId, timestamp: queueEntry.acceptedTx.timestamp }
                 result = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
 
@@ -417,7 +456,7 @@ class TransactionRepair {
                   if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post no reponse from ${utils.stringifyReduce(node.id)}  tx:${txLogID}  acc:${shortKey}`)
                   //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 1 ${utils.stringifyReduce(node.id)}`)
                   node = null
-                  responseFails++
+                  stats.responseFails++
                   continue
                 }
 
@@ -425,7 +464,7 @@ class TransactionRepair {
                   if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt result.success === ${result.success}   tx:${txLogID}  acc:${shortKey}`)
                   //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 2 ${utils.stringifyReduce(node.id)}`)
                   node = null
-                  responseFails++
+                  stats.responseFails++
                   continue
                 }
               } finally{
@@ -435,7 +474,7 @@ class TransactionRepair {
               let accountIdsReturned = []
               for (let data of result.stateList) {
                 try{
-                  dataRecieved++
+                  stats.dataRecieved++
                   this.profiler.profileSectionStart('repair_saving_account_data')
                   nestedCountersInstance.countEvent('repair1', 'saving')
                   // let shortKey = utils.stringifyReduce(data.accountId)
@@ -458,10 +497,10 @@ class TransactionRepair {
                   let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, `tx:${txLogID} repairToMatchReceipt`, true)
 
                   if(failedHashes.length === 0){
-                    dataApplied++
+                    stats.dataApplied++
                     nestedCountersInstance.countEvent('repair1', `q.repair applied cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
                   } else {
-                    failedHash++
+                    stats.failedHash++
                     this.statemanager_fatal(`repairToMatchReceipt_failedhash`, ` tx:${txLogID}  failed:${failedHashes[0]} acc:${shortKey}`)
                   }
 
@@ -603,9 +642,6 @@ class TransactionRepair {
               // }
             } 
           }
-
-
-
         }
         // next account
       }
@@ -624,7 +660,7 @@ class TransactionRepair {
       if(queueEntry.repairFinished === true){
 
         let allGood = false
-        let repairsGoodCount = 0
+        //let repairsGoodCount = 0
 
         //todo need to fix up the definition of all good.
         //we wont have account hashes for everything in a sharded context!
@@ -639,13 +675,13 @@ class TransactionRepair {
             continue
           }
           if(hashObj.h === voteHashMap.get(key)){
-            repairsGoodCount++
+            stats.repairsGoodCount++
           } else {
             badHashKeys.push(key)
           }
         }
 
-        if(repairsGoodCount === keysList.length){
+        if(stats.repairsGoodCount === keysList.length){
           allGood = true
           nestedCountersInstance.countEvent('repair1', 'AllGood')
         } else {
@@ -654,20 +690,22 @@ class TransactionRepair {
         
         queueEntry.hasValidFinalData = true
 
-        let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)}  localUpdatedAccountAndHashes:${utils.stringifyReduce(localUpdatedAccountAndHashes)} state:${queueEntry.state} counters:${utils.stringifyReduce({ requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, numUpToDateAccounts, repairsGoodCount, skipNonStored})}`
+        
+
+        let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)}  localUpdatedAccountAndHashes:${utils.stringifyReduce(localUpdatedAccountAndHashes)} state:${queueEntry.state} counters:${utils.stringifyReduce(stats)}`
         if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_success', queueEntry.logID, repairLogString)
         this.mainLogger.debug('shrd_repairToMatchReceipt_success ' + repairLogString)
         nestedCountersInstance.countEvent('repair1', 'success')
-        nestedCountersInstance.countEvent('repair1', `success: req:${requestsMade} apl:${dataApplied} localAccUsed:${localAccUsed} key count:${voteHashMap.size} allGood:${allGood}`)
+        nestedCountersInstance.countEvent('repair1', `success: req:${stats.requestsMade} apl:${stats.dataApplied} localAccUsed:${stats.localAccUsed} localAccSkipped:${stats.localAccSkipped} key count:${voteHashMap.size} allGood:${allGood}`)
         nestedCountersInstance.countEvent('repair1', `success: key count:${voteHashMap.size}`)
         nestedCountersInstance.countEvent('repair1', `success: state:${queueEntry.state} allGood:${allGood}`)
-        nestedCountersInstance.countEvent('repair1', `success: state:${queueEntry.state} allGood:${allGood} skipNonStored:${skipNonStored}`)
+        nestedCountersInstance.countEvent('repair1', `success: state:${queueEntry.state} allGood:${allGood} skipNonStored:${stats.skipNonStored}`)
         
-        if (logFlags.error && allGood === false) this.mainLogger.error(`repair1 success: req:${requestsMade} apl:${dataApplied} localAccUsed:${localAccUsed} key count:${voteHashMap.size} allGood:${allGood} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)} localUpdatedAccountAndHashes:${utils.stringifyReduce(localUpdatedAccountAndHashes)} badHashKeys:${utils.stringifyReduce(badHashKeys)} noHashKeys:${utils.stringifyReduce(noHashKeys)} nonStoredKeys:${utils.stringifyReduce(nonStoredKeys)}`)
+        if (logFlags.error && allGood === false) this.mainLogger.error(`repair1 success: req:${stats.requestsMade} apl:${stats.dataApplied} localAccUsed:${stats.localAccUsed} localAccSkipped:${stats.localAccSkipped} key count:${voteHashMap.size} allGood:${allGood} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)} localUpdatedAccountAndHashes:${utils.stringifyReduce(localUpdatedAccountAndHashes)} badHashKeys:${utils.stringifyReduce(badHashKeys)} noHashKeys:${utils.stringifyReduce(noHashKeys)} nonStoredKeys:${utils.stringifyReduce(nonStoredKeys)} keysList:${utils.stringifyReduce(keysList)} localReadyRepairs:${utils.stringifyReduce(localReadyRepairs.keys())} stats:${utils.stringifyReduce(stats)}`)
 
       } else {
         queueEntry.repairFailed = true
-        this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} state:${queueEntry.state} counters:${utils.stringifyReduce({requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, skipNonStored})}  keys ${utils.stringifyReduce(allKeys)}  `)        
+        this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} state:${queueEntry.state} counters:${utils.stringifyReduce(stats)}  keys ${utils.stringifyReduce(allKeys)}  `)        
         nestedCountersInstance.countEvent('repair1', 'failed')
         nestedCountersInstance.countEvent('repair1', `failed: key count:${voteHashMap.size}`)
         nestedCountersInstance.countEvent('repair1', `failed state:${queueEntry.state}`)
