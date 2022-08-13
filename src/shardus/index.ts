@@ -1431,8 +1431,8 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.crack === 'function') {
-        applicationInterfaceImpl.crack = (inTx) =>
-          application.crack(inTx)
+        applicationInterfaceImpl.crack = (inTx, appData) =>
+          application.crack(inTx, appData)
       } else if (typeof application.getKeyFromTransaction === 'function' && typeof application.validateTxnFields === 'function') {
         /**
          * Compatibility layer for Apps that use the old getKeyFromTransaction
