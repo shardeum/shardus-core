@@ -546,7 +546,7 @@ class TransactionRepairOld {
       }
       timestamp = txRequestResult.acceptedTX.timestamp
 
-      const {keys :keysResponse} = this.app.crack(txRequestResult.acceptedTX.data)
+      const {keys :keysResponse} = this.app.crack(txRequestResult.acceptedTX.data, txRequestResult.acceptedTX.appData)
       allKeys = keysResponse.allKeys
       //cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
       cycleToRecordOn = CycleChain.getCycleNumberFromTimestamp(timestamp)

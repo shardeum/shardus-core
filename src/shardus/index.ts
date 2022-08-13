@@ -1012,8 +1012,14 @@ class Shardus extends EventEmitter {
         return validateResult
       }
 
+      let appData = {}
+
+      // Give the dapp an opportunity to do some up front work and generate
+      // appData metadata for the applied TX
+      await this.app.txPreCrackData(timestampedTx, appData)
+
       // Ask App to crack open tx and return timestamp, id (hash), and keys
-      const { timestamp, id, keys } = this.app.crack(timestampedTx)
+      const { timestamp, id, keys } = this.app.crack(timestampedTx, appData)
       // console.log('app.crack results', timestamp, id, keys)
 
       // Validate the transaction timestamp
@@ -1049,6 +1055,7 @@ class Shardus extends EventEmitter {
         txId: id,
         keys,
         data: timestampedTx,
+        appData
       }
       // console.log('acceptedTX', acceptedTX)
       if (logFlags.verbose) this.mainLogger.debug('Transaction validated')
@@ -1446,6 +1453,18 @@ class Shardus extends EventEmitter {
           'Missing required interface function. validate()'
         )
       }
+
+      if (typeof application.txPreCrackData === 'function') {
+        applicationInterfaceImpl.txPreCrackData = async (tx, appData) =>
+          application.txPreCrackData(tx, appData)
+      } else {
+        //this is optional.  
+        //const thisPtr = this
+        applicationInterfaceImpl.txPreCrackData = async function () {
+          //thisPtr.mainLogger.debug('no app.txPreCrackData() function defined')
+        }
+      }
+
       if (typeof application.getTimestampFromTransaction === 'function') {
         applicationInterfaceImpl.getTimestampFromTransaction = (inTx) =>
           application.getTimestampFromTransaction(inTx)

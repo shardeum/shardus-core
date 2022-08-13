@@ -158,11 +158,18 @@ export interface App {
    *
    * Txs passed to this function are guaranteed to have passed validation first.
    */
-  crack(tx: OpaqueTransaction): {
+  crack(tx: OpaqueTransaction, appData: any): {
     timestamp: number
     id: string
     keys: TransactionKeys
   }
+
+  /**
+   * give the app a chance to generate additional data for the crack function
+   * @param tx 
+   * @param appData 
+   */
+  txPreCrackData(tx: OpaqueTransaction, appData: any): void // Promise<any>
 
   // DEPRECATED . This was previously a deep validate for buisness logic but it is up to the dapp to handle this as part of apply
   validateTransaction?: (...data: any) => any
@@ -972,6 +979,7 @@ export interface AcceptedTx {
   txId: string
   keys: TransactionKeys
   data: OpaqueTransaction
+  appData: any
 }
 
 export interface TxReceipt {

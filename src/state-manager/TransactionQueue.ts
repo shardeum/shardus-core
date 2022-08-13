@@ -215,7 +215,7 @@ class TransactionQueue {
       profilerInstance.scopedProfileSectionStart('spread_tx_to_group_syncing')
       try {
         //handleSharedTX will also validate fields
-        this.handleSharedTX(payload.data, sender)
+        this.handleSharedTX(payload.data, payload.appData, sender)
       } finally {
         profilerInstance.scopedProfileSectionEnd('spread_tx_to_group_syncing')
       }
@@ -229,7 +229,7 @@ class TransactionQueue {
         //  gossip 'spread_tx_to_group' to transaction group
 
         //handleSharedTX will also validate fields.  payload is an AcceptedTX so must pass in the .data as the rawTX
-        let queueEntry = this.handleSharedTX(payload.data, sender)
+        let queueEntry = this.handleSharedTX(payload.data, payload.appData, sender)
         if (queueEntry == null) {
           return
         }
@@ -287,7 +287,7 @@ class TransactionQueue {
 
   }
 
-  handleSharedTX(tx: Shardus.OpaqueTransaction, sender: Shardus.Node): QueueEntry {
+  handleSharedTX(tx: Shardus.OpaqueTransaction, appData:any, sender: Shardus.Node): QueueEntry {
     // Perform fast validation of the transaction fields
     const validateResult = this.app.validate(tx)
     if (validateResult.success === false) {
@@ -296,7 +296,7 @@ class TransactionQueue {
     }
 
     // Ask App to crack open tx and return timestamp, id (hash), and keys
-    const { timestamp, id, keys } = this.app.crack(tx)
+    const { timestamp, id, keys } = this.app.crack(tx, appData)
 
     // Check if we already have this tx in our queue
     let queueEntry = this.getQueueEntrySafe(id) // , payload.timestamp)
@@ -319,7 +319,8 @@ class TransactionQueue {
       timestamp,
       txId: id,
       keys,
-      data: tx
+      data: tx,
+      appData
     }
 
     const noConsensus = false // this can only be true for a set command which will never come from an endpoint
