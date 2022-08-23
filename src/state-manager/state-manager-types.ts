@@ -90,6 +90,7 @@ export type QueueEntry = {
     collectedVotes : AppliedVote[];
     collectedVoteHashes : AppliedVoteHash[]
     newVotes : boolean
+    voteCastAge: number
 
     gossipedReceipt: boolean;   
 

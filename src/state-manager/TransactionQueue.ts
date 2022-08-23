@@ -973,7 +973,8 @@ class TransactionQueue {
         },
         executionIdSet: new Set(),
         txSieveTime:0,
-        debug:{}
+        debug:{},
+        voteCastAge:0
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -3122,6 +3123,7 @@ class TransactionQueue {
           //note this wont work with old receipts but we can depricate old receipts soon
           let receipt2 = this.stateManager.getReceipt2(queueEntry)
           let hasReceipt = receipt2 != null  
+          let hasCastVote = queueEntry.ourVote != null
 
           let extraTime = 0          
           //let cantExpire = false
@@ -3140,10 +3142,28 @@ class TransactionQueue {
             extraTime = timeM
           }
 
+          // if we have not added extra time yet then add time for a vote.
+          if(extraTime < timeM && hasCastVote === true){
+            //this would be a way to just statically add to the time
+            //extraTime = timeM
+            let ageDiff = (queueEntry.voteCastAge + timeM) -  timeM3
+            if(ageDiff > 0){
+              extraTime = ageDiff
+            }
+          }
+
           if(isAwaitingFinalData){
             if(hasReceipt){
               extraTime = timeM2 * 1.5
             } else {
+              extraTime = timeM
+            }
+          }
+
+          //round extraTime to up to nearest 500ms (needed for counter aggregation)
+          if(extraTime > 0){
+            extraTime = Math.ceil(extraTime / 500) * 500
+            if(extraTime > timeM){
               extraTime = timeM
             }
           }
@@ -3398,6 +3418,8 @@ class TransactionQueue {
                       if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_preApplyTx_createAndShareVote', `${shortID}`, ``)
                       if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 createAndShareVote : ${queueEntry.logID} `)
                       let awaitStart = Date.now()                       
+
+                      queueEntry.voteCastAge = txAge
                       await this.stateManager.transactionConsensus.createAndShareVote(queueEntry)
                       this.updateSimpleStatsObject(processStats.awaitStats, 'createAndShareVote', Date.now() - awaitStart)
                     }

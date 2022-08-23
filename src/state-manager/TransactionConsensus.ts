@@ -180,8 +180,9 @@ class TransactionConsenus {
             //todo any limits to how many repairs at once to allow?
             this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
           }
-          //dont forward gossip, it is probably too late?
-          return
+          //x - dont forward gossip, it is probably too late?
+          //do forward gossip so we dont miss on sharing a receipt!
+          //return
         }
 
         if (queueEntry.gossipedReceipt === false){
@@ -284,27 +285,29 @@ class TransactionConsenus {
         return
       }
 
-      //look at our index in the consensus.
-      //only have certain nodes sharde gossip the receipt.
-      let ourIndex = queueEntry.ourTXGroupIndex
-      let groupLength = gossipGroup.length
-      if(this.stateManager.transactionQueue.executeInOneShard){
-        //we have to use different inputs if executeInOneShard is true
-        ourIndex = queueEntry.ourExGroupIndex
-        groupLength = queueEntry.executionGroup.length
-      }
+      // This code tried to optimize things by not having every node share a receipt.
+      
+      // //look at our index in the consensus.
+      // //only have certain nodes sharde gossip the receipt.
+      // let ourIndex = queueEntry.ourTXGroupIndex
+      // let groupLength = gossipGroup.length
+      // if(this.stateManager.transactionQueue.executeInOneShard){
+      //   //we have to use different inputs if executeInOneShard is true
+      //   ourIndex = queueEntry.ourExGroupIndex
+      //   groupLength = queueEntry.executionGroup.length
+      // }
 
-      if(ourIndex > 0){
-        let everyN = Math.max(1,Math.floor(groupLength * 0.4))
-        let nonce = parseInt('0x' + queueEntry.acceptedTx.txId.substr(0,2))
-        let idxPlusNonce = ourIndex + nonce
-        let idxModEveryN = idxPlusNonce % everyN
-        if(idxModEveryN > 0){
-          nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped')
-          if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shareAppliedReceipt-skipped', `${queueEntry.acceptedTx.txId}`, `ourIndex:${ourIndex} groupLength:${ourIndex} `)
-          return
-        }
-      }
+      // if(ourIndex > 0){
+      //   let everyN = Math.max(1,Math.floor(groupLength * 0.4))
+      //   let nonce = parseInt('0x' + queueEntry.acceptedTx.txId.substr(0,2))
+      //   let idxPlusNonce = ourIndex + nonce
+      //   let idxModEveryN = idxPlusNonce % everyN
+      //   if(idxModEveryN > 0){
+      //     nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped')
+      //     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shareAppliedReceipt-skipped', `${queueEntry.acceptedTx.txId}`, `ourIndex:${ourIndex} groupLength:${ourIndex} `)
+      //     return
+      //   }
+      // }
 
       nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-notSkipped')
       // should consider only forwarding in some cases?
