@@ -126,7 +126,7 @@ export function sendRequests() {}
 
 function refreshArchivers() {
   // [TODO] Come up with a better policy for this
-  const refreshedArchivers = [...Archivers.archivers.values()]
+  const refreshedArchivers = Archivers.getRefreshedArchivers()
   return refreshedArchivers.sort(propComparator('publicKey'))
 }
 

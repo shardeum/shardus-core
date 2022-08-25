@@ -416,6 +416,18 @@ export function sendData() {
   }
 }
 
+export function getRefreshedArchivers() {
+  let refreshedArchivers = [...archivers.values()]
+  if (leaveRequests.length > 0) {
+    for (const archiverInfo of leaveRequests) {
+      refreshedArchivers = refreshedArchivers.filter(
+        (archiver) => archiver.publicKey !== archiverInfo.nodeInfo.publicKey
+      )
+    }
+  }
+  return refreshedArchivers
+}
+
 export function registerRoutes() {
   network.registerExternalPost('joinarchiver', async (req, res) => {
     const err = validateTypes(req, { body: 'o' })
