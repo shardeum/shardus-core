@@ -59,6 +59,8 @@ export let nextQ1Start = 0
 export let scaleFactor: number = 1
 export let scaleFactorSyncBoost: number = 1
 
+export let netConfig: any = {}
+
 let madeCycle = false // True if we successfully created the last cycle record, otherwise false
 // not used anymore
 //let madeCert = false // set to True after we make our own cert and try to gossip it
@@ -524,6 +526,7 @@ function makeCycleRecord(
       ? prevRecord.start + prevRecord.duration
       : utils.getTime('s'),
     duration: prevRecord ? prevRecord.duration : config.p2p.cycleDuration,
+    networkConfigHash: makeNetworkConfigHash()
   }
 
   const cycleRecord = Object.assign(baseRecord, {
@@ -548,6 +551,22 @@ export function makeCycleMarker(record: P2P.CycleCreatorTypes.CycleRecord) {
 
 function makeCycleCert(marker: P2P.CycleCreatorTypes.CycleMarker): P2P.CycleCreatorTypes.CycleCert {
   return crypto.sign({ marker })
+}
+
+function makeNetworkConfigHash() {
+  netConfig = {
+    crypto: config.crypto,
+    heartbeatInterval: config.heartbeatInterval,
+    loadDetection: config.loadDetection,
+    network: config.network,
+    rateLimiting: config.rateLimiting,
+    sharding: config.sharding,
+    transactionExpireTime: config.transactionExpireTime,
+    p2p: { ...config.p2p },
+    // debug: config.debug,
+  }
+  delete netConfig.p2p.existingArchivers
+  return crypto.hash(netConfig)
 }
 
 async function compareCycleMarkers(myC: number, myQ: number, desired: number) {

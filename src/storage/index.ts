@@ -70,9 +70,9 @@ class Storage {
     )
     await this.storage.runCreate(
       'CREATE TABLE if not exists `cycles` (`networkId` TEXT NOT NULL, `counter` BIGINT NOT NULL UNIQUE PRIMARY KEY,' +
-        ' `safetyMode` BOOLEAN, `safetyNum` BIGINT, `maxSyncTime` BIGINT, `networkStateHash` BIGINT, `networkDataHash`' +
-        ' JSON,' +
-        ' `networkReceiptHash` JSON, `networkSummaryHash` JSON, `certificate` JSON NOT NULL, `previous` TEXT NOT' +
+      ' `safetyMode` BOOLEAN, `safetyNum` BIGINT, `maxSyncTime` BIGINT, `networkStateHash` BIGINT, `networkDataHash`' +
+      ' JSON, `networkConfigHash` TEXT NOT NULL,' +
+      ' `networkReceiptHash` JSON, `networkSummaryHash` JSON, `certificate` JSON NOT NULL, `previous` TEXT NOT' +
       ' NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL,' +
       ' `syncing` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL,' +
       ' `joinedArchivers` JSON NOT NULL,`leavingArchivers` JSON NOT NULL, `joinedConsensors` JSON NOT' +

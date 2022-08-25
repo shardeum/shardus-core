@@ -23,6 +23,7 @@ const cycles = [
     marker: { type: Sequelize.TEXT, allowNull: false },
     start: { type: Sequelize.BIGINT, allowNull: false },
     duration: { type: Sequelize.BIGINT, allowNull: false },
+    networkConfigHash: { type: Sequelize.TEXT, allowNull: true },
     maxSyncTime: { type: Sequelize.BIGINT, allowNull: true },
     active: { type: Sequelize.BIGINT, allowNull: false },
     syncing: { type: Sequelize.BIGINT, allowNull: false },

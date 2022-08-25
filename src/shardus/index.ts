@@ -33,6 +33,7 @@ import Profiler, { profilerInstance } from '../utils/profiler'
 import { time } from 'console'
 import SHARDUS_CONFIG from '../config'
 import { isApopMarkedNode } from '../p2p/Apoptosis'
+import { netConfig } from '../p2p/CycleCreator'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
@@ -1854,14 +1855,7 @@ class Shardus extends EventEmitter {
     this.network.registerExternalGet(
       'netconfig',
       async (req, res) => {
-        // This is to expose network configs only; open to all.
-        const netconfig = {...this.config};
-        delete netconfig.baseDir;
-        delete netconfig.ip;
-        delete netconfig.p2p.existingArchivers; // I think we shouldn't include this
-        delete netconfig.reporting; // I think we don't need this also
-        delete netconfig.debug // Seems we shouldn't include this in prod net
-        res.json({ config: netconfig })
+        res.json({ config: netConfig })
       }
     )
     // FOR internal testing. NEEDS to be removed for security purposes
