@@ -1702,13 +1702,13 @@ class StateManager {
 
 
     if (accountIsRemote) {
-      let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, address, this.currentCycleShardData.parititionShardDataMap)
-      if (homeNode == null) {
-        throw new Error(`getLocalOrRemoteAccount: no home node found`)
+      const randomConsensusNode = this.transactionQueue.getRandomConsensusNodeForAccount(address)
+      if (randomConsensusNode == null) {
+        throw new Error(`getLocalOrRemoteAccount: no consensus node found`)
       }
 
       // Node Precheck!
-      if (this.isNodeValidForInternalMessage(homeNode.node.id, 'getLocalOrRemoteAccount', true, true) === false) {
+      if (this.isNodeValidForInternalMessage(randomConsensusNode.id, 'getLocalOrRemoteAccount', true, true) === false) {
         // if(this.tryNextDataSourceNode('getLocalOrRemoteAccount') == false){
         //   break
         // }
@@ -1719,7 +1719,7 @@ class StateManager {
       }
 
       let message = { accountIds: [address] }
-      let r: GetAccountDataWithQueueHintsResp | boolean = await Comms.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
+      let r: GetAccountDataWithQueueHintsResp | boolean = await Comms.ask(randomConsensusNode, 'get_account_data_with_queue_hints', message)
       if (r === false) {
         if (logFlags.error) this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount r === false')
       }
