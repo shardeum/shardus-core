@@ -1296,6 +1296,18 @@ class Shardus extends EventEmitter {
     return this.stateManager.getRemoteAccount(address)
   }
 
+  getConsenusGroupForAccount(address:string): ShardusTypes.Node[] {
+    return this.stateManager.transactionQueue.getConsenusGroupForAccount(address)
+  }
+
+  getRandomConsensusNodeForAccount(address:string): ShardusTypes.Node {
+    return this.stateManager.transactionQueue.getRandomConsensusNodeForAccount(address)
+  }
+
+  isAccountRemote(address:string):boolean {
+    return this.stateManager.transactionQueue.isAccountRemote(address) 
+  }
+
   /**
    * Creates a wrapped response for formatting required by shardus
    * @param {*} accountId

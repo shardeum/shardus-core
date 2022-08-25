@@ -4367,6 +4367,32 @@ class TransactionQueue {
       value.total = Math.round(value.total * 100) / 100
     }
   }
+
+  getConsenusGroupForAccount(accountID:string): Shardus.Node[] {
+    let { homePartition } = ShardFunctions.addressToPartition(this.stateManager.currentCycleShardData.shardGlobals, accountID)
+    let homeShardData = this.stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
+    let consenusGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
+    return consenusGroup
+  }
+
+  getRandomConsensusNodeForAccount(accountID:string): Shardus.Node {
+    let { homePartition } = ShardFunctions.addressToPartition(this.stateManager.currentCycleShardData.shardGlobals, accountID)
+    let homeShardData = this.stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
+    //dont need to copy list
+    let consenusGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull
+    let node = consenusGroup[Math.floor(Math.random()*consenusGroup.length)]
+    return node
+  }
+
+  isAccountRemote(accountID:string):boolean {
+    let ourNodeShardData = this.stateManager.currentCycleShardData.nodeShardData
+    let minP = ourNodeShardData.consensusStartPartition
+    let maxP = ourNodeShardData.consensusEndPartition
+    let { homePartition } = ShardFunctions.addressToPartition(this.stateManager.currentCycleShardData.shardGlobals, accountID)
+    let accountIsRemote = ShardFunctions.partitionInWrappingRange(homePartition, minP, maxP) === false
+    return accountIsRemote
+  }
+
 }
 
 export default TransactionQueue
