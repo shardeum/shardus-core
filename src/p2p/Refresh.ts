@@ -70,7 +70,7 @@ export function updateRecord(
   record: P2P.CycleCreatorTypes.CycleRecord,
   prev: P2P.CycleCreatorTypes.CycleRecord
 ) {
-  record.refreshedArchivers = refreshArchivers() // This returns a copy of the objects
+  record.refreshedArchivers = Archivers.getRefreshedArchivers(record) // This returns a copy of the objects
   record.refreshedConsensors = refreshConsensors() // This returns a copy of the objects
 }
 
@@ -126,7 +126,7 @@ export function sendRequests() {}
 
 function refreshArchivers() {
   // [TODO] Come up with a better policy for this
-  const refreshedArchivers = Archivers.getRefreshedArchivers()
+  const refreshedArchivers = [...Archivers.archivers.values()]
   return refreshedArchivers.sort(propComparator('publicKey'))
 }
 

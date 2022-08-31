@@ -105,19 +105,15 @@ export function updateRecord(txs: P2P.ArchiversTypes.Txs, record: P2P.CycleCreat
     (a: P2P.ArchiversTypes.JoinedArchiver, b: P2P.ArchiversTypes.JoinedArchiver) =>
       a.publicKey > b.publicKey ? 1 : -1
   )
-  record.leavingArchivers = JSON.parse(
-    JSON.stringify(
-      leavingArchivers.sort((a: P2P.ArchiversTypes.JoinedArchiver, b: P2P.ArchiversTypes.JoinedArchiver) =>
-        a.publicKey > b.publicKey ? 1 : -1
-      )
-    )
+  record.leavingArchivers = leavingArchivers.sort((a: P2P.ArchiversTypes.JoinedArchiver, b: P2P.ArchiversTypes.JoinedArchiver) =>
+    a.publicKey > b.publicKey ? 1 : -1
   )
   if(logFlags.console) console.log(
     `Archiver after updating record: Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`,
     record
   )
 
-  resetLeaveRequests()
+  // resetLeaveRequests()
 }
 
 export function parseRecord(
@@ -234,6 +230,7 @@ export function updateArchivers(record) {
   for (const nodeInfo of record.leavingArchivers) {
     archivers.delete(nodeInfo.publicKey)
     removeDataRecipient(nodeInfo.publicKey)
+    leaveRequests = leaveRequests.filter(request => request.nodeInfo.publicKey !== nodeInfo.publicKey)
   }
 }
 
@@ -416,12 +413,19 @@ export function sendData() {
   }
 }
 
-export function getRefreshedArchivers() {
+export function getRefreshedArchivers(record) {
   let refreshedArchivers = [...archivers.values()]
-  if (leaveRequests.length > 0) {
-    for (const archiverInfo of leaveRequests) {
+  // if (leaveRequests.length > 0) {
+  //   for (const archiverInfo of leaveRequests) {
+  //     refreshedArchivers = refreshedArchivers.filter(
+  //       (archiver) => archiver.publicKey !== archiverInfo.nodeInfo.publicKey
+  //     )
+  //   }
+  // }
+  if (record.leavingArchivers) {
+    for (const archiverInfo of record.leavingArchivers) {
       refreshedArchivers = refreshedArchivers.filter(
-        (archiver) => archiver.publicKey !== archiverInfo.nodeInfo.publicKey
+        (archiver) => archiver.publicKey !== archiverInfo.publicKey
       )
     }
   }
