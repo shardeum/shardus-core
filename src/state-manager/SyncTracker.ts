@@ -440,12 +440,35 @@ export default class SyncTracker {
       }
     }
 
+    //number of times we can reset the list of nodes we ask from when they timeout
+    //only available when ther is a small number of nodes.
+    //we clear this if we get a good response from any node, so to fail we have to 
+    //get this many loop fails without any good responses
+    let restartListRetriesLeft = 5
+    let totalRestartList = 0
+
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
+      let moreAskTime = 0
       // Node Precheck!
       if (this.accountSync.stateManager.isNodeValidForInternalMessage(this.dataSourceHelper.dataSourceNode.id, 'syncAccountData', true, true) === false) {
         if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1') == false) {
-          throw new Error('out of account nodes to ask: syncAccountData1')
+          
+          if(restartListRetriesLeft <=0 ){
+            nestedCountersInstance.countEvent('sync', `out of account nodes to ask: syncAccountData1 totalRestartList: ${totalRestartList}`)
+            throw new Error(`out of account nodes to ask: syncAccountData1 + restartList`)      
+          }
+
+          if (this.dataSourceHelper.tryRestartList('syncAccountData1') === true){
+            //since we are restarting, give the node we are asking a break
+            await utils.sleep(2000)
+            //give even more timeout time.
+            moreAskTime = 5000
+            restartListRetriesLeft--
+            totalRestartList++
+          } else {
+            throw new Error('out of account nodes to ask: syncAccountData1')            
+          }
         }
         continue
       }
@@ -454,7 +477,7 @@ export default class SyncTracker {
       let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.accountSync.config.stateManager.accountBucketSize, offset }
       let r: GetAccountData3Resp | boolean
       try {
-        r = await Comms.ask(this.dataSourceHelper.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+        r = await Comms.ask(this.dataSourceHelper.dataSourceNode, 'get_account_data3', message, false, '', 5000 + moreAskTime ) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
       } catch (ex) {
         this.accountSync.statemanager_fatal(`syncAccountData2`, `syncAccountData2 retries:${askRetriesLeft} ask: ` + errorToStringFull(ex))
         //wait 5 sec
@@ -478,6 +501,9 @@ export default class SyncTracker {
         }
         continue
       }
+
+      restartListRetriesLeft = 5
+
       if (result.data == null) {
         if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceHelper.dataSourceNode.id}`)
         if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData3') == false) {

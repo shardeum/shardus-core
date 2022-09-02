@@ -229,7 +229,7 @@ export class NetworkClass extends EventEmitter {
     }
   }
 
-  ask(node, route, message, logged = false) {
+  ask(node, route, message, logged = false, extraTime = 0) {
     return new Promise(async (resolve, reject) => {
       this.InternalAskCounter++
       let id = ''
@@ -283,7 +283,7 @@ export class NetworkClass extends EventEmitter {
             node.internalPort,
             node.internalIp,
             data,
-            this.timeout,
+            this.timeout + extraTime,
             onRes,
             onTimeout
           )

@@ -241,7 +241,8 @@ export async function ask(
   route: string,
   message = {},
   logged = false,
-  tracker = ''
+  tracker = '', 
+  extraTime = 0
 ) {
   if (tracker === '') {
     tracker = createMsgTracker()
@@ -261,7 +262,7 @@ export async function ask(
   const signedMessage = _wrapAndTagMessage(message, tracker, node)
   let signedResponse
   try {
-    signedResponse = await network.ask(node, route, signedMessage, logged)
+    signedResponse = await network.ask(node, route, signedMessage, logged, extraTime)
   } catch (err) {
     error('P2P: ask: network.ask: ' + err)
     return false

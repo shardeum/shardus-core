@@ -137,6 +137,28 @@ export default class DataSourceHelper {
     return true
   }
 
+  tryRestartList(debugString) : boolean {
+    this.dataSourceNodeIndex = 0
+    let numNodes = this.dataSourceNodeList.length
+
+    //allow a list restart if we have a small number of nodes
+    if(numNodes > 3){
+      return false
+    }
+
+    nestedCountersInstance.countEvent('sync', `DataSourceHelper restartList ${debugString} numnodes:${numNodes}`, 1)
+
+    if(numNodes > 0){
+      this.dataSourceNode = this.dataSourceNodeList[this.dataSourceNodeIndex]
+      return true
+    }
+    return false
+  }
+
+  getNumNodes(){
+    return this.dataSourceNodeList.length
+  }
+
   removePotentiallyRemovedNodes(node) {
     return potentiallyRemoved.has(node.id) != true
   }
