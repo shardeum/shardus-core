@@ -224,13 +224,13 @@ export function getArchiverUpdates() {
 
 export function updateArchivers(record) {
   // Update archiversList
-  for (const nodeInfo of record.joinedArchivers) {
-    archivers.set(nodeInfo.publicKey, nodeInfo)
-  }
   for (const nodeInfo of record.leavingArchivers) {
     archivers.delete(nodeInfo.publicKey)
     removeDataRecipient(nodeInfo.publicKey)
     leaveRequests = leaveRequests.filter(request => request.nodeInfo.publicKey !== nodeInfo.publicKey)
+  }
+  for (const nodeInfo of record.joinedArchivers) {
+    archivers.set(nodeInfo.publicKey, nodeInfo)
   }
 }
 
