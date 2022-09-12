@@ -1005,8 +1005,14 @@ class Shardus extends EventEmitter {
           'Performing initial validation of the transaction'
         )
 
+      let appData = {}
+
+      // Give the dapp an opportunity to do some up front work and generate
+      // appData metadata for the applied TX
+      await this.app.txPreCrackData(timestampedTx, appData)
+
       // Perform fast validation of the transaction fields
-      const validateResult = this.app.validate(timestampedTx)
+      const validateResult = this.app.validate(timestampedTx, appData)
       if (validateResult.success === false) {
         // 400 is a code for bad tx or client faulty
         validateResult.status = validateResult.status
@@ -1014,12 +1020,6 @@ class Shardus extends EventEmitter {
           : 400
         return validateResult
       }
-
-      let appData = {}
-
-      // Give the dapp an opportunity to do some up front work and generate
-      // appData metadata for the applied TX
-      await this.app.txPreCrackData(timestampedTx, appData)
 
       // Ask App to crack open tx and return timestamp, id (hash), and keys
       const { timestamp, id, keys } = this.app.crack(timestampedTx, appData)
@@ -1070,6 +1070,7 @@ class Shardus extends EventEmitter {
         `${txId}`,
         `Transaction: ${utils.stringifyReduce(timestampedTx)}`
       )
+      console.log()
       this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(
         acceptedTX,
         /*send gossip*/ true,
@@ -1424,15 +1425,15 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.validate === 'function') {
-        applicationInterfaceImpl.validate = (inTx) =>
-          application.validate(inTx)
+        applicationInterfaceImpl.validate = (inTx, appData) =>
+          application.validate(inTx, appData)
       } else if (typeof application.validateTxnFields === 'function') {
         /**
          * Compatibility layer for Apps that use the old validateTxnFields fn
          * instead of the new validate fn
          */
-        applicationInterfaceImpl.validate = (inTx) => {
-          const oldResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(inTx)
+        applicationInterfaceImpl.validate = (inTx, appData) => {
+          const oldResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(inTx, appData)
           const newResult = {
             success: oldResult.success,
             reason: oldResult.reason
