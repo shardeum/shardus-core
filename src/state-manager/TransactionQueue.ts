@@ -289,7 +289,7 @@ class TransactionQueue {
 
   handleSharedTX(tx: Shardus.OpaqueTransaction, appData:any, sender: Shardus.Node): QueueEntry {
     // Perform fast validation of the transaction fields
-    const validateResult = this.app.validate(tx)
+    const validateResult = this.app.validate(tx, appData)
     if (validateResult.success === false) {
       this.statemanager_fatal(`spread_tx_to_group_validateTX`, `spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(validateResult)}`)
       return null
