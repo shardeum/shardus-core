@@ -70,6 +70,8 @@ class LoadDetection extends EventEmitter {
 
     if (this.dbg) {
       load = this.load
+      this.scaledTxTimeInQueue = load
+      this.scaledQueueLength = load
     } else {
       const txTimeInQueue = this.statistics.getAverage('txTimeInQueue') / 1000
       let scaledTxTimeInQueue =
