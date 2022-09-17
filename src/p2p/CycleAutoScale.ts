@@ -233,7 +233,8 @@ function _checkScaling() {
     desiredCount = CycleChain.newest.desired
   }
 
-  let requiredVotes = Math.max(config.p2p.minScaleReqsNeeded, config.p2p.scaleConsensusRequired * NodeList.activeByIdOrder.length )
+  let numActiveNodes = NodeList.activeByIdOrder.length
+  let requiredVotes = Math.max(config.p2p.minScaleReqsNeeded, config.p2p.scaleConsensusRequired * numActiveNodes )
 
   let scaleUpRequests = getScaleUpRequests()
   let scaleDownRequests = getScaleDownRequests()
@@ -270,12 +271,19 @@ function _checkScaling() {
       newDesired = CycleChain.newest.desired + config.p2p.amountToGrow
       // If newDesired more than maxNodes, set newDesired to maxNodes
       if (newDesired > config.p2p.maxNodes) newDesired = config.p2p.maxNodes
+
+      //limit growth to no more than 20% more than active
+      let moreThanActiveMax = Math.floor(numActiveNodes * 1.2)
+      if (newDesired > moreThanActiveMax) newDesired = moreThanActiveMax
+
       setDesireCount(newDesired)
       break
     case P2P.CycleAutoScaleTypes.ScaleType.DOWN:
       newDesired = CycleChain.newest.desired - config.p2p.amountToGrow
       // If newDesired less than minNodes, set newDesired to minNodes
       if (newDesired < config.p2p.minNodes) newDesired = config.p2p.minNodes
+
+
       setDesireCount(newDesired)
       break
     default:

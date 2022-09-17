@@ -58,6 +58,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     scaleConsensusRequired: 0.25,
     amountToGrow: 1,
     amountToShrink: 1,
+    maxDesiredMultiplier: 1.2,
     startInWitnessMode: false,
     experimentalSnapshot: true,
     detectLostSyncing: true,
