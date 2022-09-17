@@ -273,7 +273,7 @@ function _checkScaling() {
       if (newDesired > config.p2p.maxNodes) newDesired = config.p2p.maxNodes
 
       //limit growth to no more than 20% more than active
-      let moreThanActiveMax = Math.floor(numActiveNodes * 1.2)
+      let moreThanActiveMax = Math.floor(numActiveNodes * config.p2p.maxDesiredMultiplier)
       if (newDesired > moreThanActiveMax) newDesired = moreThanActiveMax
 
       setDesireCount(newDesired)
