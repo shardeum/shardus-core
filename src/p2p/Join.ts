@@ -182,13 +182,17 @@ function calculateToAccept() {
   let needed = 0
 
   // Always set needed to (desired - (active + syncing)) if its positive
-  if (desired > active + syncing) {
+  //if (desired > active + syncing) {
+  // updating to make sure this math gets applied all the time
+  if (desired > 0) {  
     needed = desired - (active + syncing)
   }
 
   // If rotation is on, add expired to needed
   if (config.p2p.maxRotatedPerCycle > 0) {
-    needed += expired
+    //only can accept as many as could actually rotate out in one cycle
+    let maxToLeave = Math.min(expired, config.p2p.maxRotatedPerCycle)
+    needed += maxToLeave
   }
 
   // Limit needed by canSync and maxJoin
