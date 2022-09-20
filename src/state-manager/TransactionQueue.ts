@@ -4066,14 +4066,17 @@ class TransactionQueue {
       accountsToAdd[account.accountId] = accountCopy
     }
 
-    // This will override with corrected value if the account are also in accountWrites
-    for (const account of queueEntry.preApplyTXResult.applyResponse.accountWrites) {
-      accountsToAdd[account.accountId] = {
-        accountId: account.accountId,
-        data: account.data.data,
-        timestamp: account.timestamp,
-        stateId: account.data.stateId,
-      } as Shardus.WrappedResponse
+    // override with the accouns in accountWrites
+    if (queueEntry.preApplyTXResult.applyResponse.accountWrites != null && queueEntry.preApplyTXResult.applyResponse.accountWrites.length > 0) {
+      accountsToAdd = {}
+      for (const account of queueEntry.preApplyTXResult.applyResponse.accountWrites) {
+        accountsToAdd[account.accountId] = {
+          accountId: account.accountId,
+          data: account.data.data,
+          timestamp: account.timestamp,
+          stateId: account.data.stateId,
+        } as Shardus.WrappedResponse
+      }
     }
 
     txReceiptToPass.accounts = [...Object.values(accountsToAdd)]
