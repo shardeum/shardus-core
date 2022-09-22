@@ -122,22 +122,35 @@ export function getExpiredRemoved(
 
   let maxRemove = config.p2p.maxRotatedPerCycle
 
+  let scaleDownRemove = 0
+  if (active - desired > 0) scaleDownRemove = active - desired
+
+  //only let the scale factor impart a partial influence 
+  let scaledAmountToShrink = Math.floor(0.5 * (config.p2p.amountToShrink * CycleCreator.scaleFactor + config.p2p.amountToShrink))
+
+  //limit the scale down by scaledAmountToShrink
+  if (scaleDownRemove > scaledAmountToShrink){
+    scaleDownRemove = scaledAmountToShrink
+  }
+    
+  let cycle = CycleChain.newest.counter
+  if(cycle > lastLoggedCycle && scaleDownRemove > 0){
+    lastLoggedCycle = cycle
+    info('scale down dump:' + JSON.stringify({cycle, scaleFactor:CycleCreator.scaleFactor, scaleDownRemove, desired, active, scaledAmountToShrink, maxRemove, expired  })  )
+  }
+
   // Allows the network to scale down even if node rotation is turned off
   if (maxRemove < 1) {
-    if (active - desired > 0) maxRemove = active - desired
-
-    let scaledAmountToShrink = Math.floor(config.p2p.amountToShrink * CycleCreator.scaleFactor)
-    if (maxRemove > scaledAmountToShrink)
-      maxRemove = scaledAmountToShrink
-
-    let cycle = CycleChain.newest.counter
-    if(cycle > lastLoggedCycle){
-      lastLoggedCycle = cycle
-      info('scale down dump:' + JSON.stringify({cycle, scaleFactor:CycleCreator.scaleFactor, desired, active, scaledAmountToShrink, maxRemove, expired  })  )
-    }
+    maxRemove = scaleDownRemove
   } else {
-    if (maxRemove > active - desired) maxRemove = active - desired
+    //else pick the higher of the two
+    maxRemove = Math.max(maxRemove, scaleDownRemove)
   }
+
+  
+
+
+  if (maxRemove > active - desired) maxRemove = active - desired
 
   // Oldest node has index 0
   for (const node of NodeList.byJoinOrder) {
