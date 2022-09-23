@@ -277,7 +277,11 @@ async function forwardReceipts() {
     // Tag dataResponse
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
     if(logFlags.console) console.log('Sending receipts to archivers', taggedDataResponse)
-    io.emit('DATA', taggedDataResponse)
+    try {
+      io.emit('DATA', taggedDataResponse)
+    } catch (e) {
+      console.log('Run into issue in forwarding receipts data', e)
+    }
   }
 
   stateManager.transactionQueue.resetReceiptsToForward()
@@ -303,8 +307,12 @@ export async function forwardAccounts(accounts: any[]) {
     // Tag dataResponse
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
     if (logFlags.console) console.log('Sending accounts to archivers', taggedDataResponse)
-    io.emit('DATA', taggedDataResponse)
-    console.log('forward Accounts Successfully!')
+    try {
+      io.emit('DATA', taggedDataResponse)
+      console.log('forward Accounts Successfully!')
+    } catch (e) {
+      console.log('Run into error in forwarding accounts', e)
+    }
   }
 }
 
@@ -394,8 +402,11 @@ export function sendData() {
         recipient.curvePk
       )
     }
-
-    io.emit('DATA', taggedDataResponse)
+    try {
+      io.emit('DATA', taggedDataResponse)
+    } catch (e) {
+      console.log('Run into issue in forwarding cycles data', e)
+    }
 
     // http
     //   .post(recipientUrl, taggedDataResponse)

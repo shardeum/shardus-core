@@ -384,44 +384,47 @@ class Shardus extends EventEmitter {
     await Network.init()
     await Network.checkTimeSynced(this.config.p2p.timeServers)
 
-    // Setup network
-    this.io = (await this.network.setup(Network.ipInfo)) as SocketIO.Server
-    Context.setIOContext(this.io)
-    let connectedSockets = {}
-    let maxArchiversSupport = 2
-    this.io.on('connection', (socket: any) => {
-      console.log(
-        `Archive server has subscribed to this node with socket id ${socket.id}!`
-      )
-      socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
+    try {
+      this.io = (await this.network.setup(Network.ipInfo)) as SocketIO.Server
+      Context.setIOContext(this.io)
+      let connectedSockets = {}
+      let maxArchiversSupport = 2 // Make this as part of the network config
+      this.io.on('connection', (socket: any) => {
         console.log(
-          'Archiver has registered its public key',
-          ARCHIVER_PUBLIC_KEY
+          `Archive server has subscribed to this node with socket id ${socket.id}!`
         )
-        for (const [key, value] of Object.entries(connectedSockets)) {
-          if (value === ARCHIVER_PUBLIC_KEY) {
-            delete connectedSockets[key]
-          }
-        }
-        if (Object.keys(connectedSockets).length >= maxArchiversSupport) {
+        socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
           console.log(
-            `There are already ${maxArchiversSupport} archivers connected for data transfer!`
+            'Archiver has registered its public key',
+            ARCHIVER_PUBLIC_KEY
           )
-          socket.disconnect();
-          return
-        }
-        connectedSockets[socket.id] = ARCHIVER_PUBLIC_KEY
-        console.log('connectedSockets', connectedSockets)
+          for (const [key, value] of Object.entries(connectedSockets)) {
+            if (value === ARCHIVER_PUBLIC_KEY) {
+              delete connectedSockets[key]
+            }
+          }
+          if (Object.keys(connectedSockets).length >= maxArchiversSupport) {
+            console.log(
+              `There are already ${maxArchiversSupport} archivers connected for data transfer!`
+            )
+            socket.disconnect()
+            return
+          }
+          connectedSockets[socket.id] = ARCHIVER_PUBLIC_KEY
+          console.log('connectedSockets', connectedSockets)
+        })
+        socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
+          console.log(
+            `Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`
+          )
+          console.log('connectedSockets', connectedSockets)
+          Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
+          delete connectedSockets[socket.id]
+        })
       })
-      socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
-        console.log(
-          `Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`
-        )
-        console.log('connectedSockets', connectedSockets)
-        Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
-        delete connectedSockets[socket.id]
-      })
-    })
+    } catch (e) {
+      console.log('Socket connection break', e)
+    }
     this.network.on('timeout', (node) => {
       console.log('in Shardus got network timeout from', node)
       const result = isApopMarkedNode(node.id)
