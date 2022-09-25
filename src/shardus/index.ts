@@ -388,7 +388,6 @@ class Shardus extends EventEmitter {
     try {
       this.io = (await this.network.setup(Network.ipInfo)) as SocketIO.Server
       Context.setIOContext(this.io)
-      let connectedSockets = {}
       let maxArchiversSupport = 2 // Make this as part of the network config
       this.io.on('connection', (socket: any) => {
         console.log(
@@ -399,32 +398,35 @@ class Shardus extends EventEmitter {
             'Archiver has registered its public key',
             ARCHIVER_PUBLIC_KEY
           )
-          for (const [key, value] of Object.entries(connectedSockets)) {
-            if (value === ARCHIVER_PUBLIC_KEY) {
-              delete connectedSockets[key]
+          for (const [key, value] of Object.entries(
+            Archivers.connectedSockets
+          )) {
+            if (key === ARCHIVER_PUBLIC_KEY) {
+              Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
             }
           }
-          if (Object.keys(connectedSockets).length >= maxArchiversSupport) {
+          if (
+            Object.keys(Archivers.connectedSockets).length >=
+            maxArchiversSupport
+          ) {
             console.log(
               `There are already ${maxArchiversSupport} archivers connected for data transfer!`
             )
             socket.disconnect()
             return
           }
-          connectedSockets[socket.id] = ARCHIVER_PUBLIC_KEY
-          console.log('connectedSockets', connectedSockets)
+          Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
         })
         socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
           console.log(
             `Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`
           )
-          console.log('connectedSockets', connectedSockets)
           Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
-          delete connectedSockets[socket.id]
+          Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
         })
       })
     } catch (e) {
-      console.log('Socket connection break', e)
+      this.mainLogger.error('Socket connection break', e)
     }
     this.network.on('timeout', (node) => {
       console.log('in Shardus got network timeout from', node)
@@ -557,12 +559,12 @@ class Shardus extends EventEmitter {
       await Snapshot.startWitnessMode()
     })
     Self.emitter.on('joining', (publicKey) => {
-      this.io.emit('DATA', `NODE JOINING ${publicKey}`)
+      // this.io.emit('DATA', `NODE JOINING ${publicKey}`)
       this.logger.playbackLogState('joining', '', publicKey)
       if (this.reporter) this.reporter.reportJoining(publicKey)
     })
     Self.emitter.on('joined', (nodeId, publicKey) => {
-      this.io.emit('DATA', `NODE JOINED ${nodeId}`)
+      // this.io.emit('DATA', `NODE JOINED ${nodeId}`)
       this.logger.playbackLogState('joined', nodeId, publicKey)
       this.logger.setPlaybackID(nodeId)
       if (this.reporter) this.reporter.reportJoined(nodeId, publicKey)
@@ -582,7 +584,7 @@ class Shardus extends EventEmitter {
       }
     })
     Self.emitter.on('active', (nodeId) => {
-      this.io.emit('DATA', `NODE ACTIVE ${nodeId}`)
+      // this.io.emit('DATA', `NODE ACTIVE ${nodeId}`)
       this.logger.playbackLogState('active', nodeId, '')
       if (this.reporter) {
         this.reporter.reportActive(nodeId)
@@ -1081,7 +1083,7 @@ class Shardus extends EventEmitter {
       )
 
       // Pass received txs to any subscribed 'DATA' receivers
-      this.io.emit('DATA', tx)
+      // this.io.emit('DATA', tx)
     } catch (err) {
       this.shardus_fatal(
         `put_ex_` + err.message,

@@ -29,6 +29,8 @@ let recipients: Map<P2P.ArchiversTypes.JoinedArchiver['publicKey'], P2P.Archiver
 let joinRequests: P2P.ArchiversTypes.Request[]
 let leaveRequests: P2P.ArchiversTypes.Request[]
 let receiptForwardInterval: Timeout | null = null
+export let connectedSockets = {}
+
 
 /** FUNCTIONS */
 
@@ -278,9 +280,13 @@ async function forwardReceipts() {
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
     if(logFlags.console) console.log('Sending receipts to archivers', taggedDataResponse)
     try {
-      io.emit('DATA', taggedDataResponse)
+      if (io.sockets.sockets[connectedSockets[publicKey]])
+        io.sockets.sockets[connectedSockets[publicKey]].emit(
+          'DATA',
+          taggedDataResponse
+        )
     } catch (e) {
-      console.log('Run into issue in forwarding receipts data', e)
+      error('Run into issue in forwarding receipts data', e)
     }
   }
 
@@ -308,10 +314,14 @@ export async function forwardAccounts(accounts: any[]) {
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
     if (logFlags.console) console.log('Sending accounts to archivers', taggedDataResponse)
     try {
-      io.emit('DATA', taggedDataResponse)
+      if (io.sockets.sockets[connectedSockets[publicKey]])
+        io.sockets.sockets[connectedSockets[publicKey]].emit(
+          'DATA',
+          taggedDataResponse
+        )
       console.log('forward Accounts Successfully!')
     } catch (e) {
-      console.log('Run into error in forwarding accounts', e)
+      error('Run into error in forwarding accounts', e)
     }
   }
 }
@@ -329,7 +339,7 @@ export function sendData() {
   if(logFlags.console) console.log('Recient List before sending data')
   if(logFlags.console) console.log(recipients)
   for (const [publicKey, recipient] of recipients) {
-    const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
+    // const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
     const responses: P2P.ArchiversTypes.DataResponse['responses'] = {}
 
     for (const request of recipient.dataRequests) {
@@ -394,18 +404,23 @@ export function sendData() {
     // Tag dataResponse
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
 
-    if(logFlags.console) {
-      console.log(
-        `Sending data for cycle ${
-          getNewest().counter
-        } to archiver ${recipientUrl}`,
-        recipient.curvePk
-      )
-    }
+    // if(logFlags.console) {
+    //   console.log(
+    //     `Sending data for cycle ${
+    //       getNewest().counter
+    //     } to archiver ${recipientUrl}`,
+    //     recipient.curvePk
+    //   )
+    // }
     try {
-      io.emit('DATA', taggedDataResponse)
+      console.log('connected socketes', publicKey, connectedSockets)
+      if (io.sockets.sockets[connectedSockets[publicKey]])
+        io.sockets.sockets[connectedSockets[publicKey]].emit(
+          'DATA',
+          taggedDataResponse
+        )
     } catch (e) {
-      console.log('Run into issue in forwarding cycles data', e)
+      error('Run into issue in forwarding cycles data', e)
     }
 
     // http
@@ -441,6 +456,14 @@ export function getRefreshedArchivers(record) {
     }
   }
   return refreshedArchivers
+}
+
+export function addArchiverConnection(publicKey, socketId) {
+  connectedSockets[publicKey] = socketId
+}
+
+export function removeArchiverConnection(publicKey) {
+  delete connectedSockets[publicKey]
 }
 
 export function registerRoutes() {

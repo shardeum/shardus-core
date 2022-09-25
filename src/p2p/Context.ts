@@ -18,7 +18,7 @@ export let network: NetworkClass
 export let shardus: Shardus
 export let stateManager: StateManager
 export let storage: Storage
-export let io
+export let io: SocketIO.Server
 export let config: ShardusTypes.StrictServerConfiguration
 export let defaultConfigs: ShardusTypes.StrictShardusConfiguration
 export let reporter: Reporter
