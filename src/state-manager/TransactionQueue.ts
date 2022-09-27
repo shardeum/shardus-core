@@ -4387,6 +4387,13 @@ class TransactionQueue {
     return node
   }
 
+  getStorageGroupForAccount(accountID: string): Shardus.Node[] {
+    let { homePartition } = ShardFunctions.addressToPartition(this.stateManager.currentCycleShardData.shardGlobals, accountID)
+    let homeShardData = this.stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
+    let storageGroup = homeShardData.homeNodes[0].nodeThatStoreOurParitionFull.slice()
+    return storageGroup
+  }
+
   isAccountRemote(accountID:string):boolean {
     let ourNodeShardData = this.stateManager.currentCycleShardData.nodeShardData
     let minP = ourNodeShardData.consensusStartPartition

@@ -717,11 +717,92 @@ class AccountPatcher {
       res.end()
     })
 
+    /**
+     *
+     *
+     * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/account-coverage?id=<accountID>
+     */
+     Context.network.registerExternalGet('account-coverage', isDebugModeMiddleware, async (req, res) => {
+      if (req.query.id === null) return
+      const id = req.query.id as string
+
+      const possibleAccountsIds: string[] = []
+      try {
+        if(id.length === 10){
+          //short form..
+          let found = false
+          let prefix = id.substr(0,4)
+          let low = prefix + '0'.repeat(60)
+          let high = prefix + 'f'.repeat(60)
+
+          let suffix = id.substr(5,5)
+          let possibleAccounts = await this.app.getAccountDataByRange(low, high, 0, Date.now(), 100, 0)
+
+          for(let account of possibleAccounts ){
+            if(account.accountId.endsWith(suffix)){
+              possibleAccountsIds.push(account.accountId)
+            }
+          }
+        } else {
+          possibleAccountsIds.push(id)
+        }
+
+        if (possibleAccountsIds.length === 0) {
+          res.write(
+            JSON.stringify({
+              success: false,
+              error: 'could not find account'
+            })
+          )
+        } else {
+          const resObj = {}
+          for (const accountId of possibleAccountsIds) {
+            const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(accountId)
+            const storedNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(accountId)
+
+            resObj[accountId] = {
+              consensusNodes: consensusNodes.map((node) => {
+                return {
+                  id: node.id,
+                  externalIp: node.externalIp,
+                  externalPort: node.externalPort,
+                  internalIp: node.internalIp,
+                  internalPort: node.internalPort,
+                }
+              }),
+              storedNodes: storedNodes.map((node) => {
+                return {
+                  id: node.id,
+                  externalIp: node.externalIp,
+                  externalPort: node.externalPort,
+                  internalIp: node.internalIp,
+                  internalPort: node.internalPort,
+                }
+              }),
+            }
+          }
+          res.write(
+            JSON.stringify({
+              success: true,
+              result: resObj
+            })
+          )
+        }
+      } catch (e) {
+        res.write(
+          JSON.stringify({
+            success: false,
+            error: e
+          })
+        )
+      }
+      res.end()
+    })
+
     Context.network.registerExternalGet('hack-version', isDebugModeMiddleware, (req, res) => {
       res.write(`1.0.1\n`)
       res.end()
     })
-
   }
 
   getAccountTreeInfo(accountID:string) : TrieAccount {
