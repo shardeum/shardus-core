@@ -817,6 +817,8 @@ export interface LogsConfiguration {
     appenders?: {
       out?: {
         type?: string
+        maxLogSize?: number
+        backups?: number
       }
       main?: {
         type?: string
