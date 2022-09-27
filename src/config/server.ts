@@ -133,6 +133,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     maxDataSyncRestarts: 5,
     maxTrackerRestarts: 5,
     syncWithAccountOffset: true,
+    useAccountCopiesTable: false,
   },
   sharding: { nodesPerConsensusGroup: 5, executeInOneShard: false },
   mode: ServerMode.Debug,

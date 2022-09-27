@@ -794,6 +794,8 @@ export interface ServerConfiguration {
     maxTrackerRestarts: number
     /** Use accountID for the offset command when syncing data */
     syncWithAccountOffset: boolean
+    /** this will control if the account copies table functions */
+    useAccountCopiesTable: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

@@ -16,6 +16,8 @@ import Sqlite3Storage from './sqlite3storage'
 
 import P2PApoptosis = require('../p2p/Apoptosis')
 
+import { config } from '../p2p/Context'
+
 interface Storage {
   profiler: Profiler
   mainLogger: Log4js.Logger
@@ -826,6 +828,10 @@ class Storage {
   }
 
   async createAccountCopies(accountCopies) {
+    if(config.stateManager.useAccountCopiesTable === false){
+      return
+    }
+    
     this._checkInit()
     try {
       // if (logFlags.console) console.log('createAccountCopies write: ' + JSON.stringify(accountCopies))
@@ -836,6 +842,10 @@ class Storage {
   }
 
   async createOrReplaceAccountCopy(accountCopy) {
+    if(config.stateManager.useAccountCopiesTable === false){
+      return
+    }
+
     this._checkInit()
     try {
       // if (logFlags.console) console.log('createOrReplaceAccountCopy write: ' + JSON.stringify(accountCopy))
@@ -854,6 +864,10 @@ class Storage {
   // hash: { type: Sequelize.STRING, allowNull: false }
 
   async getAccountReplacmentCopies1(accountIDs, cycleNumber) {
+    if(config.stateManager.useAccountCopiesTable === false){
+      return []
+    }
+
     this._checkInit()
     try {
       const result = await this._read(
@@ -876,6 +890,10 @@ class Storage {
   }
 
   async getAccountReplacmentCopies(accountIDs, cycleNumber) {
+    if(config.stateManager.useAccountCopiesTable === false){
+      return []
+    }
+
     this._checkInit()
     try {
       let expandQ = ''
@@ -895,6 +913,10 @@ class Storage {
   }
 
   async clearAccountReplacmentCopies(accountIDs, cycleNumber) {
+    if(config.stateManager.useAccountCopiesTable === false){
+      return []
+    }
+
     this._checkInit()
     try {
       await this._delete(
@@ -916,6 +938,10 @@ class Storage {
   }
 
   async getAccountCopiesByCycle(cycleNumber) {
+    if(config.stateManager.useAccountCopiesTable === false){
+      return []
+    }
+
     this._checkInit()
     try {
       //const query = `select accountId, max(cycleNumber) cycleNumber, data, timestamp, hash from accountsCopy WHERE cycleNumber <= ? group by accountId `
@@ -929,6 +955,10 @@ class Storage {
   }
 
   async getAccountCopiesByCycleAndRange(cycleNumber, lowAddress, highAddress) {
+    if(config.stateManager.useAccountCopiesTable === false){
+      return []
+    }
+
     this._checkInit()
     try {
       const query = `SELECT a.accountId,a.data,a.timestamp,a.hash,a.isGlobal FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy WHERE cycleNumber<=${cycleNumber} GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.cycleNumber<=${cycleNumber} and a.accountId>="${lowAddress}" and a.accountId<="${highAddress}" and a.isGlobal=false order by a.accountId asc`
@@ -940,6 +970,11 @@ class Storage {
   }
 
   async getGlobalAccountCopies(cycleNumber) {
+
+    if(config.stateManager.useAccountCopiesTable === false){
+      return []
+    }
+
     this._checkInit()
     try {
       const query = `SELECT a.accountId,a.data,a.timestamp,a.hash,a.isGlobal FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy WHERE cycleNumber<=${cycleNumber} GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.cycleNumber<=${cycleNumber} and a.isGlobal=true order by a.accountId asc`
@@ -955,6 +990,11 @@ class Storage {
     lowAddress,
     highAddress
   ) {
+    if(config.stateManager.useAccountCopiesTable === false){
+      return []
+    }
+
+
     this._checkInit()
     try {
       const query = `SELECT a.* FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy where cycleNumber<=${cycleNumber} GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.accountId>="${lowAddress}" and a.accountId<="${highAddress}" and a.isGlobal=false order by a.accountId asc`
@@ -966,6 +1006,10 @@ class Storage {
   }
 
   async getOldGlobalAccountCopies(cycleNumber) {
+    if(config.stateManager.useAccountCopiesTable === false){
+      return []
+    }
+
     this._checkInit()
     try {
       const query = `SELECT a.* FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy where cycleNumber<=${cycleNumber} GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.isGlobal=true order by a.accountId asc`
