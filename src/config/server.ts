@@ -131,7 +131,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     patcherMaxLeafHashesPerRequest: 300,
     patcherMaxChildHashResponses: 2000,
     maxDataSyncRestarts: 5,
-    maxTrackerRestarts: 5
+    maxTrackerRestarts: 5,
+    syncWithAccountOffset: true,
   },
   sharding: { nodesPerConsensusGroup: 5, executeInOneShard: false },
   mode: ServerMode.Debug,

@@ -305,7 +305,7 @@ class AccountSync {
         ourLockID = await this.stateManager.fifoLock('accountModification')
         // returns { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
         //GetAccountDataByRangeSmart
-        accountData = await this.stateManager.getAccountDataByRangeSmart(payload.accountStart, payload.accountEnd, payload.tsStart, payload.maxRecords, payload.offset)
+        accountData = await this.stateManager.getAccountDataByRangeSmart(payload.accountStart, payload.accountEnd, payload.tsStart, payload.maxRecords, payload.offset, payload.accountOffset)
       } finally {
         this.stateManager.fifoUnlock('accountModification', ourLockID)
       }

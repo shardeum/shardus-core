@@ -271,7 +271,8 @@ export interface App {
     tsStart: number,
     tsEnd: number,
     maxRecords: number,
-    offset: number
+    offset: number,
+    accountOffset: string,
   ) => WrappedData[]
 
   calculateAccountHash: (account: unknown) => string
@@ -791,6 +792,8 @@ export interface ServerConfiguration {
     maxDataSyncRestarts: number
     /** max number of sync restarts allowed due to thrown exceptions for each tracker instance */
     maxTrackerRestarts: number
+    /** Use accountID for the offset command when syncing data */
+    syncWithAccountOffset: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

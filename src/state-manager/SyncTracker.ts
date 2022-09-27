@@ -424,6 +424,7 @@ export default class SyncTracker {
     let stopIfNextLoopHasNoResults = false
 
     let offset = 0
+    let accountOffset = ""
 
     let askRetriesLeft = 20
 
@@ -474,7 +475,8 @@ export default class SyncTracker {
       }
 
       // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
-      let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.accountSync.config.stateManager.accountBucketSize, offset }
+      let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.accountSync.config.stateManager.accountBucketSize, offset, accountOffset }
+
       let r: GetAccountData3Resp | boolean
       try {
         r = await Comms.ask(this.dataSourceHelper.dataSourceNode, 'get_account_data3', message, false, '', 5000 + moreAskTime ) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
@@ -542,6 +544,8 @@ export default class SyncTracker {
         }
       }
 
+
+
       // If this is a repeated query, clear out any dupes from the new list we just got.
       // There could be many rows that use the stame timestamp so we will search and remove them
       let dataDuplicated = true
@@ -582,6 +586,15 @@ export default class SyncTracker {
         startTime++
         //dont need offset because we should already have all the records
         offset = 0
+      }
+
+      //clear account offset for next pass
+      accountOffset = ""
+      // if we would use an offset, then set an account offset 
+      if( this.accountSync.config.stateManager.syncWithAccountOffset === true){
+        if(offset > 0){
+          accountOffset = accountData[accountData.length-1].accountId
+        }
       }
 
       // if we have any accounts in wrappedAccounts2
