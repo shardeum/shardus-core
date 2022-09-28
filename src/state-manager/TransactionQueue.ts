@@ -3833,7 +3833,7 @@ class TransactionQueue {
                 }
 
                 if(this.config.p2p.experimentalSnapshot) this.addReceiptToForward(queueEntry)
-                console.log('commit commit', queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
+                // console.log('commit commit', queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
 
                 if (hasReceiptFail) {
                   // endpoint to allow dapp to execute something that depends on a transaction failing
