@@ -749,6 +749,13 @@ export interface ServerConfiguration {
      * in the queue / the queueLimit.
      **/
     queueLimit?: number
+    /**
+     * The queueLimit parameter is an Integer which specifies one of the two possible limits to check whether the network is under heavy load.
+     * It does this by checking it’s set value against the current transaction queue. The threshold will be equal to the number of transactions
+     * in the queue / the queueLimit.
+     * executeQueueLimit is similar to queueLimit but will only count transactions that will execute on this node
+     */
+    executeQueueLimit?: number
     /** The desiredTxTime parameter is an Integer which specifies the other condition to check whether the network is under heavy load. */
     desiredTxTime?: number
     /** The highThreshold parameter is an Integer which specifies the high end of the load the network can take. Reaching this threshold will cause the network to increase the desired nodes. */
@@ -770,6 +777,7 @@ export interface ServerConfiguration {
       external?: number
       txTimeInQueue?: number
       queueLength?: number
+      executeQueueLength?: number
     }
   }
   /** Server State manager module configuration */

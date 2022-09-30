@@ -4403,6 +4403,18 @@ class TransactionQueue {
     return accountIsRemote
   }
 
+  /** count the number of queue entries that will potentially execute on this node */
+  getExecuteQueueLength(): number {
+    let length = 0
+    for(let queueEntry of this.newAcceptedTxQueue){
+      //TODO shard hopping will have to consider if updating this value is imporant to how our load detection works.
+      //probably not since it is a zero sum game if we move it
+      if(queueEntry.isInExecutionHome){
+        length++
+      }
+    }
+    return length
+  }
 }
 
 export default TransactionQueue

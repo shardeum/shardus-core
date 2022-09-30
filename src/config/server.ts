@@ -109,6 +109,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
   statistics: { save: true, interval: 1 },
   loadDetection: {
     queueLimit: 1000,
+    executeQueueLimit: 1000.0,
     desiredTxTime: 15,
     highThreshold: 0.5,
     lowThreshold: 0.2,
@@ -120,6 +121,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
       external: 0.4,
       txTimeInQueue: 0.2,
       queueLength: 0.2,
+      executeQueueLength: 0.2,
     },
   },
   stateManager: { 

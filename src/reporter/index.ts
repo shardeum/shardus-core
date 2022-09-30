@@ -303,7 +303,9 @@ class Reporter {
     // Server load
     const currentNetworkLoad = this.loadDetection.getCurrentLoad()
     const currentNodeLoad = this.loadDetection.getCurrentNodeLoad()
-    const queueLength = this.statistics.getPreviousElement('queueLength')
+    let queueLength = this.statistics.getPreviousElement('queueLength')
+    const executeQueueLength = this.statistics.getPreviousElement('executeQueueLength')
+    queueLength = executeQueueLength //debug hack until the monitor client can show this
     const txTimeInQueue =
       this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
     const isNodeLost = this.checkIsNodeLost(Self.id)
@@ -347,6 +349,7 @@ class Reporter {
           'nodeLoad': currentNodeLoad
         },
         queueLength,
+        executeQueueLength,
         txTimeInQueue,
         rareCounters,
         txCoverage,

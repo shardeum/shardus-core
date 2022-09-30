@@ -11,11 +11,13 @@ interface LoadDetection {
   lowThreshold: number  /** if load < lowThreshold, then scale down request */
   desiredTxTime: number /** max desired average time for the age of a TX.  */
   queueLimit: number    /** max desired TXs in queue. note TXs must spend a minimum 6 seconds in the before they can process*/
+  executeQueueLimit: number  /** max desired TXs in queue that will be executed on this node. note TXs must spend a minimum 6 seconds in the before they can process*/
   statistics: Statistics
   load: number /** load is what matters for scale up or down. it is the max of scaledTimeInQueue and scaledQueueLength. */
   nodeLoad: NodeLoad /** this nodes perf related load. does not determine scale up/down, but can cause rate-limiting */
   scaledTxTimeInQueue: number /** 0-1 value on how close to desiredTxTime this nodes is (set to 0 if scaledQueueLength < lowThreshold) */
   scaledQueueLength: number /** 0-1 value on how close to queueLimit this nodes is */
+  scaledExecuteQueueLength: number /** 0-1 value on how close to queueLimit this nodes is */
   dbg: boolean
 }
 let lastMeasuredTimestamp = 0
@@ -27,6 +29,7 @@ class LoadDetection extends EventEmitter {
     this.lowThreshold = config.lowThreshold
     this.desiredTxTime = config.desiredTxTime
     this.queueLimit = config.queueLimit
+    this.executeQueueLimit = config.executeQueueLimit
     this.statistics = statistics
     this.load = 0
     this.nodeLoad = {
@@ -35,6 +38,7 @@ class LoadDetection extends EventEmitter {
     }
     this.scaledTxTimeInQueue = 0
     this.scaledQueueLength = 0
+    this.scaledExecuteQueueLength = 0
 
     this.dbg = false
 
@@ -72,6 +76,7 @@ class LoadDetection extends EventEmitter {
       load = this.load
       this.scaledTxTimeInQueue = load
       this.scaledQueueLength = load
+      this.scaledExecuteQueueLength = load
     } else {
       const txTimeInQueue = this.statistics.getAverage('txTimeInQueue') / 1000
       let scaledTxTimeInQueue =
@@ -80,8 +85,9 @@ class LoadDetection extends EventEmitter {
           : txTimeInQueue / this.desiredTxTime
 
       const queueLength = this.statistics.getWatcherValue('queueLength')
-      const scaledQueueLength =
-        queueLength >= this.queueLimit ? 1 : queueLength / this.queueLimit
+      const scaledQueueLength = queueLength >= this.queueLimit 
+          ? 1 
+          : queueLength / this.queueLimit
 
       // looking at these counters individually so we can have more detail about load
       // if (scaledTxTimeInQueue > this.highThreshold){
@@ -102,9 +108,15 @@ class LoadDetection extends EventEmitter {
         }
         scaledTxTimeInQueue = 0
       }
-
+      
+      const executeQueueLength = this.statistics.getWatcherValue('executeQueueLength')
+      const scaledExecuteQueueLength = executeQueueLength >= this.executeQueueLimit 
+          ? 1 
+          : executeQueueLength / this.executeQueueLimit
+      
       this.scaledTxTimeInQueue = scaledTxTimeInQueue
       this.scaledQueueLength = scaledQueueLength
+      this.scaledExecuteQueueLength = scaledExecuteQueueLength
 
       if (profilerInstance != null) {
         let dutyCycleLoad = profilerInstance.getTotalBusyInternal()
@@ -143,12 +155,31 @@ class LoadDetection extends EventEmitter {
         }
       }
 
-      load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
+      //lets use 80% of our EXSS load and 20% of our total load
+      //let adjustedQueueLoad = (scaledExecuteQueueLength * 0.8) + (scaledQueueLength * 0.2)
+      //lets use 100% of our EXSS load ... todo could make this a setting
+      let adjustedQueueLoad = (scaledExecuteQueueLength * 1.0) + (scaledQueueLength * 0.0)
 
-      if(scaledQueueLength > this.highThreshold){
+      //load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
+
+      load = Math.max(scaledTxTimeInQueue, adjustedQueueLoad)
+
+      // if(scaledQueueLength > this.highThreshold){
+      //   nestedCountersInstance.countEvent(
+      //     'loadRelated',
+      //     'highThreshold-scaledQueueLength'
+      //   )
+      // }
+      // if(scaledExecuteQueueLength > this.highThreshold){
+      //   nestedCountersInstance.countEvent(
+      //     'loadRelated',
+      //     'highThreshold-scaledExecuteQueueLength'
+      //   )
+      // }
+      if(adjustedQueueLoad > this.highThreshold){
         nestedCountersInstance.countEvent(
           'loadRelated',
-          'highThreshold-scaledQueueLength'
+          'highThreshold-adjustedQueueLoad'
         )
       }
       if(scaledTxTimeInQueue > this.highThreshold){
@@ -182,6 +213,7 @@ class LoadDetection extends EventEmitter {
     return {
       txTimeInQueue: this.scaledTxTimeInQueue,
       queueLength: this.scaledQueueLength,
+      executeQueueLength: this.scaledExecuteQueueLength,
     }
   }
 }

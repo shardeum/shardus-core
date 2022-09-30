@@ -191,6 +191,7 @@ class MemoryReporting {
       let numActiveNodes = NodeList.activeByIdOrder.length
       let queueCount = this.shardus.stateManager.transactionQueue.newAcceptedTxQueue.length
       let archiveQueueCount = this.shardus.stateManager.transactionQueue.archivedQueueEntries.length
+      
       outStr += ` nds:${numActiveNodes} qCt:${queueCount} aAr:${archiveQueueCount}`
     }
     outStr += '\n'
@@ -246,7 +247,8 @@ class MemoryReporting {
       this.addToReport('StateManager','TXQueue', 'pendingQueueCount', pendingQueueCount )
       let archiveQueueCount = this.shardus.stateManager.transactionQueue.archivedQueueEntries.length
       this.addToReport('StateManager','TXQueue', 'archiveQueueCount', archiveQueueCount )
-
+      let executeQueueLength = this.shardus.stateManager.transactionQueue.getExecuteQueueLength()
+      this.addToReport('StateManager','TXQueue', 'executeQueueLength', executeQueueLength )
 
       for(let syncTracker of this.shardus.stateManager.accountSync.syncTrackers){
         let partition = `${utils.stringifyReduce(syncTracker.range?.low)} - ${utils.stringifyReduce(syncTracker.range?.high)}`

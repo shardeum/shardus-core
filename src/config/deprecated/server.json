@@ -92,6 +92,7 @@
   },
   "loadDetection": {
     "queueLimit": 1000,
+    "executeQueueLimit": 1000,
     "desiredTxTime": 15,
     "highThreshold": 0.5,
     "lowThreshold": 0.2

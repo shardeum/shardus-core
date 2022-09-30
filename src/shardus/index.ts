@@ -484,6 +484,10 @@ class Shardus extends EventEmitter {
             this.stateManager
               ? this.stateManager.transactionQueue.newAcceptedTxQueue.length
               : 0,
+          executeQueueLength: () =>
+              this.stateManager
+                ? this.stateManager.transactionQueue.getExecuteQueueLength()
+                : 0,              
           serverLoad: () =>
             this.loadDetection ? this.loadDetection.getCurrentLoad() : 0,
         },
