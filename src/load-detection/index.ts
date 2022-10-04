@@ -158,30 +158,33 @@ class LoadDetection extends EventEmitter {
       //lets use 80% of our EXSS load and 20% of our total load
       //let adjustedQueueLoad = (scaledExecuteQueueLength * 0.8) + (scaledQueueLength * 0.2)
       //lets use 100% of our EXSS load ... todo could make this a setting
-      let adjustedQueueLoad = (scaledExecuteQueueLength * 1.0) + (scaledQueueLength * 0.0)
+      //let adjustedQueueLoad = (scaledExecuteQueueLength * 1.0) + (scaledQueueLength * 0.0)
 
+      //mix these together with a MAX use settings to make scaledQueueLength much larger than scaledExecuteQueueLength
+      let adjustedQueueLoad = Math.max(scaledExecuteQueueLength, scaledQueueLength)
+  
       //load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
 
       load = Math.max(scaledTxTimeInQueue, adjustedQueueLoad)
 
-      // if(scaledQueueLength > this.highThreshold){
-      //   nestedCountersInstance.countEvent(
-      //     'loadRelated',
-      //     'highThreshold-scaledQueueLength'
-      //   )
-      // }
-      // if(scaledExecuteQueueLength > this.highThreshold){
-      //   nestedCountersInstance.countEvent(
-      //     'loadRelated',
-      //     'highThreshold-scaledExecuteQueueLength'
-      //   )
-      // }
-      if(adjustedQueueLoad > this.highThreshold){
+      if(scaledQueueLength > this.highThreshold){
         nestedCountersInstance.countEvent(
           'loadRelated',
-          'highThreshold-adjustedQueueLoad'
+          'highThreshold-scaledQueueLength'
         )
       }
+      if(scaledExecuteQueueLength > this.highThreshold){
+        nestedCountersInstance.countEvent(
+          'loadRelated',
+          'highThreshold-scaledExecuteQueueLength'
+        )
+      }
+      // if(adjustedQueueLoad > this.highThreshold){
+      //   nestedCountersInstance.countEvent(
+      //     'loadRelated',
+      //     'highThreshold-adjustedQueueLoad'
+      //   )
+      // }
       if(scaledTxTimeInQueue > this.highThreshold){
         nestedCountersInstance.countEvent(
           'loadRelated',
@@ -212,7 +215,7 @@ class LoadDetection extends EventEmitter {
   getQueueLoad() {
     return {
       txTimeInQueue: this.scaledTxTimeInQueue,
-      queueLength: this.scaledQueueLength,
+      queueLength: this.scaledQueueLength,  //this will impact rejections, but not scale up-down
       executeQueueLength: this.scaledExecuteQueueLength,
     }
   }
