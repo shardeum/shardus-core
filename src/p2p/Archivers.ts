@@ -280,11 +280,18 @@ async function forwardReceipts() {
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
     if(logFlags.console) console.log('Sending receipts to archivers', taggedDataResponse)
     try {
-      if (io.sockets.sockets[connectedSockets[publicKey]])
+      if (io.sockets.sockets[connectedSockets[publicKey]]) {
+        if (logFlags.console)
+          console.log(
+            'forwarded Archiver',
+            recipient.nodeInfo.ip + ':' + recipient.nodeInfo.port
+          )
         io.sockets.sockets[connectedSockets[publicKey]].emit(
           'DATA',
           taggedDataResponse
         )
+      }
+      else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
     } catch (e) {
       error('Run into issue in forwarding receipts data', e)
     }
@@ -314,12 +321,13 @@ export async function forwardAccounts(accounts: any[]) {
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
     if (logFlags.console) console.log('Sending accounts to archivers', taggedDataResponse)
     try {
-      if (io.sockets.sockets[connectedSockets[publicKey]])
+      if (io.sockets.sockets[connectedSockets[publicKey]]) {
         io.sockets.sockets[connectedSockets[publicKey]].emit(
           'DATA',
           taggedDataResponse
         )
-      console.log('forward Accounts Successfully!')
+        console.log(`forward Accounts Successfully`)
+      }
     } catch (e) {
       error('Run into error in forwarding accounts', e)
     }
@@ -413,12 +421,13 @@ export function sendData() {
     //   )
     // }
     try {
-      console.log('connected socketes', publicKey, connectedSockets)
+      // console.log('connected socketes', publicKey, connectedSockets)
       if (io.sockets.sockets[connectedSockets[publicKey]])
         io.sockets.sockets[connectedSockets[publicKey]].emit(
           'DATA',
           taggedDataResponse
         )
+      else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
     } catch (e) {
       error('Run into issue in forwarding cycles data', e)
     }
