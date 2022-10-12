@@ -809,6 +809,8 @@ export interface ServerConfiguration {
   sharding?: {
     /** The nodesPerConsensusGroup parameter defines how many nodes will be contained within a shard */
     nodesPerConsensusGroup?: number
+    /** The number of edge nodes on each side */
+    nodesPerEdge?: number
     /** Sets if the execute in one shard feature is active */
     executeInOneShard?: boolean
   }

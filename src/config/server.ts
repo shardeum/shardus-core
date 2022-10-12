@@ -137,7 +137,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     syncWithAccountOffset: true,
     useAccountCopiesTable: false,
   },
-  sharding: { nodesPerConsensusGroup: 5, executeInOneShard: false },
+  sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,
 }
 export default SERVER_CONFIG

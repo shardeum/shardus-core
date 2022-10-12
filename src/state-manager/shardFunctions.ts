@@ -52,10 +52,10 @@ class ShardFunctions {
     shardGlobals.consensusRadius = Math.floor((nodesPerConsenusGroup - 1) / 2)
 
     // NOT ready for using nodes per edge as an input, so we will force it to a procedural value
-    // if(nodesPerEdge == null){
-    //   nodesPerEdge = shardGlobals.consensusRadius
-    // }
-    nodesPerEdge = shardGlobals.consensusRadius
+    if(nodesPerEdge == null){
+      nodesPerEdge = shardGlobals.consensusRadius
+    }
+    // nodesPerEdge = shardGlobals.consensusRadius
     shardGlobals.nodesPerEdge = nodesPerEdge
 
     const partitionStoreRadius = shardGlobals.consensusRadius + shardGlobals.nodesPerEdge
@@ -94,7 +94,8 @@ class ShardFunctions {
    * @param homePartition
    */
   static calculateStoredPartitions2(shardGlobals: ShardGlobals, homePartition: number): WrappablePartitionRange {
-    return ShardFunctions.calculateParitionRange(shardGlobals, homePartition, shardGlobals.nodesPerConsenusGroup)
+    const storedPartitionRadius = shardGlobals.consensusRadius + shardGlobals.nodesPerEdge
+    return ShardFunctions.calculateParitionRange(shardGlobals, homePartition, storedPartitionRadius)
   }
 
   static calculateConsensusPartitions(shardGlobals: ShardGlobals, homePartition: number): WrappablePartitionRange {
