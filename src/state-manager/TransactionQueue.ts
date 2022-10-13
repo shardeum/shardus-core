@@ -548,7 +548,7 @@ class TransactionQueue {
     let uniqueKeys = []
     let ourAccountLocks = null
     let acceptedTX = queueEntry.acceptedTx
-    let wrappedStates = queueEntry.collectedData
+    let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
     let localCachedData = queueEntry.localCachedData
     let keysResponse = queueEntry.txKeys
     let { timestamp, sourceKeys, targetKeys, debugInfo } = keysResponse
@@ -563,6 +563,7 @@ class TransactionQueue {
         this.mainLogger.debug(`commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
         this.mainLogger.debug(`commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
         this.mainLogger.debug(`commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+        this.mainLogger.debug(`commitConsensedTransaction  queueEntry: ${utils.stringifyReduce(queueEntry)}`)
       }
       // TODO ARCH REVIEW:  review use of fifo lock of accountModification and account keys. (more notes in tryPreApplyTransaction() above )
 
@@ -604,10 +605,13 @@ class TransactionQueue {
         //this should mean dapps don't have to use this feature.  (keeps simple dapps simpler)
       let writtenAccountsMap: WrappedResponses = {}
       if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+        let collectedData = queueEntry.collectedData
+        console.log(`commitConsensedTransaction collectedData: ${utils.stringifyReduce(collectedData)}`)
         for (let writtenAccount of applyResponse.accountWrites) {
           writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
-          writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId] ? wrappedStates[writtenAccount.accountId].stateId : ''
-          writtenAccountsMap[writtenAccount.accountId].prevDataCopy = wrappedStates[writtenAccount.accountId] ? utils.deepCopy(writtenAccount.data) : {}
+          writtenAccountsMap[writtenAccount.accountId].prevStateId = collectedData[writtenAccount.accountId] ? collectedData[writtenAccount.accountId].stateId : ''
+          writtenAccountsMap[writtenAccount.accountId].prevDataCopy = collectedData[writtenAccount.accountId] ? utils.deepCopy(collectedData[writtenAccount.accountId].data) : {}
+          // writtenAccountsMap[writtenAccount.accountId].prevDataCopy = collectedData[writtenAccount.accountId] ? utils.deepCopy(writtenAccount.data) : {}
         }
         //override wrapped states with writtenAccountsMap which should be more complete if it included
         wrappedStates = writtenAccountsMap
@@ -2487,7 +2491,7 @@ class TransactionQueue {
     let datas: { [accountID: string]: Shardus.WrappedResponse } = {}
 
     let applyResponse = queueEntry.preApplyTXResult.applyResponse
-    let wrappedStates = queueEntry.collectedData
+    let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
     let writtenAccountsMap:WrappedResponses = {}
     if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
       for (let writtenAccount of applyResponse.accountWrites) {
@@ -4056,14 +4060,16 @@ class TransactionQueue {
 
     let accountsToAdd: WrappedResponses = {}
 
-    for (const account of Object.values(queueEntry.collectedData)) {
-      let accountCopy = {
-        accountId: account.accountId,
-        data: account.data,
-        timestamp: account.timestamp,
-        stateId: account.stateId,
-      } as Shardus.WrappedResponse
-      accountsToAdd[account.accountId] = accountCopy
+    if (!this.stateManager.useAccountWritesOnly) {
+      for (const account of Object.values(queueEntry.collectedData)) {
+        let accountCopy = {
+          accountId: account.accountId,
+          data: account.data,
+          timestamp: account.timestamp,
+          stateId: account.stateId,
+        } as Shardus.WrappedResponse
+        accountsToAdd[account.accountId] = accountCopy
+      }
     }
 
     // override with the accouns in accountWrites

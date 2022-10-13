@@ -170,6 +170,8 @@ class StateManager {
   superLargeNetworkDebugReduction: boolean
 
   lastActiveCount: number
+
+  useAccountWritesOnly: boolean
   /***
    *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########
    *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ##
@@ -202,6 +204,7 @@ class StateManager {
     this.lastSeenAccountsMap = null
 
     this.appFinishedSyncing = false
+    this.useAccountWritesOnly = false
 
     //BLOCK2
 
@@ -489,7 +492,7 @@ class StateManager {
       cycleShardData.timestampEndCycle = (cycle.start + cycle.duration) * 1000
     }
 
-    const edgeNodes = this.config.sharding.nodesPerConsensusGroup as number
+    const edgeNodes = this.config.sharding.nodesPerEdge as number
 
     // save this per cycle?
     cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup as number, edgeNodes)
@@ -1152,7 +1155,7 @@ class StateManager {
           return
         }
 
-        let wrappedStates = queueEntry.collectedData
+        let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
 
         // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
         let writtenAccountsMap: WrappedResponses = {}
@@ -1228,7 +1231,7 @@ class StateManager {
 
         response.acceptedTX = queueEntry.acceptedTx
 
-        let wrappedStates = queueEntry.collectedData
+        let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
 
         // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
         let writtenAccountsMap: WrappedResponses = {}

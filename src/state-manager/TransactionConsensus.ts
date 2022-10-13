@@ -391,7 +391,8 @@ class TransactionConsenus {
 
 
       //test our data against a winning vote in the receipt
-      let wrappedStates = queueEntry.collectedData
+      let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
+
       let wrappedStateKeys = Object.keys(queueEntry.collectedData)
       let vote = appliedReceipt.appliedVotes[0] //all votes are equivalent, so grab the first
 
@@ -838,7 +839,7 @@ class TransactionConsenus {
     //   }
     // }
 
-    let wrappedStates = queueEntry.collectedData
+    let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
 
     let applyResponse = queueEntry?.preApplyTXResult?.applyResponse
 

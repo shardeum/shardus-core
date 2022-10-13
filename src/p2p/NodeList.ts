@@ -52,7 +52,6 @@ export function reset() {
 }
 
 export function addNode(node: P2P.NodeListTypes.Node) {
-  console.log('thant: adding node', node)
   // Don't add duplicates
   if (nodes.has(node.id)) {
     warn(

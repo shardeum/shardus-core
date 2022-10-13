@@ -1273,6 +1273,11 @@ class Shardus extends EventEmitter {
     })
   }
 
+  useAccountWrites() {
+    console.log('Using accountWrites only')
+    this.stateManager.useAccountWritesOnly = true
+  }
+
   tryInvolveAccount(txId: string, address: string, isRead: boolean): boolean {
     const result = this.stateManager.transactionQueue.tryInvloveAccount(
       txId,
