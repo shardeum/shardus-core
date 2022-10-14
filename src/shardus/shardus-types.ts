@@ -169,7 +169,7 @@ export interface App {
    * @param tx 
    * @param appData 
    */
-  txPreCrackData(tx: OpaqueTransaction, appData: any): void // Promise<any>
+  txPreCrackData(tx: OpaqueTransaction, appData: any): Promise<void> // Promise<any>
 
   // DEPRECATED . This was previously a deep validate for buisness logic but it is up to the dapp to handle this as part of apply
   validateTransaction?: (...data: any) => any
@@ -186,7 +186,7 @@ export interface App {
   apply: (
     inTx: OpaqueTransaction,
     wrappedStates: { [accountId: string]: WrappedData }
-  ) => ApplyResponse
+  ) => Promise<ApplyResponse>
 
   /**
    * This is called after consensus has received or produced a receipt and the trasaction is approved.
@@ -223,7 +223,7 @@ export interface App {
     applyResponse: ApplyResponse
   ) => void
 
-  getRelevantData: (accountId: string, tx: object) => WrappedResponse
+  getRelevantData: (accountId: string, tx: object) => Promise<WrappedResponse>
 
   /**
    * A function responsible for getting timestamp from injected transaction
@@ -240,7 +240,7 @@ export interface App {
   /**
    * A function that returns the State ID for a given Account Address
    */
-  getStateId?: (accountAddress: string, mustExist?: boolean) => string
+  getStateId?: (accountAddress: string, mustExist?: boolean) => Promise<string>
   /**
    * A function that returns the timestamp for a given Account Address
    */
@@ -263,7 +263,7 @@ export interface App {
     accountStart: string,
     accountEnd: string,
     maxRecords: number
-  ) => WrappedData[]
+  ) => Promise<WrappedData[]>
 
   getAccountDataByRange: (
     accountStart: string,
@@ -273,7 +273,7 @@ export interface App {
     maxRecords: number,
     offset: number,
     accountOffset: string,
-  ) => WrappedData[]
+  ) => Promise<WrappedData[]>
 
   calculateAccountHash: (account: unknown) => string
 
@@ -283,7 +283,7 @@ export interface App {
 
   deleteAccountData: (addressList: string[]) => void
 
-  getAccountDataByList: (addressList: string[]) => WrappedData[]
+  getAccountDataByList: (addressList: string[]) => Promise<WrappedData[]>
 
   deleteLocalAccountData: () => void
 

@@ -1,5 +1,5 @@
 import * as Shardus from '../shardus/shardus-types'
-import { StateManager as StateManagerTypes } from '@shardus/types'
+import {StateManager as StateManagerTypes} from '@shardus/types'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 
@@ -22,12 +22,13 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import AccountSync from './AccountSync'
 import { logFlags } from '../logger'
 import { errorToStringFull } from '../utils'
-import * as Comms from '../p2p/Comms'
+import { P2PModuleContext as P2P } from '../p2p/Context'
 
 import DataSourceHelper from './DataSourceHelper'
 
 export default class SyncTracker {
   accountSync: AccountSync //parent sync manager
+  p2p: P2P
 
   syncStarted: boolean
   syncFinished: boolean
@@ -77,11 +78,12 @@ export default class SyncTracker {
     this.restartCount = 0
   }
 
-  initByRange(accountSync: AccountSync, index: number, range: StateManagerTypes.shardFunctionTypes.BasicAddressRange, cycle: number, initalSync: boolean = false) {
+  initByRange(accountSync: AccountSync, p2p: P2P, index: number, range: StateManagerTypes.shardFunctionTypes.BasicAddressRange, cycle: number, initalSync: boolean = false) {
     // let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false,
     //isGlobalSyncTracker: false, globalAddressMap: {}, isPartOfInitialSync:initalSync, keys:{}  } as SyncTracker // partition,
     this.reset()
     this.accountSync = accountSync
+    this.p2p = p2p
     this.range = range
     this.queueEntries = []
     this.cycle = cycle
@@ -94,11 +96,12 @@ export default class SyncTracker {
     this.dataSourceHelper = new DataSourceHelper(this.accountSync.stateManager)
   }
 
-  initGlobal(accountSync: AccountSync, index: number, cycle: number, initalSync: boolean = false) {
+  initGlobal(accountSync: AccountSync,  p2p: P2P, index: number, cycle: number, initalSync: boolean = false) {
     // let syncTracker = { range: {}, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false,
     //isGlobalSyncTracker: true, globalAddressMap: {}, isPartOfInitialSync:initalSync, keys:{} } as SyncTracker // partition,
     this.reset()
     this.accountSync = accountSync
+    this.p2p = p2p
     this.range = undefined //was {} before..
     this.queueEntries = []
     this.cycle = cycle
@@ -279,7 +282,7 @@ export default class SyncTracker {
 
           //Get accounts.
           let message = { accountIds: remainingAccountsToSync }
-          let result = await Comms.ask(this.dataSourceHelper.dataSourceNode, 'get_account_data_by_list', message)
+          let result = await this.p2p.ask(this.dataSourceHelper.dataSourceNode, 'get_account_data_by_list', message)
 
           if (result == null) {
             if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result == null')
@@ -479,7 +482,7 @@ export default class SyncTracker {
 
       let r: GetAccountData3Resp | boolean
       try {
-        r = await Comms.ask(this.dataSourceHelper.dataSourceNode, 'get_account_data3', message, false, '', 5000 + moreAskTime ) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+        r = await this.p2p.ask(this.dataSourceHelper.dataSourceNode, 'get_account_data3', message, false, '', 5000 + moreAskTime ) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
       } catch (ex) {
         this.accountSync.statemanager_fatal(`syncAccountData2`, `syncAccountData2 retries:${askRetriesLeft} ask: ` + errorToStringFull(ex))
         //wait 5 sec

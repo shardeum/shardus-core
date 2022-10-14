@@ -8,7 +8,7 @@ import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, {logFlags} from '../logger'
-import ShardFunctions from './shardFunctions.js'
+import ShardFunctions from './shardFunctions'
 import { debug, time } from 'console'
 import StateManager from '.'
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -170,7 +170,7 @@ class AccountPatcher {
    */
 
   setupHandlers() {
-    Comms.registerInternal('get_trie_hashes', async (payload: HashTrieReq, respond: (arg0: HashTrieResp) => any, sender, tracker: string, msgSize: number) => {
+    this.p2p.registerInternal('get_trie_hashes', async (payload: HashTrieReq, respond: (arg0: HashTrieResp) => any, sender, tracker: string, msgSize: number) => {
       profilerInstance.scopedProfileSectionStart('get_trie_hashes', false, msgSize)
       let result = {nodeHashes:[]} as HashTrieResp
       let responseCount = 0
@@ -198,7 +198,7 @@ class AccountPatcher {
       profilerInstance.scopedProfileSectionEnd('get_trie_hashes', respondSize)
     })
 
-    Comms.registerInternal('sync_trie_hashes', async (payload: HashTrieSyncTell, respondWrapped, sender:string, tracker:string, msgSize: number) => {
+    this.p2p.registerInternal('sync_trie_hashes', async (payload: HashTrieSyncTell, respondWrapped, sender:string, tracker:string, msgSize: number) => {
 
       profilerInstance.scopedProfileSectionStart('sync_trie_hashes', false, msgSize)
       try {
@@ -265,7 +265,7 @@ class AccountPatcher {
     })
 
     //get child accountHashes for radix.  //get the hashes and ids so we know what to fix.
-    Comms.registerInternal('get_trie_accountHashes', async (payload: HashTrieReq, respond: (arg0: HashTrieAccountsResp) => any, sender:string, tracker:string, msgSize: number) => {
+    this.p2p.registerInternal('get_trie_accountHashes', async (payload: HashTrieReq, respond: (arg0: HashTrieAccountsResp) => any, sender:string, tracker:string, msgSize: number) => {
       profilerInstance.scopedProfileSectionStart('get_trie_accountHashes', false, msgSize)
       //nodeChildHashes: {radix:string, childAccounts:{accountID:string, hash:string}[]}[]
       let result = {nodeChildHashes:[], stats:{ matched:0, visisted:0, empty:0, childCount:0}} as HashTrieAccountsResp
@@ -304,7 +304,7 @@ class AccountPatcher {
       profilerInstance.scopedProfileSectionEnd('get_trie_accountHashes', respondSize)
     })
 
-    Comms.registerInternal('get_account_data_by_hashes', async (payload: HashTrieAccountDataRequest, respond: (arg0: HashTrieAccountDataResponse) => any, sender:string, tracker:string, msgSize: number) => {
+    this.p2p.registerInternal('get_account_data_by_hashes', async (payload: HashTrieAccountDataRequest, respond: (arg0: HashTrieAccountDataResponse) => any, sender:string, tracker:string, msgSize: number) => {
 
       profilerInstance.scopedProfileSectionStart('get_account_data_by_hashes', false, msgSize)
       nestedCountersInstance.countEvent('accountPatcher', `get_account_data_by_hashes`)
@@ -516,7 +516,7 @@ class AccountPatcher {
 
     Context.network.registerExternalGet('debug-patcher-fail-hashes', isDebugModeMiddleware, (req, res) => {
       try {
-        const lastCycle = CycleChain.getNewest()
+        const lastCycle = this.p2p.state.getLastCycle()
         const cycle = lastCycle.counter
         const minVotes = this.calculateMinVotes()
         const notEnoughVotesRadix = {}

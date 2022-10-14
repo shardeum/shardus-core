@@ -467,3 +467,13 @@ function warn(...msg) {
   const entry = `Self: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }
+
+
+// debug functions
+export function setIsFirst(val: boolean) {
+    isFirst = val
+}
+
+export function getIsFirst() {
+   return isFirst
+}

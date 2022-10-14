@@ -89,5 +89,8 @@ dist/
 .vscode
 !.vscode/settings.json
 
+# Webstorm files
+.idea
+
 # TS build results
 build/

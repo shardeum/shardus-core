@@ -27,7 +27,8 @@ class P2P extends EventEmitter {
     route: string,
     message?: {},
     logged?: boolean,
-    tracker?: string
+    tracker?: string,
+    extraTime?:number
   ) => Promise<any>
   tell: (
     nodes: any,

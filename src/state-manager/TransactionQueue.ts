@@ -11,7 +11,7 @@ import * as utils from '../utils'
 import { errorToStringFull, getLinearGossipBurstList, inRangeOfCurrentTime } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
-import ShardFunctions from './shardFunctions.js'
+import ShardFunctions from './shardFunctions'
 import {
   AcceptedTx,
   AccountFilter,

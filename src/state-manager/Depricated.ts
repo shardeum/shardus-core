@@ -7,7 +7,7 @@ import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, {logFlags} from '../logger'
-import ShardFunctions from './shardFunctions.js'
+import ShardFunctions from './shardFunctions'
 import { time } from 'console'
 import StateManager from '.'
 

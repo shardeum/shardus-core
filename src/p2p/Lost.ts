@@ -31,7 +31,7 @@ const allowKillRoute = true
 
 let p2pLogger
 
-let lost: Map<string, P2P.LostTypes.LostRecord>
+let lost: Map<string, P2P.LostTypes.LostRecord> = new Map<string, P2P.LostTypes.LostRecord>()
 export let isDown = {}
 let isUp = {}
 let isUpTs = {}
@@ -104,8 +104,6 @@ export function init() {
   p2pLogger = logger.getLogger('p2p')
 
   p2pLogger.info('HELLO')
-
-  lost = new Map()
 
   // Init state
   reset()
