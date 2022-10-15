@@ -83,6 +83,7 @@ class PartitionStats {
 
   statemanager_fatal: (key: string, log: string) => void
 
+  /** buildStatsReport uses the work queue to build stats reports at the correct times.  do not add items to work queue if stats are disabled */
   workQueue: { cycle: number; fn: any; args: any[] }[]
 
   constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.StrictServerConfiguration, accountCache: AccountCache) {
@@ -444,8 +445,9 @@ class PartitionStats {
       return
     }
 
-    this.workQueue.push({ cycle, fn: this.internalDoInit, args: [cycle, blob, accountDataRaw, accountId, opCounter] })
-
+    if ( this.stateManager.feature_generateStats === true) {
+      this.workQueue.push({ cycle, fn: this.internalDoInit, args: [cycle, blob, accountDataRaw, accountId, opCounter] })
+    }
     //this.internalDoInit(cycle, blob, accountDataRaw, accountId, opCounter)
   }
 
@@ -533,7 +535,9 @@ class PartitionStats {
     }
     this.accountCache.updateAccountHash(accountId, hash, timestamp, cycle)
 
-    this.workQueue.push({ cycle, fn: this.internalDoUpdate, args: [cycle, blob, accountDataBefore, accountDataAfter, opCounter] })
+    if ( this.stateManager.feature_generateStats === true) {
+      this.workQueue.push({ cycle, fn: this.internalDoUpdate, args: [cycle, blob, accountDataBefore, accountDataAfter, opCounter] })
+    }
     //this.internalDoUpdate(cycle, blob, accountDataBefore, accountDataAfter, opCounter)
   }
 

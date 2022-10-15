@@ -984,10 +984,8 @@ class StateManager {
               this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
             }
           } else {
-            if ( this.feature_generateStats === true) {
-              //I think some work was done to fix diverging stats, but how did it turn out?
-              this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount.accountId, wrapedAccount.data, 'checkAndSetAccountData-' + note)
-            }
+            //I think some work was done to fix diverging stats, but how did it turn out?
+            this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount.accountId, wrapedAccount.data, 'checkAndSetAccountData-' + note)
           }
         } else {
           //even if we do not process stats still need to update cache
