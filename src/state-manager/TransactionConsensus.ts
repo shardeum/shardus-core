@@ -225,6 +225,7 @@ class TransactionConsenus {
       timestamp: Date.now(),
     }
     const signedTsReceipt = this.crypto.sign(tsReceipt)
+    if (logFlags.debug) this.mainLogger.debug(`Timestamp receipt generated for txId ${txId}: ${utils.stringifyReduce(signedTsReceipt)}`)
 
     // caching ts receipt for later nodes
     if (!this.txTimestampCache[signedTsReceipt.cycleCounter]) {
@@ -240,9 +241,10 @@ class TransactionConsenus {
         delete this.txTimestampCache[key]
       }
     }
+    if (logFlags.debug) this.mainLogger.debug(`Pruned tx timestamp cache.`)
   }
 
-  async askTxnTimestampFromNode(tx, txId): Promise<Shardus.TimestampReceipt> {
+  async askTxnTimestampFromNode(tx, txId): Promise<Shardus.TimestampReceipt | null> {
     const homeNode = ShardFunctions.findHomeNode(Context.stateManager.currentCycleShardData.shardGlobals, txId, Context.stateManager.currentCycleShardData.parititionShardDataMap)
     const cycleMarker = CycleChain.computeCycleMarker(CycleChain.newest)
     const cycleCounter = CycleChain.newest.counter
@@ -251,7 +253,16 @@ class TransactionConsenus {
       // we generate the tx timestamp by ourselves
       return this.generateTimestampReceipt(txId, cycleMarker, cycleCounter)
     } else {
-      return await Comms.ask(homeNode.node, 'get_tx_timestamp', { cycleMarker, cycleCounter, txId, tx })
+      const timestampReceipt = await Comms.ask(homeNode.node, 'get_tx_timestamp', { cycleMarker, cycleCounter, txId, tx })
+      delete timestampReceipt.isResponse
+      const isValid = this.crypto.verify(timestampReceipt, homeNode.node.publicKey)
+      if (isValid) {
+        if (logFlags.debug) this.mainLogger.debug(`Timestamp receipt received from home node. TxId: ${txId} isValid: ${isValid}, timestampReceipt: ${JSON.stringify(timestampReceipt)}`)
+        return timestampReceipt
+      } else {
+        if (logFlags.fatal) this.mainLogger.fatal(`Timestamp receipt received from home node ${homeNode.node.publicKey} is not valid. ${utils.stringifyReduce(timestampReceipt)}`)
+        return null
+      }
     }
   }
 
