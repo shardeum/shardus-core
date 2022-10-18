@@ -41,7 +41,7 @@ const gossipScaleRoute: P2P.P2PTypes.GossipHandler<P2P.CycleAutoScaleTypes.Signe
       warn('No payload provided for the `scaling` request.')
       return
     }
-    const added = await addExtScalingRequest(payload)
+    const added = addExtScalingRequest(payload)
     if (!added) return
     Comms.sendGossip('scaling', payload, tracker, sender, NodeList.byIdOrder, false)
   } finally {
@@ -88,7 +88,7 @@ export function getDesiredCount(): number {
   return desiredCount
 }
 
-function createScaleRequest(scaleType) : P2P.CycleAutoScaleTypes.ScaleRequest {
+function createScaleRequest(scaleType) : P2P.CycleAutoScaleTypes.SignedScaleRequest {
   const request: P2P.CycleAutoScaleTypes.ScaleRequest = {
     nodeId: Self.id,
     timestamp: Date.now(),
@@ -114,12 +114,15 @@ function createScaleRequest(scaleType) : P2P.CycleAutoScaleTypes.ScaleRequest {
 function _requestNetworkScaling(upOrDown) {
   //scalingRequested makes sure we only request scaling on our own once per cycle
   if (!Self.isActive || scalingRequested) return
-  const signedRequest = createScaleRequest(upOrDown)
+  const signedRequest: P2P.CycleAutoScaleTypes.SignedScaleRequest = createScaleRequest(upOrDown)
   // await _waitUntilEndOfCycle()
-  addExtScalingRequest(signedRequest)
-  Comms.sendGossip('scaling', signedRequest, '', null, NodeList.byIdOrder, true)
-  scalingRequested = true
-  requestedScalingType = signedRequest.scale //only set this when our node requests scaling
+  const isRequestAdded = addExtScalingRequest(signedRequest)
+  if (isRequestAdded) {
+    info(`Our scale request is added. Gossiping our scale request to other nodes. ${JSON.stringify(signedRequest)}`)
+    Comms.sendGossip('scaling', signedRequest, '', null, NodeList.byIdOrder, true)
+    scalingRequested = true
+    requestedScalingType = signedRequest.scale //only set this when our node requests scaling
+  }
 }
 
 export function requestNetworkUpsize() {
@@ -138,7 +141,7 @@ export function requestNetworkDownsize() {
   _requestNetworkScaling(P2P.CycleAutoScaleTypes.ScaleType.DOWN)
 }
 
-function addExtScalingRequest(scalingRequest) : boolean {
+function addExtScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleRequest) : boolean {
   const added = _addScalingRequest(scalingRequest)
   return added
 }
@@ -162,7 +165,7 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
   // Check if cycle counter matches
   if (scalingRequest.counter !== CycleCreator.currentCycle) {
     warn(
-      `Invalid scaling request, not for this cycle. Request: ${JSON.stringify(
+      `Invalid scaling request, not for this cycle. Current cycle:${CycleCreator.currentCycle}, cycleInScaleRequest: ${scalingRequest.counter} Request: ${JSON.stringify(
         scalingRequest
       )}`
     )
