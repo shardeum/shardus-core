@@ -11,7 +11,7 @@ const utils = require('../../../build/src/utils')
 crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 
 // generate a sorted list of nodes
-function generateNodes (count, predefinedList = null) {
+function generateNodes(count, predefinedList = null) {
   let nodeList = []
   for (let i = 0; i < count; ++i) {
     let newNode = { status: 'active' }
@@ -24,7 +24,9 @@ function generateNodes (count, predefinedList = null) {
 
     nodeList.push(newNode)
   }
-  nodeList.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 }) // a[propName] == b[propName] ? 0 : a[propName] < b[propName] ? -1 : 1
+  nodeList.sort(function (a, b) {
+    return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
+  }) // a[propName] == b[propName] ? 0 : a[propName] < b[propName] ? -1 : 1
   return nodeList
 }
 
@@ -43,7 +45,7 @@ function generateNodes (count, predefinedList = null) {
 //   return results
 // }
 
-function getClosestNodes (shardGlobals, parititionShardDataMap, activeNodes, hash, count = 1) {
+function getClosestNodes(shardGlobals, parititionShardDataMap, activeNodes, hash, count = 1) {
   // if (this.currentCycleShardData == null) {
   //   throw new Error('getClosestNodes: network not ready')
   // }
@@ -51,12 +53,19 @@ function getClosestNodes (shardGlobals, parititionShardDataMap, activeNodes, has
   let homeNode = ShardFunctions.findHomeNode(shardGlobals, hash, parititionShardDataMap)
   let homeNodeIndex = homeNode.ourNodeIndex
   let idToExclude = ''
-  let results = ShardFunctions.getNodesByProximity(shardGlobals, activeNodes, homeNodeIndex, idToExclude, count, true)
+  let results = ShardFunctions.getNodesByProximity(
+    shardGlobals,
+    activeNodes,
+    homeNodeIndex,
+    idToExclude,
+    count,
+    true
+  )
 
   return results
 }
 
-function isNodeInDistancePartition (shardGlobals, hash, nodeId, distance) {
+function isNodeInDistancePartition(shardGlobals, hash, nodeId, distance) {
   // if (this.currentCycleShardData == null) {
   //   throw new Error('isNodeInDistance: network not ready')
   // }
@@ -70,7 +79,7 @@ function isNodeInDistancePartition (shardGlobals, hash, nodeId, distance) {
   return false
 }
 
-function isNodeInDistance (shardGlobals, parititionShardDataMap, hash, nodeId, distance) {
+function isNodeInDistance(shardGlobals, parititionShardDataMap, hash, nodeId, distance) {
   let someNode = ShardFunctions.findHomeNode(shardGlobals, nodeId, parititionShardDataMap)
   let someNodeIndex = someNode.ourNodeIndex
 
@@ -139,17 +148,32 @@ let useHardcodenodes = true
 // let hardcodeNodes2 = null
 
 //t2x
-// let hardcodeNodes = ["0b44x2d442","1f68xc5bd9","203axb60a6","3b50x94bd9","4d62x2fbb0","55b8x75d37","6065xe2415","6299x6fd31","767bxe33e6","7dfcx22d6c","9f5dxe964b","b092xe588c","f1b7xa2357"] 
+// let hardcodeNodes = ["0b44x2d442","1f68xc5bd9","203axb60a6","3b50x94bd9","4d62x2fbb0","55b8x75d37","6065xe2415","6299x6fd31","767bxe33e6","7dfcx22d6c","9f5dxe964b","b092xe588c","f1b7xa2357"]
 // let hardcodeNodes2 = null
 
 //t20
-// let hardcodeNodes = ["0b44x2d442","1f68xc5bd9","203axb60a6","3b50x94bd9","55b8x75d37","6065xe2415","6299x6fd31","767bxe33e6","7dfcx22d6c","9f5dxe964b","b092xe588c","f1b7xa2357"] 
+// let hardcodeNodes = ["0b44x2d442","1f68xc5bd9","203axb60a6","3b50x94bd9","55b8x75d37","6065xe2415","6299x6fd31","767bxe33e6","7dfcx22d6c","9f5dxe964b","b092xe588c","f1b7xa2357"]
 // let hardcodeNodes2 = null
 
 //t19
 //let hardcodeNodes = ["4423x0ab77","4a45x22d27","55bax46bbb","5d01x39d48","63eexfbe34","7ddcxb6586","9b8exa1c15","b520x4eef8","cab2x831cb","e029x146ea","f00bx0522f"]
 //c25
-let hardcodeNodes = ["0ac8x88ef1","21f7x6483c","6f96xae48b","796fxf7e39","8134x3d98c","833ax8a51b","851cxab703","9d26x9011c","c4c2x62e22","d085xb50f6","d49ax34fec","e172xb3af1","ed8fx77d71","fc4bx4d28e"]
+let hardcodeNodes = [
+  '0ac8x88ef1',
+  '21f7x6483c',
+  '6f96xae48b',
+  '796fxf7e39',
+  '8134x3d98c',
+  '833ax8a51b',
+  '851cxab703',
+  '9d26x9011c',
+  'c4c2x62e22',
+  'd085xb50f6',
+  'd49ax34fec',
+  'e172xb3af1',
+  'ed8fx77d71',
+  'fc4bx4d28e',
+]
 let hardcodeNodes2 = null
 
 // let hardcodeNodes = ['01cex1bed2', '0793xc7aee', '180bx3a172', '24afxce02d', '2d2ax053f6', '30aex6b5ca', '33d7x0a28e', '42bbx0242f', '43cax9b811', '5c70xdee7d', '5fcfx2f32d', '7303xfd71e', '7354xcedbc', '7b78xf936e', '7eabx5deea', '8609xcccf4', '88ecx4c9ab', '8c5axb8364', '93e3x87831', '9a91xb2cd3', '9d1dx51f4a', '9facx0e61c', 'a452x1f73d', 'a8e6xdd19c', 'bef0x7edf8', 'bfa5x12bbf', 'e116x7c34b', 'e89bxde077', 'eae4xeefb1', 'ffc1x1151f']
@@ -187,12 +211,16 @@ for (let i = 0; i < testIterations; i++) {
   } else {
     activeNodes = generateNodes(numNodes, hardcodeNodes)
   }
-  activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
+  activeNodes.sort(function (a, b) {
+    return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
+  })
   // let nodeToObserve = ourNode
 
   if (hardcodeNodes2 != null) {
     activeNodes2 = generateNodes(numNodes2, hardcodeNodes2)
-    activeNodes2.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
+    activeNodes2.sort(function (a, b) {
+      return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
+    })
   }
 
   let innerLoopCount = 1
@@ -240,25 +268,63 @@ for (let i = 0; i < testIterations; i++) {
 
     // this is an exact match for the calculations done in the shardus server:
     // generate limited data for all nodes data for all nodes.
-    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
+    ShardFunctions.computeNodePartitionDataMap(
+      shardGlobals,
+      nodeShardDataMap,
+      activeNodes,
+      parititionShardDataMap,
+      activeNodes,
+      false
+    )
     // get extended data for our node
-    nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, ourNode, nodeShardDataMap, parititionShardDataMap, activeNodes, true)
+    nodeShardData = ShardFunctions.computeNodePartitionData(
+      shardGlobals,
+      ourNode,
+      nodeShardDataMap,
+      parititionShardDataMap,
+      activeNodes,
+      true
+    )
     // generate full data for nodes that store our home partition
-    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, nodeShardData.nodeThatStoreOurParitionFull, parititionShardDataMap, activeNodes, true)
+    ShardFunctions.computeNodePartitionDataMap(
+      shardGlobals,
+      nodeShardDataMap,
+      nodeShardData.nodeThatStoreOurParitionFull,
+      parititionShardDataMap,
+      activeNodes,
+      true
+    )
     // cycleShardData.nodeShardData = cycleShardData.nodeShardDataMap.get(cycleShardData.ourNode.id)
 
     // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
     let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
-    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, fullDataForDebug)
+    ShardFunctions.computeNodePartitionDataMap(
+      shardGlobals,
+      nodeShardDataMap,
+      activeNodes,
+      parititionShardDataMap,
+      activeNodes,
+      fullDataForDebug
+    )
 
     // this is the function that messes up out calculations
-    ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
+    ShardFunctions.computeNodePartitionDataMapExt(
+      shardGlobals,
+      nodeShardDataMap,
+      activeNodes,
+      parititionShardDataMap,
+      activeNodes
+    )
 
     console.log('storedPartitions' + utils.stringifyReduce(nodeShardData.storedPartitions))
 
     // calc consensus partitions
     let ourConsensusPartitions = ShardFunctions.getConsenusPartitionList(shardGlobals, nodeShardData)
-    console.log('ourConsensusPartitions ' + utils.stringifyReduce(ourConsensusPartitions) + `  consensusEndPartition: ${nodeShardData.consensusEndPartition} consensusStartPartition ${nodeShardData.consensusStartPartition}`)
+    console.log(
+      'ourConsensusPartitions ' +
+        utils.stringifyReduce(ourConsensusPartitions) +
+        `  consensusEndPartition: ${nodeShardData.consensusEndPartition} consensusStartPartition ${nodeShardData.consensusStartPartition}`
+    )
 
     let hash = debugAccount // '0'.repeat(64) // debugAccount
 
@@ -271,7 +337,11 @@ for (let i = 0; i < testIterations; i++) {
 
     let inDist = isNodeInDistancePartition(shardGlobals, hash, debugID, 2)
 
-    console.log(`getClosestNodes  ${closestNodes.length}    inDist:${inDist}  nodes:${closestNodes.map((node) => utils.stringifyReduce(node.id)).join(',')}`)
+    console.log(
+      `getClosestNodes  ${closestNodes.length}    inDist:${inDist}  nodes:${closestNodes
+        .map((node) => utils.stringifyReduce(node.id))
+        .join(',')}`
+    )
     for (let node of activeNodes) {
       if (node.id.slice(0, 4) === '653d') {
         let a = true //  653d  911b
@@ -294,16 +364,49 @@ for (let i = 0; i < testIterations; i++) {
     }
   }
 
-  ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)
-  ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
+  ShardFunctions.computeNodePartitionDataMap(
+    shardGlobals,
+    nodeShardDataMap,
+    activeNodes,
+    parititionShardDataMap,
+    activeNodes,
+    true
+  )
+  ShardFunctions.computeNodePartitionDataMapExt(
+    shardGlobals,
+    nodeShardDataMap,
+    activeNodes,
+    parititionShardDataMap,
+    activeNodes
+  )
 
   if (hardcodeNodes2 != null) {
     let totalPartitions2 = numNodes2
     let shardGlobals2 = ShardFunctions.calculateShardGlobals(numNodes2, nodesPerConsenusGroup)
     ShardFunctions.computePartitionShardDataMap(shardGlobals2, parititionShardDataMap2, 0, totalPartitions2)
-    ShardFunctions.computeNodePartitionDataMap(shardGlobals2, nodeShardDataMap2, activeNodes2, parititionShardDataMap2, activeNodes2, false)
-    ShardFunctions.computeNodePartitionDataMap(shardGlobals2, nodeShardDataMap2, activeNodes2, parititionShardDataMap2, activeNodes2, true)
-    ShardFunctions.computeNodePartitionDataMapExt(shardGlobals2, nodeShardDataMap2, activeNodes2, parititionShardDataMap2, activeNodes2)
+    ShardFunctions.computeNodePartitionDataMap(
+      shardGlobals2,
+      nodeShardDataMap2,
+      activeNodes2,
+      parititionShardDataMap2,
+      activeNodes2,
+      false
+    )
+    ShardFunctions.computeNodePartitionDataMap(
+      shardGlobals2,
+      nodeShardDataMap2,
+      activeNodes2,
+      parititionShardDataMap2,
+      activeNodes2,
+      true
+    )
+    ShardFunctions.computeNodePartitionDataMapExt(
+      shardGlobals2,
+      nodeShardDataMap2,
+      activeNodes2,
+      parititionShardDataMap2,
+      activeNodes2
+    )
 
     let ourNodeData = nodeShardDataMap.get(debugNode.id)
     let ourNodeData2 = nodeShardDataMap2.get(debugNode.id)
@@ -313,14 +416,18 @@ for (let i = 0; i < testIterations; i++) {
     for (let change of coverageChanges) {
       // log info about the change.
       // ${utils.stringifyReduce(change)}
-      console.log(` ${ShardFunctions.leadZeros8((change.start).toString(16))}->${ShardFunctions.leadZeros8((change.end).toString(16))} `)
+      console.log(
+        ` ${ShardFunctions.leadZeros8(change.start.toString(16))}->${ShardFunctions.leadZeros8(
+          change.end.toString(16)
+        )} `
+      )
 
       // create a range object from our coverage change.
       let range = {}
       range.startAddr = change.start
       range.endAddr = change.end
-      range.low = ShardFunctions.leadZeros8((range.startAddr).toString(16)) + '0'.repeat(56)
-      range.high = ShardFunctions.leadZeros8((range.endAddr).toString(16)) + 'f'.repeat(56)
+      range.low = ShardFunctions.leadZeros8(range.startAddr.toString(16)) + '0'.repeat(56)
+      range.high = ShardFunctions.leadZeros8(range.endAddr.toString(16)) + 'f'.repeat(56)
       // create sync trackers
       // this.createSyncTrackerByRange(range, cycle)
     }
@@ -329,7 +436,7 @@ for (let i = 0; i < testIterations; i++) {
   if (debugAccount != null) {
     let homeNode = ShardFunctions.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
     // let shardParition = parititionShardDataMap.get(5)
-    let {homePartition, addressNum} = ShardFunctions.addressToPartition(shardGlobals, debugAccount)
+    let { homePartition, addressNum } = ShardFunctions.addressToPartition(shardGlobals, debugAccount)
     //ShardFunctions.
     let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
     let relationString = ShardFunctions.getNodeRelation(homeNode, debugID)
@@ -339,7 +446,9 @@ for (let i = 0; i < testIterations; i++) {
     console.log(` summary:${utils.stringifyReduce(summaryObject)}`)
     console.log(` relationString:${relationString}`)
     console.log('Home node for debug acc:' + utils.stringifyReduce(homeNode))
-    console.log('nodeThatStoreOurParitionFull:' + utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull))
+    console.log(
+      'nodeThatStoreOurParitionFull:' + utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull)
+    )
     let { homePartition: partition } = ShardFunctions.addressToPartition(shardGlobals, debugAccount)
 
     let ourNodeData = nodeShardDataMap.get(debugNode.id)
@@ -416,7 +525,11 @@ for (let i = 0; i < testIterations; i++) {
       let partitionInRange = ShardFunctions.testInRange(homePartition, nodeData.storedPartitions)
       let inRange4 = ShardFunctions.testAddressInRange(address, nodeData.storedPartitions)
       if (partitionInRange && inRange4 === false) {
-        throw new Error(`address not in range 2. node: ${utils.makeShortHash(node.id)} addr: ${utils.makeShortHash(address)} home: ${utils.makeShortHash(homeNode.node.id)} p:${partitionInRange}`)
+        throw new Error(
+          `address not in range 2. node: ${utils.makeShortHash(node.id)} addr: ${utils.makeShortHash(
+            address
+          )} home: ${utils.makeShortHash(homeNode.node.id)} p:${partitionInRange}`
+        )
       }
       // if (inRange4 === true && partitionInRange === false) {
       //   console.log('error')
@@ -426,7 +539,11 @@ for (let i = 0; i < testIterations; i++) {
 }
 
 if (testIterations > 0) {
-  console.log(`Extra nodes total: ${extraNodesTotal} avg: ${extraNodesTotal / testCounter}  avg per node: ${extraNodesTotal / (testCounter * numNodes)}`)
+  console.log(
+    `Extra nodes total: ${extraNodesTotal} avg: ${extraNodesTotal / testCounter}  avg per node: ${
+      extraNodesTotal / (testCounter * numNodes)
+    }`
+  )
 }
 
 let size1 = 3

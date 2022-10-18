@@ -1,13 +1,6 @@
 import { mod } from '../'
 
-export function getLinearSeededGossip(
-  nodeIdxs,
-  myIdx,
-  gossipFactor,
-  startingSeed,
-  seedFalloff,
-  hop = 0
-) {
+export function getLinearSeededGossip(nodeIdxs, myIdx, gossipFactor, startingSeed, seedFalloff, hop = 0) {
   const nodeCount = nodeIdxs.length
   let unique = []
   let gossipToList = []
@@ -82,12 +75,7 @@ function gossip_offset(n, f, i) {
   return r
 }
 
-export function getLinearGossipBurstList(
-  numberOfNodes,
-  gossipFactor,
-  myIdx,
-  originIdx
-) {
+export function getLinearGossipBurstList(numberOfNodes, gossipFactor, myIdx, originIdx) {
   let list = []
   let distance, factor0, offset, nodeIdx
 
@@ -112,12 +100,7 @@ export function getLinearGossipBurstList(
   return list
 }
 
-export function getLinearGossipList(
-  numberOfNodes,
-  gossipFactor,
-  myIdx,
-  isOrigin
-) {
+export function getLinearGossipList(numberOfNodes, gossipFactor, myIdx, isOrigin) {
   let list = []
   let nodeIdx
   if (gossipFactor >= numberOfNodes) {

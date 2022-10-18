@@ -37,10 +37,7 @@ type PartitionRanges = Map<
   StateManager.shardFunctionTypes.AddressRange
 >
 
-type PartitionAccounts = Map<
-  StateManager.shardFunctionTypes.AddressRange['partition'],
-  Account[]
->
+type PartitionAccounts = Map<StateManager.shardFunctionTypes.AddressRange['partition'], Account[]>
 
 type PartitionNum = number
 
@@ -64,9 +61,7 @@ export function calculatePartitionBlock(shard) {
   return partitionToReceiptMap
 }
 
-export function createNetworkHash(
-  hashes: Map<number, string>
-): P2P.SnapshotTypes.NetworkStateHash {
+export function createNetworkHash(hashes: Map<number, string>): P2P.SnapshotTypes.NetworkStateHash {
   let hashArray = []
   for (const [, hash] of hashes) {
     hashArray.push(hash)
@@ -81,10 +76,9 @@ export function updateStateHashesByCycleMap(
   stateHash: P2P.SnapshotTypes.StateHashes,
   stateHashesByCycle
 ) {
-  const newStateHashByCycle: Map<
-    Cycle['counter'],
-    P2P.SnapshotTypes.StateHashes
-  > = new Map(stateHashesByCycle)
+  const newStateHashByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.StateHashes> = new Map(
+    stateHashesByCycle
+  )
   const transformedStateHash = {
     ...stateHash,
     partitionHashes: convertMapToObj(stateHash.partitionHashes),
@@ -106,10 +100,9 @@ export function updateReceiptHashesByCycleMap(
   receiptHash: P2P.SnapshotTypes.ReceiptHashes,
   receiptHashesByCycle
 ) {
-  const newReceiptHashesByCycle: Map<
-    Cycle['counter'],
-    P2P.SnapshotTypes.ReceiptHashes
-  > = new Map(receiptHashesByCycle)
+  const newReceiptHashesByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.ReceiptHashes> = new Map(
+    receiptHashesByCycle
+  )
 
   const transformedStateHash = {
     ...receiptHash,
@@ -132,10 +125,9 @@ export function updateSummaryHashesByCycleMap(
   summaryHashes: P2P.SnapshotTypes.SummaryHashes,
   summaryHashesByCycle
 ) {
-  const newSummaryHashesByCycle: Map<
-    Cycle['counter'],
-    P2P.SnapshotTypes.SummaryHashes
-  > = new Map(summaryHashesByCycle)
+  const newSummaryHashesByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.SummaryHashes> = new Map(
+    summaryHashesByCycle
+  )
 
   const transformedSummaryHash = {
     ...summaryHashes,
@@ -207,9 +199,7 @@ export async function saveSummaryAndNetworkHashes(
   })
 }
 
-export async function readOldCycleRecord(): Promise<
-  P2P.CycleCreatorTypes.CycleRecord
-> {
+export async function readOldCycleRecord(): Promise<P2P.CycleCreatorTypes.CycleRecord> {
   const oldCycles = await Context.storage.listOldCycles()
   if (oldCycles && oldCycles.length > 0) return oldCycles[0]
 }
@@ -218,8 +208,7 @@ export async function readOldNetworkHash() {
   try {
     const networkStateHash = await Context.storage.getLastOldNetworkHash()
     log('Read Old network state hash', networkStateHash)
-    if (networkStateHash && networkStateHash.length > 0)
-      return networkStateHash[0]
+    if (networkStateHash && networkStateHash.length > 0) return networkStateHash[0]
   } catch (e) {
     snapshotLogger.error('Unable to read old network state hash')
   }
@@ -242,10 +231,7 @@ export async function calculateOldDataMap(
   lastSnapshotCycle: number
 ): Promise<Map<P2P.SnapshotTypes.PartitionNum, ShardusTypes.AccountsCopy[]>> {
   const partitionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap = new Map()
-  const oldDataMap: Map<
-    P2P.SnapshotTypes.PartitionNum,
-    ShardusTypes.AccountsCopy[]
-  > = new Map()
+  const oldDataMap: Map<P2P.SnapshotTypes.PartitionNum, ShardusTypes.AccountsCopy[]> = new Map()
   ShardFunctions.computePartitionShardDataMap(
     shardGlobals,
     partitionShardDataMap,
@@ -257,7 +243,7 @@ export async function calculateOldDataMap(
    * [NOTE] [AS] Need to do this because type of 'cycleJoined' field differs
    * between ShardusTypes.Node (number) and P2P/Node (string)
    */
-  const nodes = (NodeList.byIdOrder as unknown) as ShardusTypes.Node[]
+  const nodes = NodeList.byIdOrder as unknown as ShardusTypes.Node[]
 
   ShardFunctions.computeNodePartitionDataMap(
     shardGlobals,
@@ -266,8 +252,8 @@ export async function calculateOldDataMap(
     partitionShardDataMap,
     nodes,
     true,
-    false // this is not the active node list.  Perf will be slower so we may want to 
-          // rework this calculation
+    false // this is not the active node list.  Perf will be slower so we may want to
+    // rework this calculation
   )
 
   // If we have old data, figure out which partitions we have and put into OldDataMap
@@ -282,22 +268,17 @@ export async function calculateOldDataMap(
       )
       if (oldAccountCopiesInPartition) {
         const existingHash = oldPartitionHashMap.get(partitionId)
-        const oldAccountsWithoutCycleNumber = oldAccountCopiesInPartition.map(
-          (acc) => {
-            return {
-              accountId: acc.accountId,
-              data: acc.data,
-              timestamp: acc.timestamp,
-              hash: acc.hash,
-              isGlobal: acc.isGlobal,
-            }
+        const oldAccountsWithoutCycleNumber = oldAccountCopiesInPartition.map((acc) => {
+          return {
+            accountId: acc.accountId,
+            data: acc.data,
+            timestamp: acc.timestamp,
+            hash: acc.hash,
+            isGlobal: acc.isGlobal,
           }
-        )
+        })
         const computedHash = Context.crypto.hash(oldAccountsWithoutCycleNumber)
-        log(
-          `old accounts in partition: ${partitionId}: `,
-          oldAccountCopiesInPartition
-        )
+        log(`old accounts in partition: ${partitionId}: `, oldAccountCopiesInPartition)
         log(computedHash, existingHash)
         log('partition: ', partitionId)
         log('existing hash: ', existingHash)
@@ -315,9 +296,7 @@ export async function calculateOldDataMap(
 
   // check if we have global account in old DB
   try {
-    const oldGlobalAccounts = await Context.storage.getOldGlobalAccountCopies(
-      lastSnapshotCycle
-    )
+    const oldGlobalAccounts = await Context.storage.getOldGlobalAccountCopies(lastSnapshotCycle)
     if (oldGlobalAccounts) {
       const existingGlobalHash = oldPartitionHashMap.get(-1)
       const oldGlobalAccWithoutCycleNumber = oldGlobalAccounts.map((acc) => {
@@ -329,9 +308,7 @@ export async function calculateOldDataMap(
           isGlobal: acc.isGlobal,
         }
       })
-      const computedGlobalHash = Context.crypto.hash(
-        oldGlobalAccWithoutCycleNumber
-      )
+      const computedGlobalHash = Context.crypto.hash(oldGlobalAccWithoutCycleNumber)
       log('existing global hash', existingGlobalHash)
       log('computed global hash', computedGlobalHash)
       // make sure that we really have correct data only if hashes match
@@ -353,21 +330,15 @@ export function copyOldDataToDataToMigrate(oldDataMap, dataToMigrate) {
   }
 }
 
-export function getMissingPartitions(
-  shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
-  oldDataMap
-) {
+export function getMissingPartitions(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, oldDataMap) {
   log('Checking missing partitions...')
   const missingPartitions = []
-  const { homePartition } = ShardFunctions.addressToPartition(
-    shardGlobals,
-    Self.id
-  )
+  const { homePartition } = ShardFunctions.addressToPartition(shardGlobals, Self.id)
   log(`Home partition for us is: ${homePartition}`)
-  const {
-    partitionStart,
-    partitionEnd,
-  } = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
+  const { partitionStart, partitionEnd } = ShardFunctions.calculateStoredPartitions2(
+    shardGlobals,
+    homePartition
+  )
   log('partition start: ', partitionStart)
   log('partition end: ', partitionEnd)
   const partitionsToCheck = []
@@ -399,11 +370,7 @@ export function getMissingPartitions(
   return missingPartitions
 }
 
-export function registerDownloadRoutes(
-  network,
-  oldDataMap,
-  oldPartitionHashMap
-) {
+export function registerDownloadRoutes(network, oldDataMap, oldPartitionHashMap) {
   let dataToSend = {}
   for (const [partitionId, value] of oldDataMap) {
     dataToSend[partitionId] = {
@@ -412,8 +379,7 @@ export function registerDownloadRoutes(
     }
   }
   dataToSend = JSON.stringify(dataToSend)
-  if (logFlags.console)
-    console.log('Registering download route', typeof dataToSend, dataToSend)
+  if (logFlags.console) console.log('Registering download route', typeof dataToSend, dataToSend)
 
   network.registerExternalGet('download-snapshot-data', (req, res) => {
     const readerStream = stream.Readable.from([dataToSend])

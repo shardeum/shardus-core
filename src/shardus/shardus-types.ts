@@ -150,7 +150,7 @@ export interface App {
    *
    * Returns whether tx pass or failed validation plus the reason why
    */
-  validate(tx: OpaqueTransaction, appData: any): { success: boolean; reason: string, status: number }
+  validate(tx: OpaqueTransaction, appData: any): { success: boolean; reason: string; status: number }
 
   /**
    * Cracks open the transaction and returns its timestamp, id (hash), and any
@@ -158,7 +158,10 @@ export interface App {
    *
    * Txs passed to this function are guaranteed to have passed validation first.
    */
-  crack(tx: OpaqueTransaction, appData: any): {
+  crack(
+    tx: OpaqueTransaction,
+    appData: any
+  ): {
     timestamp: number
     id: string
     keys: TransactionKeys
@@ -166,8 +169,8 @@ export interface App {
 
   /**
    * give the app a chance to generate additional data for the crack function
-   * @param tx 
-   * @param appData 
+   * @param tx
+   * @param appData
    */
   txPreCrackData(tx: OpaqueTransaction, appData: any): Promise<void> // Promise<any>
 
@@ -193,11 +196,7 @@ export interface App {
    * Do not change any of the values passes in.
    * This is a place to generate other transactions, or do off chain work like send and email.
    */
-  transactionReceiptPass?: (
-    inTx: OpaqueTransaction,
-    wrappedStates: any,
-    applyResponse: ApplyResponse
-  ) => void
+  transactionReceiptPass?: (inTx: OpaqueTransaction, wrappedStates: any, applyResponse: ApplyResponse) => void
 
   /**
    * This is called after consensus has received or produced a receipt and the trasaction fails.
@@ -205,23 +204,11 @@ export interface App {
    * This is a place to generate other transactions, or do off chain work like send and email.
    */
 
-  transactionReceiptFail?: (
-    inTx: OpaqueTransaction,
-    wrappedStates: any,
-    applyResponse: ApplyResponse
-  ) => void
+  transactionReceiptFail?: (inTx: OpaqueTransaction, wrappedStates: any, applyResponse: ApplyResponse) => void
 
-  updateAccountFull: (
-    wrappedState: WrappedResponse,
-    localCache: any,
-    applyResponse: ApplyResponse
-  ) => void
+  updateAccountFull: (wrappedState: WrappedResponse, localCache: any, applyResponse: ApplyResponse) => void
 
-  updateAccountPartial: (
-    wrappedState: WrappedResponse,
-    localCache: any,
-    applyResponse: ApplyResponse
-  ) => void
+  updateAccountPartial: (wrappedState: WrappedResponse, localCache: any, applyResponse: ApplyResponse) => void
 
   getRelevantData: (accountId: string, tx: object) => Promise<WrappedResponse>
 
@@ -259,11 +246,7 @@ export interface App {
    */
   close: () => void
 
-  getAccountData: (
-    accountStart: string,
-    accountEnd: string,
-    maxRecords: number
-  ) => Promise<WrappedData[]>
+  getAccountData: (accountStart: string, accountEnd: string, maxRecords: number) => Promise<WrappedData[]>
 
   getAccountDataByRange: (
     accountStart: string,
@@ -272,7 +255,7 @@ export interface App {
     tsEnd: number,
     maxRecords: number,
     offset: number,
-    accountOffset: string,
+    accountOffset: string
   ) => Promise<WrappedData[]>
 
   calculateAccountHash: (account: unknown) => string
@@ -299,11 +282,7 @@ export interface App {
   sync?: () => any
 
   dataSummaryInit?: (blob: any, accountData: any) => void
-  dataSummaryUpdate?: (
-    blob: any,
-    accountDataBefore: any,
-    accountDataAfter: any
-  ) => void
+  dataSummaryUpdate?: (blob: any, accountDataBefore: any, accountDataAfter: any) => void
   txSummaryUpdate?: (blob: any, tx: any, wrappedStates: any) => void
   validateJoinRequest?: (data: any) => any
   getJoinData?: () => any
@@ -616,7 +595,7 @@ export interface ServerConfiguration {
     /** The maxSyncingPerCycle parameter is an Integer specifying the maximum number of nodes that can be in the syncing phase each cycle. */
     maxSyncingPerCycle?: number
     /** allow syncing more nodes in a small network. only works well if we are not loading a lot of data */
-    syncBoostEnabled?: boolean    
+    syncBoostEnabled?: boolean
     /** The max syncing time a node can take */
     maxSyncTimeFloor?: number
     /** max nodes to calculate median/max sync time */
@@ -730,7 +709,7 @@ export interface ServerConfiguration {
     /** use the new path for TX receipt and vote sharing optimizations */
     optimizedTXConsenus: boolean
     /** dump extra data for robust query even if in error/fatal logggin only mode */
-    robustQueryDebug: boolean 
+    robustQueryDebug: boolean
     /** pretty sure we don't want this ever but making a config so we can AB test as needed */
     forwardTXToSyncingNeighbors: boolean
   }
@@ -785,17 +764,17 @@ export interface ServerConfiguration {
     /** The stateTableBucketSize parameter is an Integer which defines the max number of accountRecords that the p2p module will ask for in it’s get_account_state call. */
     stateTableBucketSize?: number
     /** The accountBucketSize This is also currently used as input to a p2p ask method for the max number of account records */
-    accountBucketSize?: number,
+    accountBucketSize?: number
     /** number of accounts that the patcher can get per request */
-    patcherAccountsPerRequest: number,
+    patcherAccountsPerRequest: number
     /** number of accounts that the patcher can get per upddate (cycle) */
-    patcherAccountsPerUpdate: number,
+    patcherAccountsPerUpdate: number
     /** number of hashes we can ask for per request (non leaf) , not enabled yet. not sure if we want or need it*/
-    patcherMaxHashesPerRequest: number,
+    patcherMaxHashesPerRequest: number
     /** number of hashes we can ask for child nodes per request */
-    patcherMaxLeafHashesPerRequest: number,
+    patcherMaxLeafHashesPerRequest: number
     /** max number of child hashes that we can respond with */
-    patcherMaxChildHashResponses: number,
+    patcherMaxChildHashResponses: number
     /** max number of sync restarts allowed due to thrown exceptions before we go apop */
     maxDataSyncRestarts: number
     /** max number of sync restarts allowed due to thrown exceptions for each tracker instance */
@@ -1017,7 +996,5 @@ type ObjectAlias = object
 export interface OpaqueTransaction extends ObjectAlias {}
 
 export type DeepRequired<T> = Required<{
-  [P in keyof T]: T[P] extends object | undefined
-    ? DeepRequired<Required<T[P]>>
-    : T[P]
+  [P in keyof T]: T[P] extends object | undefined ? DeepRequired<Required<T[P]>> : T[P]
 }>

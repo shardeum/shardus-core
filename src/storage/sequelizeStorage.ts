@@ -4,7 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import { Sequelize } from 'sequelize'
 import Profiler from '../utils/profiler'
-import Logger, {logFlags} from '../logger'
+import Logger, { logFlags } from '../logger'
 
 interface SequelizeStorage {
   baseDir: string
@@ -29,10 +29,7 @@ class SequelizeStorage {
     this.baseDir = baseDir
     this.models = models
     this.storageConfig = storageConfig
-    this.storageConfig.options.storage = path.join(
-      this.baseDir,
-      this.storageConfig.options.storage
-    )
+    this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
     this.profiler = profiler
     // Setup logger
     this.mainLogger = logger.getLogger('default')
@@ -46,8 +43,7 @@ class SequelizeStorage {
     // Start Sequelize and load models
     //@ts-ignore
     this.sequelize = new Sequelize(...Object.values(this.storageConfig))
-    for (let [modelName, modelAttributes] of this.models)
-      this.sequelize.define(modelName, modelAttributes)
+    for (let [modelName, modelAttributes] of this.models) this.sequelize.define(modelName, modelAttributes)
     this.storageModels = this.sequelize.models
     this.initialized = false
     // Create tables for models in DB if they don't exist
@@ -97,7 +93,7 @@ class SequelizeStorage {
 // From: https://stackoverflow.com/a/21196961
 async function _ensureExists(dir) {
   return new Promise<void>((resolve, reject) => {
-    fs.mkdir(dir, { recursive: true }, err => {
+    fs.mkdir(dir, { recursive: true }, (err) => {
       if (err) {
         // Ignore err if folder exists
         if (err.code === 'EEXIST') resolve()

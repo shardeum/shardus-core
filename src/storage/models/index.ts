@@ -25,7 +25,7 @@ const models = [
   summary,
   network,
   networkReceipt,
-  networkSummary
+  networkSummary,
 ]
 
 export default models

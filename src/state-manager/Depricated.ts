@@ -6,7 +6,7 @@ import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
-import Logger, {logFlags} from '../logger'
+import Logger, { logFlags } from '../logger'
 import ShardFunctions from './shardFunctions'
 import { time } from 'console'
 import StateManager from '.'
@@ -20,7 +20,7 @@ class Depricated {
   crypto: Crypto
   config: Shardus.ServerConfiguration
   profiler: Profiler
-  
+
   logger: Logger
   p2p: P2P
   storage: Storage
@@ -47,8 +47,16 @@ class Depricated {
   // repairCompletedMap: Map<string, boolean>
   // dataRepairStack: RepairTracker[]
 
-  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ServerConfiguration) {
-    
+  constructor(
+    stateManager: StateManager,
+    profiler: Profiler,
+    app: Shardus.App,
+    logger: Logger,
+    storage: Storage,
+    p2p: P2P,
+    crypto: Crypto,
+    config: Shardus.ServerConfiguration
+  ) {
     this.crypto = crypto
     this.app = app
     this.logger = logger
@@ -215,13 +223,13 @@ class Depricated {
     //         }
     //       }
     //       if (returnedResults < expectedResults) {
-    //         if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send ${returnedResults} < ${expectedResults}`)
+    //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send ${returnedResults} < ${expectedResults}`)
     //       }
     //       acceptedTXs = await this.storage.queryAcceptedTransactionsByIds(txIDList)
-    //       // if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send2 `)
+    //       // /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send2 `)
     //       if (acceptedTXs != null && acceptedTXs.length < expectedResults) {
-    //         if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index results ${utils.stringifyReduce(acceptedTXs)} snippets ${utils.stringifyReduce(payload.debugSnippets)} `)
-    //         if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index results2:${utils.stringifyReduce(acceptedTXs.map((x: Shardus.AcceptedTx) => x.id))} snippets:${utils.stringifyReduce(payload.debugSnippets)} txid:${utils.stringifyReduce(txIDList)} `)
+    //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index results ${utils.stringifyReduce(acceptedTXs)} snippets ${utils.stringifyReduce(payload.debugSnippets)} `)
+    //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index results2:${utils.stringifyReduce(acceptedTXs.map((x: Shardus.AcceptedTx) => x.id))} snippets:${utils.stringifyReduce(payload.debugSnippets)} txid:${utils.stringifyReduce(txIDList)} `)
     //         let acceptedTXsBefore = 0
     //         if (acceptedTXs != null) {
     //           acceptedTXsBefore = acceptedTXs.length
@@ -253,7 +261,7 @@ class Depricated {
     //             }
     //           }
     //         }
-    //         if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send3 ${acceptedTXsBefore} < ${expectedResults} findsFixed: ${finds}  missing: ${utils.stringifyReduce(missingTXs)} found: ${utils.stringifyReduce(found)} acceptedTXs.length updated: ${acceptedTXs.length}`)
+    //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send3 ${acceptedTXsBefore} < ${expectedResults} findsFixed: ${finds}  missing: ${utils.stringifyReduce(missingTXs)} found: ${utils.stringifyReduce(found)} acceptedTXs.length updated: ${acceptedTXs.length}`)
     //       } else {
     //       }
     //     } catch (ex) {
@@ -310,14 +318,14 @@ class Depricated {
   //     /** @type {CombinedPartitionReceipt} */
   //     let combinedReciept = { result: partitionReceiptCopy, signatures: partitionReceipt.resultsList.map((a) => a.sign) }
 
-  //     if (logFlags.verbose) this.mainLogger.debug(' sendPartitionData ' + utils.stringifyReduceLimit({ combinedReciept, paritionObject }))
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(' sendPartitionData ' + utils.stringifyReduceLimit({ combinedReciept, paritionObject }))
 
   //     // send it
   //     // this.p2p.archivers.sendPartitionData(combinedReciept, paritionObject)
   //   }
 
   //   sendTransactionData(partitionNumber: number, cycleNumber: number, transactions: AcceptedTx[]) {
-  //     if (logFlags.verbose) this.mainLogger.debug(' sendTransactionData ' + utils.stringifyReduceLimit({ partitionNumber, cycleNumber, transactions }))
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(' sendTransactionData ' + utils.stringifyReduceLimit({ partitionNumber, cycleNumber, transactions }))
 
   //     // send it
   //     // this.p2p.archivers.sendTransactionData(partitionNumber, cycleNumber, transactions)
@@ -443,7 +451,7 @@ class Depricated {
   //       }
   //     }
   //     // reaponsesById: ${utils.stringifyReduce(responsesById)}
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair findMostCommonResponse: retVal: ${utils.stringifyReduce({ topHash, topCount, topResult })}  responses: ${utils.stringifyReduce(responses)} `)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair findMostCommonResponse: retVal: ${utils.stringifyReduce({ topHash, topCount, topResult })}  responses: ${utils.stringifyReduce(responses)} `)
   //     return { topHash, topCount, topResult }
   //   }
 
@@ -663,7 +671,7 @@ class Depricated {
   //                   // if (hashListEntry.corrections.length > 0) {
   //                   //   let nextCorrection = hashListEntry.corrections[hashListEntry.corrections.length - 1]
   //                   //   if (nextCorrection && correction && nextCorrection.bv === correction.bv) {
-  //                   //     if (logFlags.verbose) this.mainLogger.debug( ` solveHashSets overdelete fix: i:${i} j:${j} index:${index} bv:${nextCorrection.bv}}`)
+  //                   //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug( ` solveHashSets overdelete fix: i:${i} j:${j} index:${index} bv:${nextCorrection.bv}}`)
   //                   //     continue
   //                   //   }
   //                   // }
@@ -950,7 +958,7 @@ class Depricated {
   //       let hashListEntry = hashSetList[hashListIndex]
   //       hashListEntry.corrections = [] // clear this
   //       // hashListEntry.instructions = []
-  //       // if (logFlags.console) console.log(`solution for set ${hashListIndex}  locallen:${hashListEntry.hashSet.length / stepSize} `)
+  //       // /* prettier-ignore */ if (logFlags.console) console.log(`solution for set ${hashListIndex}  locallen:${hashListEntry.hashSet.length / stepSize} `)
   //       let winningVoteIndex = 0
   //       for (let voteObj of allWinningVotes) {
   //         if (voteObj.voteTally[hashListIndex] == null) {
@@ -1221,7 +1229,7 @@ class Depricated {
   //         continue
   //       }
   //       if (extra == null) {
-  //         if (log) if (logFlags.console) console.log(`testHashsetSolution error extra == null at i: ${i}  extraIndex: ${extraIndex}`)
+  //         if (log) /* prettier-ignore */ if (logFlags.console) console.log(`testHashsetSolution error extra == null at i: ${i}  extraIndex: ${extraIndex}`)
   //         break
   //       }
   //       if (txSourceList.hashes[i] == null) {
@@ -1242,7 +1250,7 @@ class Depricated {
   //     // }
   //     hashSet = Depricated.createHashSetString(newTxList.thashes, newTxList.states) // TXSTATE_TODO
 
-  //     if (log) if (logFlags.console) console.log(`extras removed: len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
+  //     if (log) /* prettier-ignore */ if (logFlags.console) console.log(`extras removed: len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
 
   //     // Txids: txSourceData.hashes, // txid1, txid2, …],  - ordered from oldest to recent
   //     // Status: txSourceData.passed, // [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
@@ -1260,7 +1268,7 @@ class Depricated {
   //         // newTxList.txs[i] = newTxList.ttxs[ourCounter]
 
   //         if (newTxList.hashes[i] == null) {
-  //           if (log) if (logFlags.console) console.log(`testHashsetSolution error null at i: ${i} solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+  //           if (log) /* prettier-ignore */ if (logFlags.console) console.log(`testHashsetSolution error null at i: ${i} solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
   //           return false
   //         }
   //         ourCounter++
@@ -1274,7 +1282,7 @@ class Depricated {
   //           continue
   //         }
   //         // if (!solutionDelta) {
-  //         //   if (logFlags.verbose) this.mainLogger.error( `_mergeRepairDataIntoLocalState2 a error solutionDelta=null  solutionIndex: ${solutionIndex} i:${i} of ${ourHashSet.indexMap.length} deltas: ${utils.stringifyReduce(repairTracker.solutionDeltas)}`)
+  //         //   /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error( `_mergeRepairDataIntoLocalState2 a error solutionDelta=null  solutionIndex: ${solutionIndex} i:${i} of ${ourHashSet.indexMap.length} deltas: ${utils.stringifyReduce(repairTracker.solutionDeltas)}`)
   //         // }
   //         // insert the next one
   //         newTxList.hashes[i] = solutionTxList.hashes[correction.i] // solutionDelta.tx.id
@@ -1282,13 +1290,13 @@ class Depricated {
   //         // newTxList.states[i] = solutionTxList.states[correction.i] // TXSTATE_TODO
 
   //         if (newTxList.hashes[i] == null) {
-  //           if (log) if (logFlags.console) console.log(`testHashsetSolution error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+  //           if (log) /* prettier-ignore */ if (logFlags.console) console.log(`testHashsetSolution error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
   //         }
   //         // newTxList.passed[i] = solutionDelta.pf
   //         // newTxList.txs[i] = solutionDelta.tx
   //         solutionIndex++
   //         // if (newTxList.hashes[i] == null) {
-  //         //   if (logFlags.verbose) this.mainLogger.error( `_mergeRepairDataIntoLocalState2 b error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+  //         //   /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error( `_mergeRepairDataIntoLocalState2 b error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
   //         // }
   //       }
   //     }
@@ -1308,7 +1316,7 @@ class Depricated {
   //     }
 
   //     if (log) if (logFlags.console) console.log(`solved set len: ${hashSet.length / stepSize}  : ${hashSet}`)
-  //     // if (logFlags.verbose) this.mainLogger.debug( `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
+  //     // /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug( `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
 
   //     return true
   //   }
@@ -1414,7 +1422,7 @@ class Depricated {
   //       // newFailedTXs: a list of TXs that we fetched, they had failed so we save them but do not apply them
   //       // extraTXIds: a list of TXIds that our partition has that the leading partition does not.  This is what we need to remove
   //       // missingTXIds: a list of TXIds that our partition has that the leading partition has that we don't.  We will need to add these in using the list newPendingTXs
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`_getRepairTrackerForCycle: creating for cycle:${counter} partition:${partition}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`_getRepairTrackerForCycle: creating for cycle:${counter} partition:${partition}`)
   //       repairTracker = {
   //         triedHashes: [],
   //         numNodes: this.stateManager.lastActiveNodeCount, // num nodes that we send partition results to
@@ -1465,15 +1473,15 @@ class Depricated {
   //     let combinedKey = repairTracker.key + repairTracker.key2
   //     if (this.repairStartedMap.has(combinedKey)) {
   //       if (this.repairCompletedMap.has(combinedKey)) {
-  //         if (logFlags.verbose) this.mainLogger.debug(`repairStats: finished repair ${combinedKey} -alreadyFlagged  tag:${debugTag}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`repairStats: finished repair ${combinedKey} -alreadyFlagged  tag:${debugTag}`)
   //       } else {
   //         this.stateManager.dataRepairsCompleted++
   //         this.repairCompletedMap.set(combinedKey, true)
-  //         if (logFlags.verbose) this.mainLogger.debug(`repairStats: finished repair ${combinedKey} tag:${debugTag}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`repairStats: finished repair ${combinedKey} tag:${debugTag}`)
   //       }
   //     } else {
   //       // should be a trace?
-  //       if (logFlags.verbose) this.mainLogger.debug(`repairStats: Calling complete on a key we dont have ${combinedKey} tag:${debugTag}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`repairStats: Calling complete on a key we dont have ${combinedKey} tag:${debugTag}`)
   //     }
 
   //     for (let i = this.dataRepairStack.length - 1; i >= 0; i--) {
@@ -1498,7 +1506,7 @@ class Depricated {
   //    * @param {RepairTracker} repairTracker
   //    */
   //   repairTrackerClearForNextRepair(repairTracker: RepairTracker) {
-  //     if (logFlags.verbose) this.mainLogger.debug(` repairTrackerClearForNextRepair cycleNumber: ${repairTracker.counter} parition: ${repairTracker.partitionId} `)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` repairTrackerClearForNextRepair cycleNumber: ${repairTracker.counter} parition: ${repairTracker.partitionId} `)
   //     repairTracker.removedTXIds = []
   //     repairTracker.repairedTXs = []
   //     repairTracker.newPendingTXs = []
@@ -1513,7 +1521,7 @@ class Depricated {
   //    * @param {number} specificParition the old version of this would repair all partitions but we had to wait.  this works on just one partition
   //    */
   //   async mergeAndApplyTXRepairs(cycleNumber: number, specificParition: number) {
-  //     if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
   //     // walk through all txs for this cycle.
   //     // get or create entries for accounts.
   //     // track when they have missing txs or wrong txs
@@ -1551,7 +1559,7 @@ class Depricated {
   //         let keysResponse = this.app.getKeyFromTransaction(tx.data)
 
   //         if (!keysResponse) {
-  //           if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+  //           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
   //         }
 
   //         let { sourceKeys, targetKeys } = keysResponse
@@ -1572,7 +1580,7 @@ class Depricated {
   //         allExtraTXids[tx] = 1
   //         // TODO Repair. ugh have to query our data and figure out which accounts need to be reset.
   //       }
-  //       if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
 
   //       // todo repair: hmmm also reset accounts have a tx we need to remove.
   //       // }
@@ -1589,7 +1597,7 @@ class Depricated {
   //             // this was a bad tx dont include it.   we have to look up the account associated with this tx and make sure they get reset
   //             let keysResponse = this.app.getKeyFromTransaction(tx.data)
   //             if (!keysResponse) {
-  //               if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+  //               /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
   //             }
   //             let { sourceKeys, targetKeys } = keysResponse
   //             for (let accountID of sourceKeys) {
@@ -1611,19 +1619,19 @@ class Depricated {
   //           }
   //         }
   //       } else {
-  //         if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.stateManager.partitionObjects.txByCycleByPartition)}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.stateManager.partitionObjects.txByCycleByPartition)}`)
   //       }
 
   //       // build and sort a list of TXs that we need to apply
 
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs txIDResetExtraCount: ${txIDResetExtraCount} allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs txIDResetExtraCount: ${txIDResetExtraCount} allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
   //       // reset accounts
   //       let accountKeys = Object.keys(allAccountsToResetById)
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
 
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
   //       let ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
 
   //       // let replacmentAccounts =  //returned by the below function for debug
   //       await this._revertAccounts(accountKeys, cycleNumber)
@@ -1640,8 +1648,8 @@ class Depricated {
   //       // sort the list by ascending timestamp
   //       newTXList.sort(utils.sortTimestampAsc) // (function (a, b) { return a.timestamp - b.timestamp })
 
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
 
   //       let applyCount = 0
   //       let applyFailCount = 0
@@ -1684,7 +1692,7 @@ class Depricated {
   //               continue
   //             }
 
-  //             if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
+  //             /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
   //             let hasStateTableData = false // may or may not have it but not tracking yet
 
   //             // TSConversion old way used to do this but seem incorrect to have receipt under data!
@@ -1724,8 +1732,8 @@ class Depricated {
   //             let success = await this.testAccountTime(tx.data, wrappedStates)
 
   //             if (!success) {
-  //               if (logFlags.verbose) this.mainLogger.debug(' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
-  //               if (logFlags.playback) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs`)
+  //               /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
+  //               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs`)
 
   //               this.statemanager_fatal(`testAccountTime_failed`, ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
 
@@ -1744,19 +1752,19 @@ class Depricated {
   //               applyCount++
   //             }
   //           } else {
-  //             if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
+  //             /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
   //           }
   //         } catch (ex) {
   //           this.mainLogger.debug('_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   //           this.statemanager_fatal(`mergeAndApplyTXRepairs_ex`, '_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   //         }
 
-  //         if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
   //       }
 
   //       // unlock the accounts we locked...  todo maybe put this in a finally statement?
   //       this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
   //     }
   //   }
 
@@ -1766,7 +1774,7 @@ class Depricated {
   //    * @param {number} specificParition the old version of this would repair all partitions but we had to wait.  this works on just one partition
   //    */
   //   async updateTrackingAndPrepareRepairs(cycleNumber: number, specificParition: number) {
-  //     if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
   //     // walk through all txs for this cycle.
   //     // get or create entries for accounts.
   //     // track when they have missing txs or wrong txs
@@ -1805,7 +1813,7 @@ class Depricated {
   //         let keysResponse = this.app.getKeyFromTransaction(tx.data)
 
   //         if (!keysResponse) {
-  //           if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+  //           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
   //         }
 
   //         let { sourceKeys, targetKeys } = keysResponse
@@ -1826,7 +1834,7 @@ class Depricated {
   //         allExtraTXids[tx] = 1
   //         // TODO Repair. ugh have to query our data and figure out which accounts need to be reset.
   //       }
-  //       if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
 
   //       // todo repair: hmmm also reset accounts have a tx we need to remove.
   //       // }
@@ -1843,7 +1851,7 @@ class Depricated {
   //             // this was a bad tx dont include it.   we have to look up the account associated with this tx and make sure they get reset
   //             let keysResponse = this.app.getKeyFromTransaction(tx.data)
   //             if (!keysResponse) {
-  //               if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+  //               /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
   //             }
   //             let { sourceKeys, targetKeys } = keysResponse
   //             for (let accountID of sourceKeys) {
@@ -1864,9 +1872,9 @@ class Depricated {
   //             // we will only play back the txs on accounts that point to allAccountsToResetById
   //           }
   //         }
-  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs txIDResetExtraCount:${txIDResetExtraCount} txIDToAccCount: ${txIDToAccCount}`)
+  //         /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs txIDResetExtraCount:${txIDResetExtraCount} txIDToAccCount: ${txIDToAccCount}`)
   //       } else {
-  //         if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.stateManager.partitionObjects.txByCycleByPartition)}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.stateManager.partitionObjects.txByCycleByPartition)}`)
   //       }
 
   //       // build and sort a list of TXs that we need to apply
@@ -1885,8 +1893,8 @@ class Depricated {
   //       // sort the list by ascending timestamp
   //       newTXList.sort(utils.sortTimestampAsc) // function (a, b) { return a.timestamp - b.timestamp })
 
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
 
   //       // Save the results of this computation for later
   //       /** @type {UpdateRepairData}  */
@@ -1900,7 +1908,7 @@ class Depricated {
   //       // how will the partition object get updated though??
   //       // }
 
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs finished`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs finished`)
   //       if (paritionsServiced === 0) {
   //         this.statemanager_fatal(`_updateTrackingAndPrepareRepairs_fail`, `_updateTrackingAndPrepareRepairs failed. not partitions serviced: ${debugKey} our consensus:${utils.stringifyReduce(lastCycleShardValues?.ourConsensusPartitions)} `)
   //       }
@@ -1920,7 +1928,7 @@ class Depricated {
   //     }
   //     this.applyAllPreparedRepairsRunning = true
 
-  //     if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs cycleNumber ${cycleNumber}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs cycleNumber ${cycleNumber}`)
 
   //     this.mainLogger.debug(`applyAllPreparedRepairs c:${cycleNumber}`)
 
@@ -1942,20 +1950,20 @@ class Depricated {
 
   //     // build and sort a list of TXs that we need to apply
 
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
   //     // reset accounts
   //     let accountKeys = Object.keys(allAccountsToResetById)
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
 
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
   //     let ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
 
   //     // let replacmentAccounts =  //returned by the below function for debug
   //     await this._revertAccounts(accountKeys, cycleNumber)
 
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs newTXList.length: ${newTXList.length}`)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs newTXList.length: ${newTXList.length}`)
 
   //     let applyCount = 0
   //     let applyFailCount = 0
@@ -2008,7 +2016,7 @@ class Depricated {
   //             continue
   //           }
 
-  //           if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
+  //           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
   //           let hasStateTableData = false // may or may not have it but not tracking yet
 
   //           // TSConversion old way used to do this but seem incorrect to have receipt under data!
@@ -2048,8 +2056,8 @@ class Depricated {
   //           let success = await this.testAccountTime(tx.data, wrappedStates)
 
   //           if (!success) {
-  //             if (logFlags.verbose) this.mainLogger.debug(' applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
-  //             if (logFlags.playback) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs`)
+  //             /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(' applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
+  //             /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs`)
   //             this.statemanager_fatal(`applyAllPreparedRepairs_fail`, ' testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
 
   //             // return
@@ -2067,20 +2075,20 @@ class Depricated {
   //             let wrappedState = wrappedStates[wrappedStateKey]
 
   //             // if(wrappedState == null) {
-  //             //   if (logFlags.verbose) this.mainLogger.error( ` _repair applyAllPreparedRepairs wrappedState == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
+  //             //   /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error( ` _repair applyAllPreparedRepairs wrappedState == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
   //             //   //could continue but want to see if there is more we can log.
   //             // }
   //             //is it global.
   //             if (this.stateManager.accountGlobals.isGlobalAccount(wrappedStateKey)) {
   //               // wrappedState.accountId)){
-  //               if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `applyAllPreparedRepairs - has`, ` ${wrappedState.accountId} ${wrappedStateKey}`)
+  //               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `applyAllPreparedRepairs - has`, ` ${wrappedState.accountId} ${wrappedStateKey}`)
   //               if (wrappedState != null) {
   //                 let globalValueSnapshot = this.stateManager.accountGlobals.getGlobalAccountValueAtTime(wrappedState.accountId, tx.timestamp)
 
   //                 if (globalValueSnapshot == null) {
   //                   //todo some error?
   //                   let globalAccountBackupList = this.stateManager.accountGlobals.getGlobalAccountBackupList(wrappedStateKey)
-  //                   if (logFlags.verbose) this.mainLogger.error(` _repair applyAllPreparedRepairs has global key but no snapshot at time ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
+  //                   /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(` _repair applyAllPreparedRepairs has global key but no snapshot at time ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
   //                   continue
   //                 }
   //                 // build a new wrapped response to insert
@@ -2091,14 +2099,14 @@ class Depricated {
   //                 // yikes probably cant do local cached data at this point.
   //                 if (logFlags.verbose) {
   //                   let globalAccountBackupList = this.stateManager.accountGlobals.getGlobalAccountBackupList(wrappedStateKey)
-  //                   if (logFlags.verbose) this.mainLogger.error(` _repair applyAllPreparedRepairs has global key details ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
+  //                   /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(` _repair applyAllPreparedRepairs has global key details ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
   //                 }
 
-  //                 if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs got global account to repair from: ${utils.stringifyReduce(newWrappedResponse)}`)
+  //                 /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs got global account to repair from: ${utils.stringifyReduce(newWrappedResponse)}`)
   //               }
   //             } else {
   //               if (wrappedState == null) {
-  //                 if (logFlags.verbose) this.mainLogger.error(` _repair applyAllPreparedRepairs is not a global account but wrapped state == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
+  //                 /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(` _repair applyAllPreparedRepairs is not a global account but wrapped state == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
   //               }
   //             }
   //           }
@@ -2112,19 +2120,19 @@ class Depricated {
   //             applyCount++
   //           }
   //         } else {
-  //           if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
+  //           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
   //         }
   //       } catch (ex) {
   //         this.mainLogger.debug('_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   //         this.statemanager_fatal(`applyAllPreparedRepairs_fail`, '_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   //       }
 
-  //       if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
   //     }
 
   //     // unlock the accounts we locked...  todo maybe put this in a finally statement?
   //     this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
   //     // }
   //     this.applyAllPreparedRepairsRunning = false
   //   }
@@ -2142,7 +2150,7 @@ class Depricated {
   //     cycleStart -= this.stateManager.syncSettleTime // adjust by sync settle time
   //     let replacmentAccounts: Shardus.AccountsCopy[]
   //     let replacmentAccountsMinusGlobals = [] as Shardus.AccountsCopy[]
-  //     if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts start  numAccounts: ${accountIDs.length} repairing cycle:${cycleNumber}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts start  numAccounts: ${accountIDs.length} repairing cycle:${cycleNumber}`)
 
   //     try {
   //       // query our account copies that are less than or equal to this cycle!
@@ -2159,10 +2167,10 @@ class Depricated {
   //           }
 
   //           if (accountData == null || accountData.data == null || accountData.accountId == null) {
-  //             if (logFlags.verbose) this.mainLogger.error(` _repair _revertAccounts null account data found: ${accountData.accountId} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
+  //             /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(` _repair _revertAccounts null account data found: ${accountData.accountId} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
   //           } else {
   //             // todo overkill
-  //             if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
+  //             /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
   //           }
   //           // TODO: globalaccounts
   //           //this is where we need to no reset a global account, but instead grab the replacment data and cache it
@@ -2172,9 +2180,9 @@ class Depricated {
   //           //Try not reverting global accounts..
   //           if (this.stateManager.accountGlobals.isGlobalAccount(accountData.accountId) === false) {
   //             replacmentAccountsMinusGlobals.push(accountData)
-  //             if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts not a global account, add to list ${utils.makeShortHash(accountData.accountId)}`)
+  //             /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts not a global account, add to list ${utils.makeShortHash(accountData.accountId)}`)
   //           } else {
-  //             if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts was a global account, do not add to list ${utils.makeShortHash(accountData.accountId)}`)
+  //             /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts was a global account, do not add to list ${utils.makeShortHash(accountData.accountId)}`)
   //           }
   //         }
   //         // tell the app to replace the account data
@@ -2182,10 +2190,10 @@ class Depricated {
   //         await this.app.resetAccountData(replacmentAccountsMinusGlobals)
   //         // update local state.
   //       } else {
-  //         if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts No replacment accounts found!!! cycle <= :${prevCycle}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts No replacment accounts found!!! cycle <= :${prevCycle}`)
   //       }
 
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts: ${accountIDs.length} replacmentAccounts ${replacmentAccounts.length} repairing cycle:${cycleNumber} replacmentAccountsMinusGlobals: ${replacmentAccountsMinusGlobals.length}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts: ${accountIDs.length} replacmentAccounts ${replacmentAccounts.length} repairing cycle:${cycleNumber} replacmentAccountsMinusGlobals: ${replacmentAccountsMinusGlobals.length}`)
 
   //       // TODO prodution. consider if we need a better set of checks before we delete an account!
   //       // If we don't have a replacement copy for an account we should try to delete it
@@ -2197,13 +2205,13 @@ class Depricated {
   //       for (let accountData of replacmentAccounts) {
   //         accountsReverted[accountData.accountId] = 1
   //         if (accountData.cycleNumber > prevCycle) {
-  //           if (logFlags.verbose) this.mainLogger.error(` _repair _revertAccounts cycle too new for backup restore: ${accountData.cycleNumber}  cycleNumber:${cycleNumber} timestamp:${accountData.timestamp}`)
+  //           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(` _repair _revertAccounts cycle too new for backup restore: ${accountData.cycleNumber}  cycleNumber:${cycleNumber} timestamp:${accountData.timestamp}`)
   //         }
 
   //         debug.push({ id: accountData.accountId, cycleNumber: accountData.cycleNumber, timestamp: accountData.timestamp, hash: accountData.hash, accHash: accountData.data.hash, accTs: accountData.data.timestamp })
   //       }
 
-  //       if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts: ${utils.stringifyReduce(debug)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts: ${utils.stringifyReduce(debug)}`)
 
   //       for (let accountID of accountIDs) {
   //         if (accountsReverted[accountID] == null) {
@@ -2211,7 +2219,7 @@ class Depricated {
   //         }
   //       }
   //       if (accountsToDelete.length > 0) {
-  //         if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts delete some accounts ${utils.stringifyReduce(accountsToDelete)}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts delete some accounts ${utils.stringifyReduce(accountsToDelete)}`)
   //         await this.app.deleteAccountData(accountsToDelete)
   //       }
 
@@ -2227,7 +2235,7 @@ class Depricated {
   //         // if (txRecord.txTS < cycleEnd) {
   //         let keysResponse = this.app.getKeyFromTransaction(txRecord.acceptedTx.data)
   //         if (!keysResponse) {
-  //           if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(txRecord.acceptedTx)}`)
+  //           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(txRecord.acceptedTx)}`)
   //         }
   //         let { sourceKeys, targetKeys } = keysResponse
   //         for (let accountID of sourceKeys) {
@@ -2275,11 +2283,11 @@ class Depricated {
   //         let accountEntry = tryGetAccountData(key)
   //         if (accountEntry.timestamp >= timestamp) {
   //           failedAgeCheck = true
-  //           if (logFlags.verbose) this.mainLogger.debug('testAccountTime account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
+  //           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('testAccountTime account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
   //         }
   //       }
   //       if (failedAgeCheck) {
-  //         // if (logFlags.verbose) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
+  //         // /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
   //         return false
   //       }
   //     } catch (ex) {
@@ -2314,11 +2322,11 @@ class Depricated {
   //         }
   //       }
 
-  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
-  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
 
   //       if (repairing !== true) {
   //         // get a list of modified account keys that we will lock
@@ -2329,15 +2337,15 @@ class Depricated {
   //         for (let accountID of targetKeys) {
   //           accountKeys.push(accountID)
   //         }
-  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
+  //         /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
   //         ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+  //         /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
   //       }
 
   //       ourLockID = await this.stateManager.fifoLock('accountModification')
 
-  //       if (logFlags.verbose) if (logFlags.console) console.log(`tryApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
-  //       // if (logFlags.verbose) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
+  //       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log(`tryApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
+  //       // /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
   //       this.stateManager.transactionQueue.applySoftLock = true
 
   //       // let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
@@ -2348,19 +2356,19 @@ class Depricated {
   //       let { stateTableResults, accountData: _accountdata } = applyResponse
   //       accountDataList = _accountdata
 
-  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
   //       // wrappedStates are side effected for now
   //       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter)
 
-  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
-  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
 
   //       this.stateManager.transactionQueue.applySoftLock = false
   //       // only write our state table data if we dont already have it in the db
   //       if (hasStateTableData === false) {
   //         for (let stateT of stateTableResults) {
-  //           if (logFlags.verbose) if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
-  //           if (logFlags.verbose) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
+  //           /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
+  //           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
   //         }
   //         await this.storage.addAccountStates(stateTableResults)
   //       }
@@ -2388,7 +2396,7 @@ class Depricated {
   //         if (ourAccountLocks != null) {
   //           this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
   //         }
-  //         if (logFlags.verbose) this.mainLogger.debug(` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
   //       }
   //     }
 
@@ -2573,11 +2581,11 @@ class Depricated {
   //       partitionResult.hashSet = hashSet
   //     }
 
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair partitionObject: ${utils.stringifyReduce(partitionObject)}`)
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair generatePartitionResult: ${utils.stringifyReduce(partitionResult)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair partitionObject: ${utils.stringifyReduce(partitionObject)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair generatePartitionResult: ${utils.stringifyReduce(partitionResult)}`)
 
   //     if (partitionObject.Txids && partitionObject.Txids.length > 0) {
-  //       if (logFlags.playback) this.logger.playbackLogNote('partitionObject', 'c' + partitionObject.Cycle_number, partitionObject)
+  //       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('partitionObject', 'c' + partitionObject.Cycle_number, partitionObject)
   //     }
   //     // nodeid in form of the signer!
   //     return partitionResult
@@ -2665,19 +2673,19 @@ class Depricated {
   //     // Tried hashes is not working correctly at the moment, it is an unused parameter. I am not even sure we want to ignore hashes
   //     let { topHash, topCount, topResult } = this.stateManager.depricated.findMostCommonResponse(cycleCounter, partitionId, repairTracker.triedHashes)
 
-  //     if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept repairTracker: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept repairTracker: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
 
   //     let requiredHalf = Math.max(1, allResults.length / 2)
   //     if (this.stateManager.useHashSets && repairPassHack) {
   //       // hack force our node to win:
   //       topCount = requiredHalf
   //       topHash = ourResult.Partition_hash
-  //       if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept hack force win: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept hack force win: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
   //     }
 
   //     let resultsList = []
   //     if (topCount >= requiredHalf) {
-  //       if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash wins: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash wins: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
   //       for (let partitionResult of allResults) {
   //         if (partitionResult.Partition_hash === topHash) {
   //           resultsList.push(partitionResult)
@@ -2686,15 +2694,15 @@ class Depricated {
   //     } else {
   //       if (this.stateManager.useHashSets) {
   //         // bail in a way that will cause us to use the hashset strings
-  //         if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: did not win, useHashSets: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: did not win, useHashSets: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
   //         return { partitionReceipt: null, topResult: null, success: false }
   //       }
-  //       if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash failed: ` + utils.makeShortHash(topHash) + ` ${topCount} / ${requiredHalf}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash failed: ` + utils.makeShortHash(topHash) + ` ${topCount} / ${requiredHalf}`)
   //       return { partitionReceipt: null, topResult, success: false }
   //     }
 
   //     if (ourResult.Partition_hash !== topHash) {
-  //       if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: our hash does not match: ` + utils.makeShortHash(topHash) + ` our hash: ${ourResult.Partition_hash}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: our hash does not match: ` + utils.makeShortHash(topHash) + ` our hash: ${ourResult.Partition_hash}`)
   //       return { partitionReceipt: null, topResult, success: false }
   //     }
 
@@ -2702,7 +2710,7 @@ class Depricated {
   //       resultsList,
   //     }
 
-  //     if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept OK! ${utils.stringifyReduce({ partitionReceipt, topResult })}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept OK! ${utils.stringifyReduce({ partitionReceipt, topResult })}`)
 
   //     return { partitionReceipt, topResult, success: true }
   //   }
@@ -2719,7 +2727,7 @@ class Depricated {
   //     this.stateManager.stateIsGood_txHashsetOld = false
   //     if (this.stateManager.canDataRepair === false) {
   //       // todo fix false negative results.  This may require inserting
-  //       if (logFlags.verbose) this.mainLogger.error(`data oos detected. (old system) False negative results given if syncing. cycle: ${cycle.counter} partition: ${partitionId} `)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(`data oos detected. (old system) False negative results given if syncing. cycle: ${cycle.counter} partition: ${partitionId} `)
   //       return
   //     }
   //     return
@@ -2760,17 +2768,17 @@ class Depricated {
   //     }
   //     let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
   //     let { partitionReceipt: partitionReceipt3, topResult: topResult3, success: success3 } = receiptResults
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair checkForGoodPartitionReciept immediate receipt check. ${debugKey} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair checkForGoodPartitionReciept immediate receipt check. ${debugKey} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
 
   //     // see if we already have a winning hash to correct to
   //     if (!success3) {
   //     //   if (repairTracker.awaitWinningHash) {
   //     //     if (topResult3 == null) {
   //     //       // if we are awaitWinningHash then wait for a top result before we start repair process again
-  //     //       if (logFlags.verbose) this.mainLogger.debug(` _repair checkForGoodPartitionReciept awaitWinningHash:true but topResult == null so keep waiting ${debugKey}`)
+  //     //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair checkForGoodPartitionReciept awaitWinningHash:true but topResult == null so keep waiting ${debugKey}`)
   //     //     } else {
-  //     //       if (logFlags.verbose) this.mainLogger.debug(` _repair checkForGoodPartitionReciept awaitWinningHash:true and we have a top result so start reparing! ${debugKey}`)
-  //     //       if (logFlags.verbose) this.mainLogger.debug(` _repair checkForGoodPartitionReciept: tryGeneratePartitionReciept failed start repair process 3 ${debugKey} ${utils.stringifyReduce(receiptResults)}`)
+  //     //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair checkForGoodPartitionReciept awaitWinningHash:true and we have a top result so start reparing! ${debugKey}`)
+  //     //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair checkForGoodPartitionReciept: tryGeneratePartitionReciept failed start repair process 3 ${debugKey} ${utils.stringifyReduce(receiptResults)}`)
   //     //       let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
   //     //       await utils.sleep(1000)
   //     //       await this.startRepairProcess(cycle, topResult3, partitionId, ourResult.Partition_hash)
@@ -2783,7 +2791,7 @@ class Depricated {
   //       }
   //       this.stateManager.storePartitionReceipt(cycleNumber, partitionReceipt3)
   //     //   this.stateManager.depricated.repairTrackerMarkFinished(repairTracker, 'checkForGoodPartitionReciept')
-  //       if (logFlags.verbose) this.mainLogger.debug(` _repair checkForGoodPartitionReciept 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair checkForGoodPartitionReciept 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
   //     }
   //   }
 
@@ -2837,7 +2845,7 @@ class Depricated {
 
   //     for (let txRecord of this.tempTXRecords) {
   //       if (txRecord.redacted > 0) {
-  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair recordTXByCycle: ${utils.makeShortHash(txRecord.acceptedTx.id)} cycle: ${cycle.counter} redacted!!! ${txRecord.redacted}`)
+  //         /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair recordTXByCycle: ${utils.makeShortHash(txRecord.acceptedTx.id)} cycle: ${cycle.counter} redacted!!! ${txRecord.redacted}`)
   //         continue
   //       }
   //       if (txRecord.txTS < cycleEnd) {
@@ -2866,7 +2874,7 @@ class Depricated {
   //       txList.processed = true
   //     }
 
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair processTempTXs txsRecorded: ${txsRecorded} txsTemp: ${txsTemp} `)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair processTempTXs txsRecorded: ${txsRecorded} txsTemp: ${txsTemp} `)
   //   }
 
   //   // TODO sharding  done! need to split this out by partition
@@ -2931,7 +2939,7 @@ class Depricated {
   //     }
 
   //     if (isGlobalModifyingTX) {
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  ignore loggging globalTX ${txQueueEntry.logID} cycle: ${cycleNumber}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  ignore loggging globalTX ${txQueueEntry.logID} cycle: ${cycleNumber}`)
   //       return
   //     }
 
@@ -2966,10 +2974,10 @@ class Depricated {
   //     }
 
   //     if (storedNonGlobal === 0 && storedGlobal === 0) {
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: nothing to save globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: nothing to save globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
   //       return
   //     }
-  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal}  tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
+  //     /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal}  tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
 
   //     for (let accountKey of allKeys) {
   //       /** @type {NodeShardData} */
@@ -2984,19 +2992,19 @@ class Depricated {
   //       let key = 'p' + partitionID
 
   //       if (this.stateManager.accountGlobals.isGlobalAccount(accountKey)) {
-  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. dont save due to global: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
+  //         /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. dont save due to global: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
   //         continue
   //       }
 
   //       let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
   //       if (weStoreThisParition === false) {
-  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition we dont save: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
+  //         /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition we dont save: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
 
   //         continue
   //       }
 
   //       if (partitionHasNonGlobal[key] === false) {
-  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. we store it but only a global ref involved this time: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
+  //         /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. we store it but only a global ref involved this time: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
 
   //         continue
   //       }
@@ -3010,7 +3018,7 @@ class Depricated {
   //       }
 
   //       if (seenParitions[key] != null) {
-  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: seenParitions[key] != null P: ${partitionID}  homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
+  //         /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: seenParitions[key] != null P: ${partitionID}  homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
   //         // skip because this partition already has this TX!
   //         continue
   //       }
@@ -3036,7 +3044,7 @@ class Depricated {
   //           // // @ts-ignore
   //           // if(accountData.hash != null){
   //           //   // @ts-ignore
-  //           //   if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair recordTXByCycle:  how is this possible: ${utils.makeShortHash(accountData.accountId)} acc hash: ${utils.makeShortHash(accountData.hash)} acc stateID: ${utils.makeShortHash(accountData.stateId)}`)
+  //           //   /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair recordTXByCycle:  how is this possible: ${utils.makeShortHash(accountData.accountId)} acc hash: ${utils.makeShortHash(accountData.hash)} acc stateID: ${utils.makeShortHash(accountData.stateId)}`)
 
   //           // }
   //           // if(accountData.stateId == null){
@@ -3058,7 +3066,7 @@ class Depricated {
   //       }
   //       // txList.txById[acceptedTx.id] = acceptedTx
   //       // TODO sharding perf.  need to add some periodic cleanup when we have more cycles than needed stored in this map!!!
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair recordTXByCycle: pushedData P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} recordedState: ${recordedState}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair recordTXByCycle: pushedData P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} recordedState: ${recordedState}`)
   //     }
   //   }
 
@@ -3076,7 +3084,7 @@ class Depricated {
   //    * @param {number} cycleNumber
   //    */
   //   async broadcastPartitionResults(cycleNumber: number) {
-  //     if (logFlags.verbose) this.mainLogger.debug(` _repair broadcastPartitionResults for cycle: ${cycleNumber}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair broadcastPartitionResults for cycle: ${cycleNumber}`)
   //     // per partition need to figure out which node cover it.
   //     // then get a list of all the results we need to send to a given node and send them at once.
   //     // need a way to do this in semi parallel?
@@ -3098,12 +3106,12 @@ class Depricated {
 
   //       //check if we are syncing that cycle if so don't send out info on it!
   //       // if(this.getSyncTrackerForParition(partitionResult.Partition_id, lastCycleShardValues)) {
-  //       //   if (logFlags.verbose ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
+  //       //   /* prettier-ignore */ if (logFlags.verbose ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
   //       //   continue
   //       // }
 
   //       // if(lastCycleShardValues.partitionsToSkip.has(partitionResult.Partition_id) === true){
-  //       //   if (logFlags.verbose ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
+  //       //   /* prettier-ignore */ if (logFlags.verbose ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
   //       //   continue
   //       // }
 
@@ -3150,12 +3158,12 @@ class Depricated {
   //       }
   //       let partitionResultsToSend = partitionResultsByNodeID.get(nodeId)
   //       let payload = { Cycle_number: cycleNumber, partitionResults: partitionResultsToSend.results }
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
 
   //       let shorthash = utils.makeShortHash(partitionResultsToSend.node.id)
   //       let toNodeStr = shorthash + ':' + partitionResultsToSend.node.externalPort
-  //       if (logFlags.playback) this.logger.playbackLogNote('broadcastPartitionResults', `${cycleNumber}`, `to ${toNodeStr} ${partitionResultsToSend.debugStr} `)
+  //       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('broadcastPartitionResults', `${cycleNumber}`, `to ${toNodeStr} ${partitionResultsToSend.debugStr} `)
 
   //       // Filter nodes before we send tell()
   //       let filteredNodes = this.stateManager.filterValidNodesForInternalMessage([partitionResultsToSend.node], 'tellCorrespondingNodes', true, true)
@@ -3170,7 +3178,6 @@ class Depricated {
 
   //     await Promise.all(promises)
   //   }
-
 
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   /***
@@ -3215,7 +3222,7 @@ class Depricated {
   //     this.stateManager.getCurrentCycleShardData()
   //     await utils.sleep(1000)
   //     if (this.stateManager.currentCycleShardData == null) {
-  //       if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `)
+  //       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `)
   //       hasValidShardData = false
   //     }
   //     if (this.stateManager.currentCycleShardData != null) {
@@ -3233,7 +3240,7 @@ class Depricated {
   //     }
   //   }
   //   let nodeShardData = this.stateManager.currentCycleShardData.nodeShardData
-  //   if (logFlags.console) console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
+  //   /* prettier-ignore */ if (logFlags.console) console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
 
   //   let rangesToSync = [] as AddressRange[]
 
@@ -3241,7 +3248,7 @@ class Depricated {
 
   //   let homePartition = nodeShardData.homePartition
 
-  //   if (logFlags.console) console.log(`homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
+  //   /* prettier-ignore */ if (logFlags.console) console.log(`homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
 
   //   let chunksGuide = 4
   //   let syncRangeGoal = Math.max(1, Math.min(chunksGuide, Math.floor(this.stateManager.currentCycleShardData.shardGlobals.numPartitions / chunksGuide)))
@@ -3272,7 +3279,7 @@ class Depricated {
   //       if (nextLowAddress != null) {
   //         range.low = nextLowAddress
   //       }
-  //       if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
+  //       /* prettier-ignore */ if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
   //       nextLowAddress = address2
   //       currentStart = currentEnd
   //       i++
@@ -3295,7 +3302,7 @@ class Depricated {
   //       if (nextLowAddress != null) {
   //         range.low = nextLowAddress
   //       }
-  //       if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition} a1: ${range.low} a2: ${range.high}`)
+  //       /* prettier-ignore */ if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition} a1: ${range.low} a2: ${range.high}`)
 
   //       nextLowAddress = address2
   //       currentStart = currentEnd
@@ -3326,7 +3333,7 @@ class Depricated {
   //       if (nextLowAddress != null) {
   //         range.low = nextLowAddress
   //       }
-  //       if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
+  //       /* prettier-ignore */ if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
   //       nextLowAddress = address2
   //       currentStart = currentEnd
   //       i++
@@ -3355,19 +3362,19 @@ class Depricated {
 
   //   for (let syncTracker of this.syncTrackers) {
   //     // let partition = syncTracker.partition
-  //     if (logFlags.console) console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
-  //     if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+  //     /* prettier-ignore */ if (logFlags.console) console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
+  //     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
   //     syncTracker.syncStarted = true
 
   //     if (syncTracker.isGlobalSyncTracker === false) {
   //       await this.syncStateDataForRangeFast(syncTracker.range)
   //     } else {
-  //       if (logFlags.console) console.log(`syncTracker syncStateDataGlobals start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
+  //       /* prettier-ignore */ if (logFlags.console) console.log(`syncTracker syncStateDataGlobals start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
   //       await this.syncStateDataGlobalsFast(syncTracker)
   //     }
   //     syncTracker.syncFinished = true
-  //     if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+  //     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
   //     this.clearSyncData()
   //   }
   //   if (logFlags.console) console.log('syncStateData end' + '   time:' + Date.now())
@@ -3399,7 +3406,7 @@ class Depricated {
   //       await this.failandRestart()
   //     } else {
   //       this.statemanager_fatal(`syncStateDataForRange_ex`, 'syncStateDataForPartition failed: ' + errorToStringFull(error))
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
   //       await this.failandRestart()
   //     }
   //   }
@@ -3445,14 +3452,14 @@ class Depricated {
   //     let result: GetAccountData3Resp = r as GetAccountData3Resp
 
   //     if (result == null) {
-  //       if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceNode.id}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceNode.id}`)
   //       if (this.tryNextDataSourceNode('syncAccountData') == false) {
   //         break
   //       }
   //       continue
   //     }
   //     if (result.data == null) {
-  //       if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceNode.id}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceNode.id}`)
   //       if (this.tryNextDataSourceNode('syncAccountData') == false) {
   //         break
   //       }
@@ -3585,26 +3592,26 @@ class Depricated {
   //   let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData', true) // repeatable form may need to call this in batches
   //   //this.stateManager.partitionStats.statsDataSummaryInit(goodAccounts)
   //   if (failedHashes.length > 1000) {
-  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
+  //     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
   //     // state -> try another node. TODO record/eval/report blame?
   //     this.stateManager.recordPotentialBadnode()
   //     throw new Error('FailAndRestartPartition_processAccountDataFast_A')
   //   }
   //   if (failedHashes.length > 0) {
-  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
+  //     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
   //     // TODO ? record/eval/report blame?
   //     this.stateManager.recordPotentialBadnode()
   //     this.failedAccounts = this.failedAccounts.concat(failedHashes)
   //     for (let accountId of failedHashes) {
   //       account = this.mapAccountData[accountId]
 
-  //       if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData ${accountId}  data: ${utils.stringifyReduce(account)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData ${accountId}  data: ${utils.stringifyReduce(account)}`)
 
   //       if (account != null) {
   //         if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData adding account to list`)
   //         this.accountsWithStateConflict.push(account)
   //       } else {
-  //         if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData cant find data: ${accountId}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData cant find data: ${accountId}`)
   //         if (accountId) {
   //           //this.accountsWithStateConflict.push({ address: accountId,  }) //NOTE: fixed with refactor
   //           this.accountsWithStateConflict.push({ accountId: accountId, data: null, stateId: null, timestamp: 0 })
@@ -3638,7 +3645,7 @@ class Depricated {
   //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC:  syncStateDataGlobals no global accounts `)
   //       return // no global accounts
   //     }
-  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC:  syncStateDataGlobals globalReport: ${utils.stringifyReduce(globalReport)} `)
+  //     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC:  syncStateDataGlobals globalReport: ${utils.stringifyReduce(globalReport)} `)
 
   //     let accountReportsByID: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
   //     for (let report of globalReport.accounts) {
@@ -3656,7 +3663,7 @@ class Depricated {
   //         if (logFlags.error) this.mainLogger.error(`DATASYNC: syncStateDataGlobals max tries excceded `)
   //         return
   //       }
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals hasAllGlobalData === false `)
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals hasAllGlobalData === false `)
 
   //       // Node Precheck!
   //       if (this.dataSourceNode == null || this.stateManager.isNodeValidForInternalMessage(this.dataSourceNode.id, 'syncStateDataGlobals', true, true) === false) {
@@ -3670,14 +3677,14 @@ class Depricated {
   //       let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
 
   //       if (result == null) {
-  //         if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result == null')
+  //         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result == null')
   //         if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
   //           break
   //         }
   //         continue
   //       }
   //       if (result.accountData == null) {
-  //         if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
+  //         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
   //         if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
   //           break
   //         }
@@ -3686,7 +3693,7 @@ class Depricated {
 
   //       accountData = accountData.concat(result.accountData)
 
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals get_account_data_by_list ${utils.stringifyReduce(result)} `)
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals get_account_data_by_list ${utils.stringifyReduce(result)} `)
 
   //       globalReport2 = await this.getRobustGlobalReport()
   //       let accountReportsByID2: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
@@ -3702,18 +3709,18 @@ class Depricated {
   //       }
   //       //check the full report for any missing data
   //       for (let report of globalReport2.accounts) {
-  //         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts `)
+  //         /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts `)
   //         let data = accountDataById[report.id]
   //         if (data == null) {
   //           //we dont have the data
   //           hasAllGlobalData = false
   //           remainingAccountsToSync.push(report.id)
-  //           if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data===null ${utils.makeShortHash(report.id)} `)
+  //           /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data===null ${utils.makeShortHash(report.id)} `)
   //         } else if (data.stateId !== report.hash) {
   //           //we have the data but he hash is wrong
   //           hasAllGlobalData = false
   //           remainingAccountsToSync.push(report.id)
-  //           if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data.stateId !== report.hash ${utils.makeShortHash(report.id)} `)
+  //           /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data.stateId !== report.hash ${utils.makeShortHash(report.id)} `)
   //         }
   //       }
   //       //set this report to the last report and continue.
@@ -3727,15 +3734,15 @@ class Depricated {
 
   //     //Write the data! and set global memory data!.  set accounts copy data too.
   //     for (let report of globalReport2.accounts) {
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts 2`)
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts 2`)
   //       let accountData = accountDataById[report.id]
   //       if (accountData != null) {
   //         dataToSet.push(accountData)
   //         goodAccounts.push(accountData)
   //         if (this.stateManager.accountGlobals.globalAccountMap.has(report.id)) {
-  //           if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals has ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
+  //           /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals has ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
   //         } else {
-  //           if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals setting ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
+  //           /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals setting ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
   //           // set the account in our table
   //           this.stateManager.accountGlobals.globalAccountMap.set(report.id, null)
   //           // push the time based backup count
@@ -3749,7 +3756,7 @@ class Depricated {
   //           let globalBackupList: Shardus.AccountsCopy[] = this.stateManager.accountGlobals.getGlobalAccountBackupList(accountId)
   //           if (globalBackupList != null) {
   //             globalBackupList.push(backupObj) // sort and cleanup later.
-  //             if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals push backup entry ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
+  //             /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals push backup entry ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
   //           }
   //         }
   //       }
@@ -3764,23 +3771,21 @@ class Depricated {
   //     if (failedHashes && failedHashes.length > 0) {
   //       throw new Error('setting data falied no error handling for this yet')
   //     }
-  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals complete synced ${dataToSet.length} accounts `)
+  //     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals complete synced ${dataToSet.length} accounts `)
   //   } catch (error) {
   //     if (error.message.includes('FailAndRestartPartition')) {
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
   //       this.statemanager_fatal(`syncStateDataGlobals_ex_failandrestart`, 'DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + errorToStringFull(error))
   //       await this.failandRestart()
   //     } else {
   //       this.statemanager_fatal(`syncStateDataGlobals_ex`, 'syncStateDataGlobals failed: ' + errorToStringFull(error))
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
   //       await this.failandRestart()
   //     }
   //   }
 
   //   this.globalAccountsSynced = true
   // }
-
-
 
   // /**
   //  *   check if account is newer than TX.
@@ -3807,15 +3812,15 @@ class Depricated {
   //       let accountEntry = tryGetAccountData(key)
   //       if (accountEntry.timestamp >= timestamp) {
   //         failedAgeCheck = true
-  //         if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
   //       }
   //     }
   //     if (failedAgeCheck) {
-  //       // if (logFlags.verbose) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
+  //       // /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
   //       return { success: false, hasStateTableData }
   //     }
 
-  //     // TODO: even if we keep the code below this line, we should consider combining keys in a set first so that we dont 
+  //     // TODO: even if we keep the code below this line, we should consider combining keys in a set first so that we dont
   //     // double up on work if a key is a source and target.
 
   //     // check state table
@@ -3832,10 +3837,10 @@ class Depricated {
   //         if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
   //           if (accountStates[0].stateBefore === '0'.repeat(64)) {
   //             //sorta broken security hole.
-  //             if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + 'bypass state comparision if before state was 00000: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
+  //             /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + 'bypass state comparision if before state was 00000: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
   //           } else {
-  //             if (logFlags.verbose) if (logFlags.console) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1')
-  //             if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
+  //             /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1')
+  //             /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
   //             return { success: false, hasStateTableData }
   //           }
   //         }
@@ -3852,16 +3857,16 @@ class Depricated {
   //             let accountEntry = tryGetAccountData(targetAddress)
 
   //             if (accountEntry == null) {
-  //               if (logFlags.verbose) if (logFlags.console) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
-  //               if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ')
+  //               /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
+  //               /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ')
   //               this.statemanager_fatal(`testAccountTimesAndStateTable_noEntry`, 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ') // todo: consider if this is just an error
   //               // fail this because we already check if the before state was all zeroes
   //               return { success: false, hasStateTableData }
   //             } else {
   //               targetState = accountEntry.stateId
   //               if (accountStates[0].stateBefore !== targetState) {
-  //                 if (logFlags.verbose) if (logFlags.console) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2')
-  //                 if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
+  //                 /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2')
+  //                 /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
   //                 return { success: false, hasStateTableData }
   //               }
   //             }
@@ -3878,8 +3883,8 @@ class Depricated {
   // /**
   //  * testAccountTimes
   //  * check to see if any of the account data has timestamps newer or equal to the transaction
-  //  * @param tx 
-  //  * @param wrappedStates 
+  //  * @param tx
+  //  * @param wrappedStates
   //  */
   // testAccountTimes(tx: Shardus.OpaqueTransaction, wrappedStates: WrappedStates) {
   //   try {
@@ -3894,11 +3899,11 @@ class Depricated {
   //       let accountEntry = wrappedStates[key]
   //       if (accountEntry.timestamp >= timestamp) {
   //         failedAgeCheck = true
-  //         if (logFlags.verbose) this.mainLogger.debug('testAccountTimes account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('testAccountTimes account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
   //       }
   //     }
   //     if (failedAgeCheck) {
-  //       // if (logFlags.verbose) this.mainLogger.debug('DATASYNC: testAccountTimes accounts have future state ' + timestamp)
+  //       // /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('DATASYNC: testAccountTimes accounts have future state ' + timestamp)
 
   //       return { success: false }
   //     }
@@ -3909,93 +3914,91 @@ class Depricated {
   //   return { success: true }
   // }
 
+  // /**
+  //    * tryPreApplyTransaction this will try to apply a transaction but will not commit the data
+  //    * @param acceptedTX
+  //    * @param hasStateTableData
+  //    * @param repairing
+  //    * @param filter
+  //    * @param wrappedStates
+  //    * @param localCachedData
+  //    */
+  //   async tryPreApplyTransaction(acceptedTX: AcceptedTx, hasStateTableData: boolean, repairing: boolean, filter: AccountFilter, wrappedStates: WrappedResponses, localCachedData: LocalCachedData): Promise<{ passed: boolean; applyResult: string; applyResponse?: Shardus.ApplyResponse }> {
+  //     let ourLockID = -1
+  //     let accountDataList
+  //     let txTs = 0
+  //     let accountKeys = []
+  //     let ourAccountLocks = null
+  //     let applyResponse: Shardus.ApplyResponse | null = null
+  //     //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
+  //     let isGlobalModifyingTX = false
 
-// /**
-//    * tryPreApplyTransaction this will try to apply a transaction but will not commit the data
-//    * @param acceptedTX
-//    * @param hasStateTableData
-//    * @param repairing
-//    * @param filter
-//    * @param wrappedStates
-//    * @param localCachedData
-//    */
-//   async tryPreApplyTransaction(acceptedTX: AcceptedTx, hasStateTableData: boolean, repairing: boolean, filter: AccountFilter, wrappedStates: WrappedResponses, localCachedData: LocalCachedData): Promise<{ passed: boolean; applyResult: string; applyResponse?: Shardus.ApplyResponse }> {
-//     let ourLockID = -1
-//     let accountDataList
-//     let txTs = 0
-//     let accountKeys = []
-//     let ourAccountLocks = null
-//     let applyResponse: Shardus.ApplyResponse | null = null
-//     //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
-//     let isGlobalModifyingTX = false
+  //     try {
+  //       let tx = acceptedTX.data
+  //       // let receipt = acceptedTX.receipt
+  //       let keysResponse = this.app.getKeyFromTransaction(tx)
+  //       let { timestamp, debugInfo } = keysResponse
+  //       txTs = timestamp
 
-//     try {
-//       let tx = acceptedTX.data
-//       // let receipt = acceptedTX.receipt
-//       let keysResponse = this.app.getKeyFromTransaction(tx)
-//       let { timestamp, debugInfo } = keysResponse
-//       txTs = timestamp
+  //       let queueEntry = this.getQueueEntry(acceptedTX.id)
+  //       if (queueEntry != null) {
+  //         if (queueEntry.globalModification === true) {
+  //           isGlobalModifyingTX = true
+  //         }
+  //       }
 
-//       let queueEntry = this.getQueueEntry(acceptedTX.id)
-//       if (queueEntry != null) {
-//         if (queueEntry.globalModification === true) {
-//           isGlobalModifyingTX = true
-//         }
-//       }
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  txid:${utils.stringifyReduce(acceptedTX.id)} ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
 
-//       if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  txid:${utils.stringifyReduce(acceptedTX.id)} ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-//       if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
-//       if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-//       if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-//       if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+  //       // TODO ARCH REVIEW:  review use of fifo lock of accountModification and account keys.
+  //       // I think we need to consider adding reader-writer lock support so that a non written to global account is a "reader" lock: check but dont aquire
+  //       // consider if it is safe to axe the use of fifolock accountModification.
+  //       if (repairing !== true) {
+  //         // get a list of modified account keys that we will lock
+  //         let { sourceKeys, targetKeys } = keysResponse
+  //         for (let accountID of sourceKeys) {
+  //           accountKeys.push(accountID)
+  //         }
+  //         for (let accountID of targetKeys) {
+  //           accountKeys.push(accountID)
+  //         }
+  //         /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` tryPreApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
+  //         ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
+  //         /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` tryPreApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+  //       }
 
-//       // TODO ARCH REVIEW:  review use of fifo lock of accountModification and account keys.
-//       // I think we need to consider adding reader-writer lock support so that a non written to global account is a "reader" lock: check but dont aquire
-//       // consider if it is safe to axe the use of fifolock accountModification.  
-//       if (repairing !== true) {
-//         // get a list of modified account keys that we will lock
-//         let { sourceKeys, targetKeys } = keysResponse
-//         for (let accountID of sourceKeys) {
-//           accountKeys.push(accountID)
-//         }
-//         for (let accountID of targetKeys) {
-//           accountKeys.push(accountID)
-//         }
-//         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` tryPreApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
-//         ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-//         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` tryPreApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
-//       }
+  //       ourLockID = await this.stateManager.fifoLock('accountModification')
 
-//       ourLockID = await this.stateManager.fifoLock('accountModification')
+  //       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log(`tryPreApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
+  //       this.applySoftLock = true
 
-//       if (logFlags.verbose) if (logFlags.console) console.log(`tryPreApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
-//       this.applySoftLock = true
+  //       applyResponse = this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
+  //       let { stateTableResults, accountData: _accountdata } = applyResponse
+  //       accountDataList = _accountdata
 
-//       applyResponse = this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
-//       let { stateTableResults, accountData: _accountdata } = applyResponse
-//       accountDataList = _accountdata
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
 
-//       if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+  //       this.applySoftLock = false
+  //     } catch (ex) {
+  //       /* prettier-ignore */ if(logFlags.error) if (logFlags.error) this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+  //       /* prettier-ignore */ if(logFlags.error) if (logFlags.error) this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
 
-//       this.applySoftLock = false
-//     } catch (ex) {
-//       if(logFlags.error) if (logFlags.error) this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-//       if(logFlags.error) if (logFlags.error) this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
+  //       return { passed: false, applyResponse, applyResult: ex.message }
+  //     } finally {
+  //       this.stateManager.fifoUnlock('accountModification', ourLockID)
+  //       if (repairing !== true) {
+  //         if (ourAccountLocks != null) {
+  //           this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
+  //         }
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` tryPreApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+  //       }
+  //     }
 
-//       return { passed: false, applyResponse, applyResult: ex.message }
-//     } finally {
-//       this.stateManager.fifoUnlock('accountModification', ourLockID)
-//       if (repairing !== true) {
-//         if (ourAccountLocks != null) {
-//           this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-//         }
-//         if (logFlags.verbose) this.mainLogger.debug(` tryPreApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
-//       }
-//     }
-
-//     return { passed: true, applyResponse, applyResult: 'applied' }
-//   }
-
+  //     return { passed: true, applyResponse, applyResult: 'applied' }
+  //   }
 
   // /**
   //  * preApplyAcceptedTransaction will apply a transaction to the in memory data but will not save the results to the database yet
@@ -4010,8 +4013,8 @@ class Depricated {
   //   let keysResponse = this.app.getKeyFromTransaction(tx)
   //   let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
 
-  //   if (logFlags.verbose) if (logFlags.console) console.log('preApplyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
-  //   if (logFlags.verbose) this.mainLogger.debug('applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+  //   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log('preApplyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+  //   /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
 
   //   let allkeys: string[] = []
   //   allkeys = allkeys.concat(sourceKeys)
@@ -4021,7 +4024,7 @@ class Depricated {
 
   //   for (let key of allkeys) {
   //     if (wrappedStates[key] == null) {
-  //       if (logFlags.verbose) if (logFlags.console) console.log(`preApplyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log(`preApplyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
   //       return { applied: false, passed: false, applyResult: '', reason: 'missing some account data' }
   //     } else {
   //       let wrappedState = wrappedStates[key]
@@ -4047,7 +4050,7 @@ class Depricated {
 
   //   if (!accountTimestampsAreOK) {
   //     if (logFlags.verbose) this.mainLogger.debug('preApplyAcceptedTransaction pretest failed: ' + timestamp)
-  //     if (logFlags.playback) this.logger.playbackLogNote('tx_preapply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+  //     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tx_preapply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
   //     return { applied: false, passed: false, applyResult: '', reason: 'preApplyAcceptedTransaction pretest failed, TX rejected' }
   //   }
 
@@ -4057,16 +4060,14 @@ class Depricated {
 
   //   if (preApplyResult) {
   //     if (logFlags.verbose) this.mainLogger.debug('preApplyAcceptedTransaction SUCCEDED ' + timestamp)
-  //     if (logFlags.playback) this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
-
+  //     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
 
   //   } else {
-  //     if (logFlags.playback) this.logger.playbackLogNote('tx_preapply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+  //     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tx_preapply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
   //   }
 
   //   return { applied: true, passed: preApplyResult.passed, applyResult: preApplyResult.applyResult, reason: 'apply result', applyResponse: preApplyResult.applyResponse }
   // }
-
 
   // async commitConsensedTransaction_old(applyResponse: Shardus.ApplyResponse, acceptedTX: AcceptedTx, hasStateTableData: boolean, repairing: boolean, filter: AccountFilter, wrappedStates: WrappedResponses, localCachedData: LocalCachedData): Promise<CommitConsensedTransactionResult> {
   //   let ourLockID = -1
@@ -4092,11 +4093,11 @@ class Depricated {
   //       }
   //     }
 
-  //     if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-  //     if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  filter: ${utils.stringifyReduce(filter)}`)
-  //     if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-  //     if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-  //     if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  filter: ${utils.stringifyReduce(filter)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
 
   //     // TODO ARCH REVIEW:  review use of fifo lock of accountModification and account keys. (more notes in tryPreApplyTransaction() above )
   //     if (repairing !== true) {
@@ -4108,30 +4109,30 @@ class Depricated {
   //       for (let accountID of targetKeys) {
   //         accountKeys.push(accountID)
   //       }
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
   //       ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
   //     }
 
   //     ourLockID = await this.stateManager.fifoLock('accountModification')
 
-  //     if (logFlags.verbose) if (logFlags.console) console.log(`commitConsensedTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
-  //     // if (logFlags.verbose) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
+  //     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log(`commitConsensedTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
+  //     // /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
   //     this.applySoftLock = true
 
   //     let { stateTableResults, accountData: _accountdata } = applyResponse
   //     accountDataList = _accountdata
 
-  //     if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
 
   //     let note = `setAccountData: tx:${queueEntry.logID} in commitConsensedTransaction. `
 
   //     // wrappedStates are side effected for now
   //     savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter, note)
 
-  //     if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  savedSomething: ${savedSomething}`)
-  //     if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
-  //     if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  savedSomething: ${savedSomething}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
 
   //     this.applySoftLock = false
   //     // only write our state table data if we dont already have it in the db
@@ -4141,8 +4142,8 @@ class Depricated {
   //         let wrappedRespose = wrappedStates[stateT.accountId]
   //         stateT.stateBefore = wrappedRespose.prevStateId
 
-  //         if (logFlags.verbose) if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
-  //         if (logFlags.verbose) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
+  //         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
   //       }
   //       await this.storage.addAccountStates(stateTableResults)
   //     //   //want to confirm that we pretty much alway take this branch
@@ -4161,7 +4162,7 @@ class Depricated {
   //     this.app.transactionReceiptPass(acceptedTX.data, wrappedStates, applyResponse)
   //   } catch (ex) {
   //     this.statemanager_fatal(`commitConsensedTransaction_ex`, 'commitConsensedTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-  //     if (logFlags.debug) this.mainLogger.debug(`commitConsensedTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
+  //     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`commitConsensedTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
   //     if (applyResponse) {
   //       // && savedSomething){
   //       // TSConversion do we really want to record this?
@@ -4178,7 +4179,7 @@ class Depricated {
   //       if (ourAccountLocks != null) {
   //         this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
   //       }
-  //       if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
   //     }
   //   }
 
@@ -4244,7 +4245,7 @@ class Depricated {
   //         }
   //         this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData)
   //       } else {
-  //         if (logFlags.error) this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
+  //         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
   //       }
   //     }
   //   }
@@ -4252,583 +4253,581 @@ class Depricated {
   //   return { success: true }
   // }
 
-//     /**
-//      * @param {ShardGlobals} shardGlobals
-//      * @param {number} s1 stored partition left lower bound (always 0)
-//      * @param {number} e1 stored partition left upper bound
-//      * @param {number} s2 stored partition right lower bound
-//      * @param {number} e2 stored partition right upper bound (always highest parition)
-//      * @param {number} start start of consensus range
-//      * @param {number} end end of consensus range
-//      * @returns {{s1:number; e1: number; s2: number; e2: number; split: boolean; changed: boolean }}
-//      */
-//     static mergeDiverseRanges(shardGlobals: ShardGlobals, s1: number, e1: number, s2: number, e2: number, start: number, end: number): MergeResults {
-//         let results = { s1, e1, s2, e2, split: true, changed: false }
-
-//         //These refer to the consensus range haning off the edge of the stored range.  i.e. consenus going further than stored.
-//         let leftOverlap = false
-//         let rightOverlap = false
-//         let leftOverhang = false
-//         let rightOverhang = false
-
-//         let nonSplitConsensusRange = start <= end
-
-//         let storedfullyOverlapsConsensus = false
-
-//         // check overlap in simple case where consensus does not wrap
-//         if (nonSplitConsensusRange) {
-//             // left overlap.  Really this means that there is some overlap of consenus and the left side range of stored partitions
-//             if (s1 <= start && e1 >= start) {
-//                 // number = partition id.   s = stored partition c = consensus partition  ^ = where the test point or points are
-//                 // 0123456789
-//                 // sss      s
-//                 //  ccc
-//                 //  ^
-//                 leftOverlap = true
-//             }
-//             // right overlap  Really this means that there is some overlap of consenus and the right side range of stored partitions
-//             if (s2 <= end && e2 >= end) {
-//                 // 0123456789
-//                 // s      sss
-//                 //       ccc
-//                 //         ^
-//                 rightOverlap = true
-//             }
-
-//             // full overlap left
-//             if (s1 <= start && e1 >= end) {
-//                 // 0123456789
-//                 // sssss    s
-//                 //   ccc
-//                 //   ^ ^
-//                 storedfullyOverlapsConsensus = true
-//             }
-//             // full overlap right
-//             if (s2 <= start && e2 >= end) {
-//                 // 0123456789
-//                 // s    sssss
-//                 //       ccc
-//                 //       ^ ^
-//                 storedfullyOverlapsConsensus = true
-//             }
-//         }
-
-//         // If the consensus range wraps across our ranges then we need to check additional cases
-//         if (nonSplitConsensusRange === false) {
-//             if (s1 <= end && e1 >= end && s2 <= start && e2 >= start) {
-//                 // 0123456789
-//                 // ssss    ss
-//                 // ccc      c
-//                 // ^ ^      ^
-//                 storedfullyOverlapsConsensus = true
-//             }
-
-//             //cases not caught yet?
-//             // 0123456789
-//             // ss     sss
-//             // c     cccc
-//             //
-
-//             // 0123456789
-//             // ss     sss
-//             // ccc     cc
-//             //
-
-//             if (end > e1 && end < s2) {
-//                 // 0123456789
-//                 // ss     sss
-//                 // ccc     cc
-//                 //   ^
-//                 leftOverhang = true
-//             }
-//             // right overlap  Really this means that there is some overlap of consenus and the right side range of stored partitions
-//             if (start < s2 && start > e1) {
-//                 // number = partition id.   s = stored partition c = consensus partition  ^ = where the test point or points are
-//                 // 0123456789
-//                 // ss     sss
-//                 // c     cccc
-//                 //       ^
-//                 rightOverhang = true
-//             }
-//         }
-
-//         // nothing to do ther is full overlap
-//         if (storedfullyOverlapsConsensus === true) {
-//             return results
-//         }
-
-//         if (leftOverlap === false && rightOverlap === false && nonSplitConsensusRange === true) {
-//             let partitionDistanceStart = ShardFunctions.circularDistance(start, e1, shardGlobals.numPartitions)
-//             let partitionDistanceEnd = ShardFunctions.circularDistance(end, s2, shardGlobals.numPartitions)
-
-//             if (partitionDistanceStart < partitionDistanceEnd) {
-//                 // 0123456789
-//                 // ss      ss
-//                 //    cc
-//                 // rrrrr   rr  r= result range
-//                 if (results.e1 < end) {
-//                     results.e1 = end
-//                     results.changed = true
-//                     return results
-//                 }
-//             } else {
-//                 // 0123456789
-//                 // ss      ss
-//                 //      cc
-//                 // rr   rrrrr  r= result range
-//                 if (results.s2 > start) {
-//                     results.s2 = start
-//                     results.changed = true
-//                     return results
-//                 }
-//             }
-//         }
-
-//         if (leftOverlap === true && rightOverlap === true && nonSplitConsensusRange === true) {
-//             // if left and right overlap then all partitions are stored:
-//             // 0123456789
-//             // ss     sss
-//             //  ccccccc
-//             // rrrrrrrrrr  r= result range
-//             if (results.e1 !== results.e2) {
-//                 results.split = false
-//                 results.e1 = results.e2 // s1 -> e1 covers entire range
-//                 results.changed = true
-//                 return results
-//             }
-//         }
-
-//         if (leftOverlap) {
-//             // 0123456789
-//             // sss      s
-//             //  ccc
-//             // rrrr     r
-//             if (results.e1 < end) {
-//                 results.e1 = end
-//                 results.changed = true
-//             }
-//         }
-//         if (rightOverlap) {
-//             // 0123456789
-//             // sss      s
-//             //  ccc
-//             // rrrr     r
-//             if (results.s2 > start) {
-//                 results.s2 = start
-//                 results.changed = true
-//             }
-//         }
-
-//         if (leftOverhang) {
-//             // 0123456789
-//             // ss     sss
-//             // ccc     cc
-//             // rrr    rrr  r= result range
-//             if (results.e1 < end) {
-//                 results.e1 = end
-//                 results.changed = true
-//             }
-//         }
-//         if (rightOverhang) {
-//             // 0123456789
-//             // s      sss
-//             //       ccc
-//             // r     rrrr  r= result range
-//             if (results.s2 > start) {
-//                 results.s2 = start
-//                 results.changed = true
-//             }
-//         }
-
-//         return results
-//     }
-
-//     //TODO TSConversion  get a better output type than any.. switch to an object maybe.
-//     static addressToPartition_old(shardGlobals: ShardGlobals, address: string): { homePartition: number; addressNum: number } {
-//         let numPartitions = shardGlobals.numPartitions
-//         let addressNum = parseInt(address.slice(0, 8), 16)
-//         let homePartition = Math.floor(numPartitions * (addressNum / 0xffffffff))
-//         return { homePartition, addressNum }
-//     }
-
-
-//     // todo memoize this per cycle!!!
-//     // TODO TSConversion partitionMax was equal to null before as optional param. what to do now?
-//     static partitionToAddressRange2_old(shardGlobals: ShardGlobals, partition: number, paritionMax?: number): AddressRange {
-//         let result = {} as AddressRange
-//         result.partition = partition
-//         let startAddr = 0xffffffff * (partition / shardGlobals.numPartitions)
-//         startAddr = Math.ceil(startAddr)
-
-//         result.p_low = partition
-//         //result.p_high = paritionMax // was a TS error
-
-//         let endPartition = partition + 1
-//         if (paritionMax) {
-//             result.p_high = paritionMax
-//             endPartition = paritionMax + 1
-//         } else {
-//             //result.p_high = partition
-//         }
-//         result.partitionEnd = endPartition
-//         let endAddr = 0xffffffff * (endPartition / shardGlobals.numPartitions)
-//         endAddr = Math.ceil(endAddr)
-
-//         // if(endAddr > 0){
-//         //   endAddr = endAddr - 1
-//         // }
-
-//         // it seems we dont need/want this code:
-//         // if (paritionMax === null) {
-//         //   endAddr-- // - 1 // subtract 1 so we don't go into the nex partition
-//         // }
-
-//         result.startAddr = startAddr
-//         result.endAddr = endAddr
-
-//         result.low = ('00000000' + startAddr.toString(16)).slice(-8) + '0'.repeat(56)
-//         result.high = ('00000000' + endAddr.toString(16)).slice(-8) + 'f'.repeat(56)
-
-//         return result
-//     }
-
-//     // TSConversion  fix up any[]
-//     static getNodesThatCoverRange(shardGlobals: ShardGlobals, lowAddress: string, highAddress: string, exclude: string[], activeNodes: Shardus.Node[]) {
-//         // calculate each nodes address position.
-//         // calculate if the nodes reach would cover our full range listed.
-//         // could we use start + delete to avoid wrapping?
-
-//         let circularDistance = function (a: number, b: number, max: number): number {
-//             let directDist = Math.abs(a - b)
-
-//             let wrapDist = directDist
-//             // if (a < b) {
-//             //   wrapDist = Math.abs(a + (max - b))
-//             // } else if (b < a) {
-//             //   wrapDist = Math.abs(b + (max - a))
-//             // }
-
-//             let wrapDist1 = Math.abs(a + (max - b))
-//             let wrapDist2 = Math.abs(b + (max - a))
-//             wrapDist = Math.min(wrapDist1, wrapDist2)
-
-//             return Math.min(directDist, wrapDist)
-//         }
-
-//         let numPartitions = shardGlobals.numPartitions
-//         let nodeLookRange = shardGlobals.nodeLookRange
-
-//         let range = [] as any[]
-
-//         let lowAddressNum = parseInt(lowAddress.slice(0, 8), 16) // assume trailing 0s
-//         let highAddressNum = parseInt(highAddress.slice(0, 8), 16) + 1 // assume trailng fffs
-
-//         // todo start and end loop at smarter areas for efficieny reasones!
-//         let distLow = 0
-//         let distHigh = 0
-
-//         // This isn't a great loop to have for effiency reasons.
-//         for (let i = 0; i < activeNodes.length; i++) {
-//             let node = activeNodes[i]
-//             if (exclude.includes(node.id)) {
-//                 continue
-//             }
-
-//             // could look up node by address??
-
-//             // calculate node middle address..
-//             let nodeAddressNum = parseInt(node.id.slice(0, 8), 16)
-//             // Fix this the center of a partition boundry??
-//             let homePartition = Math.floor(numPartitions * (nodeAddressNum / 0xffffffff))
-//             let centeredAddress = Math.floor(((homePartition + 0.5) * 0xffffffff) / numPartitions)
-
-//             // Math.min(Math.abs(centeredAddress - lowAddressNum), Math.abs(centeredAddress - lowAddressNum))
-
-//             distLow = circularDistance(centeredAddress, lowAddressNum, 0xffffffff) - nodeLookRange
-//             distHigh = circularDistance(centeredAddress, highAddressNum, 0xffffffff) - nodeLookRange
-//             // if (circularDistance(centeredAddress, lowAddressNum, 0xffffffff) > nodeLookRange) {
-//             //   continue
-//             // }
-//             // if (circularDistance(centeredAddress, highAddressNum, 0xffffffff) > nodeLookRange) {
-//             //   continue
-//             // }
-
-//             if (distLow > 0 && distHigh > 0) {
-//                 continue
-//             }
-
-//             // if (Math.abs(centeredAddress - lowAddressNum) > nodeLookRange) {
-//             //   continue
-//             // }
-//             // if (Math.abs(centeredAddress - highAddressNum) > nodeLookRange) {
-//             //   continue
-//             // }
-//             // we are in range!
-//             range.push(node)
-//         }
-//         return range
-//     }
-
-//     /**
-// * This will find two address that are close to what we want
-// * @param {string} address
-// * @returns {{address1:string; address2:string}}
-// *
-// */
-//     static getNextAdjacentAddresses_wip(address: string) {
-//         let addressNum = parseInt(address.slice(0, 8), 16)
-
-//         let addressPrefixHex = ShardFunctions.leadZeros8(addressNum.toString(16))
-
-//         let trail = address.slice(8, 64)
-
-//         if (trail === 'f'.repeat(56)) {
-//             //If we are not at the end look one ahead
-//             if (addressNum < 4294967295) {
-//                 addressNum = addressNum + 1
-//             }
-
-//             let addressPrefixHex2 = ShardFunctions.leadZeros8(addressNum.toString(16))
-
-//             let address1 = addressPrefixHex + 'f'.repeat(56)
-//             let address2 = addressPrefixHex2 + '0'.repeat(56)
-//             return { address1, address2 }
-//         } else {
-//             // if(trail === '0'.repeat(56)){
-//             //If we are not at the end look one ahead
-//             let addressPrefixHex2 = ShardFunctions.leadZeros8(addressNum.toString(16))
-
-//             let address1 = addressPrefixHex + '0'.repeat(56)
-//             let address2 = addressPrefixHex2 + '0'.repeat(55) + '1'
-//             return { address1, address2 }
-//         }
-//         //else real math.
-//     }
-
-//     /**
-//    * getShardDataForCycle
-//    * @param {number} cycleNumber
-//    * @returns {CycleShardData}
-//    */
-//     getShardDataForCycle(cycleNumber: number): CycleShardData | null {
-//         if (this.shardValuesByCycle == null) {
-//             return null
-//         }
-//         let shardData = this.shardValuesByCycle.get(cycleNumber)
-//         //kind of silly but dealing with undefined response from get TSConversion: todo investigate merit of |null vs. |undefined conventions
-//         if (shardData != null) {
-//             return shardData
-//         }
-//         return null
-//     }
-
-//     interruptibleSleep(ms: number, targetTime: number) {
-//         let resolveFn: any = null //TSConversion just setting this to any for now.
-//         let promise = new Promise((resolve) => {
-//             resolveFn = resolve
-//             setTimeout(resolve, ms)
-//         })
-//         return { promise, resolveFn, targetTime }
-//     }
-
-
-//     interruptSleepIfNeeded(targetTime: number) {
-//         if (this.sleepInterrupt) {
-//             if (targetTime < this.sleepInterrupt.targetTime) {
-//                 this.sleepInterrupt.resolveFn()
-//             }
-//         }
-//     }
-
-//     // todo refactor: move to p2p?
-//     getRandomNodesInRange(count: number, lowAddress: string, highAddress: string, exclude: string[]): Shardus.Node[] {
-//         const allNodes = activeOthersByIdOrder
-//         this.lastActiveNodeCount = allNodes.length
-//         utils.shuffleArray(allNodes)
-//         let results = [] as Shardus.Node[]
-//         if (allNodes.length <= count) {
-//             count = allNodes.length
-//         }
-//         for (const node of allNodes) {
-//             if (node.id >= lowAddress && node.id <= highAddress) {
-//                 if (exclude.includes(node.id) === false) {
-//                     results.push(node)
-//                     if (results.length >= count) {
-//                         return results
-//                     }
-//                 }
-//             }
-//         }
-//         return results
-//     }
-
-//     // This will make calls to app.getAccountDataByRange but if we are close enough to real time it will query any newer data and return lastUpdateNeeded = true
-//     async getAccountDataByRangeSmart_App(accountStart: string, accountEnd: string, tsStart: number, maxRecords: number): Promise<GetAccountDataByRangeSmart> {
-//         let tsEnd = Date.now()
-//         let wrappedAccounts = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart, tsEnd, maxRecords)
-//         let lastUpdateNeeded = false
-//         let wrappedAccounts2: WrappedStateArray = []
-//         let highestTs = 0
-//         let delta = 0
-//         // do we need more updates
-//         if (wrappedAccounts.length === 0) {
-//             lastUpdateNeeded = true
-//         } else {
-//             // see if our newest record is new enough
-//             highestTs = 0
-//             for (let account of wrappedAccounts) {
-//                 if (account.timestamp > highestTs) {
-//                     highestTs = account.timestamp
-//                 }
-//             }
-//             delta = tsEnd - highestTs
-//             // if the data we go was close enough to current time then we are done
-//             // may have to be carefull about how we tune this value relative to the rate that we make this query
-//             // we should try to make this query more often then the delta.
-//             if (logFlags.verbose) console.log('delta ' + delta)
-//             // increased allowed delta to allow for a better chance to catch up  
-//             if (delta < this.queueSitTime * 2) {
-//                 let tsStart2 = highestTs
-//                 wrappedAccounts2 = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart2, Date.now(), 10000000)
-//                 lastUpdateNeeded = true
-//             }
-//         }
-//         return { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs, delta }
-//     }
-
-//     /**
-// * storePartitionReceipt
-// * TODO sharding perf.  may need to do periodic cleanup of this and other maps so we can remove data from very old cycles
-// * TODO production need to do something with this data
-// * @param {number} cycleNumber
-// * @param {PartitionReceipt} partitionReceipt
-// */
-//     storePartitionReceipt(cycleNumber: number, partitionReceipt: PartitionReceipt) {
-//         let key = 'c' + cycleNumber
-
-//         if (!this.partitionReceiptsByCycleCounter) {
-//             this.partitionReceiptsByCycleCounter = {}
-//         }
-//         if (!this.partitionReceiptsByCycleCounter[key]) {
-//             this.partitionReceiptsByCycleCounter[key] = []
-//         }
-//         this.partitionReceiptsByCycleCounter[key].push(partitionReceipt)
-
-//         // if (this.debugFeatureOld_partitionReciepts === true) {
-//         //   // this doesnt really send to the archiver but it it does dump reciepts to logs.
-//         //   this.depricated.trySendAndPurgeReceiptsToArchives(partitionReceipt)
-//         // }
-//     }
-
-//     /**
-//    * getCycleNumberFromTimestamp
-//    * cycle numbers are calculated from the queue entry timestamp, but an offset is needed so that we can
-//    * finalize cycles in time. when you start a new cycle there could still be unfinished transactions for
-//    * syncSettleTime milliseconds.
-//    *
-//    * returns a negative number code if we can not determine the cycle
-//    */
-//     getCycleNumberFromTimestamp(timestamp: number, allowOlder: boolean = true): number {
-//         let offsetTimestamp = timestamp + this.syncSettleTime
-
-//         if (timestamp < 1 || timestamp == null) {
-//             let stack = new Error().stack
-//             this.statemanager_fatal(`getCycleNumberFromTimestamp ${timestamp}`, `getCycleNumberFromTimestamp ${timestamp} ,  ${stack}`)
-//         }
-
-//         // const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
-//         // if (cycle != null && cycle.counter != null) {
-//         //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'first lookup')
-//         //   return cycle.counter
-//         // }
-
-//         //currentCycleShardData
-//         if (this.currentCycleShardData.timestamp <= offsetTimestamp && offsetTimestamp < this.currentCycleShardData.timestampEndCycle) {
-//             if (this.currentCycleShardData.cycleNumber == null) {
-//                 this.statemanager_fatal('getCycleNumberFromTimestamp failed. cycleNumber == null', 'this.currentCycleShardData.cycleNumber == null')
-//                 nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber fail')
-//                 const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
-//                 console.log("CycleChain.getCycleByTimestamp", cycle)
-//                 if (cycle != null) {
-//                     this.statemanager_fatal('getCycleNumberFromTimestamp failed fatal redeemed', 'this.currentCycleShardData.cycleNumber == null, fatal redeemed')
-//                     nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber redeemed')
-//                     return cycle.counter
-//                 } else {
-//                     //debug only!!!
-//                     let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
-//                     this.statemanager_fatal('getCycleNumberFromTimestamp failed fatal not redeemed', 'getCycleByTimestamp cycleNumber == null not redeemed')
-//                     nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber failed to redeem')
-//                 }
-//             } else {
-//                 return this.currentCycleShardData.cycleNumber
-//             }
-//         }
-
-//         if (this.currentCycleShardData.cycleNumber == null) {
-//             nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'this.currentCycleShardData.cycleNumber == null')
-//             this.statemanager_fatal('getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null', `getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null ${this.currentCycleShardData.cycleNumber} timestamp:${timestamp}`)
-
-//         }
-
-//         //is it in the future
-//         if (offsetTimestamp >= this.currentCycleShardData.timestampEndCycle) {
-//             let cycle: Shardus.Cycle = CycleChain.getNewest()
-
-//             let timePastCurrentCycle = offsetTimestamp - this.currentCycleShardData.timestampEndCycle
-//             let cyclesAhead = Math.ceil(timePastCurrentCycle / (cycle.duration * 1000))
-//             nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `+${cyclesAhead}`)
-
-//             return this.currentCycleShardData.cycleNumber + cyclesAhead
-
-//             // let endOfNextCycle = this.currentCycleShardData.timestampEndCycle + cycle.duration * 1000
-//             // if (offsetTimestamp < endOfNextCycle /*+ this.syncSettleTime*/) {
-//             //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+1')
-//             //   return this.currentCycleShardData.cycleNumber + 1
-//             // } else if (offsetTimestamp < endOfNextCycle + /*this.syncSettleTime +*/ cycle.duration * 1000) {
-//             //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+2')
-//             //   //if (logFlags.error) this.mainLogger.error(`getCycleNumberFromTimestamp fail2: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
-//             //   return this.currentCycleShardData.cycleNumber + 2
-//             // } else {
-//             //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'too far')
-//             //   this.statemanager_fatal('getCycleNumberFromTimestamp: too far in future',`getCycleNumberFromTimestamp fail: too far in future. endOfNextCycle:${endOfNextCycle} 
-//             //     offsetTimestamp:${offsetTimestamp} timestamp:${timestamp} now:${Date.now()} end of cycle age: ${(Date.now() - endOfNextCycle)/1000}`)
-//             //   //too far in the future
-//             //   return -2
-//             // }
-//         }
-//         if (allowOlder === true) {
-//             //cycle is in the past, by process of elimination
-//             // let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
-//             const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
-//             if (cycle != null) {
-//                 nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup')
-//                 if (cycle.counter == null) {
-//                     this.statemanager_fatal('getCycleNumberFromTimestamp  unexpected cycle.cycleNumber == null', 'getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null')
-//                     nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null  ${timestamp}`)
-//                 }
-
-//                 return cycle.counter
-//             } else {
-//                 //nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle')
-//                 //debug only!!!
-//                 //let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
-//                 //this.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
-//                 let cycle: Shardus.Cycle = CycleChain.getNewest()
-//                 let cycleEstimate = this.currentCycleShardData.cycleNumber - Math.ceil((this.currentCycleShardData.timestampEndCycle - offsetTimestamp) / (cycle.duration * 1000))
-//                 if (cycleEstimate < 1) {
-//                     cycleEstimate = 1
-//                 }
-//                 nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle: ' + cycleEstimate)
-//                 return cycleEstimate
-//             }
-//         }
-
-//         //failed to match, return -1
-//         this.statemanager_fatal('getCycleNumberFromTimestamp failed final', `getCycleNumberFromTimestamp failed final ${timestamp}`)
-//         return -1
-//     }
-
-//OLD parition report endpoint.
+  //     /**
+  //      * @param {ShardGlobals} shardGlobals
+  //      * @param {number} s1 stored partition left lower bound (always 0)
+  //      * @param {number} e1 stored partition left upper bound
+  //      * @param {number} s2 stored partition right lower bound
+  //      * @param {number} e2 stored partition right upper bound (always highest parition)
+  //      * @param {number} start start of consensus range
+  //      * @param {number} end end of consensus range
+  //      * @returns {{s1:number; e1: number; s2: number; e2: number; split: boolean; changed: boolean }}
+  //      */
+  //     static mergeDiverseRanges(shardGlobals: ShardGlobals, s1: number, e1: number, s2: number, e2: number, start: number, end: number): MergeResults {
+  //         let results = { s1, e1, s2, e2, split: true, changed: false }
+
+  //         //These refer to the consensus range haning off the edge of the stored range.  i.e. consenus going further than stored.
+  //         let leftOverlap = false
+  //         let rightOverlap = false
+  //         let leftOverhang = false
+  //         let rightOverhang = false
+
+  //         let nonSplitConsensusRange = start <= end
+
+  //         let storedfullyOverlapsConsensus = false
+
+  //         // check overlap in simple case where consensus does not wrap
+  //         if (nonSplitConsensusRange) {
+  //             // left overlap.  Really this means that there is some overlap of consenus and the left side range of stored partitions
+  //             if (s1 <= start && e1 >= start) {
+  //                 // number = partition id.   s = stored partition c = consensus partition  ^ = where the test point or points are
+  //                 // 0123456789
+  //                 // sss      s
+  //                 //  ccc
+  //                 //  ^
+  //                 leftOverlap = true
+  //             }
+  //             // right overlap  Really this means that there is some overlap of consenus and the right side range of stored partitions
+  //             if (s2 <= end && e2 >= end) {
+  //                 // 0123456789
+  //                 // s      sss
+  //                 //       ccc
+  //                 //         ^
+  //                 rightOverlap = true
+  //             }
+
+  //             // full overlap left
+  //             if (s1 <= start && e1 >= end) {
+  //                 // 0123456789
+  //                 // sssss    s
+  //                 //   ccc
+  //                 //   ^ ^
+  //                 storedfullyOverlapsConsensus = true
+  //             }
+  //             // full overlap right
+  //             if (s2 <= start && e2 >= end) {
+  //                 // 0123456789
+  //                 // s    sssss
+  //                 //       ccc
+  //                 //       ^ ^
+  //                 storedfullyOverlapsConsensus = true
+  //             }
+  //         }
+
+  //         // If the consensus range wraps across our ranges then we need to check additional cases
+  //         if (nonSplitConsensusRange === false) {
+  //             if (s1 <= end && e1 >= end && s2 <= start && e2 >= start) {
+  //                 // 0123456789
+  //                 // ssss    ss
+  //                 // ccc      c
+  //                 // ^ ^      ^
+  //                 storedfullyOverlapsConsensus = true
+  //             }
+
+  //             //cases not caught yet?
+  //             // 0123456789
+  //             // ss     sss
+  //             // c     cccc
+  //             //
+
+  //             // 0123456789
+  //             // ss     sss
+  //             // ccc     cc
+  //             //
+
+  //             if (end > e1 && end < s2) {
+  //                 // 0123456789
+  //                 // ss     sss
+  //                 // ccc     cc
+  //                 //   ^
+  //                 leftOverhang = true
+  //             }
+  //             // right overlap  Really this means that there is some overlap of consenus and the right side range of stored partitions
+  //             if (start < s2 && start > e1) {
+  //                 // number = partition id.   s = stored partition c = consensus partition  ^ = where the test point or points are
+  //                 // 0123456789
+  //                 // ss     sss
+  //                 // c     cccc
+  //                 //       ^
+  //                 rightOverhang = true
+  //             }
+  //         }
+
+  //         // nothing to do ther is full overlap
+  //         if (storedfullyOverlapsConsensus === true) {
+  //             return results
+  //         }
+
+  //         if (leftOverlap === false && rightOverlap === false && nonSplitConsensusRange === true) {
+  //             let partitionDistanceStart = ShardFunctions.circularDistance(start, e1, shardGlobals.numPartitions)
+  //             let partitionDistanceEnd = ShardFunctions.circularDistance(end, s2, shardGlobals.numPartitions)
+
+  //             if (partitionDistanceStart < partitionDistanceEnd) {
+  //                 // 0123456789
+  //                 // ss      ss
+  //                 //    cc
+  //                 // rrrrr   rr  r= result range
+  //                 if (results.e1 < end) {
+  //                     results.e1 = end
+  //                     results.changed = true
+  //                     return results
+  //                 }
+  //             } else {
+  //                 // 0123456789
+  //                 // ss      ss
+  //                 //      cc
+  //                 // rr   rrrrr  r= result range
+  //                 if (results.s2 > start) {
+  //                     results.s2 = start
+  //                     results.changed = true
+  //                     return results
+  //                 }
+  //             }
+  //         }
+
+  //         if (leftOverlap === true && rightOverlap === true && nonSplitConsensusRange === true) {
+  //             // if left and right overlap then all partitions are stored:
+  //             // 0123456789
+  //             // ss     sss
+  //             //  ccccccc
+  //             // rrrrrrrrrr  r= result range
+  //             if (results.e1 !== results.e2) {
+  //                 results.split = false
+  //                 results.e1 = results.e2 // s1 -> e1 covers entire range
+  //                 results.changed = true
+  //                 return results
+  //             }
+  //         }
+
+  //         if (leftOverlap) {
+  //             // 0123456789
+  //             // sss      s
+  //             //  ccc
+  //             // rrrr     r
+  //             if (results.e1 < end) {
+  //                 results.e1 = end
+  //                 results.changed = true
+  //             }
+  //         }
+  //         if (rightOverlap) {
+  //             // 0123456789
+  //             // sss      s
+  //             //  ccc
+  //             // rrrr     r
+  //             if (results.s2 > start) {
+  //                 results.s2 = start
+  //                 results.changed = true
+  //             }
+  //         }
+
+  //         if (leftOverhang) {
+  //             // 0123456789
+  //             // ss     sss
+  //             // ccc     cc
+  //             // rrr    rrr  r= result range
+  //             if (results.e1 < end) {
+  //                 results.e1 = end
+  //                 results.changed = true
+  //             }
+  //         }
+  //         if (rightOverhang) {
+  //             // 0123456789
+  //             // s      sss
+  //             //       ccc
+  //             // r     rrrr  r= result range
+  //             if (results.s2 > start) {
+  //                 results.s2 = start
+  //                 results.changed = true
+  //             }
+  //         }
+
+  //         return results
+  //     }
+
+  //     //TODO TSConversion  get a better output type than any.. switch to an object maybe.
+  //     static addressToPartition_old(shardGlobals: ShardGlobals, address: string): { homePartition: number; addressNum: number } {
+  //         let numPartitions = shardGlobals.numPartitions
+  //         let addressNum = parseInt(address.slice(0, 8), 16)
+  //         let homePartition = Math.floor(numPartitions * (addressNum / 0xffffffff))
+  //         return { homePartition, addressNum }
+  //     }
+
+  //     // todo memoize this per cycle!!!
+  //     // TODO TSConversion partitionMax was equal to null before as optional param. what to do now?
+  //     static partitionToAddressRange2_old(shardGlobals: ShardGlobals, partition: number, paritionMax?: number): AddressRange {
+  //         let result = {} as AddressRange
+  //         result.partition = partition
+  //         let startAddr = 0xffffffff * (partition / shardGlobals.numPartitions)
+  //         startAddr = Math.ceil(startAddr)
+
+  //         result.p_low = partition
+  //         //result.p_high = paritionMax // was a TS error
+
+  //         let endPartition = partition + 1
+  //         if (paritionMax) {
+  //             result.p_high = paritionMax
+  //             endPartition = paritionMax + 1
+  //         } else {
+  //             //result.p_high = partition
+  //         }
+  //         result.partitionEnd = endPartition
+  //         let endAddr = 0xffffffff * (endPartition / shardGlobals.numPartitions)
+  //         endAddr = Math.ceil(endAddr)
+
+  //         // if(endAddr > 0){
+  //         //   endAddr = endAddr - 1
+  //         // }
+
+  //         // it seems we dont need/want this code:
+  //         // if (paritionMax === null) {
+  //         //   endAddr-- // - 1 // subtract 1 so we don't go into the nex partition
+  //         // }
+
+  //         result.startAddr = startAddr
+  //         result.endAddr = endAddr
+
+  //         result.low = ('00000000' + startAddr.toString(16)).slice(-8) + '0'.repeat(56)
+  //         result.high = ('00000000' + endAddr.toString(16)).slice(-8) + 'f'.repeat(56)
+
+  //         return result
+  //     }
+
+  //     // TSConversion  fix up any[]
+  //     static getNodesThatCoverRange(shardGlobals: ShardGlobals, lowAddress: string, highAddress: string, exclude: string[], activeNodes: Shardus.Node[]) {
+  //         // calculate each nodes address position.
+  //         // calculate if the nodes reach would cover our full range listed.
+  //         // could we use start + delete to avoid wrapping?
+
+  //         let circularDistance = function (a: number, b: number, max: number): number {
+  //             let directDist = Math.abs(a - b)
+
+  //             let wrapDist = directDist
+  //             // if (a < b) {
+  //             //   wrapDist = Math.abs(a + (max - b))
+  //             // } else if (b < a) {
+  //             //   wrapDist = Math.abs(b + (max - a))
+  //             // }
+
+  //             let wrapDist1 = Math.abs(a + (max - b))
+  //             let wrapDist2 = Math.abs(b + (max - a))
+  //             wrapDist = Math.min(wrapDist1, wrapDist2)
+
+  //             return Math.min(directDist, wrapDist)
+  //         }
+
+  //         let numPartitions = shardGlobals.numPartitions
+  //         let nodeLookRange = shardGlobals.nodeLookRange
+
+  //         let range = [] as any[]
+
+  //         let lowAddressNum = parseInt(lowAddress.slice(0, 8), 16) // assume trailing 0s
+  //         let highAddressNum = parseInt(highAddress.slice(0, 8), 16) + 1 // assume trailng fffs
+
+  //         // todo start and end loop at smarter areas for efficieny reasones!
+  //         let distLow = 0
+  //         let distHigh = 0
+
+  //         // This isn't a great loop to have for effiency reasons.
+  //         for (let i = 0; i < activeNodes.length; i++) {
+  //             let node = activeNodes[i]
+  //             if (exclude.includes(node.id)) {
+  //                 continue
+  //             }
+
+  //             // could look up node by address??
+
+  //             // calculate node middle address..
+  //             let nodeAddressNum = parseInt(node.id.slice(0, 8), 16)
+  //             // Fix this the center of a partition boundry??
+  //             let homePartition = Math.floor(numPartitions * (nodeAddressNum / 0xffffffff))
+  //             let centeredAddress = Math.floor(((homePartition + 0.5) * 0xffffffff) / numPartitions)
+
+  //             // Math.min(Math.abs(centeredAddress - lowAddressNum), Math.abs(centeredAddress - lowAddressNum))
+
+  //             distLow = circularDistance(centeredAddress, lowAddressNum, 0xffffffff) - nodeLookRange
+  //             distHigh = circularDistance(centeredAddress, highAddressNum, 0xffffffff) - nodeLookRange
+  //             // if (circularDistance(centeredAddress, lowAddressNum, 0xffffffff) > nodeLookRange) {
+  //             //   continue
+  //             // }
+  //             // if (circularDistance(centeredAddress, highAddressNum, 0xffffffff) > nodeLookRange) {
+  //             //   continue
+  //             // }
+
+  //             if (distLow > 0 && distHigh > 0) {
+  //                 continue
+  //             }
+
+  //             // if (Math.abs(centeredAddress - lowAddressNum) > nodeLookRange) {
+  //             //   continue
+  //             // }
+  //             // if (Math.abs(centeredAddress - highAddressNum) > nodeLookRange) {
+  //             //   continue
+  //             // }
+  //             // we are in range!
+  //             range.push(node)
+  //         }
+  //         return range
+  //     }
+
+  //     /**
+  // * This will find two address that are close to what we want
+  // * @param {string} address
+  // * @returns {{address1:string; address2:string}}
+  // *
+  // */
+  //     static getNextAdjacentAddresses_wip(address: string) {
+  //         let addressNum = parseInt(address.slice(0, 8), 16)
+
+  //         let addressPrefixHex = ShardFunctions.leadZeros8(addressNum.toString(16))
+
+  //         let trail = address.slice(8, 64)
+
+  //         if (trail === 'f'.repeat(56)) {
+  //             //If we are not at the end look one ahead
+  //             if (addressNum < 4294967295) {
+  //                 addressNum = addressNum + 1
+  //             }
+
+  //             let addressPrefixHex2 = ShardFunctions.leadZeros8(addressNum.toString(16))
+
+  //             let address1 = addressPrefixHex + 'f'.repeat(56)
+  //             let address2 = addressPrefixHex2 + '0'.repeat(56)
+  //             return { address1, address2 }
+  //         } else {
+  //             // if(trail === '0'.repeat(56)){
+  //             //If we are not at the end look one ahead
+  //             let addressPrefixHex2 = ShardFunctions.leadZeros8(addressNum.toString(16))
+
+  //             let address1 = addressPrefixHex + '0'.repeat(56)
+  //             let address2 = addressPrefixHex2 + '0'.repeat(55) + '1'
+  //             return { address1, address2 }
+  //         }
+  //         //else real math.
+  //     }
+
+  //     /**
+  //    * getShardDataForCycle
+  //    * @param {number} cycleNumber
+  //    * @returns {CycleShardData}
+  //    */
+  //     getShardDataForCycle(cycleNumber: number): CycleShardData | null {
+  //         if (this.shardValuesByCycle == null) {
+  //             return null
+  //         }
+  //         let shardData = this.shardValuesByCycle.get(cycleNumber)
+  //         //kind of silly but dealing with undefined response from get TSConversion: todo investigate merit of |null vs. |undefined conventions
+  //         if (shardData != null) {
+  //             return shardData
+  //         }
+  //         return null
+  //     }
+
+  //     interruptibleSleep(ms: number, targetTime: number) {
+  //         let resolveFn: any = null //TSConversion just setting this to any for now.
+  //         let promise = new Promise((resolve) => {
+  //             resolveFn = resolve
+  //             setTimeout(resolve, ms)
+  //         })
+  //         return { promise, resolveFn, targetTime }
+  //     }
+
+  //     interruptSleepIfNeeded(targetTime: number) {
+  //         if (this.sleepInterrupt) {
+  //             if (targetTime < this.sleepInterrupt.targetTime) {
+  //                 this.sleepInterrupt.resolveFn()
+  //             }
+  //         }
+  //     }
+
+  //     // todo refactor: move to p2p?
+  //     getRandomNodesInRange(count: number, lowAddress: string, highAddress: string, exclude: string[]): Shardus.Node[] {
+  //         const allNodes = activeOthersByIdOrder
+  //         this.lastActiveNodeCount = allNodes.length
+  //         utils.shuffleArray(allNodes)
+  //         let results = [] as Shardus.Node[]
+  //         if (allNodes.length <= count) {
+  //             count = allNodes.length
+  //         }
+  //         for (const node of allNodes) {
+  //             if (node.id >= lowAddress && node.id <= highAddress) {
+  //                 if (exclude.includes(node.id) === false) {
+  //                     results.push(node)
+  //                     if (results.length >= count) {
+  //                         return results
+  //                     }
+  //                 }
+  //             }
+  //         }
+  //         return results
+  //     }
+
+  //     // This will make calls to app.getAccountDataByRange but if we are close enough to real time it will query any newer data and return lastUpdateNeeded = true
+  //     async getAccountDataByRangeSmart_App(accountStart: string, accountEnd: string, tsStart: number, maxRecords: number): Promise<GetAccountDataByRangeSmart> {
+  //         let tsEnd = Date.now()
+  //         let wrappedAccounts = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart, tsEnd, maxRecords)
+  //         let lastUpdateNeeded = false
+  //         let wrappedAccounts2: WrappedStateArray = []
+  //         let highestTs = 0
+  //         let delta = 0
+  //         // do we need more updates
+  //         if (wrappedAccounts.length === 0) {
+  //             lastUpdateNeeded = true
+  //         } else {
+  //             // see if our newest record is new enough
+  //             highestTs = 0
+  //             for (let account of wrappedAccounts) {
+  //                 if (account.timestamp > highestTs) {
+  //                     highestTs = account.timestamp
+  //                 }
+  //             }
+  //             delta = tsEnd - highestTs
+  //             // if the data we go was close enough to current time then we are done
+  //             // may have to be carefull about how we tune this value relative to the rate that we make this query
+  //             // we should try to make this query more often then the delta.
+  //             if (logFlags.verbose) console.log('delta ' + delta)
+  //             // increased allowed delta to allow for a better chance to catch up
+  //             if (delta < this.queueSitTime * 2) {
+  //                 let tsStart2 = highestTs
+  //                 wrappedAccounts2 = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart2, Date.now(), 10000000)
+  //                 lastUpdateNeeded = true
+  //             }
+  //         }
+  //         return { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs, delta }
+  //     }
+
+  //     /**
+  // * storePartitionReceipt
+  // * TODO sharding perf.  may need to do periodic cleanup of this and other maps so we can remove data from very old cycles
+  // * TODO production need to do something with this data
+  // * @param {number} cycleNumber
+  // * @param {PartitionReceipt} partitionReceipt
+  // */
+  //     storePartitionReceipt(cycleNumber: number, partitionReceipt: PartitionReceipt) {
+  //         let key = 'c' + cycleNumber
+
+  //         if (!this.partitionReceiptsByCycleCounter) {
+  //             this.partitionReceiptsByCycleCounter = {}
+  //         }
+  //         if (!this.partitionReceiptsByCycleCounter[key]) {
+  //             this.partitionReceiptsByCycleCounter[key] = []
+  //         }
+  //         this.partitionReceiptsByCycleCounter[key].push(partitionReceipt)
+
+  //         // if (this.debugFeatureOld_partitionReciepts === true) {
+  //         //   // this doesnt really send to the archiver but it it does dump reciepts to logs.
+  //         //   this.depricated.trySendAndPurgeReceiptsToArchives(partitionReceipt)
+  //         // }
+  //     }
+
+  //     /**
+  //    * getCycleNumberFromTimestamp
+  //    * cycle numbers are calculated from the queue entry timestamp, but an offset is needed so that we can
+  //    * finalize cycles in time. when you start a new cycle there could still be unfinished transactions for
+  //    * syncSettleTime milliseconds.
+  //    *
+  //    * returns a negative number code if we can not determine the cycle
+  //    */
+  //     getCycleNumberFromTimestamp(timestamp: number, allowOlder: boolean = true): number {
+  //         let offsetTimestamp = timestamp + this.syncSettleTime
+
+  //         if (timestamp < 1 || timestamp == null) {
+  //             let stack = new Error().stack
+  //             this.statemanager_fatal(`getCycleNumberFromTimestamp ${timestamp}`, `getCycleNumberFromTimestamp ${timestamp} ,  ${stack}`)
+  //         }
+
+  //         // const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
+  //         // if (cycle != null && cycle.counter != null) {
+  //         //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'first lookup')
+  //         //   return cycle.counter
+  //         // }
+
+  //         //currentCycleShardData
+  //         if (this.currentCycleShardData.timestamp <= offsetTimestamp && offsetTimestamp < this.currentCycleShardData.timestampEndCycle) {
+  //             if (this.currentCycleShardData.cycleNumber == null) {
+  //                 this.statemanager_fatal('getCycleNumberFromTimestamp failed. cycleNumber == null', 'this.currentCycleShardData.cycleNumber == null')
+  //                 /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber fail')
+  //                 const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
+  //                 console.log("CycleChain.getCycleByTimestamp", cycle)
+  //                 if (cycle != null) {
+  //                     this.statemanager_fatal('getCycleNumberFromTimestamp failed fatal redeemed', 'this.currentCycleShardData.cycleNumber == null, fatal redeemed')
+  //                     /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber redeemed')
+  //                     return cycle.counter
+  //                 } else {
+  //                     //debug only!!!
+  //                     let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
+  //                     this.statemanager_fatal('getCycleNumberFromTimestamp failed fatal not redeemed', 'getCycleByTimestamp cycleNumber == null not redeemed')
+  //                     /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber failed to redeem')
+  //                 }
+  //             } else {
+  //                 return this.currentCycleShardData.cycleNumber
+  //             }
+  //         }
+
+  //         if (this.currentCycleShardData.cycleNumber == null) {
+  //             /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'this.currentCycleShardData.cycleNumber == null')
+  //             this.statemanager_fatal('getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null', `getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null ${this.currentCycleShardData.cycleNumber} timestamp:${timestamp}`)
+
+  //         }
+
+  //         //is it in the future
+  //         if (offsetTimestamp >= this.currentCycleShardData.timestampEndCycle) {
+  //             let cycle: Shardus.Cycle = CycleChain.getNewest()
+
+  //             let timePastCurrentCycle = offsetTimestamp - this.currentCycleShardData.timestampEndCycle
+  //             let cyclesAhead = Math.ceil(timePastCurrentCycle / (cycle.duration * 1000))
+  //             nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `+${cyclesAhead}`)
+
+  //             return this.currentCycleShardData.cycleNumber + cyclesAhead
+
+  //             // let endOfNextCycle = this.currentCycleShardData.timestampEndCycle + cycle.duration * 1000
+  //             // if (offsetTimestamp < endOfNextCycle /*+ this.syncSettleTime*/) {
+  //             //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+1')
+  //             //   return this.currentCycleShardData.cycleNumber + 1
+  //             // } else if (offsetTimestamp < endOfNextCycle + /*this.syncSettleTime +*/ cycle.duration * 1000) {
+  //             //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+2')
+  //             //   //if (logFlags.error) this.mainLogger.error(`getCycleNumberFromTimestamp fail2: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
+  //             //   return this.currentCycleShardData.cycleNumber + 2
+  //             // } else {
+  //             //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'too far')
+  //             //   this.statemanager_fatal('getCycleNumberFromTimestamp: too far in future',`getCycleNumberFromTimestamp fail: too far in future. endOfNextCycle:${endOfNextCycle}
+  //             //     offsetTimestamp:${offsetTimestamp} timestamp:${timestamp} now:${Date.now()} end of cycle age: ${(Date.now() - endOfNextCycle)/1000}`)
+  //             //   //too far in the future
+  //             //   return -2
+  //             // }
+  //         }
+  //         if (allowOlder === true) {
+  //             //cycle is in the past, by process of elimination
+  //             // let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
+  //             const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
+  //             if (cycle != null) {
+  //                 nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup')
+  //                 if (cycle.counter == null) {
+  //                     this.statemanager_fatal('getCycleNumberFromTimestamp  unexpected cycle.cycleNumber == null', 'getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null')
+  //                     /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null  ${timestamp}`)
+  //                 }
+
+  //                 return cycle.counter
+  //             } else {
+  //                 //nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle')
+  //                 //debug only!!!
+  //                 //let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
+  //                 //this.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
+  //                 let cycle: Shardus.Cycle = CycleChain.getNewest()
+  //                 let cycleEstimate = this.currentCycleShardData.cycleNumber - Math.ceil((this.currentCycleShardData.timestampEndCycle - offsetTimestamp) / (cycle.duration * 1000))
+  //                 if (cycleEstimate < 1) {
+  //                     cycleEstimate = 1
+  //                 }
+  //                 /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle: ' + cycleEstimate)
+  //                 return cycleEstimate
+  //             }
+  //         }
+
+  //         //failed to match, return -1
+  //         this.statemanager_fatal('getCycleNumberFromTimestamp failed final', `getCycleNumberFromTimestamp failed final ${timestamp}`)
+  //         return -1
+  //     }
+
+  //OLD parition report endpoint.
 
   // /post_partition_results (Partition_results)
   //   Partition_results - array of objects with the fields {Partition_id, Cycle_number, Partition_hash, Node_id, Node_sign}
@@ -4871,17 +4870,17 @@ class Depricated {
   //       }
   //       let ourPartitionResults = this.ourPartitionResultsByCycle[cycleKey]
   //       if (!payload.partitionResults) {
-  //         if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results: abort, partitionResults == null`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results: abort, partitionResults == null`)
   //         return
   //       }
   //       if (payload.partitionResults.length === 0) {
-  //         if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results: abort, partitionResults.length == 0`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results: abort, partitionResults.length == 0`)
   //         return
   //       }
-  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair post_partition_results payload: ${utils.stringifyReduce(payload)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair post_partition_results payload: ${utils.stringifyReduce(payload)}`)
   //       if (!payload.partitionResults[0].sign) {
   //         // TODO security need to check that this is signed by a valid and correct node
-  //         if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results: abort, no sign object on partition`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results: abort, no sign object on partition`)
   //         return
   //       }
   //       let owner = payload.partitionResults[0].sign.owner
@@ -4900,12 +4899,12 @@ class Depricated {
   //         if (partitionResult) {
   //           responses.push(partitionResult)
   //         } else {
-  //           if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results partitionResult missing`)
+  //           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results partitionResult missing`)
   //         }
-  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair post_partition_results partition: ${partitionResult.Partition_id} responses.length ${responses.length}  cycle:${payload.Cycle_number}`)
+  //         /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair post_partition_results partition: ${partitionResult.Partition_id} responses.length ${responses.length}  cycle:${payload.Cycle_number}`)
   //       }
   //       var partitionKeys = Object.keys(allResponsesByPartition)
-  //       if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results partitionKeys: ${partitionKeys.length}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results partitionKeys: ${partitionKeys.length}`)
   //       // Loop through all the partition keys and check our progress for each partition covered
   //       // todo perf consider only looping through keys of partitions that changed from this update?
   //       for (let partitionKey of partitionKeys) {
@@ -4917,15 +4916,15 @@ class Depricated {
   //           partitionId = responses[0].Partition_id
   //           repairTracker = this.stateManager.depricated._getRepairTrackerForCycle(payload.Cycle_number, partitionId)
   //           if (repairTracker.busy && repairTracker.awaitWinningHash === false) {
-  //             if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results tracker busy. ${partitionKey} responses: ${responses.length}.  ${utils.stringifyReduce(repairTracker)}`)
+  //             /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results tracker busy. ${partitionKey} responses: ${responses.length}.  ${utils.stringifyReduce(repairTracker)}`)
   //             continue
   //           }
   //           if (repairTracker.repairsFullyComplete) {
-  //             if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results repairsFullyComplete = true  cycle:${payload.Cycle_number}`)
+  //             /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results repairsFullyComplete = true  cycle:${payload.Cycle_number}`)
   //             continue
   //           }
   //         } else {
-  //           if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results no responses. ${partitionKey} responses: ${responses.length}. repairTracker: ${utils.stringifyReduce(repairTracker)} responsesById: ${utils.stringifyReduce(allResponsesByPartition)}`)
+  //           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results no responses. ${partitionKey} responses: ${responses.length}. repairTracker: ${utils.stringifyReduce(repairTracker)} responsesById: ${utils.stringifyReduce(allResponsesByPartition)}`)
   //           continue
   //         }
   //         let responsesRequired = 3
@@ -4945,7 +4944,7 @@ class Depricated {
   //             }
   //           }
   //           if (ourResult == null) {
-  //             if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results our result is not computed yet `)
+  //             /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results our result is not computed yet `)
   //             // Todo repair : may need to sleep or restart this computation later..
   //             return
   //           }
@@ -4955,28 +4954,28 @@ class Depricated {
   //             if (repairTracker.awaitWinningHash) {
   //               if (topResult == null) {
   //                 // if we are awaitWinningHash then wait for a top result before we start repair process again
-  //                 if (logFlags.verbose) this.mainLogger.debug(` _repair awaitWinningHash:true but topResult == null so keep waiting `)
+  //                 /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair awaitWinningHash:true but topResult == null so keep waiting `)
   //                 continue
   //               } else {
-  //                 if (logFlags.verbose) this.mainLogger.debug(` _repair awaitWinningHash:true and we have a top result so start reparing! `)
+  //                 /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair awaitWinningHash:true and we have a top result so start reparing! `)
   //               }
   //             }
   //             if (this.resetAndApplyPerPartition === false && repairTracker.txRepairReady === true) {
-  //               if (logFlags.verbose) this.mainLogger.debug(` _repair txRepairReady:true bail here for some strange reason.. not sure aout this yet `)
+  //               /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair txRepairReady:true bail here for some strange reason.. not sure aout this yet `)
   //               continue
   //             }
-  //             if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process 1 ${utils.stringifyReduce(receiptResults)}`)
+  //             /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process 1 ${utils.stringifyReduce(receiptResults)}`)
   //             let cycle = this.p2p.state.getCycleByCounter(payload.Cycle_number)
   //             await this.startRepairProcess(cycle, topResult, partitionId, ourResult.Partition_hash)
   //           } else if (partitionReceipt) {
-  //             // if (logFlags.verbose) this.mainLogger.debug( ` _repair post_partition_results: success store partition receipt`)
-  //             if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results 3 allFinished, final cycle: ${payload.Cycle_number} hash:${utils.stringifyReduce({ topResult })}`)
+  //             // /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug( ` _repair post_partition_results: success store partition receipt`)
+  //             /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results 3 allFinished, final cycle: ${payload.Cycle_number} hash:${utils.stringifyReduce({ topResult })}`)
   //             // do we ever send partition receipt yet?
   //             this.stateManager.storePartitionReceipt(payload.Cycle_number, partitionReceipt)
   //             this.stateManager.depricated.repairTrackerMarkFinished(repairTracker, 'post_partition_results')
   //           }
   //         } else {
-  //           if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results not enough responses awaitWinningHash: ${repairTracker.awaitWinningHash} resp: ${responses.length}. required:${responsesRequired} repairTracker: ${utils.stringifyReduce(repairTracker)}`)
+  //           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results not enough responses awaitWinningHash: ${repairTracker.awaitWinningHash} resp: ${responses.length}. required:${responsesRequired} repairTracker: ${utils.stringifyReduce(repairTracker)}`)
   //         }
   //         // End of loop over partitions.  Continue looping if there are other partions that we need to check for completion.
   //       }
@@ -5018,7 +5017,7 @@ class Depricated {
   //   //   //   // dont participate just yet.
   //   //   //   return
   //   //   // }
-  //   //   // if (logFlags.verbose) this.mainLogger.debug( ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
+  //   //   // /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug( ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
   //   //   // // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
   //   //   // this.processTempTXs(lastCycle)
   //   //   // // During the Q2 phase of a cycle, nodes compute the partition hash of the previous cycle for all the partitions covered by the node.
@@ -5110,7 +5109,7 @@ class Depricated {
   //   let result: Shardus.AccountsCopy | null = null
   //   let globalBackupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
   //   if (globalBackupList == null || globalBackupList.length === 0) {
-  //     if (logFlags.playback) this.logger.playbackLogNote('globalBackupList', `applyAllPreparedRepairs - missing value for ${accountId}`)
+  //     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('globalBackupList', `applyAllPreparedRepairs - missing value for ${accountId}`)
   //     return null
   //   }
 
@@ -5148,7 +5147,7 @@ class Depricated {
   //   }
   // }
 
-  // 
+  //
   // sortAndMaintainBackups(oldestTimestamp: number): void {
   //   let keys = this.globalAccountRepairBank.keys()
   //   for (let key of keys) {
@@ -5168,7 +5167,6 @@ class Depricated {
   //   }
   //   return results
   // }
-
 
   //statsDataSummaryUpdate(accountDataBefore:any, accountDataAfter:Shardus.WrappedData){
   // statsDataSummaryUpdate(cycle: number, accountData: Shardus.WrappedResponse, debugMsg:string) {
@@ -5195,7 +5193,7 @@ class Depricated {
   //   //     if(this.seenCreatedAccounts.has(accountId)){
   //   //         let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
   //   //         if(accountMemData.t > timestamp){
-  //   //             if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+  //   //             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
   //   //             return
   //   //         }
   //   //     } else {
@@ -5213,7 +5211,7 @@ class Depricated {
   //   if (this.accountCache.hasAccount(accountId)) {
   //     let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
   //     if (accountMemData.t > timestamp) {
-  //       if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+  //       /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
   //       return
   //     }
   //   } else {
@@ -5231,21 +5229,21 @@ class Depricated {
 
   // }
 
-   // statsDataSummaryInit(cycle: number, accountData: Shardus.WrappedData, debugMsg:string) {
+  // statsDataSummaryInit(cycle: number, accountData: Shardus.WrappedData, debugMsg:string) {
   //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInit c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountData.accountId)} inputs:${JSON.stringify({accountData})}`)
 
   //   let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountData.accountId)
   //   blob.counter++
 
   //   // if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountData.accountId)){
-  //   //     // if (logFlags.error) this.mainLogger.error(`statsDataSummaryInit seenCreatedAccounts dupe: ${utils.stringifyReduce(accountData.accountId)}`)
+  //   //     // /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`statsDataSummaryInit seenCreatedAccounts dupe: ${utils.stringifyReduce(accountData.accountId)}`)
   //   //     return
   //   // }
   //   // if(this.useSeenAccountMap === true){
   //   //     let accountMemData:AccountMemoryCache = {t:accountData.timestamp, h:accountData.stateId}
   //   //     this.seenCreatedAccounts.set(accountData.accountId, accountMemData)
   //   // }
-    
+
   //   if (this.accountCache.hasAccount(accountData.accountId)) {
   //     return
   //   }
@@ -5264,7 +5262,6 @@ class Depricated {
   //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryInit c:${cycle} accForBin:${utils.makeShortHash(accountData.accountId)}  ${this.debugAccountData(accountData.data)}`)
   //   if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountData.accountId)
   // }
-
 
   // statsDataSummaryUpdate2(cycle: number, accountDataBefore: any, accountDataAfter: Shardus.WrappedData, debugMsg:string) {
   //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryUpdate2 c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}   inputs:${JSON.stringify({accountDataBefore , accountDataAfter })}`)
@@ -5290,7 +5287,7 @@ class Depricated {
   //   //     if(this.seenCreatedAccounts.has(accountId)){
   //   //         let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
   //   //         if(accountMemData.t > timestamp){
-  //   //             if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+  //   //             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
   //   //             return
   //   //         }
   //   //     } else {
@@ -5308,7 +5305,7 @@ class Depricated {
   //   if (this.accountCache.hasAccount(accountId)) {
   //     let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
   //     if (accountMemData.t > timestamp) {
-  //       if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+  //       /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
   //       return
   //     }
   //   } else {
@@ -5322,7 +5319,6 @@ class Depricated {
 
   //   this.app.dataSummaryUpdate(blob.opaqueBlob, accountDataBefore, accountDataAfter.data)
 
-
   //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryUpdate2 c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}   ${this.debugAccountData(accountDataAfter.data)} - ${this.debugAccountData(accountDataBefore)}`)
   //   if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountDataAfter.accountId)
 
@@ -5331,12 +5327,11 @@ class Depricated {
   // statsDataSummaryInitRaw(cycle: number, accountId: string, accountDataRaw: any, debugMsg:string) {
   //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInitRaw c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountId)}  inputs:${JSON.stringify({accountDataRaw})}`)
 
-
   //   let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountId)
   //   blob.counter++
 
   //   // if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountId)){
-  //   //     // if (logFlags.error) this.mainLogger.error(`statsDataSummaryInitRaw seenCreatedAccounts dupe: ${utils.stringifyReduce(accountId)}`)
+  //   //     // /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`statsDataSummaryInitRaw seenCreatedAccounts dupe: ${utils.stringifyReduce(accountId)}`)
   //   //     return
   //   // }
   //   // if(this.useSeenAccountMap === true){
@@ -5408,8 +5403,8 @@ class Depricated {
 
   //   let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.currentCycleShardData.nodeShardData
   //   // partittions:
-  //   let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered, 
-  //   nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [], 
+  //   let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered,
+  //   nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [],
   //   globalStateHash: '', calculationTime: this.currentCycleShardData.calculationTime }
   //   partitionDump.cycle = this.currentCycleShardData.cycleNumber
 
@@ -5507,7 +5502,6 @@ class Depricated {
   //   this.shardLogger.debug(this.lastShardReport)
   // }
 
-
   //   /**
   //  * dumpAccountDebugData2 a temporary version that also uses stats data
   //  */
@@ -5515,34 +5509,34 @@ class Depricated {
   //     if (this.currentCycleShardData == null) {
   //       return
   //     }
-  
+
   //     // hmm how to deal with data that is changing... it cant!!
   //     let partitionMap = this.currentCycleShardData.parititionShardDataMap
-  
+
   //     let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.currentCycleShardData.nodeShardData
   //     // partittions:
-  //     let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered, 
-  //     nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [], 
+  //     let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered,
+  //     nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [],
   //     globalStateHash: '', calculationTime: this.currentCycleShardData.calculationTime }
   //     partitionDump.cycle = this.currentCycleShardData.cycleNumber
-  
+
   //     // todo port this to a static stard function!
   //     // check if we are in the consenus group for this partition
   //     let minP = ourNodeShardData.consensusStartPartition // storedPartitions.partitionStart
   //     let maxP = ourNodeShardData.consensusEndPartition // storedPartitions.partitionEnd
-  
+
   //     // let minP = ourNodeShardData.storedPartitions.partitionStart
   //     // let maxP = ourNodeShardData.storedPartitions.partitionEnd
-  
+
   //     let cMin = ourNodeShardData.consensusStartPartition
   //     let cMax = ourNodeShardData.consensusEndPartition
-  
+
   //     partitionDump.rangesCovered = { ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`, id: utils.makeShortHash(ourNodeShardData.node.id), fracID: ourNodeShardData.nodeAddressNum / 0xffffffff, hP: ourNodeShardData.homePartition, cMin: cMin, cMax: cMax, stMin: ourNodeShardData.storedPartitions.partitionStart, stMax: ourNodeShardData.storedPartitions.partitionEnd, numP: this.currentCycleShardData.shardGlobals.numPartitions }
-  
+
   //     // todo print out coverage map by node index
-  
+
   //     partitionDump.nodesCovered = { idx: ourNodeShardData.ourNodeIndex, ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`, id: utils.makeShortHash(ourNodeShardData.node.id), fracID: ourNodeShardData.nodeAddressNum / 0xffffffff, hP: ourNodeShardData.homePartition, consensus: [], stored: [], extra: [], numP: this.currentCycleShardData.shardGlobals.numPartitions }
-  
+
   //     for (let node of ourNodeShardData.consensusNodeForOurNode) {
   //       let nodeData = this.currentCycleShardData.nodeShardDataMap.get(node.id)
   //       //@ts-ignore just debug junk
@@ -5553,12 +5547,12 @@ class Depricated {
   //       //@ts-ignore just debug junk
   //       partitionDump.nodesCovered.stored.push({ idx: nodeData.ourNodeIndex, hp: nodeData.homePartition })
   //     }
-  
+
   //     if (this.currentCycleShardData.ourNode.status === 'active') {
   //       for (var [key, value] of partitionMap) {
   //         let partition: DebugDumpPartition = { parititionID: key, accounts: [], accounts2: [], skip: {} as DebugDumpPartitionSkip }
   //         partitionDump.partitions.push(partition)
-  
+
   //         // normal case
   //         if (maxP > minP) {
   //           // are we outside the min to max range
@@ -5578,11 +5572,11 @@ class Depricated {
   //             continue
   //           }
   //         }
-  
+
   //         let partitionShardData = value
   //         let accountStart = partitionShardData.homeRange.low
   //         let accountEnd = partitionShardData.homeRange.high
-  
+
   //         if (this.debugFeature_dumpAccountDataFromSQL === true) {
   //           let wrappedAccounts = await this.app.getAccountData(accountStart, accountEnd, 10000000)
   //           // { accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp }
@@ -5598,10 +5592,10 @@ class Depricated {
   //             }
   //             partition.accounts.push({ id: wrappedAccount.accountId, hash: wrappedAccount.stateId, v: v })
   //           }
-  
+
   //           partition.accounts.sort(this._sortByIdAsc)
   //         }
-  
+
   //         // Take the cache data report and fill out accounts2 and partitionHash2
   //         if (mainHashResults.partitionHashResults.has(partition.parititionID)) {
   //           let partitionHashResults = mainHashResults.partitionHashResults.get(partition.parititionID)
@@ -5614,23 +5608,23 @@ class Depricated {
   //           partition.partitionHash2 = partitionHashResults.hashOfHashes
   //         }
   //       }
-  
+
   //       //partitionDump.allNodeIds = []
   //       for (let node of this.currentCycleShardData.activeNodes) {
   //         partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
   //       }
-  
+
   //       partitionDump.globalAccountIDs = Array.from(this.accountGlobals.globalAccountSet.keys())
   //       partitionDump.globalAccountIDs.sort()
   //       // dump information about consensus group and edge nodes for each partition
   //       // for (var [key, value] of this.currentCycleShardData.parititionShardDataMap){
-  
+
   //       // }
-  
+
   //       let {globalAccountSummary, globalStateHash} = this.accountGlobals.getGlobalDebugReport()
   //       partitionDump.globalAccountSummary = globalAccountSummary
   //       partitionDump.globalStateHash = globalStateHash
-  
+
   //     } else {
   //       if (this.currentCycleShardData != null && this.currentCycleShardData.activeNodes.length > 0) {
   //         for (let node of this.currentCycleShardData.activeNodes) {
@@ -5638,12 +5632,11 @@ class Depricated {
   //         }
   //       }
   //     }
-  
+
   //     this.lastShardReport = utils.stringifyReduce(partitionDump)
   //     this.shardLogger.debug(this.lastShardReport)
   //     //this.shardLogger.debug(utils.stringifyReduce(partitionDump))
   //   }
-
 
   //   /**
   //  * syncStateDataForRange
@@ -5655,30 +5648,30 @@ class Depricated {
   //       let partition = 'notUsed'
   //       this.currentRange = range
   //       this.addressRange = range // this.partitionToAddressRange(partition)
-  
+
   //       this.partitionStartTimeStamp = Date.now()
-  
+
   //       let lowAddress = this.addressRange.low
   //       let highAddress = this.addressRange.high
-  
+
   //       partition = `${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)}`
-  
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataForPartition partition: ${partition} `)
-  
+
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataForPartition partition: ${partition} `)
+
   //       if(this.useStateTable === true){
   //         await this.syncStateTableData(lowAddress, highAddress, 0, Date.now() - this.stateManager.syncSettleTime)
   //       }
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncStateTableData 1st pass done.`)
-  
-  //       nestedCountersInstance.countEvent('sync', `sync partition: ${partition} start: ${this.stateManager.currentCycleShardData.cycleNumber}`)
-  
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncStateTableData 1st pass done.`)
+
+  //       /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `sync partition: ${partition} start: ${this.stateManager.currentCycleShardData.cycleNumber}`)
+
   //       this.readyforTXs = true // open the floodgates of queuing stuffs.
-  
+
   //       await this.syncAccountData(lowAddress, highAddress)
   //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncAccountData done.`)
-  
+
   //       // potentially do the next 2 blocks periodically in the account data retreval so we can flush data to disk!  generalize the account state table update so it can be called 'n' times
-  
+
   //       // Sync the Account State Table Second Pass
   //       //   Wait at least 10T since the Ts_end time of the First Pass
   //       //   Same as the procedure for First Pass except:
@@ -5686,22 +5679,22 @@ class Depricated {
   //       if(this.useStateTable === true){
   //         await this.syncStateTableData(lowAddress, highAddress, this.lastStateSyncEndtime, Date.now())
   //       }
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncStateTableData 2nd pass done.`)
-  
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncStateTableData 2nd pass done.`)
+
   //       // Process the Account data
   //       //   For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
   //       //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
   //       //   Use the App.set_account_data function with the Account data to save the data to the application Accounts Table; if any failed accounts are returned save the account id to be looked up later
   //       let accountsSaved = await this.processAccountData()
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: partition: ${partition}, processAccountData done.`)
-  
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: partition: ${partition}, processAccountData done.`)
+
   //       // Sync the failed accounts
   //       //   Log that some account failed
   //       //   Use the /get_account_data_by_list API to get the data for the accounts that need to be looked up later from any of the nodes that had a matching hash but different from previously used nodes
   //       //   Repeat the “Sync the Account State Table Second Pass” step
   //       //   Repeat the “Process the Account data” step
   //       await this.syncFailedAcccounts(lowAddress, highAddress)
-  
+
   //       if (this.failedAccountsRemain()) {
   //         if (logFlags.debug)
   //           this.mainLogger.debug(
@@ -5709,32 +5702,32 @@ class Depricated {
   //               this.accountsWithStateConflict.length
   //             } missingAccountData:${this.missingAccountData.length} stateTableForMissingTXs:${Object.keys(this.stateTableForMissingTXs).length}`
   //           )
-  
+
   //         //This section allows to retry for failed accounts but it greatly slows down the sync process, so I think that is not the right answer
-  
+
   //         // this.mainLogger.debug(`DATASYNC: failedAccountsRemain, wait ${this.stateManager.syncSettleTime}ms and retry ${lowAddress} - ${highAddress}`)
   //         // await utils.sleep(this.stateManager.syncSettleTime)
-  
+
   //         // await this.syncFailedAcccounts(lowAddress, highAddress)
-  
+
   //         // if(this.failedAccountsRemain()){
   //         //   this.statemanager_fatal(`failedAccountsRemain2`, `failedAccountsRemain2: this.accountsWithStateConflict:${utils.stringifyReduce(this.accountsWithStateConflict)} this.missingAccountData:${utils.stringifyReduce(this.missingAccountData)} `)
   //         // } else {
   //         //   this.mainLogger.debug(`DATASYNC: syncFailedAcccounts FIX WORKED`)
   //         // }
   //       }
-  
+
   //       let keysToRepair = Object.keys(this.stateTableForMissingTXs).length
   //       if (keysToRepair > 0) {
   //         // alternate repair.
   //         this.repairMissingTXs()
   //       }
-  
-  //       nestedCountersInstance.countEvent('sync', `sync partition: ${partition} end: ${this.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} missing tx to repair: ${keysToRepair}`)
-  
+
+  //       /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `sync partition: ${partition} end: ${this.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} missing tx to repair: ${keysToRepair}`)
+
   //     } catch (error) {
   //       if(error.message.includes('reset-sync-ranges')){
-  
+
   //         this.statemanager_fatal(`syncStateDataForRange_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error))
   //         //buble up:
   //         throw new Error('reset-sync-ranges')
@@ -5744,12 +5737,12 @@ class Depricated {
   //         await this.failandRestart()
   //       } else {
   //         this.statemanager_fatal(`syncStateDataForRange_ex`, 'syncStateDataForPartition failed: ' + errorToStringFull(error))
-  //         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
+  //         /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
   //         await this.failandRestart()
   //       }
   //     }
   //   }
-  
+
   //   /***
   //  *     ######  ##    ## ##    ##  ######   ######  ########    ###    ######## ######## ########    ###    ########  ##       ######## ########     ###    ########    ###
   //  *    ##    ##  ##  ##  ###   ## ##    ## ##    ##    ##      ## ##      ##    ##          ##      ## ##   ##     ## ##       ##       ##     ##   ## ##      ##      ## ##
@@ -5773,11 +5766,10 @@ class Depricated {
   //     return
   //   }
 
-
   //   let debugRange = ` ${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)}`
 
-  //   if (logFlags.console) console.log(`syncStateTableData startTime: ${startTime} endTime: ${endTime}` + '   time:' + Date.now())
-  //   if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateTableData startTime: ${startTime} endTime: ${endTime} low: ${lowAddress} high: ${highAddress} `)
+  //   /* prettier-ignore */ if (logFlags.console) console.log(`syncStateTableData startTime: ${startTime} endTime: ${endTime}` + '   time:' + Date.now())
+  //   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateTableData startTime: ${startTime} endTime: ${endTime} low: ${lowAddress} high: ${highAddress} `)
   //   // todo m11: this loop will try three more random nodes, this is slightly different than described how to handle failure in the doc. this should be corrected but will take more code
   //   // should prossible break this into a state machine in  its own class.
   //   while (searchingForGoodData) {
@@ -5819,10 +5811,10 @@ class Depricated {
   //       }
   //       let result = await this.p2p.ask(node, 'get_account_state_hash', message)
   //       if (result === false) {
-  //         if (logFlags.error) this.mainLogger.error(`ASK FAIL syncStateTableData result === false node:${utils.stringifyReduce(node.id)}`)
+  //         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL syncStateTableData result === false node:${utils.stringifyReduce(node.id)}`)
   //       }
   //       if (result == null) {
-  //         if (logFlags.error) this.mainLogger.error(`ASK FAIL syncStateTableData result == null node:${utils.stringifyReduce(node.id)}`)
+  //         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL syncStateTableData result == null node:${utils.stringifyReduce(node.id)}`)
   //       }
 
   //       // TODO I dont know the best way to handle a non null network error here, below is an idea
@@ -5878,7 +5870,7 @@ class Depricated {
   //     nodes = filteredNodes
 
   //     if (Array.isArray(nodes) === false) {
-  //       if (logFlags.error) this.mainLogger.error(`syncStateTableData: non array returned ${utils.stringifyReduce(nodes)}`)
+  //       /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`syncStateTableData: non array returned ${utils.stringifyReduce(nodes)}`)
   //       return // nothing to do
   //     }
 
@@ -5916,13 +5908,13 @@ class Depricated {
   //     } catch (ex) {
   //       // NOTE: no longer expecting an exception from robust query in cases where we do not have enough votes or respones!
   //       //       but for now if isRobustResult == false then we local code wil throw an exception
-  //       if (logFlags.debug) this.mainLogger.debug('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   //       this.statemanager_fatal(`syncStateTableData_robustQ`, 'syncStateTableData: robustQuery ' + debugRange + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   //       throw new Error('FailAndRestartPartition_stateTable_B' + debugRange)
   //     }
 
   //     if (result && result.stateHash) {
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery returned result: ${result.stateHash}`)
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery returned result: ${result.stateHash}`)
   //       if (!winners || winners.length === 0) {
   //         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: no winners, going to throw fail and restart`)
   //         this.statemanager_fatal(`syncStateTableData_noWin`, `DATASYNC: no winners, going to throw fail and restart` + debugRange) // todo: consider if this is just an error
@@ -5934,7 +5926,7 @@ class Depricated {
   //       firstHash = result.stateHash
   //     } else {
   //       let resultStr = utils.stringifyReduce(result)
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery get_account_state_hash failed ${result} `  + debugRange)
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery get_account_state_hash failed ${result} `  + debugRange)
   //       throw new Error('FailAndRestartPartition_stateTable_D ' + result + debugRange)
   //     }
 
@@ -5943,7 +5935,7 @@ class Depricated {
   //     let loopCount = 0
 
   //     let lowTimeQuery = startTime
-  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: hash: getting state table data from: ${utils.makeShortHash(this.dataSourceNode.id) + ':' + this.dataSourceNode.externalPort}`)
+  //     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: hash: getting state table data from: ${utils.makeShortHash(this.dataSourceNode.id) + ':' + this.dataSourceNode.externalPort}`)
 
   //     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
   //     while (moreDataRemaining) {
@@ -5959,14 +5951,14 @@ class Depricated {
   //       let result = await this.p2p.ask(this.dataSourceNode, 'get_account_state', message)
 
   //       if (result == null) {
-  //         if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result == null')
+  //         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result == null')
   //         if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
   //           break
   //         }
   //         continue
   //       }
   //       if (result.accountStates == null) {
-  //         if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result.accountStates == null')
+  //         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result.accountStates == null')
   //         if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
   //           break
   //         }
@@ -6035,20 +6027,18 @@ class Depricated {
   //       filteredAccountStates.unshift(accountState)
   //     }
 
-
-
   //     let recievedStateDataHash = this.crypto.hash(filteredAccountStates)
 
   //     if (recievedStateDataHash === firstHash) {
   //       searchingForGoodData = false
   //     } else {
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateTableData finished downloading the requested data but the hash does not match`)
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateTableData finished downloading the requested data but the hash does not match`)
   //       // Failed again back through loop! TODO ? record/eval/report blame?
   //       this.stateManager.recordPotentialBadnode()
   //       throw new Error('FailAndRestartPartition_stateTable_E' + debugRange)
   //     }
 
-  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateTableData saving ${this.combinedAccountStateData.length} records to db`)
+  //     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateTableData saving ${this.combinedAccountStateData.length} records to db`)
   //     // If the hash matches then update our Account State Table with the data
   //     await this.storage.addAccountStates(this.combinedAccountStateData) // keep in memory copy for faster processing...
   //     this.inMemoryStateTableData = this.inMemoryStateTableData.concat(this.combinedAccountStateData)
@@ -6056,8 +6046,6 @@ class Depricated {
   //     this.syncStatement.numSyncedState += this.combinedAccountStateData.length
   //   }
   // }
-
-
 
   // /***
   //  *     ######  ##    ## ##    ##  ######     ###     ######   ######   #######  ##     ## ##    ## ######## ########     ###    ########    ###
@@ -6099,7 +6087,7 @@ class Depricated {
   //   }
 
   //   if(this.dataSourceNode == null){
-  //     if (logFlags.error) this.mainLogger.error(`syncAccountData: dataSourceNode == null ${lowAddress} - ${highAddress}`)
+  //     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`syncAccountData: dataSourceNode == null ${lowAddress} - ${highAddress}`)
   //     //if we see this then getDataSourceNode failed.
   //     // this is most likely because the ranges selected when we started sync are now invalid and too wide to be filled.
 
@@ -6131,14 +6119,14 @@ class Depricated {
   //     let result: GetAccountData3Resp = r as GetAccountData3Resp
 
   //     if (result == null) {
-  //       if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceNode.id}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceNode.id}`)
   //       if (this.tryNextDataSourceNode('syncAccountData') == false) {
   //         break
   //       }
   //       continue
   //     }
   //     if (result.data == null) {
-  //       if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceNode.id}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceNode.id}`)
   //       if (this.tryNextDataSourceNode('syncAccountData') == false) {
   //         break
   //       }
@@ -6190,16 +6178,14 @@ class Depricated {
   //       }
   //     }
 
-
   //     if(lastLowQuery === lowTimeQuery){
   //       //update offset, so we can get next page of data
   //       //offset+= (result.data.wrappedAccounts.length + result.data.wrappedAccounts2.length)
   //       offset+=sameAsStartTS //conservative offset!
   //     } else {
   //       //clear offset
-  //       offset=0 
+  //       offset=0
   //     }
-
 
   //     // if we have any accounts in wrappedAccounts2
   //     let accountData2 = result.data.wrappedAccounts2
@@ -6227,21 +6213,21 @@ class Depricated {
   //     if (lastUpdateNeeded || (accountData2.length === 0 && accountData.length === 0)) {
   //       if(lastUpdateNeeded){
   //         //we are done
-  //         moreDataRemaining = false    
+  //         moreDataRemaining = false
   //       } else {
   //         if(stopIfNextLoopHasNoResults === true){
   //           //we are done
-  //           moreDataRemaining = false           
+  //           moreDataRemaining = false
   //         } else{
   //           //bump start time and loop once more!
   //           //If we don't get anymore accounts on that loopl then we will quit for sure
   //           //If we do get more accounts then stopIfNextLoopHasNoResults will reset in a branch below
   //           startTime++
-  //           loopCount++  
-  //           stopIfNextLoopHasNoResults = true            
-  //         }    
+  //           loopCount++
+  //           stopIfNextLoopHasNoResults = true
+  //         }
   //       }
-        
+
   //       if (logFlags.debug)
   //         this.mainLogger.debug(
   //           `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset}`
@@ -6441,7 +6427,7 @@ class Depricated {
   //     } else if (account.syncData.anyMatch === true) {
   //       if (account.syncData.missingTX) {
   //         fix1Worked++
-  //         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData FIX WORKED. ${utils.stringifyReduce(account)}  `)
+  //         /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData FIX WORKED. ${utils.stringifyReduce(account)}  `)
   //       }
   //       //this is the positive case. We have a match so we can use this account
   //       delete account.syncData
@@ -6481,30 +6467,29 @@ class Depricated {
   //   // failedHashes is a list of accounts that failed to match the hash reported by the server
   //   let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData', true) // repeatable form may need to call this in batches
 
-
   //   this.syncStatement.numAccounts += goodAccounts.length
 
   //   if (failedHashes.length > 1000) {
-  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
+  //     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
   //     // state -> try another node. TODO record/eval/report blame?
   //     this.stateManager.recordPotentialBadnode()
   //     throw new Error('FailAndRestartPartition_processAccountData_A')
   //   }
   //   if (failedHashes.length > 0) {
-  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
+  //     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
   //     // TODO ? record/eval/report blame?
   //     this.stateManager.recordPotentialBadnode()
   //     this.failedAccounts = this.failedAccounts.concat(failedHashes)
   //     for (let accountId of failedHashes) {
   //       account = this.mapAccountData[accountId]
 
-  //       if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData ${accountId}  data: ${utils.stringifyReduce(account)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData ${accountId}  data: ${utils.stringifyReduce(account)}`)
 
   //       if (account != null) {
   //         if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData adding account to list`)
   //         this.accountsWithStateConflict.push(account)
   //       } else {
-  //         if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData cant find data: ${accountId}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData cant find data: ${accountId}`)
   //         if (accountId) {
   //           //this.accountsWithStateConflict.push({ address: accountId,  }) //NOTE: fixed with refactor
   //           this.accountsWithStateConflict.push({ accountId: accountId, data: null, stateId: null, timestamp: 0 })
@@ -6560,7 +6545,7 @@ class Depricated {
   //     if (accountEntry.accountId) {
   //       addressList.push(accountEntry.accountId)
   //     } else {
-  //       if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts failed to add account ${accountEntry}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts failed to add account ${accountEntry}`)
   //     }
   //   }
   //   // add the addresses of accounts that we got state table data for but not data for
@@ -6568,7 +6553,7 @@ class Depricated {
   //   this.missingAccountData = []
 
   //   // TODO m11:  should we pick different nodes to ask? (at the very least need to change the data source node!!!!!!)
-  //   if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts requesting data for failed hashes ${utils.stringifyReduce(addressList)}`)
+  //   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts requesting data for failed hashes ${utils.stringifyReduce(addressList)}`)
 
   //   // Node Precheck!
   //   if (this.stateManager.isNodeValidForInternalMessage(this.dataSourceNode.id, 'syncStateDataGlobals', true, true) === false) {
@@ -6587,7 +6572,7 @@ class Depricated {
   //   this.syncStatement.failedAccounts += addressList.length
 
   //   if (result == null) {
-  //     if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncFailedAcccounts result == null')
+  //     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncFailedAcccounts result == null')
   //     if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
   //       return
   //     }
@@ -6596,7 +6581,7 @@ class Depricated {
   //     return
   //   }
   //   if (result.accountData == null) {
-  //     if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncFailedAcccounts result.accountData == null')
+  //     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncFailedAcccounts result.accountData == null')
   //     if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
   //       return
   //     }
@@ -6607,7 +6592,7 @@ class Depricated {
 
   //   this.combinedAccountData = this.combinedAccountData.concat(result.accountData)
 
-  //   if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts combinedAccountData: ${this.combinedAccountData.length} accountData: ${result.accountData.length}`)
+  //   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts combinedAccountData: ${this.combinedAccountData.length} accountData: ${result.accountData.length}`)
   //   if(this.useStateTable === true){
   //     //depricated
   //     //await this.syncStateTableData(lowAddress, highAddress, this.lastStateSyncEndtime, Date.now())
@@ -6636,7 +6621,7 @@ class Depricated {
 
   //   let keys = Object.keys(this.stateTableForMissingTXs)
 
-  //   if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs begin: ${keys.length} ${utils.stringifyReduce(keys)}`)
+  //   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs begin: ${keys.length} ${utils.stringifyReduce(keys)}`)
   //   for (let key of keys) {
   //     try {
   //       this.profiler.profileSectionStart('repairMissingTX')
@@ -6651,15 +6636,15 @@ class Depricated {
   //         continue
   //       }
 
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs start: ${utils.stringifyReduce(stateTableData)}`)
+  //       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs start: ${utils.stringifyReduce(stateTableData)}`)
   //       //get receipt for txID
   //       let result = await this.stateManager.getTxRepair().requestMissingReceipt(stateTableData.txId, Number(stateTableData.txTimestamp), stateTableData.accountId)
   //       if (result != null && result.success === true) {
   //         //@ts-ignore todo can axe this when we get rid of old receipts
   //         let repairOk = await this.stateManager.getTxRepair().repairToMatchReceiptWithoutQueueEntry(result.receipt, stateTableData.accountId)
-  //         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs finished: ok:${repairOk} ${utils.stringifyReduce(stateTableData)}`)
+  //         /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs finished: ok:${repairOk} ${utils.stringifyReduce(stateTableData)}`)
   //       } else {
-  //         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs cant get receipt: ${utils.stringifyReduce(stateTableData)}`)
+  //         /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs cant get receipt: ${utils.stringifyReduce(stateTableData)}`)
   //         this.statemanager_fatal(`repairMissingTXs_fail`, `repairMissingTXs_fail ${utils.stringifyReduce(stateTableData)} result:${utils.stringifyReduce(result)}`)
   //       }
   //     } catch (error) {
@@ -6718,7 +6703,6 @@ class Depricated {
   //     )
   //   // For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
 
-
   //   //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
   //   this.accountsWithStateConflict = []
   //   let goodAccounts: Shardus.WrappedData[] = []
@@ -6741,26 +6725,26 @@ class Depricated {
   //   this.syncStatement.numAccounts += goodAccounts.length
 
   //   if (failedHashes.length > 1000) {
-  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
+  //     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
   //     // state -> try another node. TODO record/eval/report blame?
   //     this.stateManager.recordPotentialBadnode()
   //     throw new Error('FailAndRestartPartition_processAccountData_A')
   //   }
   //   if (failedHashes.length > 0) {
-  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
+  //     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
   //     // TODO ? record/eval/report blame?
   //     this.stateManager.recordPotentialBadnode()
   //     this.failedAccounts = this.failedAccounts.concat(failedHashes)
   //     for (let accountId of failedHashes) {
   //       account = this.mapAccountData[accountId]
 
-  //       if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData ${accountId}  data: ${utils.stringifyReduce(account)}`)
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData ${accountId}  data: ${utils.stringifyReduce(account)}`)
 
   //       if (account != null) {
   //         if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData adding account to list`)
   //         this.accountsWithStateConflict.push(account)
   //       } else {
-  //         if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData cant find data: ${accountId}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData cant find data: ${accountId}`)
   //         if (accountId) {
   //           //this.accountsWithStateConflict.push({ address: accountId,  }) //NOTE: fixed with refactor
   //           this.accountsWithStateConflict.push({ accountId: accountId, data: null, stateId: null, timestamp: 0 })
@@ -6780,36 +6764,34 @@ class Depricated {
 
   //from:syncStateDataForRange2
 
-        // // Sync the failed accounts
-      // //   Log that some account failed
-      // //   Use the /get_account_data_by_list API to get the data for the accounts that need to be looked up later from any of the nodes that had a matching hash but different from previously used nodes
-      // //   Repeat the “Sync the Account State Table Second Pass” step
-      // //   Repeat the “Process the Account data” step
-      // await this.syncFailedAcccounts(lowAddress, highAddress)
+  // // Sync the failed accounts
+  // //   Log that some account failed
+  // //   Use the /get_account_data_by_list API to get the data for the accounts that need to be looked up later from any of the nodes that had a matching hash but different from previously used nodes
+  // //   Repeat the “Sync the Account State Table Second Pass” step
+  // //   Repeat the “Process the Account data” step
+  // await this.syncFailedAcccounts(lowAddress, highAddress)
 
-      // if (this.failedAccountsRemain()) {
-      //   if (logFlags.debug)
-      //     this.mainLogger.debug(
-      //       `DATASYNC: failedAccountsRemain,  ${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)} accountsWithStateConflict:${
-      //         this.accountsWithStateConflict.length
-      //       } missingAccountData:${this.missingAccountData.length} stateTableForMissingTXs:${Object.keys(this.stateTableForMissingTXs).length}`
-      //     )
-      // }
+  // if (this.failedAccountsRemain()) {
+  //   if (logFlags.debug)
+  //     this.mainLogger.debug(
+  //       `DATASYNC: failedAccountsRemain,  ${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)} accountsWithStateConflict:${
+  //         this.accountsWithStateConflict.length
+  //       } missingAccountData:${this.missingAccountData.length} stateTableForMissingTXs:${Object.keys(this.stateTableForMissingTXs).length}`
+  //     )
+  // }
 
-      // let keysToRepair = Object.keys(this.stateTableForMissingTXs).length
-      // if (keysToRepair > 0) {
-      //   // alternate repair.
-      //   this.repairMissingTXs()
-      // }
+  // let keysToRepair = Object.keys(this.stateTableForMissingTXs).length
+  // if (keysToRepair > 0) {
+  //   // alternate repair.
+  //   this.repairMissingTXs()
+  // }
 
-
-      ///from get_account_data_by_hashes handler
-      // if(this.stateManager.accountSync.useStateTable === true){
-      //   if(accountsToGetStateTableDataFor.length > 0){
-      //     result.stateTableData = await this.stateManager.storage.queryAccountStateTableByListNewest(accountsToGetStateTableDataFor)
-      //   }
-      // }
-
+  ///from get_account_data_by_hashes handler
+  // if(this.stateManager.accountSync.useStateTable === true){
+  //   if(accountsToGetStateTableDataFor.length > 0){
+  //     result.stateTableData = await this.stateManager.storage.queryAccountStateTableByListNewest(accountsToGetStateTableDataFor)
+  //   }
+  // }
 
   // /**
   //  * failedAccountsRemain
@@ -6825,9 +6807,6 @@ class Depricated {
   //   }
   //   return true
   // }
-
-
-
 }
 
 export default Depricated

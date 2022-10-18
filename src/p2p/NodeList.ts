@@ -1,12 +1,7 @@
 import { Logger } from 'log4js'
 import { stringify } from '@shardus/crypto-utils'
 import { P2P } from '@shardus/types'
-import {
-  binarySearch,
-  insertSorted,
-  propComparator,
-  propComparator2
-} from '../utils'
+import { binarySearch, insertSorted, propComparator, propComparator2 } from '../utils'
 import { crypto, logger } from './Context'
 import * as CycleChain from './CycleChain'
 import { id } from './Self'
@@ -55,9 +50,8 @@ export function addNode(node: P2P.NodeListTypes.Node) {
   // Don't add duplicates
   if (nodes.has(node.id)) {
     warn(
-      `NodeList.addNode: tried to add duplicate ${
-        node.externalPort
-      }: ${stringify(node)}\n` + `${new Error().stack}`
+      `NodeList.addNode: tried to add duplicate ${node.externalPort}: ${stringify(node)}\n` +
+        `${new Error().stack}`
     )
 
     return
@@ -132,11 +126,7 @@ export function removeNode(id) {
   if (idx >= 0) syncingByIdOrder.splice(idx, 1)
 
   const joinRequestTimestamp = nodes.get(id).joinRequestTimestamp
-  idx = binarySearch(
-    byJoinOrder,
-    { joinRequestTimestamp, id },
-    propComparator2('joinRequestTimestamp', 'id')
-  )
+  idx = binarySearch(byJoinOrder, { joinRequestTimestamp, id }, propComparator2('joinRequestTimestamp', 'id'))
   if (idx >= 0) byJoinOrder.splice(idx, 1)
 
   // Remove from maps
@@ -157,7 +147,7 @@ export function updateNode(update: P2P.NodeListTypes.Update) {
       node[key] = update[key]
     }
     //test if this node is in the active list already.  if it is not, then we can add it
-    let idx = binarySearch(activeByIdOrder, { id:node.id }, propComparator('id'))
+    let idx = binarySearch(activeByIdOrder, { id: node.id }, propComparator('id'))
     if (idx < 0) {
       // Add the node to active arrays, if needed
       if (update.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
@@ -200,23 +190,13 @@ export function getDebug() {
     NODES:
       hash:                  ${crypto.hash(byJoinOrder).slice(0, 5)}
       byJoinOrder:           [${byJoinOrder
-        .map(
-          (node) =>
-            `${node.externalIp}:${node.externalPort}-${node.counterRefreshed}`
-        )
+        .map((node) => `${node.externalIp}:${node.externalPort}-${node.counterRefreshed}`)
         .join()}]
       byIdOrder:             [${byIdOrder
-        .map(
-          (node) =>
-            `${node.externalIp}:${node.externalPort}` + '-x' + idTrim(node.id)
-        )
+        .map((node) => `${node.externalIp}:${node.externalPort}` + '-x' + idTrim(node.id))
         .join()}]
-      othersByIdOrder:       [${othersByIdOrder.map(
-        (node) => `${node.externalIp}:${node.externalPort}`
-      )}]
-      activeByIdOrder:       [${activeByIdOrder.map(
-        (node) => `${node.externalIp}:${node.externalPort}`
-      )}]
+      othersByIdOrder:       [${othersByIdOrder.map((node) => `${node.externalIp}:${node.externalPort}`)}]
+      activeByIdOrder:       [${activeByIdOrder.map((node) => `${node.externalIp}:${node.externalPort}`)}]
       activeOthersByIdOrder: [${activeOthersByIdOrder.map(
         (node) => `${node.externalIp}:${node.externalPort}`
       )}]

@@ -93,9 +93,7 @@ class ExitHandler {
     log.push(`heapTotal: ${(report.heapTotal * toMB).toFixed(2)} MB\n`)
     log.push(`heapUsed: ${(report.heapUsed * toMB).toFixed(2)} MB\n`)
     log.push(`external: ${(report.external * toMB).toFixed(2)} MB\n`)
-    log.push(
-      `arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`
-    )
+    log.push(`arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`)
 
     this.memStats.gatherReport()
     this.memStats.reportToStream(this.memStats.report, fakeStream, 0)
@@ -103,9 +101,7 @@ class ExitHandler {
 
     log = []
     profilerInstance.scopedProfileSectionStart('counts')
-    const arrayReport = this.counters.arrayitizeAndSort(
-      this.counters.eventCounters
-    )
+    const arrayReport = this.counters.arrayitizeAndSort(this.counters.eventCounters)
 
     this.counters.printArrayReport(arrayReport, fakeStream, 0)
     profilerInstance.scopedProfileSectionEnd('counts')

@@ -3,14 +3,14 @@ const NS_PER_SEC = 1e9
 import { Utils } from 'sequelize/types'
 import * as Context from '../p2p/Context'
 import * as utils from '../utils'
-import Crypto from "../crypto"
+import Crypto from '../crypto'
 import Shardus from '../shardus'
 import StateManager from '../state-manager'
 import * as CycleCreator from '../p2p/CycleCreator'
-const os = require('os');
+const os = require('os')
 import { nestedCountersInstance } from '../utils/nestedCounters'
-const process = require('process');
-import { resourceUsage } from 'process';
+const process = require('process')
+import { resourceUsage } from 'process'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import * as NodeList from '../p2p/NodeList'
 import { spawn } from 'child_process'
@@ -21,29 +21,26 @@ interface MemoryReporting {}
 
 type CounterMap = Map<string, CounterNode>
 interface CounterNode {
-    count: number
-    subCounters: CounterMap
-
+  count: number
+  subCounters: CounterMap
 }
 
 export let memoryReportingInstance: MemoryReporting
 
 type MemItem = {
-  category:string
-  subcat:string
-  itemKey:string
-  count:number
+  category: string
+  subcat: string
+  itemKey: string
+  count: number
 }
 
 class MemoryReporting {
-
   crypto: Crypto
   report: MemItem[]
   shardus: Shardus
   lastCPUTimes: any[]
 
-  constructor(shardus:Shardus) {
-
+  constructor(shardus: Shardus) {
     this.crypto = null
     memoryReportingInstance = this
     this.report = []
@@ -54,24 +51,23 @@ class MemoryReporting {
 
   registerEndpoints() {
     Context.network.registerExternalGet('memory', isDebugModeMiddleware, (req, res) => {
-        let toMB = 1/1000000
-        let report = process.memoryUsage()
-        res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
-        res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
-        res.write(`heapTotal: ${(report.heapTotal * toMB).toFixed(2)} MB\n`)
-        res.write(`heapUsed: ${(report.heapUsed * toMB).toFixed(2)} MB\n`)
-        res.write(`external: ${(report.external * toMB).toFixed(2)} MB\n`)
-        res.write(`arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`)
+      let toMB = 1 / 1000000
+      let report = process.memoryUsage()
+      res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
+      res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
+      res.write(`heapTotal: ${(report.heapTotal * toMB).toFixed(2)} MB\n`)
+      res.write(`heapUsed: ${(report.heapUsed * toMB).toFixed(2)} MB\n`)
+      res.write(`external: ${(report.external * toMB).toFixed(2)} MB\n`)
+      res.write(`arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`)
 
-        this.gatherReport()
-        this.reportToStream(this.report, res, 0)
-        res.end()
-
+      this.gatherReport()
+      this.reportToStream(this.report, res, 0)
+      res.end()
     })
     Context.network.registerExternalGet('memory-short', isDebugModeMiddleware, (req, res) => {
-      nestedCountersInstance.countRareEvent('test', `memory-short`) // only here to so we can test the rare event counter system
+      /* prettier-ignore */ nestedCountersInstance.countRareEvent('test', `memory-short`) // only here to so we can test the rare event counter system
 
-      let toMB = 1/1000000
+      let toMB = 1 / 1000000
       let report = process.memoryUsage()
       res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
       res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
@@ -100,75 +96,66 @@ class MemoryReporting {
       res.end()
     })
 
-    Context.network.registerExternalGet(
-      'top',
-      isDebugModeMiddleware,
-      (req, res) => {
-        const top = spawn("top", ["-n", "10"]);
-        top.stdout.on("data", dataBuffer => {
-          res.write(dataBuffer)
-          top.kill()
-          res.end()
-        })
-        top.on("close", code => {
-          console.log(`child process exited with code ${code}`);
-        });
-        top.stderr.on("data", data => {
-          console.log('top command error', data)
-          res.write('top command error')
-          top.kill()
-          res.end()
-        })
+    Context.network.registerExternalGet('top', isDebugModeMiddleware, (req, res) => {
+      const top = spawn('top', ['-n', '10'])
+      top.stdout.on('data', (dataBuffer) => {
+        res.write(dataBuffer)
+        top.kill()
+        res.end()
+      })
+      top.on('close', (code) => {
+        console.log(`child process exited with code ${code}`)
+      })
+      top.stderr.on('data', (data) => {
+        console.log('top command error', data)
+        res.write('top command error')
+        top.kill()
+        res.end()
+      })
     })
 
-    Context.network.registerExternalGet(
-      'df',
-      isDebugModeMiddleware,
-      (req, res) => {
-        const df = spawn("df");
-        df.stdout.on("data", dataBuffer => {
-          res.write(dataBuffer)
-          df.kill()
-          res.end()
-        })
-        df.on("close", code => {
-          console.log(`child process exited with code ${code}`);
-        });
-        df.stderr.on("data", data => {
-          console.log('df command error', data)
-          res.write('df command error')
-          df.kill()
-          res.end()
-        })
+    Context.network.registerExternalGet('df', isDebugModeMiddleware, (req, res) => {
+      const df = spawn('df')
+      df.stdout.on('data', (dataBuffer) => {
+        res.write(dataBuffer)
+        df.kill()
+        res.end()
       })
+      df.on('close', (code) => {
+        console.log(`child process exited with code ${code}`)
+      })
+      df.stderr.on('data', (data) => {
+        console.log('df command error', data)
+        res.write('df command error')
+        df.kill()
+        res.end()
+      })
+    })
 
     Context.network.registerExternalGet('memory-gc', isDebugModeMiddleware, (req, res) => {
-
       res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
       try {
         if (global.gc) {
-          global.gc();
-          res.write('garbage collected!');
+          global.gc()
+          res.write('garbage collected!')
         } else {
-          res.write('No access to global.gc.  run with node --expose-gc');
+          res.write('No access to global.gc.  run with node --expose-gc')
         }
       } catch (e) {
-        res.write('ex:No access to global.gc.  run with node --expose-gc');
+        res.write('ex:No access to global.gc.  run with node --expose-gc')
       }
       res.end()
     })
 
     Context.network.registerExternalGet('scaleFactor', isDebugModeMiddleware, (req, res) => {
-
       res.write(`Scale debug  Timestamp: ${Date.now()}\n`)
       try {
         res.write(`CycleAutoScale.  ${CycleCreator.scaleFactor}`)
       } catch (e) {
-        res.write(JSON.stringify(e));
+        res.write(JSON.stringify(e))
       }
       res.end()
     })
-
   }
 
   private addNodesToReport() {
@@ -182,37 +169,33 @@ class MemoryReporting {
     }
   }
 
-  getMemoryStringBasic(){
-    let toMB = 1/1000000
+  getMemoryStringBasic() {
+    let toMB = 1 / 1000000
     let report = process.memoryUsage()
     let outStr = `rss: ${(report.rss * toMB).toFixed(2)} MB`
     //todo integrate this into the main stats tsv
-    if(this.shardus && this.shardus.stateManager){
+    if (this.shardus && this.shardus.stateManager) {
       let numActiveNodes = NodeList.activeByIdOrder.length
       let queueCount = this.shardus.stateManager.transactionQueue.newAcceptedTxQueue.length
       let archiveQueueCount = this.shardus.stateManager.transactionQueue.archivedQueueEntries.length
-      
+
       outStr += ` nds:${numActiveNodes} qCt:${queueCount} aAr:${archiveQueueCount}`
     }
     outStr += '\n'
     return outStr
   }
 
-
-  addToReport(category:string, subcat:string, itemKey:string, count:number){
-    let obj = {category, subcat, itemKey, count}
+  addToReport(category: string, subcat: string, itemKey: string, count: number) {
+    let obj = { category, subcat, itemKey, count }
     this.report.push(obj)
   }
 
-  reportToStream(report:MemItem[], stream, indent){
-
+  reportToStream(report: MemItem[], stream, indent) {
     let indentText = '___'.repeat(indent)
     for (let item of report) {
-      let {category, subcat, itemKey, count} = item
+      let { category, subcat, itemKey, count } = item
       let countStr = `${count}`
-      stream.write(
-      `${countStr.padStart(10)} ${category} ${subcat} ${itemKey}\n`
-      )
+      stream.write(`${countStr.padStart(10)} ${category} ${subcat} ${itemKey}\n`)
 
       // if (subArray != null && subArray.length > 0) {
       //   this.printArrayReport(subArray, stream, indent + 1)
@@ -220,62 +203,71 @@ class MemoryReporting {
     }
   }
 
-  gatherReport(){
+  gatherReport() {
     this.report = []
     this.gatherStateManagerReport()
     this.systemProcessReport()
     this.addNetStatsToReport()
   }
 
-  gatherStateManagerReport(){
-    if(this.shardus && this.shardus.stateManager){
-
-      if(NodeList.activeByIdOrder){
+  gatherStateManagerReport() {
+    if (this.shardus && this.shardus.stateManager) {
+      if (NodeList.activeByIdOrder) {
         let numActiveNodes = NodeList.activeByIdOrder.length
-        this.addToReport('P2P','Nodelist', 'numActiveNodes', numActiveNodes )
+        this.addToReport('P2P', 'Nodelist', 'numActiveNodes', numActiveNodes)
       }
 
       let cacheDbg = this.shardus.stateManager.accountCache.getDebugStats()
       //let cacheCount = this.shardus.stateManager.accountCache.accountsHashCache3.workingHistoryList.accountIDs.length
-      this.addToReport('StateManager','AccountsCache', 'workingAccounts', cacheDbg[0] )
+      this.addToReport('StateManager', 'AccountsCache', 'workingAccounts', cacheDbg[0])
       //let cacheCount2 = this.shardus.stateManager.accountCache.accountsHashCache3.accountHashMap.size
-      this.addToReport('StateManager','AccountsCache', 'mainMap', cacheDbg[1] )
+      this.addToReport('StateManager', 'AccountsCache', 'mainMap', cacheDbg[1])
 
       let queueCount = this.shardus.stateManager.transactionQueue.newAcceptedTxQueue.length
-      this.addToReport('StateManager','TXQueue', 'queueCount', queueCount )
+      this.addToReport('StateManager', 'TXQueue', 'queueCount', queueCount)
       let pendingQueueCount = this.shardus.stateManager.transactionQueue.newAcceptedTxQueueTempInjest.length
-      this.addToReport('StateManager','TXQueue', 'pendingQueueCount', pendingQueueCount )
+      this.addToReport('StateManager', 'TXQueue', 'pendingQueueCount', pendingQueueCount)
       let archiveQueueCount = this.shardus.stateManager.transactionQueue.archivedQueueEntries.length
-      this.addToReport('StateManager','TXQueue', 'archiveQueueCount', archiveQueueCount )
+      this.addToReport('StateManager', 'TXQueue', 'archiveQueueCount', archiveQueueCount)
       let executeQueueLength = this.shardus.stateManager.transactionQueue.getExecuteQueueLength()
-      this.addToReport('StateManager','TXQueue', 'executeQueueLength', executeQueueLength )
+      this.addToReport('StateManager', 'TXQueue', 'executeQueueLength', executeQueueLength)
 
-      for(let syncTracker of this.shardus.stateManager.accountSync.syncTrackers){
-        let partition = `${utils.stringifyReduce(syncTracker.range?.low)} - ${utils.stringifyReduce(syncTracker.range?.high)}`
-        this.addToReport('StateManager','SyncTracker', `isGlobal:${syncTracker.isGlobalSyncTracker} started:${syncTracker.syncStarted} finished:${syncTracker.syncFinished} partition:${partition}`, 1 )
+      for (let syncTracker of this.shardus.stateManager.accountSync.syncTrackers) {
+        let partition = `${utils.stringifyReduce(syncTracker.range?.low)} - ${utils.stringifyReduce(
+          syncTracker.range?.high
+        )}`
+        this.addToReport(
+          'StateManager',
+          'SyncTracker',
+          `isGlobal:${syncTracker.isGlobalSyncTracker} started:${syncTracker.syncStarted} finished:${syncTracker.syncFinished} partition:${partition}`,
+          1
+        )
       }
 
       let inSync = !this.shardus.stateManager.accountPatcher.failedLastTrieSync
-      this.addToReport('Patcher','insync', `${inSync}` , 1  )
-      this.addToReport('Patcher','history', JSON.stringify(this.shardus.stateManager.accountPatcher.syncFailHistory), 1 )
+      this.addToReport('Patcher', 'insync', `${inSync}`, 1)
+      this.addToReport(
+        'Patcher',
+        'history',
+        JSON.stringify(this.shardus.stateManager.accountPatcher.syncFailHistory),
+        1
+      )
 
-      this.addToReport('Patcher','insync', `${inSync}` , 1  )
+      this.addToReport('Patcher', 'insync', `${inSync}`, 1)
 
       //too much data moved to to /nodelist endpoint
       //this.addNodesToReport()
-
     }
   }
 
-
-  getCPUTimes(){
-    const cpus = os.cpus();
+  getCPUTimes() {
+    const cpus = os.cpus()
     let times = []
 
-    for(let cpu of cpus){
+    for (let cpu of cpus) {
       let timeObj = {}
       let total = 0
-      for(const [key, value] of Object.entries(cpu.times)){
+      for (const [key, value] of Object.entries(cpu.times)) {
         let time = Number(value)
         total += time
         timeObj[key] = value
@@ -287,8 +279,7 @@ class MemoryReporting {
     return times
   }
 
-  cpuPercent(){
-
+  cpuPercent() {
     let currentTimes = this.getCPUTimes()
 
     let deltaTimes = []
@@ -296,23 +287,22 @@ class MemoryReporting {
 
     let percentTotal = 0
 
-    for(let i=0; i< currentTimes.length; i++) {
-      const currentTimeEntry = currentTimes[i];
+    for (let i = 0; i < currentTimes.length; i++) {
+      const currentTimeEntry = currentTimes[i]
       const lastTimeEntry = this.lastCPUTimes[i]
       let deltaTimeObj = {}
-      for(const [key, value] of Object.entries(currentTimeEntry)){
+      for (const [key, value] of Object.entries(currentTimeEntry)) {
         deltaTimeObj[key] = currentTimeEntry[key] - lastTimeEntry[key]
       }
       deltaTimes.push(deltaTimeObj)
 
-      for(const [key, value] of Object.entries(currentTimeEntry)){
+      for (const [key, value] of Object.entries(currentTimeEntry)) {
         percentTimes[key] = deltaTimeObj[key] / deltaTimeObj['total']
       }
 
-      percentTotal += (percentTimes['user'] || 0)
-      percentTotal += (percentTimes['nice'] || 0)
-      percentTotal += (percentTimes['sys'] || 0)
-
+      percentTotal += percentTimes['user'] || 0
+      percentTotal += percentTimes['nice'] || 0
+      percentTotal += percentTimes['sys'] || 0
     }
 
     this.lastCPUTimes = currentTimes
@@ -325,53 +315,49 @@ class MemoryReporting {
     return percentUsed
   }
 
-  roundTo3decimals(num){
+  roundTo3decimals(num) {
     return Math.round((num + Number.EPSILON) * 1000) / 1000
   }
 
-  systemProcessReport(){
-
-    this.addToReport('Process','CPU', 'cpuPercent', this.roundTo3decimals(this.cpuPercent() * 100) )
+  systemProcessReport() {
+    this.addToReport('Process', 'CPU', 'cpuPercent', this.roundTo3decimals(this.cpuPercent() * 100))
 
     let avgCPU = this.shardus.statistics.getAverage('cpuPercent')
-    this.addToReport('Process','CPU', 'cpuAVGPercent', this.roundTo3decimals(avgCPU * 100) )
+    this.addToReport('Process', 'CPU', 'cpuAVGPercent', this.roundTo3decimals(avgCPU * 100))
     let multiStats = this.shardus.statistics.getMultiStatReport('cpuPercent')
 
-    multiStats.allVals.forEach(function(val, index) {
-      multiStats.allVals[index] = Math.round(val * 100);
+    multiStats.allVals.forEach(function (val, index) {
+      multiStats.allVals[index] = Math.round(val * 100)
     })
     multiStats.min = this.roundTo3decimals(multiStats.min * 100)
     multiStats.max = this.roundTo3decimals(multiStats.max * 100)
     multiStats.avg = this.roundTo3decimals(multiStats.avg * 100)
 
-    this.addToReport('Process','CPU', `cpu: ${JSON.stringify(multiStats)}`, 1)
+    this.addToReport('Process', 'CPU', `cpu: ${JSON.stringify(multiStats)}`, 1)
 
     let report = resourceUsage()
     for (const [key, value] of Object.entries(report)) {
-      this.addToReport('Process','Details', key, value )
+      this.addToReport('Process', 'Details', key, value)
     }
-
   }
 
-  getShardusNetReport(){
-    if(this.shardus == null || this.shardus.network == null || this.shardus.network.sn == null){
+  getShardusNetReport() {
+    if (this.shardus == null || this.shardus.network == null || this.shardus.network.sn == null) {
       return null
     }
-    if(this.shardus.network.sn.stats != null){
+    if (this.shardus.network.sn.stats != null) {
       let stats = this.shardus.network.sn.stats()
       return stats
     }
     return null
   }
 
-  addNetStatsToReport(){
+  addNetStatsToReport() {
     let stats = this.getShardusNetReport()
-    if(stats != null){
-      this.addToReport('NetStats','stats', 'stats', (JSON.stringify(stats, null, 4), 1))
+    if (stats != null) {
+      this.addToReport('NetStats', 'stats', 'stats', (JSON.stringify(stats, null, 4), 1))
     }
-
   }
-
 }
 
 export default MemoryReporting

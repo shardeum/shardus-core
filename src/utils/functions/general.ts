@@ -10,8 +10,7 @@ export const mod = (n, m) => {
 }
 
 export function propComparator<T>(prop: keyof T) {
-  const comparator = (a: T, b: T) =>
-    a[prop] > b[prop] ? 1 : a[prop] < b[prop] ? -1 : 0
+  const comparator = (a: T, b: T) => (a[prop] > b[prop] ? 1 : a[prop] < b[prop] ? -1 : 0)
   return comparator
 }
 
@@ -148,15 +147,14 @@ export function validateTypes(inp, def) {
   return ''
 }
 
-export function errorToStringFull(error){
+export function errorToStringFull(error) {
   return `${error.name}: ${error.message} at ${error.stack}`
 }
 
-
-export function sumObject(sumObject, toAddObject){
+export function sumObject(sumObject, toAddObject) {
   for (const [key, val] of Object.entries(sumObject)) {
     let otherVal = toAddObject[key]
-    if(otherVal == null){
+    if (otherVal == null) {
       continue
     }
     switch (typeof val) {
@@ -176,17 +174,15 @@ export function generateObjectSchema(obj, options = { arrTypeDiversity: false })
   const schema = {}
 
   if (Array.isArray(obj)) {
-    throw new Error(
-      'Object schema generation function does not accept array as argument'
-    )
+    throw new Error('Object schema generation function does not accept array as argument')
   }
 
   for (const [key, value] of Object.entries(obj)) {
     if (obj.hasOwnProperty(key) && obj[key] !== null) {
       if (value.constructor === Object) {
-        schema[key] = generateObjectSchema(value, { arrTypeDiversity: options.arrTypeDiversity})
+        schema[key] = generateObjectSchema(value, { arrTypeDiversity: options.arrTypeDiversity })
       } else if (Array.isArray(value)) {
-        schema[key] = generateArraySchema(value, { diversity: options.arrTypeDiversity})
+        schema[key] = generateArraySchema(value, { diversity: options.arrTypeDiversity })
       } else {
         schema[key] = typeof value
       }
@@ -206,11 +202,11 @@ export function generateObjectSchema(obj, options = { arrTypeDiversity: false })
 // [new Date(), new Date()]     -> 'object[]'
 // [[1,3,2],[1,3,4]]            -> 'array[]'
 // [new Date(), 'false', 1]     -> 'any[]' if options.diversity set true
-export function generateArraySchema(arr: unknown[], options = { diversity : false}): string {
+export function generateArraySchema(arr: unknown[], options = { diversity: false }): string {
   let schema: string
 
   for (let i = 0; i < arr.length; i++) {
-    // let's return 'any' when array is holding multiple types 
+    // let's return 'any' when array is holding multiple types
     if (i > 0 && arr[i].constructor !== arr[i - 1].constructor) {
       if (options.diversity) {
         return 'any[]'
@@ -238,7 +234,7 @@ export function generateArraySchema(arr: unknown[], options = { diversity : fals
 // @param {LiteralObject} idol, This is the object the function will hold standard to
 // @param {LiteralObject} admirer, This is the object the function compare against standard object idol
 // Note: these positional parameter matter at which position the object is passed to
-// This first parameter idol object will be idolized 
+// This first parameter idol object will be idolized
 // and the function will determine if the second parameter (admirer) object fit the idolized object schema
 // Note idol object does not accept type diversive array like this { arr: ['doe', 1, false] } will throw errors.
 export function compareObjectShape(idol, admirer) {
@@ -247,14 +243,14 @@ export function compareObjectShape(idol, admirer) {
   let defectoChain = []
 
   let idol_schema
-  try{
-    idol_schema = generateObjectSchema(idol, { arrTypeDiversity: false }) 
+  try {
+    idol_schema = generateObjectSchema(idol, { arrTypeDiversity: false })
   } catch (e) {
     throw new Error('Type varies array detected inside idol object')
   }
   const admirer_schema = generateObjectSchema(admirer, { arrTypeDiversity: true })
 
-  if (JSON.stringify(idol_schema) === JSON.stringify(admirer_schema)){
+  if (JSON.stringify(idol_schema) === JSON.stringify(admirer_schema)) {
     isValid = true
     return { isValid, error }
   }
@@ -280,8 +276,7 @@ export function compareObjectShape(idol, admirer) {
     const bigger_obj = l1 >= l2 ? worshipped : worshipper
 
     for (const key in bigger_obj) {
-      const DEFECTOR_FOUND =
-        smartComparator(worshipped[key], worshipper[key]) === false
+      const DEFECTOR_FOUND = smartComparator(worshipped[key], worshipper[key]) === false
 
       if (DEFECTOR_FOUND) {
         // save the path to the prop , Example: ['server', 'log']
@@ -304,7 +299,7 @@ export function compareObjectShape(idol, admirer) {
 }
 
 // version checker
-export function isEqualOrNewerVersion (oldVer : string, newVer : string) {
+export function isEqualOrNewerVersion(oldVer: string, newVer: string) {
   if (oldVer === newVer) {
     return true
   }
@@ -320,8 +315,8 @@ export function isEqualOrNewerVersion (oldVer : string, newVer : string) {
 }
 
 // adapted from stack overflow post
-export function humanFileSize(size: number ): string {
-  const i = size == 0 ? 0 : Math.floor( Math.log(size) / Math.log(1024) )
-  const value = Number( size / Math.pow(1024, i) ).toFixed(2)
+export function humanFileSize(size: number): string {
+  const i = size == 0 ? 0 : Math.floor(Math.log(size) / Math.log(1024))
+  const value = Number(size / Math.pow(1024, i)).toFixed(2)
   return value + ' ' + ['B', 'kB', 'MB', 'GB', 'TB'][i]
 }

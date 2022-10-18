@@ -41,19 +41,30 @@ export function getTxs(): P2P.RefreshTypes.Txs {
   return {}
 }
 
-export function validateRecordTypes(rec: P2P.RefreshTypes.Record): string{
-  let err = validateTypes(rec,{refreshedArchivers:'a',refreshedConsensors:'a'})
+export function validateRecordTypes(rec: P2P.RefreshTypes.Record): string {
+  let err = validateTypes(rec, { refreshedArchivers: 'a', refreshedConsensors: 'a' })
   if (err) return err
-  for(const item of rec.refreshedArchivers){
-    err = validateTypes(item,{publicKey:'s',ip:'s',port:'n',curvePk:'s'})
-    if (err) return 'in refreshedArchivers array '+err
+  for (const item of rec.refreshedArchivers) {
+    err = validateTypes(item, { publicKey: 's', ip: 's', port: 'n', curvePk: 's' })
+    if (err) return 'in refreshedArchivers array ' + err
   }
-  for(const item of rec.refreshedConsensors){
-    err = validateTypes(item,{activeTimestamp:'n',address:'s',externalIp:'s',externalPort:'n',
-      internalIp:'s',internalPort:'n',joinRequestTimestamp:'n',publicKey:'s',
-      cycleJoined:'s',counterRefreshed:'n',id:'s',curvePublicKey:'s',status:'s'
+  for (const item of rec.refreshedConsensors) {
+    err = validateTypes(item, {
+      activeTimestamp: 'n',
+      address: 's',
+      externalIp: 's',
+      externalPort: 'n',
+      internalIp: 's',
+      internalPort: 'n',
+      joinRequestTimestamp: 'n',
+      publicKey: 's',
+      cycleJoined: 's',
+      counterRefreshed: 'n',
+      id: 's',
+      curvePublicKey: 's',
+      status: 's',
     })
-    if (err) return 'in joinedConsensors array '+err
+    if (err) return 'in joinedConsensors array ' + err
   }
   return ''
 }
@@ -74,9 +85,7 @@ export function updateRecord(
   record.refreshedConsensors = refreshConsensors() // This returns a copy of the objects
 }
 
-export function parseRecord(
-  record: P2P.CycleCreatorTypes.CycleRecord
-): P2P.CycleParserTypes.Change {
+export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   // If Archivers.archivers doesn't have a refreshedArchiver, put it in
   for (const refreshed of record.refreshedArchivers) {
     if (Archivers.archivers.has(refreshed.publicKey) === false) {
@@ -147,7 +156,7 @@ function refreshConsensors() {
   const nodesToRefresh = [...NodeList.activeByIdOrder]
     .sort(propComparator2('counterRefreshed', 'id'))
     .splice(0, refreshCount)
-    .map(node => deepmerge({}, node))
+    .map((node) => deepmerge({}, node))
 
   return nodesToRefresh
 }
@@ -162,13 +171,13 @@ export function cyclesToKeep() {
    * Walk through the cycle chain backwards to calculate how many records we
    * need to build the current node list
    */
-//  const squasher = new CycleParser.ChangeSquasher()
+  //  const squasher = new CycleParser.ChangeSquasher()
   let count = 1
   let seen = new Map()
   let removed = []
   let refuted = []
   for (const record of reversed(cycles)) {
-/*
+    /*
     squasher.addChange(CycleParser.parse(record))
     if (
       squasher.final.updated.length >= activeNodeCount(newest) &&
@@ -182,10 +191,10 @@ export function cyclesToKeep() {
     }
     if (newest.counter !== record.counter) {
       if (record.lost.length > 0) {
-        removed = [...removed, ...record.lost.filter(id => !refuted.includes(id))]
+        removed = [...removed, ...record.lost.filter((id) => !refuted.includes(id))]
       }
       if (record.lostSyncing.length > 0) {
-        removed = [...removed, ...record.lostSyncing.filter(id => !refuted.includes(id))]
+        removed = [...removed, ...record.lostSyncing.filter((id) => !refuted.includes(id))]
       }
     }
     if (record.apoptosized.length > 0) {
@@ -203,8 +212,8 @@ export function cyclesToKeep() {
     if (seen.size >= totalNodeCount(newest)) break
     count++
   }
-  info('cycles to keep is '+count)
-//  showNodeCount(newest)
+  info('cycles to keep is ' + count)
+  //  showNodeCount(newest)
   // Keep a few more than that, just to be safe
   return count + 3
 }

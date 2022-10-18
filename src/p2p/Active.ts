@@ -23,8 +23,7 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
 ) => {
   profilerInstance.scopedProfileSectionStart('gossip-active', true)
   try {
-    if (logFlags.p2pNonFatal)
-      info(`Got active request: ${JSON.stringify(payload)}`)
+    if (logFlags.p2pNonFatal) info(`Got active request: ${JSON.stringify(payload)}`)
     let err = ''
     err = validateTypes(payload, {
       nodeId: 's',
@@ -55,14 +54,7 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
     if (!isOrig && CycleCreator.currentQuarter > 2) return
 
     if (addActiveTx(payload))
-      Comms.sendGossip(
-        'gossip-active',
-        payload,
-        tracker,
-        sender,
-        NodeList.byIdOrder,
-        false
-      )
+      Comms.sendGossip('gossip-active', payload, tracker, sender, NodeList.byIdOrder, false)
   } finally {
     profilerInstance.scopedProfileSectionEnd('gossip-active')
   }
@@ -79,10 +71,7 @@ const routes = {
 
 let p2pLogger: Logger
 
-let activeRequests: Map<
-  P2P.NodeListTypes.Node['publicKey'],
-  P2P.ActiveTypes.SignedActiveRequest
-  >
+let activeRequests: Map<P2P.NodeListTypes.Node['publicKey'], P2P.ActiveTypes.SignedActiveRequest>
 let queuedRequest: P2P.ActiveTypes.ActiveRequest
 
 /** FUNCTIONS */
@@ -123,12 +112,10 @@ export function validateRecordTypes(rec: P2P.ActiveTypes.Record): string {
   })
   if (err) return err
   for (const item of rec.activated) {
-    if (typeof item !== 'string')
-      return 'items of activated array must be strings'
+    if (typeof item !== 'string') return 'items of activated array must be strings'
   }
   for (const item of rec.activatedPublicKeys) {
-    if (typeof item !== 'string')
-      return 'items of activatedPublicKeys array must be strings'
+    if (typeof item !== 'string') return 'items of activatedPublicKeys array must be strings'
   }
   return ''
 }
@@ -169,11 +156,7 @@ export function updateRecord(
     let index = cycles.length - 1
 
     // loop through cycle chain and collect sync times
-    while (
-      cycles.length > 0 &&
-      cycleCounter > lastCheckedCycleForSyncTimes &&
-      loopCount < maxLoopCount
-    ) {
+    while (cycles.length > 0 && cycleCounter > lastCheckedCycleForSyncTimes && loopCount < maxLoopCount) {
       loopCount++
       const cycle = cycles[index]
       if (cycle) {
@@ -181,9 +164,7 @@ export function updateRecord(
         for (const nodeId of cycle.activated) {
           const node = NodeList.nodes.get(nodeId)
           const included = syncTimes.filter(
-            (item) =>
-              item.nodeId === node.id &&
-              item.activeTimestamp === node.activeTimestamp
+            (item) => item.nodeId === node.id && item.activeTimestamp === node.activeTimestamp
           )
           if (included && included.length > 0) continue
           const syncTime = node.activeTimestamp - node.joinRequestTimestamp
@@ -193,7 +174,7 @@ export function updateRecord(
             activeTimestamp: node.activeTimestamp,
             joinTimestamp: node.joinRequestTimestamp,
             syncTime,
-            refreshedCounter: cycle.counter
+            refreshedCounter: cycle.counter,
           })
           addedCount += 1
         }
@@ -201,9 +182,7 @@ export function updateRecord(
         // collect sync time from refreshed active nodes
         for (const node of cycle.refreshedConsensors) {
           const included = syncTimes.filter(
-            (item) =>
-              item.nodeId === node.id &&
-              item.activeTimestamp === node.activeTimestamp
+            (item) => item.nodeId === node.id && item.activeTimestamp === node.activeTimestamp
           )
           if (included && included.length > 0) continue
           const syncTime = node.activeTimestamp - node.joinRequestTimestamp
@@ -213,7 +192,7 @@ export function updateRecord(
             activeTimestamp: node.activeTimestamp,
             joinTimestamp: node.joinRequestTimestamp,
             syncTime,
-            refreshedCounter: cycle.counter
+            refreshedCounter: cycle.counter,
           })
           addedCount += 1
         }
@@ -229,24 +208,17 @@ export function updateRecord(
         syncTimes = syncTimes.slice(0, config.p2p.maxNodeForSyncTime)
       }
     }
-    if (syncTimes.length > 0)
-      lastCheckedCycleForSyncTimes = syncTimes[0].refreshedCounter // updated last checked cycle
+    if (syncTimes.length > 0) lastCheckedCycleForSyncTimes = syncTimes[0].refreshedCounter // updated last checked cycle
     const syncDurations = syncTimes
       .map((syncTime) => syncTime.activeTimestamp - syncTime.joinTimestamp)
       .sort((a, b) => a - b)
     const medianIndex = Math.floor(syncDurations.length / 2)
     const medianSyncTime = syncDurations[medianIndex]
 
-    info(
-      'Sync time records sorted',
-      syncTimes.length,
-      JSON.stringify(syncTimes)
-    )
+    info('Sync time records sorted', syncTimes.length, JSON.stringify(syncTimes))
 
     if (CycleChain.newest)
-      info(
-        `Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`
-      )
+      info(`Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`)
 
     let maxSyncTime = medianSyncTime ? medianSyncTime * 2 : 0
     if (maxSyncTime < config.p2p.maxSyncTimeFloor) {
@@ -260,9 +232,7 @@ export function updateRecord(
   }
 }
 
-export function parseRecord(
-  record: P2P.CycleCreatorTypes.CycleRecord
-): P2P.CycleParserTypes.Change {
+export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   // Look at the activated id's and make Self emit 'active' if your own id is there
   if (record.activated.includes(Self.id)) {
     Self.setActive()
@@ -288,23 +258,12 @@ export function sendRequests() {
     const activeTx = crypto.sign(queuedRequest)
     queuedRequest = undefined
 
-    if (logFlags.p2pNonFatal)
-      info(`Gossiping active request: ${JSON.stringify(activeTx)}`)
+    if (logFlags.p2pNonFatal) info(`Gossiping active request: ${JSON.stringify(activeTx)}`)
     addActiveTx(activeTx)
-    Comms.sendGossip(
-      'gossip-active',
-      activeTx,
-      '',
-      null,
-      NodeList.byIdOrder,
-      true
-    )
+    Comms.sendGossip('gossip-active', activeTx, '', null, NodeList.byIdOrder, true)
 
     // Check if we went active and try again if we didn't in 1 cycle duration
-    const activeTimeout = setTimeout(
-      requestActive,
-      config.p2p.cycleDuration * 1000 + 500
-    )
+    const activeTimeout = setTimeout(requestActive, config.p2p.cycleDuration * 1000 + 500)
 
     Self.emitter.once('active', () => {
       info(`Went active!`)

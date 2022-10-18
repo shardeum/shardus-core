@@ -8,10 +8,10 @@ import { memoryReportingInstance } from '../utils/memoryReporting'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 interface LoadDetection {
   highThreshold: number /** if load > highThreshold, then scale up request */
-  lowThreshold: number  /** if load < lowThreshold, then scale down request */
+  lowThreshold: number /** if load < lowThreshold, then scale down request */
   desiredTxTime: number /** max desired average time for the age of a TX.  */
-  queueLimit: number    /** max desired TXs in queue. note TXs must spend a minimum 6 seconds in the before they can process*/
-  executeQueueLimit: number  /** max desired TXs in queue that will be executed on this node. note TXs must spend a minimum 6 seconds in the before they can process*/
+  queueLimit: number /** max desired TXs in queue. note TXs must spend a minimum 6 seconds in the before they can process*/
+  executeQueueLimit: number /** max desired TXs in queue that will be executed on this node. note TXs must spend a minimum 6 seconds in the before they can process*/
   statistics: Statistics
   load: number /** load is what matters for scale up or down. it is the max of scaledTimeInQueue and scaledQueueLength. */
   nodeLoad: NodeLoad /** this nodes perf related load. does not determine scale up/down, but can cause rate-limiting */
@@ -44,7 +44,7 @@ class LoadDetection extends EventEmitter {
 
     /**
      * Sets load to DESIRED_LOAD (should be between 0 and 1)
-     * 
+     *
      * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/loadset?load=<DESIRED_LOAD>
      */
     Context.network.registerExternalGet('loadset', isDebugModeMiddleware, (req, res) => {
@@ -56,7 +56,7 @@ class LoadDetection extends EventEmitter {
     })
     /**
      * Resets load detection to normal behavior
-     * 
+     *
      * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/loadreset
      */
     Context.network.registerExternalGet('loadreset', isDebugModeMiddleware, (req, res) => {
@@ -79,15 +79,10 @@ class LoadDetection extends EventEmitter {
       this.scaledExecuteQueueLength = load
     } else {
       const txTimeInQueue = this.statistics.getAverage('txTimeInQueue') / 1000
-      let scaledTxTimeInQueue =
-        txTimeInQueue >= this.desiredTxTime
-          ? 1
-          : txTimeInQueue / this.desiredTxTime
+      let scaledTxTimeInQueue = txTimeInQueue >= this.desiredTxTime ? 1 : txTimeInQueue / this.desiredTxTime
 
       const queueLength = this.statistics.getWatcherValue('queueLength')
-      const scaledQueueLength = queueLength >= this.queueLimit 
-          ? 1 
-          : queueLength / this.queueLimit
+      const scaledQueueLength = queueLength >= this.queueLimit ? 1 : queueLength / this.queueLimit
 
       // looking at these counters individually so we can have more detail about load
       // if (scaledTxTimeInQueue > this.highThreshold){
@@ -98,9 +93,9 @@ class LoadDetection extends EventEmitter {
       // }
 
       //need 20 samples in the queue before we start worrying about them being there too long
-      if(queueLength < 20){
-      //if(scaledQueueLength < (this.lowThreshold)){ //tried to get fancy, but going back to 20 as a constant.
-        if(scaledTxTimeInQueue > this.highThreshold){
+      if (queueLength < 20) {
+        //if(scaledQueueLength < (this.lowThreshold)){ //tried to get fancy, but going back to 20 as a constant.
+        if (scaledTxTimeInQueue > this.highThreshold) {
           nestedCountersInstance.countEvent(
             'loadRelated',
             `scaledTxTimeInQueue clamped due to low scaledQueueLength`
@@ -108,12 +103,11 @@ class LoadDetection extends EventEmitter {
         }
         scaledTxTimeInQueue = 0
       }
-      
+
       const executeQueueLength = this.statistics.getWatcherValue('executeQueueLength')
-      const scaledExecuteQueueLength = executeQueueLength >= this.executeQueueLimit 
-          ? 1 
-          : executeQueueLength / this.executeQueueLimit
-      
+      const scaledExecuteQueueLength =
+        executeQueueLength >= this.executeQueueLimit ? 1 : executeQueueLength / this.executeQueueLimit
+
       this.scaledTxTimeInQueue = scaledTxTimeInQueue
       this.scaledQueueLength = scaledQueueLength
       this.scaledExecuteQueueLength = scaledExecuteQueueLength
@@ -121,22 +115,11 @@ class LoadDetection extends EventEmitter {
       if (profilerInstance != null) {
         let dutyCycleLoad = profilerInstance.getTotalBusyInternal()
         if (dutyCycleLoad.duty > 0.8) {
-          nestedCountersInstance.countEvent(
-            'loadRelated',
-            `note-dutyCycle 0.8`
-          )
-        }
-        else if (dutyCycleLoad.duty > 0.6) {
-          nestedCountersInstance.countEvent(
-            'loadRelated',
-            `note-dutyCycle 0.6`
-          )
-        }
-        else if (dutyCycleLoad.duty > 0.4) {
-          nestedCountersInstance.countEvent(
-            'loadRelated',
-            'note-dutyCycle 0.4'
-          )
+          nestedCountersInstance.countEvent('loadRelated', `note-dutyCycle 0.8`)
+        } else if (dutyCycleLoad.duty > 0.6) {
+          nestedCountersInstance.countEvent('loadRelated', `note-dutyCycle 0.6`)
+        } else if (dutyCycleLoad.duty > 0.4) {
+          nestedCountersInstance.countEvent('loadRelated', 'note-dutyCycle 0.4')
         }
 
         this.statistics.setManualStat('netInternalDuty', dutyCycleLoad.netInternlDuty)
@@ -144,11 +127,10 @@ class LoadDetection extends EventEmitter {
 
         let cpuPercent = memoryReportingInstance.cpuPercent()
         this.statistics.setManualStat('cpuPercent', cpuPercent)
-        
 
         let internalDutyAvg = this.statistics.getAverage('netInternalDuty')
         let externalDutyAvg = this.statistics.getAverage('netExternalDuty')
-      
+
         this.nodeLoad = {
           internal: internalDutyAvg, //dutyCycleLoad.netInternlDuty,
           external: externalDutyAvg, //dutyCycleLoad.netExternlDuty,
@@ -162,22 +144,16 @@ class LoadDetection extends EventEmitter {
 
       //mix these together with a MAX use settings to make scaledQueueLength much larger than scaledExecuteQueueLength
       let adjustedQueueLoad = Math.max(scaledExecuteQueueLength, scaledQueueLength)
-  
+
       //load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
 
       load = Math.max(scaledTxTimeInQueue, adjustedQueueLoad)
 
-      if(scaledQueueLength > this.highThreshold){
-        nestedCountersInstance.countEvent(
-          'loadRelated',
-          'highThreshold-scaledQueueLength'
-        )
+      if (scaledQueueLength > this.highThreshold) {
+        nestedCountersInstance.countEvent('loadRelated', 'highThreshold-scaledQueueLength')
       }
-      if(scaledExecuteQueueLength > this.highThreshold){
-        nestedCountersInstance.countEvent(
-          'loadRelated',
-          'highThreshold-scaledExecuteQueueLength'
-        )
+      if (scaledExecuteQueueLength > this.highThreshold) {
+        nestedCountersInstance.countEvent('loadRelated', 'highThreshold-scaledExecuteQueueLength')
       }
       // if(adjustedQueueLoad > this.highThreshold){
       //   nestedCountersInstance.countEvent(
@@ -185,22 +161,19 @@ class LoadDetection extends EventEmitter {
       //     'highThreshold-adjustedQueueLoad'
       //   )
       // }
-      if(scaledTxTimeInQueue > this.highThreshold){
-        nestedCountersInstance.countEvent(
-          'loadRelated',
-          'highThreshold-scaledTxTimeInQueue'
-        )
+      if (scaledTxTimeInQueue > this.highThreshold) {
+        nestedCountersInstance.countEvent('loadRelated', 'highThreshold-scaledTxTimeInQueue')
       }
     }
 
     //If our max load is higher than the threshold send highLoad event that will create scale up gossip
-    if (load > this.highThreshold){
+    if (load > this.highThreshold) {
       this.emit('highLoad')
-    } 
+    }
     //If our max load is lower than threshold send a scale down message.
-    if (load < this.lowThreshold){
+    if (load < this.lowThreshold) {
       this.emit('lowLoad')
-    } 
+    }
     this.load = load
   }
 
@@ -215,7 +188,7 @@ class LoadDetection extends EventEmitter {
   getQueueLoad() {
     return {
       txTimeInQueue: this.scaledTxTimeInQueue,
-      queueLength: this.scaledQueueLength,  //this will impact rejections, but not scale up-down
+      queueLength: this.scaledQueueLength, //this will impact rejections, but not scale up-down
       executeQueueLength: this.scaledExecuteQueueLength,
     }
   }

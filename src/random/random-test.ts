@@ -3,9 +3,7 @@ const Random = require('./index')
 const random = Random()
 
 console.log(`Result of 'random.rand()': ${random.rand()}`)
-console.log(
-  `Result of 'random.randomInt(0, 1000)': ${random.randomInt(0, 1000)}\n`
-)
+console.log(`Result of 'random.randomInt(0, 1000)': ${random.randomInt(0, 1000)}\n`)
 
 const seed1 = Random.generateSeed()
 const seed2 = Random.generateSeed()

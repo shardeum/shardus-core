@@ -57,8 +57,7 @@ export function validateRecordTypes(rec: P2P.RotationTypes.Record): string {
   let err = validateTypes(rec, { expired: 'n', removed: 'a' })
   if (err) return err
   for (const item of rec.removed) {
-    if (typeof item !== 'string')
-      return 'items of removed array must be strings'
+    if (typeof item !== 'string') return 'items of removed array must be strings'
   }
   return ''
 }
@@ -70,7 +69,11 @@ export function dropInvalidTxs(txs: P2P.RotationTypes.Txs): P2P.RotationTypes.Tx
 /*
 Given the txs and prev cycle record mutate the referenced record
 */
-export function updateRecord(txs: P2P.RotationTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord, prev: P2P.CycleCreatorTypes.CycleRecord) {
+export function updateRecord(
+  txs: P2P.RotationTypes.Txs,
+  record: P2P.CycleCreatorTypes.CycleRecord,
+  prev: P2P.CycleCreatorTypes.CycleRecord
+) {
   if (!prev) {
     record.expired = 0
     record.removed = []
@@ -125,18 +128,32 @@ export function getExpiredRemoved(
   let scaleDownRemove = 0
   if (active - desired > 0) scaleDownRemove = active - desired
 
-  //only let the scale factor impart a partial influence 
-  let scaledAmountToShrink = Math.floor(0.5 * (config.p2p.amountToShrink * CycleCreator.scaleFactor + config.p2p.amountToShrink))
+  //only let the scale factor impart a partial influence
+  let scaledAmountToShrink = Math.floor(
+    0.5 * (config.p2p.amountToShrink * CycleCreator.scaleFactor + config.p2p.amountToShrink)
+  )
 
   //limit the scale down by scaledAmountToShrink
-  if (scaleDownRemove > scaledAmountToShrink){
+  if (scaleDownRemove > scaledAmountToShrink) {
     scaleDownRemove = scaledAmountToShrink
   }
-    
+
   let cycle = CycleChain.newest.counter
-  if(cycle > lastLoggedCycle && scaleDownRemove > 0){
+  if (cycle > lastLoggedCycle && scaleDownRemove > 0) {
     lastLoggedCycle = cycle
-    info('scale down dump:' + JSON.stringify({cycle, scaleFactor:CycleCreator.scaleFactor, scaleDownRemove, desired, active, scaledAmountToShrink, maxRemove, expired  })  )
+    info(
+      'scale down dump:' +
+        JSON.stringify({
+          cycle,
+          scaleFactor: CycleCreator.scaleFactor,
+          scaleDownRemove,
+          desired,
+          active,
+          scaledAmountToShrink,
+          maxRemove,
+          expired,
+        })
+    )
   }
 
   // Allows the network to scale down even if node rotation is turned off
@@ -146,9 +163,6 @@ export function getExpiredRemoved(
     //else pick the higher of the two
     maxRemove = Math.max(maxRemove, scaleDownRemove)
   }
-
-  
-
 
   if (maxRemove > active - desired) maxRemove = active - desired
 

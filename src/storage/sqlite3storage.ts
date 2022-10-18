@@ -9,7 +9,7 @@ import * as Snapshot from '../snapshot'
 import * as utils from '../utils'
 import Profiler from '../utils/profiler'
 import { config, crypto, logger } from '../p2p/Context'
-import {logFlags} from '../logger'
+import { logFlags } from '../logger'
 
 const Op = Sequelize.Op
 const sqlite3 = require('sqlite3').verbose()
@@ -26,17 +26,13 @@ interface Sqlite3Storage {
 }
 
 class Sqlite3Storage {
-
   oldDBPath: string
 
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
   constructor(models, storageConfig, logger, baseDir, profiler) {
     this.baseDir = baseDir
     this.storageConfig = storageConfig
-    this.storageConfig.options.storage = path.join(
-      this.baseDir,
-      this.storageConfig.options.storage
-    )
+    this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
     this.profiler = profiler
     // Setup logger
     this.mainLogger = logger.getLogger('default')
@@ -104,16 +100,14 @@ class Sqlite3Storage {
     // todo base this off of models
   }
 
-
-  async deleteFolder(path:string){
+  async deleteFolder(path: string) {
     //recursive delete of db folder
-    try{
-      fs.rmdirSync(path, { recursive: true, maxRetries : 5 })
+    try {
+      fs.rmdirSync(path, { recursive: true, maxRetries: 5 })
       //why does this not work: it was added in v14.14 !!!
       //fs.rmSync(dbDir, { recursive: true, force: true, maxRetries : 5 })
       //fs.rmSync(dbDir,{ recursive: true, force: true })
     } catch (e) {
-      
       this.mainLogger.error('error removing directory db..' + e.name + ': ' + e.message + ' at ' + e.stack)
       //wait 5 seconds and try one more time
       // await utils.sleep(5000)
@@ -121,8 +115,8 @@ class Sqlite3Storage {
     }
   }
 
-  async deleteOldDBPath(){
-    if(this.storageConfig.options.saveOldDBFiles != true){
+  async deleteOldDBPath() {
+    if (this.storageConfig.options.saveOldDBFiles != true) {
       await this.deleteFolder(this.oldDBPath)
     }
   }
@@ -137,15 +131,14 @@ class Sqlite3Storage {
 
       this.oldDBPath = oldDirPath
 
-      if(this.storageConfig.options.saveOldDBFiles){
+      if (this.storageConfig.options.saveOldDBFiles) {
         fs.renameSync(dbDir, oldDirPath)
         if (oldDirPath) {
           this.mainLogger.info('Setting old data path. this will cause safety mode?' + oldDirPath)
           Snapshot.setOldDataPath(oldDirPath)
           this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
-        }        
+        }
       } else {
-
         // for now we rename it not matter what and delete it later
         fs.renameSync(dbDir, oldDirPath)
         if (oldDirPath) {
@@ -153,69 +146,68 @@ class Sqlite3Storage {
           // TODO work something out to load this on demand
           // Snapshot.setOldDataPath(oldDirPath)
           // this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
-        }   
+        }
 
         //TEMP HACK always delete old db.  TODO later have it delete at a later time
         // but the delay is making testing hard
-        await utils.sleep(5000) 
+        await utils.sleep(5000)
         await this.deleteOldDBPath()
       }
     } catch (e) {
       if (config.p2p.startInWitnessMode) {
         throw new Error('Unable to start in witness mode: no old data')
-      } else{
-        this.mainLogger.error('error moving/removing directory db.. ' + e.name + ': ' + e.message + ' at ' + e.stack)
+      } else {
+        this.mainLogger.error(
+          'error moving/removing directory db.. ' + e.name + ': ' + e.message + ' at ' + e.stack
+        )
       }
     }
     try {
-    // Create dbDir if it doesn't exist
-    await _ensureExists(dbDir)
+      // Create dbDir if it doesn't exist
+      await _ensureExists(dbDir)
 
-    if (this.storageConfig.options.memoryFile) {
-      this.db = new sqlite3.Database(':memory:')
-    } else {
-      this.db = new sqlite3.Database(this.storageConfig.options.storage)
+      if (this.storageConfig.options.memoryFile) {
+        this.db = new sqlite3.Database(':memory:')
+      } else {
+        this.db = new sqlite3.Database(this.storageConfig.options.storage)
+      }
+
+      // Create tables for models in DB if they don't exist
+      // for (let model of Object.values(this.models)) {
+      //   await model.sync()
+      //   this._rawQuery(model, 'PRAGMA synchronous = OFF')
+      //   this._rawQuery(model, 'PRAGMA journal_mode = MEMORY')
+      // }
+
+      // await this.run('CREATE TABLE if not exists `acceptedTxs` (`id` VARCHAR(255) NOT NULL PRIMARY KEY, `timestamp` BIGINT NOT NULL, `data` JSON NOT NULL, `status` VARCHAR(255) NOT NULL, `receipt` JSON NOT NULL)')
+      // await this.run('CREATE TABLE if not exists `accountStates` ( `accountId` VARCHAR(255) NOT NULL, `txId` VARCHAR(255) NOT NULL, `txTimestamp` BIGINT NOT NULL, `stateBefore` VARCHAR(255) NOT NULL, `stateAfter` VARCHAR(255) NOT NULL,  PRIMARY KEY (`accountId`, `txTimestamp`))')
+      // await this.run('CREATE TABLE if not exists `cycles` (`counter` BIGINT NOT NULL UNIQUE PRIMARY KEY, `certificate` JSON NOT NULL, `previous` TEXT NOT NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL, `activated` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT NULL, `apoptosized` JSON NOT NULL)')
+      // await this.run('CREATE TABLE if not exists `nodes` (`id` TEXT NOT NULL PRIMARY KEY, `publicKey` TEXT NOT NULL, `curvePublicKey` TEXT NOT NULL, `cycleJoined` TEXT NOT NULL, `internalIp` VARCHAR(255) NOT NULL, `externalIp` VARCHAR(255) NOT NULL, `internalPort` SMALLINT NOT NULL, `externalPort` SMALLINT NOT NULL, `joinRequestTimestamp` BIGINT NOT NULL, `address` VARCHAR(255) NOT NULL, `status` VARCHAR(255) NOT NULL)')
+      // await this.run('CREATE TABLE if not exists `properties` (`key` VARCHAR(255) NOT NULL PRIMARY KEY, `value` JSON)')
+      // await this.run('CREATE TABLE if not exists `accountsCopy` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))')
+
+      // , `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL
+      // `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+      // await this.run('CREATE TABLE if not exists `accounts` (`address` VARCHAR(255) NOT NULL PRIMARY KEY, `modified` BIGINT NOT NULL, `sequence` BIGINT NOT NULL, `owners` JSON NOT NULL, `signs` SMALLINT NOT NULL, `balance` DOUBLE PRECISION NOT NULL, `type` VARCHAR(255) NOT NULL, `data` JSON NOT NULL, `hash` VARCHAR(255) NOT NULL, `txs` TEXT NOT NULL, `timestamp` BIGINT NOT NULL)')
+
+      await this.run('PRAGMA synchronous = OFF')
+
+      if (this.storageConfig.options.walMode === true) {
+        await this.run('PRAGMA journal_mode = WAL')
+      } else {
+        await this.run('PRAGMA journal_mode = MEMORY')
+      }
+      if (this.storageConfig.options.exclusiveLockMode === true) {
+        await this.run('PRAGMA locking_mode = EXCLUSIVE')
+      }
+
+      this.initialized = true
+      this.mainLogger.info('Database initialized.')
+    } catch (e) {
+      console.log('storageDir: ', this.storageConfig.options.storage)
+      this.mainLogger.error('storage init error ' + e.name + ': ' + e.message + ' at ' + e.stack)
+      throw new Error('storage init error ' + e.name + ': ' + e.message + ' at ' + e.stack)
     }
-
-    // Create tables for models in DB if they don't exist
-    // for (let model of Object.values(this.models)) {
-    //   await model.sync()
-    //   this._rawQuery(model, 'PRAGMA synchronous = OFF')
-    //   this._rawQuery(model, 'PRAGMA journal_mode = MEMORY')
-    // }
-
-    // await this.run('CREATE TABLE if not exists `acceptedTxs` (`id` VARCHAR(255) NOT NULL PRIMARY KEY, `timestamp` BIGINT NOT NULL, `data` JSON NOT NULL, `status` VARCHAR(255) NOT NULL, `receipt` JSON NOT NULL)')
-    // await this.run('CREATE TABLE if not exists `accountStates` ( `accountId` VARCHAR(255) NOT NULL, `txId` VARCHAR(255) NOT NULL, `txTimestamp` BIGINT NOT NULL, `stateBefore` VARCHAR(255) NOT NULL, `stateAfter` VARCHAR(255) NOT NULL,  PRIMARY KEY (`accountId`, `txTimestamp`))')
-    // await this.run('CREATE TABLE if not exists `cycles` (`counter` BIGINT NOT NULL UNIQUE PRIMARY KEY, `certificate` JSON NOT NULL, `previous` TEXT NOT NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL, `activated` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT NULL, `apoptosized` JSON NOT NULL)')
-    // await this.run('CREATE TABLE if not exists `nodes` (`id` TEXT NOT NULL PRIMARY KEY, `publicKey` TEXT NOT NULL, `curvePublicKey` TEXT NOT NULL, `cycleJoined` TEXT NOT NULL, `internalIp` VARCHAR(255) NOT NULL, `externalIp` VARCHAR(255) NOT NULL, `internalPort` SMALLINT NOT NULL, `externalPort` SMALLINT NOT NULL, `joinRequestTimestamp` BIGINT NOT NULL, `address` VARCHAR(255) NOT NULL, `status` VARCHAR(255) NOT NULL)')
-    // await this.run('CREATE TABLE if not exists `properties` (`key` VARCHAR(255) NOT NULL PRIMARY KEY, `value` JSON)')
-    // await this.run('CREATE TABLE if not exists `accountsCopy` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))')
-
-    // , `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL
-    // `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-    // await this.run('CREATE TABLE if not exists `accounts` (`address` VARCHAR(255) NOT NULL PRIMARY KEY, `modified` BIGINT NOT NULL, `sequence` BIGINT NOT NULL, `owners` JSON NOT NULL, `signs` SMALLINT NOT NULL, `balance` DOUBLE PRECISION NOT NULL, `type` VARCHAR(255) NOT NULL, `data` JSON NOT NULL, `hash` VARCHAR(255) NOT NULL, `txs` TEXT NOT NULL, `timestamp` BIGINT NOT NULL)')
-
-    await this.run('PRAGMA synchronous = OFF')
-
-    if(this.storageConfig.options.walMode === true){
-      await this.run('PRAGMA journal_mode = WAL')
-    } else {
-      await this.run('PRAGMA journal_mode = MEMORY')
-    }
-    if(this.storageConfig.options.exclusiveLockMode === true){
-      await this.run('PRAGMA locking_mode = EXCLUSIVE')
-    }
-
-    this.initialized = true
-    this.mainLogger.info('Database initialized.')
-
-  } catch (e) {
-    console.log("storageDir: ", this.storageConfig.options.storage)
-    this.mainLogger.error('storage init error ' + e.name + ': ' + e.message + ' at ' + e.stack)
-    throw new Error('storage init error ' + e.name + ': ' + e.message + ' at ' + e.stack)
-    
-  }
-
   }
   async close() {
     // this.mainLogger.info('Closing Database connections.')
@@ -236,165 +228,154 @@ class Sqlite3Storage {
   }
 
   _create(table, object, opts) {
-    try{
-    this.profiler.profileSectionStart('db')
-    // if (logFlags.console) console.log('_create2: ' + stringify(object))
-    if (Array.isArray(object)) {
-      // return table.bulkCreate(values, opts)
-      // todo transaciton or something else
+    try {
+      this.profiler.profileSectionStart('db')
+      // if (logFlags.console) console.log('_create2: ' + stringify(object))
+      if (Array.isArray(object)) {
+        // return table.bulkCreate(values, opts)
+        // todo transaciton or something else
 
-      for (const subObj of object) {
-        // if (logFlags.console) console.log('sub obj: ' + stringify(subObj))
-        this._create(table, subObj, opts)
+        for (const subObj of object) {
+          // if (logFlags.console) console.log('sub obj: ' + stringify(subObj))
+          this._create(table, subObj, opts)
+        }
+        return
       }
-      return
-    }
-    let queryString = table.insertString
-    if (opts && opts.createOrReplace) {
-      queryString = table.insertOrReplaceString
-    }
-    const inputs = []
-    // if (logFlags.console) console.log('columns: ' + stringify(table.columns))
-    for (const column of table.columns) {
-      let value = object[column]
-
-      if (table.isColumnJSON[column]) {
-        value = stringify(value)
+      let queryString = table.insertString
+      if (opts && opts.createOrReplace) {
+        queryString = table.insertOrReplaceString
       }
-      // if (logFlags.console) console.log(`column: ${column}  ${value}`)
-      inputs.push(value)
-    }
-    queryString += this.options2string(opts)
+      const inputs = []
+      // if (logFlags.console) console.log('columns: ' + stringify(table.columns))
+      for (const column of table.columns) {
+        let value = object[column]
 
-    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(inputs))
-    return this.run(queryString, inputs)
-    
+        if (table.isColumnJSON[column]) {
+          value = stringify(value)
+        }
+        // if (logFlags.console) console.log(`column: ${column}  ${value}`)
+        inputs.push(value)
+      }
+      queryString += this.options2string(opts)
+
+      // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(inputs))
+      return this.run(queryString, inputs)
     } finally {
       this.profiler.profileSectionEnd('db')
     }
   }
 
   async _read(table, params, opts) {
-    try{
+    try {
       this.profiler.profileSectionStart('db')
-    // return table.findAll({ where, ...opts })
-    let queryString = table.selectString
+      // return table.findAll({ where, ...opts })
+      let queryString = table.selectString
 
-    // let valueArray = []
+      // let valueArray = []
 
-    const paramsArray = this.params2Array(params, table)
+      const paramsArray = this.params2Array(params, table)
 
-    const { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
-      paramsArray
-    )
+      const { whereString, whereValueArray } = this.paramsToWhereStringAndValues(paramsArray)
 
-    const valueArray = whereValueArray
-    queryString += whereString
-    queryString += this.options2string(opts)
+      const valueArray = whereValueArray
+      queryString += whereString
+      queryString += this.options2string(opts)
 
-    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
+      // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
 
-    const results = await this.all(queryString, valueArray)
-    // optionally parse results!
-    if (!opts || !opts.raw) {
-      if (table.JSONkeys.length > 0) {
-        // for (let i = 0; i < results.length; i++) {
-        //   let result = results[i]
-        //   if (logFlags.console) console.log('todo parse this??? ' + result)
-        // }
+      const results = await this.all(queryString, valueArray)
+      // optionally parse results!
+      if (!opts || !opts.raw) {
+        if (table.JSONkeys.length > 0) {
+          // for (let i = 0; i < results.length; i++) {
+          //   let result = results[i]
+          //   if (logFlags.console) console.log('todo parse this??? ' + result)
+          // }
+        }
       }
-    }
-    return results
+      return results
     } finally {
       this.profiler.profileSectionEnd('db')
     }
   }
   async _readOld(table, params, opts) {
-    try{
+    try {
       this.profiler.profileSectionStart('db')
-    // return table.findAll({ where, ...opts })
-    let queryString = table.selectString
+      // return table.findAll({ where, ...opts })
+      let queryString = table.selectString
 
-    // let valueArray = []
+      // let valueArray = []
 
-    const paramsArray = this.params2Array(params, table)
+      const paramsArray = this.params2Array(params, table)
 
-    const { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
-      paramsArray
-    )
+      const { whereString, whereValueArray } = this.paramsToWhereStringAndValues(paramsArray)
 
-    const valueArray = whereValueArray
-    queryString += whereString
-    queryString += this.options2string(opts)
+      const valueArray = whereValueArray
+      queryString += whereString
+      queryString += this.options2string(opts)
 
-    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
+      // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
 
-    const results = await this.allOld(queryString, valueArray)
-    // optionally parse results!
-    if (!opts || !opts.raw) {
-      if (table.JSONkeys.length > 0) {
-        // for (let i = 0; i < results.length; i++) {
-        //   let result = results[i]
-        //   if (logFlags.console) console.log('todo parse this??? ' + result)
-        // }
+      const results = await this.allOld(queryString, valueArray)
+      // optionally parse results!
+      if (!opts || !opts.raw) {
+        if (table.JSONkeys.length > 0) {
+          // for (let i = 0; i < results.length; i++) {
+          //   let result = results[i]
+          //   if (logFlags.console) console.log('todo parse this??? ' + result)
+          // }
+        }
       }
-    }
-    return results
+      return results
     } finally {
       this.profiler.profileSectionEnd('db')
     }
   }
 
   _update(table, values, where, opts) {
-    try{
+    try {
       this.profiler.profileSectionStart('db')
-    // return table.update(values, { where, ...opts })
-    let queryString = table.updateString
+      // return table.update(values, { where, ...opts })
+      let queryString = table.updateString
 
-    const valueParams = this.params2Array(values, table)
-    // eslint-disable-next-line prefer-const
-    let { resultString, valueArray } = this.paramsToAssignmentStringAndValues(
-      valueParams
-    )
+      const valueParams = this.params2Array(values, table)
+      // eslint-disable-next-line prefer-const
+      let { resultString, valueArray } = this.paramsToAssignmentStringAndValues(valueParams)
 
-    queryString += resultString
+      queryString += resultString
 
-    const whereParams = this.params2Array(where, table)
-    const { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
-      whereParams
-    )
-    queryString += whereString
+      const whereParams = this.params2Array(where, table)
+      const { whereString, whereValueArray } = this.paramsToWhereStringAndValues(whereParams)
+      queryString += whereString
 
-    valueArray = valueArray.concat(whereValueArray)
+      valueArray = valueArray.concat(whereValueArray)
 
-    queryString += this.options2string(opts)
+      queryString += this.options2string(opts)
 
-    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
-    return this.run(queryString, valueArray)
+      // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
+      return this.run(queryString, valueArray)
     } finally {
       this.profiler.profileSectionEnd('db')
     }
   }
   _delete(table, where, opts) {
-    try{
+    try {
       this.profiler.profileSectionStart('db')
-    // if (!where) {
-    //   return table.destroy({ ...opts })
-    // }
-    // return table.destroy({ where, ...opts })
+      // if (!where) {
+      //   return table.destroy({ ...opts })
+      // }
+      // return table.destroy({ where, ...opts })
 
-    let queryString = table.deleteString
+      let queryString = table.deleteString
 
-    const whereParams = this.params2Array(where, table)
-    const { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
-      whereParams
-    )
-    const valueArray = whereValueArray
-    queryString += whereString
-    queryString += this.options2string(opts)
+      const whereParams = this.params2Array(where, table)
+      const { whereString, whereValueArray } = this.paramsToWhereStringAndValues(whereParams)
+      const valueArray = whereValueArray
+      queryString += whereString
+      queryString += this.options2string(opts)
 
-    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
-    return this.run(queryString, valueArray)
+      // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
+      return this.run(queryString, valueArray)
     } finally {
       this.profiler.profileSectionEnd('db')
     }
@@ -402,9 +383,9 @@ class Sqlite3Storage {
 
   _rawQuery(queryString, valueArray) {
     // return this.sequelize.query(query, { model: table })
-    try{
+    try {
       this.profiler.profileSectionStart('db')
-    return this.all(queryString, valueArray)
+      return this.all(queryString, valueArray)
     } finally {
       this.profiler.profileSectionEnd('db')
     }
@@ -412,9 +393,9 @@ class Sqlite3Storage {
 
   _rawQueryOld(queryString, valueArray) {
     // return this.sequelize.query(query, { model: table })
-    try{
+    try {
       this.profiler.profileSectionStart('db')
-    return this.allOld(queryString, valueArray)
+      return this.allOld(queryString, valueArray)
     } finally {
       this.profiler.profileSectionEnd('db')
     }
@@ -431,10 +412,7 @@ class Sqlite3Storage {
         const paramEntry: any = { name: key }
 
         const value = paramsObj[key]
-        if (
-          utils.isObject(value) &&
-          table.isColumnJSON[paramEntry.name] === false
-        ) {
+        if (utils.isObject(value) && table.isColumnJSON[paramEntry.name] === false) {
           // WHERE column_name BETWEEN value1 AND value2;
           if (value[Op.between]) {
             const between = value[Op.between]

@@ -36,76 +36,56 @@ class NestedCounters {
   }
 
   registerEndpoints() {
-    Context.network.registerExternalGet(
-      'counts',
-      isDebugModeMiddleware,
-      (req, res) => {
-        profilerInstance.scopedProfileSectionStart('counts')
-        // let counterMap = utils.deepCopy(this.eventCounters)
-        const arrayReport = this.arrayitizeAndSort(this.eventCounters)
+    Context.network.registerExternalGet('counts', isDebugModeMiddleware, (req, res) => {
+      profilerInstance.scopedProfileSectionStart('counts')
+      // let counterMap = utils.deepCopy(this.eventCounters)
+      const arrayReport = this.arrayitizeAndSort(this.eventCounters)
 
-        // let reportPath = path.join(scanner.instanceDir, 'histogram.txt')
-        // let stream = fs.createWriteStream(reportPath, {
-        //   flags: 'w'
-        // })
+      // let reportPath = path.join(scanner.instanceDir, 'histogram.txt')
+      // let stream = fs.createWriteStream(reportPath, {
+      //   flags: 'w'
+      // })
 
-        res.write(`${Date.now()}\n`)
+      res.write(`${Date.now()}\n`)
 
-        this.printArrayReport(arrayReport, res, 0)
-        res.end()
-        profilerInstance.scopedProfileSectionEnd('counts')
+      this.printArrayReport(arrayReport, res, 0)
+      res.end()
+      profilerInstance.scopedProfileSectionEnd('counts')
 
-        //res.json(utils.stringifyReduce(this.eventCounters))
-      }
-    )
-    Context.network.registerExternalGet(
-      'counts-reset',
-      isDebugModeMiddleware,
-      (req, res) => {
-        this.eventCounters = new Map()
-        res.write(`counts reset ${Date.now()}`)
-        res.end()
-      }
-    )
-    Context.network.registerExternalGet(
-      'rare-counts-reset',
-      isDebugModeMiddleware,
-      (req, res) => {
-        this.rareEventCounters = new Map()
-        res.write(`Rare counts reset ${Date.now()}`)
-        res.end()
-      }
-    )
+      //res.json(utils.stringifyReduce(this.eventCounters))
+    })
+    Context.network.registerExternalGet('counts-reset', isDebugModeMiddleware, (req, res) => {
+      this.eventCounters = new Map()
+      res.write(`counts reset ${Date.now()}`)
+      res.end()
+    })
+    Context.network.registerExternalGet('rare-counts-reset', isDebugModeMiddleware, (req, res) => {
+      this.rareEventCounters = new Map()
+      res.write(`Rare counts reset ${Date.now()}`)
+      res.end()
+    })
 
-    Context.network.registerExternalGet(
-      'debug-inf-loop',
-      isDebugModeMiddleware,
-      (req, res) => {
-        res.write('starting inf loop, goodbye')
-        res.end()
-        let counter = 1
-        this.infLoopDebug = true
-        while (this.infLoopDebug) {
-          const s = 'asdf'
-          const s2 = utils.stringifyReduce({ test: [s, s, s, s, s, s, s] })
-          const s3 = utils.stringifyReduce({ test: [s2, s2, s2, s2, s2, s2, s2] })
-          if (this.crypto != null) {
-            this.crypto.hash(s3)
-          }
-          counter++
+    Context.network.registerExternalGet('debug-inf-loop', isDebugModeMiddleware, (req, res) => {
+      res.write('starting inf loop, goodbye')
+      res.end()
+      let counter = 1
+      this.infLoopDebug = true
+      while (this.infLoopDebug) {
+        const s = 'asdf'
+        const s2 = utils.stringifyReduce({ test: [s, s, s, s, s, s, s] })
+        const s3 = utils.stringifyReduce({ test: [s2, s2, s2, s2, s2, s2, s2] })
+        if (this.crypto != null) {
+          this.crypto.hash(s3)
         }
+        counter++
       }
-    )
+    })
 
-    Context.network.registerExternalGet(
-      'debug-inf-loop-off',
-      isDebugModeMiddleware,
-      (req, res) => {
-        this.infLoopDebug = false
-        res.write('stopping inf loop, who knows if this is possible')
-        res.end()
-      }
-    )
+    Context.network.registerExternalGet('debug-inf-loop-off', isDebugModeMiddleware, (req, res) => {
+      this.infLoopDebug = false
+      res.write('stopping inf loop, who knows if this is possible')
+      res.end()
+    })
   }
 
   countEvent(category1: string, category2: string, count: number = 1) {

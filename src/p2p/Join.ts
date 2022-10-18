@@ -34,9 +34,7 @@ const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'cyclemarker',
   handler: (_req, res) => {
-    const marker = CycleChain.newest
-      ? CycleChain.newest.previous
-      : '0'.repeat(64)
+    const marker = CycleChain.newest ? CycleChain.newest.previous : '0'.repeat(64)
     res.json(marker)
   },
 }
@@ -92,7 +90,8 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
     if (CycleCreator.currentQuarter >= 3) return
 
     //  Validate of payload is done in addJoinRequest
-    if (addJoinRequest(payload)) Comms.sendGossip('gossip-join', payload, tracker, sender, NodeList.byIdOrder, false)
+    if (addJoinRequest(payload))
+      Comms.sendGossip('gossip-join', payload, tracker, sender, NodeList.byIdOrder, false)
   } finally {
     profilerInstance.scopedProfileSectionEnd('gossip-join')
   }
@@ -108,8 +107,6 @@ const routes = {
 /** FUNCTIONS */
 
 /** CycleCreator Functions */
-
-
 
 export function init() {
   p2pLogger = logger.getLogger('p2p')
@@ -131,16 +128,15 @@ export function reset() {
   seen = new Set()
 }
 
-export function getNodeRequestingJoin() : P2P.P2PTypes.P2PNode[] {
+export function getNodeRequestingJoin(): P2P.P2PTypes.P2PNode[] {
   let nodes: P2P.P2PTypes.P2PNode[] = []
-  for(let request of requests){
-    if(request && request.nodeInfo){
+  for (let request of requests) {
+    if (request && request.nodeInfo) {
       nodes.push(request.nodeInfo)
     }
   }
   return nodes
 }
-
 
 function calculateToAccept() {
   const desired = CycleChain.newest.desired
@@ -154,25 +150,27 @@ function calculateToAccept() {
   let syncMax =
     CycleChain.newest.safetyMode === true
       ? CycleChain.newest.safetyNum
-      : Math.floor(config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor * CycleCreator.scaleFactorSyncBoost)
+      : Math.floor(
+          config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor * CycleCreator.scaleFactorSyncBoost
+        )
 
   //The first batch of nodes to join the network after the seed node server can join at a higher rate if firstCycleJoin is set
   //This first batch will sync the full data range from the seed node, which should be very little data
   //This get the network rolling faster, but also allows us to use a slightly higher base join rate because
   //we are not worrying on how it performs with small networks. < 25 nodes.
-  if(active === 0 && config.p2p.firstCycleJoin ){
+  if (active === 0 && config.p2p.firstCycleJoin) {
     maxJoin = Math.max(config.p2p.firstCycleJoin, maxJoin)
     syncMax += config.p2p.firstCycleJoin
   }
   //For a few cycles we can boost the max sync to account for firstCycleJoin nodes.
-  if(CycleChain.newest.counter < 10 && config.p2p.firstCycleJoin){
+  if (CycleChain.newest.counter < 10 && config.p2p.firstCycleJoin) {
     syncMax += config.p2p.firstCycleJoin
   }
 
-  if(active > 0){
+  if (active > 0) {
     let syncMaxLimit = 150 //todo make config
-    if(syncMax > syncMaxLimit){
-      nestedCountersInstance.countEvent('networkSize', `limit syncmax ${syncMax}=>${syncMaxLimit} cyc:${CycleCreator.currentCycle}`)
+    if (syncMax > syncMaxLimit) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('networkSize', `limit syncmax ${syncMax}=>${syncMaxLimit} cyc:${CycleCreator.currentCycle}`)
       syncMax = syncMaxLimit
     }
   }
@@ -184,7 +182,7 @@ function calculateToAccept() {
   // Always set needed to (desired - (active + syncing)) if its positive
   //if (desired > active + syncing) {
   // updating to make sure this math gets applied all the time
-  if (desired > 0) {  
+  if (desired > 0) {
     needed = desired - (active + syncing)
   }
 
@@ -207,9 +205,24 @@ function calculateToAccept() {
   }
 
   let cycle = CycleChain.newest.counter
-  if(cycle > lastLoggedCycle){
+  if (cycle > lastLoggedCycle) {
     lastLoggedCycle = cycle
-    info('scale dump:' + JSON.stringify({cycle, scaleFactor:CycleCreator.scaleFactor,needed, desired, active, syncing, canSync, syncMax, maxJoin, expired ,scaleFactorSyncBoost:CycleCreator.scaleFactorSyncBoost  })  )
+    info(
+      'scale dump:' +
+        JSON.stringify({
+          cycle,
+          scaleFactor: CycleCreator.scaleFactor,
+          needed,
+          desired,
+          active,
+          syncing,
+          canSync,
+          syncMax,
+          maxJoin,
+          expired,
+          scaleFactorSyncBoost: CycleCreator.scaleFactorSyncBoost,
+        })
+    )
   }
   return needed
 }
@@ -291,10 +304,7 @@ export async function createJoinRequest(
   const nodeInfo = Self.getThisNodeInfo()
   // TO-DO: Think about if the selection number still needs to be signed
   const proofOfWork = {
-    compute: await crypto.getComputeProofOfWork(
-      cycleMarker,
-      config.p2p.difficulty
-    ),
+    compute: await crypto.getComputeProofOfWork(cycleMarker, config.p2p.difficulty),
   }
   let joinReq = { nodeInfo, cycleMarker, proofOfWork, version }
   if (typeof shardus.app.getJoinData === 'function') {
@@ -309,14 +319,13 @@ export async function createJoinRequest(
     }
   }
   const signedJoinReq = crypto.sign(joinReq)
-  if(logFlags.p2pNonFatal) info(`Join request created... Join request: ${JSON.stringify(signedJoinReq)}`)
+  if (logFlags.p2pNonFatal) info(`Join request created... Join request: ${JSON.stringify(signedJoinReq)}`)
   return signedJoinReq
 }
 
 export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
-
-  if(Self.p2pIgnoreJoinRequests === true){
-    if(logFlags.p2pNonFatal) info(`Join request ignored. p2pIgnoreJoinRequests === true`)
+  if (Self.p2pIgnoreJoinRequests === true) {
+    if (logFlags.p2pNonFatal) info(`Join request ignored. p2pIgnoreJoinRequests === true`)
     return
   }
 
@@ -373,11 +382,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
     }
   }
   const node = joinRequest.nodeInfo
-  if(logFlags.p2pNonFatal) info(`Got join request for ${node.externalIp}:${node.externalPort}`)
+  if (logFlags.p2pNonFatal) info(`Got join request for ${node.externalIp}:${node.externalPort}`)
 
   // Check if this node has already been seen this cycle
   if (seen.has(node.publicKey)) {
-    if(logFlags.p2pNonFatal) info('Node has already been seen this cycle. Unable to add join request.')
+    if (logFlags.p2pNonFatal) info('Node has already been seen this cycle. Unable to add join request.')
     return false
   }
 
@@ -387,7 +396,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
   // Return if we already know about this node
   const ipPort = NodeList.ipPort(node.internalIp, node.internalPort)
   if (NodeList.byIpPort.has(ipPort)) {
-    if (logFlags.p2pNonFatal) info('Cannot add join request for this node, already a known node.', JSON.stringify(NodeList.byIpPort.get(ipPort)))
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Cannot add join request for this node, already a known node.', JSON.stringify(NodeList.byIpPort.get(ipPort)))
     const node = NodeList.byIpPort.get(ipPort)
     return false
   }
@@ -413,12 +422,8 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
     cycleNumber: CycleChain.newest.counter,
     selectionKey: selectionKey ? selectionKey : node.publicKey,
   })
-  if (
-    last &&
-    requests.length >= toAccept &&
-    !crypto.isGreaterHash(selectionNum, last.selectionNum)
-  ) {
-    if(logFlags.p2pNonFatal) info('Join request not better than lowest, not added.')
+  if (last && requests.length >= toAccept && !crypto.isGreaterHash(selectionNum, last.selectionNum)) {
+    if (logFlags.p2pNonFatal) info('Join request not better than lowest, not added.')
     return false
   }
 
@@ -435,18 +440,13 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
   }
   // Insert sorted into best list if we made it this far
   utils.insertSorted(requests, { ...joinRequest, selectionNum }, (a, b) =>
-    a.selectionNum < b.selectionNum
-      ? 1
-      : a.selectionNum > b.selectionNum
-      ? -1
-      : 0
+    a.selectionNum < b.selectionNum ? 1 : a.selectionNum > b.selectionNum ? -1 : 0
   )
-  if(logFlags.p2pNonFatal) info(
-    `Added join request for ${joinRequest.nodeInfo.externalIp}:${joinRequest.nodeInfo.externalPort}`
-  )
+  if (logFlags.p2pNonFatal)
+    info(`Added join request for ${joinRequest.nodeInfo.externalIp}:${joinRequest.nodeInfo.externalPort}`)
 
   // If we have > maxJoinedPerCycle requests, trim them down
-  if(logFlags.p2pNonFatal) info(`Requests: ${requests.length}, toAccept: ${toAccept}`)
+  if (logFlags.p2pNonFatal) info(`Requests: ${requests.length}, toAccept: ${toAccept}`)
   if (requests.length > toAccept) {
     const over = requests.length - toAccept
     requests.splice(-over)
@@ -478,11 +478,11 @@ export async function fetchCycleMarker(nodes) {
     delete cm1.currentTime
     delete cm2.currentTime
     const equivalent = isDeepStrictEqual(cm1, cm2)
-    if(logFlags.p2pNonFatal) info(`Equivalence of the two compared cycle marker infos: ${equivalent}`)
+    if (logFlags.p2pNonFatal) info(`Equivalence of the two compared cycle marker infos: ${equivalent}`)
     return equivalent
   }
 
-  const {topResult:marker} = await robustQuery(nodes, queryFn)
+  const { topResult: marker } = await robustQuery(nodes, queryFn)
   return marker
 }
 
@@ -493,24 +493,16 @@ export async function submitJoin(
   // Send the join request to a handful of the active node all at once:w
   const selectedNodes = utils.getRandom(nodes, Math.min(nodes.length, 5))
   const promises = []
-  if(logFlags.p2pNonFatal) info(
-    `Sending join request to ${selectedNodes.map((n) => `${n.ip}:${n.port}`)}`
-  )
+  if (logFlags.p2pNonFatal) info(`Sending join request to ${selectedNodes.map((n) => `${n.ip}:${n.port}`)}`)
   for (const node of selectedNodes) {
     try {
       promises.push(
         http.post(`${node.ip}:${node.port}/join`, joinRequest).catch((err) => {
-          error(
-            `Join: submitJoin: Error posting join request to ${node.ip}:${node.port}`,
-            err
-          )
+          error(`Join: submitJoin: Error posting join request to ${node.ip}:${node.port}`, err)
         })
       )
     } catch (err) {
-      error(
-        `Join: submitJoin: Error posting join request to ${node.ip}:${node.port}`,
-        err
-      )
+      error(`Join: submitJoin: Error posting join request to ${node.ip}:${node.port}`, err)
     }
   }
   await Promise.all(promises)
@@ -523,7 +515,7 @@ export async function fetchJoined(activeNodes) {
     return res
   }
   try {
-    const {topResult:response, winningNodes:_responders} = await robustQuery(activeNodes, queryFn)
+    const { topResult: response, winningNodes: _responders } = await robustQuery(activeNodes, queryFn)
     if (!response) return
     if (!response.node) return
     let err = utils.validateTypes(response, { node: 'o' })
@@ -550,10 +542,8 @@ function validateJoinRequest(request: P2P.JoinTypes.JoinRequest) {
 
 export function computeNodeId(publicKey, cycleMarker) {
   const nodeId = crypto.hash({ publicKey, cycleMarker })
-  if(logFlags.p2pNonFatal) {
-    info(
-    `Node ID computation: publicKey: ${publicKey}, cycleMarker: ${cycleMarker}`
-    )
+  if (logFlags.p2pNonFatal) {
+    info(`Node ID computation: publicKey: ${publicKey}, cycleMarker: ${cycleMarker}`)
     info(`Node ID is: ${nodeId}`)
   }
   return nodeId

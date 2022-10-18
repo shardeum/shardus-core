@@ -82,11 +82,7 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
   }
 }
 
-export const stringifyReduceLimit = (
-  val,
-  limit = 100,
-  isArrayProp?: boolean
-) => {
+export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean) => {
   let i, max, str, keys, key, propVal, toStr
 
   if (limit < 0) {
@@ -164,7 +160,7 @@ export const replacer = (key, value) => {
   if (originalObject instanceof Map) {
     return {
       dataType: 'stringifyReduce_map_2_array',
-      value: Array.from(originalObject.entries()) // or with spread: value: [...originalObject]
+      value: Array.from(originalObject.entries()), // or with spread: value: [...originalObject]
     }
   } else {
     return value
@@ -194,8 +190,7 @@ export const reviverExpander = (key, value) => {
 }
 
 //Figure out certain chunky objects and store them in their own table
-export const stringifyReduceMemoize = (val, isArrayProp?: boolean) => {
-}
+export const stringifyReduceMemoize = (val, isArrayProp?: boolean) => {}
 
 export const reviverMemoize = (key, value) => {
   if (typeof value === 'object' && value !== null) {
@@ -205,7 +200,6 @@ export const reviverMemoize = (key, value) => {
   }
   return value
 }
-
 
 export const debugReplacer = (key, value) => {
   const originalObject = value // this[key]
@@ -220,7 +214,7 @@ export const debugReplacer = (key, value) => {
   if (originalObject instanceof Map) {
     return {
       dataType: 'stringifyReduce_map_2_array',
-      value: Array.from(originalObject.entries()) // or with spread: value: [...originalObject]
+      value: Array.from(originalObject.entries()), // or with spread: value: [...originalObject]
     }
   } else {
     return value

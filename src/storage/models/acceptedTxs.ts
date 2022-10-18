@@ -7,7 +7,7 @@ const acceptedTx = [
     timestamp: { type: Sequelize.BIGINT, allowNull: false },
     data: { type: Sequelize.JSON, allowNull: false },
     keys: { type: Sequelize.JSON, allowNull: false },
-  }
+  },
 ]
 
 export default acceptedTx

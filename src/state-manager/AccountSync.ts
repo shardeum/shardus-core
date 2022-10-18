@@ -245,31 +245,45 @@ class AccountSync {
     // Ts_end - get data older than this timestamp
     // Returns a single hash of the data from the Account State Table determined by the input parameters; sort by Tx_ts  then Tx_id before taking the hash
     // Updated names:  accountStart , accountEnd, tsStart, tsEnd
-    this.p2p.registerInternal('get_account_state_hash', async (payload: AccountStateHashReq, respond: (arg0: AccountStateHashResp) => any, sender, tracker: string, msgSize: number) => {
-      this.profiler.scopedProfileSectionStart('get_account_state_hash', false, msgSize)
-      let responseSize = cUninitializedSize
-      try {
-        let result = {} as AccountStateHashResp
+    this.p2p.registerInternal(
+      'get_account_state_hash',
+      async (
+        payload: AccountStateHashReq,
+        respond: (arg0: AccountStateHashResp) => any,
+        sender,
+        tracker: string,
+        msgSize: number
+      ) => {
+        this.profiler.scopedProfileSectionStart('get_account_state_hash', false, msgSize)
+        let responseSize = cUninitializedSize
+        try {
+          let result = {} as AccountStateHashResp
 
-        if (this.softSync_checkInitialFlag && this.initalSyncFinished === false) {
-          //not ready?
-          result.ready = false
-          result.stateHash = this.stateManager.currentCycleShardData.ourNode.id
-          await respond(result)
-          return
+          if (this.softSync_checkInitialFlag && this.initalSyncFinished === false) {
+            //not ready?
+            result.ready = false
+            result.stateHash = this.stateManager.currentCycleShardData.ourNode.id
+            await respond(result)
+            return
+          }
+
+          // yikes need to potentially hash only N records at a time and return an array of hashes
+          let stateHash = await this.stateManager.transactionQueue.getAccountsStateHash(
+            payload.accountStart,
+            payload.accountEnd,
+            payload.tsStart,
+            payload.tsEnd
+          )
+          result.stateHash = stateHash
+          result.ready = true
+          responseSize = await respond(result)
+        } catch (e) {
+          this.statemanager_fatal('get_account_state_hash', e)
+        } finally {
+          this.profiler.scopedProfileSectionEnd('get_account_state_hash', responseSize)
         }
-
-        // yikes need to potentially hash only N records at a time and return an array of hashes
-        let stateHash = await this.stateManager.transactionQueue.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
-        result.stateHash = stateHash
-        result.ready = true
-        responseSize = await respond(result)
-      } catch (e) {
-        this.statemanager_fatal('get_account_state_hash', e)
-      } finally {
-        this.profiler.scopedProfileSectionEnd('get_account_state_hash', responseSize)
       }
-    })
+    )
 
     //    /get_account_state (Acc_start, Acc_end, Ts_start, Ts_end)
     // Acc_start - get data for accounts starting with this account id; inclusive
@@ -280,7 +294,13 @@ class AccountSync {
     // Updated names:  accountStart , accountEnd, tsStart, tsEnd
     this.p2p.registerInternal(
       'get_account_state',
-      async (payload: GetAccountStateReq, respond: (arg0: { accountStates: Shardus.StateTableObject[] }) => any, sender, tracker: string, msgSize: number) => {
+      async (
+        payload: GetAccountStateReq,
+        respond: (arg0: { accountStates: Shardus.StateTableObject[] }) => any,
+        sender,
+        tracker: string,
+        msgSize: number
+      ) => {
         if (this.config.stateManager == null) {
           throw new Error('this.config.stateManager == null') //TODO TSConversion  would be nice to eliminate some of these config checks.
         }
@@ -289,36 +309,58 @@ class AccountSync {
 
         // max records set artificially low for better test coverage
         // todo m11: make configs for how many records to query
-        let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, this.config.stateManager.stateTableBucketSize)
+        let accountStates = await this.storage.queryAccountStateTable(
+          payload.accountStart,
+          payload.accountEnd,
+          payload.tsStart,
+          payload.tsEnd,
+          this.config.stateManager.stateTableBucketSize
+        )
         result.accountStates = accountStates
         let responseSize = await respond(result)
         this.profiler.scopedProfileSectionEnd('get_account_state', responseSize)
       }
     )
 
-    this.p2p.registerInternal('get_account_data3', async (payload: GetAccountData3Req, respond: (arg0: { data: GetAccountDataByRangeSmart }) => any, sender, tracker: string, msgSize: number) => {
-      this.profiler.scopedProfileSectionStart('get_account_data3', false, msgSize)
-      let result = {} as { data: GetAccountDataByRangeSmart } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
-      let accountData: GetAccountDataByRangeSmart | null = null
-      let ourLockID = -1
-      try {
-        ourLockID = await this.stateManager.fifoLock('accountModification')
-        // returns { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
-        //GetAccountDataByRangeSmart
-        accountData = await this.stateManager.getAccountDataByRangeSmart(payload.accountStart, payload.accountEnd, payload.tsStart, payload.maxRecords, payload.offset, payload.accountOffset)
-      } finally {
-        this.stateManager.fifoUnlock('accountModification', ourLockID)
+    this.p2p.registerInternal(
+      'get_account_data3',
+      async (
+        payload: GetAccountData3Req,
+        respond: (arg0: { data: GetAccountDataByRangeSmart }) => any,
+        sender,
+        tracker: string,
+        msgSize: number
+      ) => {
+        this.profiler.scopedProfileSectionStart('get_account_data3', false, msgSize)
+        let result = {} as { data: GetAccountDataByRangeSmart } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
+        let accountData: GetAccountDataByRangeSmart | null = null
+        let ourLockID = -1
+        try {
+          ourLockID = await this.stateManager.fifoLock('accountModification')
+          // returns { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
+          //GetAccountDataByRangeSmart
+          accountData = await this.stateManager.getAccountDataByRangeSmart(
+            payload.accountStart,
+            payload.accountEnd,
+            payload.tsStart,
+            payload.maxRecords,
+            payload.offset,
+            payload.accountOffset
+          )
+        } finally {
+          this.stateManager.fifoUnlock('accountModification', ourLockID)
+        }
+
+        //PERF Disiable this in production or performance testing.
+        this.stateManager.testAccountDataWrapped(accountData.wrappedAccounts)
+        //PERF Disiable this in production or performance testing.
+        this.stateManager.testAccountDataWrapped(accountData.wrappedAccounts2)
+
+        result.data = accountData
+        let responseSize = await respond(result)
+        this.profiler.scopedProfileSectionEnd('get_account_data3', responseSize)
       }
-
-      //PERF Disiable this in production or performance testing.
-      this.stateManager.testAccountDataWrapped(accountData.wrappedAccounts)
-      //PERF Disiable this in production or performance testing.
-      this.stateManager.testAccountDataWrapped(accountData.wrappedAccounts2)
-
-      result.data = accountData
-      let responseSize = await respond(result)
-      this.profiler.scopedProfileSectionEnd('get_account_data3', responseSize)
-    })
+    )
 
     // /get_account_data_by_list (Acc_ids)
     // Acc_ids - array of accounts to get
@@ -328,7 +370,13 @@ class AccountSync {
     // Updated names:  accountIds, max records
     this.p2p.registerInternal(
       'get_account_data_by_list',
-      async (payload: { accountIds: any }, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any, sender, tracker: string, msgSize: number) => {
+      async (
+        payload: { accountIds: any },
+        respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any,
+        sender,
+        tracker: string,
+        msgSize: number
+      ) => {
         this.profiler.scopedProfileSectionStart('get_account_data_by_list', false, msgSize)
         let result = {} as { accountData: Shardus.WrappedData[] | null }
         let accountData = null
@@ -360,7 +408,9 @@ class AccountSync {
         let activeNodes = Wrapper.p2p.state.getNodes()
         if (activeNodes) {
           for (let node of activeNodes.values()) {
-            let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/sync-statement`)
+            let getResp = await this.logger._internalHackGetWithResp(
+              `${node.externalIp}:${node.externalPort}/sync-statement`
+            )
             console.log('getResp active', getResp.body)
             res.write(`${node.externalIp}:${node.externalPort}/sync-statement\n`)
             res.write(getResp.body ? getResp.body : 'no data')
@@ -370,7 +420,9 @@ class AccountSync {
         let joiningNodes = Wrapper.p2p.state.getNodesRequestingJoin()
         if (joiningNodes) {
           for (let node of joiningNodes.values()) {
-            let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/sync-statement`)
+            let getResp = await this.logger._internalHackGetWithResp(
+              `${node.externalIp}:${node.externalPort}/sync-statement`
+            )
             console.log('getResp syncing', getResp.body)
             res.write(`${node.externalIp}:${node.externalPort}/sync-statement\n`)
             res.write(getResp.body ? getResp.body : 'no data')
@@ -416,8 +468,6 @@ class AccountSync {
       res.write(`debugFail4 = ${this.debugFail4} \n`)
       res.end()
     })
-    
-
   }
 
   /***
@@ -473,12 +523,15 @@ class AccountSync {
       this.syncStatement.timeBeforeDataSync = (Date.now() - Self.p2pSyncEnd) / 1000
       this.syncStatement.timeBeforeDataSync2 = this.syncStatement.timeBeforeDataSync
 
-      nestedCountersInstance.countEvent('sync', `sync comlete numCycles: ${this.syncStatement.numCycles} start:${this.syncStatement.cycleStarted} end:${this.syncStatement.cycleEnded}`)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `sync comlete numCycles: ${this.syncStatement.numCycles} start:${this.syncStatement.cycleStarted} end:${this.syncStatement.cycleEnded}`)
 
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.syncStatement)}`)
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.syncStatement)}`)
 
       this.syncStatmentIsComplete()
-      this.statemanager_fatal('shrd_sync_syncStatement-tempdebug', `${utils.stringifyReduce(this.syncStatement)}`)
+      this.statemanager_fatal(
+        'shrd_sync_syncStatement-tempdebug',
+        `${utils.stringifyReduce(this.syncStatement)}`
+      )
       return
     }
 
@@ -516,7 +569,7 @@ class AccountSync {
     // }
 
     let nodeShardData = this.stateManager.currentCycleShardData.nodeShardData
-    if (logFlags.console) console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
+    /* prettier-ignore */ if (logFlags.console) console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
 
     let rangesToSync: StateManagerTypes.shardFunctionTypes.AddressRange[]
 
@@ -524,7 +577,7 @@ class AccountSync {
 
     let homePartition = nodeShardData.homePartition
 
-    if (logFlags.console) console.log(`homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
+    /* prettier-ignore */ if (logFlags.console) console.log(`homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
 
     // syncRangeGoal helps us calculate how many partitions per range we need to get our data in chunksGuide number of chunks.
     // chunksGuide === 4, would mean that in a network with many nodes most of the time we would have 4 ranges to sync.
@@ -569,13 +622,13 @@ class AccountSync {
             break
           }
 
-          if(this.debugFail1){
+          if (this.debugFail1) {
             nestedCountersInstance.countEvent('sync', `syncStateDataGlobals: debugFail1 reset-sync-ranges`)
             await utils.sleep(3000)
             //will cause a sync reset of all trackers
             throw new Error('reset-sync-ranges debugFail1')
           }
-          if(this.debugFail2){
+          if (this.debugFail2) {
             nestedCountersInstance.countEvent('sync', `syncStateDataGlobals: debugFail2 cause apop`)
             await utils.sleep(3000)
             this.debugFail2 = false
@@ -584,8 +637,8 @@ class AccountSync {
           }
 
           // let partition = syncTracker.partition
-          if (logFlags.console) console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
-          if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduceLimit(syncTracker.range)} `)
+          /* prettier-ignore */ if (logFlags.console) console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
+          /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduceLimit(syncTracker.range)} `)
 
           syncTracker.syncStarted = true
 
@@ -597,26 +650,29 @@ class AccountSync {
               await syncTracker.syncStateDataForRange2() //syncTracker.range)
             }
           } else {
-            if (logFlags.console) console.log(`syncTracker syncStateDataGlobals start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
+            /* prettier-ignore */ if (logFlags.console) console.log(`syncTracker syncStateDataGlobals start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
             await syncTracker.syncStateDataGlobals() //syncTracker)
           }
           syncTracker.syncFinished = true
 
-          if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduceLimit(syncTracker.range)} `)
+          /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduceLimit(syncTracker.range)} `)
           this.clearSyncData()
         }
         //if we get here without an exception that we are finished with the outer loop
         running = false
       } catch (error) {
         if (error.message.includes('reset-sync-ranges')) {
-          this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error))
+          this.statemanager_fatal(
+            `mainSyncLoop_reset-sync-ranges`,
+            'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error)
+          )
 
           if (breakCount > this.config.stateManager.maxDataSyncRestarts) {
             this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges-givingUP`, 'too many tries')
             running = false
             this.clearSyncTrackers()
 
-            nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: too many exceptions in accound data sync.  Init apop`)
+            /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: too many exceptions in accound data sync.  Init apop`)
             this.stateManager.initApoptosisAndQuitSyncing('too many exceptions in accound data sync')
 
             return
@@ -648,7 +704,11 @@ class AccountSync {
           let lastCycle = cycle
           cycle = this.stateManager.currentCycleShardData.cycleNumber
           homePartition = nodeShardData.homePartition
-          console.log(`RETRYSYNC: homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
+          console.log(
+            `RETRYSYNC: homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(
+              nodeShardData.storedPartitions
+            )}`
+          )
 
           //init global if we did not complete syncing them before
           if (keptGlobal === false && this.globalAccountsSynced === false && useGlobalAccounts === true) {
@@ -663,12 +723,14 @@ class AccountSync {
             newTrackers++
           }
 
-          nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({ cleared, kept, newTrackers })}`)
+          /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({ cleared, kept, newTrackers })}`)
 
           continue //resume loop at top!
         } else {
-
-          this.statemanager_fatal(`initialSyncMain unhandledEX`, 'initialSyncMain unhandledEX:' + errorToStringFull(error))
+          this.statemanager_fatal(
+            `initialSyncMain unhandledEX`,
+            'initialSyncMain unhandledEX:' + errorToStringFull(error)
+          )
           running = false
 
           nestedCountersInstance.countRareEvent('sync', `initialSyncMain unhandledEX.  Init apop`)
@@ -676,7 +738,7 @@ class AccountSync {
         }
       }
     }
-    // if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
+    // /* prettier-ignore */ if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
     if (logFlags.console) console.log('syncStateData end' + '   time:' + Date.now())
   }
 
@@ -685,7 +747,7 @@ class AccountSync {
       this.stateManager.getCurrentCycleShardData()
       await utils.sleep(1000)
       if (this.stateManager.currentCycleShardData == null) {
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `)
+        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `)
         hasValidShardData = false
       }
       if (this.stateManager.currentCycleShardData != null) {
@@ -695,7 +757,11 @@ class AccountSync {
             this.logger.playbackLogNote(
               'shrd_sync_waitForShardData',
               ` `,
-              `hasCompleteData:${this.stateManager.currentCycleShardData.hasCompleteData} active:${utils.stringifyReduce(temp)} ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `
+              `hasCompleteData:${
+                this.stateManager.currentCycleShardData.hasCompleteData
+              } active:${utils.stringifyReduce(temp)} ${utils.stringifyReduce(
+                this.stateManager.currentCycleShardData
+              )} `
             )
         } else {
           hasValidShardData = true
@@ -713,14 +779,22 @@ class AccountSync {
   ): StateManagerTypes.shardFunctionTypes.AddressRange[] {
     //let chunksGuide = 4
     // todo consider making minSyncRangeGuide = 3 or 4..
-    let syncRangeGoal = Math.max(minSyncRangeGuide, Math.min(chunksGuide, Math.floor(this.stateManager.currentCycleShardData.shardGlobals.numPartitions / chunksGuide)))
+    let syncRangeGoal = Math.max(
+      minSyncRangeGuide,
+      Math.min(
+        chunksGuide,
+        Math.floor(this.stateManager.currentCycleShardData.shardGlobals.numPartitions / chunksGuide)
+      )
+    )
     let partitionsCovered = 0
     let partitionsPerRange = 1
     let rangesToSync = [] //, rangesToSync: StateManagerTypes.shardFunctionTypes.AddressRange[]
 
     if (nodeShardData.storedPartitions.rangeIsSplit === true) {
-      partitionsCovered = nodeShardData.storedPartitions.partitionEnd1 - nodeShardData.storedPartitions.partitionStart1
-      partitionsCovered += nodeShardData.storedPartitions.partitionEnd2 - nodeShardData.storedPartitions.partitionStart2
+      partitionsCovered =
+        nodeShardData.storedPartitions.partitionEnd1 - nodeShardData.storedPartitions.partitionStart1
+      partitionsCovered +=
+        nodeShardData.storedPartitions.partitionEnd2 - nodeShardData.storedPartitions.partitionStart2
       partitionsPerRange = Math.max(Math.floor(partitionsCovered / syncRangeGoal), 1)
       if (logFlags.console)
         console.log(
@@ -735,7 +809,11 @@ class AccountSync {
       let i = 0
       while (currentEnd < end) {
         currentEnd = Math.min(currentStart + partitionsPerRange, end)
-        let range = ShardFunctions.partitionToAddressRange2(this.stateManager.currentCycleShardData.shardGlobals, currentStart, currentEnd)
+        let range = ShardFunctions.partitionToAddressRange2(
+          this.stateManager.currentCycleShardData.shardGlobals,
+          currentStart,
+          currentEnd
+        )
 
         let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
         range.high = address1
@@ -743,7 +821,7 @@ class AccountSync {
         if (nextLowAddress != null) {
           range.low = nextLowAddress
         }
-        if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
+        /* prettier-ignore */ if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
         nextLowAddress = address2
         currentStart = currentEnd
         i++
@@ -758,7 +836,11 @@ class AccountSync {
 
       while (currentEnd < end) {
         currentEnd = Math.min(currentStart + partitionsPerRange, end)
-        let range = ShardFunctions.partitionToAddressRange2(this.stateManager.currentCycleShardData.shardGlobals, currentStart, currentEnd)
+        let range = ShardFunctions.partitionToAddressRange2(
+          this.stateManager.currentCycleShardData.shardGlobals,
+          currentStart,
+          currentEnd
+        )
 
         let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
         range.high = address1
@@ -766,7 +848,7 @@ class AccountSync {
         if (nextLowAddress != null) {
           range.low = nextLowAddress
         }
-        if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition} a1: ${range.low} a2: ${range.high}`)
+        /* prettier-ignore */ if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition} a1: ${range.low} a2: ${range.high}`)
 
         nextLowAddress = address2
         currentStart = currentEnd
@@ -774,7 +856,8 @@ class AccountSync {
         rangesToSync.push(range)
       }
     } else {
-      partitionsCovered = nodeShardData.storedPartitions.partitionEnd - nodeShardData.storedPartitions.partitionStart
+      partitionsCovered =
+        nodeShardData.storedPartitions.partitionEnd - nodeShardData.storedPartitions.partitionStart
       partitionsPerRange = Math.max(Math.floor(partitionsCovered / syncRangeGoal), 1)
       if (logFlags.console)
         console.log(
@@ -790,7 +873,11 @@ class AccountSync {
       let i = 0
       while (currentEnd < end) {
         currentEnd = Math.min(currentStart + partitionsPerRange, end)
-        let range = ShardFunctions.partitionToAddressRange2(this.stateManager.currentCycleShardData.shardGlobals, currentStart, currentEnd)
+        let range = ShardFunctions.partitionToAddressRange2(
+          this.stateManager.currentCycleShardData.shardGlobals,
+          currentStart,
+          currentEnd
+        )
 
         let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
         range.high = address1
@@ -798,7 +885,7 @@ class AccountSync {
         if (nextLowAddress != null) {
           range.low = nextLowAddress
         }
-        if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
+        /* prettier-ignore */ if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
         nextLowAddress = address2
         currentStart = currentEnd
         i++
@@ -809,7 +896,11 @@ class AccountSync {
     // if we don't have a range to sync yet manually sync the whole range.
     if (rangesToSync.length === 0) {
       if (logFlags.console) console.log(`syncStateData ranges: pushing full range, no ranges found`)
-      let range = ShardFunctions.partitionToAddressRange2(this.stateManager.currentCycleShardData.shardGlobals, 0, this.stateManager.currentCycleShardData.shardGlobals.numPartitions - 1)
+      let range = ShardFunctions.partitionToAddressRange2(
+        this.stateManager.currentCycleShardData.shardGlobals,
+        0,
+        this.stateManager.currentCycleShardData.shardGlobals.numPartitions - 1
+      )
       rangesToSync.push(range)
     }
     if (logFlags.console) console.log(`syncStateData ranges: ${utils.stringifyReduce(rangesToSync)}}`)
@@ -845,16 +936,22 @@ class AccountSync {
     }
     let queryFn = async (node: Shardus.Node) => {
       // Node Precheck!
-      if (this.stateManager.isNodeValidForInternalMessage(node.id, 'getRobustGlobalReport', true, true) === false) {
-        return { ready: false, msg: `getRobustGlobalReport invalid node to ask: ${utils.stringifyReduce(node.id)}` }
+      if (
+        this.stateManager.isNodeValidForInternalMessage(node.id, 'getRobustGlobalReport', true, true) ===
+        false
+      ) {
+        return {
+          ready: false,
+          msg: `getRobustGlobalReport invalid node to ask: ${utils.stringifyReduce(node.id)}`,
+        }
       }
 
       let result = await this.p2p.ask(node, 'get_globalaccountreport', {})
       if (result === false) {
-        if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === false node:${utils.stringifyReduce(node.id)}`)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === false node:${utils.stringifyReduce(node.id)}`)
       }
       if (result === null) {
-        if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null node:${utils.stringifyReduce(node.id)}`)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null node:${utils.stringifyReduce(node.id)}`)
       }
 
       // TODO I dont know the best way to handle a non null network error here, below is something I had before but disabled for some reason
@@ -875,7 +972,7 @@ class AccountSync {
       if (logFlags.debug) this.mainLogger.debug(`no nodes available`)
       return // nothing to do
     }
-    if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery getRobustGlobalReport ${utils.stringifyReduce(nodes.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery getRobustGlobalReport ${utils.stringifyReduce(nodes.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
     let result
     let winners
     try {
@@ -883,8 +980,8 @@ class AccountSync {
 
       // if we did not get a result at all wait, log and retry
       if (robustQueryResult === null) {
-        if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport results === null wait 10 seconds and try again. nodes:${nodes.length} `)
-        if (logFlags.console) console.log(`DATASYNC: getRobustGlobalReport results === null wait 10 seconds and try again. nodes:${nodes.length}  `)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport results === null wait 10 seconds and try again. nodes:${nodes.length} `)
+        /* prettier-ignore */ if (logFlags.console) console.log(`DATASYNC: getRobustGlobalReport results === null wait 10 seconds and try again. nodes:${nodes.length}  `)
         nestedCountersInstance.countEvent('sync', 'DATASYNC: getRobustGlobalReport results === null')
         await utils.sleep(10 * 1000) //wait 10 seconds and try again.
         return await this.getRobustGlobalReport()
@@ -895,33 +992,42 @@ class AccountSync {
 
       // if the result is not robust wait, throw an execption
       if (robustQueryResult.isRobustResult == false) {
-        if (logFlags.debug) this.mainLogger.debug('getRobustGlobalReport: robustQuery isRobustResult == false')
-        this.statemanager_fatal(`getRobustGlobalReport_nonRobust`, 'getRobustGlobalReport: robustQuery isRobustResult == false')
-        nestedCountersInstance.countEvent('sync', 'DATASYNC: getRobustGlobalReport: robustQuery isRobustResult == false')
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug('getRobustGlobalReport: robustQuery isRobustResult == false')
+        this.statemanager_fatal(
+          `getRobustGlobalReport_nonRobust`,
+          'getRobustGlobalReport: robustQuery isRobustResult == false'
+        )
+        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', 'DATASYNC: getRobustGlobalReport: robustQuery isRobustResult == false')
         throw new Error('FailAndRestartPartition_globalReport_A')
       }
 
       // if the reports are not ready then wait, log an retry
       if (result.ready === false) {
-        if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again `)
-        if (logFlags.console) console.log(`DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again `)
-        nestedCountersInstance.countEvent('sync', 'DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again')
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again `)
+        /* prettier-ignore */ if (logFlags.console) console.log(`DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again `)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', 'DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again')
         await utils.sleep(10 * 1000) //wait 10 seconds and try again.
         return await this.getRobustGlobalReport()
       }
     } catch (ex) {
       // NOTE: no longer expecting an exception from robust query in cases where we do not have enough votes or respones!
       //       but for now if isRobustResult == false then we local code wil throw an exception
-      if (logFlags.debug) this.mainLogger.debug('getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.statemanager_fatal(`getRobustGlobalReport_ex`, 'getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug('getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.statemanager_fatal(
+        `getRobustGlobalReport_ex`,
+        'getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
+      )
       throw new Error('FailAndRestartPartition_globalReport_B')
     }
     if (!winners || winners.length === 0) {
-      if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport no winners, going to throw fail and restart`)
-      this.statemanager_fatal(`getRobustGlobalReport_noWin`, `DATASYNC: getRobustGlobalReport no winners, going to throw fail and restart`) // todo: consider if this is just an error
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport no winners, going to throw fail and restart`)
+      this.statemanager_fatal(
+        `getRobustGlobalReport_noWin`,
+        `DATASYNC: getRobustGlobalReport no winners, going to throw fail and restart`
+      ) // todo: consider if this is just an error
       throw new Error('FailAndRestartPartition_globalReport_noWin')
     }
-    if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport found a winner.  results: ${utils.stringifyReduce(result)}`)
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport found a winner.  results: ${utils.stringifyReduce(result)}`)
 
     // this.dataSourceNodeIndex = 0
     // this.dataSourceNode = winners[this.dataSourceNodeIndex] // Todo random index
@@ -967,7 +1073,7 @@ class AccountSync {
       return
     }
 
-    nestedCountersInstance.countEvent('sync', `fail and restart non globals left:${anyNonGlobalSyncTrackersLeft}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `fail and restart non globals left:${anyNonGlobalSyncTrackersLeft}`)
     this.syncStatement.failAndRestart++
 
     //TODO proper restart not useing global var
@@ -1010,7 +1116,7 @@ class AccountSync {
         }
 
         if (syncTracker.syncFinished === true) {
-          if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeClear', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+          /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeClear', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
           // allow syncing queue entries to resume!
           for (let queueEntry of syncTracker.queueEntries) {
@@ -1029,7 +1135,9 @@ class AccountSync {
                 this.logger.playbackLogNote(
                   'shrd_sync_wakeupTX_skip1',
                   `${queueEntry.acceptedTx.txId}`,
-                  `not in active queue qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
+                  `not in active queue qId: ${queueEntry.entryID} ts: ${
+                    queueEntry.txKeys.timestamp
+                  } acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
                 )
                 continue
               }
@@ -1038,7 +1146,9 @@ class AccountSync {
                 this.logger.playbackLogNote(
                   'shrd_sync_wakeupTX_skip2',
                   `${queueEntry.acceptedTx.txId}`,
-                  `state!=syncing ${queueEntry.state} qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
+                  `state!=syncing ${queueEntry.state} qId: ${queueEntry.entryID} ts: ${
+                    queueEntry.txKeys.timestamp
+                  } acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
                 )
                 continue
               }
@@ -1060,7 +1170,9 @@ class AccountSync {
                   this.logger.playbackLogNote(
                     'shrd_sync_wakeupTX_txGroupUpdate',
                     `${queueEntry.acceptedTx.txId}`,
-                    `new value: ${queueEntry.ourNodeInTransactionGroup}   qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
+                    `new value: ${queueEntry.ourNodeInTransactionGroup}   qId: ${queueEntry.entryID} ts: ${
+                      queueEntry.txKeys.timestamp
+                    } acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
                   )
               }
 
@@ -1074,12 +1186,14 @@ class AccountSync {
                 this.logger.playbackLogNote(
                   'shrd_sync_wakeupTX',
                   `${queueEntry.acceptedTx.txId}`,
-                  `before: ${before} inTXGrp: ${queueEntry.ourNodeInTransactionGroup} qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(
+                  `before: ${before} inTXGrp: ${queueEntry.ourNodeInTransactionGroup} qId: ${
+                    queueEntry.entryID
+                  } ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(
                     queueEntry.txKeys.allKeys
                   )}`
                 )
               // } else {
-              //   if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_wakeupTXcancel', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`)
+              //   /* prettier-ignore */ if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_wakeupTXcancel', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`)
               //   queueEntry.state = 'canceled'
               //   queueEntry.didWakeup = true
               // }
@@ -1089,13 +1203,13 @@ class AccountSync {
           this.syncTrackers.splice(i, 1)
         }
       }
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeClearFinished', ` `, `num trackers left: ${this.syncTrackers.length} `)
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeClearFinished', ` `, `num trackers left: ${this.syncTrackers.length} `)
 
       if (this.initalSyncRemaining > 0 && initalSyncRemaining === 0) {
         this.initalSyncFinished = true
         this.initalSyncRemaining = 0
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: initalSyncFinished.`)
-        nestedCountersInstance.countEvent('sync', `initialSyncFinished ${this.stateManager.currentCycleShardData.cycleNumber}`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `initialSyncFinished ${this.stateManager.currentCycleShardData.cycleNumber}`)
       }
     }
   }
@@ -1133,22 +1247,25 @@ class AccountSync {
         for (let syncTracker of arrayCopy) {
           if (syncTracker.syncStarted === false) {
             // let partition = syncTracker.partition
-            if (logFlags.console) console.log(`rtsyncTracker start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
-            if (logFlags.playback) this.logger.playbackLogNote('rt_shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+            /* prettier-ignore */ if (logFlags.console) console.log(`rtsyncTracker start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
+            /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('rt_shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
             syncTracker.syncStarted = true
             startedCount++
             await syncTracker.syncStateDataForRange2() //syncTracker.range)
             syncTracker.syncFinished = true
 
-            if (logFlags.playback) this.logger.playbackLogNote('rt_shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+            /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('rt_shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
             this.clearSyncData()
           }
         }
       } while (startedCount > 0)
     } catch (ex) {
-      if (logFlags.debug) this.mainLogger.debug('syncRuntimeTrackers: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.statemanager_fatal(`syncRuntimeTrackers_ex`, 'syncRuntimeTrackers: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug('syncRuntimeTrackers: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.statemanager_fatal(
+        `syncRuntimeTrackers_ex`,
+        'syncRuntimeTrackers: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
+      )
 
       //clear out sync trackers and let repair handle it if needed.
       let cleared = this.syncTrackers.length
@@ -1158,7 +1275,7 @@ class AccountSync {
       let cycle = this.stateManager.currentCycleShardData.cycleNumber
       let lastCycle = cycle - 1
 
-      nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: runtime. lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({ cleared, kept, newTrackers })}`)
+      /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: runtime. lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({ cleared, kept, newTrackers })}`)
 
       // clear all sync trackers.
       this.clearSyncTrackers()
@@ -1184,7 +1301,11 @@ class AccountSync {
    * @param {number} cycle
    * @return {SyncTracker}
    */
-  createSyncTrackerByRange(range: StateManagerTypes.shardFunctionTypes.BasicAddressRange, cycle: number, initalSync: boolean = false): SyncTracker {
+  createSyncTrackerByRange(
+    range: StateManagerTypes.shardFunctionTypes.BasicAddressRange,
+    cycle: number,
+    initalSync: boolean = false
+  ): SyncTracker {
     let index = this.syncTrackerIndex++
 
     let syncTracker = new SyncTracker()
@@ -1247,7 +1368,8 @@ class AccountSync {
     if (cycleShardData == null) {
       return null
     }
-    let partitionShardData: StateManagerTypes.shardFunctionTypes.ShardInfo = cycleShardData.parititionShardDataMap.get(partitionID)
+    let partitionShardData: StateManagerTypes.shardFunctionTypes.ShardInfo =
+      cycleShardData.parititionShardDataMap.get(partitionID)
 
     let addressLow = partitionShardData.homeRange.low
     let addressHigh = partitionShardData.homeRange.high

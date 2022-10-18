@@ -52,7 +52,10 @@ export function prepend(cycle: P2P.CycleCreatorTypes.CycleRecord) {
     if (!newest) newest = cycle
   }
 }
-export function validate(prev: P2P.CycleCreatorTypes.CycleRecord, next: P2P.CycleCreatorTypes.CycleRecord): boolean {
+export function validate(
+  prev: P2P.CycleCreatorTypes.CycleRecord,
+  next: P2P.CycleCreatorTypes.CycleRecord
+): boolean {
   const prevMarker = computeCycleMarker(prev)
   if (next.previous !== prevMarker) return false
   // [TODO] More validation
@@ -95,94 +98,102 @@ export function getStoredCycleByTimestamp(timestamp) {
 
 /**
  * Get a cycle from a timestamp.
- * Future timestamps are allowed. Timestamps for cycles older than stored are allow if the allowOlder flag is set 
+ * Future timestamps are allowed. Timestamps for cycles older than stored are allow if the allowOlder flag is set
  * @param timestamp timestamp of the TX.  NOTE by default the sync settle time will be added.  set addSyncSettleTime = false to avoid this
- * @param allowOlder this allows calculating a cycle number for a cycle that is not stored. 
+ * @param allowOlder this allows calculating a cycle number for a cycle that is not stored.
  * @param addSyncSettleTime add in the sync settle time to the request.
  */
-export function getCycleNumberFromTimestamp(timestamp : number, allowOlder: boolean = true, addSyncSettleTime: boolean = true) {
-    let currentCycleShardData = stateManager.getCurrentCycleShardData()
+export function getCycleNumberFromTimestamp(
+  timestamp: number,
+  allowOlder: boolean = true,
+  addSyncSettleTime: boolean = true
+) {
+  let currentCycleShardData = stateManager.getCurrentCycleShardData()
 
-    let offsetTimestamp = timestamp
+  let offsetTimestamp = timestamp
 
-    if(addSyncSettleTime){
-      offsetTimestamp = timestamp + stateManager.syncSettleTime
-    }
+  if (addSyncSettleTime) {
+    offsetTimestamp = timestamp + stateManager.syncSettleTime
+  }
 
-    if(timestamp < 1 || timestamp == null){
-      let stack = new Error().stack
-      stateManager.statemanager_fatal(`getCycleNumberFromTimestamp ${timestamp}`, `getCycleNumberFromTimestamp ${timestamp} ,  ${stack}`)
-    }
+  if (timestamp < 1 || timestamp == null) {
+    let stack = new Error().stack
+    /* prettier-ignore */ stateManager.statemanager_fatal(`getCycleNumberFromTimestamp ${timestamp}`, `getCycleNumberFromTimestamp ${timestamp} ,  ${stack}`)
+  }
 
-    //currentCycleShardData
-    if (currentCycleShardData.timestamp <= offsetTimestamp && offsetTimestamp < currentCycleShardData.timestampEndCycle) {
-      if(currentCycleShardData.cycleNumber == null){
-        stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed. cycleNumber == null', 'currentCycleShardData.cycleNumber == null')
-        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber fail')
-        const cycle = getStoredCycleByTimestamp(offsetTimestamp)
-        console.log("CycleChain.getCycleNumberFromTimestamp getStoredCycleByTimestamp",cycle, timestamp)
-        if (cycle != null) {
-          stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed fatal redeemed', 'currentCycleShardData.cycleNumber == null, fatal redeemed')
-          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber redeemed')
-          return cycle.counter
-        } else {
-          //debug only!!!
-          let cycle2 = getStoredCycleByTimestamp(offsetTimestamp)
-          stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed fatal not redeemed', 'getStoredCycleByTimestamp cycleNumber == null not redeemed')
-          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber failed to redeem')
-        }
-      } else {
-        return currentCycleShardData.cycleNumber
-      }
-    }
-
-    if(currentCycleShardData.cycleNumber == null){
-      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber == null')
-      stateManager.statemanager_fatal('getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null',`getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null ${currentCycleShardData.cycleNumber} timestamp:${timestamp}`)
-
-    }
-
-    //is it in the future
-    if (offsetTimestamp >= currentCycleShardData.timestampEndCycle) {
-      let cycle: P2P.CycleCreatorTypes.CycleRecord = getNewest()
-
-      let timePastCurrentCycle = offsetTimestamp - currentCycleShardData.timestampEndCycle
-      let cyclesAhead = Math.ceil(timePastCurrentCycle / (cycle.duration * 1000))
-      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `+${cyclesAhead}`)
-
-      return currentCycleShardData.cycleNumber + cyclesAhead
-    }
-    if (allowOlder === true) {
-      //cycle is in the past, by process of elimination
-      // let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
+  //currentCycleShardData
+  if (
+    currentCycleShardData.timestamp <= offsetTimestamp &&
+    offsetTimestamp < currentCycleShardData.timestampEndCycle
+  ) {
+    if (currentCycleShardData.cycleNumber == null) {
+      /* prettier-ignore */ stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed. cycleNumber == null', 'currentCycleShardData.cycleNumber == null')
+      /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber fail')
       const cycle = getStoredCycleByTimestamp(offsetTimestamp)
+      console.log('CycleChain.getCycleNumberFromTimestamp getStoredCycleByTimestamp', cycle, timestamp)
       if (cycle != null) {
-        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup')
-        if(cycle.counter == null){
-          stateManager.statemanager_fatal('getCycleNumberFromTimestamp  unexpected cycle.cycleNumber == null', 'getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null')
-          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null  ${timestamp}`)
-        }
-
+        /* prettier-ignore */ stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed fatal redeemed', 'currentCycleShardData.cycleNumber == null, fatal redeemed')
+        /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber redeemed')
         return cycle.counter
       } else {
-        //nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle')
         //debug only!!!
-        //let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
-        //stateManager.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
-        let cycle: P2P.CycleCreatorTypes.CycleRecord = getNewest()
-        let cycleEstimate = currentCycleShardData.cycleNumber - Math.ceil((currentCycleShardData.timestampEndCycle - offsetTimestamp) / (cycle.duration * 1000))
-        if(cycleEstimate < 1){
-          cycleEstimate = 1
-        }
-        if(logFlags.verbose) nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle: ' + cycleEstimate)
-        return cycleEstimate
+        let cycle2 = getStoredCycleByTimestamp(offsetTimestamp)
+        /* prettier-ignore */ stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed fatal not redeemed', 'getStoredCycleByTimestamp cycleNumber == null not redeemed')
+        /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber failed to redeem')
       }
+    } else {
+      return currentCycleShardData.cycleNumber
     }
+  }
 
-    //failed to match, return -1
-    stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed final', `getCycleNumberFromTimestamp failed final ${timestamp}`)
-    return -1
+  if (currentCycleShardData.cycleNumber == null) {
+    /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber == null')
+    /* prettier-ignore */ stateManager.statemanager_fatal('getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null',`getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null ${currentCycleShardData.cycleNumber} timestamp:${timestamp}`)
+  }
 
+  //is it in the future
+  if (offsetTimestamp >= currentCycleShardData.timestampEndCycle) {
+    let cycle: P2P.CycleCreatorTypes.CycleRecord = getNewest()
+
+    let timePastCurrentCycle = offsetTimestamp - currentCycleShardData.timestampEndCycle
+    let cyclesAhead = Math.ceil(timePastCurrentCycle / (cycle.duration * 1000))
+    nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `+${cyclesAhead}`)
+
+    return currentCycleShardData.cycleNumber + cyclesAhead
+  }
+  if (allowOlder === true) {
+    //cycle is in the past, by process of elimination
+    // let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
+    const cycle = getStoredCycleByTimestamp(offsetTimestamp)
+    if (cycle != null) {
+      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup')
+      if (cycle.counter == null) {
+        /* prettier-ignore */ stateManager.statemanager_fatal('getCycleNumberFromTimestamp  unexpected cycle.cycleNumber == null', 'getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null')
+        /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null  ${timestamp}`)
+      }
+
+      return cycle.counter
+    } else {
+      //nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle')
+      //debug only!!!
+      //let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
+      //stateManager.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
+      let cycle: P2P.CycleCreatorTypes.CycleRecord = getNewest()
+      let cycleEstimate =
+        currentCycleShardData.cycleNumber -
+        Math.ceil((currentCycleShardData.timestampEndCycle - offsetTimestamp) / (cycle.duration * 1000))
+      if (cycleEstimate < 1) {
+        cycleEstimate = 1
+      }
+      if (logFlags.verbose)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle: ' + cycleEstimate)
+      return cycleEstimate
+    }
+  }
+
+  //failed to match, return -1
+  /* prettier-ignore */ stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed final', `getCycleNumberFromTimestamp failed final ${timestamp}`)
+  return -1
 }
 
 export function prune(keep: number) {
@@ -209,9 +220,7 @@ export function getDebug() {
     const actv = record.active
     const exp = record.expired
     const desr = record.desired
-    const joind = record.joinedConsensors.map(
-      (c) => `${c.externalIp}:${c.externalPort}`
-    )
+    const joind = record.joinedConsensors.map((c) => `${c.externalIp}:${c.externalPort}`)
     const actvd = record.activated.map((id) => {
       if (idToIpPort[id]) return idToIpPort[id]
       const node = nodes.get(id)
@@ -223,18 +232,10 @@ export function getDebug() {
       }
     })
     //    const rmvd = record.removed.map(id => idToPort[id])
-    const rmvd = record.removed.map((id) =>
-      idToIpPort[id] ? idToIpPort[id] : 'x' + id.slice(0, 3)
-    )
-    const lost = record.lost.map((id) =>
-      idToIpPort[id] ? idToIpPort[id] : 'x' + id.slice(0, 3)
-    )
-    const refu = record.refuted.map((id) =>
-      idToIpPort[id] ? idToIpPort[id] : 'x' + id.slice(0, 3)
-    )
-    const apopd = record.apoptosized.map((id) =>
-      idToIpPort[id] ? idToIpPort[id] : 'x' + id.slice(0, 3)
-    )
+    const rmvd = record.removed.map((id) => (idToIpPort[id] ? idToIpPort[id] : 'x' + id.slice(0, 3)))
+    const lost = record.lost.map((id) => (idToIpPort[id] ? idToIpPort[id] : 'x' + id.slice(0, 3)))
+    const refu = record.refuted.map((id) => (idToIpPort[id] ? idToIpPort[id] : 'x' + id.slice(0, 3)))
+    const apopd = record.apoptosized.map((id) => (idToIpPort[id] ? idToIpPort[id] : 'x' + id.slice(0, 3)))
     const rfshd = record.refreshedConsensors.map(
       (c) => `${c.externalIp}:${c.externalPort}-${c.counterRefreshed}`
     )

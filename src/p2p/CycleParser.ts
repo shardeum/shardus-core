@@ -4,9 +4,7 @@ import { reversed } from '../utils'
 import * as CycleCreator from './CycleCreator'
 
 export function parse(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
-  const changes = CycleCreator.submodules.map(submodule =>
-    submodule.parseRecord(record)
-  )
+  const changes = CycleCreator.submodules.map((submodule) => submodule.parseRecord(record))
   const mergedChange = deepmerge.all<P2P.CycleParserTypes.Change>(changes)
   return mergedChange
 }

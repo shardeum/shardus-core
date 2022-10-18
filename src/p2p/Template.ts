@@ -9,7 +9,7 @@ let p2pLogger: Logger
 
 /** ROUTES */
 
-const gossipRoute: P2P.P2PTypes.GossipHandler = payload => {}
+const gossipRoute: P2P.P2PTypes.GossipHandler = (payload) => {}
 
 const routes = {
   internal: {},

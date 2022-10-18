@@ -10,8 +10,8 @@ import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as Utils from './Utils'
-import {logFlags} from '../logger'
-import {getNodeRequestingJoin} from './Join'
+import { logFlags } from '../logger'
+import { getNodeRequestingJoin } from './Join'
 import { P2P as P2PTypings } from '@shardus/types'
 import * as CycleAutoScale from './CycleAutoScale'
 
@@ -28,15 +28,9 @@ class P2P extends EventEmitter {
     message?: {},
     logged?: boolean,
     tracker?: string,
-    extraTime?:number
+    extraTime?: number
   ) => Promise<any>
-  tell: (
-    nodes: any,
-    route: any,
-    message: any,
-    logged?: boolean,
-    tracker?: string
-  ) => Promise<number>
+  tell: (nodes: any, route: any, message: any, logged?: boolean, tracker?: string) => Promise<number>
   sendGossipIn: (
     type: any,
     payload: any,
@@ -132,11 +126,11 @@ class P2P extends EventEmitter {
     return CycleChain.cycles.slice(0 - amount)
   }
 
-  shutdown(){
+  shutdown() {
     CycleCreator.shutdown()
   }
 
-  configUpdated(){
+  configUpdated() {
     //todo, make this nicer!
     CycleAutoScale.configUpdated()
   }
@@ -159,11 +153,12 @@ class State extends EventEmitter {
 
   getNodeByPubKey(pubkey) {
     if (NodeList.byPubKey.has(pubkey) !== true) {
-      if (logFlags.console) console.log(
-        `getNodeByPubKey cant find ${utils.makeShortHash(
-          pubkey
-        )} in set: ${utils.stringifyReduce(NodeList.byPubKey.keys)} `
-      )
+      if (logFlags.console)
+        console.log(
+          `getNodeByPubKey cant find ${utils.makeShortHash(pubkey)} in set: ${utils.stringifyReduce(
+            NodeList.byPubKey.keys
+          )} `
+        )
     }
     return NodeList.byPubKey.get(pubkey)
   }
@@ -185,7 +180,7 @@ class State extends EventEmitter {
   // The original function in p2p.state just returns an array with all nodes that are syncing excluding self
   //     there is no concept of neighbors
   getOrderedSyncingNeighbors(node) {
-    const nodes = NodeList.othersByIdOrder.filter(e => e.status === 'syncing') // remove syncing nodes
+    const nodes = NodeList.othersByIdOrder.filter((e) => e.status === 'syncing') // remove syncing nodes
     return nodes
   }
 
@@ -246,11 +241,7 @@ function getSubsetOfNodeList(nodes, self = null) {
   // Check if self in node list
   if (!nodes[self]) {
     // stack
-    this.mainLogger.warn(
-      `Invalid node ID in 'self' field. Given ID: ${self} : ${
-        new Error().stack
-      }`
-    )
+    this.mainLogger.warn(`Invalid node ID in 'self' field. Given ID: ${self} : ${new Error().stack}`)
     return Object.values(nodes)
   }
   const nodesCopy = utils.deepCopy(nodes)
@@ -268,27 +259,19 @@ namespace archiver {
   export function sendPartitionData(partitionReceipt, paritionObject) {
     for (const nodeInfo of this.cycleRecipients) {
       const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_partition`
-      http.post(nodeUrl, { partitionReceipt, paritionObject }).catch(err => {
+      http.post(nodeUrl, { partitionReceipt, paritionObject }).catch((err) => {
         this.logError(`sendPartitionData: Failed to post to ${nodeUrl} ` + err)
       })
     }
   }
 
   // copied from p2p-archiver.js
-  export function sendTransactionData(
-    partitionNumber,
-    cycleNumber,
-    transactions
-  ) {
+  export function sendTransactionData(partitionNumber, cycleNumber, transactions) {
     for (const nodeInfo of this.cycleRecipients) {
       const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_transactions`
-      http
-        .post(nodeUrl, { partitionNumber, cycleNumber, transactions })
-        .catch(err => {
-          this.logError(
-            `sendTransactionData: Failed to post to ${nodeUrl} ` + err
-          )
-        })
+      http.post(nodeUrl, { partitionNumber, cycleNumber, transactions }).catch((err) => {
+        this.logError(`sendTransactionData: Failed to post to ${nodeUrl} ` + err)
+      })
     }
   }
 }

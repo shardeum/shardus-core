@@ -15,10 +15,10 @@ import SHARDUS_CONFIG from './config'
 export const __ShardFunctions = {
   addressToPartition,
   partitionInWrappingRange,
-  findHomeNode
+  findHomeNode,
 }
 
-const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG 
+const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG
 
 const overwriteMerge = (target, source, options) => source
 

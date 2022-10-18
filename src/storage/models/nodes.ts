@@ -14,8 +14,8 @@ const nodes = [
     joinRequestTimestamp: { type: Sequelize.BIGINT, allowNull: false },
     activeTimestamp: { type: Sequelize.BIGINT, allowNull: false },
     address: { type: Sequelize.STRING, allowNull: false },
-    status: { type: Sequelize.STRING, allowNull: false }
-  }
+    status: { type: Sequelize.STRING, allowNull: false },
+  },
 ]
 
 export default nodes

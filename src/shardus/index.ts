@@ -40,7 +40,7 @@ const allZeroes64 = '0'.repeat(64)
 const saveConsoleOutput = require('./saveConsoleOutput')
 
 const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG
-  
+
 Context.setDefaultConfigs(defaultConfigs)
 
 type RouteHandlerRegister = (route: string, authHandler: Handler, responseHandler?: Handler) => void
@@ -100,10 +100,8 @@ class Shardus extends EventEmitter {
     Context.setConfig(this.config)
     logFlags.verbose = false
 
-    let startInFatalsLogMode =
-      config && config.debug && config.debug.startInFatalsLogMode ? true : false
-    let startInErrorsLogMode =
-      config && config.debug && config.debug.startInErrorLogMode ? true : false
+    let startInFatalsLogMode = config && config.debug && config.debug.startInFatalsLogMode ? true : false
+    let startInErrorsLogMode = config && config.debug && config.debug.startInErrorLogMode ? true : false
 
     let dynamicLogMode = ''
     if (startInFatalsLogMode === true) {
@@ -123,16 +121,8 @@ class Shardus extends EventEmitter {
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
     this.appLogger = this.logger.getLogger('app')
-    this.exitHandler = new ExitHandler(
-      this.memoryReporting,
-      this.nestedCounters
-    )
-    this.storage = new Storage(
-      config.baseDir,
-      storageConfig,
-      this.logger,
-      this.profiler
-    )
+    this.exitHandler = new ExitHandler(this.memoryReporting, this.nestedCounters)
+    this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
     Context.setStorageContext(this.storage)
     this.crypto = new Crypto(this.config, this.logger, this.storage)
     Context.setCryptoContext(this.crypto)
@@ -390,37 +380,23 @@ class Shardus extends EventEmitter {
       Context.setIOContext(this.io)
       let maxArchiversSupport = 2 // Make this as part of the network config
       this.io.on('connection', (socket: any) => {
-        console.log(
-          `Archive server has subscribed to this node with socket id ${socket.id}!`
-        )
+        console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
         socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
-          console.log(
-            'Archiver has registered its public key',
-            ARCHIVER_PUBLIC_KEY
-          )
-          for (const [key, value] of Object.entries(
-            Archivers.connectedSockets
-          )) {
+          console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
+          for (const [key, value] of Object.entries(Archivers.connectedSockets)) {
             if (key === ARCHIVER_PUBLIC_KEY) {
               Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
             }
           }
-          if (
-            Object.keys(Archivers.connectedSockets).length >=
-            maxArchiversSupport
-          ) {
-            console.log(
-              `There are already ${maxArchiversSupport} archivers connected for data transfer!`
-            )
+          if (Object.keys(Archivers.connectedSockets).length >= maxArchiversSupport) {
+            console.log(`There are already ${maxArchiversSupport} archivers connected for data transfer!`)
             socket.disconnect()
             return
           }
           Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
         })
         socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
-          console.log(
-            `Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`
-          )
+          console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
           Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
           Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
         })
@@ -438,12 +414,8 @@ class Shardus extends EventEmitter {
       /** [TODO] Report lost */
       nestedCountersInstance.countEvent('lostNodes', 'timeout')
 
-      nestedCountersInstance.countRareEvent(
-        'lostNodes',
-        `timeout  ${node.internalIp}:${node.internalPort}`
-      )
-      if (this.network.statisticsInstance)
-        this.network.statisticsInstance.incrementCounter('lostNodeTimeout')
+      nestedCountersInstance.countRareEvent('lostNodes', `timeout  ${node.internalIp}:${node.internalPort}`)
+      if (this.network.statisticsInstance) this.network.statisticsInstance.incrementCounter('lostNodeTimeout')
     })
     this.network.on('error', (node) => {
       console.log('in Shardus got network error from', node)
@@ -461,10 +433,7 @@ class Shardus extends EventEmitter {
     // Setup other modules
     this.debug = new Debug(this.config.baseDir, this.network)
     this.debug.addToArchive(this.logger.logDir, './logs')
-    this.debug.addToArchive(
-      path.parse(this.storage.storage.storageConfig.options.storage).dir,
-      './db'
-    )
+    this.debug.addToArchive(path.parse(this.storage.storage.storageConfig.options.storage).dir, './db')
 
     this.statistics = new Statistics(
       this.config.baseDir,
@@ -481,15 +450,10 @@ class Shardus extends EventEmitter {
         ],
         watchers: {
           queueLength: () =>
-            this.stateManager
-              ? this.stateManager.transactionQueue.newAcceptedTxQueue.length
-              : 0,
+            this.stateManager ? this.stateManager.transactionQueue.newAcceptedTxQueue.length : 0,
           executeQueueLength: () =>
-              this.stateManager
-                ? this.stateManager.transactionQueue.getExecuteQueueLength()
-                : 0,              
-          serverLoad: () =>
-            this.loadDetection ? this.loadDetection.getCurrentLoad() : 0,
+            this.stateManager ? this.stateManager.transactionQueue.getExecuteQueueLength() : 0,
+          serverLoad: () => (this.loadDetection ? this.loadDetection.getCurrentLoad() : 0),
         },
         timers: ['txTimeInQueue'],
         manualStats: ['netInternalDuty', 'netExternalDuty', 'cpuPercent'],
@@ -504,10 +468,7 @@ class Shardus extends EventEmitter {
 
     this.statistics
 
-    this.loadDetection = new LoadDetection(
-      this.config.loadDetection,
-      this.statistics
-    )
+    this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
     this.loadDetection.on('highLoad', () => {
       // console.log(`High load detected Cycle ${currentCycle}, Quarter: ${currentQuarter}`)
       nestedCountersInstance.countEvent('loadRelated', 'highLoad')
@@ -521,10 +482,7 @@ class Shardus extends EventEmitter {
 
     this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
 
-    this.rateLimiting = new RateLimiting(
-      this.config.rateLimiting,
-      this.loadDetection
-    )
+    this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection)
 
     if (this.app) {
       this._createAndLinkStateManager()
@@ -543,13 +501,13 @@ class Shardus extends EventEmitter {
 
     this.reporter = this.config.reporting.report
       ? new Reporter(
-        this.config.reporting,
-        this.logger,
-        this.statistics,
-        this.stateManager,
-        this.profiler,
-        this.loadDetection
-      )
+          this.config.reporting,
+          this.logger,
+          this.statistics,
+          this.stateManager,
+          this.profiler,
+          this.loadDetection
+        )
       : null
     Context.setReporterContext(this.reporter)
 
@@ -603,8 +561,7 @@ class Shardus extends EventEmitter {
     })
     Self.emitter.on('error', (e) => {
       console.log(e.message + ' at ' + e.stack)
-      if (logFlags.debug)
-        this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
+      if (logFlags.debug) this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
       // normally fatal error keys should not be variable ut this seems like an ok exception for now
       this.shardus_fatal(
         `onError_ex` + e.message + ' at ' + e.stack,
@@ -666,10 +623,7 @@ class Shardus extends EventEmitter {
         'Shardus: caught apoptosized event; finished clean up'
       )
 */
-      nestedCountersInstance.countRareEvent(
-        'fatal',
-        'exitCleanly: apoptosized (not technically fatal)'
-      )
+      nestedCountersInstance.countRareEvent('fatal', 'exitCleanly: apoptosized (not technically fatal)')
       this.mainLogger.error('exitCleanly: apoptosized')
       this.mainLogger.error(message)
       this.mainLogger.error(callstack)
@@ -696,10 +650,10 @@ class Shardus extends EventEmitter {
 
       // need to make sure sync is finish or we may not have the global account
       // even worse, the dapp may not have initialized storage yet
-      if(this.stateManager.appFinishedSyncing === true){
+      if (this.stateManager.appFinishedSyncing === true) {
         this.updateConfigChangeQueue(lastCycle)
       }
-      
+
       this.updateDebug(lastCycle)
     })
   }
@@ -729,9 +683,7 @@ class Shardus extends EventEmitter {
    */
   _unregisterListener(event) {
     if (!this._listeners[event]) {
-      this.mainLogger.warn(
-        `This event listener doesn't exist! Event: \`${event}\` in Shardus`
-      )
+      this.mainLogger.warn(`This event listener doesn't exist! Event: \`${event}\` in Shardus`)
       return
     }
     const entry = this._listeners[event]
@@ -815,8 +767,7 @@ class Shardus extends EventEmitter {
       }
       return
     }
-    if (this.stateManager)
-      await this.stateManager.accountSync.initialSyncMain(3)
+    if (this.stateManager) await this.stateManager.accountSync.initialSyncMain(3)
     // if (this.stateManager) await this.stateManager.accountSync.syncStateDataFast(3) // fast mode
     console.log('syncAppData')
     if (this.p2p.isFirstSeed) {
@@ -905,22 +856,13 @@ class Shardus extends EventEmitter {
 
     // Check if Consensor is ready to receive txs before processing it further
     if (!this.appProvided)
-      throw new Error(
-        'Please provide an App object to Shardus.setup before calling Shardus.put'
-      )
+      throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
     if (logFlags.verbose)
-      this.mainLogger.debug(
-        `Start of injectTransaction ${JSON.stringify(
-          tx
-        )} set:${set} global:${global}`
-      ) // not reducing tx here so we can get the long hashes
+      this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(tx)} set:${set} global:${global}`) // not reducing tx here so we can get the long hashes
     if (!this.stateManager.accountSync.dataSyncMainPhaseComplete) {
       this.statistics.incrementCounter('txRejected')
-      nestedCountersInstance.countEvent(
-        'rejected',
-        '!dataSyncMainPhaseComplete'
-      )
-      return { success: false, reason: 'Node is still syncing.', status:500 }
+      nestedCountersInstance.countEvent('rejected', '!dataSyncMainPhaseComplete')
+      return { success: false, reason: 'Node is still syncing.', status: 500 }
     }
     if (!this.stateManager.hasCycleShardData()) {
       this.statistics.incrementCounter('txRejected')
@@ -928,7 +870,7 @@ class Shardus extends EventEmitter {
       return {
         success: false,
         reason: 'Not ready to accept transactions, shard calculations pending',
-        status: 500
+        status: 500,
       }
     }
     if (set === false) {
@@ -937,9 +879,7 @@ class Shardus extends EventEmitter {
           // This ok because we are initializing a global at the set time period
         } else {
           if (logFlags.verbose)
-            this.mainLogger.debug(
-              `txRejected ${JSON.stringify(tx)} set:${set} global:${global}`
-            )
+            this.mainLogger.debug(`txRejected ${JSON.stringify(tx)} set:${set} global:${global}`)
 
           this.statistics.incrementCounter('txRejected')
           nestedCountersInstance.countEvent('rejected', '!allowTransactions')
@@ -965,7 +905,7 @@ class Shardus extends EventEmitter {
       this.statistics.incrementCounter('txRejected')
       nestedCountersInstance.countEvent('loadRelated', 'txRejected')
       nestedCountersInstance.countEvent('rejected', 'isOverloaded')
-      return { success: false, reason: 'Maximum load exceeded.', status:500 }
+      return { success: false, reason: 'Maximum load exceeded.', status: 500 }
     }
 
     try {
@@ -974,11 +914,7 @@ class Shardus extends EventEmitter {
       const txId = this.crypto.hash(tx)
       let timestampReceipt: ShardusTypes.TimestampReceipt
       if (!injectedTimestamp) {
-        timestampReceipt =
-          await this.stateManager.transactionConsensus.askTxnTimestampFromNode(
-            tx,
-            txId
-          )
+        timestampReceipt = await this.stateManager.transactionConsensus.askTxnTimestampFromNode(tx, txId)
       }
       if (!injectedTimestamp && !timestampReceipt) {
         this.shardus_fatal(
@@ -990,15 +926,11 @@ class Shardus extends EventEmitter {
         return {
           success: false,
           reason: 'Transaction timestamp cannot be determined.',
-          status: 500
+          status: 500,
         }
       }
       let timestampedTx
-      if (
-        !injectedTimestamp &&
-        timestampReceipt &&
-        timestampReceipt.timestamp
-      ) {
+      if (!injectedTimestamp && timestampReceipt && timestampReceipt.timestamp) {
         timestampedTx = {
           tx,
           timestampReceipt,
@@ -1007,10 +939,7 @@ class Shardus extends EventEmitter {
         timestampedTx = { tx }
       }
       // Perform basic validation of the transaction fields
-      if (logFlags.verbose)
-        this.mainLogger.debug(
-          'Performing initial validation of the transaction'
-        )
+      if (logFlags.verbose) this.mainLogger.debug('Performing initial validation of the transaction')
 
       let appData = {}
 
@@ -1022,9 +951,7 @@ class Shardus extends EventEmitter {
       const validateResult = this.app.validate(timestampedTx, appData)
       if (validateResult.success === false) {
         // 400 is a code for bad tx or client faulty
-        validateResult.status = validateResult.status
-          ? validateResult.status
-          : 400
+        validateResult.status = validateResult.status ? validateResult.status : 400
         return validateResult
       }
 
@@ -1039,10 +966,7 @@ class Shardus extends EventEmitter {
         txExpireTimeMs = 2 * 10 * 1000 //todo consider if this should be a config.
       }
 
-      if (
-        inRangeOfCurrentTime(timestamp, txExpireTimeMs, txExpireTimeMs) ===
-        false
-      ) {
+      if (inRangeOfCurrentTime(timestamp, txExpireTimeMs, txExpireTimeMs) === false) {
         this.shardus_fatal(
           `put_txExpired`,
           `Transaction Expired: timestamp:${timestamp} now:${Date.now()} diff(now-ts):${
@@ -1050,10 +974,7 @@ class Shardus extends EventEmitter {
           }  ${utils.stringifyReduce(tx)} `
         )
         this.statistics.incrementCounter('txRejected')
-        nestedCountersInstance.countEvent(
-          'rejected',
-          '_isTransactionTimestampExpired'
-        )
+        nestedCountersInstance.countEvent('rejected', '_isTransactionTimestampExpired')
         return { success: false, reason: 'Transaction Expired', status: 400 }
       }
 
@@ -1065,11 +986,12 @@ class Shardus extends EventEmitter {
         txId: id,
         keys,
         data: timestampedTx,
-        appData
+        appData,
       }
       // console.log('acceptedTX', acceptedTX)
       if (logFlags.verbose) this.mainLogger.debug('Transaction validated')
-      if(global === false){ //temp way to make global modifying TXs not over count
+      if (global === false) {
+        //temp way to make global modifying TXs not over count
         this.statistics.incrementCounter('txInjected')
       }
       this.logger.playbackLogNote(
@@ -1089,28 +1011,19 @@ class Shardus extends EventEmitter {
       // Pass received txs to any subscribed 'DATA' receivers
       // this.io.emit('DATA', tx)
     } catch (err) {
-      this.shardus_fatal(
-        `put_ex_` + err.message,
-        `Put: Failed to process transaction. Exception: ${err}`
-      )
-      this.fatalLogger.fatal(
-        'Put: ' + err.name + ': ' + err.message + ' at ' + err.stack
-      )
+      this.shardus_fatal(`put_ex_` + err.message, `Put: Failed to process transaction. Exception: ${err}`)
+      this.fatalLogger.fatal('Put: ' + err.name + ': ' + err.message + ' at ' + err.stack)
       return {
         success: false,
-        reason: `Failed to process transaction: ${utils.stringifyReduce(
-          tx
-        )} ${err}`,
-        status: 500 // 500 status code means transaction is generally failed 
+        reason: `Failed to process transaction: ${utils.stringifyReduce(tx)} ${err}`,
+        status: 500, // 500 status code means transaction is generally failed
       }
     } finally {
       this.profiler.profileSectionEnd('put')
     }
 
     if (logFlags.verbose) {
-      this.mainLogger.debug(
-        `End of injectTransaction ${utils.stringifyReduce(tx)}`
-      )
+      this.mainLogger.debug(`End of injectTransaction ${utils.stringifyReduce(tx)}`)
     }
 
     return {
@@ -1189,10 +1102,10 @@ class Shardus extends EventEmitter {
       accountData: [],
       accountWrites: [],
       appDefinedData: {},
-      failed:false,
-      failMessage:null,
-      appReceiptData:null,
-      appReceiptDataHash:null
+      failed: false,
+      failMessage: null,
+      appReceiptData: null,
+      appReceiptDataHash: null,
     }
     return replyObject
   }
@@ -1206,7 +1119,7 @@ class Shardus extends EventEmitter {
     resultObject.appReceiptDataHash = appReceiptDataHash
   }
 
-  applyResponseSetFailed(resultObject: ShardusTypes.ApplyResponse, failMessage:string){
+  applyResponseSetFailed(resultObject: ShardusTypes.ApplyResponse, failMessage: string) {
     resultObject.failed = true
     resultObject.failMessage = failMessage
   }
@@ -1229,9 +1142,7 @@ class Shardus extends EventEmitter {
     }
     //@ts-ignore
     resultObject.stateTableResults.push(state)
-    let foundAccountData = resultObject.accountData.find(
-      (a) => a.accountId === accountId
-    )
+    let foundAccountData = resultObject.accountData.find((a) => a.accountId === accountId)
     if (foundAccountData) {
       foundAccountData = {
         ...foundAccountData,
@@ -1279,11 +1190,7 @@ class Shardus extends EventEmitter {
   }
 
   tryInvolveAccount(txId: string, address: string, isRead: boolean): boolean {
-    const result = this.stateManager.transactionQueue.tryInvloveAccount(
-      txId,
-      address,
-      isRead
-    )
+    const result = this.stateManager.transactionQueue.tryInvloveAccount(txId, address, isRead)
     return result
   }
 
@@ -1312,16 +1219,16 @@ class Shardus extends EventEmitter {
     return this.stateManager.getRemoteAccount(address)
   }
 
-  getConsenusGroupForAccount(address:string): ShardusTypes.Node[] {
+  getConsenusGroupForAccount(address: string): ShardusTypes.Node[] {
     return this.stateManager.transactionQueue.getConsenusGroupForAccount(address)
   }
 
-  getRandomConsensusNodeForAccount(address:string): ShardusTypes.Node {
+  getRandomConsensusNodeForAccount(address: string): ShardusTypes.Node {
     return this.stateManager.transactionQueue.getRandomConsensusNodeForAccount(address)
   }
 
-  isAccountRemote(address:string):boolean {
-    return this.stateManager.transactionQueue.isAccountRemote(address) 
+  isAccountRemote(address: string): boolean {
+    return this.stateManager.transactionQueue.isAccountRemote(address)
   }
 
   /**
@@ -1376,20 +1283,18 @@ class Shardus extends EventEmitter {
   //   await this.stateManager.checkAndSetAccountData([wrappedResponse], 'debugSetAccountState', false)
   // }
 
-
   /**
    * This is for a dapp to restore a bunch of account data in a debug situation.
    * This will call back into the dapp and instruct it to commit each account
    * This will also update shardus values.
    * There is a bug with re-updating the accounts copy db though.
-   * @param accountCopies 
+   * @param accountCopies
    */
-  async debugCommitAccountCopies(accountCopies: ShardusTypes.AccountsCopy[]){
+  async debugCommitAccountCopies(accountCopies: ShardusTypes.AccountsCopy[]) {
     await this.stateManager._commitAccountCopies(accountCopies)
   }
 
   async forwardAccounts(accounts: any[]) {
-  
     await Archivers.forwardAccounts(accounts)
   }
 
@@ -1397,7 +1302,6 @@ class Shardus extends EventEmitter {
   getDevPublicKey() {
     return getDevPublicKey()
   }
-
 
   /**
    * Checks if this node is active in the network
@@ -1427,8 +1331,7 @@ class Shardus extends EventEmitter {
    * @returns {App}
    */
   _getApplicationInterface(application) {
-    if (logFlags.debug)
-      this.mainLogger.debug('Start of _getApplicationInterfaces()')
+    if (logFlags.debug) this.mainLogger.debug('Start of _getApplicationInterfaces()')
     const applicationInterfaceImpl: any = {}
     try {
       if (application == null) {
@@ -1437,56 +1340,58 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.validate === 'function') {
-        applicationInterfaceImpl.validate = (inTx, appData) =>
-          application.validate(inTx, appData)
+        applicationInterfaceImpl.validate = (inTx, appData) => application.validate(inTx, appData)
       } else if (typeof application.validateTxnFields === 'function') {
         /**
          * Compatibility layer for Apps that use the old validateTxnFields fn
          * instead of the new validate fn
          */
         applicationInterfaceImpl.validate = (inTx, appData) => {
-          const oldResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(inTx, appData)
+          const oldResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(
+            inTx,
+            appData
+          )
           const newResult = {
             success: oldResult.success,
-            reason: oldResult.reason
+            reason: oldResult.reason,
           }
           return newResult
         }
       } else {
-        throw new Error(
-          'Missing required interface function. validate()'
-        )
+        throw new Error('Missing required interface function. validate()')
       }
 
       if (typeof application.crack === 'function') {
-        applicationInterfaceImpl.crack = (inTx, appData) =>
-          application.crack(inTx, appData)
-      } else if (typeof application.getKeyFromTransaction === 'function' && typeof application.validateTxnFields === 'function') {
+        applicationInterfaceImpl.crack = (inTx, appData) => application.crack(inTx, appData)
+      } else if (
+        typeof application.getKeyFromTransaction === 'function' &&
+        typeof application.validateTxnFields === 'function'
+      ) {
         /**
          * Compatibility layer for Apps that use the old getKeyFromTransaction
          * fn instead of the new crack fn
          */
         applicationInterfaceImpl.crack = (inTx) => {
-          const oldGetKeyFromTransactionResult: ShardusTypes.TransactionKeys = application.getKeyFromTransaction(inTx)
-          const oldValidateTxnFieldsResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(inTx)
+          const oldGetKeyFromTransactionResult: ShardusTypes.TransactionKeys =
+            application.getKeyFromTransaction(inTx)
+          const oldValidateTxnFieldsResult: ShardusTypes.IncomingTransactionResult =
+            application.validateTxnFields(inTx)
           const newResult = {
             timestamp: oldValidateTxnFieldsResult.txnTimestamp,
             id: this.crypto.hash(inTx), // [TODO] [URGENT] We really shouldn't be doing this and should change all apps to use the new way and do their own hash
-            keys: oldGetKeyFromTransactionResult
+            keys: oldGetKeyFromTransactionResult,
           }
           return newResult
         }
       } else {
-        throw new Error(
-          'Missing required interface function. validate()'
-        )
+        throw new Error('Missing required interface function. validate()')
       }
 
       if (typeof application.txPreCrackData === 'function') {
         applicationInterfaceImpl.txPreCrackData = async (tx, appData) =>
           application.txPreCrackData(tx, appData)
       } else {
-        //this is optional.  
+        //this is optional.
         //const thisPtr = this
         applicationInterfaceImpl.txPreCrackData = async function () {
           //thisPtr.mainLogger.debug('no app.txPreCrackData() function defined')
@@ -1497,100 +1402,56 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.getTimestampFromTransaction = (inTx) =>
           application.getTimestampFromTransaction(inTx)
       } else {
-        throw new Error(
-          'Missing requried interface function.getTimestampFromTransaction()'
-        )
+        throw new Error('Missing requried interface function.getTimestampFromTransaction()')
       }
 
       if (typeof application.apply === 'function') {
-        applicationInterfaceImpl.apply = (inTx, wrappedStates) =>
-          application.apply(inTx, wrappedStates)
+        applicationInterfaceImpl.apply = (inTx, wrappedStates) => application.apply(inTx, wrappedStates)
       } else {
         throw new Error('Missing required interface function. apply()')
       }
 
       if (typeof application.transactionReceiptPass === 'function') {
-        applicationInterfaceImpl.transactionReceiptPass = async (
-          tx,
-          wrappedStates,
-          applyResponse
-        ) =>
+        applicationInterfaceImpl.transactionReceiptPass = async (tx, wrappedStates, applyResponse) =>
           application.transactionReceiptPass(tx, wrappedStates, applyResponse)
       } else {
-        applicationInterfaceImpl.transactionReceiptPass = async function (
-          tx,
-          wrappedStates,
-          applyResponse
-        ) { }
+        applicationInterfaceImpl.transactionReceiptPass = async function (tx, wrappedStates, applyResponse) {}
       }
 
       if (typeof application.transactionReceiptFail === 'function') {
-        applicationInterfaceImpl.transactionReceiptFail = async (
-          tx,
-          wrappedStates,
-          applyResponse
-        ) =>
+        applicationInterfaceImpl.transactionReceiptFail = async (tx, wrappedStates, applyResponse) =>
           application.transactionReceiptFail(tx, wrappedStates, applyResponse)
       } else {
-        applicationInterfaceImpl.transactionReceiptFail = async function (
-          tx,
-          wrappedStates,
-          applyResponse
-        ) { }
+        applicationInterfaceImpl.transactionReceiptFail = async function (tx, wrappedStates, applyResponse) {}
       }
 
       if (typeof application.updateAccountFull === 'function') {
-        applicationInterfaceImpl.updateAccountFull = async (
-          wrappedStates,
-          localCache,
-          applyResponse
-        ) =>
-          application.updateAccountFull(
-            wrappedStates,
-            localCache,
-            applyResponse
-          )
+        applicationInterfaceImpl.updateAccountFull = async (wrappedStates, localCache, applyResponse) =>
+          application.updateAccountFull(wrappedStates, localCache, applyResponse)
       } else {
-        throw new Error(
-          'Missing required interface function. updateAccountFull()'
-        )
+        throw new Error('Missing required interface function. updateAccountFull()')
       }
 
       if (typeof application.updateAccountPartial === 'function') {
-        applicationInterfaceImpl.updateAccountPartial = async (
-          wrappedStates,
-          localCache,
-          applyResponse
-        ) =>
-          application.updateAccountPartial(
-            wrappedStates,
-            localCache,
-            applyResponse
-          )
+        applicationInterfaceImpl.updateAccountPartial = async (wrappedStates, localCache, applyResponse) =>
+          application.updateAccountPartial(wrappedStates, localCache, applyResponse)
       } else {
-        throw new Error(
-          'Missing required interface function. updateAccountPartial()'
-        )
+        throw new Error('Missing required interface function. updateAccountPartial()')
       }
 
       if (typeof application.getRelevantData === 'function') {
         applicationInterfaceImpl.getRelevantData = async (accountId, tx) =>
           application.getRelevantData(accountId, tx)
       } else {
-        throw new Error(
-          'Missing required interface function. getRelevantData()'
-        )
+        throw new Error('Missing required interface function. getRelevantData()')
       }
 
       if (typeof application.getStateId === 'function') {
-        applicationInterfaceImpl.getStateId = async (
-          accountAddress,
-          mustExist
-        ) => application.getStateId(accountAddress, mustExist)
+        applicationInterfaceImpl.getStateId = async (accountAddress, mustExist) =>
+          application.getStateId(accountAddress, mustExist)
       } else {
         // throw new Error('Missing required interface function. getStateId()')
-        if (logFlags.debug)
-          this.mainLogger.debug('getStateId not used by global server')
+        if (logFlags.debug) this.mainLogger.debug('getStateId not used by global server')
       }
 
       if (typeof application.close === 'function') {
@@ -1623,11 +1484,8 @@ class Shardus extends EventEmitter {
       // Provides the functionality defined for /get_accounts API
       // Max_records - limits the number of records returned
       if (typeof application.getAccountData === 'function') {
-        applicationInterfaceImpl.getAccountData = async (
-          accountStart,
-          accountEnd,
-          maxRecords
-        ) => application.getAccountData(accountStart, accountEnd, maxRecords)
+        applicationInterfaceImpl.getAccountData = async (accountStart, accountEnd, maxRecords) =>
+          application.getAccountData(accountStart, accountEnd, maxRecords)
       } else {
         throw new Error('Missing required interface function. getAccountData()')
       }
@@ -1652,18 +1510,13 @@ class Shardus extends EventEmitter {
             accountOffset
           )
       } else {
-        throw new Error(
-          'Missing required interface function. getAccountDataByRange()'
-        )
+        throw new Error('Missing required interface function. getAccountDataByRange()')
       }
 
       if (typeof application.calculateAccountHash === 'function') {
-        applicationInterfaceImpl.calculateAccountHash = (account) =>
-          application.calculateAccountHash(account)
+        applicationInterfaceImpl.calculateAccountHash = (account) => application.calculateAccountHash(account)
       } else {
-        throw new Error(
-          'Missing required interface function. calculateAccountHash()'
-        )
+        throw new Error('Missing required interface function. calculateAccountHash()')
       }
 
       // App.set_account_data (Acc_records)
@@ -1692,26 +1545,19 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.deleteAccountData = async (addressList) =>
           application.deleteAccountData(addressList)
       } else {
-        throw new Error(
-          'Missing required interface function. deleteAccountData()'
-        )
+        throw new Error('Missing required interface function. deleteAccountData()')
       }
 
       if (typeof application.getAccountDataByList === 'function') {
         applicationInterfaceImpl.getAccountDataByList = async (addressList) =>
           application.getAccountDataByList(addressList)
       } else {
-        throw new Error(
-          'Missing required interface function. getAccountDataByList()'
-        )
+        throw new Error('Missing required interface function. getAccountDataByList()')
       }
       if (typeof application.deleteLocalAccountData === 'function') {
-        applicationInterfaceImpl.deleteLocalAccountData = async () =>
-          application.deleteLocalAccountData()
+        applicationInterfaceImpl.deleteLocalAccountData = async () => application.deleteLocalAccountData()
       } else {
-        throw new Error(
-          'Missing required interface function. deleteLocalAccountData()'
-        )
+        throw new Error('Missing required interface function. deleteLocalAccountData()')
       }
       if (typeof application.getAccountDebugValue === 'function') {
         applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) =>
@@ -1723,8 +1569,7 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.canDebugDropTx === 'function') {
-        applicationInterfaceImpl.canDebugDropTx = (tx) =>
-          application.canDebugDropTx(tx)
+        applicationInterfaceImpl.canDebugDropTx = (tx) => application.canDebugDropTx(tx)
       } else {
         applicationInterfaceImpl.canDebugDropTx = (tx) => true
       }
@@ -1742,24 +1587,13 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.dataSummaryInit = async (blob, accountData) =>
           application.dataSummaryInit(blob, accountData)
       } else {
-        applicationInterfaceImpl.dataSummaryInit = async function (
-          blob,
-          accountData
-        ) {
+        applicationInterfaceImpl.dataSummaryInit = async function (blob, accountData) {
           //thisPtr.mainLogger.debug('no app.dataSummaryInit() function defined')
         }
       }
       if (typeof application.dataSummaryUpdate === 'function') {
-        applicationInterfaceImpl.dataSummaryUpdate = async (
-          blob,
-          accountDataBefore,
-          accountDataAfter
-        ) =>
-          application.dataSummaryUpdate(
-            blob,
-            accountDataBefore,
-            accountDataAfter
-          )
+        applicationInterfaceImpl.dataSummaryUpdate = async (blob, accountDataBefore, accountDataAfter) =>
+          application.dataSummaryUpdate(blob, accountDataBefore, accountDataAfter)
       } else {
         applicationInterfaceImpl.dataSummaryUpdate = async function (
           blob,
@@ -1770,32 +1604,20 @@ class Shardus extends EventEmitter {
         }
       }
       if (typeof application.txSummaryUpdate === 'function') {
-        applicationInterfaceImpl.txSummaryUpdate = async (
-          blob,
-          tx,
-          wrappedStates
-        ) => application.txSummaryUpdate(blob, tx, wrappedStates)
+        applicationInterfaceImpl.txSummaryUpdate = async (blob, tx, wrappedStates) =>
+          application.txSummaryUpdate(blob, tx, wrappedStates)
       } else {
-        applicationInterfaceImpl.txSummaryUpdate = async function (
-          blob,
-          tx,
-          wrappedStates
-        ) {
+        applicationInterfaceImpl.txSummaryUpdate = async function (blob, tx, wrappedStates) {
           //thisPtr.mainLogger.debug('no app.txSummaryUpdate() function defined')
         }
       }
 
       if (typeof application.getAccountTimestamp === 'function') {
         //getAccountTimestamp(accountAddress, mustExist = true)
-        applicationInterfaceImpl.getAccountTimestamp = async (
-          accountAddress,
-          mustExist
-        ) => application.getAccountTimestamp(accountAddress, mustExist)
+        applicationInterfaceImpl.getAccountTimestamp = async (accountAddress, mustExist) =>
+          application.getAccountTimestamp(accountAddress, mustExist)
       } else {
-        applicationInterfaceImpl.getAccountTimestamp = async function (
-          accountAddress,
-          mustExist
-        ) {
+        applicationInterfaceImpl.getAccountTimestamp = async function (accountAddress, mustExist) {
           //thisPtr.mainLogger.debug('no app.getAccountTimestamp() function defined')
           return 0
         }
@@ -1805,9 +1627,7 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.getTimestampAndHashFromAccount = (account) =>
           application.getTimestampAndHashFromAccount(account)
       } else {
-        applicationInterfaceImpl.getTimestampAndHashFromAccount = function (
-          account
-        ) {
+        applicationInterfaceImpl.getTimestampAndHashFromAccount = function (account) {
           return {
             timestamp: 0,
             hash: 'getTimestampAndHashFromAccount not impl',
@@ -1826,18 +1646,10 @@ class Shardus extends EventEmitter {
         `getAppInterface_ex`,
         `Required application interface not implemented. Exception: ${ex}`
       )
-      this.fatalLogger.fatal(
-        '_getApplicationInterface: ' +
-        ex.name +
-        ': ' +
-        ex.message +
-        ' at ' +
-        ex.stack
-      )
+      this.fatalLogger.fatal('_getApplicationInterface: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       throw new Error(ex)
     }
-    if (logFlags.debug)
-      this.mainLogger.debug('End of _getApplicationInterfaces()')
+    if (logFlags.debug) this.mainLogger.debug('End of _getApplicationInterfaces()')
 
     // hack to force this to the correct answer.. not sure why other type correction methods did not work..
     return /** @type {App} */ /** @type {unknown} */ applicationInterfaceImpl
@@ -1849,94 +1661,47 @@ class Shardus extends EventEmitter {
    */
   _registerRoutes() {
     // DEBUG routes
-    this.network.registerExternalPost(
-      'exit',
-      isDebugModeMiddleware,
-      async (req, res) => {
-        res.json({ success: true })
-        await this.shutdown()
-      }
-    )
+    this.network.registerExternalPost('exit', isDebugModeMiddleware, async (req, res) => {
+      res.json({ success: true })
+      await this.shutdown()
+    })
 
-    this.network.registerExternalGet(
-      'config',
-      isDebugModeMiddleware,
-      async (req, res) => {
-        res.json({ config: this.config })
-      }
-    )
-    this.network.registerExternalGet(
-      'netconfig',
-      async (req, res) => {
-        res.json({ config: netConfig })
-      }
-    )
+    this.network.registerExternalGet('config', isDebugModeMiddleware, async (req, res) => {
+      res.json({ config: this.config })
+    })
+    this.network.registerExternalGet('netconfig', async (req, res) => {
+      res.json({ config: netConfig })
+    })
     // FOR internal testing. NEEDS to be removed for security purposes
-    this.network.registerExternalPost(
-      'testGlobalAccountTX',
-      isDebugModeMiddleware,
-      async (req, res) => {
-        try {
-          this.mainLogger.debug(
-            `testGlobalAccountTX: req:${utils.stringifyReduce(req.body)}`
-          )
-          const tx = req.body.tx
-          this.put(tx, false, true)
-          res.json({ success: true })
-        } catch (ex) {
-          this.mainLogger.debug(
-            'testGlobalAccountTX:' +
-            ex.name +
-            ': ' +
-            ex.message +
-            ' at ' +
-            ex.stack
-          )
-          this.shardus_fatal(
-            `registerExternalPost_ex`,
-            'testGlobalAccountTX:' +
-            ex.name +
-            ': ' +
-            ex.message +
-            ' at ' +
-            ex.stack
-          )
-        }
+    this.network.registerExternalPost('testGlobalAccountTX', isDebugModeMiddleware, async (req, res) => {
+      try {
+        this.mainLogger.debug(`testGlobalAccountTX: req:${utils.stringifyReduce(req.body)}`)
+        const tx = req.body.tx
+        this.put(tx, false, true)
+        res.json({ success: true })
+      } catch (ex) {
+        this.mainLogger.debug('testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.shardus_fatal(
+          `registerExternalPost_ex`,
+          'testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack
+        )
       }
-    )
+    })
 
-    this.network.registerExternalPost(
-      'testGlobalAccountTXSet',
-      isDebugModeMiddleware,
-      async (req, res) => {
-        try {
-          this.mainLogger.debug(
-            `testGlobalAccountTXSet: req:${utils.stringifyReduce(req.body)}`
-          )
-          const tx = req.body.tx
-          this.put(tx, true, true)
-          res.json({ success: true })
-        } catch (ex) {
-          this.mainLogger.debug(
-            'testGlobalAccountTXSet:' +
-            ex.name +
-            ': ' +
-            ex.message +
-            ' at ' +
-            ex.stack
-          )
-          this.shardus_fatal(
-            `registerExternalPost2_ex`,
-            'testGlobalAccountTXSet:' +
-            ex.name +
-            ': ' +
-            ex.message +
-            ' at ' +
-            ex.stack
-          )
-        }
+    this.network.registerExternalPost('testGlobalAccountTXSet', isDebugModeMiddleware, async (req, res) => {
+      try {
+        this.mainLogger.debug(`testGlobalAccountTXSet: req:${utils.stringifyReduce(req.body)}`)
+        const tx = req.body.tx
+        this.put(tx, true, true)
+        res.json({ success: true })
+      } catch (ex) {
+        this.mainLogger.debug('testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.shardus_fatal(
+          `registerExternalPost2_ex`,
+          'testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack
+        )
       }
-    )
+    })
   }
 
   /**
@@ -1999,8 +1764,7 @@ class Shardus extends EventEmitter {
 
     const txnAge = currNodeTimestamp - timestamp
     if (logFlags.debug)
-      this.mainLogger
-        .debug(`Transaction Timestamp: ${timestamp} CurrNodeTimestamp: ${currNodeTimestamp}
+      this.mainLogger.debug(`Transaction Timestamp: ${timestamp} CurrNodeTimestamp: ${currNodeTimestamp}
     txnExprationTime: ${txnExprationTime}   TransactionAge: ${txnAge}`)
 
     // this.mainLogger.debug(`TransactionAge: ${txnAge}`)
@@ -2014,9 +1778,7 @@ class Shardus extends EventEmitter {
 
   async updateConfigChangeQueue(lastCycle: ShardusTypes.Cycle) {
     if (lastCycle == null) return
-    let accounts = await this.app.getAccountDataByList([
-      changeListGlobalAccount,
-    ])
+    let accounts = await this.app.getAccountDataByList([changeListGlobalAccount])
     if (accounts != null && accounts.length === 1) {
       let account = accounts[0]
       // @ts-ignore // TODO where is listOfChanges coming from here? I don't think it should exist on data
@@ -2060,10 +1822,7 @@ class Shardus extends EventEmitter {
         } else {
           existingObject[key] = value
           this.mainLogger.info(`patched ${key} to ${value}`)
-          nestedCountersInstance.countEvent(
-            'config',
-            `patched ${key} to ${value}`
-          )
+          nestedCountersInstance.countEvent('config', `patched ${key} to ${value}`)
         }
       }
     }
@@ -2088,11 +1847,7 @@ class Shardus extends EventEmitter {
       //nestedCountersInstance.resetRareCounters()
       profilerInstance.clearScopedTimes()
 
-      if (
-        countEndpointStop === -1 ||
-        countEndpointStop <= countEndpointStart ||
-        countEndpointStop == null
-      ) {
+      if (countEndpointStop === -1 || countEndpointStop <= countEndpointStart || countEndpointStop == null) {
         this.config.debug.countEndpointStop = countEndpointStart + 2
       }
     }
@@ -2104,10 +1859,7 @@ class Shardus extends EventEmitter {
       scopedReport.cycle = lastCycle.counter
       scopedReport.node = `${Self.ip}:${Self.port}`
       scopedReport.id = utils.makeShortHash(Self.id)
-      nestedCountersInstance.countRareEvent(
-        'scopedTimeReport',
-        JSON.stringify(scopedReport)
-      )
+      nestedCountersInstance.countRareEvent('scopedTimeReport', JSON.stringify(scopedReport))
     }
   }
 
@@ -2128,9 +1880,6 @@ class Shardus extends EventEmitter {
       this.fatalLogger.fatal(log)
     }
   }
-
-
-
 }
 
 // tslint:disable-next-line: no-default-export

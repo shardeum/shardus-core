@@ -44,16 +44,14 @@ const gossipRouteName = 'apoptosis'
 let p2pLogger
 const proposals: { [id: string]: P2P.ApoptosisTypes.SignedApoptosisProposal } = {}
 
-
-
 /** ROUTES */
 
 const stopExternalRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'stop',
   handler: (_req, res) => {
-    if (isDebugMode()){
-      res.json({status: 'goodbye cruel world'})
+    if (isDebugMode()) {
+      res.json({ status: 'goodbye cruel world' })
       apoptosizeSelf('Apoptosis called at stopExternalRoute => src/p2p/Apoptosis.ts')
     }
   },
@@ -63,8 +61,8 @@ const failExternalRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'fail',
   handler: (_req, res) => {
-    if (isDebugMode()){
-      warn ('fail route invoked in Apoptosis; used to test unclean exit')
+    if (isDebugMode()) {
+      warn('fail route invoked in Apoptosis; used to test unclean exit')
       //let fail_endpoint_debug = undefined
       //console.log(fail_endpoint_debug.forced)
       throw Error('fail_endpoint_debug')
@@ -75,60 +73,82 @@ const failExternalRoute: P2P.P2PTypes.Route<Handler> = {
 // This route is expected to return "pass" or "fail" so that
 //   the exiting node can know that some other nodes have
 //   received the message and will send it to other nodes
-const apoptosisInternalRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<P2P.ApoptosisTypes.SignedApoptosisProposal>> = {
+const apoptosisInternalRoute: P2P.P2PTypes.Route<
+  P2P.P2PTypes.InternalHandler<P2P.ApoptosisTypes.SignedApoptosisProposal>
+> = {
   name: internalRouteName,
   handler: (payload, response, sender) => {
     profilerInstance.scopedProfileSectionStart('apoptosize')
     try {
       info(`Got Apoptosis proposal: ${JSON.stringify(payload)}`)
       let err = ''
-      err = validateTypes(payload, {when:'n',id:'s',sign:'o'})
-      if (err){ warn('bad input '+err); return }
-      err = validateTypes(payload.sign, {owner:'s',sig:'s'})
-      if (err){ warn('bad input sign '+err); return }
-// The when must be set to current cycle +-1 because it is being
-//    received from the originating node
-      if (!(payload as P2P.P2PTypes.LooseObject).when){ response({s:'fail',r:1}); return }
+      err = validateTypes(payload, { when: 'n', id: 's', sign: 'o' })
+      if (err) {
+        warn('bad input ' + err)
+        return
+      }
+      err = validateTypes(payload.sign, { owner: 's', sig: 's' })
+      if (err) {
+        warn('bad input sign ' + err)
+        return
+      }
+      // The when must be set to current cycle +-1 because it is being
+      //    received from the originating node
+      if (!(payload as P2P.P2PTypes.LooseObject).when) {
+        response({ s: 'fail', r: 1 })
+        return
+      }
       const when = payload.when
-      if (when > currentCycle+1 || when < currentCycle-1){ response({s:'fail',r:2}); return  }
+      if (when > currentCycle + 1 || when < currentCycle - 1) {
+        response({ s: 'fail', r: 2 })
+        return
+      }
       //  check that the node which sent this is the same as the node that signed it, otherwise this is not original message so ignore it
-      if (sender === payload.id){
-//  if (addProposal(payload)) p2p.sendGossipIn(gossipRouteName, payload)
-//  if (addProposal(payload)) Comms.sendGossip(gossipRouteName, payload)
-//  Omar - we must always accept the original apoptosis message regardless of quarter and save it to gossip next cycle
-//    but if we are in Q1 gossip it, otherwise save for Q1 of next cycle
-        if (addProposal(payload)){
-          if (currentQuarter === 1){  // if it is Q1 we can try to gossip the message now instead of waiting for Q1 of next cycle
+      if (sender === payload.id) {
+        //  if (addProposal(payload)) p2p.sendGossipIn(gossipRouteName, payload)
+        //  if (addProposal(payload)) Comms.sendGossip(gossipRouteName, payload)
+        //  Omar - we must always accept the original apoptosis message regardless of quarter and save it to gossip next cycle
+        //    but if we are in Q1 gossip it, otherwise save for Q1 of next cycle
+        if (addProposal(payload)) {
+          if (currentQuarter === 1) {
+            // if it is Q1 we can try to gossip the message now instead of waiting for Q1 of next cycle
             Comms.sendGossip(gossipRouteName, payload)
           }
-          response({s:'pass'})
+          response({ s: 'pass' })
           return
-        }
-        else{
+        } else {
           warn(`addProposal failed for payload: ${JSON.stringify(payload)}`)
         }
-      }
-      else{
+      } else {
         warn(`sender is not apop node: sender:${sender} apop:${payload.id}`)
-        response({s:'fail',r:3})
+        response({ s: 'fail', r: 3 })
       }
     } finally {
       profilerInstance.scopedProfileSectionEnd('apoptosize')
     }
-  }
+  },
 }
 
-const apoptosisGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ApoptosisTypes.SignedApoptosisProposal> =
-   (payload, sender, tracker) => {
+const apoptosisGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ApoptosisTypes.SignedApoptosisProposal> = (
+  payload,
+  sender,
+  tracker
+) => {
   profilerInstance.scopedProfileSectionStart('apoptosis')
   try {
     info(`Got Apoptosis gossip: ${JSON.stringify(payload)}`)
     let err = ''
-    err = validateTypes(payload, {when:'n',id:'s',sign:'o'})
-    if (err){ warn('apoptosisGossipRoute bad payload: '+err); return }
-    err = validateTypes(payload.sign, {owner:'s',sig:'s'})
-    if (err){ warn('apoptosisGossipRoute bad payload.sign: '+err); return }
-    if ([1,2].includes(currentQuarter)){
+    err = validateTypes(payload, { when: 'n', id: 's', sign: 'o' })
+    if (err) {
+      warn('apoptosisGossipRoute bad payload: ' + err)
+      return
+    }
+    err = validateTypes(payload.sign, { owner: 's', sig: 's' })
+    if (err) {
+      warn('apoptosisGossipRoute bad payload.sign: ' + err)
+      return
+    }
+    if ([1, 2].includes(currentQuarter)) {
       if (addProposal(payload)) {
         Comms.sendGossip(gossipRouteName, payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
       }
@@ -139,14 +159,13 @@ const apoptosisGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ApoptosisTypes.Signed
 }
 
 const routes = {
-  external: [stopExternalRoute, failExternalRoute ],
-  internal: [apoptosisInternalRoute ],
+  external: [stopExternalRoute, failExternalRoute],
+  internal: [apoptosisInternalRoute],
   gossip: {
-//    'gossip-join': gossipJoinRoute,
+    //    'gossip-join': gossipJoinRoute,
     [gossipRouteName]: apoptosisGossipRoute,
   },
 }
-
 
 /** FUNCTIONS */
 
@@ -173,8 +192,8 @@ export function init() {
 export function reset() {
   // only delete proposals where the node has been removed
   //   otherwise we will submit the proposal again in the next Q1
-  for (const id of Object.keys(proposals)){
-    if (!nodes.get(id)){
+  for (const id of Object.keys(proposals)) {
+    if (!nodes.get(id)) {
       delete proposals[id]
     }
   }
@@ -186,28 +205,24 @@ export function getTxs(): P2P.ApoptosisTypes.Txs {
   }
 }
 
-export function validateRecordTypes(rec: P2P.ApoptosisTypes.Record): string{
-  let err = validateTypes(rec,{apoptosized:'a'})
+export function validateRecordTypes(rec: P2P.ApoptosisTypes.Record): string {
+  let err = validateTypes(rec, { apoptosized: 'a' })
   if (err) return err
-  for(const item of rec.apoptosized){
-    if (typeof(item) !== 'string') return 'items of apoptosized array must be strings'
+  for (const item of rec.apoptosized) {
+    if (typeof item !== 'string') return 'items of apoptosized array must be strings'
   }
   return ''
 }
 
 export function dropInvalidTxs(txs: P2P.ApoptosisTypes.Txs): P2P.ApoptosisTypes.Txs {
-  const valid = txs.apoptosis.filter(request => validateProposal(request))
+  const valid = txs.apoptosis.filter((request) => validateProposal(request))
   return { apoptosis: valid }
 }
 
 /*
 Given the txs and prev cycle record mutate the referenced record
 */
-export function updateRecord(
-  txs: P2P.ApoptosisTypes.Txs,
-  record: P2P.ApoptosisTypes.Record,
-)
-{
+export function updateRecord(txs: P2P.ApoptosisTypes.Txs, record: P2P.ApoptosisTypes.Record) {
   const apoptosized = []
   for (const request of txs.apoptosis) {
     const publicKey = request.sign.owner
@@ -223,26 +238,28 @@ export function parseRecord(record: P2P.ApoptosisTypes.Record): P2P.CycleParserT
   if (record.apoptosized.includes(Self.id)) {
     // This could happen if our Internet connection was bad.
     error(`We got marked for apoptosis even though we didn't ask for it. Being nice and leaving.`)
-    Self.emitter.emit('apoptosized', getCallstack(), 'Apoptosis being called at parseRecord() => src/p2p/Apoptosis.ts')
+    Self.emitter.emit(
+      'apoptosized',
+      getCallstack(),
+      'Apoptosis being called at parseRecord() => src/p2p/Apoptosis.ts'
+    )
   }
   return {
     added: [],
     removed: record.apoptosized,
-    updated: []
+    updated: [],
   }
-
 }
 
 export function sendRequests() {
-  for (const id of Object.keys(proposals)){
+  for (const id of Object.keys(proposals)) {
     // make sure node is still in the network, since it might
     //   have already been removed
-    if (nodes.get(id)){
+    if (nodes.get(id)) {
       Comms.sendGossip(gossipRouteName, proposals[id], '', null, byIdOrder, true)
     }
   }
 }
-
 
 /* Module functions */
 
@@ -253,13 +270,13 @@ export async function apoptosizeSelf(message: string) {
   // [TODO] - maybe we should shuffle this array
   const activeNodes = activeByIdOrder
   const proposal = createProposal()
-/* Don't use tell, do a robust query instead
+  /* Don't use tell, do a robust query instead
 //  await p2p.tell(activeNodes, internalRouteName, proposal)
   await Comms.tell(activeNodes, internalRouteName, proposal)
 */
   const qF = async (node) => {
-//  use ask instead of tell and expect the node to
-//          acknowledge it received the request by sending 'pass'
+    //  use ask instead of tell and expect the node to
+    //          acknowledge it received the request by sending 'pass'
     if (node.id === Self.id) return null
     const res = Comms.ask(node, internalRouteName, proposal)
     return res
@@ -267,40 +284,44 @@ export async function apoptosizeSelf(message: string) {
   const eF = (item1, item2) => {
     if (!item1 || !item2) return false
     if (!item1.s || !item2.s) return false
-    if ((item1.s === 'pass') && (item2.s === 'pass')) return true
+    if (item1.s === 'pass' && item2.s === 'pass') return true
     return false
   }
   // If we don't have any active nodes; means we are still joining
-  if (activeNodes.length > 0){
+  if (activeNodes.length > 0) {
     info(`In apoptosizeSelf calling robustQuery proposal`)
     let redunancy = 1
-    if (activeNodes.length > 5){ redunancy = 2 }
-    if (activeNodes.length > 10){ redunancy = 3 }
+    if (activeNodes.length > 5) {
+      redunancy = 2
+    }
+    if (activeNodes.length > 10) {
+      redunancy = 3
+    }
     info(`Redunancy is ${redunancy}`)
     await robustQuery(activeNodes, qF, eF, redunancy, true)
     info(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}`)
   }
-// Omar - added the following line. Maybe we should emit an event when we apoptosize so other modules and app can clean up
+  // Omar - added the following line. Maybe we should emit an event when we apoptosize so other modules and app can clean up
   Self.emitter.emit('apoptosized', getCallstack(), message) // we can pass true as a parameter if we want to be restarted
-// Omar - we should not add any proposal since we are exiting; we already sent our proposal to some nodes
-//  addProposal(proposal)
+  // Omar - we should not add any proposal since we are exiting; we already sent our proposal to some nodes
+  //  addProposal(proposal)
   error('We have been apoptosized. Exiting with status 1. Will not be restarted.')
 }
 
 function createProposal(): P2P.ApoptosisTypes.SignedApoptosisProposal {
   const proposal = {
-//    id: p2p.id,
+    //    id: p2p.id,
     id: Self.id,
-// Omar -  Maybe we should add a timestamp or cycle number to the message so it cannot be replayed
+    // Omar -  Maybe we should add a timestamp or cycle number to the message so it cannot be replayed
     when: currentCycle,
   }
-//  return p2p.crypto.sign(proposal)
+  //  return p2p.crypto.sign(proposal)
   return crypto.sign(proposal)
 }
 
 function addProposal(proposal: P2P.ApoptosisTypes.SignedApoptosisProposal): boolean {
   if (validateProposal(proposal) === false) return false
-//  const publicKey = proposal.sign.owner
+  //  const publicKey = proposal.sign.owner
   const id = proposal.id
   if (proposals[id]) return false
   proposals[id] = proposal
@@ -319,10 +340,10 @@ function validateProposal(payload: unknown): boolean {
 
   // even joining nodes can send apoptosis message, so check all nodes list
   const node = nodes.get(id)
-  if (! node) return false
+  if (!node) return false
 
   // Check if signature is valid and signed by expected node
-//  const valid = p2p.crypto.verify(proposal, node.publicKey)
+  //  const valid = p2p.crypto.verify(proposal, node.publicKey)
   const valid = crypto.verify(proposal, node.publicKey)
   if (!valid) return false
 
@@ -331,7 +352,8 @@ function validateProposal(payload: unknown): boolean {
 
 export function isApopMarkedNode(id: string): boolean {
   let apopNode = false
-  if (proposals[id]) {// Check if the node is in the proposal list
+  if (proposals[id]) {
+    // Check if the node is in the proposal list
     apopNode = true
   }
   info('check if the node is apop marked node', id, apopNode)
@@ -353,11 +375,10 @@ function error(...msg) {
   p2pLogger.error(entry)
 }
 
-
 /** STORAGE DATA */
 
 /* Don't need this any more since we are not storing cycles in the database
-*/
+ */
 export const addCycleFieldQuery = `ALTER TABLE cycles ADD ${cycleDataName} JSON NULL`
 
 export const sequelizeCycleFieldModel = {

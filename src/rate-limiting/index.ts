@@ -17,36 +17,36 @@ class RateLimiting {
 
   calculateThrottlePropotion(load, limit) {
     const throttleRange = 1 - limit
-    const throttleAmount = load- limit
+    const throttleAmount = load - limit
     const throttleProportion = throttleAmount / throttleRange
     return throttleProportion
   }
 
   getWinningLoad(nodeLoad, queueLoad) {
-    let loads = {...nodeLoad, ...queueLoad}
+    let loads = { ...nodeLoad, ...queueLoad }
     let maxThrottle: number = 0
     let loadType: any
     for (let key in loads) {
-      if(this.loadLimit[key] == null){
+      if (this.loadLimit[key] == null) {
         continue //not checking load limit for undefined or 0 limit.
       }
       if (loads[key] < this.loadLimit[key]) continue
       let throttle = this.calculateThrottlePropotion(loads[key], this.loadLimit[key])
 
-      nestedCountersInstance.countEvent('loadRelated',`ratelimit reached: ${key} > ${this.loadLimit[key]}`)  
+      /* prettier-ignore */ nestedCountersInstance.countEvent('loadRelated',`ratelimit reached: ${key} > ${this.loadLimit[key]}`)
       if (throttle > maxThrottle) {
         maxThrottle = throttle
         loadType = key
       }
     }
 
-    if(loadType){
-      nestedCountersInstance.countEvent('loadRelated',`ratelimit winning load factor: ${loadType}`)  
+    if (loadType) {
+      nestedCountersInstance.countEvent('loadRelated', `ratelimit winning load factor: ${loadType}`)
     }
 
     return {
       throttle: maxThrottle,
-      loadType
+      loadType,
     }
   }
 

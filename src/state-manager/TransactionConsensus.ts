@@ -9,7 +9,14 @@ import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import ShardFunctions from './shardFunctions'
 import StateManager from '.'
-import { AppliedReceipt, AppliedReceipt2, AppliedVote, AppliedVoteHash, QueueEntry, WrappedResponses } from './state-manager-types'
+import {
+  AppliedReceipt,
+  AppliedReceipt2,
+  AppliedVote,
+  AppliedVoteHash,
+  QueueEntry,
+  WrappedResponses,
+} from './state-manager-types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as Self from '../p2p/Self'
 import * as CycleChain from '../p2p/CycleChain'
@@ -35,8 +42,16 @@ class TransactionConsenus {
 
   txTimestampCache: any
 
-  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.StrictServerConfiguration) {
-
+  constructor(
+    stateManager: StateManager,
+    profiler: Profiler,
+    app: Shardus.App,
+    logger: Logger,
+    storage: Storage,
+    p2p: P2P,
+    crypto: Crypto,
+    config: Shardus.StrictServerConfiguration
+  ) {
     this.crypto = crypto
     this.app = app
     this.logger = logger
@@ -54,7 +69,6 @@ class TransactionConsenus {
     this.txTimestampCache = {}
   }
 
-
   /***
    *    ######## ##    ## ########  ########   #######  #### ##    ## ########  ######
    *    ##       ###   ## ##     ## ##     ## ##     ##  ##  ###   ##    ##    ##    ##
@@ -71,153 +85,213 @@ class TransactionConsenus {
       if (this.txTimestampCache[cycleCounter] && this.txTimestampCache[cycleCounter][txId]) {
         await respond(this.txTimestampCache[cycleCounter][txId])
       } else {
-        const tsReceipt: Shardus.TimestampReceipt = this.generateTimestampReceipt(txId, cycleMarker, cycleCounter)
+        const tsReceipt: Shardus.TimestampReceipt = this.generateTimestampReceipt(
+          txId,
+          cycleMarker,
+          cycleCounter
+        )
         await respond(tsReceipt)
       }
     })
 
-    this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker, msgSize: number) => {
-      profilerInstance.scopedProfileSectionStart('spread_appliedReceipt', false, msgSize)
-      let respondSize = cUninitializedSize
-      try {
-        let appliedReceipt = payload as AppliedReceipt
-        let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
-        if (queueEntry == null) {
+    this.p2p.registerGossipHandler(
+      'spread_appliedReceipt',
+      async (payload, sender, tracker, msgSize: number) => {
+        profilerInstance.scopedProfileSectionStart('spread_appliedReceipt', false, msgSize)
+        let respondSize = cUninitializedSize
+        try {
+          let appliedReceipt = payload as AppliedReceipt
+          let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
           if (queueEntry == null) {
-            // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
-            queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(payload.txid, 'spread_appliedReceipt') // , payload.timestamp)
-            if (queueEntry != null) {
-              // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
-              // would need to make sure we send gossip though.
+            if (queueEntry == null) {
+              // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
+              queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
+                payload.txid,
+                'spread_appliedReceipt'
+              ) // , payload.timestamp)
+              if (queueEntry != null) {
+                // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
+                // would need to make sure we send gossip though.
+              }
+            }
+            if (queueEntry == null) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
+              // NEW start repair process that will find the TX then apply repairs
+              // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(appliedReceipt)
+              return
             }
           }
-          if (queueEntry == null) {
-            if (logFlags.error) this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
-            // NEW start repair process that will find the TX then apply repairs
-            // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(appliedReceipt)
+
+          if (
+            this.stateManager.testFailChance(
+              this.stateManager.ignoreRecieptChance,
+              'spread_appliedReceipt',
+              utils.stringifyReduce(appliedReceipt.txid),
+              '',
+              logFlags.verbose
+            ) === true
+          ) {
             return
           }
-        }
 
-        if (this.stateManager.testFailChance(this.stateManager.ignoreRecieptChance, 'spread_appliedReceipt', utils.stringifyReduce(appliedReceipt.txid), '', logFlags.verbose) === true) {
-          return
-        }
+          // TODO STATESHARDING4 ENDPOINTS check payload format
+          // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
 
-        // TODO STATESHARDING4 ENDPOINTS check payload format
-        // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
+          let receiptNotNull = appliedReceipt != null
 
-        let receiptNotNull = appliedReceipt != null
+          if (queueEntry.gossipedReceipt === false) {
+            queueEntry.gossipedReceipt = true
+            /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
 
-        if (queueEntry.gossipedReceipt === false){
-          queueEntry.gossipedReceipt = true
-          if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
+            if (queueEntry.archived === false) {
+              queueEntry.recievedAppliedReceipt = appliedReceipt
+            }
 
+            // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
 
-          if(queueEntry.archived === false){
-            queueEntry.recievedAppliedReceipt = appliedReceipt
+            // share the appliedReceipt.
+            let sender = null
+            let gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+            if (gossipGroup.length > 1) {
+              // should consider only forwarding in some cases?
+              this.stateManager.debugNodeGroup(
+                queueEntry.acceptedTx.txId,
+                queueEntry.acceptedTx.timestamp,
+                `share appliedReceipt to neighbors`,
+                gossipGroup
+              )
+              //no await so we cant get the message out size in a reasonable way
+              respondSize = await this.p2p.sendGossipIn(
+                'spread_appliedReceipt',
+                appliedReceipt,
+                tracker,
+                sender,
+                gossipGroup,
+                false
+              )
+            }
+          } else {
+            // we get here if the receipt has already been shared
+            /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared`)
           }
-
-          // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
-
-          // share the appliedReceipt.
-          let sender = null
-          let gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-          if (gossipGroup.length > 1) {
-            // should consider only forwarding in some cases?
-            this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
-            //no await so we cant get the message out size in a reasonable way
-            respondSize = await this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, tracker, sender, gossipGroup, false)
-          }
-        } else {
-          // we get here if the receipt has already been shared
-          if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared`)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt', respondSize)
         }
-
-      } finally {
-        profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt', respondSize)
       }
-    })
+    )
 
-    this.p2p.registerGossipHandler('spread_appliedReceipt2', async (payload, sender, tracker, msgSize: number) => {
-      profilerInstance.scopedProfileSectionStart('spread_appliedReceipt2', false, msgSize)
-      let respondSize = cUninitializedSize
-      try {
-        let appliedReceipt = payload as AppliedReceipt2
-        let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
-        if (queueEntry == null) {
+    this.p2p.registerGossipHandler(
+      'spread_appliedReceipt2',
+      async (payload, sender, tracker, msgSize: number) => {
+        profilerInstance.scopedProfileSectionStart('spread_appliedReceipt2', false, msgSize)
+        let respondSize = cUninitializedSize
+        try {
+          let appliedReceipt = payload as AppliedReceipt2
+          let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
           if (queueEntry == null) {
-            // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
-            queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(payload.txid, 'spread_appliedReceipt2') // , payload.timestamp)
-            if (queueEntry != null) {
-              // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
-              // would need to make sure we send gossip though.
+            if (queueEntry == null) {
+              // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
+              queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
+                payload.txid,
+                'spread_appliedReceipt2'
+              ) // , payload.timestamp)
+              if (queueEntry != null) {
+                // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
+                // would need to make sure we send gossip though.
+              }
+            }
+            if (queueEntry == null) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
+              // NEW start repair process that will find the TX then apply repairs
+              // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(appliedReceipt)
+              return
             }
           }
-          if (queueEntry == null) {
-            if (logFlags.error) this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
-            // NEW start repair process that will find the TX then apply repairs
-            // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(appliedReceipt)
+
+          if (
+            this.stateManager.testFailChance(
+              this.stateManager.ignoreRecieptChance,
+              'spread_appliedReceipt2',
+              utils.stringifyReduce(appliedReceipt.txid),
+              '',
+              logFlags.verbose
+            ) === true
+          ) {
             return
           }
-        }
 
-        if (this.stateManager.testFailChance(this.stateManager.ignoreRecieptChance, 'spread_appliedReceipt2', utils.stringifyReduce(appliedReceipt.txid), '', logFlags.verbose) === true) {
-          return
-        }
+          // TODO STATESHARDING4 ENDPOINTS check payload format
+          // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
 
-        // TODO STATESHARDING4 ENDPOINTS check payload format
-        // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
+          let receiptNotNull = appliedReceipt != null
 
-        let receiptNotNull = appliedReceipt != null
-
-        if(queueEntry.state === 'expired'){
-          //have we tried to repair this yet?
-          let startRepair = queueEntry.repairStarted === false
-          if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2. tx expired. start repair:${startRepair}. update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
-          if(queueEntry.repairStarted === false){
-            nestedCountersInstance.countEvent('repair1', 'got receipt for expiredTX start repair')
-            queueEntry.appliedReceiptForRepair2 = appliedReceipt
-            //todo any limits to how many repairs at once to allow?
-            this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
-          }
-          //x - dont forward gossip, it is probably too late?
-          //do forward gossip so we dont miss on sharing a receipt!
-          //return
-        }
-
-        if (queueEntry.gossipedReceipt === false){
-          queueEntry.gossipedReceipt = true
-          if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
-
-          if(queueEntry.archived === false){
-            queueEntry.recievedAppliedReceipt2 = appliedReceipt
+          if (queueEntry.state === 'expired') {
+            //have we tried to repair this yet?
+            let startRepair = queueEntry.repairStarted === false
+            /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2. tx expired. start repair:${startRepair}. update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
+            if (queueEntry.repairStarted === false) {
+              nestedCountersInstance.countEvent('repair1', 'got receipt for expiredTX start repair')
+              queueEntry.appliedReceiptForRepair2 = appliedReceipt
+              //todo any limits to how many repairs at once to allow?
+              this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
+            }
+            //x - dont forward gossip, it is probably too late?
+            //do forward gossip so we dont miss on sharing a receipt!
+            //return
           }
 
-          // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
+          if (queueEntry.gossipedReceipt === false) {
+            queueEntry.gossipedReceipt = true
+            /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
 
-          // share the appliedReceipt.
-          let sender = null
-          let gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-          if (gossipGroup.length > 1) {
-            // should consider only forwarding in some cases?
-            this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
-            //no await so we cant get the message out size in a reasonable way
-            respondSize = await this.p2p.sendGossipIn('spread_appliedReceipt2', appliedReceipt, tracker, sender, gossipGroup, false)
+            if (queueEntry.archived === false) {
+              queueEntry.recievedAppliedReceipt2 = appliedReceipt
+            }
+
+            // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
+
+            // share the appliedReceipt.
+            let sender = null
+            let gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+            if (gossipGroup.length > 1) {
+              // should consider only forwarding in some cases?
+              this.stateManager.debugNodeGroup(
+                queueEntry.acceptedTx.txId,
+                queueEntry.acceptedTx.timestamp,
+                `share appliedReceipt to neighbors`,
+                gossipGroup
+              )
+              //no await so we cant get the message out size in a reasonable way
+              respondSize = await this.p2p.sendGossipIn(
+                'spread_appliedReceipt2',
+                appliedReceipt,
+                tracker,
+                sender,
+                gossipGroup,
+                false
+              )
+            }
+          } else {
+            // we get here if the receipt has already been shared
+            /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared`)
           }
-        } else {
-          // we get here if the receipt has already been shared
-          if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared`)
+        } catch (ex) {
+          this.statemanager_fatal(
+            `spread_appliedReceipt2_ex`,
+            'spread_appliedReceipt2 endpoint failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
+          )
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt2', respondSize)
         }
-      } catch(ex){
-        this.statemanager_fatal(`spread_appliedReceipt2_ex`, 'spread_appliedReceipt2 endpoint failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      } finally {
-        profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt2', respondSize)
       }
-    })
-
+    )
   }
 
-  generateTimestampReceipt(txId, cycleMarker: string, cycleCounter: CycleRecord['counter']): TimestampReceipt {
+  generateTimestampReceipt(
+    txId,
+    cycleMarker: string,
+    cycleCounter: CycleRecord['counter']
+  ): TimestampReceipt {
     const tsReceipt: TimestampReceipt = {
       txId,
       cycleMarker,
@@ -225,7 +299,7 @@ class TransactionConsenus {
       timestamp: Date.now(),
     }
     const signedTsReceipt = this.crypto.sign(tsReceipt)
-    if (logFlags.debug) this.mainLogger.debug(`Timestamp receipt generated for txId ${txId}: ${utils.stringifyReduce(signedTsReceipt)}`)
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Timestamp receipt generated for txId ${txId}: ${utils.stringifyReduce(signedTsReceipt)}`)
 
     // caching ts receipt for later nodes
     if (!this.txTimestampCache[signedTsReceipt.cycleCounter]) {
@@ -245,7 +319,11 @@ class TransactionConsenus {
   }
 
   async askTxnTimestampFromNode(tx, txId): Promise<Shardus.TimestampReceipt | null> {
-    const homeNode = ShardFunctions.findHomeNode(Context.stateManager.currentCycleShardData.shardGlobals, txId, Context.stateManager.currentCycleShardData.parititionShardDataMap)
+    const homeNode = ShardFunctions.findHomeNode(
+      Context.stateManager.currentCycleShardData.shardGlobals,
+      txId,
+      Context.stateManager.currentCycleShardData.parititionShardDataMap
+    )
     const cycleMarker = CycleChain.computeCycleMarker(CycleChain.newest)
     const cycleCounter = CycleChain.newest.counter
     this.mainLogger.debug('Asking timestamp from node', homeNode.node)
@@ -253,14 +331,19 @@ class TransactionConsenus {
       // we generate the tx timestamp by ourselves
       return this.generateTimestampReceipt(txId, cycleMarker, cycleCounter)
     } else {
-      const timestampReceipt = await Comms.ask(homeNode.node, 'get_tx_timestamp', { cycleMarker, cycleCounter, txId, tx })
+      const timestampReceipt = await Comms.ask(homeNode.node, 'get_tx_timestamp', {
+        cycleMarker,
+        cycleCounter,
+        txId,
+        tx,
+      })
       delete timestampReceipt.isResponse
       const isValid = this.crypto.verify(timestampReceipt, homeNode.node.publicKey)
       if (isValid) {
-        if (logFlags.debug) this.mainLogger.debug(`Timestamp receipt received from home node. TxId: ${txId} isValid: ${isValid}, timestampReceipt: ${JSON.stringify(timestampReceipt)}`)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Timestamp receipt received from home node. TxId: ${txId} isValid: ${isValid}, timestampReceipt: ${JSON.stringify(timestampReceipt)}`)
         return timestampReceipt
       } else {
-        if (logFlags.fatal) this.mainLogger.fatal(`Timestamp receipt received from home node ${homeNode.node.publicKey} is not valid. ${utils.stringifyReduce(timestampReceipt)}`)
+        /* prettier-ignore */ if (logFlags.fatal) this.mainLogger.fatal(`Timestamp receipt received from home node ${homeNode.node.publicKey} is not valid. ${utils.stringifyReduce(timestampReceipt)}`)
         return null
       }
     }
@@ -272,16 +355,15 @@ class TransactionConsenus {
    * @param queueEntry
    */
   async shareAppliedReceipt(queueEntry: QueueEntry) {
-    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
+    /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
 
     let appliedReceipt = queueEntry.appliedReceipt
 
-    if(config.debug.optimizedTXConsenus && queueEntry.appliedReceipt2 == null){
+    if (config.debug.optimizedTXConsenus && queueEntry.appliedReceipt2 == null) {
       //take no action
-      nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped appliedReceipt2 == null')
+      /* prettier-ignore */ nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped appliedReceipt2 == null')
       return
     }
-
 
     // share the appliedReceipt.
     let sender = null
@@ -291,13 +373,12 @@ class TransactionConsenus {
     // let updatedGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry, true)
 
     if (gossipGroup.length > 1) {
-
       if (queueEntry.ourNodeInTransactionGroup === false) {
         return
       }
 
       // This code tried to optimize things by not having every node share a receipt.
-      
+
       // //look at our index in the consensus.
       // //only have certain nodes sharde gossip the receipt.
       // let ourIndex = queueEntry.ourTXGroupIndex
@@ -315,23 +396,27 @@ class TransactionConsenus {
       //   let idxModEveryN = idxPlusNonce % everyN
       //   if(idxModEveryN > 0){
       //     nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped')
-      //     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shareAppliedReceipt-skipped', `${queueEntry.acceptedTx.txId}`, `ourIndex:${ourIndex} groupLength:${ourIndex} `)
+      //     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shareAppliedReceipt-skipped', `${queueEntry.acceptedTx.txId}`, `ourIndex:${ourIndex} groupLength:${ourIndex} `)
       //     return
       //   }
       // }
 
       nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-notSkipped')
       // should consider only forwarding in some cases?
-      this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
-      
-      if(config.debug.optimizedTXConsenus){
+      this.stateManager.debugNodeGroup(
+        queueEntry.acceptedTx.txId,
+        queueEntry.acceptedTx.timestamp,
+        `share appliedReceipt to neighbors`,
+        gossipGroup
+      )
+
+      if (config.debug.optimizedTXConsenus) {
         let payload = queueEntry.appliedReceipt2
         //let payload = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
         this.p2p.sendGossipIn('spread_appliedReceipt2', payload, '', sender, gossipGroup, true)
       } else {
         this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, '', sender, gossipGroup, true)
       }
-
     }
   }
 
@@ -344,15 +429,14 @@ class TransactionConsenus {
    * @param queueEntry
    */
   hasAppliedReceiptMatchingPreApply(queueEntry: QueueEntry, appliedReceipt: AppliedReceipt): boolean {
-
     // This is much easier than the old way
-    if(config.debug.optimizedTXConsenus && queueEntry.ourVote){
+    if (config.debug.optimizedTXConsenus && queueEntry.ourVote) {
       let reciept = queueEntry.appliedReceipt2 ?? queueEntry.recievedAppliedReceipt2
-      if(reciept != null && queueEntry.ourVoteHash != null){
-        if(this.crypto.hash(reciept.appliedVote) === queueEntry.ourVoteHash){
+      if (reciept != null && queueEntry.ourVoteHash != null) {
+        if (this.crypto.hash(reciept.appliedVote) === queueEntry.ourVoteHash) {
           return true
         } else {
-          if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match missing id:${utils.stringifyReduce(reciept.txid)} `)
+          /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match missing id:${utils.stringifyReduce(reciept.txid)} `)
           return false
         }
       }
@@ -364,29 +448,27 @@ class TransactionConsenus {
     }
 
     if (queueEntry.ourVote == null) {
-      if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ourVote == null`)
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ourVote == null`)
       return false
     }
 
-
-
     if (appliedReceipt != null) {
       if (appliedReceipt.result !== queueEntry.ourVote.transaction_result) {
-        if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ${appliedReceipt.result}, ${queueEntry.ourVote.transaction_result} appliedReceipt.result !== queueEntry.ourVote.transaction_result`)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ${appliedReceipt.result}, ${queueEntry.ourVote.transaction_result} appliedReceipt.result !== queueEntry.ourVote.transaction_result`)
         return false
       }
       if (appliedReceipt.txid !== queueEntry.ourVote.txid) {
-        if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.txid !== queueEntry.ourVote.txid`)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.txid !== queueEntry.ourVote.txid`)
         return false
       }
       if (appliedReceipt.appliedVotes.length === 0) {
-        if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes.length == 0`)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes.length == 0`)
         return false
       }
 
       if (appliedReceipt.appliedVotes[0].cant_apply === true) {
         // TODO STATESHARDING4 NEGATIVECASE    need to figure out what to do here
-        if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes[0].cant_apply === true`)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes[0].cant_apply === true`)
         //If the network votes for cant_apply then we wouldn't need to patch.  We return true here
         //but outside logic will have to know to check cant_apply flag and make sure to not commit data
         return true
@@ -394,12 +476,10 @@ class TransactionConsenus {
 
       //we return true for a false receipt because there is no need to repair our data to match the receipt
       //it is already checked above if we matched the result
-      if(appliedReceipt.result === false){
-        if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} result===false Good Match`)
+      if (appliedReceipt.result === false) {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} result===false Good Match`)
         return true
       }
-
-
 
       //test our data against a winning vote in the receipt
       let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
@@ -407,13 +487,12 @@ class TransactionConsenus {
       let wrappedStateKeys = Object.keys(queueEntry.collectedData)
       let vote = appliedReceipt.appliedVotes[0] //all votes are equivalent, so grab the first
 
-
       // Iff we have accountWrites, then overwrite the keys and wrapped data
       let appOrderedKeys = []
-      let writtenAccountsMap:WrappedResponses = {}
+      let writtenAccountsMap: WrappedResponses = {}
       let applyResponse = queueEntry?.preApplyTXResult?.applyResponse
-      if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
-        for(let wrappedAccount of applyResponse.accountWrites){
+      if (applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+        for (let wrappedAccount of applyResponse.accountWrites) {
           appOrderedKeys.push(wrappedAccount.accountId)
           writtenAccountsMap[wrappedAccount.accountId] = wrappedAccount.data
         }
@@ -426,16 +505,16 @@ class TransactionConsenus {
       //If we are not in the execution home then use data that was sent to us for the commit
       // if(queueEntry.globalModification === false && this.stateManager.transactionQueue.executeInOneShard && queueEntry.isInExecutionHome === false){
       //   wrappedStates = {}
-      //   let timestamp = queueEntry.acceptedTx.timestamp        
+      //   let timestamp = queueEntry.acceptedTx.timestamp
       //   for(let key of Object.keys(queueEntry.collectedFinalData)){
       //     let finalAccount = queueEntry.collectedFinalData[key]
       //     let accountId = finalAccount.accountId
       //     let prevStateCalc = wrappedStates[accountId] ? wrappedStates[accountId].stateId : ''
-      //     if (logFlags.verbose) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply collectedFinalData tx:${queueEntry.logID} ts:${timestamp} ${utils.makeShortHash(finalAccount)} preveStateID: ${finalAccount.prevStateId } vs expected: ${prevStateCalc}`)
+      //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply collectedFinalData tx:${queueEntry.logID} ts:${timestamp} ${utils.makeShortHash(finalAccount)} preveStateID: ${finalAccount.prevStateId } vs expected: ${prevStateCalc}`)
 
       //     wrappedStates[key] = finalAccount
       //   }
-      //   if (logFlags.verbose) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply collectedFinalData tx:${queueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+      //   /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply collectedFinalData tx:${queueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
       // }
 
       for (let j = 0; j < vote.account_id.length; j++) {
@@ -447,19 +526,19 @@ class TransactionConsenus {
           if (wrappedState.accountId === id) {
             found = true
             if (wrappedState.stateId !== hash) {
-              if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match id:${utils.stringifyReduce(id)} hash:${utils.stringifyReduce(wrappedState.stateId)} votehash:${utils.stringifyReduce(hash)}`)
+              /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match id:${utils.stringifyReduce(id)} hash:${utils.stringifyReduce(wrappedState.stateId)} votehash:${utils.stringifyReduce(hash)}`)
               return false
             }
           }
         }
         if (found === false) {
-          if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match missing id:${utils.stringifyReduce(id)} `)
+          /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match missing id:${utils.stringifyReduce(id)} `)
           return false
         }
       }
 
-      if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} Good Match`)
-      if (logFlags.playback) this.logger.playbackLogNote('hasAppliedReceiptMatchingPreApply', `${queueEntry.logID}`, `  Good Match`)
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} Good Match`)
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('hasAppliedReceiptMatchingPreApply', `${queueEntry.logID}`, `  Good Match`)
     }
 
     return true
@@ -473,9 +552,9 @@ class TransactionConsenus {
    * @param queueEntry
    */
   tryProduceReceipt(queueEntry: QueueEntry): AppliedReceipt | null {
-    if(config.debug.optimizedTXConsenus){
+    if (config.debug.optimizedTXConsenus) {
       let receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
-      if(receipt2 != null){
+      if (receipt2 != null) {
         //
         //@ts-ignore
         return receipt2
@@ -491,7 +570,7 @@ class TransactionConsenus {
     //   return null
     // }
 
-    if(queueEntry.appliedReceipt != null){
+    if (queueEntry.appliedReceipt != null) {
       return queueEntry.appliedReceipt
     }
 
@@ -501,7 +580,7 @@ class TransactionConsenus {
     // Design TODO:  should this be the full transaction group or just the consensus group?
     let votingGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
 
-    if(this.stateManager.transactionQueue.executeInOneShard){
+    if (this.stateManager.transactionQueue.executeInOneShard) {
       //use execuiton group instead of full transaciton group, since only the execution group will run the transaction
       votingGroup = queueEntry.executionGroup
     }
@@ -510,15 +589,14 @@ class TransactionConsenus {
 
     //hacky for now.  debug code:
     //@ts-ignore
-    if(queueEntry.loggedStats1 == null){
+    if (queueEntry.loggedStats1 == null) {
       //@ts-ignore
       queueEntry.loggedStats1 = true
-      nestedCountersInstance.countEvent('transactionStats', ` votingGroup:${votingGroup.length}`)      
+      nestedCountersInstance.countEvent('transactionStats', ` votingGroup:${votingGroup.length}`)
     }
 
-
     let numVotes = queueEntry.collectedVotes.length
-    if(config.debug.optimizedTXConsenus){
+    if (config.debug.optimizedTXConsenus) {
       numVotes = queueEntry.collectedVoteHashes.length
     }
 
@@ -528,7 +606,7 @@ class TransactionConsenus {
     }
 
     // be smart an only recalculate votes when we see a new vote show up.
-    if(queueEntry.newVotes === false){
+    if (queueEntry.newVotes === false) {
       return null
     }
     queueEntry.newVotes = false
@@ -536,33 +614,32 @@ class TransactionConsenus {
     let passCount = 0
     let failCount = 0
 
-    if(config.debug.optimizedTXConsenus){
-
+    if (config.debug.optimizedTXConsenus) {
       let mostVotes = 0
       let winningVoteHash
-      let hashCounts:Map<string,number> = new Map()
-      
+      let hashCounts: Map<string, number> = new Map()
+
       for (let i = 0; i < numVotes; i++) {
         let currentVote = queueEntry.collectedVoteHashes[i]
         let voteCount = hashCounts.get(currentVote.voteHash)
         let updatedVoteCount
-        if(voteCount === undefined){
+        if (voteCount === undefined) {
           updatedVoteCount = 1
         } else {
           updatedVoteCount = voteCount + 1
         }
         hashCounts.set(currentVote.voteHash, updatedVoteCount)
-        if(updatedVoteCount > mostVotes){
+        if (updatedVoteCount > mostVotes) {
           mostVotes = updatedVoteCount
           winningVoteHash = currentVote.voteHash
         }
       }
 
-      if(mostVotes < requiredVotes){
+      if (mostVotes < requiredVotes) {
         return null
       }
 
-      if(winningVoteHash != undefined){
+      if (winningVoteHash != undefined) {
         //make the new receipt.
         let appliedReceipt2: AppliedReceipt2 = {
           txid: queueEntry.acceptedTx.txId,
@@ -575,22 +652,22 @@ class TransactionConsenus {
 
         for (let i = 0; i < numVotes; i++) {
           let currentVote = queueEntry.collectedVoteHashes[i]
-          if(currentVote.voteHash === winningVoteHash){
+          if (currentVote.voteHash === winningVoteHash) {
             appliedReceipt2.signatures.push(currentVote.sign)
           }
         }
         //result and appliedVote must be set using a winning vote..
         //we may not have this yet
 
-        if(queueEntry.ourVote != null && queueEntry.ourVoteHash === winningVoteHash){
+        if (queueEntry.ourVote != null && queueEntry.ourVoteHash === winningVoteHash) {
           appliedReceipt2.result = queueEntry.ourVote.transaction_result
           appliedReceipt2.appliedVote = queueEntry.ourVote
           // now send it !!!
 
           queueEntry.appliedReceipt2 = appliedReceipt2
 
-          for(let i=0; i<queueEntry.ourVote.account_id.length; i++){
-            if(queueEntry.ourVote.account_id[i] === 'app_data_hash'){
+          for (let i = 0; i < queueEntry.ourVote.account_id.length; i++) {
+            if (queueEntry.ourVote.account_id[i] === 'app_data_hash') {
               appliedReceipt2.app_data_hash = queueEntry.ourVote.account_state_hash_after[i]
               break
             }
@@ -601,16 +678,15 @@ class TransactionConsenus {
             txid: queueEntry.acceptedTx.txId,
             result: queueEntry.ourVote.transaction_result,
             appliedVotes: [queueEntry.ourVote],
-            app_data_hash: appliedReceipt2.app_data_hash
+            app_data_hash: appliedReceipt2.app_data_hash,
           }
           queueEntry.appliedReceipt = appliedReceipt
 
           return appliedReceipt
         }
-
       }
       return null
-    } 
+    }
 
     // First Pass: Check if there are enough pass or fail votes to attempt a receipt.
     for (let i = 0; i < numVotes; i++) {
@@ -656,7 +732,7 @@ class TransactionConsenus {
             let vote = currentVote
 
             //use top values for app_data_hash. this should just work
-            if(currentVote.app_data_hash != null && currentVote.app_data_hash != ''){
+            if (currentVote.app_data_hash != null && currentVote.app_data_hash != '') {
               let id = 'app_data_hash'
               let hash = currentVote.app_data_hash
               if (topValuesByIDByHash[id] == null) {
@@ -709,20 +785,20 @@ class TransactionConsenus {
     if (passed === true) {
       let tooFewVotes = false
       let uniqueAccounts = Object.keys(topHashByID)
-      for(let accountID of uniqueAccounts){
-        if (topHashByID[accountID].count < requiredVotes ) {
+      for (let accountID of uniqueAccounts) {
+        if (topHashByID[accountID].count < requiredVotes) {
           tooFewVotes = true
-          if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: failed. requiredVotes${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
-          if (logFlags.info) this.mainLogger.info(`tryProduceReceipt canProduceReceipt: failed. requiredVotes:${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
+          /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: failed. requiredVotes${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
+          /* prettier-ignore */ if (logFlags.info) this.mainLogger.info(`tryProduceReceipt canProduceReceipt: failed. requiredVotes:${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
         }
       }
-      if(tooFewVotes){
+      if (tooFewVotes) {
         return null
       }
     }
 
-    if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} requiredVotes${requiredVotes}`)
-    if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
+    /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} requiredVotes${requiredVotes}`)
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
 
     let passingAccountVotesTotal = 0
     // Assemble the receipt from votes that are passing
@@ -731,7 +807,7 @@ class TransactionConsenus {
         txid: queueEntry.acceptedTx.txId,
         result: passed,
         appliedVotes: [],
-        app_data_hash: ''
+        app_data_hash: '',
       }
 
       // grab just the votes that match the winning pass or fail status
@@ -765,41 +841,35 @@ class TransactionConsenus {
         }
 
         let topAppDataHashEntry = topHashByID['app_data_hash']
-        if(topAppDataHashEntry != null && topAppDataHashEntry.hash != null){
+        if (topAppDataHashEntry != null && topAppDataHashEntry.hash != null) {
           appliedReceipt.app_data_hash = topAppDataHashEntry.hash
           //should we append the full app data?
         }
-        
       }
 
       // if a passing vote won then check all the hashes.
       // if (passed) {
       //   if (passingAccountVotesTotal < requiredVotes) {
-      //     if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal}`)
-      //     if (logFlags.error) this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} `)
+      //     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal}`)
+      //     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} `)
       //     return null
       //   }
       // }
 
       // one last check to make sure we assembled enough votes.
       // this is needed because our hash counts could have added up but if a vote could still get discarded if any one of its account hashes are wrong
-      if(passed && appliedReceipt.appliedVotes.length < requiredVotes) {
-        if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt:  failed to produce enough votes. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal}`)
-        if (logFlags.error) this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed to produce enough votes: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} `)
+      if (passed && appliedReceipt.appliedVotes.length < requiredVotes) {
+        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt:  failed to produce enough votes. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal}`)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed to produce enough votes: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} `)
         return null
       }
 
-      if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: Success. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} rc:${utils.stringifyReduce(appliedReceipt)}`)
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: Success. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} rc:${utils.stringifyReduce(appliedReceipt)}`)
 
       // recored our generated receipt to the queue entry
       queueEntry.appliedReceipt = appliedReceipt
       return appliedReceipt
-    
-
     }
-
-
-
 
     return null
   }
@@ -815,7 +885,7 @@ class TransactionConsenus {
    * @param queueEntry
    */
   async createAndShareVote(queueEntry: QueueEntry) {
-    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
+    /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
 
     // TODO STATESHARDING4 CHECK VOTES PER CONSENSUS GROUP
 
@@ -827,13 +897,13 @@ class TransactionConsenus {
       account_state_hash_after: [],
       node_id: this.stateManager.currentCycleShardData.ourNode.id,
       cant_apply: queueEntry.preApplyTXResult.applied === false,
-      app_data_hash:''
+      app_data_hash: '',
     }
 
     ourVote.app_data_hash = queueEntry?.preApplyTXResult?.applyResponse.appReceiptDataHash
 
     if (queueEntry.debugFail_voteFlip === true) {
-      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
+      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
 
       ourVote.transaction_result = !ourVote.transaction_result
     }
@@ -855,16 +925,16 @@ class TransactionConsenus {
     let applyResponse = queueEntry?.preApplyTXResult?.applyResponse
 
     let stats = {
-      usedApplyResponse:false,
-      wrappedStateSet:0,
-      optimized:false
+      usedApplyResponse: false,
+      wrappedStateSet: 0,
+      optimized: false,
     }
     //if we have values for accountWrites, then build a list wrappedStates from it and use this list instead
     //of the collected data list
-    if(applyResponse != null){
-      let writtenAccountsMap:WrappedResponses = {}
-      if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
-        for(let writtenAccount of applyResponse.accountWrites){
+    if (applyResponse != null) {
+      let writtenAccountsMap: WrappedResponses = {}
+      if (applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+        for (let writtenAccount of applyResponse.accountWrites) {
           writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
         }
         //override wrapped states with writtenAccountsMap which should be more complete if it included
@@ -882,15 +952,14 @@ class TransactionConsenus {
       //we need to sort this list and doing it in place seems ok
       //applyResponse.stateTableResults.sort(this.sortByAccountId )
 
-  
-      if(config.debug.optimizedTXConsenus){
+      if (config.debug.optimizedTXConsenus) {
         stats.optimized = true
         //need to sort our parallel lists so that they are deterministic!!
         let wrappedStatesList = [...Object.values(wrappedStates)]
 
         //this sort is critical to a deterministic vote structure.. we need this if taking a hash
         wrappedStatesList.sort(this.sortByAccountId)
-        
+
         for (let wrappedState of wrappedStatesList) {
           // note this is going to stomp the hash value for the account
           // this used to happen in dapp.updateAccountFull  we now have to save off prevStateId on the wrappedResponse
@@ -900,7 +969,7 @@ class TransactionConsenus {
 
           ourVote.account_id.push(wrappedState.accountId)
           ourVote.account_state_hash_after.push(wrappedState.stateId)
-        } 
+        }
       } else {
         //old way usorted.
         for (let key of Object.keys(wrappedStates)) {
@@ -914,27 +983,25 @@ class TransactionConsenus {
 
           ourVote.account_id.push(wrappedState.accountId)
           ourVote.account_state_hash_after.push(wrappedState.stateId)
-        }        
-      }   
-
+        }
+      }
     }
 
-    let appliedVoteHash:AppliedVoteHash
-    if(config.debug.optimizedTXConsenus ){
+    let appliedVoteHash: AppliedVoteHash
+    if (config.debug.optimizedTXConsenus) {
       //let temp = ourVote.node_id
       ourVote.node_id = '' //exclue this from hash
       let voteHash = this.crypto.hash(ourVote)
       //ourVote.node_id = temp
       appliedVoteHash = {
-        txid:ourVote.txid,
-        voteHash
+        txid: ourVote.txid,
+        voteHash,
       }
       appliedVoteHash = this.crypto.sign(appliedVoteHash)
       queueEntry.ourVoteHash = voteHash
-      
+
       //append our vote
       this.tryAppendVoteHash(queueEntry, appliedVoteHash)
-      
     } else {
       //in the old way we must sign the vote here
       ourVote = this.crypto.sign(ourVote)
@@ -944,42 +1011,51 @@ class TransactionConsenus {
     queueEntry.ourVote = ourVote
     // also append it to the total list of votes
     let appendWorked = this.tryAppendVote(queueEntry, ourVote)
-    if(appendWorked === false){
+    if (appendWorked === false) {
       nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote appendFailed')
     }
     // share the vote via gossip?
     let sender = null
 
     let consensusGroup = []
-    if(this.stateManager.transactionQueue.executeInOneShard === true){
+    if (this.stateManager.transactionQueue.executeInOneShard === true) {
       //only share with the exection group
       consensusGroup = queueEntry.executionGroup
     } else {
       //sharing with the entire transaction group actually..
-      consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)  
+      consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
     }
 
     if (consensusGroup.length >= 1) {
-      this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup)
+      this.stateManager.debugNodeGroup(
+        queueEntry.acceptedTx.txId,
+        queueEntry.acceptedTx.timestamp,
+        `share tx vote to neighbors`,
+        consensusGroup
+      )
 
-      if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)}`)
-      if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)} `)
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)}`)
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)} `)
 
       // Filter nodes before we send tell()
-      let filteredNodes = this.stateManager.filterValidNodesForInternalMessage(consensusGroup, 'createAndShareVote', true, true)
+      let filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
+        consensusGroup,
+        'createAndShareVote',
+        true,
+        true
+      )
       if (filteredNodes.length === 0) {
-        if (logFlags.error) this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try')
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try')
         return null
       }
       let filteredConsensusGroup = filteredNodes
 
-      if(config.debug.optimizedTXConsenus){
+      if (config.debug.optimizedTXConsenus) {
         this.p2p.tell(filteredConsensusGroup, 'spread_appliedVoteHash', appliedVoteHash)
       } else {
-        //old way 
+        //old way
         this.p2p.tell(filteredConsensusGroup, 'spread_appliedVote', ourVote)
       }
-      
     } else {
       nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote fail, no consensus group')
     }
@@ -995,8 +1071,8 @@ class TransactionConsenus {
   tryAppendVote(queueEntry: QueueEntry, vote: AppliedVote): boolean {
     let numVotes = queueEntry.collectedVotes.length
 
-    if (logFlags.playback) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`)
-    if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVotes.length} `)
+    /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`)
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVotes.length} `)
 
     // just add the vote if we dont have any yet
     if (numVotes === 0) {
@@ -1024,8 +1100,8 @@ class TransactionConsenus {
   tryAppendVoteHash(queueEntry: QueueEntry, voteHash: AppliedVoteHash): boolean {
     let numVotes = queueEntry.collectedVotes.length
 
-    if (logFlags.playback) this.logger.playbackLogNote('tryAppendVoteHash', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVoteHashes.length}`)
-    if (logFlags.debug) this.mainLogger.debug(`tryAppendVoteHash collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVoteHashes.length} `)
+    /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVoteHash', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVoteHashes.length}`)
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryAppendVoteHash collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVoteHashes.length} `)
 
     // just add the vote if we dont have any yet
     if (numVotes === 0) {
@@ -1049,9 +1125,6 @@ class TransactionConsenus {
 
     return true
   }
-
 }
-
-
 
 export default TransactionConsenus

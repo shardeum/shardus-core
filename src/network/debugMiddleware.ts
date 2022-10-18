@@ -24,16 +24,20 @@ export const isDebugModeMiddleware = (_req, res, next) => {
         }
       }
       //auth my by checking a signature
-      if(_req.query.sig != null && _req.query.sig_counter != null){
+      if (_req.query.sig != null && _req.query.sig_counter != null) {
         const ownerPk = getDevPublicKey()
         let requestSig = _req.query.sig
         //check if counter is valid
-        let sigObj = {route: _req.route.path, count: String(_req.query.sig_counter), sign: {owner:ownerPk,sig:requestSig } }
+        let sigObj = {
+          route: _req.route.path,
+          count: String(_req.query.sig_counter),
+          sign: { owner: ownerPk, sig: requestSig },
+        }
 
         //reguire a larger counter than before.
-        if(parseInt(sigObj.count) > lastCounter){
-          let verified = Context.crypto.verify(sigObj,  ownerPk)
-          if(verified === true){
+        if (parseInt(sigObj.count) > lastCounter) {
+          let verified = Context.crypto.verify(sigObj, ownerPk)
+          if (verified === true) {
             //update counter so we can't use it again
             lastCounter = parseInt(sigObj.count)
             next()
@@ -42,19 +46,13 @@ export const isDebugModeMiddleware = (_req, res, next) => {
             console.log('Signature is not correct', sigObj, lastCounter)
           }
         } else {
-          console.log(
-            'Counter is not larger than last counter',
-            sigObj.count,
-            lastCounter
-          )
+          console.log('Counter is not larger than last counter', sigObj.count, lastCounter)
         }
       }
-    } catch(error){
-
-    }
+    } catch (error) {}
     return res.status(403).json({
       status: 403,
-      message: 'FORBIDDEN. Endpoint is only available in debug mode.'
+      message: 'FORBIDDEN. Endpoint is only available in debug mode.',
     })
   }
 

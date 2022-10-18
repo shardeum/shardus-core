@@ -20,7 +20,7 @@ interface Statistics {
   watchers: any
   timers: any
   manualStats: { [name: string]: ManualRing }
-  ringOverrides: {[override:string]: number}
+  ringOverrides: { [override: string]: number }
 }
 
 class Statistics extends EventEmitter {
@@ -32,13 +32,13 @@ class Statistics extends EventEmitter {
       watchers = {},
       timers = [],
       manualStats = [],
-      ringOverrides = {}
+      ringOverrides = {},
     }: {
       counters: string[]
       watchers: any
       timers: any
       manualStats: string[]
-      ringOverrides: {[override:string]: number}
+      ringOverrides: { [override: string]: number }
     },
     context
   ) {
@@ -89,11 +89,7 @@ class Statistics extends EventEmitter {
   startSnapshots() {
     const tabSeperatedHeaders = 'Name\tValue\tTime\n'
     this._pushToStream(tabSeperatedHeaders)
-    if (!this.interval)
-      this.interval = setInterval(
-        this._takeSnapshot.bind(this),
-        this.intervalDuration
-      )
+    if (!this.interval) this.interval = setInterval(this._takeSnapshot.bind(this), this.intervalDuration)
   }
 
   stopSnapshots() {
@@ -161,10 +157,7 @@ class Statistics extends EventEmitter {
 
   getMultiStatReport(name) {
     const ringHolder =
-      this.counters[name] ||
-      this.watchers[name] ||
-      this.timers[name] ||
-      this.manualStats[name]
+      this.counters[name] || this.watchers[name] || this.timers[name] || this.manualStats[name]
     if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
 
     return ringHolder.ring.multiStats()
@@ -172,18 +165,14 @@ class Statistics extends EventEmitter {
 
   clearRing(name) {
     const ringHolder =
-      this.counters[name] ||
-      this.watchers[name] ||
-      this.timers[name] ||
-      this.manualStats[name]
+      this.counters[name] || this.watchers[name] || this.timers[name] || this.manualStats[name]
     if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
     return ringHolder.ring.clear()
   }
 
   // Returns the value of the last element of the given WatcherRing, CounterRing, or TimerRing
   getPreviousElement(name) {
-    const ringHolder =
-      this.counters[name] || this.watchers[name] || this.timers[name]
+    const ringHolder = this.counters[name] || this.watchers[name] || this.timers[name]
     if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
     return ringHolder.ring.previous()
   }
@@ -217,7 +206,7 @@ class Statistics extends EventEmitter {
     const manualStats = {}
     for (const name of counterDefs) {
       let count = 10
-      if(ringOverrides[name] != null){
+      if (ringOverrides[name] != null) {
         count = ringOverrides[name]
       }
       manualStats[name] = new ManualRing(count) //should it be a config
@@ -231,26 +220,17 @@ class Statistics extends EventEmitter {
 
     for (const counter in this.counters) {
       this.counters[counter].snapshot()
-      tabSeperatedValues += `${counter}-average\t${this.getAverage(
-        counter
-      )}\t${time}\n`
-      tabSeperatedValues += `${counter}-total\t${this.getCounterTotal(
-        counter
-      )}\t${time}\n`
+      tabSeperatedValues += `${counter}-average\t${this.getAverage(counter)}\t${time}\n`
+      tabSeperatedValues += `${counter}-total\t${this.getCounterTotal(counter)}\t${time}\n`
     }
     for (const watcher in this.watchers) {
       this.watchers[watcher].snapshot()
-      tabSeperatedValues += `${watcher}-average\t${this.getAverage(
-        watcher
-      )}\t${time}\n`
-      tabSeperatedValues += `${watcher}-value\t${this.getWatcherValue(
-        watcher
-      )}\t${time}\n`
+      tabSeperatedValues += `${watcher}-average\t${this.getAverage(watcher)}\t${time}\n`
+      tabSeperatedValues += `${watcher}-value\t${this.getWatcherValue(watcher)}\t${time}\n`
     }
     for (const timer in this.timers) {
       this.timers[timer].snapshot()
-      tabSeperatedValues += `${timer}-average\t${this.getAverage(timer) /
-        1000}\t${time}\n`
+      tabSeperatedValues += `${timer}-average\t${this.getAverage(timer) / 1000}\t${time}\n`
     }
 
     for (const writeFn of this.snapshotWriteFns) {
@@ -308,19 +288,18 @@ class Ring {
         sum += val
         total++
 
-        if(val < min) {
+        if (val < min) {
           min = val
         }
-        if(val > max){
+        if (val > max) {
           max = val
         }
         allVals.push(val)
       }
     }
-    let avg =  total > 0 ? sum / total : 0
-    return {min, max, avg, allVals, sum}
+    let avg = total > 0 ? sum / total : 0
+    return { min, max, avg, allVals, sum }
   }
-
 
   previous() {
     const prevIndex = (this.index < 1 ? this.elements.length : this.index) - 1
@@ -408,7 +387,6 @@ class TimerRing {
 }
 
 interface ManualRing {
-
   ring: Ring
 }
 
@@ -416,13 +394,11 @@ class ManualRing {
   constructor(length) {
     this.ring = new Ring(length)
   }
-  manualSetValue(value){
+  manualSetValue(value) {
     this.ring.save(value)
   }
-  snapshot() {
-  }
+  snapshot() {}
 }
-
 
 /**
  * Check for a variable that is not undefined or null

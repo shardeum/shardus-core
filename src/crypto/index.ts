@@ -2,7 +2,7 @@ import * as crypto from '@shardus/crypto-utils'
 import Log4js from 'log4js'
 import { fork, ChildProcess } from 'child_process'
 import * as Shardus from '../shardus/shardus-types'
-import Logger, {logFlags} from '../logger'
+import Logger, { logFlags } from '../logger'
 import Storage from '../storage'
 
 interface Crypto {
@@ -19,11 +19,7 @@ interface Crypto {
 }
 
 class Crypto {
-  constructor(
-    config: Shardus.StrictServerConfiguration,
-    logger: Logger,
-    storage: Storage
-  ) {
+  constructor(config: Shardus.StrictServerConfiguration, logger: Logger, storage: Storage) {
     this.config = config
     this.mainLogger = logger.getLogger('main')
     this.storage = storage
@@ -37,14 +33,10 @@ class Crypto {
     crypto.init(this.config.crypto.hashKey)
     const keypair = await this.storage.getProperty('keypair')
     if (!keypair) {
-      this.mainLogger.info(
-        'Keypair unable to be loaded from database. Generating new keypair...'
-      )
+      this.mainLogger.info('Keypair unable to be loaded from database. Generating new keypair...')
       this.keypair = this._generateKeypair()
       await this.storage.setProperty('keypair', this.keypair)
-      this.mainLogger.info(
-        'New keypair successfully generated and saved to database.'
-      )
+      this.mainLogger.info('New keypair successfully generated and saved to database.')
     } else {
       this.mainLogger.info('Keypair loaded successfully from database.')
       this.keypair = keypair
@@ -95,19 +87,19 @@ class Crypto {
    * relies on node honesty.. better (but more work) to implement at shardus_net level
    *    to implement at shardus_net level we need to have it send us an extra argument to show
    *    the message size
-   * @param obj 
-   * @param recipientCurvePk 
-   * @returns 
+   * @param obj
+   * @param recipientCurvePk
+   * @returns
    */
   tagWithSize(obj: any, recipientCurvePk: crypto.curvePublicKey) {
     const strEncoded = crypto.stringify(obj)
-    const tag_msgSize = strEncoded.length //get the message size                                        
+    const tag_msgSize = strEncoded.length //get the message size
     const objCopy = JSON.parse(strEncoded)
     objCopy.tag_msgSize = tag_msgSize // set the size
     const sharedKey = this.getSharedKey(recipientCurvePk)
     crypto.tagObj(objCopy, sharedKey)
     return objCopy
-  }  
+  }
 
   authenticate(obj: any, senderCurvePk: crypto.curvePublicKey) {
     const sharedKey = this.getSharedKey(senderCurvePk)
@@ -139,11 +131,7 @@ class Crypto {
   }
 
   getComputeProofOfWork(seed, difficulty) {
-    return this._runProofOfWorkGenerator(
-      './computePowGenerator.js',
-      seed,
-      difficulty
-    )
+    return this._runProofOfWorkGenerator('./computePowGenerator.js', seed, difficulty)
   }
 
   stopAllGenerators() {
@@ -161,7 +149,7 @@ class Crypto {
       this.powGenerators[generator] = fork(generator, undefined, { cwd: __dirname })
     }
     const promise = new Promise((resolve, reject) => {
-      this.powGenerators[generator].on('message', powObj => {
+      this.powGenerators[generator].on('message', (powObj) => {
         this._stopProofOfWorkGenerator(generator)
         resolve(powObj)
       })
@@ -177,7 +165,7 @@ class Crypto {
   _stopProofOfWorkGenerator(generator: string) {
     if (!this.powGenerators[generator]) return Promise.resolve('not running')
     const promise = new Promise((resolve, reject) => {
-      this.powGenerators[generator].on('close', signal => {
+      this.powGenerators[generator].on('close', (signal) => {
         delete this.powGenerators[generator]
         resolve(signal)
       })

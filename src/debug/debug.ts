@@ -22,11 +22,8 @@ class Debug {
   }
 
   addToArchive(src, dest) {
-    if (path.isAbsolute(dest))
-      throw new Error('"dest" must be a relative path.')
-    src = path.isAbsolute(src)
-      ? src
-      : path.resolve(path.join(this.baseDir, src))
+    if (path.isAbsolute(dest)) throw new Error('"dest" must be a relative path.')
+    src = path.isAbsolute(src) ? src : path.resolve(path.join(this.baseDir, src))
     this.files[src] = dest
   }
 
@@ -42,7 +39,7 @@ class Debug {
     const trie = Trie(entries)
     const pack = tar.pack(cwd, {
       entries,
-      map: function(header) {
+      map: function (header) {
         // Find the closest entry for this item
         let entry = header.name
         while (!trie.isPrefix(entry)) {
@@ -64,10 +61,7 @@ class Debug {
     this.network.registerExternalGet('debug', isDebugModeMiddleware, (req, res) => {
       const archive = this.createArchiveStream()
       const gzip = zlib.createGzip()
-      res.set(
-        'content-disposition',
-        `attachment; filename="${this.archiveName}"`
-      )
+      res.set('content-disposition', `attachment; filename="${this.archiveName}"`)
       res.set('content-type', 'application/gzip')
       archive.pipe(gzip).pipe(res)
     })

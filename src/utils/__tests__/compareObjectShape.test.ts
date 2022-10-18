@@ -245,7 +245,7 @@ test('compareObjectShape() > should return error object on array type mismatch',
   const { isValid, error } = compareObjectShape(idol, admirer)
 
   const expectedError = {
-    defectiveProp: { numArr: 'any[]'},
+    defectiveProp: { numArr: 'any[]' },
     defectiveChain: ['nestedObj', 'numArr'],
   }
 

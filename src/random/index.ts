@@ -10,7 +10,7 @@ const generateSeed = () => {
   return bytes.toString('hex')
 }
 
-const parseSeed = seed => {
+const parseSeed = (seed) => {
   if (typeof seed !== 'string' || seed.length !== 32) {
     return false
   }
@@ -44,7 +44,7 @@ const sfc32 = (a, b, c, d) => {
   }
 }
 
-const generateContext = seed => {
+const generateContext = (seed) => {
   if (!seed) {
     seed = generateSeed()
   }

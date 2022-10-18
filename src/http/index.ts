@@ -18,8 +18,8 @@ function _normalizeUrl(url: string) {
 
 async function _get(url, getResponseObj = false) {
   const res = await got.get(url, {
-    timeout: 1000,   //  Omar - setting this to 1 sec
-    retry: 0,   // Omar - setting this to 0.
+    timeout: 1000, //  Omar - setting this to 1 sec
+    retry: 0, // Omar - setting this to 0.
     json: true,
   })
   if (getResponseObj) return res
@@ -35,14 +35,7 @@ async function get(url: string, getResponseObj = false) {
   let host = parseUrl(normalized, true)
 
   if (_logger) {
-    _logger.playbackLog(
-      'self',
-      host.hostname + ':' + host.port,
-      'HttpRequest',
-      host.pathname,
-      getIndex,
-      ''
-    )
+    _logger.playbackLog('self', host.hostname + ':' + host.port, 'HttpRequest', host.pathname, getIndex, '')
   }
 
   let res = await _get(host, getResponseObj)
@@ -64,8 +57,8 @@ async function get(url: string, getResponseObj = false) {
 
 async function _post(host, payload, getResponseObj = false, timeout = 1000) {
   const res = await got.post(host, {
-    timeout: timeout,   // Omar - set this to 1 sec
-    retry: 0,   // Omar - set this to 0
+    timeout: timeout, // Omar - set this to 1 sec
+    retry: 0, // Omar - set this to 0
     json: true,
     body: payload,
   })

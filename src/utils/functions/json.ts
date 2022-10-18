@@ -1,7 +1,4 @@
-import {
-  readdirSync,
-  readFileSync,
-} from 'fs'
+import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 
 export const readJSON = (filename) => {

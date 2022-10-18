@@ -1,4 +1,3 @@
-
 const StateManager = require('../../../src/state-manager')
 // const utils = require('../../../utils')
 
@@ -73,8 +72,32 @@ let hashSetList2 = []
 
 // hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'b1', votePower: 1, hashSet: 'a9514904521e77d4c2fed6ebf35f5687823725f86cd043af1d1f8b10edfc6b700fdf3c216d43af265b9ec4df6c6b5d0bc7a2862e6e03c58ca932991ae71361f96d6edee815c03530c0b588350548b135429934731c544e0fff292d27f070e103de2ede5704b52b108ac9424f59a2a781eae0d8317789b4a7a5fa6f082a8ca6b6dc1e19f9da5b8f0900bc17df65b591fd4364859654be0d8367394b609b2a2dc4914e42503688026bce0b2bdd4b7f95b73137e3c415b1b4381d59d7cc5c52494eeb1a7ca07f15750f77f271a84c115f57de061bb2eb1a82f5fc5d52a3ff10c7a913b9cdf15c4075798720433b8e908915362de192633bed64157bd7f47d7aca662d94a0ffd9aa6ce8056521d394d2410c84c78190c4525f76352553e92590b91e295050d141a843c6d7820dc2e66c61b85f405a192d0615df3a1310f4b322a84341b006879ff2eb72f40831b9ba41fab3b9bda962ec180a20cafecf993e5d1019', lastValue: '', errorStack: [], corrections: [], indexOffset: 0, waitForIndex: -1 })
 // hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'b2', votePower: 100, hashSet: 'a9514904521e77d4c2fed6ebf35f5687823725f86cd043af1d1f8b10edfc6b700fdf3c216daf265b2ec4df6c6b5d0bc7a2862e6e03c58ca932991ae71361f96d6edee815c03530c0b588350548b1354208993467731c544e0fff292d27f070e103de2ede57042b108ac9424f59a2a781eae0d8317789b4a7a5e6fa6f082a8ca6b6dc1e19f9da5b8f0900bc17df65b591fd4364859654be0d8367394b609b2a2dc4914e42503688026bce0b2bdd4b7f95b73137e3c415b1b4381d59d7cc5c52494eeb1a7ca07f15750f77f271a84c115f57de061bb2eb1a82f5fc5d52a3ff10c7a913b9cdf15c4075798720433b8e908915362de192633bed64157bd7f47d7aca662d94a0ffd9aa6ce8056521d394d2a9410c84c78190c4525f76352553e92590b91e295050d141a843c6d7820dc2e66c61b85f405a192d0615df3a1310f4b322a84341b00687f2eb72f40831b9ba41fab3b9bda962ec180a20cafecf993e5d581019', lastValue: '', errorStack: [], corrections: [], indexOffset: 0, waitForIndex: -1 })
-hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'b1', votePower: 1, hashSet: '94e384c2faea3b762d3c858568ec6933d1a08f55f3bd036f7768675f5d79f3c86f9a93bfba4f99b69159d71cae6c4d0da8391ad262b7', lastValue: '', errorStack: [], corrections: [], indexOffset: 0, waitForIndex: -1 })
-hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'b2', votePower: 100, hashSet: '9abc94e384c2faea3b762d3c858568ec6933d1a08f55f3bd036f7768675f5d79f3c86f9a93bfba4f99b69159d71cae6c4d0da8391ad2', lastValue: '', errorStack: [], corrections: [], indexOffset: 0, waitForIndex: -1 })
+hashSetList.push(
+  /** @type {GenericHashSetEntry} */ {
+    hash: 'b1',
+    votePower: 1,
+    hashSet:
+      '94e384c2faea3b762d3c858568ec6933d1a08f55f3bd036f7768675f5d79f3c86f9a93bfba4f99b69159d71cae6c4d0da8391ad262b7',
+    lastValue: '',
+    errorStack: [],
+    corrections: [],
+    indexOffset: 0,
+    waitForIndex: -1,
+  }
+)
+hashSetList.push(
+  /** @type {GenericHashSetEntry} */ {
+    hash: 'b2',
+    votePower: 100,
+    hashSet:
+      '9abc94e384c2faea3b762d3c858568ec6933d1a08f55f3bd036f7768675f5d79f3c86f9a93bfba4f99b69159d71cae6c4d0da8391ad2',
+    lastValue: '',
+    errorStack: [],
+    corrections: [],
+    indexOffset: 0,
+    waitForIndex: -1,
+  }
+)
 
 let output = StateManager.solveHashSets(hashSetList, 10)
 
@@ -83,8 +106,32 @@ let output = StateManager.solveHashSets(hashSetList, 10)
 
 // hashSetList2.push(/** @type {GenericHashSetEntry} */{ hash: 'b4', votePower: 1, hashSet: 'a9514904521e77d4c2fed6ebf35f5687823725f86cd043af1d1f8b10edfc6b700fdf3c216d43af265b9ec4df6c6b5d0bc7a2862e6e03c58ca932991ae71361f96d6edee815c03530c0b588350548b135429934731c544e0fff292d27f070e103de2ede5704b52b108ac9424f59a2a781eae0d8317789b4a7a5fa6f082a8ca6b6dc1e19f9da5b8f0900bc17df65b591fd4364859654be0d8367394b609b2a2dc4914e42503688026bce0b2bdd4b7f95b73137e3c415b1b4381d59d7cc5c52494eeb1a7ca07f15750f77f271a84c115f57de061bb2eb1a82f5fc5d52a3ff10c7a913b9cdf15c4075798720433b8e908915362de192633bed64157bd7f47d7aca662d94a0ffd9aa6ce8056521d394d2410c84c78190c4525f76352553e92590b91e295050d141a843c6d7820dc2e66c61b85f405a192d0615df3a1310f4b322a84341b006879ff2eb72f40831b9ba41fab3b9bda962ec180a20cafecf993e5d1019', lastValue: '', errorStack: [], corrections: [], indexOffset: 0, waitForIndex: -1 })
 // hashSetList2.push(/** @type {GenericHashSetEntry} */{ hash: 'forced', votePower: 1000, hashSet: 'a9514904521e77d4c2fed6ebf35f5687823725f86cd043af1d1f8b10edfc6b700fdf3c216daf265b2ec4df6c6b5d0bc7a2862e6e03c58ca932991ae71361f96d6edee815c03530c0b588350548b1354208993467731c544e0fff292d27f070e103de2ede57042b108ac9424f59a2a781eae0d8317789b4a7a5e6fa6f082a8ca6b6dc1e19f9da5b8f0900bc17df65b591fd4364859654be0d8367394b609b2a2dc4914e42503688026bce0b2bdd4b7f95b73137e3c415b1b4381d59d7cc5c52494eeb1a7ca07f15750f77f271a84c115f57de061bb2eb1a82f5fc5d52a3ff10c7a913b9cdf15c4075798720433b8e908915362de192633bed64157bd7f47d7aca662d94a0ffd9aa6ce8056521d394d2a9410c84c78190c4525f76352553e92590b91e295050d141a843c6d7820dc2e66c61b85f405a192d0615df3a1310f4b322a84341b00687f2eb72f40831b9ba41fab3b9bda962ec180a20cafecf993e5d581019', lastValue: '', errorStack: [], corrections: [], indexOffset: 0, waitForIndex: -1 })
-hashSetList2.push(/** @type {GenericHashSetEntry} */{ hash: 'b4', votePower: 1, hashSet: '9abc94e384c2faea3b762d3c858568ec6933d1a08f55f3bd036f7768675f5d79f3c86f9a93bfba4f99b69159d71cae6c4d0da8391ad2', lastValue: '', errorStack: [], corrections: [], indexOffset: 0, waitForIndex: -1 })
-hashSetList2.push(/** @type {GenericHashSetEntry} */{ hash: 'forced', votePower: 1000, hashSet: '9abc94e384c2faea3b762d3c858568ec6933d1a08f55f3bd036f7768675f5d79f3c86f9a93bfba4f99b69159d71cae6c4d0da8391ad262b7', lastValue: '', errorStack: [], corrections: [], indexOffset: 0, waitForIndex: -1 })
+hashSetList2.push(
+  /** @type {GenericHashSetEntry} */ {
+    hash: 'b4',
+    votePower: 1,
+    hashSet:
+      '9abc94e384c2faea3b762d3c858568ec6933d1a08f55f3bd036f7768675f5d79f3c86f9a93bfba4f99b69159d71cae6c4d0da8391ad2',
+    lastValue: '',
+    errorStack: [],
+    corrections: [],
+    indexOffset: 0,
+    waitForIndex: -1,
+  }
+)
+hashSetList2.push(
+  /** @type {GenericHashSetEntry} */ {
+    hash: 'forced',
+    votePower: 1000,
+    hashSet:
+      '9abc94e384c2faea3b762d3c858568ec6933d1a08f55f3bd036f7768675f5d79f3c86f9a93bfba4f99b69159d71cae6c4d0da8391ad262b7',
+    lastValue: '',
+    errorStack: [],
+    corrections: [],
+    indexOffset: 0,
+    waitForIndex: -1,
+  }
+)
 
 let output2 = StateManager.solveHashSets(hashSetList2, 40, 0.625, output)
 
@@ -102,11 +149,15 @@ if (hashSetList2.length > 0) {
 }
 
 console.log(JSON.stringify(hashSetList[0].indexMap))
-hashSetList[0].extraMap.sort(function (a, b) { return a - b })
+hashSetList[0].extraMap.sort(function (a, b) {
+  return a - b
+})
 
 console.log(JSON.stringify(hashSetList[0].extraMap))
 if (hashSetList2.length > 0) {
-  hashSetList2[0].extraMap.sort(function (a, b) { return a - b })
+  hashSetList2[0].extraMap.sort(function (a, b) {
+    return a - b
+  })
   console.log(JSON.stringify(hashSetList2[0].indexMap))
   console.log(JSON.stringify(hashSetList2[0].extraMap))
 }
@@ -115,13 +166,13 @@ let hashSet = ''
 for (let hash of output) {
   hashSet += hash
 }
-console.log('solution:  ' + (hashSet.length / 2) + ' ' + hashSet)
+console.log('solution:  ' + hashSet.length / 2 + ' ' + hashSet)
 if (hashSetList2.length > 0) {
   let hashSet2 = ''
   for (let hash of output2) {
     hashSet2 += hash
   }
-  console.log('solution2: ' + (hashSet2.length / 2) + ' ' + hashSet2)
+  console.log('solution2: ' + hashSet2.length / 2 + ' ' + hashSet2)
 }
 
 StateManager.testHashsetSolution(hashSetList2[0], hashSetList2[1])

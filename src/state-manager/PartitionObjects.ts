@@ -7,19 +7,27 @@ import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
-import Logger, {logFlags} from '../logger'
+import Logger, { logFlags } from '../logger'
 import ShardFunctions from './shardFunctions'
 import { time } from 'console'
 import StateManager from '.'
 import Depricated from './Depricated'
-import { PartitionCycleReport, PartitionObject, PartitionResult, TempTxRecord, TxTallyList, CycleShardData, MainHashResults } from './state-manager-types'
+import {
+  PartitionCycleReport,
+  PartitionObject,
+  PartitionResult,
+  TempTxRecord,
+  TxTallyList,
+  CycleShardData,
+  MainHashResults,
+} from './state-manager-types'
 
 class PartitionObjects {
   app: Shardus.App
   crypto: Crypto
   config: Shardus.StrictServerConfiguration
   profiler: Profiler
-  
+
   logger: Logger
   p2p: P2P
   storage: Storage
@@ -32,7 +40,6 @@ class PartitionObjects {
   statemanager_fatal: (key: string, log: string) => void
 
   nextCycleReportToSend: PartitionCycleReport
-
 
   lastCycleReported: number
   partitionReportDirty: boolean
@@ -48,12 +55,22 @@ class PartitionObjects {
   /** TxTallyList data indexed by cycle key and partition key. @see TxTallyList */
   txByCycleByPartition: { [cycleKey: string]: { [partitionKey: string]: TxTallyList } }
   /** Stores the partition responses that other nodes push to us.  Index by cycle key, then index by partition id */
-  allPartitionResponsesByCycleByPartition: { [cycleKey: string]: { [partitionKey: string]: PartitionResult[] } }
+  allPartitionResponsesByCycleByPartition: {
+    [cycleKey: string]: { [partitionKey: string]: PartitionResult[] }
+  }
 
   resetAndApplyPerPartition: boolean
 
-  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.StrictServerConfiguration) {
-    
+  constructor(
+    stateManager: StateManager,
+    profiler: Profiler,
+    app: Shardus.App,
+    logger: Logger,
+    storage: Storage,
+    p2p: P2P,
+    crypto: Crypto,
+    config: Shardus.StrictServerConfiguration
+  ) {
     this.crypto = crypto
     this.app = app
     this.logger = logger
@@ -106,15 +123,16 @@ class PartitionObjects {
   getPartitionReport(consensusOnly: boolean, smallHashes: boolean): PartitionCycleReport {
     let response: PartitionCycleReport = {} // {res:[], cycleNumber:-1}
     if (this.nextCycleReportToSend != null) {
-
       let shardValues = this.stateManager.shardValuesByCycle.get(this.nextCycleReportToSend.cycleNumber)
       let shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
       let consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
       let consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
-      
 
-      response = {res:[], cycleNumber:this.nextCycleReportToSend.cycleNumber}
-      if (this.lastCycleReported < this.nextCycleReportToSend.cycleNumber || this.partitionReportDirty === true) {
+      response = { res: [], cycleNumber: this.nextCycleReportToSend.cycleNumber }
+      if (
+        this.lastCycleReported < this.nextCycleReportToSend.cycleNumber ||
+        this.partitionReportDirty === true
+      ) {
         // consensusOnly hashes
         if (smallHashes === true) {
           for (let r of this.nextCycleReportToSend.res) {
@@ -122,12 +140,14 @@ class PartitionObjects {
           }
         }
         for (let r of this.nextCycleReportToSend.res) {
-          if(consensusOnly){
+          if (consensusOnly) {
             //check if partition is in our range!
-            if(ShardFunctions.partitionInWrappingRange(r.i, consensusStartPartition, consensusEndPartition)){
+            if (
+              ShardFunctions.partitionInWrappingRange(r.i, consensusStartPartition, consensusEndPartition)
+            ) {
               response.res.push(r)
             }
-          } else{
+          } else {
             response.res.push(r)
           }
         }
@@ -137,7 +157,7 @@ class PartitionObjects {
         this.nextCycleReportToSend = null // clear it because we sent it
         this.partitionReportDirty = false // not dirty anymore
 
-        if (logFlags.debug) this.mainLogger.debug('getPartitionReport: ' + `insync: ${this.stateManager.stateIsGood} ` + utils.stringifyReduce(response))
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug('getPartitionReport: ' + `insync: ${this.stateManager.stateIsGood} ` + utils.stringifyReduce(response))
       }
     }
     return response
@@ -194,11 +214,7 @@ class PartitionObjects {
    *    ######## ##    ## ########        ##         #######  #### ##    ##    ##     ######
    */
 
-  setupHandlers() {
-
-  }
-
-
+  setupHandlers() {}
 }
 
 export default PartitionObjects

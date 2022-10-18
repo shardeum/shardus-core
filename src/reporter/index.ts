@@ -1,6 +1,6 @@
 import Log4js from 'log4js'
 import LoadDetection from '../load-detection'
-import Logger, {logFlags} from '../logger'
+import Logger, { logFlags } from '../logger'
 import { ipInfo } from '../network'
 import { config, crypto } from '../p2p/Context'
 import * as Shardus from '../shardus/shardus-types'
@@ -52,14 +52,7 @@ interface Reporter {
   statisticsReport: StatisticsReport
 }
 class Reporter {
-  constructor(
-    config,
-    logger,
-    statistics,
-    stateManager,
-    profiler,
-    loadDetection
-  ) {
+  constructor(config, logger, statistics, stateManager, profiler, loadDetection) {
     this.config = config
     this.mainLogger = logger.getLogger('main')
     this.statistics = statistics
@@ -72,7 +65,7 @@ class Reporter {
 
     this.lastTime = Date.now()
 
-    this.doConsoleReport = isDebugModeAnd((config) => config.profiler);
+    this.doConsoleReport = isDebugModeAnd((config) => config.profiler)
 
     this.hasRecipient = this.config.recipient != null
     this.resetStatisticsReport()
@@ -89,18 +82,10 @@ class Reporter {
   }
 
   collectStatisticToReport() {
-    this.statisticsReport.txInjected += this.statistics
-      ? this.statistics.getPreviousElement('txInjected')
-      : 0
-    this.statisticsReport.txApplied += this.statistics
-      ? this.statistics.getPreviousElement('txApplied')
-      : 0
-    this.statisticsReport.txRejected += this.statistics
-      ? this.statistics.getPreviousElement('txRejected')
-      : 0
-    this.statisticsReport.txExpired += this.statistics
-      ? this.statistics.getPreviousElement('txExpired')
-      : 0
+    this.statisticsReport.txInjected += this.statistics ? this.statistics.getPreviousElement('txInjected') : 0
+    this.statisticsReport.txApplied += this.statistics ? this.statistics.getPreviousElement('txApplied') : 0
+    this.statisticsReport.txRejected += this.statistics ? this.statistics.getPreviousElement('txRejected') : 0
+    this.statisticsReport.txExpired += this.statistics ? this.statistics.getPreviousElement('txExpired') : 0
     this.statisticsReport.txProcessed += this.statistics
       ? this.statistics.getPreviousElement('txProcessed')
       : 0
@@ -117,9 +102,8 @@ class Reporter {
         nodeIpInfo,
       })
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(
-        'reportJoining: ' + e.name + ': ' + e.message + ' at ' + e.stack
-      )
+      if (logFlags.error)
+        this.mainLogger.error('reportJoining: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
     }
   }
@@ -136,9 +120,8 @@ class Reporter {
         nodeIpInfo,
       })
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(
-        'reportJoined: ' + e.name + ': ' + e.message + ' at ' + e.stack
-      )
+      if (logFlags.error)
+        this.mainLogger.error('reportJoined: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
     }
   }
@@ -150,9 +133,8 @@ class Reporter {
     try {
       await http.post(`${this.config.recipient}/active`, { nodeId })
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(
-        'reportActive: ' + e.name + ': ' + e.message + ' at ' + e.stack
-      )
+      if (logFlags.error)
+        this.mainLogger.error('reportActive: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
     }
   }
@@ -164,9 +146,8 @@ class Reporter {
     try {
       await http.post(`${this.config.recipient}/sync-statement`, { nodeId, syncStatement })
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(
-        'reportSyncStatement: ' + e.name + ': ' + e.message + ' at ' + e.stack
-      )
+      if (logFlags.error)
+        this.mainLogger.error('reportSyncStatement: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
     }
   }
@@ -178,9 +159,8 @@ class Reporter {
     try {
       await http.post(`${this.config.recipient}/removed`, { nodeId })
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(
-        'reportRemoved: ' + e.name + ': ' + e.message + ' at ' + e.stack
-      )
+      if (logFlags.error)
+        this.mainLogger.error('reportRemoved: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
     }
     // Omar added this, since, just clearing the timer did not work
@@ -202,9 +182,8 @@ class Reporter {
     try {
       await http.post(`${this.config.recipient}/heartbeat`, report)
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(
-        '_sendReport: ' + e.name + ': ' + e.message + ' at ' + e.stack
-      )
+      if (logFlags.error)
+        this.mainLogger.error('_sendReport: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
     }
   }
@@ -244,7 +223,7 @@ class Reporter {
     const cycleMarker = CycleChain.newest.previous || '' // [TODO] Replace with cycle creator
     const cycleCounter = CycleChain.newest.counter
 
-    let nodelistIDs = NodeList.activeByIdOrder.map((node)=>node.id)
+    let nodelistIDs = NodeList.activeByIdOrder.map((node) => node.id)
     const nodelistHash = crypto.hash(nodelistIDs)
     //const nodelistHash = crypto.hash(NodeList.byJoinOrder) //todo figure out what fields are off.
     const desiredNodes = getDesiredCount()
@@ -266,14 +245,10 @@ class Reporter {
     let globalSync = null
     let txCoverage = {}
     if (this.stateManager != null) {
-
       //todo need to get rid of / no-op partition report.  It can't scale with # of accounts. (at least not without some advanements in how handle hashing)
       //A report using trie hashes would be smarter / more usefull as a replacement.
-      if(this.stateManager.partitionObjects != null){
-        partitionReport = this.stateManager.partitionObjects.getPartitionReport(
-          true,
-          true
-        )
+      if (this.stateManager.partitionObjects != null) {
+        partitionReport = this.stateManager.partitionObjects.getPartitionReport(true, true)
       }
 
       if (config.mode === 'debug' && !config.debug.disableTxCoverageReport) {
@@ -295,8 +270,7 @@ class Reporter {
       const shardData = this.stateManager.currentCycleShardData //   getShardDataForCycle(cycleCounter)
       if (shardData != null) {
         partitions = shardData.shardGlobals.numPartitions
-        partitionsCovered =
-          shardData.nodeShardData.storedPartitions.partitionsCovered
+        partitionsCovered = shardData.nodeShardData.storedPartitions.partitionsCovered
       }
     }
 
@@ -306,8 +280,7 @@ class Reporter {
     let queueLength = this.statistics.getPreviousElement('queueLength')
     const executeQueueLength = this.statistics.getPreviousElement('executeQueueLength')
     queueLength = executeQueueLength //debug hack until the monitor client can show this
-    const txTimeInQueue =
-      this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
+    const txTimeInQueue = this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
     const isNodeLost = this.checkIsNodeLost(Self.id)
     const isNodeRefuted = this.checkIsNodeRefuted(Self.id)
     const isDataSynced = !this.stateManager.accountPatcher.failedLastTrieSync
@@ -344,33 +317,27 @@ class Reporter {
         globalSync,
         partitions,
         partitionsCovered,
-        'currentLoad': {
-          'networkLoad': currentNetworkLoad,
-          'nodeLoad': currentNodeLoad
+        currentLoad: {
+          networkLoad: currentNetworkLoad,
+          nodeLoad: currentNodeLoad,
         },
         queueLength,
         executeQueueLength,
         txTimeInQueue,
         rareCounters,
         txCoverage,
-        'isLost': isNodeLost,
-        'isRefuted': isNodeRefuted,
-        'shardusVersion': packageJson.version,
+        isLost: isNodeLost,
+        isRefuted: isNodeRefuted,
+        shardusVersion: packageJson.version,
       })
-      if (
-        this.stateManager != null &&
-        config.mode === 'debug' &&
-        !config.debug.disableTxCoverageReport
-      ) {
+      if (this.stateManager != null && config.mode === 'debug' && !config.debug.disableTxCoverageReport) {
         this.stateManager.transactionQueue.resetTxCoverageMap()
       }
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(
-        'startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack
-      )
+      if (logFlags.error)
+        this.mainLogger.error('startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
     }
-
 
     this.resetStatisticsReport()
     //this.consoleReport()
@@ -386,8 +353,7 @@ class Reporter {
       self.collectStatisticToReport()
 
       //temp mem debugging:
-      this.mainLogger.info(memoryReportingInstance.getMemoryStringBasic() )
-
+      this.mainLogger.info(memoryReportingInstance.getMemoryStringBasic())
     }, 1000)
     // Creates and sends a report every `interval` seconds
     this.reportTimer = setTimeout(() => {
@@ -399,12 +365,8 @@ class Reporter {
     const time = Date.now()
     let delta = time - this.lastTime
     delta = delta * 0.001
-    const txInjected = this.statistics
-      ? this.statistics.getPreviousElement('txInjected')
-      : 0
-    const txApplied = this.statistics
-      ? this.statistics.getPreviousElement('txApplied')
-      : 0
+    const txInjected = this.statistics ? this.statistics.getPreviousElement('txInjected') : 0
+    const txApplied = this.statistics ? this.statistics.getPreviousElement('txApplied') : 0
     const report = `Perf inteval ${delta}    ${txInjected} Injected @${
       txInjected / delta
     } per second.    ${txApplied} Applied @${txApplied / delta} per second`
@@ -416,13 +378,9 @@ class Reporter {
       //Note: turning this log on will make the perf endpoint math get reset
       //  one option would be to have a flag that gets set if anyone hits the perf endpoint
       //  if so, then just stop this logging.  for now i will leave this off.
-//      if (logFlags.console) console.log(this.profiler.printAndClearReport(delta))
-      if (logFlags.console) console.log(
-        'Current load',
-        'counter',
-        CycleChain.newest.counter,
-        this.loadDetection.getCurrentLoad()
-      )
+      //      if (logFlags.console) console.log(this.profiler.printAndClearReport(delta))
+      if (logFlags.console)
+        console.log('Current load', 'counter', CycleChain.newest.counter, this.loadDetection.getCurrentLoad())
     }
   }
 

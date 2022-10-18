@@ -2,7 +2,7 @@ import Log4js from 'log4js'
 // const fs = require('fs')
 // const path = require('path')
 import { Op } from 'sequelize'
-import Logger, {logFlags} from '../logger'
+import Logger, { logFlags } from '../logger'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
 import Profiler from '../utils/profiler'
@@ -49,20 +49,14 @@ class Storage {
     // this.storage = new SequelizeStorage(models, config, logger, baseDir, this.profiler)
 
     // this.storage = new BetterSqlite3Storage(models, config, logger, baseDir, this.profiler)
-    this.storage = new Sqlite3Storage(
-      models,
-      config,
-      logger,
-      baseDir,
-      this.profiler
-    )
+    this.storage = new Sqlite3Storage(models, config, logger, baseDir, this.profiler)
     this.stateManager = null
   }
 
   async init() {
-    console.log('shardus storage init:' )
+    console.log('shardus storage init:')
     await this.storage.init()
-    console.log('shardus storage init complete' )
+    console.log('shardus storage init complete')
 
     await this.storage.runCreate(
       'CREATE TABLE if not exists `acceptedTxs` (`txId` VARCHAR(255) NOT NULL PRIMARY KEY, `timestamp` BIGINT NOT NULL, `data` JSON NOT NULL, `keys` JSON NOT NULL)'
@@ -72,15 +66,15 @@ class Storage {
     )
     await this.storage.runCreate(
       'CREATE TABLE if not exists `cycles` (`networkId` TEXT NOT NULL, `counter` BIGINT NOT NULL UNIQUE PRIMARY KEY,' +
-      ' `safetyMode` BOOLEAN, `safetyNum` BIGINT, `maxSyncTime` BIGINT, `networkStateHash` BIGINT, `networkDataHash`' +
-      ' JSON, `networkConfigHash` TEXT NOT NULL,' +
-      ' `networkReceiptHash` JSON, `networkSummaryHash` JSON, `certificate` JSON NOT NULL, `previous` TEXT NOT' +
-      ' NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL,' +
-      ' `syncing` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL,' +
-      ' `joinedArchivers` JSON NOT NULL,`leavingArchivers` JSON NOT NULL, `joinedConsensors` JSON NOT' +
-      ' NULL,`refreshedArchivers` JSON NOT NULL, `refreshedConsensors` JSON NOT NULL, `activated` JSON NOT NULL,' +
-      ' `activatedPublicKeys` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT' +
-      ' NULL, `lostSyncing` JSON NOT NULL , `refuted` JSON NOT NULL)'
+        ' `safetyMode` BOOLEAN, `safetyNum` BIGINT, `maxSyncTime` BIGINT, `networkStateHash` BIGINT, `networkDataHash`' +
+        ' JSON, `networkConfigHash` TEXT NOT NULL,' +
+        ' `networkReceiptHash` JSON, `networkSummaryHash` JSON, `certificate` JSON NOT NULL, `previous` TEXT NOT' +
+        ' NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL,' +
+        ' `syncing` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL,' +
+        ' `joinedArchivers` JSON NOT NULL,`leavingArchivers` JSON NOT NULL, `joinedConsensors` JSON NOT' +
+        ' NULL,`refreshedArchivers` JSON NOT NULL, `refreshedConsensors` JSON NOT NULL, `activated` JSON NOT NULL,' +
+        ' `activatedPublicKeys` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT' +
+        ' NULL, `lostSyncing` JSON NOT NULL , `refuted` JSON NOT NULL)'
     )
     await this.storage.runCreate(
       'CREATE TABLE if not exists `nodes` (`id` TEXT NOT NULL PRIMARY KEY, `publicKey` TEXT NOT NULL, `curvePublicKey` TEXT NOT NULL, `cycleJoined` TEXT NOT NULL, `internalIp` VARCHAR(255) NOT NULL, `externalIp` VARCHAR(255) NOT NULL, `internalPort` SMALLINT NOT NULL, `externalPort` SMALLINT NOT NULL, `joinRequestTimestamp` BIGINT NOT NULL, `activeTimestamp` BIGINT NOT NULL, `address` VARCHAR(255) NOT NULL, `status` VARCHAR(255) NOT NULL)'
@@ -118,32 +112,25 @@ class Storage {
     // get models and helper methods from the storage class we just initializaed.
     this.storageModels = this.storage.storageModels
 
-    this._create = async (table, values, opts) =>
-      this.storage._create(table, values, opts)
-    this._read = async (table, where, opts) =>
-      this.storage._read(table, where, opts)
-    this._readOld = async (table, where, opts) =>
-      this.storage._readOld(table, where, opts)
-    this._update = async (table, values, where, opts) =>
-      this.storage._update(table, values, where, opts)
-    this._delete = async (table, where, opts) =>
-      this.storage._delete(table, where, opts)
-    this._query = async (query, tableModel) =>
-      this.storage._rawQuery(query, tableModel) // or queryString, valueArray for non-sequelize
-    this._queryOld = async (query, tableModel) =>
-      this.storage._rawQueryOld(query, tableModel) // or queryString, valueArray for non-sequelize
+    this._create = async (table, values, opts) => this.storage._create(table, values, opts)
+    this._read = async (table, where, opts) => this.storage._read(table, where, opts)
+    this._readOld = async (table, where, opts) => this.storage._readOld(table, where, opts)
+    this._update = async (table, values, where, opts) => this.storage._update(table, values, where, opts)
+    this._delete = async (table, where, opts) => this.storage._delete(table, where, opts)
+    this._query = async (query, tableModel) => this.storage._rawQuery(query, tableModel) // or queryString, valueArray for non-sequelize
+    this._queryOld = async (query, tableModel) => this.storage._rawQueryOld(query, tableModel) // or queryString, valueArray for non-sequelize
 
     this.initialized = true
-    if (Snapshot.oldDataPath){
+    if (Snapshot.oldDataPath) {
       //temporarily disable safety mode, it seems to break rotation
       //await Snapshot.initSafetyModeVals()
-    } 
+    }
   }
   async close() {
     await this.storage.close()
   }
 
-  async deleteOldDBPath(){
+  async deleteOldDBPath() {
     await this.storage.deleteOldDBPath()
   }
 
@@ -372,9 +359,8 @@ class Storage {
     // Attempt to add node to the nodeIds list
     const addNodeToList = (node) => {
       if (!node.id) {
-        if (logFlags.error) this.mainLogger.error(
-          `Node attempted to be deleted without ID: ${JSON.stringify(node)}`
-        )
+        if (logFlags.error)
+          this.mainLogger.error(`Node attempted to be deleted without ID: ${JSON.stringify(node)}`)
         return
       }
       nodeIds.push(node.id)
@@ -576,7 +562,10 @@ class Storage {
       })
     } catch (e) {
       this.fatalLogger.fatal(
-        'addAccountStates db failure.  start apoptosis ' + JSON.stringify(e.message) + ' ' + JSON.stringify(accountStates)
+        'addAccountStates db failure.  start apoptosis ' +
+          JSON.stringify(e.message) +
+          ' ' +
+          JSON.stringify(accountStates)
       )
       this.stateManager.initApoptosisAndQuitSyncing('addAccountStates')
     }
@@ -660,13 +649,7 @@ class Storage {
     }
   }
 
-  async queryAccountStateTable(
-    accountStart,
-    accountEnd,
-    tsStart,
-    tsEnd,
-    limit
-  ) {
+  async queryAccountStateTable(accountStart, accountEnd, tsStart, tsEnd, limit) {
     this._checkInit()
     try {
       const result = await this._read(
@@ -725,7 +708,7 @@ class Storage {
       }
       //maxTS?
       const query = `select accountId, txId, max(txTimestamp) txTimestamp, stateBefore, stateAfter from accountStates WHERE accountId IN (${expandQ}) group by accountId `
-      const result = await this._query(query, [ ...accountIDs])
+      const result = await this._query(query, [...accountIDs])
       return result
     } catch (e) {
       throw new Error(e)
@@ -828,10 +811,10 @@ class Storage {
   }
 
   async createAccountCopies(accountCopies) {
-    if(config.stateManager.useAccountCopiesTable === false){
+    if (config.stateManager.useAccountCopiesTable === false) {
       return
     }
-    
+
     this._checkInit()
     try {
       // if (logFlags.console) console.log('createAccountCopies write: ' + JSON.stringify(accountCopies))
@@ -842,7 +825,7 @@ class Storage {
   }
 
   async createOrReplaceAccountCopy(accountCopy) {
-    if(config.stateManager.useAccountCopiesTable === false){
+    if (config.stateManager.useAccountCopiesTable === false) {
       return
     }
 
@@ -864,7 +847,7 @@ class Storage {
   // hash: { type: Sequelize.STRING, allowNull: false }
 
   async getAccountReplacmentCopies1(accountIDs, cycleNumber) {
-    if(config.stateManager.useAccountCopiesTable === false){
+    if (config.stateManager.useAccountCopiesTable === false) {
       return []
     }
 
@@ -890,7 +873,7 @@ class Storage {
   }
 
   async getAccountReplacmentCopies(accountIDs, cycleNumber) {
-    if(config.stateManager.useAccountCopiesTable === false){
+    if (config.stateManager.useAccountCopiesTable === false) {
       return []
     }
 
@@ -913,7 +896,7 @@ class Storage {
   }
 
   async clearAccountReplacmentCopies(accountIDs, cycleNumber) {
-    if(config.stateManager.useAccountCopiesTable === false){
+    if (config.stateManager.useAccountCopiesTable === false) {
       return []
     }
 
@@ -938,7 +921,7 @@ class Storage {
   }
 
   async getAccountCopiesByCycle(cycleNumber) {
-    if(config.stateManager.useAccountCopiesTable === false){
+    if (config.stateManager.useAccountCopiesTable === false) {
       return []
     }
 
@@ -955,7 +938,7 @@ class Storage {
   }
 
   async getAccountCopiesByCycleAndRange(cycleNumber, lowAddress, highAddress) {
-    if(config.stateManager.useAccountCopiesTable === false){
+    if (config.stateManager.useAccountCopiesTable === false) {
       return []
     }
 
@@ -970,8 +953,7 @@ class Storage {
   }
 
   async getGlobalAccountCopies(cycleNumber) {
-
-    if(config.stateManager.useAccountCopiesTable === false){
+    if (config.stateManager.useAccountCopiesTable === false) {
       return []
     }
 
@@ -985,15 +967,10 @@ class Storage {
     }
   }
 
-  async getOldAccountCopiesByCycleAndRange(
-    cycleNumber,
-    lowAddress,
-    highAddress
-  ) {
-    if(config.stateManager.useAccountCopiesTable === false){
+  async getOldAccountCopiesByCycleAndRange(cycleNumber, lowAddress, highAddress) {
+    if (config.stateManager.useAccountCopiesTable === false) {
       return []
     }
-
 
     this._checkInit()
     try {
@@ -1006,7 +983,7 @@ class Storage {
   }
 
   async getOldGlobalAccountCopies(cycleNumber) {
-    if(config.stateManager.useAccountCopiesTable === false){
+    if (config.stateManager.useAccountCopiesTable === false) {
       return []
     }
 

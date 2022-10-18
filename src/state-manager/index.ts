@@ -1,6 +1,6 @@
 import * as Shardus from '../shardus/shardus-types'
 
-import {StateManager as StateManagerTypes } from '@shardus/types'
+import { StateManager as StateManagerTypes } from '@shardus/types'
 
 import { isNodeDown, isNodeLost, isNodeUpRecent } from '../p2p/Lost'
 
@@ -18,7 +18,7 @@ import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profile
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
-import Logger, {logFlags} from '../logger'
+import Logger, { logFlags } from '../logger'
 import { throws } from 'assert'
 import * as Context from '../p2p/Context'
 import { potentiallyRemoved, activeByIdOrder, activeOthersByIdOrder } from '../p2p/NodeList'
@@ -38,7 +38,40 @@ import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
 import Depricated from './Depricated'
 import AccountPatcher from './AccountPatcher'
-import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt, CycleDebugNotes, AppliedVoteHash, AppliedReceipt2, RequestReceiptForTxResp_old } from './state-manager-types'
+import {
+  CycleShardData,
+  PartitionReceipt,
+  FifoLockObjectMap,
+  QueueEntry,
+  AcceptedTx,
+  AccountCopy,
+  GetAccountDataByRangeSmart,
+  WrappedStateArray,
+  AccountHashCache,
+  RequestReceiptForTxReq,
+  RequestReceiptForTxResp,
+  RequestStateForTxReqPost,
+  RequestStateForTxResp,
+  RequestTxResp,
+  AppliedVote,
+  GetAccountDataWithQueueHintsResp,
+  DebugDumpPartitions,
+  DebugDumpRangesCovered,
+  DebugDumpNodesCovered,
+  DebugDumpPartition,
+  DebugDumpPartitionSkip,
+  MainHashResults,
+  SimpleDistanceObject,
+  WrappedResponses,
+  LocalCachedData,
+  AccountFilter,
+  StringBoolObjectMap,
+  AppliedReceipt,
+  CycleDebugNotes,
+  AppliedVoteHash,
+  AppliedReceipt2,
+  RequestReceiptForTxResp_old,
+} from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
 
@@ -136,8 +169,6 @@ class StateManager {
 
   debugFeatureOld_partitionReciepts: boolean // depends on old partition report features.
 
-
-
   logger: Logger
 
   extendedRepairLogging: boolean
@@ -164,7 +195,7 @@ class StateManager {
 
   processCycleSummaries: boolean // controls if we execute processPreviousCycleSummaries() at cycle_q1_start
 
-  cycleDebugNotes : CycleDebugNotes
+  cycleDebugNotes: CycleDebugNotes
 
   superLargeNetworkDebugReduction: boolean
 
@@ -180,9 +211,16 @@ class StateManager {
    *    ##    ## ##     ## ##   ### ##    ##    ##    ##    ##  ##     ## ##    ##    ##    ##     ## ##    ##
    *     ######   #######  ##    ##  ######     ##    ##     ##  #######   ######     ##     #######  ##     ##
    */
-  constructor( profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.StrictServerConfiguration) {
+  constructor(
+    profiler: Profiler,
+    app: Shardus.App,
+    logger: Logger,
+    storage: Storage,
+    p2p: P2P,
+    crypto: Crypto,
+    config: Shardus.StrictServerConfiguration
+  ) {
     //super()
-
 
     this.p2p = p2p
     this.crypto = crypto
@@ -234,21 +272,47 @@ class StateManager {
     this.partitionStats.summaryPartitionCount = 4096 //32
     this.partitionStats.initSummaryBlobs()
 
-    this.accountSync = new AccountSync(this,  profiler, app, logger, storage, p2p, crypto, config)
+    this.accountSync = new AccountSync(this, profiler, app, logger, storage, p2p, crypto, config)
 
-    this.accountGlobals = new AccountGlobals(this,  profiler, app, logger, storage, p2p, crypto, config)
-    this.transactionQueue = new TransactionQueue(this,  profiler, app, logger, storage, p2p, crypto, config)
+    this.accountGlobals = new AccountGlobals(this, profiler, app, logger, storage, p2p, crypto, config)
+    this.transactionQueue = new TransactionQueue(this, profiler, app, logger, storage, p2p, crypto, config)
 
-    if(this.config.debug.optimizedTXConsenus){
-      this.transactionRepair = new TransactionRepair(this,  profiler, app, logger, storage, p2p, crypto, config)     
+    if (this.config.debug.optimizedTXConsenus) {
+      this.transactionRepair = new TransactionRepair(
+        this,
+        profiler,
+        app,
+        logger,
+        storage,
+        p2p,
+        crypto,
+        config
+      )
     } else {
-      this.transactionRepairOld = new TransactionRepairOld(this,  profiler, app, logger, storage, p2p, crypto, config)      
+      this.transactionRepairOld = new TransactionRepairOld(
+        this,
+        profiler,
+        app,
+        logger,
+        storage,
+        p2p,
+        crypto,
+        config
+      )
     }
 
-
-    this.transactionConsensus = new TransactionConsenus(this,  profiler, app, logger, storage, p2p, crypto, config)
-    this.partitionObjects = new PartitionObjects(this,  profiler, app, logger, storage, p2p, crypto, config)
-    this.depricated = new Depricated(this,  profiler, app, logger, storage, p2p, crypto, config)
+    this.transactionConsensus = new TransactionConsenus(
+      this,
+      profiler,
+      app,
+      logger,
+      storage,
+      p2p,
+      crypto,
+      config
+    )
+    this.partitionObjects = new PartitionObjects(this, profiler, app, logger, storage, p2p, crypto, config)
+    this.depricated = new Depricated(this, profiler, app, logger, storage, p2p, crypto, config)
     this.accountPatcher = new AccountPatcher(this, profiler, app, logger, p2p, crypto, config)
 
     // feature controls.
@@ -275,14 +339,28 @@ class StateManager {
 
     // other debug features
     if (this.config && this.config.debug) {
-      this.feature_useNewParitionReport = this.tryGetBoolProperty(this.config.debug, 'useNewParitionReport', this.feature_useNewParitionReport)
+      this.feature_useNewParitionReport = this.tryGetBoolProperty(
+        this.config.debug,
+        'useNewParitionReport',
+        this.feature_useNewParitionReport
+      )
 
       // this.oldFeature_GeneratePartitionReport = this.tryGetBoolProperty(this.config.debug, 'oldPartitionSystem', this.oldFeature_GeneratePartitionReport)
 
-      this.debugFeature_dumpAccountDataFromSQL = this.tryGetBoolProperty(this.config.debug, 'dumpAccountReportFromSQL', this.debugFeature_dumpAccountDataFromSQL)
+      this.debugFeature_dumpAccountDataFromSQL = this.tryGetBoolProperty(
+        this.config.debug,
+        'dumpAccountReportFromSQL',
+        this.debugFeature_dumpAccountDataFromSQL
+      )
     }
 
-    this.cycleDebugNotes = {repairs:0, lateRepairs:0, patchedAccounts:0, badAccounts:0, noRcptRepairs:0 }
+    this.cycleDebugNotes = {
+      repairs: 0,
+      lateRepairs: 0,
+      patchedAccounts: 0,
+      badAccounts: 0,
+      noRcptRepairs: 0,
+    }
 
     /** @type {number} */
     this.dataRepairsCompleted = 0
@@ -399,8 +477,6 @@ class StateManager {
         this.failNoRepairTxChance = 0
       }
     }
-
-
   }
 
   // TEMP hack emit events through p2p
@@ -422,26 +498,26 @@ class StateManager {
   // This is called once per cycle to update to calculate the necessary shard values.
   updateShardValues(cycleNumber: number) {
     if (this.currentCycleShardData == null) {
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_firstCycle', `${cycleNumber}`, ` first init `)
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_firstCycle', `${cycleNumber}`, ` first init `)
     }
 
     let cycleShardData = {} as CycleShardData
 
     // lets make sure shard calculation are happening at a consistent interval
     let calculationTime = Date.now()
-    if(this.lastShardCalculationTS > 0){
-      let delay = (calculationTime - this.lastShardCalculationTS) - (this.config.p2p.cycleDuration * 1000)
+    if (this.lastShardCalculationTS > 0) {
+      let delay = calculationTime - this.lastShardCalculationTS - this.config.p2p.cycleDuration * 1000
 
-      if(delay > 5000){
-        this.statemanager_fatal(`updateShardValues-delay > 5s ${delay/1000}`, `updateShardValues-delay ${delay/1000}`)
-      }
-      else if(delay > 4000){
+      if (delay > 5000) {
+        this.statemanager_fatal(
+          `updateShardValues-delay > 5s ${delay / 1000}`,
+          `updateShardValues-delay ${delay / 1000}`
+        )
+      } else if (delay > 4000) {
         nestedCountersInstance.countEvent('stateManager', 'updateShardValues delay > 4s')
-      }
-      else if(delay > 3000){
+      } else if (delay > 3000) {
         nestedCountersInstance.countEvent('stateManager', 'updateShardValues delay > 3s')
-      }
-      else if(delay > 2000){
+      } else if (delay > 2000) {
         nestedCountersInstance.countEvent('stateManager', 'updateShardValues delay > 2s')
       }
 
@@ -458,13 +534,12 @@ class StateManager {
     cycleShardData.partitionsToSkip = new Map()
     cycleShardData.hasCompleteData = false
 
-
-    if(this.lastActiveCount === -1){
+    if (this.lastActiveCount === -1) {
       this.lastActiveCount = activeByIdOrder.length
     } else {
       let change = activeByIdOrder.length - this.lastActiveCount
-      if(change != 0){
-        nestedCountersInstance.countEvent('networkSize',`cyc:${cycleNumber} active:${activeByIdOrder.length} change:${change}`)
+      if (change != 0) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('networkSize',`cyc:${cycleNumber} active:${activeByIdOrder.length} change:${change}`)
       }
       this.lastActiveCount = activeByIdOrder.length
     }
@@ -478,7 +553,7 @@ class StateManager {
     }
 
     if (cycleShardData.activeNodes.length === 0) {
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_noNodeListAvailable', `${cycleNumber}`, `  `)
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_noNodeListAvailable', `${cycleNumber}`, `  `)
       return // no active nodes so stop calculating values
     }
 
@@ -495,21 +570,44 @@ class StateManager {
     const edgeNodes = this.config.sharding.nodesPerEdge as number
 
     // save this per cycle?
-    cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup as number, edgeNodes)
+    cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(
+      cycleShardData.activeNodes.length,
+      this.config.sharding.nodesPerConsensusGroup as number,
+      edgeNodes
+    )
 
     this.profiler.profileSectionStart('updateShardValues_computePartitionShardDataMap1') //13ms, #:60
     // partition shard data
-    ShardFunctions.computePartitionShardDataMap(cycleShardData.shardGlobals, cycleShardData.parititionShardDataMap, 0, cycleShardData.shardGlobals.numPartitions)
+    ShardFunctions.computePartitionShardDataMap(
+      cycleShardData.shardGlobals,
+      cycleShardData.parititionShardDataMap,
+      0,
+      cycleShardData.shardGlobals.numPartitions
+    )
     this.profiler.profileSectionEnd('updateShardValues_computePartitionShardDataMap1')
 
     this.profiler.profileSectionStart('updateShardValues_computePartitionShardDataMap2') //37ms, #:60
     // generate limited data for all nodes data for all nodes.
-    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, false)
+    ShardFunctions.computeNodePartitionDataMap(
+      cycleShardData.shardGlobals,
+      cycleShardData.nodeShardDataMap,
+      cycleShardData.activeNodes,
+      cycleShardData.parititionShardDataMap,
+      cycleShardData.activeNodes,
+      false
+    )
     this.profiler.profileSectionEnd('updateShardValues_computePartitionShardDataMap2')
 
-    this.profiler.profileSectionStart('updateShardValues_computeNodePartitionData')  //22ms, #:60
+    this.profiler.profileSectionStart('updateShardValues_computeNodePartitionData') //22ms, #:60
     // get extended data for our node
-    cycleShardData.nodeShardData = ShardFunctions.computeNodePartitionData(cycleShardData.shardGlobals, cycleShardData.ourNode, cycleShardData.nodeShardDataMap, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
+    cycleShardData.nodeShardData = ShardFunctions.computeNodePartitionData(
+      cycleShardData.shardGlobals,
+      cycleShardData.ourNode,
+      cycleShardData.nodeShardDataMap,
+      cycleShardData.parititionShardDataMap,
+      cycleShardData.activeNodes,
+      true
+    )
     this.profiler.profileSectionEnd('updateShardValues_computeNodePartitionData')
 
     // This is currently redudnant if we move to lazy init of extended data we should turn it back on
@@ -525,7 +623,14 @@ class StateManager {
     this.profiler.profileSectionStart('updateShardValues_computeNodePartitionDataMap2') //232ms, #:60
     // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
     let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
-    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, fullDataForDebug)
+    ShardFunctions.computeNodePartitionDataMap(
+      cycleShardData.shardGlobals,
+      cycleShardData.nodeShardDataMap,
+      cycleShardData.activeNodes,
+      cycleShardData.parititionShardDataMap,
+      cycleShardData.activeNodes,
+      fullDataForDebug
+    )
     this.profiler.profileSectionEnd('updateShardValues_computeNodePartitionDataMap2')
 
     // TODO if fullDataForDebug gets turned false we will update the guts of this calculation
@@ -553,7 +658,7 @@ class StateManager {
         cycleShardData.syncingNeighborsTxGroup.push(cycleShardData.ourNode)
         cycleShardData.hasSyncingNeighbors = true
 
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_neighbors', `${cycleShardData.cycleNumber}`, ` neighbors: ${utils.stringifyReduce(cycleShardData.syncingNeighbors.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_neighbors', `${cycleShardData.cycleNumber}`, ` neighbors: ${utils.stringifyReduce(cycleShardData.syncingNeighbors.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
       } else {
         cycleShardData.hasSyncingNeighbors = false
       }
@@ -562,7 +667,7 @@ class StateManager {
 
       // if (this.preTXQueue.length > 0) {
       //   for (let tx of this.preTXQueue) {
-      //     if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_preTX', ` `, ` ${utils.stringifyReduce(tx)} `)
+      //     /* prettier-ignore */ if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_preTX', ` `, ` ${utils.stringifyReduce(tx)} `)
       //     this.transactionQueue.routeAndQueueAcceptedTransaction(tx, false, null)
       //   }
       //   this.preTXQueue = []
@@ -576,18 +681,24 @@ class StateManager {
     this.profiler.profileSectionStart('updateShardValues_getPartitionLists') // 0
     // calculate our consensus partitions for use by data repair:
     // cycleShardData.ourConsensusPartitions = []
-    let partitions = ShardFunctions.getConsenusPartitionList(cycleShardData.shardGlobals, cycleShardData.nodeShardData)
+    let partitions = ShardFunctions.getConsenusPartitionList(
+      cycleShardData.shardGlobals,
+      cycleShardData.nodeShardData
+    )
     cycleShardData.ourConsensusPartitions = partitions
 
-    let partitions2 = ShardFunctions.getStoredPartitionList(cycleShardData.shardGlobals, cycleShardData.nodeShardData)
+    let partitions2 = ShardFunctions.getStoredPartitionList(
+      cycleShardData.shardGlobals,
+      cycleShardData.nodeShardData
+    )
     cycleShardData.ourStoredPartitions = partitions2
 
     this.profiler.profileSectionEnd('updateShardValues_getPartitionLists')
 
     // this will be a huge log.
     // Temp disable for log size
-    // if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
-    if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${this.currentCycleShardData.cycleNumber} `)
+    // /* prettier-ignore */ if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
+    /* prettier-ignore */ if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${this.currentCycleShardData.cycleNumber} `)
 
     this.lastActiveNodeCount = cycleShardData.activeNodes.length
 
@@ -605,14 +716,13 @@ class StateManager {
     let cycleToCompareTo = newSharddata.cycleNumber - 1
 
     //if this is our first time to sync we should attempt to compare to an older cycle
-    if(this.firstTimeToRuntimeSync === true){
+    if (this.firstTimeToRuntimeSync === true) {
       this.firstTimeToRuntimeSync = false
 
       //make sure the cycle started is an older one
-      if(this.accountSync.syncStatement.cycleStarted < cycleToCompareTo){
+      if (this.accountSync.syncStatement.cycleStarted < cycleToCompareTo) {
         cycleToCompareTo = this.accountSync.syncStatement.cycleStarted
       } else {
-
         //in theory we could just return but I dont want to change that side of the branch yet.
       }
     }
@@ -625,16 +735,24 @@ class StateManager {
     }
     let cycle = this.currentCycleShardData.cycleNumber
     // oldShardData.shardGlobals, newSharddata.shardGlobals
-    let coverageChanges = ShardFunctions.computeCoverageChanges(oldShardData.nodeShardData, newSharddata.nodeShardData)
+    let coverageChanges = ShardFunctions.computeCoverageChanges(
+      oldShardData.nodeShardData,
+      newSharddata.nodeShardData
+    )
 
     for (let change of coverageChanges) {
       // log info about the change.
       // ${utils.stringifyReduce(change)}
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_change', `${oldShardData.cycleNumber}->${newSharddata.cycleNumber}`, ` ${ShardFunctions.leadZeros8(change.start.toString(16))}->${ShardFunctions.leadZeros8(change.end.toString(16))} `)
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_change', `${oldShardData.cycleNumber}->${newSharddata.cycleNumber}`, ` ${ShardFunctions.leadZeros8(change.start.toString(16))}->${ShardFunctions.leadZeros8(change.end.toString(16))} `)
 
       // create a range object from our coverage change.
 
-      let range = { startAddr: 0, endAddr: 0, low: '', high: '' } as StateManagerTypes.shardFunctionTypes.BasicAddressRange // this init is a somewhat wastefull way to allow the type to be happy.
+      let range = {
+        startAddr: 0,
+        endAddr: 0,
+        low: '',
+        high: '',
+      } as StateManagerTypes.shardFunctionTypes.BasicAddressRange // this init is a somewhat wastefull way to allow the type to be happy.
       range.startAddr = change.start
       range.endAddr = change.end
       range.low = ShardFunctions.leadZeros8(range.startAddr.toString(16)) + '0'.repeat(56)
@@ -673,7 +791,7 @@ class StateManager {
     while (this.currentCycleShardData == null) {
       this.getCurrentCycleShardData()
       await utils.sleep(1000)
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_waitForShardData_firstNode', ``, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_waitForShardData_firstNode', ``, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
     }
   }
 
@@ -715,7 +833,13 @@ class StateManager {
     return defaultValue
   }
 
-  testFailChance(failChance: number, debugName: string, key: string, message: string, verboseRequired: boolean): boolean {
+  testFailChance(
+    failChance: number,
+    debugName: string,
+    key: string,
+    message: string,
+    verboseRequired: boolean
+  ): boolean {
     if (failChance == null) {
       return false
     }
@@ -731,7 +855,6 @@ class StateManager {
     }
     return false
   }
-
 
   // getRandomIndex (list: any[]) {
   //   let max = list.length - 1
@@ -758,7 +881,6 @@ class StateManager {
   // }
 
   async startCatchUpQueue() {
-
     //make sure we have cycle shard data.
     await this.waitForShardData('startCatchUpQueue')
 
@@ -776,18 +898,22 @@ class StateManager {
     //update sync statement
     this.accountSync.syncStatement.syncComplete = true
     this.accountSync.syncStatement.cycleEnded = this.currentCycleShardData.cycleNumber
-    this.accountSync.syncStatement.numCycles = this.accountSync.syncStatement.cycleEnded - this.accountSync.syncStatement.cycleStarted
-
+    this.accountSync.syncStatement.numCycles =
+      this.accountSync.syncStatement.cycleEnded - this.accountSync.syncStatement.cycleStarted
 
     this.accountSync.syncStatement.syncEndTime = Date.now()
-    this.accountSync.syncStatement.syncSeconds = (this.accountSync.syncStatement.syncEndTime - this.accountSync.syncStatement.syncStartTime) / 1000
+    this.accountSync.syncStatement.syncSeconds =
+      (this.accountSync.syncStatement.syncEndTime - this.accountSync.syncStatement.syncStartTime) / 1000
 
-    nestedCountersInstance.countEvent('sync', `sync comlete numCycles: ${this.accountSync.syncStatement.numCycles} start:${this.accountSync.syncStatement.cycleStarted} end:${this.accountSync.syncStatement.cycleEnded}`)
-    if(this.accountSync.syncStatement.internalFlag === true){
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `sync comlete numCycles: ${this.accountSync.syncStatement.numCycles} start:${this.accountSync.syncStatement.cycleStarted} end:${this.accountSync.syncStatement.cycleEnded}`)
+    if (this.accountSync.syncStatement.internalFlag === true) {
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
       this.accountSync.syncStatmentIsComplete()
-      this.statemanager_fatal('shrd_sync_syncStatement-tempdebug', `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
-    } else{
+      this.statemanager_fatal(
+        'shrd_sync_syncStatement-tempdebug',
+        `${utils.stringifyReduce(this.accountSync.syncStatement)}`
+      )
+    } else {
       this.accountSync.syncStatement.internalFlag = true
     }
 
@@ -807,7 +933,10 @@ class StateManager {
    * writeCombinedAccountDataToBackups
    * @param failedHashes This is a list of hashes that failed and should be ignored in the write operation.
    */
-  async writeCombinedAccountDataToBackups(goodAccounts: Shardus.WrappedData[], failedHashes: string[]) : Promise<number> {
+  async writeCombinedAccountDataToBackups(
+    goodAccounts: Shardus.WrappedData[],
+    failedHashes: string[]
+  ): Promise<number> {
     // ?:{[id:string]: boolean}
     if (failedHashes.length === 0 && goodAccounts.length === 0) {
       return 0 // nothing to do yet
@@ -838,7 +967,7 @@ class StateManager {
       }
       accountCopies.push(accountCopy)
     }
-    if (logFlags.verbose) this.mainLogger.debug('writeCombinedAccountDataToBackups ' + accountCopies.length + ' ' + utils.stringifyReduce(accountCopies))
+    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('writeCombinedAccountDataToBackups ' + accountCopies.length + ' ' + utils.stringifyReduce(accountCopies))
 
     if (logFlags.verbose) console.log('DBG accountCopies.  (in main log)')
 
@@ -852,7 +981,14 @@ class StateManager {
   // if we get the same range request from the same client..... nope!
 
   // This will make calls to app.getAccountDataByRange but if we are close enough to real time it will query any newer data and return lastUpdateNeeded = true
-  async getAccountDataByRangeSmart(accountStart: string, accountEnd: string, tsStart: number, maxRecords: number, offset: number, accountOffset:string): Promise<GetAccountDataByRangeSmart> {
+  async getAccountDataByRangeSmart(
+    accountStart: string,
+    accountEnd: string,
+    tsStart: number,
+    maxRecords: number,
+    offset: number,
+    accountOffset: string
+  ): Promise<GetAccountDataByRangeSmart> {
     let tsEnd = Date.now()
 
     // todo convert this to use account backup data, then compare perf vs app as num accounts grows past 10k
@@ -860,7 +996,15 @@ class StateManager {
     // alternate todo: query it all from the app then create a smart streaming wrapper that persists between calls and even
     // handles updates to day by putting updated data at the end of the list with updated data wrappers.
 
-    let wrappedAccounts = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart, tsEnd, maxRecords, offset, accountOffset)
+    let wrappedAccounts = await this.app.getAccountDataByRange(
+      accountStart,
+      accountEnd,
+      tsStart,
+      tsEnd,
+      maxRecords,
+      offset,
+      accountOffset
+    )
     let lastUpdateNeeded = false
     let wrappedAccounts2: WrappedStateArray = []
     let highestTs = 0
@@ -885,7 +1029,15 @@ class StateManager {
 
       if (delta < this.queueSitTime * 2) {
         let tsStart2 = highestTs
-        wrappedAccounts2 = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart2, Date.now(), maxRecords, 0, "")
+        wrappedAccounts2 = await this.app.getAccountDataByRange(
+          accountStart,
+          accountEnd,
+          tsStart2,
+          Date.now(),
+          maxRecords,
+          0,
+          ''
+        )
         lastUpdateNeeded = true //?? not sure .. this could cause us to skip some, but that is ok!
       }
     }
@@ -900,28 +1052,36 @@ class StateManager {
       let { accountId, stateId, data: recordData } = wrappedData
       //stateId = wrappedData.stateId
       if (stateId != wrappedData.stateId) {
-        if (logFlags.error) this.mainLogger.error(`testAccountDataWrapped what is going on!!:  ${utils.makeShortHash(wrappedData.stateId)}  stateId: ${utils.makeShortHash(stateId)} `)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`testAccountDataWrapped what is going on!!:  ${utils.makeShortHash(wrappedData.stateId)}  stateId: ${utils.makeShortHash(stateId)} `)
       }
       let hash = this.app.calculateAccountHash(recordData)
       if (stateId !== hash) {
-        if (logFlags.error) this.mainLogger.error(`testAccountDataWrapped hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
-        if (logFlags.error) this.mainLogger.error('testAccountDataWrapped hash test failed: details: ' + stringify(recordData))
-        if (logFlags.error) this.mainLogger.error('testAccountDataWrapped hash test failed: wrappedData.stateId: ' + utils.makeShortHash(wrappedData.stateId))
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`testAccountDataWrapped hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('testAccountDataWrapped hash test failed: details: ' + stringify(recordData))
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('testAccountDataWrapped hash test failed: wrappedData.stateId: ' + utils.makeShortHash(wrappedData.stateId))
         var stack = new Error().stack
         if (logFlags.error) this.mainLogger.error(`stack: ${stack}`)
       }
     }
   }
 
-  async checkAndSetAccountData(accountRecords: Shardus.WrappedData[], note: string, processStats: boolean, updatedAccounts:string[] = null): Promise<string[]> {
+  async checkAndSetAccountData(
+    accountRecords: Shardus.WrappedData[],
+    note: string,
+    processStats: boolean,
+    updatedAccounts: string[] = null
+  ): Promise<string[]> {
     let accountsToAdd: any[] = []
     let failedHashes: string[] = []
     for (let wrapedAccount of accountRecords) {
       let { accountId, stateId, data: recordData, timestamp } = wrapedAccount
       let hash = this.app.calculateAccountHash(recordData)
       let cycleToRecordOn = CycleChain.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
-      if(cycleToRecordOn <= -1){
-        this.statemanager_fatal(`checkAndSetAccountData cycleToRecordOn==-1`, `checkAndSetAccountData cycleToRecordOn==-1 ${wrapedAccount.timestamp}` )
+      if (cycleToRecordOn <= -1) {
+        this.statemanager_fatal(
+          `checkAndSetAccountData cycleToRecordOn==-1`,
+          `checkAndSetAccountData cycleToRecordOn==-1 ${wrapedAccount.timestamp}`
+        )
         failedHashes.push(accountId)
         return failedHashes
       }
@@ -933,16 +1093,20 @@ class StateManager {
           //should update cache anyway (older value may be needed)
 
           // I have doubts that cache should be able to roll a value back..
-          this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
+          this.accountCache.updateAccountHash(
+            wrapedAccount.accountId,
+            wrapedAccount.stateId,
+            wrapedAccount.timestamp,
+            cycleToRecordOn
+          )
 
-          if (logFlags.error) this.mainLogger.error(`setAccountData: abort. checkAndSetAccountData older timestamp note:${note} acc: ${utils.makeShortHash(accountId)} timestamp:${timestamp} accountMemData.t:${accountMemData.t} hash: ${utils.makeShortHash(hash)} cache:${utils.stringifyReduce(accountMemData)}`)
+          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`setAccountData: abort. checkAndSetAccountData older timestamp note:${note} acc: ${utils.makeShortHash(accountId)} timestamp:${timestamp} accountMemData.t:${accountMemData.t} hash: ${utils.makeShortHash(hash)} cache:${utils.stringifyReduce(accountMemData)}`)
           continue //this is a major error need to skip the writing.
         }
       } else {
         // not an error to not have this data yet
-        // if (logFlags.error) this.mainLogger.error(`checkAndSetAccountData: did not find seen account. note:${note} acc: ${utils.makeShortHash(accountId)} hash: ${utils.makeShortHash(hash)}`)
+        // /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`checkAndSetAccountData: did not find seen account. note:${note} acc: ${utils.makeShortHash(accountId)} hash: ${utils.makeShortHash(hash)}`)
       }
-
 
       if (stateId === hash) {
         // if (recordData.owners) recordData.owners = JSON.parse(recordData.owners)
@@ -950,22 +1114,26 @@ class StateManager {
         // if (recordData.txs) recordData.txs = JSON.parse(recordData.txs) // dont parse this, since it is already the string form we need to write it.
         accountsToAdd.push(recordData)
 
-        if(updatedAccounts != null){
+        if (updatedAccounts != null) {
           updatedAccounts.push(accountId)
         }
 
-        let debugString = `setAccountData: note:${note} acc: ${utils.makeShortHash(accountId)} hash: ${utils.makeShortHash(hash)} ts:${wrapedAccount.timestamp}`
+        let debugString = `setAccountData: note:${note} acc: ${utils.makeShortHash(
+          accountId
+        )} hash: ${utils.makeShortHash(hash)} ts:${wrapedAccount.timestamp}`
         if (logFlags.debug) this.mainLogger.debug(debugString)
         if (logFlags.verbose) console.log(debugString)
 
-
-        if(wrapedAccount.timestamp === 0){
+        if (wrapedAccount.timestamp === 0) {
           let stack = new Error().stack
 
-          this.statemanager_fatal(`checkAndSetAccountData ts=0`, `checkAndSetAccountData ts=0 ${debugString}    ${stack}` )
+          this.statemanager_fatal(
+            `checkAndSetAccountData ts=0`,
+            `checkAndSetAccountData ts=0 ${debugString}    ${stack}`
+          )
         }
 
-        if(processStats){
+        if (processStats) {
           if (this.accountCache.hasAccount(accountId)) {
             //TODO STATS BUG..  this is what can cause one form of stats bug.
             //we may have covered this account in the past, then not covered it, and now we cover it again.  Stats doesn't know how to repair
@@ -974,34 +1142,54 @@ class StateManager {
             //this.partitionStats.statsDataSummaryUpdate2(cycleToRecordOn, null, wrapedAccount)
 
             let tryToCorrectStats = true
-            if(tryToCorrectStats){
+            if (tryToCorrectStats) {
               let accounts = await this.app.getAccountDataByList([wrapedAccount.accountId])
-              if(accounts != null && accounts.length === 1){
-                this.partitionStats.statsDataSummaryUpdate(cycleToRecordOn, accounts[0].data, wrapedAccount, 'checkAndSetAccountData-' + note)
+              if (accounts != null && accounts.length === 1) {
+                this.partitionStats.statsDataSummaryUpdate(
+                  cycleToRecordOn,
+                  accounts[0].data,
+                  wrapedAccount,
+                  'checkAndSetAccountData-' + note
+                )
               }
             } else {
               //old way
-              this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
+              this.accountCache.updateAccountHash(
+                wrapedAccount.accountId,
+                wrapedAccount.stateId,
+                wrapedAccount.timestamp,
+                cycleToRecordOn
+              )
             }
           } else {
             //I think some work was done to fix diverging stats, but how did it turn out?
-            this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount.accountId, wrapedAccount.data, 'checkAndSetAccountData-' + note)
+            this.partitionStats.statsDataSummaryInit(
+              cycleToRecordOn,
+              wrapedAccount.accountId,
+              wrapedAccount.data,
+              'checkAndSetAccountData-' + note
+            )
           }
         } else {
           //even if we do not process stats still need to update cache
           //todo maybe even take the stats out of the pipeline for updating cache? (but that is kinda tricky)
-          this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
+          this.accountCache.updateAccountHash(
+            wrapedAccount.accountId,
+            wrapedAccount.stateId,
+            wrapedAccount.timestamp,
+            cycleToRecordOn
+          )
         }
       } else {
-        if (logFlags.error) this.mainLogger.error(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
-        if (logFlags.error) this.mainLogger.error('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
-        if (logFlags.verbose) console.log(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
-        if (logFlags.verbose) console.log('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
+        /* prettier-ignore */ if (logFlags.verbose) console.log('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
         failedHashes.push(accountId)
       }
     }
-    if (logFlags.debug) this.mainLogger.debug(`setAccountData toAdd:${accountsToAdd.length}  failed:${failedHashes.length}`)
-    if (logFlags.verbose) console.log(`setAccountData toAdd:${accountsToAdd.length}  failed:${failedHashes.length}`)
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`setAccountData toAdd:${accountsToAdd.length}  failed:${failedHashes.length}`)
+    /* prettier-ignore */ if (logFlags.verbose) console.log(`setAccountData toAdd:${accountsToAdd.length}  failed:${failedHashes.length}`)
     await this.app.setAccountData(accountsToAdd)
     return failedHashes
   }
@@ -1018,7 +1206,10 @@ class StateManager {
 
   _registerListener(emitter: any, event: string, callback: any) {
     if (this._listeners[event]) {
-      this.statemanager_fatal(`_registerListener_dupes`, 'State Manager can only register one listener per event!')
+      this.statemanager_fatal(
+        `_registerListener_dupes`,
+        'State Manager can only register one listener per event!'
+      )
       return
     }
     emitter.on(event, callback)
@@ -1049,8 +1240,8 @@ class StateManager {
 
     this.depricated.setupHandlers()
 
-    if(this.partitionObjects != null){
-      this.partitionObjects.setupHandlers()      
+    if (this.partitionObjects != null) {
+      this.partitionObjects.setupHandlers()
     }
 
     this.transactionQueue.setupHandlers()
@@ -1064,286 +1255,366 @@ class StateManager {
     this.partitionStats.setupHandlers()
 
     // p2p ASK
-    this.p2p.registerInternal('request_receipt_for_tx_old', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp_old) => any, sender, tracker: string, msgSize: number) => {
-      profilerInstance.scopedProfileSectionStart('request_receipt_for_tx_old', false, msgSize)
-      
-      let response: RequestReceiptForTxResp_old = { receipt: null, note: '', success: false }
+    this.p2p.registerInternal(
+      'request_receipt_for_tx_old',
+      async (
+        payload: RequestReceiptForTxReq,
+        respond: (arg0: RequestReceiptForTxResp_old) => any,
+        sender,
+        tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('request_receipt_for_tx_old', false, msgSize)
 
-      let responseSize = cUninitializedSize
-      try {
-        let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-        if (queueEntry == null) {
-          queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
-        }
+        let response: RequestReceiptForTxResp_old = { receipt: null, note: '', success: false }
 
-        if (queueEntry == null) {
-          response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-          await respond(response)
-          return
-        }
+        let responseSize = cUninitializedSize
+        try {
+          let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+          if (queueEntry == null) {
+            queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
+          }
 
-        if (queueEntry.appliedReceipt != null) {
-          response.receipt = queueEntry.appliedReceipt
-        } else if (queueEntry.recievedAppliedReceipt != null) {
-          response.receipt = queueEntry.recievedAppliedReceipt
+          if (queueEntry == null) {
+            response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${
+              payload.timestamp
+            } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+            await respond(response)
+            return
+          }
+
+          if (queueEntry.appliedReceipt != null) {
+            response.receipt = queueEntry.appliedReceipt
+          } else if (queueEntry.recievedAppliedReceipt != null) {
+            response.receipt = queueEntry.recievedAppliedReceipt
+          }
+          if (response.receipt != null) {
+            response.success = true
+          } else {
+            response.note = `found queueEntry but no receipt: ${utils.stringifyReduce(payload.txid)} ${
+              payload.txid
+            }  ${payload.timestamp}`
+          }
+          responseSize = await respond(response)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('request_receipt_for_tx_old', responseSize)
         }
-        if (response.receipt != null) {
-          response.success = true
-        } else {
-          response.note = `found queueEntry but no receipt: ${utils.stringifyReduce(payload.txid)} ${payload.txid}  ${payload.timestamp}`
-        }
-        responseSize = await respond(response)
-      } finally {
-        profilerInstance.scopedProfileSectionEnd('request_receipt_for_tx_old', responseSize)
       }
-    })
+    )
 
     // p2p ASK
-    this.p2p.registerInternal('request_receipt_for_tx', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp) => any, sender, tracker: string, msgSize: number) => {
-      profilerInstance.scopedProfileSectionStart('request_receipt_for_tx', false, msgSize)
-      
-      let response: RequestReceiptForTxResp = { receipt: null, note: '', success: false }
+    this.p2p.registerInternal(
+      'request_receipt_for_tx',
+      async (
+        payload: RequestReceiptForTxReq,
+        respond: (arg0: RequestReceiptForTxResp) => any,
+        sender,
+        tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('request_receipt_for_tx', false, msgSize)
 
-      let responseSize = cUninitializedSize
-      try {
-        let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-        if (queueEntry == null) {
-          queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
-        }
+        let response: RequestReceiptForTxResp = { receipt: null, note: '', success: false }
 
-        if (queueEntry == null) {
-          response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-          await respond(response)
-          return
-        }
-
-        response.receipt = this.getReceipt2(queueEntry)
-
-        if (response.receipt != null) {
-          response.success = true
-        } else {
-          response.note = `found queueEntry but no receipt: ${utils.stringifyReduce(payload.txid)} ${payload.txid}  ${payload.timestamp}`
-        }
-        responseSize = await respond(response)
-      } finally {
-        profilerInstance.scopedProfileSectionEnd('request_receipt_for_tx', responseSize)
-      }
-    })
-
-    this.p2p.registerInternal('request_state_for_tx_post', async (payload: RequestStateForTxReqPost, respond: (arg0: RequestStateForTxResp) => any, sender, tracker: string, msgSize: number) => {
-      profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
-      let responseSize = cUninitializedSize
-      try {      
-        let response: RequestStateForTxResp = { stateList: [], beforeHashes: {}, note: '', success: false }
-        // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
-        let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-        if (queueEntry == null) {
-          queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_state_for_tx_post') // , payload.timestamp)
-        }
-
-        if (queueEntry == null) {
-          response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-          nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post cant find queue entry')
-          await respond(response)
-          return
-        }
-
-        if(queueEntry.hasValidFinalData === false){
-          response.note = `has queue entry but not final data: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-          nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post hasValidFinalData==false')
-          await respond(response)
-          return
-        }
-
-        let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
-
-        // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
-        let writtenAccountsMap: WrappedResponses = {}
-        let applyResponse = queueEntry?.preApplyTXResult.applyResponse
-        if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
-          for (let writtenAccount of applyResponse.accountWrites) {
-            writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
-          }
-          wrappedStates = writtenAccountsMap
-          if (logFlags.verbose) this.mainLogger.debug(`request_state_for_tx_post applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
-        }
-
-        //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
-
-        if (wrappedStates != null) {
-          for (let key of Object.keys(wrappedStates)) {
-            let wrappedState = wrappedStates[key]
-            let accountData = wrappedState
-
-            if (payload.key !== accountData.accountId) {
-              continue //not this account.
-            }
-
-            if (accountData.stateId != payload.hash) {
-              response.note = `failed accountData.stateId != payload.hash txid: ${utils.makeShortHash(payload.txid)}  ts:${payload.timestamp} hash:${utils.makeShortHash(accountData.stateId)}`
-              nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post failed accountData.stateId != payload.hash txid')
-              await respond(response)
-              return
-            }
-            if (accountData) {
-              //include the before hash
-              response.beforeHashes[key] = queueEntry.beforeHashes[key]
-              //include the data
-              response.stateList.push(accountData)
-            }
-          }
-        }
-
-        nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post success')
-        response.success = true
-        responseSize = await respond(response)        
-      } finally{
-        profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
-      }
-
-    })
-
-
-    this.p2p.registerInternal('request_tx_and_state', async (payload: {txid:string}, respond: (arg0: RequestTxResp) => any, sender, tracker: string, msgSize: number) => {
-      profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
-      let responseSize = cUninitializedSize
-      try {  
-        let response: RequestTxResp = { stateList: [], beforeHashes: {}, note: '', success: false, originalData:{} }
-
-        let txid = payload.txid
-
-        let queueEntry = this.transactionQueue.getQueueEntrySafe(txid)
-        if (queueEntry == null) {
-          queueEntry = this.transactionQueue.getQueueEntryArchived(txid, 'request_tx_and_state')
-        }
-
-        //temp error for debug
-        // if (logFlags.error) this.mainLogger.error(`request_tx_and_state NOTE ${utils.stringifyReduce(payload)} got queue entry: ${queueEntry != null}`)
-
-        if (queueEntry == null) {
-          response.note = `failed to find queue entry: ${utils.stringifyReduce(txid)} dbg:${this.debugTXHistory[utils.stringifyReduce(txid)]}`
-
-          if (logFlags.error) this.mainLogger.error(`request_tx_and_state ${response.note}`)
-
-          await respond(response)
-          return
-        }
-
-        response.acceptedTX = queueEntry.acceptedTx
-
-        let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
-
-        // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
-        let writtenAccountsMap: WrappedResponses = {}
-        let applyResponse = queueEntry?.preApplyTXResult.applyResponse
-        if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
-          for (let writtenAccount of applyResponse.accountWrites) {
-            writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
-          }
-          wrappedStates = writtenAccountsMap
-          if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
-        }
-
-        //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
-
-        if (wrappedStates != null) {
-          for (let key of Object.keys(wrappedStates)) {
-            let wrappedState = wrappedStates[key]
-            let accountData = wrappedState
-            if (accountData) {
-              //include the before hash
-              response.beforeHashes[key] = queueEntry.beforeHashes[key]
-              //include the data
-              response.stateList.push(accountData)
-            }
-          }
-        }
-
-        response.originalData = stringify(queueEntry.originalData)
-        response.success = true
-        responseSize = await respond(response)
-      } finally {
-        profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
-      }
-
-    })
-
-    // TODO STATESHARDING4 ENDPOINTS ok, I changed this to tell, but we still need to check sender!
-    //this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
-    this.p2p.registerInternal('spread_appliedVote', async (payload: AppliedVote, respond: any, sender, tracker: string, msgSize: number) => {
-      profilerInstance.scopedProfileSectionStart('spread_appliedVote', false, msgSize)
-      try{
-        let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-        if (queueEntry == null) {
-          return
-        }
-        let newVote = payload as AppliedVote
-        // TODO STATESHARDING4 ENDPOINTS check payload format
-        // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
-
-        if (this.transactionConsensus.tryAppendVote(queueEntry, newVote)) {
-          // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
-        }        
-      } finally {
-        profilerInstance.scopedProfileSectionEnd('spread_appliedVote')        
-      }
-    })
-
-    this.p2p.registerInternal('spread_appliedVoteHash', async (payload: AppliedVoteHash, respond: any, sender, tracker: string, msgSize: number) => {
-      profilerInstance.scopedProfileSectionStart('spread_appliedVoteHash', false, msgSize)
-      try{
-        let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-        if (queueEntry == null) {
-          return
-        }
-        let collectedVoteHash = payload as AppliedVoteHash
-        // TODO STATESHARDING4 ENDPOINTS check payload format
-        // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (correct consenus group and valid signature)
-
-        if (this.transactionConsensus.tryAppendVoteHash(queueEntry, collectedVoteHash)) {
-          // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
-        }        
-      } finally {
-        profilerInstance.scopedProfileSectionEnd('spread_appliedVoteHash')        
-      }
-    })
-
-    this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: GetAccountDataWithQueueHintsResp) => any, sender, tracker: string, msgSize: number) => {
-      profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
-      let responseSize = cUninitializedSize
-      try { 
-      
-        let result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
-        let accountData = null
-        let ourLockID = -1
+        let responseSize = cUninitializedSize
         try {
-          ourLockID = await this.fifoLock('accountModification')
-          accountData = await this.app.getAccountDataByList(payload.accountIds)
-        } finally {
-          this.fifoUnlock('accountModification', ourLockID)
-        }
-        if (accountData != null) {
-          for (let wrappedAccount of accountData) {
-            let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
-            wrappedAccountInQueueRef.seenInQueue = false
+          let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+          if (queueEntry == null) {
+            queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
+          }
 
-            if (this.lastSeenAccountsMap != null) {
-              let queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
-              if (queueEntry != null) {
-                wrappedAccountInQueueRef.seenInQueue = true
+          if (queueEntry == null) {
+            response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${
+              payload.timestamp
+            } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+            await respond(response)
+            return
+          }
+
+          response.receipt = this.getReceipt2(queueEntry)
+
+          if (response.receipt != null) {
+            response.success = true
+          } else {
+            response.note = `found queueEntry but no receipt: ${utils.stringifyReduce(payload.txid)} ${
+              payload.txid
+            }  ${payload.timestamp}`
+          }
+          responseSize = await respond(response)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('request_receipt_for_tx', responseSize)
+        }
+      }
+    )
+
+    this.p2p.registerInternal(
+      'request_state_for_tx_post',
+      async (
+        payload: RequestStateForTxReqPost,
+        respond: (arg0: RequestStateForTxResp) => any,
+        sender,
+        tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
+        let responseSize = cUninitializedSize
+        try {
+          let response: RequestStateForTxResp = { stateList: [], beforeHashes: {}, note: '', success: false }
+          // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
+          let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+          if (queueEntry == null) {
+            queueEntry = this.transactionQueue.getQueueEntryArchived(
+              payload.txid,
+              'request_state_for_tx_post'
+            ) // , payload.timestamp)
+          }
+
+          if (queueEntry == null) {
+            response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${
+              payload.timestamp
+            } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post cant find queue entry')
+            await respond(response)
+            return
+          }
+
+          if (queueEntry.hasValidFinalData === false) {
+            response.note = `has queue entry but not final data: ${utils.stringifyReduce(payload.txid)}  ${
+              payload.timestamp
+            } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post hasValidFinalData==false')
+            await respond(response)
+            return
+          }
+
+          let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
+
+          // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
+          let writtenAccountsMap: WrappedResponses = {}
+          let applyResponse = queueEntry?.preApplyTXResult.applyResponse
+          if (
+            applyResponse != null &&
+            applyResponse.accountWrites != null &&
+            applyResponse.accountWrites.length > 0
+          ) {
+            for (let writtenAccount of applyResponse.accountWrites) {
+              writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+            }
+            wrappedStates = writtenAccountsMap
+            /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_state_for_tx_post applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+          }
+
+          //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
+
+          if (wrappedStates != null) {
+            for (let key of Object.keys(wrappedStates)) {
+              let wrappedState = wrappedStates[key]
+              let accountData = wrappedState
+
+              if (payload.key !== accountData.accountId) {
+                continue //not this account.
+              }
+
+              if (accountData.stateId != payload.hash) {
+                response.note = `failed accountData.stateId != payload.hash txid: ${utils.makeShortHash(
+                  payload.txid
+                )}  ts:${payload.timestamp} hash:${utils.makeShortHash(accountData.stateId)}`
+                /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post failed accountData.stateId != payload.hash txid')
+                await respond(response)
+                return
+              }
+              if (accountData) {
+                //include the before hash
+                response.beforeHashes[key] = queueEntry.beforeHashes[key]
+                //include the data
+                response.stateList.push(accountData)
               }
             }
           }
+
+          nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post success')
+          response.success = true
+          responseSize = await respond(response)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
         }
-        //PERF Disiable this in production or performance testing. / this works due to inheritance
-        this.testAccountDataWrapped(accountData)
-        // we cast up the array return type because we have attached the seenInQueue memeber to the data.
-        result.accountData = accountData as Shardus.WrappedDataFromQueue[]
-        responseSize = await respond(result)
-      } finally {
-        profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
       }
-    })
+    )
+
+    this.p2p.registerInternal(
+      'request_tx_and_state',
+      async (
+        payload: { txid: string },
+        respond: (arg0: RequestTxResp) => any,
+        sender,
+        tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
+        let responseSize = cUninitializedSize
+        try {
+          let response: RequestTxResp = {
+            stateList: [],
+            beforeHashes: {},
+            note: '',
+            success: false,
+            originalData: {},
+          }
+
+          let txid = payload.txid
+
+          let queueEntry = this.transactionQueue.getQueueEntrySafe(txid)
+          if (queueEntry == null) {
+            queueEntry = this.transactionQueue.getQueueEntryArchived(txid, 'request_tx_and_state')
+          }
+
+          //temp error for debug
+          // /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`request_tx_and_state NOTE ${utils.stringifyReduce(payload)} got queue entry: ${queueEntry != null}`)
+
+          if (queueEntry == null) {
+            response.note = `failed to find queue entry: ${utils.stringifyReduce(txid)} dbg:${
+              this.debugTXHistory[utils.stringifyReduce(txid)]
+            }`
+
+            if (logFlags.error) this.mainLogger.error(`request_tx_and_state ${response.note}`)
+
+            await respond(response)
+            return
+          }
+
+          response.acceptedTX = queueEntry.acceptedTx
+
+          let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
+
+          // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
+          let writtenAccountsMap: WrappedResponses = {}
+          let applyResponse = queueEntry?.preApplyTXResult.applyResponse
+          if (
+            applyResponse != null &&
+            applyResponse.accountWrites != null &&
+            applyResponse.accountWrites.length > 0
+          ) {
+            for (let writtenAccount of applyResponse.accountWrites) {
+              writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+            }
+            wrappedStates = writtenAccountsMap
+            /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+          }
+
+          //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
+
+          if (wrappedStates != null) {
+            for (let key of Object.keys(wrappedStates)) {
+              let wrappedState = wrappedStates[key]
+              let accountData = wrappedState
+              if (accountData) {
+                //include the before hash
+                response.beforeHashes[key] = queueEntry.beforeHashes[key]
+                //include the data
+                response.stateList.push(accountData)
+              }
+            }
+          }
+
+          response.originalData = stringify(queueEntry.originalData)
+          response.success = true
+          responseSize = await respond(response)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
+        }
+      }
+    )
+
+    // TODO STATESHARDING4 ENDPOINTS ok, I changed this to tell, but we still need to check sender!
+    //this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
+    this.p2p.registerInternal(
+      'spread_appliedVote',
+      async (payload: AppliedVote, respond: any, sender, tracker: string, msgSize: number) => {
+        profilerInstance.scopedProfileSectionStart('spread_appliedVote', false, msgSize)
+        try {
+          let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+          if (queueEntry == null) {
+            return
+          }
+          let newVote = payload as AppliedVote
+          // TODO STATESHARDING4 ENDPOINTS check payload format
+          // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
+
+          if (this.transactionConsensus.tryAppendVote(queueEntry, newVote)) {
+            // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
+          }
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('spread_appliedVote')
+        }
+      }
+    )
+
+    this.p2p.registerInternal(
+      'spread_appliedVoteHash',
+      async (payload: AppliedVoteHash, respond: any, sender, tracker: string, msgSize: number) => {
+        profilerInstance.scopedProfileSectionStart('spread_appliedVoteHash', false, msgSize)
+        try {
+          let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+          if (queueEntry == null) {
+            return
+          }
+          let collectedVoteHash = payload as AppliedVoteHash
+          // TODO STATESHARDING4 ENDPOINTS check payload format
+          // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (correct consenus group and valid signature)
+
+          if (this.transactionConsensus.tryAppendVoteHash(queueEntry, collectedVoteHash)) {
+            // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
+          }
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('spread_appliedVoteHash')
+        }
+      }
+    )
+
+    this.p2p.registerInternal(
+      'get_account_data_with_queue_hints',
+      async (
+        payload: { accountIds: string[] },
+        respond: (arg0: GetAccountDataWithQueueHintsResp) => any,
+        sender,
+        tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
+        let responseSize = cUninitializedSize
+        try {
+          let result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
+          let accountData = null
+          let ourLockID = -1
+          try {
+            ourLockID = await this.fifoLock('accountModification')
+            accountData = await this.app.getAccountDataByList(payload.accountIds)
+          } finally {
+            this.fifoUnlock('accountModification', ourLockID)
+          }
+          if (accountData != null) {
+            for (let wrappedAccount of accountData) {
+              let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
+              wrappedAccountInQueueRef.seenInQueue = false
+
+              if (this.lastSeenAccountsMap != null) {
+                let queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
+                if (queueEntry != null) {
+                  wrappedAccountInQueueRef.seenInQueue = true
+                }
+              }
+            }
+          }
+          //PERF Disiable this in production or performance testing. / this works due to inheritance
+          this.testAccountDataWrapped(accountData)
+          // we cast up the array return type because we have attached the seenInQueue memeber to the data.
+          result.accountData = accountData as Shardus.WrappedDataFromQueue[]
+          responseSize = await respond(result)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
+        }
+      }
+    )
 
     //<pre id="json"></pre>
     Context.network.registerExternalGet('debug_stats', isDebugModeMiddleware, (req, res) => {
@@ -1390,17 +1661,16 @@ class StateManager {
     //a debug nodelist so tools can map nodes to the shortIDs that we use
     Context.network.registerExternalGet('nodelist_debug', isDebugModeMiddleware, (req, res) => {
       let debugNodeList = []
-      for(let node of activeByIdOrder){
+      for (let node of activeByIdOrder) {
         let nodeEntry = {
-          id:utils.makeShortHash(node.id), 
-          ip:node.externalIp,
-          port:node.externalPort
+          id: utils.makeShortHash(node.id),
+          ip: node.externalIp,
+          port: node.externalPort,
         }
         debugNodeList.push(nodeEntry)
       }
       res.json(debugNodeList)
     })
-    
   }
 
   _unregisterEndpoints() {
@@ -1434,7 +1704,6 @@ class StateManager {
     this.p2p.unregisterInternal('sync_trie_hashes')
     this.p2p.unregisterInternal('get_trie_accountHashes')
     this.p2p.unregisterInternal('get_account_data_by_hashes')
-
   }
 
   // //////////////////////////////////////////////////////////////////////////
@@ -1470,18 +1739,18 @@ class StateManager {
       return
     }
 
-    if (logFlags.playback) this.logger.playbackLogNote('_firstTimeQueueAwait', `this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue.newAcceptedTxQueue.length} this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue.newAcceptedTxQueue.length}`)
+    /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('_firstTimeQueueAwait', `this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue.newAcceptedTxQueue.length} this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue.newAcceptedTxQueue.length}`)
 
     // process and keep only TXs that will change local data.
     let newList = []
     if (this.transactionQueue.newAcceptedTxQueueTempInjest.length > 0) {
       for (let txQueueEntry of this.transactionQueue.newAcceptedTxQueueTempInjest) {
-        if(this.transactionQueue.txWillChangeLocalData(txQueueEntry) === true){
+        if (this.transactionQueue.txWillChangeLocalData(txQueueEntry) === true) {
           newList.push(txQueueEntry)
-          nestedCountersInstance.countEvent('stateManager', '_firstTimeQueueAwait kept TX' )
+          nestedCountersInstance.countEvent('stateManager', '_firstTimeQueueAwait kept TX')
           this.accountSync.syncStatement.nonDiscardedTXs++
         } else {
-          nestedCountersInstance.countEvent('stateManager', '_firstTimeQueueAwait discard TX' )
+          nestedCountersInstance.countEvent('stateManager', '_firstTimeQueueAwait discard TX')
           this.accountSync.syncStatement.discardedTXs++
         }
       }
@@ -1490,11 +1759,14 @@ class StateManager {
 
     await this.transactionQueue.processAcceptedTxQueue(true)
 
-    if(this.accountSync.syncStatement.internalFlag === true){
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
+    if (this.accountSync.syncStatement.internalFlag === true) {
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
       this.accountSync.syncStatmentIsComplete()
-      this.statemanager_fatal('shrd_sync_syncStatement-tempdebug', `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
-    } else{
+      this.statemanager_fatal(
+        'shrd_sync_syncStatement-tempdebug',
+        `${utils.stringifyReduce(this.accountSync.syncStatement)}`
+      )
+    } else {
       this.accountSync.syncStatement.internalFlag = true
     }
   }
@@ -1521,11 +1793,20 @@ class StateManager {
     // hmm how to deal with data that is changing... it cant!!
     let partitionMap = this.currentCycleShardData.parititionShardDataMap
 
-    let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.currentCycleShardData.nodeShardData
+    let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
+      this.currentCycleShardData.nodeShardData
     // partittions:
-    let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered,
-    nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [],
-    globalStateHash: '', calculationTime: this.currentCycleShardData.calculationTime }
+    let partitionDump: DebugDumpPartitions = {
+      partitions: [],
+      cycle: 0,
+      rangesCovered: {} as DebugDumpRangesCovered,
+      nodesCovered: {} as DebugDumpNodesCovered,
+      allNodeIds: [],
+      globalAccountIDs: [],
+      globalAccountSummary: [],
+      globalStateHash: '',
+      calculationTime: this.currentCycleShardData.calculationTime,
+    }
     partitionDump.cycle = this.currentCycleShardData.cycleNumber
 
     // todo port this to a static stard function!
@@ -1539,11 +1820,31 @@ class StateManager {
     let cMin = ourNodeShardData.consensusStartPartition
     let cMax = ourNodeShardData.consensusEndPartition
 
-    partitionDump.rangesCovered = { ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`, id: utils.makeShortHash(ourNodeShardData.node.id), fracID: ourNodeShardData.nodeAddressNum / 0xffffffff, hP: ourNodeShardData.homePartition, cMin: cMin, cMax: cMax, stMin: ourNodeShardData.storedPartitions.partitionStart, stMax: ourNodeShardData.storedPartitions.partitionEnd, numP: this.currentCycleShardData.shardGlobals.numPartitions }
+    partitionDump.rangesCovered = {
+      ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`,
+      id: utils.makeShortHash(ourNodeShardData.node.id),
+      fracID: ourNodeShardData.nodeAddressNum / 0xffffffff,
+      hP: ourNodeShardData.homePartition,
+      cMin: cMin,
+      cMax: cMax,
+      stMin: ourNodeShardData.storedPartitions.partitionStart,
+      stMax: ourNodeShardData.storedPartitions.partitionEnd,
+      numP: this.currentCycleShardData.shardGlobals.numPartitions,
+    }
 
     // todo print out coverage map by node index
 
-    partitionDump.nodesCovered = { idx: ourNodeShardData.ourNodeIndex, ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`, id: utils.makeShortHash(ourNodeShardData.node.id), fracID: ourNodeShardData.nodeAddressNum / 0xffffffff, hP: ourNodeShardData.homePartition, consensus: [], stored: [], extra: [], numP: this.currentCycleShardData.shardGlobals.numPartitions }
+    partitionDump.nodesCovered = {
+      idx: ourNodeShardData.ourNodeIndex,
+      ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`,
+      id: utils.makeShortHash(ourNodeShardData.node.id),
+      fracID: ourNodeShardData.nodeAddressNum / 0xffffffff,
+      hP: ourNodeShardData.homePartition,
+      consensus: [],
+      stored: [],
+      extra: [],
+      numP: this.currentCycleShardData.shardGlobals.numPartitions,
+    }
 
     for (let node of ourNodeShardData.consensusNodeForOurNode) {
       let nodeData = this.currentCycleShardData.nodeShardDataMap.get(node.id)
@@ -1558,7 +1859,12 @@ class StateManager {
 
     if (this.currentCycleShardData.ourNode.status === 'active') {
       for (var [key, value] of partitionMap) {
-        let partition: DebugDumpPartition = { parititionID: key, accounts: [], accounts2: [], skip: {} as DebugDumpPartitionSkip }
+        let partition: DebugDumpPartition = {
+          parititionID: key,
+          accounts: [],
+          accounts2: [],
+          skip: {} as DebugDumpPartitionSkip,
+        }
         partitionDump.partitions.push(partition)
 
         // normal case
@@ -1594,7 +1900,7 @@ class StateManager {
               continue
             }
             duplicateCheck[wrappedAccount.accountId] = true
-            let v:string
+            let v: string
             if (this.app.getAccountDebugValue != null) {
               v = this.app.getAccountDebugValue(wrappedAccount)
             } else {
@@ -1631,10 +1937,9 @@ class StateManager {
 
       // }
 
-      let {globalAccountSummary, globalStateHash} = this.accountGlobals.getGlobalDebugReport()
+      let { globalAccountSummary, globalStateHash } = this.accountGlobals.getGlobalDebugReport()
       partitionDump.globalAccountSummary = globalAccountSummary
       partitionDump.globalStateHash = globalStateHash
-
     } else {
       if (this.currentCycleShardData != null && this.currentCycleShardData.activeNodes.length > 0) {
         for (let node of this.currentCycleShardData.activeNodes) {
@@ -1648,17 +1953,17 @@ class StateManager {
     //this.shardLogger.debug(utils.stringifyReduce(partitionDump))
   }
 
-  async waitForShardData(counterMsg:string = '') {
+  async waitForShardData(counterMsg: string = '') {
     // wait for shard data
     while (this.currentCycleShardData == null) {
       this.getCurrentCycleShardData()
       await utils.sleep(1000)
 
-      if(counterMsg.length > 0){
-        nestedCountersInstance.countRareEvent('sync' , `waitForShardData ${counterMsg}` )
+      if (counterMsg.length > 0) {
+        nestedCountersInstance.countRareEvent('sync', `waitForShardData ${counterMsg}`)
       }
 
-      if (logFlags.playback) this.logger.playbackLogNote('_waitForShardData', ` `, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('_waitForShardData', ` `, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
     }
   }
 
@@ -1678,12 +1983,9 @@ class StateManager {
 
     let forceLocalGlobalLookup = false
 
-
-
     if (this.accountGlobals.isGlobalAccount(address)) {
       forceLocalGlobalLookup = true
     }
-
 
     // check if we have this account locally. (does it have to be consenus or just stored?)
     let accountIsRemote = true
@@ -1692,17 +1994,21 @@ class StateManager {
     let minP = ourNodeShardData.consensusStartPartition
     let maxP = ourNodeShardData.consensusEndPartition
     // HOMENODEMATHS this seems good.  making sure our node covers this partition
-    let { homePartition } = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, address)
+    let { homePartition } = ShardFunctions.addressToPartition(
+      this.currentCycleShardData.shardGlobals,
+      address
+    )
     accountIsRemote = ShardFunctions.partitionInWrappingRange(homePartition, minP, maxP) === false
 
     // hack to say we have all the data
-    if (this.currentCycleShardData.activeNodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius) {
+    if (
+      this.currentCycleShardData.activeNodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius
+    ) {
       accountIsRemote = false
     }
     if (forceLocalGlobalLookup) {
       accountIsRemote = false
     }
-
 
     if (accountIsRemote) {
       const randomConsensusNode = this.transactionQueue.getRandomConsensusNodeForAccount(address)
@@ -1711,18 +2017,25 @@ class StateManager {
       }
 
       // Node Precheck!
-      if (this.isNodeValidForInternalMessage(randomConsensusNode.id, 'getLocalOrRemoteAccount', true, true) === false) {
+      if (
+        this.isNodeValidForInternalMessage(randomConsensusNode.id, 'getLocalOrRemoteAccount', true, true) ===
+        false
+      ) {
         // if(this.tryNextDataSourceNode('getLocalOrRemoteAccount') == false){
         //   break
         // }
 
         //throw new Error(`getLocalOrRemoteAccount: no retry implmented yet`)
-        if (logFlags.verbose) this.getAccountFailDump(address, 'getLocalOrRemoteAccount: isNodeValidForInternalMessage failed, no retry')
+        /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'getLocalOrRemoteAccount: isNodeValidForInternalMessage failed, no retry')
         return null
       }
 
       let message = { accountIds: [address] }
-      let r: GetAccountDataWithQueueHintsResp | boolean = await this.p2p.ask(randomConsensusNode, 'get_account_data_with_queue_hints', message)
+      let r: GetAccountDataWithQueueHintsResp | boolean = await this.p2p.ask(
+        randomConsensusNode,
+        'get_account_data_with_queue_hints',
+        message
+      )
       if (r === false) {
         if (logFlags.error) this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount r === false')
       }
@@ -1736,11 +2049,11 @@ class StateManager {
         return wrappedAccount
       } else {
         if (result == null) {
-          if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data: result == null')
+          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data: result == null')
         } else if (result.accountData == null) {
-          if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data: result.accountData == null ' + utils.stringifyReduce(result))
+          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data: result.accountData == null ' + utils.stringifyReduce(result))
         } else if (result.accountData.length <= 0) {
-          if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data: result.accountData.length <= 0 ' + utils.stringifyReduce(result))
+          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data: result.accountData.length <= 0 ' + utils.stringifyReduce(result))
         }
       }
     } else {
@@ -1770,7 +2083,7 @@ class StateManager {
         if (logFlags.verbose) this.getAccountFailDump(address, 'accountData[0] == null')
       }
       if (accountData.length > 1 || accountData.length == 0) {
-        if (logFlags.verbose) this.getAccountFailDump(address, `getAccountDataByList() returned wrong element count: ${accountData}`)
+        /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, `getAccountDataByList() returned wrong element count: ${accountData}`)
       }
       return wrappedAccount
     }
@@ -1779,7 +2092,7 @@ class StateManager {
 
   getAccountFailDump(address: string, message: string) {
     // this.currentCycleShardData
-    if (logFlags.playback) this.logger.playbackLogNote('getAccountFailDump', ` `, `${utils.makeShortHash(address)} ${message} `)
+    /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('getAccountFailDump', ` `, `${utils.makeShortHash(address)} ${message} `)
   }
 
   // HOMENODEMATHS is this used by any apps? it is not used by shardus
@@ -1792,7 +2105,11 @@ class StateManager {
       throw new Error('getRemoteAccount: network not ready')
     }
 
-    let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, address, this.currentCycleShardData.parititionShardDataMap)
+    let homeNode = ShardFunctions.findHomeNode(
+      this.currentCycleShardData.shardGlobals,
+      address,
+      this.currentCycleShardData.parititionShardDataMap
+    )
     if (homeNode == null) {
       throw new Error(`getRemoteAccount: no home node found`)
     }
@@ -1803,7 +2120,7 @@ class StateManager {
       //   break
       // }
       // throw new Error(`getRemoteAccount: not retry yet`)
-      if (logFlags.error) this.mainLogger.error('getRemoteAccount: isNodeValidForInternalMessage failed, no retry yet')
+      /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('getRemoteAccount: isNodeValidForInternalMessage failed, no retry yet')
       return null
     }
 
@@ -1834,7 +2151,11 @@ class StateManager {
       throw new Error('getClosestNodes: network not ready')
     }
     let cycleShardData = this.currentCycleShardData
-    let homeNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, hash, cycleShardData.parititionShardDataMap)
+    let homeNode = ShardFunctions.findHomeNode(
+      cycleShardData.shardGlobals,
+      hash,
+      cycleShardData.parititionShardDataMap
+    )
     if (homeNode == null) {
       throw new Error(`getClosestNodes: no home node found`)
     }
@@ -1842,7 +2163,14 @@ class StateManager {
     // HOMENODEMATHS consider using partition of the raw hash instead of home node of hash
     let homeNodeIndex = homeNode.ourNodeIndex
     let idToExclude = ''
-    let results = ShardFunctions.getNodesByProximity(cycleShardData.shardGlobals, cycleShardData.activeNodes, homeNodeIndex, idToExclude, count, true)
+    let results = ShardFunctions.getNodesByProximity(
+      cycleShardData.shardGlobals,
+      cycleShardData.activeNodes,
+      homeNodeIndex,
+      idToExclude,
+      count,
+      true
+    )
 
     return results
   }
@@ -1861,26 +2189,43 @@ class StateManager {
   getClosestNodesGlobal(hash: string, count: number) {
     let hashNumber = parseInt(hash.slice(0, 7), 16)
     let nodes = activeByIdOrder
-    let nodeDistMap: { id: string; distance: number }[] = nodes.map((node) => ({ id: node.id, distance: Math.abs(hashNumber - parseInt(node.id.slice(0, 7), 16)) }))
+    let nodeDistMap: { id: string; distance: number }[] = nodes.map((node) => ({
+      id: node.id,
+      distance: Math.abs(hashNumber - parseInt(node.id.slice(0, 7), 16)),
+    }))
     nodeDistMap.sort(this._distanceSortAsc) ////(a, b) => a.distance < b.distance)
     //if (logFlags.console) console.log('SORTED NODES BY DISTANCE', nodes)
     return nodeDistMap.slice(0, count).map((node) => node.id)
   }
 
   // TSConversion todo see if we need to log any of the new early exits.
-  isNodeInDistance(shardGlobals: StateManagerTypes.shardFunctionTypes.ShardGlobals, parititionShardDataMap: StateManagerTypes.shardFunctionTypes.ParititionShardDataMap, hash: string, nodeId: string, distance: number) {
+  isNodeInDistance(
+    shardGlobals: StateManagerTypes.shardFunctionTypes.ShardGlobals,
+    parititionShardDataMap: StateManagerTypes.shardFunctionTypes.ParititionShardDataMap,
+    hash: string,
+    nodeId: string,
+    distance: number
+  ) {
     let cycleShardData = this.currentCycleShardData
     if (cycleShardData == null) {
       return false
     }
     // HOMENODEMATHS need to eval useage here
-    let someNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, nodeId, cycleShardData.parititionShardDataMap)
+    let someNode = ShardFunctions.findHomeNode(
+      cycleShardData.shardGlobals,
+      nodeId,
+      cycleShardData.parititionShardDataMap
+    )
     if (someNode == null) {
       return false
     }
     let someNodeIndex = someNode.ourNodeIndex
 
-    let homeNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, hash, cycleShardData.parititionShardDataMap)
+    let homeNode = ShardFunctions.findHomeNode(
+      cycleShardData.shardGlobals,
+      hash,
+      cycleShardData.parititionShardDataMap
+    )
     if (homeNode == null) {
       return false
     }
@@ -1928,7 +2273,14 @@ class StateManager {
    */
 
   // TODO WrappedStates
-  async setAccount(wrappedStates: WrappedResponses, localCachedData: LocalCachedData, applyResponse: Shardus.ApplyResponse, isGlobalModifyingTX: boolean, accountFilter?: AccountFilter,  note?:string) {
+  async setAccount(
+    wrappedStates: WrappedResponses,
+    localCachedData: LocalCachedData,
+    applyResponse: Shardus.ApplyResponse,
+    isGlobalModifyingTX: boolean,
+    accountFilter?: AccountFilter,
+    note?: string
+  ) {
     // let sourceAddress = inTx.srcAct
     // let targetAddress = inTx.tgtAct
     // let amount = inTx.txnAmt
@@ -1951,8 +2303,12 @@ class StateManager {
     // This ordering can be vitally important for things like a contract account that requires contract storage to be saved first
     // note that the wrapped data passed in alread had accountWrites merged in
     let appOrderedKeys = []
-    if(applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
-      for(let wrappedAccount of applyResponse.accountWrites){
+    if (
+      applyResponse != null &&
+      applyResponse.accountWrites != null &&
+      applyResponse.accountWrites.length > 0
+    ) {
+      for (let wrappedAccount of applyResponse.accountWrites) {
         appOrderedKeys.push(wrappedAccount.accountId)
       }
       keys = appOrderedKeys
@@ -1966,13 +2322,13 @@ class StateManager {
       // let wrappedData = wrappedStates[key]
       if (wrappedData == null) {
         // TSConversion todo: harden this. throw exception?
-        if (logFlags.verbose) this.mainLogger.debug(`setAccount wrappedData == null :${utils.makeShortHash(wrappedData.accountId)}`)
+        /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`setAccount wrappedData == null :${utils.makeShortHash(wrappedData.accountId)}`)
         continue
       }
 
       // TODO: to discuss how to handle this
       if (canWriteToAccount(wrappedData.accountId) === false) {
-        if (logFlags.verbose) this.mainLogger.debug(`setAccount canWriteToAccount == false :${utils.makeShortHash(wrappedData.accountId)}`)
+        /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`setAccount canWriteToAccount == false :${utils.makeShortHash(wrappedData.accountId)}`)
         continue
       }
 
@@ -1982,13 +2338,13 @@ class StateManager {
       if (this.accountGlobals.isGlobalAccount(key)) {
         if (isGlobalModifyingTX === false) {
           if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `setAccount - has`)
-          if (logFlags.verbose) this.mainLogger.debug('setAccount: Not writing global account: ' + utils.makeShortHash(key))
+          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('setAccount: Not writing global account: ' + utils.makeShortHash(key))
           continue
         }
-        if (logFlags.verbose) this.mainLogger.debug('setAccount: writing global account: ' + utils.makeShortHash(key))
+        /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('setAccount: writing global account: ' + utils.makeShortHash(key))
       }
 
-      if (logFlags.verbose) this.mainLogger.debug(`${note} setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)} hash:${utils.makeShortHash(wrappedData.stateId)} ts:${wrappedData.timestamp}`)
+      /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`${note} setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)} hash:${utils.makeShortHash(wrappedData.stateId)} ts:${wrappedData.timestamp}`)
       if (wrappedData.isPartial) {
         await this.app.updateAccountPartial(wrappedData, localCachedData[key], applyResponse)
       } else {
@@ -2008,7 +2364,11 @@ class StateManager {
    * @param {boolean} repairing
    * @param {number} txTimestamp
    */
-  async updateAccountsCopyTable(accountDataList: Shardus.AccountData[], repairing: boolean, txTimestamp: number) {
+  async updateAccountsCopyTable(
+    accountDataList: Shardus.AccountData[],
+    repairing: boolean,
+    txTimestamp: number
+  ) {
     let cycleNumber = -1
 
     let timePlusSettle = txTimestamp + this.syncSettleTime //tx timestamp + settle time to determine what cycle to save in
@@ -2017,8 +2377,11 @@ class StateManager {
     let cycle = CycleChain.getCycleNumberFromTimestamp(txTimestamp)
     cycleNumber = cycle
 
-    if(cycleNumber <= -1){
-      this.statemanager_fatal(`updateAccountsCopyTable cycleToRecordOn==-1`, `updateAccountsCopyTable cycleToRecordOn==-1 ${timePlusSettle}` )
+    if (cycleNumber <= -1) {
+      this.statemanager_fatal(
+        `updateAccountsCopyTable cycleToRecordOn==-1`,
+        `updateAccountsCopyTable cycleToRecordOn==-1 ${timePlusSettle}`
+      )
       return
     }
 
@@ -2030,7 +2393,7 @@ class StateManager {
     // todo review this assumption. seems ok at the moment.  are there times cycle could be null and getting the last cycle is not a valid answer?
     // if (cycle == null) {
     //   cycle = CycleChain.getNewest()
-    //   // if (logFlags.verbose) if (logFlags.error) this.mainLogger.error( `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)
+    //   // /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error( `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)
     //   cycleOffset = 1
     // }
     // cycleNumber = cycle.counter + cycleOffset
@@ -2040,29 +2403,29 @@ class StateManager {
     // let cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
     // let cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
     // if (timePlusSettle < cycleStart) {
-    //   if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+    //   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
     // }
     // if (timePlusSettle >= cycleEnd) {
-    //   // if (logFlags.verbose) if (logFlags.error) this.mainLogger.error( `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+    //   // /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error( `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
     //   cycleOffset++
     //   cycleNumber = cycle.counter + cycleOffset
     //   cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
     //   cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
     //   if (timePlusSettle >= cycleEnd) {
-    //     if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+    //     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
     //   }
     // }
 
     // TSConversion need to sort out account types!!!
     // @ts-ignore This has seemed fine in past so not going to sort out a type discrepencie here.  !== would detect and log it anyhow.
     if (accountDataList.length > 0 && accountDataList[0].timestamp !== txTimestamp) {
-      if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable timestamps do match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
+      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable timestamps do match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
     }
     if (accountDataList.length === 0) {
       // need to decide if this matters!
-      if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable empty txts:${txTimestamp}  `)
+      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable empty txts:${txTimestamp}  `)
     }
-    // if (logFlags.verbose) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle computed:${cycleNumber} `)
+    // /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle computed:${cycleNumber} `)
 
     for (let accountEntry of accountDataList) {
       let { accountId, data, timestamp, hash } = accountEntry
@@ -2070,7 +2433,7 @@ class StateManager {
 
       let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
 
-      if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+      /* prettier-ignore */ if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
       // todo perf. queue and batch these to the table?
       // if (logFlags.verbose) this.mainLogger.debug( 'updateAccountsCopyTableA ' + JSON.stringify(accountEntry))
@@ -2089,8 +2452,7 @@ class StateManager {
    * @param accountCopies
    */
   async _commitAccountCopies(accountCopies: Shardus.AccountsCopy[]) {
-
-    let rawDataList:unknown[] = []
+    let rawDataList: unknown[] = []
     if (accountCopies.length > 0) {
       for (let accountData of accountCopies) {
         // make sure the data is not a json string
@@ -2099,10 +2461,10 @@ class StateManager {
         }
 
         if (accountData == null || accountData.data == null || accountData.accountId == null) {
-          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` _commitAccountCopies null account data found: ${accountData.accountId} data: ${utils.stringifyReduce(accountData)}`)
+          /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` _commitAccountCopies null account data found: ${accountData.accountId} data: ${utils.stringifyReduce(accountData)}`)
           continue
         } else {
-          if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(` _commitAccountCopies: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} data: ${utils.stringifyReduce(accountData)}`)
+          /* prettier-ignore */ if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(` _commitAccountCopies: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} data: ${utils.stringifyReduce(accountData)}`)
         }
 
         rawDataList.push(accountData.data)
@@ -2130,14 +2492,14 @@ class StateManager {
         // const cycle = CycleChain.getCycleByTimestamp(timestamp + this.syncSettleTime)
         // // find the correct cycle based on timetamp
         // if (!cycle) {
-        //   if (logFlags.error) this.mainLogger.error(`_commitAccountCopies failed to get cycle for timestamp ${timestamp} accountId:${utils.makeShortHash(accountId)}`)
+        //   /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`_commitAccountCopies failed to get cycle for timestamp ${timestamp} accountId:${utils.makeShortHash(accountId)}`)
         //   continue
         // }
         // let cycleNumber = cycle.counter
 
         let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
 
-        if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+        /* prettier-ignore */ if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
         // If the account is global ad it to the global backup list
         if (globalAccountKeyMap[accountId] === true) {
@@ -2147,23 +2509,19 @@ class StateManager {
           if (this.accountGlobals.isGlobalAccount(accountId) === false) {
             //this.accountGlobals.globalAccountMap.set(accountId, null) // we use null. ended up not using the data, only checking for the key is used
             this.accountGlobals.setGlobalAccount(accountId)
-            if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `set global in _commitAccountCopies accountId:${utils.makeShortHash(accountId)}`)
+            /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `set global in _commitAccountCopies accountId:${utils.makeShortHash(accountId)}`)
           }
-
         }
 
         this.accountCache.updateAccountHash(accountId, hash, timestamp, 0)
 
-        try{
+        try {
           //Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
           await this.storage.createOrReplaceAccountCopy(backupObj)
-        } catch(error){
-          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` _commitAccountCopies storage: ${JSON.stringify(error)}}`)
-          nestedCountersInstance.countEvent('_commitAccountCopies', `_commitAccountCopies fail`) 
+        } catch (error) {
+          /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` _commitAccountCopies storage: ${JSON.stringify(error)}}`)
+          nestedCountersInstance.countEvent('_commitAccountCopies', `_commitAccountCopies fail`)
         }
-
-
-
       }
     }
   }
@@ -2188,15 +2546,22 @@ class StateManager {
 
     let thisFifo = this.fifoLocks[fifoName]
     if (thisFifo == null) {
-      thisFifo = { fifoName, queueCounter: 0, waitingList: [], lastServed: 0, queueLocked: false, lockOwner: 1 }
+      thisFifo = {
+        fifoName,
+        queueCounter: 0,
+        waitingList: [],
+        lastServed: 0,
+        queueLocked: false,
+        lockOwner: 1,
+      }
       this.fifoLocks[fifoName] = thisFifo
     }
     thisFifo.queueCounter++
     let ourID = thisFifo.queueCounter
     let entry = { id: ourID }
 
-    if(fifoName === 'accountModification'){
-      nestedCountersInstance.countEvent('fifo-backup',`accountModification ${thisFifo.waitingList.length}`)
+    if (fifoName === 'accountModification') {
+      nestedCountersInstance.countEvent('fifo-backup', `accountModification ${thisFifo.waitingList.length}`)
     }
 
     if (thisFifo.waitingList.length > 0 || thisFifo.queueLocked) {
@@ -2276,7 +2641,10 @@ class StateManager {
       seen[accountID] = true
       let ourLockID = ourLocks[i]
       if (ourLockID == -1) {
-        this.statemanager_fatal(`bulkFifoUnlockAccounts_fail`, `bulkFifoUnlockAccounts hit placeholder i:${i} ${utils.stringifyReduce({ accountIDs, ourLocks })} `)
+        this.statemanager_fatal(
+          `bulkFifoUnlockAccounts_fail`,
+          `bulkFifoUnlockAccounts hit placeholder i:${i} ${utils.stringifyReduce({ accountIDs, ourLocks })} `
+        )
       }
 
       this.fifoUnlock(accountID, ourLockID)
@@ -2305,13 +2673,13 @@ class StateManager {
     // if (this.depricated.repairTrackingByCycleById == null) {
     //   return
     // }
-    if(this.partitionObjects != null){
+    if (this.partitionObjects != null) {
       if (this.partitionObjects.allPartitionResponsesByCycleByPartition == null) {
         return
       }
       if (this.partitionObjects.ourPartitionResultsByCycle == null) {
         return
-      }      
+      }
     }
 
     if (this.shardValuesByCycle == null) {
@@ -2345,28 +2713,27 @@ class StateManager {
     // }
 
     // cleanup old partition objects / receipts.
-    if(this.partitionObjects != null){
+    if (this.partitionObjects != null) {
       for (let cycleKey of Object.keys(this.partitionObjects.allPartitionResponsesByCycleByPartition)) {
         let cycle = cycleKey.slice(1)
         let cycleNum = parseInt(cycle, 10)
-      if (cycleNum < oldestCycle) {
-        // delete old cycle
-        delete this.partitionObjects.allPartitionResponsesByCycleByPartition[cycleKey]
-        removedallPartitionResponsesByCycleByPartition++
+        if (cycleNum < oldestCycle) {
+          // delete old cycle
+          delete this.partitionObjects.allPartitionResponsesByCycleByPartition[cycleKey]
+          removedallPartitionResponsesByCycleByPartition++
+        }
       }
-    }
 
-    for (let cycleKey of Object.keys(this.partitionObjects.ourPartitionResultsByCycle)) {
-      let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle, 10)
-      if (cycleNum < oldestCycle) {
-        // delete old cycle
+      for (let cycleKey of Object.keys(this.partitionObjects.ourPartitionResultsByCycle)) {
+        let cycle = cycleKey.slice(1)
+        let cycleNum = parseInt(cycle, 10)
+        if (cycleNum < oldestCycle) {
+          // delete old cycle
           delete this.partitionObjects.ourPartitionResultsByCycle[cycleKey]
           removedourPartitionResultsByCycle++
         }
-      }      
+      }
     }
-
 
     // cleanup this.shardValuesByCycle
     for (let cycleKey of this.shardValuesByCycle.keys()) {
@@ -2399,7 +2766,7 @@ class StateManager {
     let removedrepairUpdateDataByCycle = 0
     let removedpartitionObjectsByCycle = 0
 
-    if(this.partitionObjects != null){
+    if (this.partitionObjects != null) {
       // cleanup this.partitionObjects.txByCycleByPartition
       for (let cycleKey of Object.keys(this.partitionObjects.txByCycleByPartition)) {
         let cycle = cycleKey.slice(1)
@@ -2419,7 +2786,7 @@ class StateManager {
           delete this.partitionObjects.recentPartitionObjectsByCycleByHash[cycleKey]
           removedrecentPartitionObjectsByCycleByHash++
         }
-      }      
+      }
     }
 
     // // cleanup this.depricated.repairUpdateDataByCycle
@@ -2432,7 +2799,7 @@ class StateManager {
     //     removedrepairUpdateDataByCycle++
     //   }
     // }
-    if(this.partitionObjects != null){
+    if (this.partitionObjects != null) {
       // cleanup this.partitionObjects.partitionObjectsByCycle
       for (let cycleKey of Object.keys(this.partitionObjects.partitionObjectsByCycle)) {
         let cycle = cycleKey.slice(1)
@@ -2488,7 +2855,7 @@ class StateManager {
       }
     }
 
-    if (logFlags.debug) this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle} ${removedtxByCycleByPartition} ${removedrecentPartitionObjectsByCycleByHash} ${removedrepairUpdateDataByCycle} ${removedpartitionObjectsByCycle} ${removepartitionReceiptsByCycleCounter} ${removeourPartitionReceiptsByCycleCounter} archQ:${archivedEntriesRemoved}`)
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle} ${removedtxByCycleByPartition} ${removedrecentPartitionObjectsByCycleByHash} ${removedrepairUpdateDataByCycle} ${removedpartitionObjectsByCycle} ${removepartitionReceiptsByCycleCounter} ${removeourPartitionReceiptsByCycleCounter} archQ:${archivedEntriesRemoved}`)
 
     // TODO 1 calculate timestamp for oldest accepted TX to delete.
 
@@ -2612,10 +2979,10 @@ class StateManager {
     }
 
     await utils.sleep(1000) //wait one second helps with local networks
-                            //need to investigate further
-                            //it was either a sync issue or something to do with the actions below.
-                            //I made this fix locally awhile ago and had too much come up before I could get good
-                            //notes down.
+    //need to investigate further
+    //it was either a sync issue or something to do with the actions below.
+    //I made this fix locally awhile ago and had too much come up before I could get good
+    //notes down.
 
     // if (this.oldFeature_GeneratePartitionReport === true) {
     //   if (logFlags.verbose) this.mainLogger.debug(` processPreviousCycleSummaries cycle: ${cycle.counter}`)
@@ -2654,56 +3021,68 @@ class StateManager {
     let mainHashResults: MainHashResults = null
     if (this.feature_partitionHashes === true) {
       if (cycleShardValues && cycleShardValues.ourNode.status === 'active') {
-
-        this.profiler.profileSectionStart('stateManager_processPreviousCycleSummaries_buildPartitionHashesForNode')
-        if(this.config.debug.newCacheFlow){
-          this.accountCache.processCacheUpdates(cycleShardValues) 
-        } else{
+        this.profiler.profileSectionStart(
+          'stateManager_processPreviousCycleSummaries_buildPartitionHashesForNode'
+        )
+        if (this.config.debug.newCacheFlow) {
+          this.accountCache.processCacheUpdates(cycleShardValues)
+        } else {
           mainHashResults = this.accountCache.buildPartitionHashesForNode(cycleShardValues) //This needs to be replaced by something that
-                      //processes data for a completed cycle in a consistent way.  mainHash reults are not needed anymore.
-                      //they will not scale well with a large number of accounts.
+          //processes data for a completed cycle in a consistent way.  mainHash reults are not needed anymore.
+          //they will not scale well with a large number of accounts.
         }
 
-        this.profiler.profileSectionEnd('stateManager_processPreviousCycleSummaries_buildPartitionHashesForNode')
-
+        this.profiler.profileSectionEnd(
+          'stateManager_processPreviousCycleSummaries_buildPartitionHashesForNode'
+        )
 
         this.profiler.profileSectionStart('stateManager_updatePartitionReport_updateTrie')
         //Note: the main work is happening in accountCache.buildPartitionHashesForNode, this just
         // uses that data to create our old report structure for reporting to the monitor-server
         // this.partitionObjects.updatePartitionReport(cycleShardValues, mainHashResults) //this needs to go away along all of partitionObjects I think
-              //this is used in the reporter and account dump, but these features cant scale to hundreds of nodes.
-              //
-        this.accountPatcher.updateTrieAndBroadCast(lastCycle.counter) 
+        //this is used in the reporter and account dump, but these features cant scale to hundreds of nodes.
+        //
+        this.accountPatcher.updateTrieAndBroadCast(lastCycle.counter)
         this.profiler.profileSectionEnd('stateManager_updatePartitionReport_updateTrie')
       }
     }
 
-
     //reset cycleDebugNotes
-    this.cycleDebugNotes = {repairs:0, lateRepairs:0, patchedAccounts:0, badAccounts:0, noRcptRepairs:0 }
+    this.cycleDebugNotes = {
+      repairs: 0,
+      lateRepairs: 0,
+      patchedAccounts: 0,
+      badAccounts: 0,
+      noRcptRepairs: 0,
+    }
 
     // Hook for Snapshot module to listen to after partition data is settled
-    this.eventEmitter.emit('cycleTxsFinalized', cycleShardValues, receiptMapResults, statsClump, mainHashResults)
+    this.eventEmitter.emit(
+      'cycleTxsFinalized',
+      cycleShardValues,
+      receiptMapResults,
+      statsClump,
+      mainHashResults
+    )
     this.transactionConsensus.pruneTxTimestampCache()
 
     if (this.debugFeature_dumpAccountData === true) {
-      if(this.superLargeNetworkDebugReduction === true || logFlags.verbose){
+      if (this.superLargeNetworkDebugReduction === true || logFlags.verbose) {
         //log just the node IDS and cycle number even this may be too much eventually
-        let partitionDump = { cycle:cycleShardValues.cycleNumber, allNodeIds:[]}
+        let partitionDump = { cycle: cycleShardValues.cycleNumber, allNodeIds: [] }
         for (let node of this.currentCycleShardData.activeNodes) {
           partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
         }
         this.lastShardReport = utils.stringifyReduce(partitionDump)
         this.shardLogger.debug(this.lastShardReport)
       } else {
-        if(this.partitionObjects != null){
-          this.dumpAccountDebugData2(mainHashResults) //more detailed work          
+        if (this.partitionObjects != null) {
+          this.dumpAccountDebugData2(mainHashResults) //more detailed work
         }
       }
-
     }
 
-    if(this.partitionObjects != null){
+    if (this.partitionObjects != null) {
       // pre-allocate the next two cycles if needed
       for (let i = 1; i <= 2; i++) {
         let prekey = 'c' + (cycle.counter + i)
@@ -2713,7 +3092,7 @@ class StateManager {
         if (this.partitionObjects.ourPartitionResultsByCycle[prekey] == null) {
           this.partitionObjects.ourPartitionResultsByCycle[prekey] = []
         }
-      }      
+      }
     }
 
     // if (this.oldFeature_GeneratePartitionReport === true && this.oldFeature_BroadCastPartitionReport === true) {
@@ -2742,10 +3121,12 @@ class StateManager {
     if (logFlags.error) this.mainLogger.error(log)
 
     let stack = new Error().stack
-    this.statemanager_fatal('initApoptosisAndQuitSyncing', `initApoptosisAndQuitSyncing ${logMsg} ${stack}` )
+    this.statemanager_fatal('initApoptosisAndQuitSyncing', `initApoptosisAndQuitSyncing ${logMsg} ${stack}`)
 
     this.accountSync.failAndDontRestartSync()
-    this.p2p.initApoptosis('Apoptosis being initialized by `p2p.initApoptosis` within initApoptosisAndQuitSyncing() at src/state-manager/index.ts')
+    this.p2p.initApoptosis(
+      'Apoptosis being initialized by `p2p.initApoptosis` within initApoptosisAndQuitSyncing() at src/state-manager/index.ts'
+    )
   }
 
   /***
@@ -2757,7 +3138,6 @@ class StateManager {
    *    ##    ##  ##       ##    ## ##        ##  ##           ##    ##    ##
    *    ##     ## ########  ######  ######## #### ##           ##     ######
    */
-
 
   /**
    * getReceipt
@@ -2800,22 +3180,22 @@ class StateManager {
     return receipt
   }
 
-  hasReceipt(queueEntry: QueueEntry){
-    if(this.config.debug.optimizedTXConsenus){
+  hasReceipt(queueEntry: QueueEntry) {
+    if (this.config.debug.optimizedTXConsenus) {
       return this.getReceipt2(queueEntry) != null
     } else {
       return this.getReceipt(queueEntry) != null
     }
   }
-  getReceiptResult(queueEntry: QueueEntry){
-    if(this.config.debug.optimizedTXConsenus){
+  getReceiptResult(queueEntry: QueueEntry) {
+    if (this.config.debug.optimizedTXConsenus) {
       let receipt = this.getReceipt2(queueEntry)
-      if(receipt){
+      if (receipt) {
         return receipt.result
       }
     } else {
       let receipt = this.getReceipt(queueEntry)
-      if(receipt){
+      if (receipt) {
         return receipt.result
       }
     }
@@ -2823,22 +3203,22 @@ class StateManager {
   }
 
   getReceiptVote(queueEntry: QueueEntry): AppliedVote {
-    if(this.config.debug.optimizedTXConsenus){
+    if (this.config.debug.optimizedTXConsenus) {
       let receipt = this.getReceipt2(queueEntry)
-      if(receipt){
+      if (receipt) {
         return receipt.appliedVote
       }
     } else {
       let receipt = this.getReceipt(queueEntry)
-      if(receipt && receipt.appliedVotes && receipt.appliedVotes.length > 0){
+      if (receipt && receipt.appliedVotes && receipt.appliedVotes.length > 0) {
         return receipt.appliedVotes[0]
       }
     }
-
   }
 
-
-  generateReceiptMapResults(lastCycle: Shardus.Cycle): StateManagerTypes.StateManagerTypes.ReceiptMapResult[] {
+  generateReceiptMapResults(
+    lastCycle: Shardus.Cycle
+  ): StateManagerTypes.StateManagerTypes.ReceiptMapResult[] {
     let results: StateManagerTypes.StateManagerTypes.ReceiptMapResult[] = []
 
     let cycleToSave = lastCycle.counter
@@ -2852,7 +3232,7 @@ class StateManager {
         receiptMap: {},
         txCount: 0,
         txsMap: {},
-        txsMapEVMReceipt: {}
+        txsMapEVMReceipt: {},
       }
       receiptMapByPartition.set(i, mapResult)
       // add to the list we will return
@@ -2869,13 +3249,13 @@ class StateManager {
         // make sure we have a receipt
         let receipt: AppliedReceipt | AppliedReceipt2 = this.getReceipt(queueEntry)
 
-        if(this.config.debug.optimizedTXConsenus){
+        if (this.config.debug.optimizedTXConsenus) {
           receipt = this.getReceipt2(queueEntry)
         }
 
         if (receipt == null) {
           //check  && queueEntry.globalModification === false because global accounts will not get a receipt, should this change?
-          if(logFlags.error && queueEntry.globalModification === false) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in newAcceptedTxQueue. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+          /* prettier-ignore */ if(logFlags.error && queueEntry.globalModification === false) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in newAcceptedTxQueue. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
         } else {
           queueEntriesToSave.push(queueEntry)
         }
@@ -2890,14 +3270,14 @@ class StateManager {
       if (queueEntry.cycleToRecordOn === cycleToSave) {
         // make sure we have a receipt
         let receipt: AppliedReceipt | AppliedReceipt2 = this.getReceipt(queueEntry)
-        if(this.config.debug.optimizedTXConsenus){
+        if (this.config.debug.optimizedTXConsenus) {
           receipt = this.getReceipt2(queueEntry)
         }
         if (receipt == null) {
           //check  && queueEntry.globalModification === false
           //we dont expect expired TXs to have a receipt.  this should reduce log spam
-          if(queueEntry.state != 'expired'){
-            if(logFlags.error && queueEntry.globalModification === false) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in archivedQueueEntries. ${utils.stringifyReduce(queueEntry.acceptedTx)} state:${queueEntry.state}`)
+          if (queueEntry.state != 'expired') {
+            /* prettier-ignore */ if(logFlags.error && queueEntry.globalModification === false) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in archivedQueueEntries. ${utils.stringifyReduce(queueEntry.acceptedTx)} state:${queueEntry.state}`)
           }
         } else {
           queueEntriesToSave.push(queueEntry)
@@ -2908,20 +3288,20 @@ class StateManager {
     const netId: string = '123abc'
     //go over the save list..
     for (let queueEntry of queueEntriesToSave) {
-      let accountData : Shardus.WrappedResponse[] = queueEntry?.preApplyTXResult?.applyResponse?.accountData
-      if(accountData == null){
-        nestedCountersInstance.countRareEvent('generateReceiptMapResults' , `accountData==null tests: ${queueEntry?.preApplyTXResult == null} ${queueEntry?.preApplyTXResult?.applyResponse == null} ${queueEntry?.preApplyTXResult?.applyResponse?.accountData == null}` )
+      let accountData: Shardus.WrappedResponse[] = queueEntry?.preApplyTXResult?.applyResponse?.accountData
+      if (accountData == null) {
+        /* prettier-ignore */ nestedCountersInstance.countRareEvent('generateReceiptMapResults' , `accountData==null tests: ${queueEntry?.preApplyTXResult == null} ${queueEntry?.preApplyTXResult?.applyResponse == null} ${queueEntry?.preApplyTXResult?.applyResponse?.accountData == null}` )
       }
       // delete the localCache
-      if(accountData != null){
+      if (accountData != null) {
         for (let account of accountData) {
           delete account.localCache
-        }        
+        }
       }
       // console.log('accountData accountData', accountData)
       for (let partition of queueEntry.involvedPartitions) {
         let receipt: AppliedReceipt | AppliedReceipt2 = this.getReceipt(queueEntry)
-        if(this.config.debug.optimizedTXConsenus){
+        if (this.config.debug.optimizedTXConsenus) {
           receipt = this.getReceipt2(queueEntry)
         }
 
@@ -2943,13 +3323,13 @@ class StateManager {
 
           let gotAppReceipt = false
           //set receipt data.  todo get evmReceiptForTX from receipt.
-          if(receipt.app_data_hash != null && receipt.app_data_hash != ''){
+          if (receipt.app_data_hash != null && receipt.app_data_hash != '') {
             let applyResponse = queueEntry?.preApplyTXResult?.applyResponse
             // we may not always have appReceiptData... especially in execute in local shard
-            if(applyResponse.appReceiptDataHash === receipt.app_data_hash){
-              mapResult.txsMapEVMReceipt[txIdShort] = applyResponse.appReceiptData 
+            if (applyResponse.appReceiptDataHash === receipt.app_data_hash) {
+              mapResult.txsMapEVMReceipt[txIdShort] = applyResponse.appReceiptData
               gotAppReceipt = true
-            }  
+            }
           }
 
           nestedCountersInstance.countEvent('stateManager', `gotAppReceipt:${gotAppReceipt}`)
@@ -2976,51 +3356,76 @@ class StateManager {
    *     ######   #######  ##     ## ######## ### ### ###
    */
 
-
-  isNodeValidForInternalMessage(nodeId: string, debugMsg: string, checkForNodeDown: boolean = true, checkForNodeLost: boolean = true, checkIsUpRecent: boolean = true): boolean {
+  isNodeValidForInternalMessage(
+    nodeId: string,
+    debugMsg: string,
+    checkForNodeDown: boolean = true,
+    checkForNodeLost: boolean = true,
+    checkIsUpRecent: boolean = true
+  ): boolean {
     let node: Shardus.Node = this.p2p.state.getNode(nodeId)
     let logErrors = logFlags.debug
     if (node == null) {
-      if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+      if (logErrors)
+        if (logFlags.error)
+          /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
       return false
     }
     let nodeStatus = node.status
     if (nodeStatus != 'active' || potentiallyRemoved.has(node.id)) {
-      if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+      if (logErrors)
+        if (logFlags.error)
+          /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
       return false
     }
 
-    if(checkIsUpRecent){
+    if (checkIsUpRecent) {
       let { upRecent, state, age } = isNodeUpRecent(nodeId, 5000)
-      if(upRecent === true){
+      if (upRecent === true) {
         if (checkForNodeDown) {
           let { down, state } = isNodeDown(nodeId)
           if (down === true) {
-            if (logErrors) this.mainLogger.debug(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+            if (logErrors)
+              this.mainLogger.debug(
+                `isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(
+                  nodeId
+                )} ${debugMsg}`
+              )
           }
         }
         if (checkForNodeLost) {
           if (isNodeLost(nodeId) === true) {
-            if (logErrors) this.mainLogger.debug(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+            if (logErrors)
+              this.mainLogger.debug(
+                `isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(
+                  nodeId
+                )} ${debugMsg}`
+              )
           }
         }
         return true
       } else {
-        if (logErrors) this.mainLogger.debug(`isNodeUpRecentOverride: ${age} upRecent = false. no recent TX, but this is not a fail conditions`)
+        if (logErrors)
+          this.mainLogger.debug(
+            `isNodeUpRecentOverride: ${age} upRecent = false. no recent TX, but this is not a fail conditions`
+          )
       }
     }
-
 
     if (checkForNodeDown) {
       let { down, state } = isNodeDown(nodeId)
       if (down === true) {
-        if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+        if (logErrors)
+          if (logFlags.error)
+            /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
         return false
       }
     }
     if (checkForNodeLost) {
       if (isNodeLost(nodeId) === true) {
-        if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+        if (logErrors)
+          if (logFlags.error)
+            /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
         return false
       }
     }
@@ -3029,16 +3434,22 @@ class StateManager {
 
   /**
    * This takes a lists of nodes and test which are safe/smart to send to.
-   * The node list is updated once per cycle but this function can take into nodes that may have been reported down but are 
-   * recently up again.  
-   * @param nodeList 
-   * @param debugMsg 
-   * @param checkForNodeDown 
-   * @param checkForNodeLost 
-   * @param checkIsUpRecent 
+   * The node list is updated once per cycle but this function can take into nodes that may have been reported down but are
+   * recently up again.
+   * @param nodeList
+   * @param debugMsg
+   * @param checkForNodeDown
+   * @param checkForNodeLost
+   * @param checkIsUpRecent
    * @returns A list of filtered nodes based on the settings passed in
    */
-  filterValidNodesForInternalMessage(nodeList: Shardus.Node[], debugMsg: string, checkForNodeDown: boolean = true, checkForNodeLost: boolean = true, checkIsUpRecent: boolean = true): Shardus.Node[] {
+  filterValidNodesForInternalMessage(
+    nodeList: Shardus.Node[],
+    debugMsg: string,
+    checkForNodeDown: boolean = true,
+    checkForNodeLost: boolean = true,
+    checkIsUpRecent: boolean = true
+  ): Shardus.Node[] {
     let filteredNodes = []
 
     let logErrors = logFlags.debug
@@ -3046,46 +3457,67 @@ class StateManager {
       let nodeId = node.id
 
       if (node == null) {
-        if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+        if (logErrors)
+          if (logFlags.error)
+            /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
         continue
       }
       let nodeStatus = node.status
       if (nodeStatus != 'active' || potentiallyRemoved.has(node.id)) {
-        if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+        if (logErrors)
+          if (logFlags.error)
+            /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
         continue
       }
-      if(checkIsUpRecent){
+      if (checkIsUpRecent) {
         let { upRecent, state, age } = isNodeUpRecent(nodeId, 5000)
-        if(upRecent === true){
+        if (upRecent === true) {
           filteredNodes.push(node)
 
           if (checkForNodeDown) {
             let { down, state } = isNodeDown(nodeId)
             if (down === true) {
-              if (logErrors) this.mainLogger.debug(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+              if (logErrors)
+                this.mainLogger.debug(
+                  `isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(
+                    nodeId
+                  )} ${debugMsg}`
+                )
             }
           }
           if (checkForNodeLost) {
             if (isNodeLost(nodeId) === true) {
-              if (logErrors) this.mainLogger.debug(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+              if (logErrors)
+                this.mainLogger.debug(
+                  `isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(
+                    nodeId
+                  )} ${debugMsg}`
+                )
             }
           }
           continue
         } else {
-          if (logErrors) this.mainLogger.debug(`isNodeUpRecentOverride: ${age} no recent TX, but this is not a fail conditions`)
+          if (logErrors)
+            this.mainLogger.debug(
+              `isNodeUpRecentOverride: ${age} no recent TX, but this is not a fail conditions`
+            )
         }
       }
 
       if (checkForNodeDown) {
         let { down, state } = isNodeDown(nodeId)
         if (down === true) {
-          if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+          if (logErrors)
+            if (logFlags.error)
+              /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
           continue
         }
       }
       if (checkForNodeLost) {
         if (isNodeLost(nodeId) === true) {
-          if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+          if (logErrors)
+            if (logFlags.error)
+              /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
           continue
         }
       }
@@ -3094,16 +3526,16 @@ class StateManager {
     return filteredNodes
   }
 
-  getTxRepair() : TransactionRepair | TransactionRepairOld {
-    if(this.transactionRepair){
+  getTxRepair(): TransactionRepair | TransactionRepairOld {
+    if (this.transactionRepair) {
       return this.transactionRepair
     }
-    if(this.transactionRepairOld){
+    if (this.transactionRepairOld) {
       return this.transactionRepairOld
     }
   }
 
-  startProcessingCycleSummaries(){
+  startProcessingCycleSummaries() {
     this.processCycleSummaries = true
   }
 

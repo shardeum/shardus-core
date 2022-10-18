@@ -1,4 +1,3 @@
-
 // @ts-nocheck
 /*eslint-disable*/
 
@@ -15,7 +14,6 @@ try {
   //console.log(data)
 
   testInput = JSON.parse(data)
-
 } catch (e) {
   console.log('Error:', e.stack)
 }
@@ -23,7 +21,13 @@ try {
 console.count('asdf')
 
 // (repairTracker, ourPartitionObj, ourLastResultHash, ourHashSet,  txListOverride
-stateManager._mergeRepairDataIntoLocalState2(testInput.repairTracker, null, null, testInput.ourHashSet,   testInput.txList)
+stateManager._mergeRepairDataIntoLocalState2(
+  testInput.repairTracker,
+  null,
+  null,
+  testInput.ourHashSet,
+  testInput.txList
+)
 
 console.count('asdf')
 

@@ -79,9 +79,8 @@ export function reset() {
 }
 
 export function getDesiredCount(): number {
-
   // having trouble finding a better way to update this!
-  if(desiredCount < config.p2p.minNodes){
+  if (desiredCount < config.p2p.minNodes) {
     desiredCount = config.p2p.minNodes
   }
 
@@ -146,7 +145,7 @@ function addExtScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScal
   return added
 }
 
-function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleRequest) : boolean {
+function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleRequest): boolean {
   // Check existence of fields
   if (
     !scalingRequest.nodeId ||
@@ -155,11 +154,7 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
     !scalingRequest.scale ||
     !scalingRequest.sign
   ) {
-    warn(
-      `Invalid scaling request, missing fields. Request: ${JSON.stringify(
-        scalingRequest
-      )}`
-    )
+    warn(`Invalid scaling request, missing fields. Request: ${JSON.stringify(scalingRequest)}`)
     return false
   }
   // Check if cycle counter matches
@@ -176,11 +171,7 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
     scalingRequest.scale !== P2P.CycleAutoScaleTypes.ScaleType.UP &&
     scalingRequest.scale !== P2P.CycleAutoScaleTypes.ScaleType.DOWN
   ) {
-    warn(
-      `Invalid scaling request, not a valid scaling type. Request: ${JSON.stringify(
-        scalingRequest
-      )}`
-    )
+    warn(`Invalid scaling request, not a valid scaling type. Request: ${JSON.stringify(scalingRequest)}`)
     return false
   }
   // Try to get the node who supposedly signed this request
@@ -189,28 +180,16 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
     node = NodeList.nodes.get(scalingRequest.nodeId)
   } catch (e) {
     warn(e)
-    warn(
-      `Invalid scaling request, not a known node. Request: ${JSON.stringify(
-        scalingRequest
-      )}`
-    )
+    warn(`Invalid scaling request, not a known node. Request: ${JSON.stringify(scalingRequest)}`)
     return false
   }
   if (node == null) {
-    warn(
-      `Invalid scaling request, not a known node. Request: ${JSON.stringify(
-        scalingRequest
-      )}`
-    )
+    warn(`Invalid scaling request, not a known node. Request: ${JSON.stringify(scalingRequest)}`)
     return false
   }
   // Return false if fails validation for signature
   if (!crypto.verify(scalingRequest, node.publicKey)) {
-    warn(
-      `Invalid scaling request, signature is not valid. Request: ${JSON.stringify(
-        scalingRequest
-      )}`
-    )
+    warn(`Invalid scaling request, signature is not valid. Request: ${JSON.stringify(scalingRequest)}`)
     return false
   }
   return true
@@ -232,19 +211,21 @@ function _checkScaling() {
 
   // lazy init of desiredCount
   // if we have a good value in our cycle chane for desired nodes update our desired count.
-  if(CycleChain.newest != null && CycleChain.newest.desired != null){
+  if (CycleChain.newest != null && CycleChain.newest.desired != null) {
     desiredCount = CycleChain.newest.desired
   }
 
   let numActiveNodes = NodeList.activeByIdOrder.length
-  let requiredVotes = Math.max(config.p2p.minScaleReqsNeeded, config.p2p.scaleConsensusRequired * numActiveNodes )
+  let requiredVotes = Math.max(
+    config.p2p.minScaleReqsNeeded,
+    config.p2p.scaleConsensusRequired * numActiveNodes
+  )
 
   let scaleUpRequests = getScaleUpRequests()
   let scaleDownRequests = getScaleDownRequests()
 
   // Check up first, but must have more votes than down votes.
-  if (scaleUpRequests.length >= requiredVotes &&
-    scaleUpRequests.length >= scaleDownRequests.length) {
+  if (scaleUpRequests.length >= requiredVotes && scaleUpRequests.length >= scaleDownRequests.length) {
     approvedScalingType = P2P.CycleAutoScaleTypes.ScaleType.UP
     changed = true
   }
@@ -286,15 +267,10 @@ function _checkScaling() {
       // If newDesired less than minNodes, set newDesired to minNodes
       if (newDesired < config.p2p.minNodes) newDesired = config.p2p.minNodes
 
-
       setDesireCount(newDesired)
       break
     default:
-      error(
-        new Error(
-          `Invalid scaling flag after changing flag. Flag: ${approvedScalingType}`
-        )
-      )
+      error(new Error(`Invalid scaling flag after changing flag. Flag: ${approvedScalingType}`))
       return
   }
   console.log('newDesired', newDesired)
@@ -307,8 +283,8 @@ function setDesireCount(count: number) {
   }
 }
 
-export function configUpdated(){
-  if(desiredCount < config.p2p.minNodes){
+export function configUpdated() {
+  if (desiredCount < config.p2p.minNodes) {
     desiredCount = config.p2p.minNodes
   }
 }
@@ -319,9 +295,7 @@ export function sendRequests() {}
 
 export function getTxs(): P2P.CycleAutoScaleTypes.Txs {
   // [IMPORTANT] Must return a copy to avoid mutation
-  const requestsCopy = deepmerge({}, [
-    ...Object.values(scalingRequestsCollector),
-  ])
+  const requestsCopy = deepmerge({}, [...Object.values(scalingRequestsCollector)])
   return {
     autoscaling: requestsCopy,
   }
@@ -349,7 +323,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   }
 }
 
-function getScaleUpRequests() : P2P.CycleAutoScaleTypes.SignedScaleRequest[] {
+function getScaleUpRequests(): P2P.CycleAutoScaleTypes.SignedScaleRequest[] {
   let requests = []
   for (let [nodeId, request] of scalingRequestsCollector) {
     if (request.scale === P2P.CycleAutoScaleTypes.ScaleType.UP) requests.push(request)
@@ -357,7 +331,7 @@ function getScaleUpRequests() : P2P.CycleAutoScaleTypes.SignedScaleRequest[] {
   return requests
 }
 
-function getScaleDownRequests() : P2P.CycleAutoScaleTypes.SignedScaleRequest[] {
+function getScaleDownRequests(): P2P.CycleAutoScaleTypes.SignedScaleRequest[] {
   let requests = []
   for (let [nodeId, request] of scalingRequestsCollector) {
     if (request.scale === P2P.CycleAutoScaleTypes.ScaleType.DOWN) requests.push(request)
@@ -365,8 +339,7 @@ function getScaleDownRequests() : P2P.CycleAutoScaleTypes.SignedScaleRequest[] {
   return requests
 }
 
-function _addToScalingRequests(scalingRequest) : boolean {
-
+function _addToScalingRequests(scalingRequest): boolean {
   switch (scalingRequest.scale) {
     case P2P.CycleAutoScaleTypes.ScaleType.UP:
       // This was blocking other votes from comming in.. need to check this in _requestNetworkScaling
@@ -404,16 +377,12 @@ function _addToScalingRequests(scalingRequest) : boolean {
       //_checkScaling() //Wait till later to calculate this.  Not for perf reasons, but to get the max possible votes considered
       return true
     default:
-      warn(
-        `Invalid scaling type in _addToScalingRequests(). Request: ${JSON.stringify(
-          scalingRequest
-        )}`
-      )
+      warn(`Invalid scaling type in _addToScalingRequests(). Request: ${JSON.stringify(scalingRequest)}`)
       return false
   }
 }
 
-function _addScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleRequest) : boolean {
+function _addScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleRequest): boolean {
   // Check existence of node
   if (!scalingRequest.nodeId) return false
 
@@ -440,8 +409,7 @@ async function _waitUntilEndOfCycle() {
   } else {
     timeToWait = 0
   }
-  if (logFlags.p2pNonFatal)
-    info(`Waiting for ${timeToWait} ms before next cycle marker creation...`)
+  if (logFlags.p2pNonFatal) info(`Waiting for ${timeToWait} ms before next cycle marker creation...`)
   await sleep(timeToWait)
 }
 

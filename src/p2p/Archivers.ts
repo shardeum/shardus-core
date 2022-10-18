@@ -31,7 +31,6 @@ let leaveRequests: P2P.ArchiversTypes.Request[]
 let receiptForwardInterval: Timeout | null = null
 export let connectedSockets = {}
 
-
 /** FUNCTIONS */
 
 /** CycleCreator Functions */
@@ -59,12 +58,10 @@ export function reset() {
 export function getTxs(): P2P.ArchiversTypes.Txs {
   // [IMPORTANT] Must return a copy to avoid mutation
   const requestsCopy = deepmerge({}, [...joinRequests, ...leaveRequests])
-  if(logFlags.console) console.log(
-    `getTxs: Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`,
-    {
+  if (logFlags.console)
+    console.log(`getTxs: Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`, {
       archivers: requestsCopy,
-    }
-  )
+    })
 
   return {
     archivers: requestsCopy,
@@ -97,30 +94,31 @@ export function updateRecord(txs: P2P.ArchiversTypes.Txs, record: P2P.CycleCreat
     .filter((request) => request.requestType === P2P.ArchiversTypes.RequestTypes.LEAVE)
     .map((leaveRequest) => leaveRequest.nodeInfo)
 
-    if(logFlags.console) console.log(
-    `Archiver before updating record: Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`,
-    joinedArchivers,
-    leavingArchivers
-  )
+  if (logFlags.console)
+    console.log(
+      `Archiver before updating record: Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`,
+      joinedArchivers,
+      leavingArchivers
+    )
 
   record.joinedArchivers = joinedArchivers.sort(
     (a: P2P.ArchiversTypes.JoinedArchiver, b: P2P.ArchiversTypes.JoinedArchiver) =>
       a.publicKey > b.publicKey ? 1 : -1
   )
-  record.leavingArchivers = leavingArchivers.sort((a: P2P.ArchiversTypes.JoinedArchiver, b: P2P.ArchiversTypes.JoinedArchiver) =>
-    a.publicKey > b.publicKey ? 1 : -1
+  record.leavingArchivers = leavingArchivers.sort(
+    (a: P2P.ArchiversTypes.JoinedArchiver, b: P2P.ArchiversTypes.JoinedArchiver) =>
+      a.publicKey > b.publicKey ? 1 : -1
   )
-  if(logFlags.console) console.log(
-    `Archiver after updating record: Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`,
-    record
-  )
+  if (logFlags.console)
+    console.log(
+      `Archiver after updating record: Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`,
+      record
+    )
 
   // resetLeaveRequests()
 }
 
-export function parseRecord(
-  record: P2P.CycleCreatorTypes.CycleRecord
-): P2P.CycleParserTypes.Change {
+export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   // Update our archivers list
   updateArchivers(record)
 
@@ -175,10 +173,11 @@ export function addJoinRequest(joinRequest, tracker?, gossip = true) {
     return false
   }
   joinRequests.push(joinRequest)
-  if(logFlags.console) console.log(
-    `Join request added in cycle ${CycleCreator.currentCycle}, quarter ${CycleCreator.currentQuarter}`,
-    joinRequest
-  )
+  if (logFlags.console)
+    console.log(
+      `Join request added in cycle ${CycleCreator.currentCycle}, quarter ${CycleCreator.currentQuarter}`,
+      joinRequest
+    )
   if (gossip === true) {
     Comms.sendGossip('joinarchiver', joinRequest, tracker, null, NodeList.byIdOrder, true)
   }
@@ -213,7 +212,7 @@ export function addLeaveRequest(request, tracker?, gossip = true) {
   }
 
   leaveRequests.push(request)
-  if(logFlags.console) console.log('adding leave requests', leaveRequests)
+  if (logFlags.console) console.log('adding leave requests', leaveRequests)
   if (gossip === true) {
     Comms.sendGossip('leavingarchiver', request, tracker, null, NodeList.byIdOrder, true)
   }
@@ -229,7 +228,7 @@ export function updateArchivers(record) {
   for (const nodeInfo of record.leavingArchivers) {
     archivers.delete(nodeInfo.publicKey)
     removeDataRecipient(nodeInfo.publicKey)
-    leaveRequests = leaveRequests.filter(request => request.nodeInfo.publicKey !== nodeInfo.publicKey)
+    leaveRequests = leaveRequests.filter((request) => request.nodeInfo.publicKey !== nodeInfo.publicKey)
   }
   for (const nodeInfo of record.joinedArchivers) {
     archivers.set(nodeInfo.publicKey, nodeInfo)
@@ -238,16 +237,18 @@ export function updateArchivers(record) {
 
 export function addDataRecipient(
   nodeInfo: P2P.ArchiversTypes.JoinedArchiver,
-  dataRequests: P2P.ArchiversTypes.DataRequest<P2P.CycleCreatorTypes.CycleRecord | P2P.SnapshotTypes.StateMetaData>[]
+  dataRequests: P2P.ArchiversTypes.DataRequest<
+    P2P.CycleCreatorTypes.CycleRecord | P2P.SnapshotTypes.StateMetaData
+  >[]
 ) {
-  if(logFlags.console) console.log('Adding data recipient..', arguments)
+  if (logFlags.console) console.log('Adding data recipient..', arguments)
   const recipient = {
     nodeInfo,
     // TODO: dataRequest should be an array
     dataRequests: dataRequests,
     curvePk: crypto.convertPublicKeyToCurve(nodeInfo.publicKey),
   }
-  if(logFlags.console) console.log('dataRequests: ', recipient.dataRequests)
+  if (logFlags.console) console.log('dataRequests: ', recipient.dataRequests)
   recipients.set(nodeInfo.publicKey, recipient)
 }
 
@@ -274,24 +275,17 @@ async function forwardReceipts() {
       recipient: publicKey,
     }
 
-    nestedCountersInstance.countEvent('Archiver','forwardReceipts', responses.RECEIPT.length ) 
+    nestedCountersInstance.countEvent('Archiver', 'forwardReceipts', responses.RECEIPT.length)
 
     // Tag dataResponse
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
-    if(logFlags.console) console.log('Sending receipts to archivers', taggedDataResponse)
+    if (logFlags.console) console.log('Sending receipts to archivers', taggedDataResponse)
     try {
       if (io.sockets.sockets[connectedSockets[publicKey]]) {
         if (logFlags.console)
-          console.log(
-            'forwarded Archiver',
-            recipient.nodeInfo.ip + ':' + recipient.nodeInfo.port
-          )
-        io.sockets.sockets[connectedSockets[publicKey]].emit(
-          'DATA',
-          taggedDataResponse
-        )
-      }
-      else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
+          console.log('forwarded Archiver', recipient.nodeInfo.ip + ':' + recipient.nodeInfo.port)
+        io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
+      } else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
     } catch (e) {
       error('Run into issue in forwarding receipts data', e)
     }
@@ -301,7 +295,6 @@ async function forwardReceipts() {
 
   profilerInstance.scopedProfileSectionEnd('forwardReceipts')
 }
-
 
 export async function forwardAccounts(accounts: any[]) {
   if (!config.p2p.experimentalSnapshot) return
@@ -322,10 +315,7 @@ export async function forwardAccounts(accounts: any[]) {
     if (logFlags.console) console.log('Sending accounts to archivers', taggedDataResponse)
     try {
       if (io.sockets.sockets[connectedSockets[publicKey]]) {
-        io.sockets.sockets[connectedSockets[publicKey]].emit(
-          'DATA',
-          taggedDataResponse
-        )
+        io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
         console.log(`forward Accounts Successfully`)
       }
     } catch (e) {
@@ -336,16 +326,16 @@ export async function forwardAccounts(accounts: any[]) {
 
 export function removeDataRecipient(publicKey) {
   if (recipients.has(publicKey)) {
-    if(logFlags.console) console.log('Removing data recipient', publicKey)
+    if (logFlags.console) console.log('Removing data recipient', publicKey)
     recipients.delete(publicKey)
   } else {
-    if(logFlags.console) console.log(`Data recipient ${publicKey} is already removed`)
+    if (logFlags.console) console.log(`Data recipient ${publicKey} is already removed`)
   }
 }
 
 export function sendData() {
-  if(logFlags.console) console.log('Recient List before sending data')
-  if(logFlags.console) console.log(recipients)
+  if (logFlags.console) console.log('Recient List before sending data')
+  if (logFlags.console) console.log(recipients)
   for (const [publicKey, recipient] of recipients) {
     // const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
     const responses: P2P.ArchiversTypes.DataResponse['responses'] = {}
@@ -354,7 +344,9 @@ export function sendData() {
       switch (request.type) {
         case P2P.SnapshotTypes.TypeNames.CYCLE: {
           // Identify request type
-          const typedRequest = request as P2P.ArchiversTypes.DataRequest<P2P.SnapshotTypes.NamesToTypes['CYCLE']>
+          const typedRequest = request as P2P.ArchiversTypes.DataRequest<
+            P2P.SnapshotTypes.NamesToTypes['CYCLE']
+          >
           // Get latest cycles since lastData
           const cycleRecords = getCycleChain(typedRequest.lastData + 1)
           const cyclesWithMarker = []
@@ -366,8 +358,7 @@ export function sendData() {
           }
           // Update lastData
           if (cyclesWithMarker.length > 0) {
-            typedRequest.lastData =
-              cyclesWithMarker[cyclesWithMarker.length - 1].counter
+            typedRequest.lastData = cyclesWithMarker[cyclesWithMarker.length - 1].counter
           }
           // Add to responses
           responses.CYCLE = cyclesWithMarker
@@ -378,7 +369,7 @@ export function sendData() {
           const typedRequest = request as P2P.ArchiversTypes.DataRequest<
             P2P.SnapshotTypes.NamesToTypes['STATE_METADATA']
           >
-          if(logFlags.console) console.log('STATE_METADATA typedRequest', typedRequest)
+          if (logFlags.console) console.log('STATE_METADATA typedRequest', typedRequest)
           // Get latest state hash data since lastData
           const stateHashes = getStateHashes(typedRequest.lastData + 1)
           const receiptHashes = getReceiptHashes(typedRequest.lastData + 1)
@@ -423,10 +414,7 @@ export function sendData() {
     try {
       // console.log('connected socketes', publicKey, connectedSockets)
       if (io.sockets.sockets[connectedSockets[publicKey]])
-        io.sockets.sockets[connectedSockets[publicKey]].emit(
-          'DATA',
-          taggedDataResponse
-        )
+        io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
       else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
     } catch (e) {
       error('Run into issue in forwarding cycles data', e)
@@ -484,12 +472,12 @@ export function registerRoutes() {
     }
 
     const joinRequest = req.body
-    if(logFlags.p2pNonFatal) info(`Archiver join request received: ${JSON.stringify(joinRequest)}`)
+    if (logFlags.p2pNonFatal) info(`Archiver join request received: ${JSON.stringify(joinRequest)}`)
     res.json({ success: true })
 
     const accepted = await addJoinRequest(joinRequest)
     if (!accepted) return warn('Archiver join request not accepted.')
-    if(logFlags.p2pNonFatal) info('Archiver join request accepted!')
+    if (logFlags.p2pNonFatal) info('Archiver join request accepted!')
   })
 
   network.registerExternalPost('leavingarchivers', async (req, res) => {
@@ -500,62 +488,56 @@ export function registerRoutes() {
     }
 
     const leaveRequest = req.body
-    if(logFlags.p2pNonFatal) info(`Archiver leave request received: ${JSON.stringify(leaveRequest)}`)
+    if (logFlags.p2pNonFatal) info(`Archiver leave request received: ${JSON.stringify(leaveRequest)}`)
     res.json({ success: true })
 
     const accepted = await addLeaveRequest(leaveRequest)
     if (!accepted) return warn('Archiver leave request not accepted.')
-    if(logFlags.p2pNonFatal) info('Archiver leave request accepted!')
+    if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')
   })
-  Comms.registerGossipHandler(
-    'joinarchiver',
-    async (payload, sender, tracker) => {
-      profilerInstance.scopedProfileSectionStart('joinarchiver')
-      try {
-        if(logFlags.console) console.log('Join request gossip received:', payload)
-        const existingJoinRequest = joinRequests.find(
-          (j) => j.nodeInfo.publicKey === payload.nodeInfo.publicKey
-        )
-        if (!existingJoinRequest) {
-          const accepted = await addJoinRequest(payload, tracker, false)
-          if(logFlags.console) {
-            console.log('This join request is new. Should forward the join request')
-            console.log('join request gossip accepted', accepted)
-          }
-          if (!accepted) return warn('Archiver join request not accepted.')
-          if(logFlags.p2pNonFatal) info('Archiver join request accepted!')
-          Comms.sendGossip('joinarchiver', payload, tracker, sender, NodeList.byIdOrder, false)
-        } else {
-          if(logFlags.console) console.log('Already received archiver join gossip for this node')
+  Comms.registerGossipHandler('joinarchiver', async (payload, sender, tracker) => {
+    profilerInstance.scopedProfileSectionStart('joinarchiver')
+    try {
+      if (logFlags.console) console.log('Join request gossip received:', payload)
+      const existingJoinRequest = joinRequests.find(
+        (j) => j.nodeInfo.publicKey === payload.nodeInfo.publicKey
+      )
+      if (!existingJoinRequest) {
+        const accepted = await addJoinRequest(payload, tracker, false)
+        if (logFlags.console) {
+          console.log('This join request is new. Should forward the join request')
+          console.log('join request gossip accepted', accepted)
         }
-      } finally {
-        profilerInstance.scopedProfileSectionEnd('joinarchiver')
+        if (!accepted) return warn('Archiver join request not accepted.')
+        if (logFlags.p2pNonFatal) info('Archiver join request accepted!')
+        Comms.sendGossip('joinarchiver', payload, tracker, sender, NodeList.byIdOrder, false)
+      } else {
+        if (logFlags.console) console.log('Already received archiver join gossip for this node')
       }
+    } finally {
+      profilerInstance.scopedProfileSectionEnd('joinarchiver')
     }
-  )
+  })
 
-  Comms.registerGossipHandler(
-    'leavingarchiver',
-    async (payload, sender, tracker) => {
-      profilerInstance.scopedProfileSectionStart('leavingarchiver')
-      try {
-        if(logFlags.console) console.log('Leave request gossip received:', payload)
-        const existingLeaveRequest = leaveRequests.find(
-          (j) => j.nodeInfo.publicKey === payload.nodeInfo.publicKey
-        )
-        if (!existingLeaveRequest) {
-          const accepted = await addLeaveRequest(payload, tracker, false)
-          if (!accepted) return warn('Archiver leave request not accepted.')
-          if(logFlags.p2pNonFatal) info('Archiver leave request accepted!')
-          Comms.sendGossip('leavingarchiver', payload, tracker, sender, NodeList.byIdOrder, false)
-        } else {
-          if(logFlags.console) console.log('Already received archiver leave gossip for this node')
-        }
-      } finally {
-        profilerInstance.scopedProfileSectionEnd('leavingarchiver')
+  Comms.registerGossipHandler('leavingarchiver', async (payload, sender, tracker) => {
+    profilerInstance.scopedProfileSectionStart('leavingarchiver')
+    try {
+      if (logFlags.console) console.log('Leave request gossip received:', payload)
+      const existingLeaveRequest = leaveRequests.find(
+        (j) => j.nodeInfo.publicKey === payload.nodeInfo.publicKey
+      )
+      if (!existingLeaveRequest) {
+        const accepted = await addLeaveRequest(payload, tracker, false)
+        if (!accepted) return warn('Archiver leave request not accepted.')
+        if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')
+        Comms.sendGossip('leavingarchiver', payload, tracker, sender, NodeList.byIdOrder, false)
+      } else {
+        if (logFlags.console) console.log('Already received archiver leave gossip for this node')
       }
+    } finally {
+      profilerInstance.scopedProfileSectionEnd('leavingarchiver')
     }
-  )
+  })
 
   network.registerExternalPost('requestdata', (req, res) => {
     let err = validateTypes(req, { body: 'o' })
@@ -564,7 +546,7 @@ export function registerRoutes() {
       return res.json({ success: false, error: err })
     }
     err = validateTypes(req.body, {
-      tag: 's'
+      tag: 's',
     })
     if (err) {
       warn(`requestdata: bad req.body ${err}`)
@@ -572,7 +554,7 @@ export function registerRoutes() {
     }
 
     const dataRequest = req.body
-    if(logFlags.p2pNonFatal) info('dataRequest received', JSON.stringify(dataRequest))
+    if (logFlags.p2pNonFatal) info('dataRequest received', JSON.stringify(dataRequest))
 
     const foundArchiver = archivers.get(dataRequest.publicKey)
 
@@ -628,7 +610,7 @@ export function registerRoutes() {
     // [TODO] Authenticate tag
 
     const queryRequest = req.body
-    if(logFlags.p2pNonFatal) info('queryRequest received', JSON.stringify(queryRequest))
+    if (logFlags.p2pNonFatal) info('queryRequest received', JSON.stringify(queryRequest))
 
     const foundArchiver = archivers.get(queryRequest.publicKey)
     if (!foundArchiver) {
@@ -638,7 +620,11 @@ export function registerRoutes() {
     }
     delete queryRequest.publicKey
     delete queryRequest.tag
-    let data : { [key: number]: StateManager.StateManagerTypes.ReceiptMapResult[] | StateManager.StateManagerTypes.StatsClump }
+    let data: {
+      [key: number]:
+        | StateManager.StateManagerTypes.ReceiptMapResult[]
+        | StateManager.StateManagerTypes.StatsClump
+    }
     if (queryRequest.type === 'RECEIPT_MAP') {
       data = getReceiptMap(queryRequest.lastData)
     } else if (queryRequest.type === 'SUMMARY_BLOB') {

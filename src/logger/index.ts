@@ -79,7 +79,7 @@ export type LogFlags = {
   // playback:boolean;
   // playback_verbose:boolean
 
-  p2pNonFatal:boolean;
+  p2pNonFatal: boolean
   // //p2p_info:boolean;
 
   // snapshot:boolean;
@@ -105,22 +105,20 @@ export let logFlags: LogFlags = {
   // playback:true,
   // playback_verbose:true,
 
-  p2pNonFatal:true,
+  p2pNonFatal: true,
 
   // snapshot:true,
-} 
-
+}
 
 class Logger {
   backupLogFlags: LogFlags
 
-  constructor(baseDir: string, config: Shardus.StrictLogsConfiguration, dynamicLogMode:string) {
+  constructor(baseDir: string, config: Shardus.StrictLogsConfiguration, dynamicLogMode: string) {
     this.baseDir = baseDir
     this.config = config
     this.logDir = null
     this.log4Conf = null
     this._setupLogs(dynamicLogMode)
-
   }
 
   // Checks if the configuration has the required components
@@ -151,7 +149,7 @@ class Logger {
   }
 
   // Setup the logs with the provided configuration using the base directory provided for relative paths
-  _setupLogs(dynamicLogMode:string) {
+  _setupLogs(dynamicLogMode: string) {
     const baseDir = this.baseDir
     const config = this.config
 
@@ -174,14 +172,13 @@ class Logger {
 
     this.setupLogControlValues()
 
-    if(dynamicLogMode.toLowerCase() === 'fatal' || dynamicLogMode.toLowerCase() === 'fatals'){
+    if (dynamicLogMode.toLowerCase() === 'fatal' || dynamicLogMode.toLowerCase() === 'fatals') {
       console.log('startInFatalsLogMode=true!')
       this.setFatalFlags()
-    } else if(dynamicLogMode.toLowerCase() === 'error' || dynamicLogMode.toLowerCase() === 'errors'){
+    } else if (dynamicLogMode.toLowerCase() === 'error' || dynamicLogMode.toLowerCase() === 'errors') {
       console.log('startInErrorLogMode=true!')
       this.setErrorFlags()
     }
-    
 
     this._seenAddresses = {}
     this._shortStrings = {}
@@ -203,21 +200,14 @@ class Logger {
 
   setPlaybackIPInfo(ipInfo) {
     this._playbackIPInfo = ipInfo
-    let newName =
-      'temp_' +
-      this._playbackOwner_host +
-      ':' +
-      this._playbackIPInfo.externalPort
+    let newName = 'temp_' + this._playbackOwner_host + ':' + this._playbackIPInfo.externalPort
     this.playbackLogNote('logHostNameUpdate', '', { newName })
     this._playbackOwner = newName
   }
 
   setPlaybackID(nodeID) {
     this._playbackNodeID = nodeID
-    let newName =
-      utils.makeShortHash(this._playbackNodeID) +
-      ':' +
-      this._playbackIPInfo.externalPort
+    let newName = utils.makeShortHash(this._playbackNodeID) + ':' + this._playbackIPInfo.externalPort
     this.playbackLogNote('logHostNameUpdate', '', {
       newName,
       nodeID: nodeID + ' ',
@@ -264,7 +254,7 @@ class Logger {
   playbackLog(from, to, type, endpoint, id, desc) {
     if (!logFlags.playback) {
       return
-    }   
+    }
 
     nestedCountersInstance.countEvent(type, endpoint)
 
@@ -299,17 +289,16 @@ class Logger {
     this.playbackLog('', '', 'Note', noteCategory, id, desc)
   }
 
+  setFatalFlags() {
+    for (const [key, value] of Object.entries(logFlags)) {
+      logFlags[key] = false
+    }
+    logFlags.fatal = true
 
-  setFatalFlags(){
-      for (const [key, value] of Object.entries(logFlags)) {
-        logFlags[key] = false
-      }
-      logFlags.fatal = true
-
-      logFlags.playback = false
+    logFlags.playback = false
   }
 
-  setErrorFlags(){
+  setErrorFlags() {
     for (const [key, value] of Object.entries(logFlags)) {
       logFlags[key] = false
     }
@@ -317,9 +306,9 @@ class Logger {
     logFlags.error = true
 
     logFlags.playback = false
-}
+  }
 
-  setDefaultFlags(){
+  setDefaultFlags() {
     for (const [key, value] of Object.entries(logFlags)) {
       logFlags[key] = this.backupLogFlags[key]
     }
@@ -330,7 +319,6 @@ class Logger {
       logFlags.playback = false
     }
   }
-
 
   registerEndpoints(Context) {
     Context.network.registerExternalGet('log-fatal', isDebugModeMiddleware, (req, res) => {
@@ -351,35 +339,34 @@ class Logger {
       this.setDefaultFlags()
       for (const [key, value] of Object.entries(logFlags)) {
         res.write(`${key}: ${value}\n`)
-      }      
+      }
       res.end()
     })
-
 
     // DO NOT USE IN LIVE NETWORK
     Context.network.registerExternalGet('log-default-all', isDebugModeMiddleware, (req, res) => {
       this.setDefaultFlags()
 
-      try{
+      try {
         let activeNodes = Context.p2p.state.getNodes()
-        if(activeNodes){
-          for(let node of activeNodes.values()){
+        if (activeNodes) {
+          for (let node of activeNodes.values()) {
             this._internalHackGet(`${node.externalIp}:${node.externalPort}/log-default`)
             res.write(`${node.externalIp}:${node.externalPort}/log-default\n`)
-          }        
+          }
         }
-        res.write(`joining nodes...\n`)  
+        res.write(`joining nodes...\n`)
         let joiningNodes = Context.p2p.state.getNodesRequestingJoin()
-        if(joiningNodes){
-          for(let node of joiningNodes.values()){
+        if (joiningNodes) {
+          for (let node of joiningNodes.values()) {
             this._internalHackGet(`${node.externalIp}:${node.externalPort}/log-default`)
             res.write(`${node.externalIp}:${node.externalPort}/log-default\n`)
-          }        
+          }
         }
 
-        res.write(`sending default logs to all nodes\n`)        
-      } catch(e){
-        res.write(`${e}\n`) 
+        res.write(`sending default logs to all nodes\n`)
+      } catch (e) {
+        res.write(`${e}\n`)
       }
 
       res.end()
@@ -388,77 +375,71 @@ class Logger {
     // DO NOT USE IN LIVE NETWORK
     Context.network.registerExternalGet('log-fatal-all', isDebugModeMiddleware, (req, res) => {
       this.setFatalFlags()
-      try{
+      try {
         let activeNodes = Context.p2p.state.getNodes()
-        if(activeNodes){
-          for(let node of activeNodes.values()){
+        if (activeNodes) {
+          for (let node of activeNodes.values()) {
             this._internalHackGet(`${node.externalIp}:${node.externalPort}/log-fatal`)
             res.write(`${node.externalIp}:${node.externalPort}/log-fatal\n`)
-          }        
+          }
         }
-        res.write(`joining nodes...\n`)  
+        res.write(`joining nodes...\n`)
         let joiningNodes = Context.p2p.state.getNodesRequestingJoin()
-        if(joiningNodes){
-          for(let node of joiningNodes.values()){
+        if (joiningNodes) {
+          for (let node of joiningNodes.values()) {
             this._internalHackGet(`${node.externalIp}:${node.externalPort}/log-fatal`)
             res.write(`${node.externalIp}:${node.externalPort}/log-fatal\n`)
-          }  
+          }
         }
-        res.write(`sending fatal logs to all nodes\n`)   
-      } catch(e){
-        res.write(`${e}\n`) 
+        res.write(`sending fatal logs to all nodes\n`)
+      } catch (e) {
+        res.write(`${e}\n`)
       }
       res.end()
-    })    
-
+    })
   }
 
   _containsProtocol(url: string) {
     if (!url.match('https?://*')) return false
     return true
   }
-  
+
   _normalizeUrl(url: string) {
     let normalized = url
     if (!this._containsProtocol(url)) normalized = 'http://' + url
     return normalized
   }
-  async _internalHackGet(url:string){
+  async _internalHackGet(url: string) {
     let normalized = this._normalizeUrl(url)
     let host = parseUrl(normalized, true)
-    try{
+    try {
       await got.get(host, {
-        timeout: 1000,   
-        retry: 0,  
+        timeout: 1000,
+        retry: 0,
         throwHttpErrors: false,
         //parseJson: (text:string)=>{},
         //json: false, // the whole reason for _internalHackGet was because we dont want the text response to mess things up
-                     //  and as a debug non shipping endpoint did not want to add optional parameters to http module
-      })   
-      
-    } catch(e) {
-
-    }
-
+        //  and as a debug non shipping endpoint did not want to add optional parameters to http module
+      })
+    } catch (e) {}
   }
-  async _internalHackGetWithResp(url:string){
+  async _internalHackGetWithResp(url: string) {
     let normalized = this._normalizeUrl(url)
     let host = parseUrl(normalized, true)
-    try{
+    try {
       const res = await got.get(host, {
-        timeout: 7000,   
-        retry: 0,  
+        timeout: 7000,
+        retry: 0,
         throwHttpErrors: false,
         //parseJson: (text:string)=>{},
         //json: false, // the whole reason for _internalHackGet was because we dont want the text response to mess things up
-                     //  and as a debug non shipping endpoint did not want to add optional parameters to http module
-      })   
-      
+        //  and as a debug non shipping endpoint did not want to add optional parameters to http module
+      })
+
       return res
-    } catch(e) {
+    } catch (e) {
       return null
     }
-
   }
 
   setupLogControlValues() {
@@ -466,29 +447,29 @@ class Logger {
 
     let mainLogger = this.getLogger('main')
     // @ts-ignore
-    if (mainLogger && ['TRACE','trace'].includes(mainLogger.level.levelStr)) {
+    if (mainLogger && ['TRACE', 'trace'].includes(mainLogger.level.levelStr)) {
       logFlags.verbose = true
       logFlags.debug = true
       logFlags.info = true
       logFlags.error = true
       // @ts-ignore
-    } else if (mainLogger && ['DEBUG','debug'].includes(mainLogger.level.levelStr)) {
+    } else if (mainLogger && ['DEBUG', 'debug'].includes(mainLogger.level.levelStr)) {
       logFlags.verbose = false
       logFlags.debug = true
       logFlags.info = true
       logFlags.error = true
       // @ts-ignore
-    } else if (mainLogger && ['INFO','info'].includes(mainLogger.level.levelStr)) {
+    } else if (mainLogger && ['INFO', 'info'].includes(mainLogger.level.levelStr)) {
       logFlags.verbose = false
       logFlags.debug = false
       logFlags.info = true
       logFlags.error = true
       // @ts-ignore
-    } else if (mainLogger && ['ERROR','error','WARN','warn'].includes(mainLogger.level.levelStr)) {
+    } else if (mainLogger && ['ERROR', 'error', 'WARN', 'warn'].includes(mainLogger.level.levelStr)) {
       logFlags.verbose = false
       logFlags.debug = false
       logFlags.info = true
-      logFlags.error = true     
+      logFlags.error = true
     } else {
       logFlags.verbose = false
       logFlags.debug = false
@@ -499,7 +480,7 @@ class Logger {
 
     let playbackLogger = this.getLogger('playback')
     logFlags.playback = false
-    if(playbackLogger){
+    if (playbackLogger) {
       // @ts-ignore
       logFlags.playback_trace = ['TRACE'].includes(playbackLogger.level.levelStr)
       // @ts-ignore
@@ -508,18 +489,18 @@ class Logger {
         logFlags.playback = true
       } else {
         logFlags.playback = false
-      }  
+      }
     }
-  
+
     let netLogger = this.getLogger('net')
     // @ts-ignore
-    if (netLogger && ['TRACE','trace'].includes(netLogger.level.levelStr)) {
+    if (netLogger && ['TRACE', 'trace'].includes(netLogger.level.levelStr)) {
       logFlags.net_trace = true
     }
 
     let p2pLogger = this.getLogger('p2p')
     // @ts-ignore
-    if (p2pLogger && ['FATAL','fatal'].includes(netLogger.level.levelStr)) {
+    if (p2pLogger && ['FATAL', 'fatal'].includes(netLogger.level.levelStr)) {
       logFlags.p2pNonFatal = false
     } else {
       logFlags.p2pNonFatal = true

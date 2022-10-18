@@ -8,8 +8,8 @@ const accountsCopy = [
     data: { type: Sequelize.JSON, allowNull: false },
     timestamp: { type: Sequelize.BIGINT, allowNull: false },
     hash: { type: Sequelize.STRING, allowNull: false },
-    isGlobal: { type: Sequelize.BOOLEAN, allowNull: false }
-  }
+    isGlobal: { type: Sequelize.BOOLEAN, allowNull: false },
+  },
 ]
 
 export default accountsCopy

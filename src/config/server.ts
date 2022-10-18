@@ -9,24 +9,17 @@ const SERVER_CONFIG: StrictServerConfiguration = {
   },
   p2p: {
     ipServer: 'api.ipify.org/?format=json',
-    timeServers: [
-      '0.pool.ntp.org',
-      '1.pool.ntp.org',
-      '2.pool.ntp.org',
-      '3.pool.ntp.org',
-    ],
+    timeServers: ['0.pool.ntp.org', '1.pool.ntp.org', '2.pool.ntp.org', '3.pool.ntp.org'],
     existingArchivers: [
       {
         ip: '127.0.0.1',
         port: 4000,
-        publicKey:
-          '758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3',
+        publicKey: '758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3',
       },
       {
         ip: '127.0.0.1',
         port: 4001,
-        publicKey:
-          'e4b5e3d51e727f897786a1bb176a028ecfe1941bfa5beefd3c6209c3dbc07cf7',
+        publicKey: 'e4b5e3d51e727f897786a1bb176a028ecfe1941bfa5beefd3c6209c3dbc07cf7',
       },
     ],
     syncLimit: 180,
@@ -124,11 +117,11 @@ const SERVER_CONFIG: StrictServerConfiguration = {
       executeQueueLength: 0.2,
     },
   },
-  stateManager: { 
-    stateTableBucketSize: 500, 
+  stateManager: {
+    stateTableBucketSize: 500,
     accountBucketSize: 200,
     patcherAccountsPerRequest: 250,
-    patcherAccountsPerUpdate: 2500, 
+    patcherAccountsPerUpdate: 2500,
     patcherMaxHashesPerRequest: 300,
     patcherMaxLeafHashesPerRequest: 300,
     patcherMaxChildHashResponses: 2000,

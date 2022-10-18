@@ -5,7 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import * as Sequelize from 'sequelize'
 import * as utils from '../utils'
-import Logger, {logFlags} from '../logger'
+import Logger, { logFlags } from '../logger'
 
 const Op = Sequelize.Op
 var Sqlite3 = require('better-sqlite3')
@@ -32,10 +32,7 @@ class BetterSqlite3Storage {
   ) {
     this.baseDir = baseDir
     this.storageConfig = storageConfig
-    this.storageConfig.options.storage = path.join(
-      this.baseDir,
-      this.storageConfig.options.storage
-    )
+    this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
     this.profiler = profiler
     // Setup logger
     this.mainLogger = logger.getLogger('main')
@@ -190,9 +187,7 @@ class BetterSqlite3Storage {
 
     let paramsArray = this.params2Array(params, table)
 
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
-      paramsArray
-    )
+    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(paramsArray)
 
     let valueArray = whereValueArray
     queryString += whereString
@@ -218,16 +213,12 @@ class BetterSqlite3Storage {
     let queryString = table.updateString
 
     let valueParams = this.params2Array(values, table)
-    let { resultString, valueArray } = this.paramsToAssignmentStringAndValues(
-      valueParams
-    )
+    let { resultString, valueArray } = this.paramsToAssignmentStringAndValues(valueParams)
 
     queryString += resultString
 
     let whereParams = this.params2Array(where, table)
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
-      whereParams
-    )
+    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(whereParams)
     queryString += whereString
 
     valueArray = valueArray.concat(whereValueArray)
@@ -246,9 +237,7 @@ class BetterSqlite3Storage {
     let queryString = table.deleteString
 
     let whereParams = this.params2Array(where, table)
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
-      whereParams
-    )
+    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(whereParams)
     let valueArray = whereValueArray
     queryString += whereString
     queryString += this.options2string(opts)
@@ -429,7 +418,7 @@ class BetterSqlite3Storage {
 // From: https://stackoverflow.com/a/21196961
 async function _ensureExists(dir) {
   return new Promise<void>((resolve, reject) => {
-    fs.mkdir(dir, { recursive: true }, err => {
+    fs.mkdir(dir, { recursive: true }, (err) => {
       if (err) {
         // Ignore err if folder exists
         if (err.code === 'EEXIST') resolve()

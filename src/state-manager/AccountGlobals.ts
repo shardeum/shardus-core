@@ -6,7 +6,7 @@ import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profile
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
-import Logger, {logFlags} from '../logger'
+import Logger, { logFlags } from '../logger'
 import ShardFunctions from './shardFunctions'
 import { time } from 'console'
 import StateManager from '.'
@@ -52,7 +52,6 @@ class AccountGlobals {
     crypto: Crypto,
     config: Shardus.StrictServerConfiguration
   ) {
-
     this.crypto = crypto
     this.app = app
     this.logger = logger
@@ -75,109 +74,129 @@ class AccountGlobals {
   }
 
   setupHandlers() {
-    this.p2p.registerInternal('get_globalaccountreport', async (payload: any, respond: (arg0: GlobalAccountReportResp) => any, sender, tracker: string, msgSize: number) => {
-      this.profiler.scopedProfileSectionStart('get_globalaccountreport', false, msgSize)
-      let responseSize = cUninitializedSize
-      try {
-        let result = { combinedHash: '', accounts: [], ready: this.stateManager.appFinishedSyncing } as GlobalAccountReportResp
-
-        let globalAccountKeys = this.globalAccountSet.keys()
-
-        let toQuery: string[] = []
-
-        let responded = false
-        console.log('Running get_globalaccountreport', this.stateManager.accountSync.globalAccountsSynced, this.stateManager.appFinishedSyncing)
-        console.log('Running get_globalaccountreport result', result)
-        // not ready
-        if (this.stateManager.accountSync.globalAccountsSynced === false || this.stateManager.appFinishedSyncing === false) {
-          result.ready = false
-          await respond(result)
-          responded = true
-
-          //should just return here, but I want coutners below to help verify the fix! 20210624
-          //return
-        }
-
-        //TODO: Perf  could do things faster by pulling from cache, but would need extra testing:
-        // let notInCache:string[]
-        // for(let key of globalAccountKeys){
-        //   let report
-        //   if(this.globalAccountRepairBank.has(key)){
-        //     let accountCopyList = this.globalAccountRepairBank.get(key)
-        //     let newestCopy = accountCopyList[accountCopyList.length-1]
-        //     report = {id:key, hash:newestCopy.hash, timestamp:newestCopy.timestamp }
-        //   } else{
-        //     notInCache.push(key)
-        //   }
-        //   result.accounts.push(report)
-        // }
-        for (let key of globalAccountKeys) {
-          toQuery.push(key)
-        }
-
-        // I Think this section can be depricated.  The appFinishedSyncing check above should be enough to bail when it is appropriate
-        // const useGlobalAccount = true
-        // if (this.p2p.isFirstSeed && useGlobalAccount) {
-        //   //TODO: SOON this will mess up dapps that dont use global accounts.  update: maybe add a config to specify if there will be no global accounts for a network. pls discuss fix with group.
-        //   if(toQuery.length === 0 && this.stateManager.appFinishedSyncing === false){
-        //     nestedCountersInstance.countEvent(`sync`, `HACKFIX - first node needs to wait! ready:${result.ready} responded:${responded}`)
-        //     result.ready = false
-        //     if(responded === false){
-        //       this.statemanager_fatal('get_globalaccountreport -first seed has no globals', `get_globalaccountreport -first seed has no globals. ready:${result.ready} responded:${responded}`)
-        //       await respond(result)
-        //     }
-        //     return
-        //   }
-        // }
-
-        if(result.ready === false){
-          nestedCountersInstance.countEvent(`sync`, `HACKFIX - forgot to return!`)
-          return
-        }
-
-        let accountData: Shardus.WrappedData[]
-        let ourLockID = -1
+    this.p2p.registerInternal(
+      'get_globalaccountreport',
+      async (
+        payload: any,
+        respond: (arg0: GlobalAccountReportResp) => any,
+        sender,
+        tracker: string,
+        msgSize: number
+      ) => {
+        this.profiler.scopedProfileSectionStart('get_globalaccountreport', false, msgSize)
+        let responseSize = cUninitializedSize
         try {
-          ourLockID = await this.stateManager.fifoLock('accountModification')
-          // TODO: if we have more than 900 keys to query in this list must split this into multiple queries!.. ok technically this will not impact liberdus but it could impact
-          //       a dapp that uses sqlite
-          accountData = await this.app.getAccountDataByList(toQuery)
-        } finally {
-          this.stateManager.fifoUnlock('accountModification', ourLockID)
-        }
-        if (accountData != null) {
-          for (let wrappedAccount of accountData) {
-            // let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
-            // wrappedAccountInQueueRef.seenInQueue = false
-            // if (this.lastSeenAccountsMap != null) {
-            //   let queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
-            //   if (queueEntry != null) {
-            //     wrappedAccountInQueueRef.seenInQueue = true
-            //   }
-            // }
-            let report = { id: wrappedAccount.accountId, hash: wrappedAccount.stateId, timestamp: wrappedAccount.timestamp }
-            result.accounts.push(report)
+          let result = {
+            combinedHash: '',
+            accounts: [],
+            ready: this.stateManager.appFinishedSyncing,
+          } as GlobalAccountReportResp
+
+          let globalAccountKeys = this.globalAccountSet.keys()
+
+          let toQuery: string[] = []
+
+          let responded = false
+          console.log(
+            'Running get_globalaccountreport',
+            this.stateManager.accountSync.globalAccountsSynced,
+            this.stateManager.appFinishedSyncing
+          )
+          console.log('Running get_globalaccountreport result', result)
+          // not ready
+          if (
+            this.stateManager.accountSync.globalAccountsSynced === false ||
+            this.stateManager.appFinishedSyncing === false
+          ) {
+            result.ready = false
+            await respond(result)
+            responded = true
+
+            //should just return here, but I want coutners below to help verify the fix! 20210624
+            //return
           }
+
+          //TODO: Perf  could do things faster by pulling from cache, but would need extra testing:
+          // let notInCache:string[]
+          // for(let key of globalAccountKeys){
+          //   let report
+          //   if(this.globalAccountRepairBank.has(key)){
+          //     let accountCopyList = this.globalAccountRepairBank.get(key)
+          //     let newestCopy = accountCopyList[accountCopyList.length-1]
+          //     report = {id:key, hash:newestCopy.hash, timestamp:newestCopy.timestamp }
+          //   } else{
+          //     notInCache.push(key)
+          //   }
+          //   result.accounts.push(report)
+          // }
+          for (let key of globalAccountKeys) {
+            toQuery.push(key)
+          }
+
+          // I Think this section can be depricated.  The appFinishedSyncing check above should be enough to bail when it is appropriate
+          // const useGlobalAccount = true
+          // if (this.p2p.isFirstSeed && useGlobalAccount) {
+          //   //TODO: SOON this will mess up dapps that dont use global accounts.  update: maybe add a config to specify if there will be no global accounts for a network. pls discuss fix with group.
+          //   if(toQuery.length === 0 && this.stateManager.appFinishedSyncing === false){
+          //     /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `HACKFIX - first node needs to wait! ready:${result.ready} responded:${responded}`)
+          //     result.ready = false
+          //     if(responded === false){
+          //       this.statemanager_fatal('get_globalaccountreport -first seed has no globals', `get_globalaccountreport -first seed has no globals. ready:${result.ready} responded:${responded}`)
+          //       await respond(result)
+          //     }
+          //     return
+          //   }
+          // }
+
+          if (result.ready === false) {
+            nestedCountersInstance.countEvent(`sync`, `HACKFIX - forgot to return!`)
+            return
+          }
+
+          let accountData: Shardus.WrappedData[]
+          let ourLockID = -1
+          try {
+            ourLockID = await this.stateManager.fifoLock('accountModification')
+            // TODO: if we have more than 900 keys to query in this list must split this into multiple queries!.. ok technically this will not impact liberdus but it could impact
+            //       a dapp that uses sqlite
+            accountData = await this.app.getAccountDataByList(toQuery)
+          } finally {
+            this.stateManager.fifoUnlock('accountModification', ourLockID)
+          }
+          if (accountData != null) {
+            for (let wrappedAccount of accountData) {
+              // let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
+              // wrappedAccountInQueueRef.seenInQueue = false
+              // if (this.lastSeenAccountsMap != null) {
+              //   let queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
+              //   if (queueEntry != null) {
+              //     wrappedAccountInQueueRef.seenInQueue = true
+              //   }
+              // }
+              let report = {
+                id: wrappedAccount.accountId,
+                hash: wrappedAccount.stateId,
+                timestamp: wrappedAccount.timestamp,
+              }
+              result.accounts.push(report)
+            }
+          }
+          //TODO: SOON. PERF Disiable this in production or performance testing. (we need a global flag to specify if it is a release or debug build, could then implement this, along with turning off debug endpoints)
+          this.stateManager.testAccountDataWrapped(accountData)
+
+          result.accounts.sort(utils.sort_id_Asc)
+          result.combinedHash = this.crypto.hash(result)
+          responseSize = await respond(result)
+        } finally {
+          this.profiler.scopedProfileSectionEnd('get_globalaccountreport', responseSize)
         }
-        //TODO: SOON. PERF Disiable this in production or performance testing. (we need a global flag to specify if it is a release or debug build, could then implement this, along with turning off debug endpoints)
-        this.stateManager.testAccountDataWrapped(accountData)
-
-        result.accounts.sort(utils.sort_id_Asc)
-        result.combinedHash = this.crypto.hash(result)
-        responseSize = await respond(result)
-      } finally {
-        this.profiler.scopedProfileSectionEnd('get_globalaccountreport', responseSize)
       }
-    })
+    )
   }
-
-
 
   // sortByTimestamp(a: any, b: any): number {
   //   return utils.sortAscProp(a, b, 'timestamp')
   // }
-
-
 
   /**
    * isGlobalAccount
@@ -214,12 +233,15 @@ class AccountGlobals {
       //set this as a known global
       this.globalAccountSet.add(report.id)
     }
-    if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getGlobalListEarly: ${utils.stringifyReduce(temp)}`)
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getGlobalListEarly: ${utils.stringifyReduce(temp)}`)
 
     this.hasknownGlobals = true
   }
 
-  getGlobalDebugReport() : {globalAccountSummary:{id:string, state:string, ts:number}[], globalStateHash:string} {
+  getGlobalDebugReport(): {
+    globalAccountSummary: { id: string; state: string; ts: number }[]
+    globalStateHash: string
+  } {
     let globalAccountSummary = []
     for (let globalID in this.globalAccountSet.keys()) {
       let accountHash = this.stateManager.accountCache.getAccountHash(globalID)
@@ -227,7 +249,7 @@ class AccountGlobals {
       globalAccountSummary.push(summaryObj)
     }
     let globalStateHash = this.crypto.hash(globalAccountSummary)
-    return {globalAccountSummary, globalStateHash}
+    return { globalAccountSummary, globalStateHash }
   }
 }
 

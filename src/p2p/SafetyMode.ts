@@ -94,10 +94,10 @@ export function updateRecord(
 
   const stateHashes = Snapshot.getStateHashes(cycleNumberForNetworkDataHash)
   if (stateHashes && stateHashes.length > 0) {
-    record.networkDataHash = stateHashes.map(stateHash => {
+    record.networkDataHash = stateHashes.map((stateHash) => {
       return {
         cycle: stateHash.counter,
-        hash: stateHash.networkHash
+        hash: stateHash.networkHash,
       }
     })
     if (record.networkDataHash.length > 0) {
@@ -109,14 +109,15 @@ export function updateRecord(
 
   const receiptHashes = Snapshot.getReceiptHashes(cycleNumberForNetworkReceiptHash)
   if (receiptHashes && receiptHashes.length > 0) {
-    record.networkReceiptHash = receiptHashes.map(receiptHash => {
+    record.networkReceiptHash = receiptHashes.map((receiptHash) => {
       return {
         cycle: receiptHash.counter,
-        hash: receiptHash.networkReceiptHash
+        hash: receiptHash.networkReceiptHash,
       }
     })
     if (record.networkReceiptHash.length > 0) {
-      cycleNumberForNetworkReceiptHash = record.networkReceiptHash[record.networkReceiptHash.length - 1].cycle + 1
+      cycleNumberForNetworkReceiptHash =
+        record.networkReceiptHash[record.networkReceiptHash.length - 1].cycle + 1
     }
   } else {
     record.networkReceiptHash = []
@@ -124,14 +125,15 @@ export function updateRecord(
 
   const summaryHashes = Snapshot.getSummaryHashes(cycleNumberForNetworkSummaryHash)
   if (summaryHashes && summaryHashes.length > 0) {
-    record.networkSummaryHash = summaryHashes.map(stateHash => {
+    record.networkSummaryHash = summaryHashes.map((stateHash) => {
       return {
         cycle: stateHash.counter,
-        hash: stateHash.networkSummaryHash
+        hash: stateHash.networkSummaryHash,
       }
     })
     if (record.networkSummaryHash.length > 0) {
-      cycleNumberForNetworkSummaryHash = record.networkSummaryHash[record.networkSummaryHash.length - 1].cycle + 1
+      cycleNumberForNetworkSummaryHash =
+        record.networkSummaryHash[record.networkSummaryHash.length - 1].cycle + 1
     }
   } else {
     record.networkSummaryHash = []
@@ -143,9 +145,7 @@ export function validateRecordTypes(rec: P2P.SafetyModeTypes.Record): string {
   return ''
 }
 
-export function parseRecord(
-  record: P2P.CycleCreatorTypes.CycleRecord
-): P2P.CycleParserTypes.Change {
+export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   return {
     added: [],
     removed: [],

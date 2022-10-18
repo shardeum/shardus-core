@@ -23,31 +23,31 @@ export const cNoSizeTrack = -2
 export const cUninitializedSize = -1
 
 type NumberStat = {
-  total: number;
-  max: number;
-  min: number;
-  avg: number;
-  c: number ; 
+  total: number
+  max: number
+  min: number
+  avg: number
+  c: number
 }
 
 type BigNumberStat = {
-  total: bigint;
-  max: bigint;
-  min: bigint;
-  avg: bigint;
-  c: number; 
+  total: bigint
+  max: bigint
+  min: bigint
+  avg: bigint
+  c: number
 }
 
 type SectionStat = BigNumberStat & {
-  name: string;
+  name: string
   internal: boolean
-  req: NumberStat;
-  resp: NumberStat;
-  start: bigint;
-  end: bigint;
-  started: boolean;
-  reentryCount: number;
-  reentryCountEver: number;
+  req: NumberStat
+  resp: NumberStat
+  start: bigint
+  end: bigint
+  started: boolean
+  reentryCount: number
+  reentryCountEver: number
 }
 
 export interface NodeLoad {
@@ -58,7 +58,7 @@ export interface NodeLoad {
 export let profilerInstance: Profiler
 class Profiler {
   sectionTimes: any
-  scopedSectionTimes: {[name:string]:SectionStat}
+  scopedSectionTimes: { [name: string]: SectionStat }
   eventCounters: Map<string, Map<string, number>>
   stackHeight: number
   netInternalStackHeight: number
@@ -84,151 +84,124 @@ class Profiler {
   }
 
   registerEndpoints() {
-    Context.network.registerExternalGet(
-      'perf',
-      isDebugModeMiddleware,
-      (req, res) => {
-        let result = this.printAndClearReport(1)
-        //res.json({result })
+    Context.network.registerExternalGet('perf', isDebugModeMiddleware, (req, res) => {
+      let result = this.printAndClearReport(1)
+      //res.json({result })
 
-        res.write(result)
-        res.end()
+      res.write(result)
+      res.end()
+    })
+
+    Context.network.registerExternalGet('perf-scoped', isDebugModeMiddleware, (req, res) => {
+      let result = this.printAndClearScopedReport(1)
+      //res.json({result })
+
+      res.write(result)
+      res.end()
+    })
+
+    Context.network.registerExternalGet('combined-debug', isDebugModeMiddleware, async (req, res) => {
+      const waitTime = Number.parseInt(req.query.wait as string, 10) || 60
+
+      // hit "counts-reset" endpoint
+      this.eventCounters = new Map()
+      res.write(`counts reset at ${new Date()}\n`)
+
+      // hit "perf" endpoint to clear perf stats
+      this.printAndClearReport(1)
+      this.clearScopedTimes()
+
+      if (this.statisticsInstance) this.statisticsInstance.clearRing('txProcessed')
+
+      // wait X seconds
+      await sleep(waitTime * 1000)
+      res.write(`Results for ${waitTime} sec of sampling...`)
+      res.write(`\n===========================\n`)
+
+      // write nodeId, ip and port
+      res.write(`\n=> NODE DETAIL\n`)
+      res.write(`NODE ID: ${Self.id}\n`)
+      res.write(`IP: ${Self.ip}\n`)
+      res.write(`PORT: ${Self.port}\n`)
+
+      // write "memory" results
+      let toMB = 1 / 1000000
+      let report = process.memoryUsage()
+      res.write(`\n=> MEMORY RESULTS\n`)
+      res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
+      res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
+      res.write(`heapTotal: ${(report.heapTotal * toMB).toFixed(2)} MB\n`)
+      res.write(`heapUsed: ${(report.heapUsed * toMB).toFixed(2)} MB\n`)
+      res.write(`external: ${(report.external * toMB).toFixed(2)} MB\n`)
+      res.write(`arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`)
+      memoryReportingInstance.gatherReport()
+      memoryReportingInstance.reportToStream(memoryReportingInstance.report, res, 0)
+
+      if (this.statisticsInstance) {
+        const injectedTpsReport = this.statisticsInstance.getMultiStatReport('txInjected')
+        res.write('\n=> Node Injected TPS')
+        res.write(`\n Avg: ${injectedTpsReport.avg} `)
+        res.write(`\n Max: ${injectedTpsReport.max} `)
+        res.write(`\n Vals: ${injectedTpsReport.allVals} \n`)
+        this.statisticsInstance.clearRing('txInjected')
+
+        const processedTpsReport = this.statisticsInstance.getMultiStatReport('txApplied')
+        res.write('\n=> Node Applied TPS')
+        res.write(`\n Avg: ${processedTpsReport.avg} `)
+        res.write(`\n Max: ${processedTpsReport.max} `)
+        res.write(`\n Vals: ${processedTpsReport.allVals} \n`)
+        this.statisticsInstance.clearRing('txApplied')
+
+        const rejectedTpsReport = this.statisticsInstance.getMultiStatReport('txRejected')
+        res.write('\n=> Node Rejected TPS')
+        res.write(`\n Avg: ${rejectedTpsReport.avg} `)
+        res.write(`\n Max: ${rejectedTpsReport.max} `)
+        res.write(`\n Vals: ${rejectedTpsReport.allVals} \n`)
+        this.statisticsInstance.clearRing('txRejected')
+
+        const networkTimeoutReport = this.statisticsInstance.getMultiStatReport('networkTimeout')
+        res.write('\n=> Network Timeout / sec ')
+        res.write(`\n Avg: ${networkTimeoutReport.avg} `)
+        res.write(`\n Max: ${networkTimeoutReport.max} `)
+        res.write(`\n Vals: ${networkTimeoutReport.allVals} \n`)
+        this.statisticsInstance.clearRing('networkTimeout')
+
+        const lostNodeTimeoutReport = this.statisticsInstance.getMultiStatReport('lostNodeTimeout')
+        res.write('\n=> LostNode Timeout / sec ')
+        res.write(`\n Avg: ${lostNodeTimeoutReport.avg} `)
+        res.write(`\n Max: ${lostNodeTimeoutReport.max} `)
+        res.write(`\n Vals: ${lostNodeTimeoutReport.allVals} \n`)
+        this.statisticsInstance.clearRing('lostNodeTimeout')
       }
-    )
 
-    Context.network.registerExternalGet(
-      'perf-scoped',
-      isDebugModeMiddleware,
-      (req, res) => {
-        let result = this.printAndClearScopedReport(1)
-        //res.json({result })
+      // write "perf" results
+      let result = this.printAndClearReport(1)
+      res.write(`\n=> PERF RESULTS\n`)
+      res.write(result)
+      res.write(`\n===========================\n`)
 
-        res.write(result)
-        res.end()
-      }
-    )
+      // write scoped-perf results
+      let scopedPerfResult = this.printAndClearScopedReport(1)
+      res.write(`\n=> SCOPED PERF RESULTS\n`)
+      res.write(scopedPerfResult)
+      res.write(`\n===========================\n`)
 
-    Context.network.registerExternalGet(
-      'combined-debug',
-      isDebugModeMiddleware,
-      async (req, res) => {
-        const waitTime = Number.parseInt(req.query.wait as string, 10) || 60
+      // write "counts" results
+      let arrayReport = nestedCountersInstance.arrayitizeAndSort(nestedCountersInstance.eventCounters)
+      res.write(`\n=> COUNTS RESULTS\n`)
+      res.write(`${Date.now()}\n`)
+      nestedCountersInstance.printArrayReport(arrayReport, res, 0)
+      res.write(`\n===========================\n`)
 
-        // hit "counts-reset" endpoint
-        this.eventCounters = new Map()
-        res.write(`counts reset at ${new Date()}\n`)
-
-        // hit "perf" endpoint to clear perf stats
-        this.printAndClearReport(1)
-        this.clearScopedTimes()
-
-        if (this.statisticsInstance)
-          this.statisticsInstance.clearRing('txProcessed')
-
-        // wait X seconds
-        await sleep(waitTime * 1000)
-        res.write(`Results for ${waitTime} sec of sampling...`)
-        res.write(`\n===========================\n`)
-
-        // write nodeId, ip and port
-        res.write(`\n=> NODE DETAIL\n`)
-        res.write(`NODE ID: ${Self.id}\n`)
-        res.write(`IP: ${Self.ip}\n`)
-        res.write(`PORT: ${Self.port}\n`)
-
-        // write "memory" results
-        let toMB = 1 / 1000000
-        let report = process.memoryUsage()
-        res.write(`\n=> MEMORY RESULTS\n`)
-        res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
-        res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
-        res.write(`heapTotal: ${(report.heapTotal * toMB).toFixed(2)} MB\n`)
-        res.write(`heapUsed: ${(report.heapUsed * toMB).toFixed(2)} MB\n`)
-        res.write(`external: ${(report.external * toMB).toFixed(2)} MB\n`)
-        res.write(
-          `arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`
-        )
-        memoryReportingInstance.gatherReport()
-        memoryReportingInstance.reportToStream(
-          memoryReportingInstance.report,
-          res,
-          0
-        )
-
-        if (this.statisticsInstance) {
-          const injectedTpsReport =
-            this.statisticsInstance.getMultiStatReport('txInjected')
-          res.write('\n=> Node Injected TPS')
-          res.write(`\n Avg: ${injectedTpsReport.avg} `)
-          res.write(`\n Max: ${injectedTpsReport.max} `)
-          res.write(`\n Vals: ${injectedTpsReport.allVals} \n`)
-          this.statisticsInstance.clearRing('txInjected')
-
-          const processedTpsReport =
-            this.statisticsInstance.getMultiStatReport('txApplied')
-          res.write('\n=> Node Applied TPS')
-          res.write(`\n Avg: ${processedTpsReport.avg} `)
-          res.write(`\n Max: ${processedTpsReport.max} `)
-          res.write(`\n Vals: ${processedTpsReport.allVals} \n`)
-          this.statisticsInstance.clearRing('txApplied')
-
-          const rejectedTpsReport =
-            this.statisticsInstance.getMultiStatReport('txRejected')
-          res.write('\n=> Node Rejected TPS')
-          res.write(`\n Avg: ${rejectedTpsReport.avg} `)
-          res.write(`\n Max: ${rejectedTpsReport.max} `)
-          res.write(`\n Vals: ${rejectedTpsReport.allVals} \n`)
-          this.statisticsInstance.clearRing('txRejected')
-
-          const networkTimeoutReport =
-            this.statisticsInstance.getMultiStatReport('networkTimeout')
-          res.write('\n=> Network Timeout / sec ')
-          res.write(`\n Avg: ${networkTimeoutReport.avg} `)
-          res.write(`\n Max: ${networkTimeoutReport.max} `)
-          res.write(`\n Vals: ${networkTimeoutReport.allVals} \n`)
-          this.statisticsInstance.clearRing('networkTimeout')
-
-          const lostNodeTimeoutReport =
-            this.statisticsInstance.getMultiStatReport('lostNodeTimeout')
-          res.write('\n=> LostNode Timeout / sec ')
-          res.write(`\n Avg: ${lostNodeTimeoutReport.avg} `)
-          res.write(`\n Max: ${lostNodeTimeoutReport.max} `)
-          res.write(`\n Vals: ${lostNodeTimeoutReport.allVals} \n`)
-          this.statisticsInstance.clearRing('lostNodeTimeout')
-        }
-
-        // write "perf" results
-        let result = this.printAndClearReport(1)
-        res.write(`\n=> PERF RESULTS\n`)
-        res.write(result)
-        res.write(`\n===========================\n`)
-
-        // write scoped-perf results
-        let scopedPerfResult = this.printAndClearScopedReport(1)
-        res.write(`\n=> SCOPED PERF RESULTS\n`)
-        res.write(scopedPerfResult)
-        res.write(`\n===========================\n`)
-
-        // write "counts" results
-        let arrayReport = nestedCountersInstance.arrayitizeAndSort(
-          nestedCountersInstance.eventCounters
-        )
-        res.write(`\n=> COUNTS RESULTS\n`)
-        res.write(`${Date.now()}\n`)
-        nestedCountersInstance.printArrayReport(arrayReport, res, 0)
-        res.write(`\n===========================\n`)
-
-        res.end()
-      }
-    )
+      res.end()
+    })
   }
 
   profileSectionStart(sectionName, internal = false) {
     let section = this.sectionTimes[sectionName]
 
     if (section != null && section.started === true) {
-      if (profilerSelfReporting)
-        nestedCountersInstance.countEvent('profiler-start-error', sectionName)
+      if (profilerSelfReporting) nestedCountersInstance.countEvent('profiler-start-error', sectionName)
       return
     }
 
@@ -268,8 +241,7 @@ class Profiler {
   profileSectionEnd(sectionName, internal = false) {
     let section = this.sectionTimes[sectionName]
     if (section == null || section.started === false) {
-      if (profilerSelfReporting)
-        nestedCountersInstance.countEvent('profiler-end-error', sectionName)
+      if (profilerSelfReporting) nestedCountersInstance.countEvent('profiler-end-error', sectionName)
       return
     }
 
@@ -279,8 +251,7 @@ class Profiler {
     section.started = false
 
     if (internal === false) {
-      if (profilerSelfReporting)
-        nestedCountersInstance.countEvent('profiler-end', sectionName)
+      if (profilerSelfReporting) nestedCountersInstance.countEvent('profiler-end', sectionName)
 
       this.stackHeight--
       if (this.stackHeight === 0) {
@@ -302,8 +273,12 @@ class Profiler {
     }
   }
 
-  scopedProfileSectionStart(sectionName:string, internal:boolean = false, messageSize:number = cNoSizeTrack) {
-    let section:SectionStat = this.scopedSectionTimes[sectionName]
+  scopedProfileSectionStart(
+    sectionName: string,
+    internal: boolean = false,
+    messageSize: number = cNoSizeTrack
+  ) {
+    let section: SectionStat = this.scopedSectionTimes[sectionName]
 
     if (section != null && section.started === true) {
       //need thes because we cant handle recursion, but does it ever happen?
@@ -331,26 +306,26 @@ class Profiler {
           max: 0,
           min: cDefaultMin,
           avg: 0,
-          c: 0,          
+          c: 0,
         },
         resp: {
           total: 0,
           max: 0,
           min: cDefaultMin,
           avg: 0,
-          c: 0,          
+          c: 0,
         },
         start: t,
         end: t,
         started: false,
         reentryCount: 0,
-        reentryCountEver: 0
+        reentryCountEver: 0,
       }
       this.scopedSectionTimes[sectionName] = section
     }
 
     // update request size stats
-    if(messageSize != cNoSizeTrack && messageSize != cUninitializedSize){
+    if (messageSize != cNoSizeTrack && messageSize != cUninitializedSize) {
       let stat = section.req
       stat.total += messageSize
       stat.c += 1
@@ -364,7 +339,7 @@ class Profiler {
     section.c++
   }
 
-  scopedProfileSectionEnd(sectionName: string, messageSize:number = cNoSizeTrack) {
+  scopedProfileSectionEnd(sectionName: string, messageSize: number = cNoSizeTrack) {
     const section = this.scopedSectionTimes[sectionName]
     if (section == null || section.started === false) {
       if (profilerSelfReporting) return
@@ -381,7 +356,7 @@ class Profiler {
     section.started = false
 
     //if we get a valid size let track stats on it
-    if(messageSize != cNoSizeTrack && messageSize != cUninitializedSize){
+    if (messageSize != cNoSizeTrack && messageSize != cUninitializedSize) {
       let stat = section.resp
       stat.total += messageSize
       stat.c += 1
@@ -397,8 +372,7 @@ class Profiler {
   }
 
   getTotalBusyInternal(): any {
-    if (profilerSelfReporting)
-      nestedCountersInstance.countEvent('profiler-note', 'getTotalBusyInternal')
+    if (profilerSelfReporting) nestedCountersInstance.countEvent('profiler-note', 'getTotalBusyInternal')
 
     this.profileSectionEnd('_internal_total', true)
     let internalTotalBusy = this.sectionTimes['_internal_totalBusy']
@@ -415,14 +389,12 @@ class Profiler {
     }
     if (internalNetInternl != null && internalTotal != null) {
       if (internalTotal.total > BigInt(0)) {
-        netInternlDuty =
-          (BigInt(100) * internalNetInternl.total) / internalTotal.total
+        netInternlDuty = (BigInt(100) * internalNetInternl.total) / internalTotal.total
       }
     }
     if (internalNetExternl != null && internalTotal != null) {
       if (internalTotal.total > BigInt(0)) {
-        netExternlDuty =
-          (BigInt(100) * internalNetExternl.total) / internalTotal.total
+        netExternlDuty = (BigInt(100) * internalNetExternl.total) / internalTotal.total
       }
     }
     this.profileSectionStart('_internal_total', true)
@@ -466,16 +438,15 @@ class Profiler {
           max: 0,
           min: cDefaultMin,
           avg: 0,
-          c: 0,          
+          c: 0,
         }
         section.resp = {
           total: 0,
           max: 0,
           min: cDefaultMin,
           avg: 0,
-          c: 0,          
+          c: 0,
         }
-
       }
     }
   }
@@ -508,9 +479,7 @@ class Profiler {
         let totalMs = section.total / divider
         let dutyStr = `${duty}`.padStart(4)
         let totalStr = `${totalMs}`.padStart(13)
-        let line = `${dutyStr}% ${section.name.padEnd(30)}, ${totalStr}ms, #:${
-          section.c
-        }`
+        let line = `${dutyStr}% ${section.name.padEnd(30)}, ${totalStr}ms, #:${section.c}`
         //section.total = BigInt(0)
 
         lines.push({ line, totalMs })
@@ -541,33 +510,33 @@ class Profiler {
         const maxMs = Number((section.max * percent) / divider) / 100
         let minMs = Number((section.min * percent) / divider) / 100
         const totalMs = Number((section.total * percent) / divider) / 100
-        if(section.c === 0){
+        if (section.c === 0) {
           minMs = 0
         }
-        let line = `Avg: ${avgMs}ms ${section.name.padEnd(30)}, Max: ${maxMs}ms,  Min: ${minMs}ms,  Total: ${totalMs}ms, #:${
-          section.c
-        }`
+        let line = `Avg: ${avgMs}ms ${section.name.padEnd(
+          30
+        )}, Max: ${maxMs}ms,  Min: ${minMs}ms,  Total: ${totalMs}ms, #:${section.c}`
 
-        if(section.resp.c > 0){
+        if (section.resp.c > 0) {
           let dataReport = {
             total: humanFileSize(section.resp.total),
             min: humanFileSize(section.resp.min),
             max: humanFileSize(section.resp.max),
             c: section.resp.c,
-            avg: humanFileSize(Math.ceil(section.resp.total / section.resp.c)) //Math.round(100 * section.s.total / section.s.c) / 100
+            avg: humanFileSize(Math.ceil(section.resp.total / section.resp.c)), //Math.round(100 * section.s.total / section.s.c) / 100
           }
-          line += ' resp:' + JSON.stringify(dataReport)          
+          line += ' resp:' + JSON.stringify(dataReport)
         }
         let numberStat = section.req
-        if(numberStat.c > 0){
+        if (numberStat.c > 0) {
           let dataReport = {
             total: humanFileSize(numberStat.total),
             min: humanFileSize(numberStat.min),
             max: humanFileSize(numberStat.max),
             c: numberStat.c,
-            avg: humanFileSize(Math.ceil(numberStat.total / numberStat.c)) //Math.round(100 * section.s.total / section.s.c) / 100
+            avg: humanFileSize(Math.ceil(numberStat.total / numberStat.c)), //Math.round(100 * section.s.total / section.s.c) / 100
           }
-          line += ' req:' + JSON.stringify(dataReport)          
+          line += ' req:' + JSON.stringify(dataReport)
         }
 
         lines.push({ line, avgMs })
@@ -593,34 +562,34 @@ class Profiler {
         const maxMs = Number((section.max * percent) / divider) / 100
         let minMs = Number((section.min * percent) / divider) / 100
         const totalMs = Number((section.total * percent) / divider) / 100
-        if(section.c === 0){
+        if (section.c === 0) {
           minMs = 0
         }
         let data = {}
         let dataReq = {}
-        if(section.resp.c > 0){
+        if (section.resp.c > 0) {
           let dataReport = {
             total: section.resp.total,
             min: section.resp.min,
             max: section.resp.max,
             c: section.resp.c,
-            avg: humanFileSize(Math.ceil(section.resp.total / section.resp.c)) //Math.round(100 * section.s.total / section.s.c) / 100
+            avg: humanFileSize(Math.ceil(section.resp.total / section.resp.c)), //Math.round(100 * section.s.total / section.s.c) / 100
           }
-          data = dataReport       
+          data = dataReport
         }
         let numberStat = section.req
-        if(numberStat.c > 0){
+        if (numberStat.c > 0) {
           let dataReport = {
             total: humanFileSize(numberStat.total),
             min: humanFileSize(numberStat.min),
             max: humanFileSize(numberStat.max),
             c: numberStat.c,
-            avg: humanFileSize(Math.ceil(numberStat.total / numberStat.c)) //Math.round(100 * section.s.total / section.s.c) / 100
+            avg: humanFileSize(Math.ceil(numberStat.total / numberStat.c)), //Math.round(100 * section.s.total / section.s.c) / 100
           }
-          dataReq = dataReport  
+          dataReq = dataReport
         }
 
-        times.push({name:section.name, minMs, maxMs, totalMs, avgMs, c:section.c , data, dataReq})
+        times.push({ name: section.name, minMs, maxMs, totalMs, avgMs, c: section.c, data, dataReq })
       }
     }
     let scopedTimes = { scopedTimes: times }

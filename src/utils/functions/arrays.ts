@@ -107,19 +107,11 @@ export function binaryLowest<T>(ar: T[], comparator?: Comparator<T>) {
  * @param el
  * @param comparator
  */
-export function binarySearch<T, E = Partial<T>>(
-  arr: T[],
-  el: E,
-  comparator?: Comparator<T, typeof el>
-) {
+export function binarySearch<T, E = Partial<T>>(arr: T[], el: E, comparator?: Comparator<T, typeof el>) {
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
     comparator = (a, b) => {
-      return a.toString() > b.toString()
-        ? 1
-        : a.toString() < b.toString()
-        ? -1
-        : 0
+      return a.toString() > b.toString() ? 1 : a.toString() < b.toString() ? -1 : 0
     }
   }
   let m = 0

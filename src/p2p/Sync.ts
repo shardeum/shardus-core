@@ -53,7 +53,7 @@ const cyclesRoute: P2P.P2PTypes.Route<Handler> = {
       // const cycles = p2p.state.getCycles(start, end)
       const cycles = CycleChain.getCycleChain(start, end)
       res.json(cycles)
-    } catch(e) {
+    } catch (e) {
       warn('sync-cycles', e)
     } finally {
       profilerInstance.scopedProfileSectionEnd('sync-cycles')
@@ -99,9 +99,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
     const start = end - cyclesToGet
     info(`Getting cycles ${start} - ${end}...`)
     const prevCycles = await getCycles(activeNodes, start, end)
-    info(
-      `Got cycles ${JSON.stringify(prevCycles.map((cycle) => cycle.counter))}`
-    )
+    info(`Got cycles ${JSON.stringify(prevCycles.map((cycle) => cycle.counter))}`)
     info(`  ${JSON.stringify(prevCycles)}`)
 
     // If prevCycles is empty, start over
@@ -135,21 +133,10 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
       }
     }
 
-    info(
-      `Got ${
-        squasher.final.updated.length
-      } active nodes, need ${activeNodeCount(cycleToSyncTo)}`
-    )
-    info(
-      `Got ${squasher.final.added.length} total nodes, need ${totalNodeCount(
-        cycleToSyncTo
-      )}`
-    )
+    info(`Got ${squasher.final.updated.length} active nodes, need ${activeNodeCount(cycleToSyncTo)}`)
+    info(`Got ${squasher.final.added.length} total nodes, need ${totalNodeCount(cycleToSyncTo)}`)
     if (squasher.final.added.length < totalNodeCount(cycleToSyncTo))
-      info(
-        'Short on nodes. Need to get more cycles. Cycle:' +
-          cycleToSyncTo.counter
-      )
+      info('Short on nodes. Need to get more cycles. Cycle:' + cycleToSyncTo.counter)
     //    showNodeCount(cycleToSyncTo)
 
     // If you weren't able to prepend any of the prevCycles, start over
@@ -191,9 +178,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
   applyNodeListChange(squasher.final)
 
   info('Synced to cycle', cycleToSyncTo.counter)
-  info(
-    `Sync complete; ${NodeList.activeByIdOrder.length} active nodes; ${CycleChain.cycles.length} cycles`
-  )
+  info(`Sync complete; ${NodeList.activeByIdOrder.length} active nodes; ${CycleChain.cycles.length} cycles`)
   info(`NodeList after sync: ${JSON.stringify([...NodeList.nodes.entries()])}`)
   info(`CycleChain after sync: ${JSON.stringify(CycleChain.cycles)}`)
 
@@ -201,8 +186,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
 }
 
 type SyncNode = Partial<
-  Pick<P2P.SyncTypes.ActiveNode, 'ip' | 'port'> &
-    Pick<P2P.NodeListTypes.Node, 'externalIp' | 'externalPort'>
+  Pick<P2P.SyncTypes.ActiveNode, 'ip' | 'port'> & Pick<P2P.NodeListTypes.Node, 'externalIp' | 'externalPort'>
 >
 
 export async function syncNewCycles(activeNodes: SyncNode[]) {
@@ -223,8 +207,7 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
     const oldCounter = CycleChain.newest.counter
     for (const nextCycle of nextCycles) {
       //      CycleChain.validate(CycleChain.newest, newestCycle)
-      if (CycleChain.validate(CycleChain.newest, nextCycle))
-        await digestCycle(nextCycle)
+      if (CycleChain.validate(CycleChain.newest, nextCycle)) await digestCycle(nextCycle)
       else
         error(
           `syncNewCycles next record does not fit with prev record.\nnext: ${JSON.stringify(
@@ -256,10 +239,7 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
 export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   const marker = CycleCreator.makeCycleMarker(cycle)
   if (CycleChain.cyclesByMarker[marker]) {
-    warn(
-      `Tried to digest cycle record twice: ${JSON.stringify(cycle)}\n` +
-        `${new Error().stack}`
-    )
+    warn(`Tried to digest cycle record twice: ${JSON.stringify(cycle)}\n` + `${new Error().stack}`)
     return
   }
 
@@ -268,7 +248,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   CycleChain.append(cycle)
 
   let nodeLimit = 2 //todo set this to a higher number, but for now I want to make sure it works in a small test
-  if(NodeList.activeByIdOrder.length <= nodeLimit){
+  if (NodeList.activeByIdOrder.length <= nodeLimit) {
     info(`
       Digested C${cycle.counter}
         cycle record: ${JSON.stringify(cycle)}
@@ -284,12 +264,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
       node list: too many to list: ${NodeList.nodes.size}
       active nodes: too many to list: ${NodeList.activeByIdOrder.length}
     `)
-
   }
-
-
-
-
 }
 
 function applyNodeListChange(change: P2P.CycleParserTypes.Change) {
@@ -298,9 +273,7 @@ function applyNodeListChange(change: P2P.CycleParserTypes.Change) {
   NodeList.removeNodes(change.removed)
 }
 
-export async function getNewestCycle(
-  activeNodes: SyncNode[]
-): Promise<P2P.CycleCreatorTypes.CycleRecord> {
+export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.CycleCreatorTypes.CycleRecord> {
   const queryFn = async (node: SyncNode) => {
     const ip = node.ip ? node.ip : node.externalIp
     const port = node.port ? node.port : node.externalPort
