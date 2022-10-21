@@ -19,6 +19,7 @@ interface LoadDetection {
   scaledQueueLength: number /** 0-1 value on how close to queueLimit this nodes is */
   scaledExecuteQueueLength: number /** 0-1 value on how close to queueLimit this nodes is */
   dbg: boolean
+  lastEmitCycle: number /** the last cylce that we have sent load events on */
 }
 let lastMeasuredTimestamp = 0
 
@@ -41,6 +42,7 @@ class LoadDetection extends EventEmitter {
     this.scaledExecuteQueueLength = 0
 
     this.dbg = false
+    this.lastEmitCycle = -1
 
     /**
      * Sets load to DESIRED_LOAD (should be between 0 and 1)
@@ -166,14 +168,24 @@ class LoadDetection extends EventEmitter {
       }
     }
 
-    //If our max load is higher than the threshold send highLoad event that will create scale up gossip
-    if (load > this.highThreshold) {
-      this.emit('highLoad')
+    //only send load events if we are on a new cycle.
+    //updateLoad gets called at a much higher frequency than once per cycle
+    //We could potentially make this better by taking some kind of self average
+    //rather than just the random luck of load see when a new cycle has turned over.
+    //however, these load metrics already have some inherent averaging
+    let cycle = Context.p2p.state.getLastCycle().counter
+    if (this.lastEmitCycle != cycle) {
+      this.lastEmitCycle = cycle
+      //If our max load is higher than the threshold send highLoad event that will create scale up gossip
+      if (load > this.highThreshold) {
+        this.emit('highLoad')
+      }
+      //If our max load is lower than threshold send a scale down message.
+      if (load < this.lowThreshold) {
+        this.emit('lowLoad')
+      }
     }
-    //If our max load is lower than threshold send a scale down message.
-    if (load < this.lowThreshold) {
-      this.emit('lowLoad')
-    }
+
     this.load = load
   }
 
