@@ -314,7 +314,8 @@ export async function sendGossip(
   tracker = '',
   sender = null,
   inpNodes = NodeList.byIdOrder, // Joining nodes need gossip too; we don't send to ourself
-  isOrigin = false
+  isOrigin = false,
+  factor = -1
 ) {
   let msgSize = cUninitializedSize
   // [TODO] Don't copy the node list once sorted lists are passed in
@@ -352,7 +353,10 @@ export async function sendGossip(
     return msgSize
   }
 
-  const gossipFactor = config.p2p.gossipFactor
+  let gossipFactor = config.p2p.gossipFactor
+  if(factor > 0){
+    gossipFactor = factor
+  }
   let recipientIdxs
   let originNode
   let originIdx

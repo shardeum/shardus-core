@@ -10,6 +10,7 @@ import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /** STATE */
 
@@ -43,7 +44,7 @@ const gossipScaleRoute: P2P.P2PTypes.GossipHandler<P2P.CycleAutoScaleTypes.Signe
     }
     const added = addExtScalingRequest(payload)
     if (!added) return
-    Comms.sendGossip('scaling', payload, tracker, sender, NodeList.byIdOrder, false)
+    Comms.sendGossip('scaling', payload, tracker, sender, NodeList.byIdOrder, false, 2)
   } finally {
     profilerInstance.scopedProfileSectionEnd('gossip-scaling')
   }
@@ -118,9 +119,10 @@ function _requestNetworkScaling(upOrDown) {
   const isRequestAdded = addExtScalingRequest(signedRequest)
   if (isRequestAdded) {
     info(`Our scale request is added. Gossiping our scale request to other nodes. ${JSON.stringify(signedRequest)}`)
-    Comms.sendGossip('scaling', signedRequest, '', null, NodeList.byIdOrder, true)
+    Comms.sendGossip('scaling', signedRequest, '', null, NodeList.byIdOrder, true, 2)
     scalingRequested = true
     requestedScalingType = signedRequest.scale //only set this when our node requests scaling
+    nestedCountersInstance.countEvent('p2p', 'send scaling: ' + upOrDown?'up':'down')
   }
 }
 
