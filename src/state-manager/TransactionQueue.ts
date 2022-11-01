@@ -623,20 +623,12 @@ class TransactionQueue {
     try {
       this.profiler.profileSectionStart('commit-1-setAccount')
       if (logFlags.verbose) {
-        this.mainLogger.debug(
-          `commitConsensedTransaction  ts:${timestamp} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`
-        )
-        this.mainLogger.debug(
-          `commitConsensedTransaction  filter: ${utils.stringifyReduce(queueEntry.localKeys)}`
-        )
-        this.mainLogger.debug(`commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-        this.mainLogger.debug(
-          `commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`
-        )
-        this.mainLogger.debug(
-          `commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`
-        )
-        this.mainLogger.debug(`commitConsensedTransaction  queueEntry: ${utils.stringifyReduce(queueEntry)}`)
+        /* prettier-ignore */ this.mainLogger.debug( `commitConsensedTransaction  ts:${timestamp} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}` )
+        /* prettier-ignore */ this.mainLogger.debug( `commitConsensedTransaction  filter: ${utils.stringifyReduce(queueEntry.localKeys)}` )
+        /* prettier-ignore */ this.mainLogger.debug(`commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+        /* prettier-ignore */ this.mainLogger.debug( `commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}` )
+        /* prettier-ignore */ this.mainLogger.debug( `commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}` )
+        /* prettier-ignore */ this.mainLogger.debug(`commitConsensedTransaction  queueEntry: ${utils.stringifyReduce(queueEntry)}`)
       }
       // TODO ARCH REVIEW:  review use of fifo lock of accountModification and account keys. (more notes in tryPreApplyTransaction() above )
 
@@ -682,7 +674,7 @@ class TransactionQueue {
         applyResponse.accountWrites.length > 0
       ) {
         let collectedData = queueEntry.collectedData
-        console.log(`commitConsensedTransaction collectedData: ${utils.stringifyReduce(collectedData)}`)
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log(`commitConsensedTransaction collectedData: ${utils.stringifyReduce(collectedData)}`)
         for (let writtenAccount of applyResponse.accountWrites) {
           writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
           writtenAccountsMap[writtenAccount.accountId].prevStateId = collectedData[writtenAccount.accountId]
@@ -5012,6 +5004,23 @@ class TransactionQueue {
       }
     }
     return length
+  }
+
+  getAccountQueueCount(accountID: string, remote: boolean = false): number {
+    nestedCountersInstance.countEvent('stateManager', `getAccountQueueCount`)
+    let count = 0
+    for (let queueEntry of this.newAcceptedTxQueueTempInjest) {
+      if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
+        count++
+      }
+    }
+    for (let queueEntry of this.newAcceptedTxQueue) {
+      if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
+        count++
+      }
+    }
+    // if (logFlags.verbose) console.log(`getAccountQueueCount: remote:${remote} ${count} acc:${utils.stringifyReduce(accountID)}`)
+    return count
   }
 }
 

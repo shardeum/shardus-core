@@ -1211,6 +1211,14 @@ class Shardus extends EventEmitter {
     }
   }
 
+  async getLocalOrRemoteAccountQueueCount(address): Promise<number> {
+    if (this.p2p.allowTransactions()) {
+      return this.stateManager.getLocalOrRemoteAccountQueueCount(address)
+    } else {
+      return 0
+    }
+  }
+
   /**
    * This function is used to query data from an account that is guaranteed to be in a remote shard
    * @param {*} address The address / publicKey of the account in which to query

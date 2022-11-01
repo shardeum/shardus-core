@@ -69,10 +69,7 @@ export function init() {
 }
 
 export function reset() {
-  console.log(
-    'Resetting auto-scale module',
-    `Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`
-  )
+  /* prettier-ignore */ if (logFlags.verbose) console.log( 'Resetting auto-scale module', `Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}` )
   scalingRequested = false
   scalingRequestsCollector = new Map()
   requestedScalingType = null

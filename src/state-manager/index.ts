@@ -71,6 +71,8 @@ import {
   AppliedVoteHash,
   AppliedReceipt2,
   RequestReceiptForTxResp_old,
+  RequestAccountQueueCounts,
+  QueueCountsResponse,
 } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
@@ -1450,7 +1452,7 @@ class StateManager {
         tracker: string,
         msgSize: number
       ) => {
-        profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
+        profilerInstance.scopedProfileSectionStart('request_tx_and_state', false, msgSize)
         let responseSize = cUninitializedSize
         try {
           let response: RequestTxResp = {
@@ -1520,7 +1522,7 @@ class StateManager {
           response.success = true
           responseSize = await respond(response)
         } finally {
-          profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
+          profilerInstance.scopedProfileSectionEnd('request_tx_and_state', responseSize)
         }
       }
     )
@@ -1580,7 +1582,7 @@ class StateManager {
         tracker: string,
         msgSize: number
       ) => {
-        profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
+        profilerInstance.scopedProfileSectionStart('get_account_data_with_queue_hints', false, msgSize)
         let responseSize = cUninitializedSize
         try {
           let result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
@@ -1611,7 +1613,32 @@ class StateManager {
           result.accountData = accountData as Shardus.WrappedDataFromQueue[]
           responseSize = await respond(result)
         } finally {
-          profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
+          profilerInstance.scopedProfileSectionEnd('get_account_data_with_queue_hints', responseSize)
+        }
+      }
+    )
+
+    this.p2p.registerInternal(
+      'get_account_queue_count',
+      async (
+        payload: RequestAccountQueueCounts,
+        respond: (arg0: QueueCountsResponse) => any,
+        sender,
+        tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('get_account_queue_count', false, msgSize)
+        let responseSize = cUninitializedSize
+        try {
+          let result: QueueCountsResponse = { counts: [] }
+          for (let address of payload.accountIds) {
+            let count = this.transactionQueue.getAccountQueueCount(address, true)
+            result.counts.push(count)
+          }
+
+          responseSize = await respond(result)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('get_account_queue_count', responseSize)
         }
       }
     )
@@ -1967,6 +1994,76 @@ class StateManager {
     }
   }
 
+  async getLocalOrRemoteAccountQueueCount(address: string): Promise<number> {
+    let count
+    if (this.currentCycleShardData == null) {
+      await this.waitForShardData()
+    }
+    if (this.currentCycleShardData == null) {
+      throw new Error('getLocalOrRemoteAccount: network not ready')
+    }
+    let forceLocalGlobalLookup = false
+    if (this.accountGlobals.isGlobalAccount(address)) {
+      forceLocalGlobalLookup = true
+    }
+
+    let accountIsRemote = this.transactionQueue.isAccountRemote(address)
+    if (forceLocalGlobalLookup) {
+      accountIsRemote = false
+    }
+
+    if (accountIsRemote) {
+      const randomConsensusNode = this.transactionQueue.getRandomConsensusNodeForAccount(address)
+      if (randomConsensusNode == null) {
+        throw new Error(`getLocalOrRemoteAccountQueueCount: no consensus node found`)
+      }
+
+      // Node Precheck!
+      if (
+        this.isNodeValidForInternalMessage(
+          randomConsensusNode.id,
+          'getLocalOrRemoteAccountQueueCount',
+          true,
+          true
+        ) === false
+      ) {
+        /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'getLocalOrRemoteAccountQueueCount: isNodeValidForInternalMessage failed, no retry')
+        return null
+      }
+
+      let message: RequestAccountQueueCounts = { accountIds: [address] }
+      let r: QueueCountsResponse | boolean = await this.p2p.ask(
+        randomConsensusNode,
+        'get_account_queue_count',
+        message
+      )
+      if (r === false) {
+        if (logFlags.error) this.mainLogger.error('ASK FAIL getLocalOrRemoteAccountQueueCount r === false')
+      }
+
+      let result = r as QueueCountsResponse
+      if (result != null && result.counts != null && result.counts.length > 0) {
+        count = result.counts[0]
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts response: ${count} address:${utils.stringifyReduce(address)}`)
+      } else {
+        if (result == null) {
+          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data 2: result == null')
+        } else if (result.counts == null) {
+          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data 2: result.counts == null ' + utils.stringifyReduce(result))
+        } else if (result.counts.length <= 0) {
+          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data 2: result.counts.length <= 0 ' + utils.stringifyReduce(result))
+        }
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts failed: ${utils.stringifyReduce(result)} address:${utils.stringifyReduce(address)}`)
+      }
+    } else {
+      // we are local!
+      count = this.transactionQueue.getAccountQueueCount(address)
+      /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts local: ${count} address:${utils.stringifyReduce(address)}`)
+    }
+
+    return count
+  }
+
   // todo support metadata so we can serve up only a portion of the account
   // todo 2? communicate directly back to client... could have security issue.
   // todo 3? require a relatively stout client proof of work
@@ -1986,19 +2083,19 @@ class StateManager {
     if (this.accountGlobals.isGlobalAccount(address)) {
       forceLocalGlobalLookup = true
     }
+    let accountIsRemote = this.transactionQueue.isAccountRemote(address)
+    // // check if we have this account locally. (does it have to be consenus or just stored?)
+    // let accountIsRemote = true
 
-    // check if we have this account locally. (does it have to be consenus or just stored?)
-    let accountIsRemote = true
-
-    let ourNodeShardData = this.currentCycleShardData.nodeShardData
-    let minP = ourNodeShardData.consensusStartPartition
-    let maxP = ourNodeShardData.consensusEndPartition
-    // HOMENODEMATHS this seems good.  making sure our node covers this partition
-    let { homePartition } = ShardFunctions.addressToPartition(
-      this.currentCycleShardData.shardGlobals,
-      address
-    )
-    accountIsRemote = ShardFunctions.partitionInWrappingRange(homePartition, minP, maxP) === false
+    // let ourNodeShardData = this.currentCycleShardData.nodeShardData
+    // let minP = ourNodeShardData.consensusStartPartition
+    // let maxP = ourNodeShardData.consensusEndPartition
+    // // HOMENODEMATHS this seems good.  making sure our node covers this partition
+    // let { homePartition } = ShardFunctions.addressToPartition(
+    //   this.currentCycleShardData.shardGlobals,
+    //   address
+    // )
+    // accountIsRemote = ShardFunctions.partitionInWrappingRange(homePartition, minP, maxP) === false
 
     // hack to say we have all the data
     if (

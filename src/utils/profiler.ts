@@ -135,7 +135,7 @@ class Profiler {
       res.write(`external: ${(report.external * toMB).toFixed(2)} MB\n`)
       res.write(`arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`)
       memoryReportingInstance.gatherReport()
-      memoryReportingInstance.reportToStream(memoryReportingInstance.report, res, 0)
+      memoryReportingInstance.reportToStream(memoryReportingInstance.report, res)
 
       if (this.statisticsInstance) {
         const injectedTpsReport = this.statisticsInstance.getMultiStatReport('txInjected')

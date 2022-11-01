@@ -739,6 +739,10 @@ export type RequestStateForTxReqPost = { txid: string; timestamp: number; key: s
 
 export type GetAccountDataWithQueueHintsResp = { accountData: Shardus.WrappedDataFromQueue[] | null }
 
+
+export type RequestAccountQueueCounts = { accountIds: string[] }
+export type QueueCountsResponse = { counts: number[] }
+
 export type GlobalAccountReportResp = {
   ready: boolean
   combinedHash: string

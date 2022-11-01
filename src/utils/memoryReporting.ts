@@ -53,7 +53,7 @@ class MemoryReporting {
       res.write(`arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`)
 
       this.gatherReport()
-      this.reportToStream(this.report, res, 0)
+      this.reportToStream(this.report, res)
       res.end()
     })
 
@@ -76,7 +76,7 @@ class MemoryReporting {
       this.report = []
       this.addNodesToReport()
       res.write('\n')
-      this.reportToStream(this.report, res, 0)
+      this.reportToStream(this.report, res)
       res.write('\n')
       res.end()
     })
@@ -85,7 +85,7 @@ class MemoryReporting {
       this.report = []
       res.write('\n')
       this.addNetStatsToReport()
-      this.reportToStream(this.report, res, 0)
+      this.reportToStream(this.report, res)
       res.write('\n')
       res.end()
     })
