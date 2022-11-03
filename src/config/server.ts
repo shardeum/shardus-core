@@ -55,6 +55,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     startInWitnessMode: false,
     experimentalSnapshot: true,
     detectLostSyncing: true,
+    scaleGroupLimit: 25,
   },
   ip: {
     externalIp: '0.0.0.0',

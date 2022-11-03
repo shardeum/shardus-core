@@ -53,6 +53,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
     //  Validate of joinReq is done in addJoinRequest
     if (addJoinRequest(joinRequest)) {
       Comms.sendGossip('gossip-join', joinRequest, '', null, NodeList.byIdOrder, true)
+      nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
     }
     res.end()
   },

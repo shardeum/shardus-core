@@ -1,6 +1,6 @@
 import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
-import { StateManager } from '@shardus/types'
+import { StateManager, P2P } from '@shardus/types'
 
 const stringify = require('fast-stable-stringify')
 
@@ -388,7 +388,7 @@ class ShardFunctions {
   static computeNodePartitionDataMap(
     shardGlobals: ShardGlobals,
     nodeShardDataMap: NodeShardDataMap,
-    nodesToGenerate: Shardus.Node[],
+    nodesToGenerate: P2P.NodeListTypes.Node[],//Shardus.Node[],
     partitionShardDataMap: PartitionShardDataMap,
     activeNodes: Shardus.Node[],
     extendedData: boolean,

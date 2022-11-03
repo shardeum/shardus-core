@@ -2,7 +2,7 @@ import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
 import { logFlags } from '../logger'
 import { P2P } from '@shardus/types'
-import { sleep, validateTypes } from '../utils'
+import { sleep, validateTypes, fastIsPicked } from '../utils'
 import * as Comms from './Comms'
 import { config, crypto, logger } from './Context'
 import * as CycleChain from './CycleChain'
@@ -36,8 +36,7 @@ const gossipScaleRoute: P2P.P2PTypes.GossipHandler<P2P.CycleAutoScaleTypes.Signe
 ) => {
   profilerInstance.scopedProfileSectionStart('gossip-scaling')
   try {
-    if (logFlags.p2pNonFatal)
-      info(`Got scale request: ${JSON.stringify(payload)}`)
+    if (logFlags.p2pNonFatal) info(`Got scale request: ${JSON.stringify(payload)}`)
     if (!payload) {
       warn('No payload provided for the `scaling` request.')
       return
@@ -85,7 +84,7 @@ export function getDesiredCount(): number {
   return desiredCount
 }
 
-function createScaleRequest(scaleType) : P2P.CycleAutoScaleTypes.SignedScaleRequest {
+function createScaleRequest(scaleType): P2P.CycleAutoScaleTypes.SignedScaleRequest {
   const request: P2P.CycleAutoScaleTypes.ScaleRequest = {
     nodeId: Self.id,
     timestamp: Date.now(),
@@ -115,11 +114,15 @@ function _requestNetworkScaling(upOrDown) {
   // await _waitUntilEndOfCycle()
   const isRequestAdded = addExtScalingRequest(signedRequest)
   if (isRequestAdded) {
-    info(`Our scale request is added. Gossiping our scale request to other nodes. ${JSON.stringify(signedRequest)}`)
+    info(
+      `Our scale request is added. Gossiping our scale request to other nodes. ${JSON.stringify(
+        signedRequest
+      )}`
+    )
     Comms.sendGossip('scaling', signedRequest, '', null, NodeList.byIdOrder, true, 2)
     scalingRequested = true
     requestedScalingType = signedRequest.scale //only set this when our node requests scaling
-    nestedCountersInstance.countEvent('p2p', 'send scaling: ' + upOrDown?'up':'down')
+    nestedCountersInstance.countEvent('p2p', 'initiate gossip: scaling: ' + (upOrDown ? 'up' : 'down'))
   }
 }
 
@@ -127,6 +130,11 @@ export function requestNetworkUpsize() {
   if (getDesiredCount() >= config.p2p.maxNodes) {
     return
   }
+
+  if (_canThisNodeSendScaleRequests() === false) {
+    return
+  }
+
   console.log('DBG', 'UPSIZE!')
   _requestNetworkScaling(P2P.CycleAutoScaleTypes.ScaleType.UP)
 }
@@ -135,11 +143,16 @@ export function requestNetworkDownsize() {
   if (getDesiredCount() <= config.p2p.minNodes) {
     return
   }
+
+  if (_canThisNodeSendScaleRequests() === false) {
+    return
+  }
+
   console.log('DBG', 'DOWNSIZE!')
   _requestNetworkScaling(P2P.CycleAutoScaleTypes.ScaleType.DOWN)
 }
 
-function addExtScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleRequest) : boolean {
+function addExtScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleRequest): boolean {
   const added = _addScalingRequest(scalingRequest)
   return added
 }
@@ -159,9 +172,9 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
   // Check if cycle counter matches
   if (scalingRequest.counter !== CycleCreator.currentCycle) {
     warn(
-      `Invalid scaling request, not for this cycle. Current cycle:${CycleCreator.currentCycle}, cycleInScaleRequest: ${scalingRequest.counter} Request: ${JSON.stringify(
-        scalingRequest
-      )}`
+      `Invalid scaling request, not for this cycle. Current cycle:${
+        CycleCreator.currentCycle
+      }, cycleInScaleRequest: ${scalingRequest.counter} Request: ${JSON.stringify(scalingRequest)}`
     )
     return false
   }
@@ -194,6 +207,42 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
   return true
 }
 
+//Protocl security node:
+//note we will need the ablity to check if other nodes also meet this requirement
+//so that we can reject input from nodes that are not permitted to send a vote
+//to do that well we need to make it easy to get the index of a node by ID
+function _canThisNodeSendScaleRequests() {
+  let scaleVoteLimits = config.p2p.scaleGroupLimit > 0
+  if (scaleVoteLimits === false) {
+    return true
+  }
+
+  let numActiveNodes = NodeList.activeByIdOrder.length
+
+  if (numActiveNodes < config.p2p.scaleGroupLimit) {
+    true
+  }
+  let canSendGossip = false
+  let offset = CycleChain.newest.counter //todo something more random
+  let ourIndex = -1
+  let ourNodeID = Self.id
+  //might be nicer to get calculate this in another location.  This does exist in state manager, but would require some refactoring to share it in a nice way
+  for (let i = 0; i < numActiveNodes; i++) {
+    let node: P2P.NodeListTypes.Node = NodeList.activeByIdOrder[i] as P2P.NodeListTypes.Node
+    if (node.id === ourNodeID) {
+      ourIndex = i
+      break
+    }
+  }
+  if (ourIndex === -1) {
+    return false
+  }
+
+  canSendGossip = fastIsPicked(ourIndex, numActiveNodes, config.p2p.scaleGroupLimit, offset)
+
+  return canSendGossip
+}
+
 function _checkScaling() {
   // Keep a flag if we have changed our metadata.scaling at all
   let changed = false
@@ -222,6 +271,12 @@ function _checkScaling() {
 
   let scaleUpRequests = getScaleUpRequests()
   let scaleDownRequests = getScaleDownRequests()
+
+  let scaleVoteLimits = config.p2p.scaleGroupLimit > 0 && numActiveNodes > config.p2p.scaleGroupLimit
+  if (scaleVoteLimits) {
+    //This will reduce the amount of votde required, because scaleGroupLimit will limit the number of nodes actually voting
+    requiredVotes = Math.min(requiredVotes, config.p2p.scaleGroupLimit * config.p2p.scaleConsensusRequired)
+  }
 
   // Check up first, but must have more votes than down votes.
   if (scaleUpRequests.length >= requiredVotes && scaleUpRequests.length >= scaleDownRequests.length) {
@@ -292,6 +347,9 @@ export function queueRequest(request) {}
 
 export function sendRequests() {}
 
+//TODO please review this.  It seems we get consensus on scale up/down, but then
+//are not using the autoscaling list for the subsequent operations?
+//maybe that is ok?
 export function getTxs(): P2P.CycleAutoScaleTypes.Txs {
   // [IMPORTANT] Must return a copy to avoid mutation
   const requestsCopy = deepmerge({}, [...Object.values(scalingRequestsCollector)])

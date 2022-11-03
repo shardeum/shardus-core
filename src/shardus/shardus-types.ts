@@ -626,6 +626,8 @@ export interface ServerConfiguration {
     startInWitnessMode?: boolean
     experimentalSnapshot?: boolean
     detectLostSyncing?: boolean
+    /** limit the scaling group to a max number of nodes */
+    scaleGroupLimit?: number
   }
   /** Server IP configuration */
   ip?: {

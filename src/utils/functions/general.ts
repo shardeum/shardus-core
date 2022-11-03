@@ -320,3 +320,17 @@ export function humanFileSize(size: number): string {
   const value = Number(size / Math.pow(1024, i)).toFixed(2)
   return value + ' ' + ['B', 'kB', 'MB', 'GB', 'TB'][i]
 }
+
+export function fastIsPicked(ourIndex: number, groupSize: number, numToPick: number, offset: number=0):boolean{
+  let isPicked = false
+  let fstride = groupSize / numToPick
+  let finalOffset = ourIndex + offset
+  let steps = finalOffset / fstride
+  steps = Math.round(steps)
+  let fendPoint = steps * fstride
+  let endpoint = Math.round(fendPoint)
+  if(endpoint === finalOffset) {
+    isPicked = true
+  }
+  return isPicked
+}
