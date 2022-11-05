@@ -232,7 +232,7 @@ function _canThisNodeSendScaleRequests(_nodeId: string) {
   let offset = CycleChain.newest.counter //todo something more random
   let nodeInfo = stateManager.currentCycleShardData.nodeShardDataMap.get(_nodeId)
 
-  // no such node in the list 
+  // no such node in the list
   if(!nodeInfo) return false
 
   const ourIndex = nodeInfo.ourNodeIndex
@@ -453,6 +453,7 @@ function _addScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleR
   return added
 }
 
+//TODO: we need to consider using _waitUntilEndOfCycle to schedule voting times
 async function _waitUntilEndOfCycle() {
   const currentTime = Date.now()
   const nextQ1Start = CycleCreator.nextQ1Start

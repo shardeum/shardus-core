@@ -1740,31 +1740,6 @@ class Shardus extends EventEmitter {
   }
 
   /**
-   * Records a timestamp in a heartbeat to the storage module
-   */
-  async _writeHeartbeat() {
-    const timestamp = utils.getTime('s')
-    await this.storage.setProperty('heartbeat', timestamp)
-  }
-
-  /**
-   * Sets up the heartbeat interval for keeping track of time alive
-   */
-  _setupHeartbeat() {
-    this.heartbeatTimer = setInterval(async () => {
-      await this._writeHeartbeat()
-    }, this.heartbeatInterval * 1000)
-  }
-
-  /**
-   * Stops the heartbeat interval
-   */
-  _stopHeartbeat() {
-    this.mainLogger.info('Stopping heartbeat...')
-    clearInterval(this.heartbeatTimer)
-  }
-
-  /**
    * Checks a transaction timestamp for expiration
    * @param {number} timestamp
    */

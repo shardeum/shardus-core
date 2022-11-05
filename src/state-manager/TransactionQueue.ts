@@ -1466,20 +1466,6 @@ class TransactionQueue {
   }
 
   /**
-   * getQueueEntryPending
-   * get a queue entry from the pending queue (has not been added to the main queue yet)
-   * this is mainly for internal use, it makes more sense to call getQueueEntrySafe
-   * @param txid
-   */
-  getQueueEntryPending(txid: string): QueueEntry | null {
-    let queueEntry = this.newAcceptedTxQueueTempInjestByID.get(txid)
-    if (queueEntry === undefined) {
-      return null
-    }
-    return queueEntry
-  }
-
-  /**
    * getQueueEntrySafe
    * get a queue entry from the queue or the pending queue (but not archive queue)
    * @param txid
@@ -3094,10 +3080,6 @@ class TransactionQueue {
       this.archivedQueueEntries.shift()
     }
   }
-
-  setState(queueEntry: QueueEntry, newState: string) {}
-
-  setHigherState(queueEntry: QueueEntry, newState: string) {}
 
   /***
    *    ########  ########   #######   ######  ########  ######   ######

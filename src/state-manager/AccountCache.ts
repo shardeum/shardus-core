@@ -617,23 +617,6 @@ class AccountCache {
     return mainHashResults
   }
 
-  filterOutNonStoredData(mainHashResults: MainHashResults) {
-    let cycle = mainHashResults.cycle
-    let shardValues = this.stateManager.shardValuesByCycle.get(cycle)
-    let shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
-
-    for (let partition of mainHashResults.partitionHashResults.keys()) {
-      let partitionHashResults: PartitionHashResults = mainHashResults.partitionHashResults.get(partition)
-      if (
-        ShardFunctions.testInRange(
-          partitionHashResults.partition,
-          shardValues.nodeShardData.storedPartitions
-        ) === false
-      ) {
-      }
-    }
-  }
-
   // fast version of what is above.  This is what we really need for production
   // it should be pretty close to working now that other issues with timestamps were fixed.
   // should test and re-enable it.

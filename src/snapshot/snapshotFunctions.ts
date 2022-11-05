@@ -35,7 +35,7 @@ interface Account {
 type PartitionRanges = Map<
   StateManager.shardFunctionTypes.AddressRange['partition'],
   StateManager.shardFunctionTypes.AddressRange
->
+  >
 
 type PartitionAccounts = Map<StateManager.shardFunctionTypes.AddressRange['partition'], Account[]>
 
@@ -432,13 +432,6 @@ export function convertMapToObj(inputMap) {
   const obj = {}
   for (const [key, value] of inputMap) {
     obj[key] = value
-  }
-  return obj
-}
-export function convertArrayToObj(inputArr) {
-  const obj = {}
-  for (let i = 0; i < inputArr.length; i++) {
-    obj[i] = inputArr[i]
   }
   return obj
 }

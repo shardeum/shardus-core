@@ -131,14 +131,6 @@ export function queueRequest(request) {}
 
 export function sendRequests() {}
 
-/** Module Functions */
-
-function refreshArchivers() {
-  // [TODO] Come up with a better policy for this
-  const refreshedArchivers = [...Archivers.archivers.values()]
-  return refreshedArchivers.sort(propComparator('publicKey'))
-}
-
 function refreshConsensors() {
   /**
    * [NOTE] We could update the counterRefreshed value here before putting

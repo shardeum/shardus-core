@@ -188,12 +188,14 @@ class State extends EventEmitter {
     return CycleChain.newest
   }
 
+  //save for local debugging
   getCycleByCounter(counter) {
     const i = utils.binarySearch(CycleChain.cycles, { counter }, utils.propComparator('counter'))
     if (i > -1) return CycleChain.cycles[i]
     return null
   }
 
+  //save for local debugging
   getCycleByTimestamp(timestamp) {
     const secondsTs = Math.floor(timestamp * 0.001)
     const i = utils.binarySearch(CycleChain.cycles, secondsTs, (ts, record) => {

@@ -548,50 +548,6 @@ function makeNetworkConfigHash() {
   return crypto.hash(netConfig)
 }
 
-async function compareCycleMarkers(myC: number, myQ: number, desired: number) {
-  if (logFlags.p2pNonFatal) info('Comparing cycle markers...')
-
-  // Init vars
-  let matches = 0
-
-  // Get random nodes
-  // [TODO] Use a randomShifted array
-  const nodes = utils.getRandom(NodeList.activeOthersByIdOrder, 2 * desired)
-
-  for (const node of nodes) {
-    // Send marker, txs to /compare-marker endpoint of another node
-    const req: CompareMarkerReq = { marker, txs }
-    const resp: CompareMarkerRes = await Comms.ask(node, 'compare-marker', req)
-
-    /**
-     * [IMPORTANT] Don't change things if the awaited call took too long
-     */
-    if (cycleQuarterChanged(myC, myQ)) return false
-
-    if (resp) {
-      if (resp.marker === marker) {
-        // Increment our matches if they computed the same marker
-        matches++
-
-        // Done if desired matches reached
-        if (matches >= desired) {
-          return true
-        }
-      } else if (resp.txs) {
-        // Otherwise, Get missed CycleTxs
-        const unseen = unseenTxs(txs, resp.txs)
-        const validUnseen = dropInvalidTxs(unseen)
-
-        // Update this cycle's txs, record, marker, and cert
-        txs = deepmerge(txs, validUnseen)
-        ;({ record, marker, cert } = makeCycleData(txs, CycleChain.newest))
-      }
-    }
-  }
-
-  return true
-}
-
 // This is not being used anymore. If we decide to use it, be sure to validate the inputs.
 function compareCycleMarkersEndpoint(req: CompareMarkerReq): CompareMarkerRes {
   // If your markers matches, just send back a marker

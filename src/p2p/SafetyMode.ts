@@ -156,20 +156,3 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 export function queueRequest(request) {}
 
 export function sendRequests() {}
-
-/** Module Functions */
-
-function info(...msg) {
-  const entry = `[CHANGE ME]: ${msg.join(' ')}`
-  p2pLogger.info(entry)
-}
-
-function warn(...msg) {
-  const entry = `[CHANGE ME]: ${msg.join(' ')}`
-  p2pLogger.warn(entry)
-}
-
-function error(...msg) {
-  const entry = `[CHANGE ME]: ${msg.join(' ')}`
-  p2pLogger.error(entry)
-}

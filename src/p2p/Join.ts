@@ -467,26 +467,6 @@ export async function firstJoin() {
   return computeNodeId(crypto.keypair.publicKey, zeroMarker)
 }
 
-export async function fetchCycleMarker(nodes) {
-  const queryFn = async (node) => {
-    const marker = await http.get(`${node.ip}:${node.port}/cyclemarker`)
-    return marker
-  }
-
-  function _isSameCycleMarkerInfo(info1, info2) {
-    const cm1 = utils.deepCopy(info1)
-    const cm2 = utils.deepCopy(info2)
-    delete cm1.currentTime
-    delete cm2.currentTime
-    const equivalent = isDeepStrictEqual(cm1, cm2)
-    if (logFlags.p2pNonFatal) info(`Equivalence of the two compared cycle marker infos: ${equivalent}`)
-    return equivalent
-  }
-
-  const { topResult: marker } = await robustQuery(nodes, queryFn)
-  return marker
-}
-
 export async function submitJoin(
   nodes: P2P.P2PTypes.Node[],
   joinRequest: P2P.JoinTypes.JoinRequest & P2P.P2PTypes.SignedObject

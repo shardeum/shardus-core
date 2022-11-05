@@ -219,14 +219,6 @@ class Sqlite3Storage {
     await this.run(createStatement)
   }
 
-  async dropAndCreateModel(model) {
-    // await model.sync({ force: true })
-  }
-
-  _checkInit() {
-    if (!this.initialized) throw new Error('Storage not initialized.')
-  }
-
   _create(table, object, opts) {
     try {
       this.profiler.profileSectionStart('db')

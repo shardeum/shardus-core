@@ -300,19 +300,6 @@ async function discoverNetwork(seedNodes) {
   return true
 }
 
-/** HELPER FUNCTIONS */
-
-async function calculateTimeDifference() {
-  const response: any = await got.get('https://google.com')
-  const localTime = Date.now()
-  const googleTime = Date.parse(response.headers.date)
-  const timeDiff = Math.abs(localTime - googleTime)
-  if (logFlags.p2pNonFatal) info('googleTime', googleTime)
-  if (logFlags.p2pNonFatal) info('localTime', localTime)
-  if (logFlags.p2pNonFatal) info('Time diff between google.com and local machine', timeDiff)
-  return timeDiff
-}
-
 // export async function checkTimeSynced(timeServers) {
 //   for (const host of timeServers) {
 //     try {
