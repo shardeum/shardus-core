@@ -60,7 +60,13 @@ class RateLimiting {
     if (throttle > 0) {
       // TODO: add counter to track max load type
     }
-    return Math.random() < throttle
+    let overloaded = Math.random() < throttle
+
+    if(overloaded){
+      nestedCountersInstance.countEvent('loadRelated', 'txRejected:' + loadType)
+    }
+
+    return overloaded
   }
 }
 

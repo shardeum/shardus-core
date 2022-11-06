@@ -1749,6 +1749,7 @@ class StateManager {
 
   tryStartAcceptedQueue() {
     if (!this.accountSync.dataSyncMainPhaseComplete) {
+      nestedCountersInstance.countEvent('processing', 'data sync pending')
       return
     }
     if (!this.transactionQueue.newAcceptedTxQueueRunning) {

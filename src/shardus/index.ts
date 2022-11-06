@@ -903,7 +903,6 @@ class Shardus extends EventEmitter {
     }
     if (this.rateLimiting.isOverloaded()) {
       this.statistics.incrementCounter('txRejected')
-      nestedCountersInstance.countEvent('loadRelated', 'txRejected')
       nestedCountersInstance.countEvent('rejected', 'isOverloaded')
       return { success: false, reason: 'Maximum load exceeded.', status: 500 }
     }

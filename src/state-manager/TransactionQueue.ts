@@ -92,6 +92,8 @@ class TransactionQueue {
   /** process loop stats.  This map contains the latest and the last of each time overage category */
   lastProcessStats: { [limitName: string]: ProcessQueueStats }
 
+  stuckProcessReported: boolean
+
   constructor(
     stateManager: StateManager,
     profiler: Profiler,
@@ -153,6 +155,8 @@ class TransactionQueue {
     this.queueTimingFixes = true
 
     this.lastProcessStats = {}
+
+    this.stuckProcessReported = false
   }
 
   /***
@@ -3133,7 +3137,21 @@ class TransactionQueue {
     }
 
     try {
+
+      nestedCountersInstance.countEvent('processing', 'processing-enter')
+
+      if (this.newAcceptedTxQueueTempInjest.length > 5000){
+        nestedCountersInstance.countEvent('stateManager', `newAcceptedTxQueueTempInjest>5000 leftRunning:${this.newAcceptedTxQueueRunning} noShardCalcs:${this.stateManager.currentCycleShardData == null} `)
+        
+        //report rare counter once
+        if(this.stuckProcessReported === false){
+          this.stuckProcessReported = true
+          nestedCountersInstance.countRareEvent('stateManager', `newAcceptedTxQueueTempInjest>5000 leftRunning:${this.newAcceptedTxQueueRunning} noShardCalcs:${this.stateManager.currentCycleShardData == null} `)
+        }
+      }
+
       if (this.newAcceptedTxQueueRunning === true) {
+        nestedCountersInstance.countEvent('stateManager', 'newAcceptedTxQueueRunning === true')
         return
       }
       this.newAcceptedTxQueueRunning = true
@@ -3156,6 +3174,7 @@ class TransactionQueue {
       this.profiler.profileSectionStart('processQ')
 
       if (this.stateManager.currentCycleShardData == null) {
+        nestedCountersInstance.countEvent('stateManager', 'currentCycleShardData == null early exit')
         return
       }
 
