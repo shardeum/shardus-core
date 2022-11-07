@@ -34,10 +34,10 @@ import { time } from 'console'
 import SHARDUS_CONFIG from '../config'
 import { isApopMarkedNode } from '../p2p/Apoptosis'
 import { netConfig } from '../p2p/CycleCreator'
+import { startSaving } from './saveConsoleOutput'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
-const saveConsoleOutput = require('./saveConsoleOutput')
 
 const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG
 
@@ -114,7 +114,7 @@ class Shardus extends EventEmitter {
     Snapshot.initLogger()
 
     if (logsConfig.saveConsoleOutput) {
-      saveConsoleOutput.startSaving(path.join(config.baseDir, logsConfig.dir))
+      startSaving(path.join(config.baseDir, logsConfig.dir))
     }
 
     this.mainLogger = this.logger.getLogger('main')

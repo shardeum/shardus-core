@@ -1,24 +1,22 @@
-const { createWriteStream } = require('fs')
-const { Console } = require('console')
-const { PassThrough } = require('stream')
-const { join } = require('path')
+import { Console } from 'console'
+import { PassThrough } from 'stream'
+import { join } from 'path'
+import { RollingFileStream } from 'streamroller'
 
-function startSaving(baseDir) {
+export function startSaving(baseDir: string) {
   // Create a file to save combined stdout and stderr output
   const outFileName = `out.log`
-  const outFile = createWriteStream(join(baseDir, outFileName), { flags: 'a' })
+  const stream = new RollingFileStream(join(baseDir, outFileName), 10000000, 10)
 
   // Create passthroughs that write to stdout, stderr, and the output file
   const outPass = new PassThrough()
   outPass.pipe(process.stdout)
-  outPass.pipe(outFile)
+  outPass.pipe(stream)
 
   const errPass = new PassThrough()
   errPass.pipe(process.stderr)
-  errPass.pipe(outFile)
+  errPass.pipe(stream)
 
   // Monkey patch the global console with a new one that uses our passthroughs
   console = new Console({ stdout: outPass, stderr: errPass }) // eslint-disable-line no-global-assign
 }
-
-exports.startSaving = startSaving
