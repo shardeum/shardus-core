@@ -54,8 +54,13 @@ export class NetworkClass extends EventEmitter {
   externalCatchAll: any
   debugNetworkDelay: number
   statisticsInstance: any
+  customStringifier?: (val: any) => string
 
-  constructor(config: Shardus.StrictServerConfiguration, logger: Logger) {
+  constructor(
+    config: Shardus.StrictServerConfiguration,
+    logger: Logger,
+    customStringifier?: (val: any) => string
+  ) {
     super()
     this.app = express()
     this.sn = null
@@ -78,6 +83,7 @@ export class NetworkClass extends EventEmitter {
     }
 
     nestedCountersInstance.countEvent('network', 'init')
+    this.customStringifier = customStringifier
   }
 
   setStatisticsInstance(statistics) {
@@ -123,6 +129,7 @@ export class NetworkClass extends EventEmitter {
   async _setupInternal() {
     this.sn = Sn({
       port: this.ipInfo.internalPort,
+      customStringifier: this.customStringifier,
     })
     this.intServer = await this.sn.listen(async (data, remote, respond) => {
       let routeName

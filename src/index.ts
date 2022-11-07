@@ -22,7 +22,7 @@ const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG
 
 const overwriteMerge = (target, source, options) => source
 
-export function shardusFactory(configs = {}) {
+export function shardusFactory(configs = {}, opts?: { customStringifier?: (val: any) => string }) {
   const mergedConfigs = merge(defaultConfigs, configs, {
     arrayMerge: overwriteMerge,
   })
@@ -50,5 +50,5 @@ export function shardusFactory(configs = {}) {
     throw new Error(msg)
   }
 
-  return new Shardus(mergedConfigs)
+  return new Shardus(mergedConfigs, opts)
 }

@@ -87,11 +87,10 @@ interface Shardus {
  * The main module that is used by the app developer to interact with the shardus api
  */
 class Shardus extends EventEmitter {
-  constructor({
-    server: config,
-    logs: logsConfig,
-    storage: storageConfig,
-  }: ShardusTypes.StrictShardusConfiguration) {
+  constructor(
+    { server: config, logs: logsConfig, storage: storageConfig }: ShardusTypes.StrictShardusConfiguration,
+    opts?: { customStringifier?: (val: any) => string }
+  ) {
     super()
     this.nestedCounters = new NestedCounters()
     this.memoryReporting = new MemoryReporting(this)
@@ -126,7 +125,7 @@ class Shardus extends EventEmitter {
     Context.setStorageContext(this.storage)
     this.crypto = new Crypto(this.config, this.logger, this.storage)
     Context.setCryptoContext(this.crypto)
-    this.network = new Network.NetworkClass(config, this.logger)
+    this.network = new Network.NetworkClass(config, this.logger, opts?.customStringifier)
     Context.setNetworkContext(this.network)
 
     // Set the old P2P to a Wrapper into the new P2P
