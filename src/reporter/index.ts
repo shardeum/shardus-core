@@ -46,6 +46,7 @@ interface Reporter {
   loadDetection: LoadDetection
   logger: Logger
   reportTimer: NodeJS.Timeout
+  reportingInterval: NodeJS.Timeout
   lastTime: number
   doConsoleReport: boolean
   hasRecipient: boolean
@@ -349,7 +350,11 @@ class Reporter {
 
   startReporting() {
     const self = this
-    setInterval(() => {
+    
+    if (this.reportingInterval) {
+      return
+    }
+    this.reportingInterval = setInterval(() => {
       self.collectStatisticToReport()
 
       //temp mem debugging:
@@ -387,6 +392,8 @@ class Reporter {
   stopReporting() {
     this.mainLogger.info('Stopping statistics reporting...')
     clearTimeout(this.reportTimer)
+    clearTimeout(this.reportingInterval)
+    this.reportingInterval = null
   }
 }
 
