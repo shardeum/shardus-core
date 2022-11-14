@@ -31,6 +31,7 @@ import {
   RequestReceiptForTxResp_old,
   ProcessQueueStats,
   SimpleNumberStats,
+  QueueCountsResult
 } from './state-manager-types'
 
 const stringify = require('fast-stable-stringify')
@@ -773,6 +774,8 @@ class TransactionQueue {
         filter,
         note
       )
+      console.log('thant: savedSomething for the txNonce: ', queueEntry.acceptedTx.appData.txNonce, savedSomething)
+      queueEntry.accountDataSet = true
       this.profiler.scopedProfileSectionEnd('commit_setAccount')
       if (savedSomething) {
         if (this.config.debug.optimizedTXConsenus) {
@@ -1135,6 +1138,7 @@ class TransactionQueue {
         txSieveTime: 0,
         debug: {},
         voteCastAge: 0,
+        accountDataSet: false
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -3142,7 +3146,7 @@ class TransactionQueue {
 
       if (this.newAcceptedTxQueueTempInjest.length > 5000){
         nestedCountersInstance.countEvent('stateManager', `newAcceptedTxQueueTempInjest>5000 leftRunning:${this.newAcceptedTxQueueRunning} noShardCalcs:${this.stateManager.currentCycleShardData == null} `)
-        
+
         //report rare counter once
         if(this.stuckProcessReported === false){
           this.stuckProcessReported = true
@@ -4236,6 +4240,8 @@ class TransactionQueue {
                     'awaitFinalData_passed',
                     false
                   )
+                  console.log('thant: checkAndSetAccountData for the txNonce: ', queueEntry.acceptedTx.appData.txNonce)
+                  queueEntry.accountDataSet = true
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
                     'checkAndSetAccountData',
@@ -5025,21 +5031,30 @@ class TransactionQueue {
     return length
   }
 
-  getAccountQueueCount(accountID: string, remote: boolean = false): number {
+  getAccountQueueCount(accountID: string, remote: boolean = false): QueueCountsResult {
     nestedCountersInstance.countEvent('stateManager', `getAccountQueueCount`)
     let count = 0
+    let committingAppData: Shardus.AcceptedTx["appData"] = []
     for (let queueEntry of this.newAcceptedTxQueueTempInjest) {
       if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
+        let tx = queueEntry.acceptedTx
+        if (logFlags.verbose) console.log('getAccountQueueCount: found upstream tx in the injested queue:', `currentNonce: ${tx.appData.nonce}, queueCount: ${tx.appData.queueCount}, txNonce: ${tx.appData.txNonce}, queueStatus: ${queueEntry.state} hasFinalData: ${queueEntry.hasValidFinalData} accountDataSet: ${queueEntry.accountDataSet}`);
         count++
       }
     }
     for (let queueEntry of this.newAcceptedTxQueue) {
       if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
+        let tx = queueEntry.acceptedTx
+        if (queueEntry.state === 'commiting' && queueEntry.accountDataSet === false) {
+          committingAppData.push(tx.appData)
+          continue
+        }
+        if (logFlags.verbose) console.log('getAccountQueueCount: found upstream tx in the newAccepted queue:', `currentNonce: ${tx.appData.nonce}, queueCount: ${tx.appData.queueCount}, txNonce: ${tx.appData.txNonce}, queueStatus: ${queueEntry.state} hasFinalData: ${queueEntry.hasValidFinalData} accountDataSet: ${queueEntry.accountDataSet}`);
         count++
       }
     }
-    // if (logFlags.verbose) console.log(`getAccountQueueCount: remote:${remote} ${count} acc:${utils.stringifyReduce(accountID)}`)
-    return count
+    if (logFlags.verbose) console.log(`getAccountQueueCount: remote:${remote} ${count} acc:${utils.stringifyReduce(accountID)}`)
+    return { count, committingAppData }
   }
 }
 

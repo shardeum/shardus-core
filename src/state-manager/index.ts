@@ -73,6 +73,7 @@ import {
   RequestReceiptForTxResp_old,
   RequestAccountQueueCounts,
   QueueCountsResponse,
+  QueueCountsResult
 } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
@@ -1630,10 +1631,11 @@ class StateManager {
         profilerInstance.scopedProfileSectionStart('get_account_queue_count', false, msgSize)
         let responseSize = cUninitializedSize
         try {
-          let result: QueueCountsResponse = { counts: [] }
+          let result: QueueCountsResponse = { counts: [], committingAppData: [] }
           for (let address of payload.accountIds) {
-            let count = this.transactionQueue.getAccountQueueCount(address, true)
+            let { count, committingAppData } = this.transactionQueue.getAccountQueueCount(address, true)
             result.counts.push(count)
+            result.committingAppData.push(committingAppData)
           }
 
           responseSize = await respond(result)
@@ -1995,8 +1997,9 @@ class StateManager {
     }
   }
 
-  async getLocalOrRemoteAccountQueueCount(address: string): Promise<number> {
+  async getLocalOrRemoteAccountQueueCount(address: string): Promise<QueueCountsResult> {
     let count
+    let committingAppData
     if (this.currentCycleShardData == null) {
       await this.waitForShardData()
     }
@@ -2045,6 +2048,7 @@ class StateManager {
       let result = r as QueueCountsResponse
       if (result != null && result.counts != null && result.counts.length > 0) {
         count = result.counts[0]
+        committingAppData = result.committingAppData[0]
         /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts response: ${count} address:${utils.stringifyReduce(address)}`)
       } else {
         if (result == null) {
@@ -2058,11 +2062,13 @@ class StateManager {
       }
     } else {
       // we are local!
-      count = this.transactionQueue.getAccountQueueCount(address)
+      let queueCountResult = this.transactionQueue.getAccountQueueCount(address)
+      count = queueCountResult.count
+      committingAppData = queueCountResult.committingAppData
       /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts local: ${count} address:${utils.stringifyReduce(address)}`)
     }
 
-    return count
+    return { count, committingAppData }
   }
 
   // todo support metadata so we can serve up only a portion of the account

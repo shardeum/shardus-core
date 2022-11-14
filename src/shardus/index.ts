@@ -22,7 +22,7 @@ import Reporter from '../reporter'
 import * as ShardusTypes from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
-import { WrappedResponses } from '../state-manager/state-manager-types'
+import { WrappedResponses, QueueCountsResult } from '../state-manager/state-manager-types'
 import Statistics from '../statistics'
 import Storage from '../storage'
 import * as utils from '../utils'
@@ -1209,11 +1209,11 @@ class Shardus extends EventEmitter {
     }
   }
 
-  async getLocalOrRemoteAccountQueueCount(address): Promise<number> {
+  async getLocalOrRemoteAccountQueueCount(address): Promise<QueueCountsResult> {
     if (this.p2p.allowTransactions()) {
       return this.stateManager.getLocalOrRemoteAccountQueueCount(address)
     } else {
-      return 0
+      return {count: 0, committingAppData: []}
     }
   }
 

@@ -153,6 +153,7 @@ export type QueueEntry = {
   executionDebug?: any
   txDebug?: TxDebug
   txSieveTime: number
+  accountDataSet: boolean
 
   /** todo start migrating stuff that is truely debug only into this object */
   debug: {
@@ -741,7 +742,8 @@ export type GetAccountDataWithQueueHintsResp = { accountData: Shardus.WrappedDat
 
 
 export type RequestAccountQueueCounts = { accountIds: string[] }
-export type QueueCountsResponse = { counts: number[] }
+export type QueueCountsResponse = { counts: number[], committingAppData: QueueEntry["acceptedTx"]["appData"][] }
+export type QueueCountsResult = {count: number, committingAppData: Shardus.AcceptedTx["appData"]}
 
 export type GlobalAccountReportResp = {
   ready: boolean
