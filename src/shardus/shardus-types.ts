@@ -216,7 +216,8 @@ export interface App {
    * A function responsible for getting timestamp from injected transaction
    */
   getTimestampFromTransaction: (
-    inTx: OpaqueTransaction // it is better to not use IncomingTransaction
+    inTx: OpaqueTransaction, // it is better to not use IncomingTransaction
+    appData: {}
   ) => number
 
   /**

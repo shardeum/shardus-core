@@ -907,12 +907,26 @@ class Shardus extends EventEmitter {
     }
 
     try {
-      const injectedTimestamp = this.app.getTimestampFromTransaction(tx)
+
+      // Perform basic validation of the transaction fields
+      if (logFlags.verbose) this.mainLogger.debug('Performing initial validation of the transaction')
+
+      let appData = {}
+
+      // Give the dapp an opportunity to do some up front work and generate
+      // appData metadata for the applied TX
+      await this.app.txPreCrackData(tx, appData)
+
+      const injectedTimestamp = this.app.getTimestampFromTransaction(tx, appData)
 
       const txId = this.crypto.hash(tx)
       let timestampReceipt: ShardusTypes.TimestampReceipt
-      if (!injectedTimestamp) {
+      if (!injectedTimestamp || injectedTimestamp === -1) {
+        if (injectedTimestamp === -1) {
+          console.log('Dapp request to generate a new timestmap for the tx')
+        }
         timestampReceipt = await this.stateManager.transactionConsensus.askTxnTimestampFromNode(tx, txId)
+        console.log('Network generated a timestamp', timestampReceipt);
       }
       if (!injectedTimestamp && !timestampReceipt) {
         this.shardus_fatal(
@@ -928,7 +942,7 @@ class Shardus extends EventEmitter {
         }
       }
       let timestampedTx
-      if (!injectedTimestamp && timestampReceipt && timestampReceipt.timestamp) {
+      if (timestampReceipt && timestampReceipt.timestamp) {
         timestampedTx = {
           tx,
           timestampReceipt,
@@ -936,14 +950,6 @@ class Shardus extends EventEmitter {
       } else {
         timestampedTx = { tx }
       }
-      // Perform basic validation of the transaction fields
-      if (logFlags.verbose) this.mainLogger.debug('Performing initial validation of the transaction')
-
-      let appData = {}
-
-      // Give the dapp an opportunity to do some up front work and generate
-      // appData metadata for the applied TX
-      await this.app.txPreCrackData(timestampedTx, appData)
 
       // Perform fast validation of the transaction fields
       const validateResult = this.app.validate(timestampedTx, appData)
@@ -1405,8 +1411,8 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.getTimestampFromTransaction === 'function') {
-        applicationInterfaceImpl.getTimestampFromTransaction = (inTx) =>
-          application.getTimestampFromTransaction(inTx)
+        applicationInterfaceImpl.getTimestampFromTransaction = (inTx, appData) =>
+          application.getTimestampFromTransaction(inTx, appData)
       } else {
         throw new Error('Missing requried interface function.getTimestampFromTransaction()')
       }
