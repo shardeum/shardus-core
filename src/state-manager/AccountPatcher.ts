@@ -659,30 +659,44 @@ class AccountPatcher {
       'get-tree-last-insync-all',
       isDebugModeMiddleware,
       async (req, res) => {
+        const format = req.query.format ?? 'text'
+        const resData = {
+          nodes: [],
+          totalOOS: 0,
+          inSync: false,
+        }
         try {
           //wow, why does Context.p2p not work..
           let oosCount = 0
-          let activeNodes = Wrapper.p2p.state.getNodes()
+          const activeNodes = Wrapper.p2p.state.getNodes()
           if (activeNodes) {
-            for (let node of activeNodes.values()) {
-              let getResp = await this.logger._internalHackGetWithResp(
+            for (const node of activeNodes.values()) {
+              const getResp = await this.logger._internalHackGetWithResp(
                 `${node.externalIp}:${node.externalPort}/get-tree-last-insync`
               )
               if (getResp.body && getResp.body.includes('false')) {
                 oosCount++
               }
-              res.write(
-                `inSync: ${getResp.body ? getResp.body.trim() : 'no data'}  ${node.externalIp}:${
-                  node.externalPort
-                } ${getResp.body ? (getResp.body ? '' : ' ***') : ''} \n `
-              )
-              //res.write(getResp.body ? getResp.body : 'no data')
+              resData.nodes.push({
+                node: `${node.externalIp}:${node.externalPort}`,
+                data: `${getResp.body ? getResp.body.trim() : 'no data'}`,
+              })
             }
           }
 
-          res.write(`this node in sync:${this.failedLastTrieSync === false} totalOOS:${oosCount} \n`)
+          resData.totalOOS = oosCount
+          resData.inSync = this.failedLastTrieSync === false
+
+          if (format === 'text') {
+            for (const node of resData.nodes) {
+              res.write(`inSync: ${node.data}  ${node.node}\n`)
+            }
+            res.write(`this node in sync:${this.failedLastTrieSync === false} totalOOS:${oosCount} \n`)
+          } else {
+            res.status(200).jsonp(resData)
+          }
         } catch (e) {
-          res.write(`${e}\n`)
+          res.status(500).jsonp(e)
         }
 
         res.end()
