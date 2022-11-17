@@ -1,13 +1,14 @@
+import * as cryptoUtils from '@shardus/crypto-utils'
+import { P2P } from '@shardus/types'
 import { Logger } from 'log4js'
+import { logFlags } from '../logger'
 import { setIsUpTs } from '../p2p/Lost'
 import * as utils from '../utils'
+import { nestedCountersInstance } from '../utils/nestedCounters'
+import { cNoSizeTrack, cUninitializedSize } from '../utils/profiler'
 import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import { P2P } from '@shardus/types'
-import { logFlags } from '../logger'
-import { nestedCountersInstance } from '../utils/nestedCounters'
-import { cNoSizeTrack, cUninitializedSize } from '../utils/profiler'
 
 /** ROUTES */
 
@@ -86,9 +87,11 @@ function _authenticateByNode(message, node) {
       error('Node object did not contain curve public key for authenticateByNode()!')
       return false
     }
-    result = crypto.authenticate(message, node.curvePublicKey)
+    result = config.p2p.useSignaturesForAuth
+      ? crypto.verify(message, node.publicKey)
+      : crypto.authenticate(message, node.curvePublicKey)
   } catch (e) {
-    error(`Invalid or missing authentication tag on message: ${JSON.stringify(message)}`)
+    error(`Invalid or missing authentication/signature tag on message: ${JSON.stringify(message)}`)
     return false
   }
   return result
@@ -105,12 +108,22 @@ function _extractPayload(wrappedPayload, nodeGroup) {
     warn(`_extractPayload Failed to extract payload. Error: ${error}`)
     return [null]
   }
-  err = utils.validateTypes(wrappedPayload, {
-    sender: 's',
-    payload: 'o',
-    tag: 's',
-    tracker: 's?',
-  })
+  err = utils.validateTypes(
+    wrappedPayload,
+    config.p2p.useSignaturesForAuth
+      ? {
+          sender: 's',
+          payload: 'o',
+          sign: 'o',
+          tracker: 's?',
+        }
+      : {
+          sender: 's',
+          payload: 'o',
+          tag: 's',
+          tracker: 's?',
+        }
+  )
   if (err) {
     warn('extractPayload: bad wrappedPayload: ' + err + ' ' + JSON.stringify(wrappedPayload))
     return [null]
@@ -134,23 +147,31 @@ function _extractPayload(wrappedPayload, nodeGroup) {
   const payload = wrappedPayload.payload
   const sender = wrappedPayload.sender
   const tracker = wrappedPayload.tracker
-  const msgSize = wrappedPayload.tag_msgSize
+  const msgSize = wrappedPayload.msgSize
   return [payload, sender, tracker, msgSize]
 }
 
-function _wrapAndTagMessage(msg, tracker = '', recipientNode) {
+function _wrapMessage(msg, tracker = '') {
   if (!msg) throw new Error('No message given to wrap and tag!')
   if (logFlags.verbose) {
     warn(`Attaching sender ${Self.id} to the message: ${utils.stringifyReduceLimit(msg)}`)
   }
-  const wrapped = {
+  return {
     payload: msg,
     sender: Self.id,
     tracker,
-    tag_msgSize: 0,
+    msgSize: 0,
   }
-  const tagged = crypto.tagWithSize(wrapped, recipientNode.curvePublicKey)
-  return tagged
+}
+
+function _wrapAndTagMessage(msg, tracker = '', recipientNode) {
+  const wrapped = _wrapMessage(msg, tracker)
+  return crypto.tagWithSize(wrapped, recipientNode.curvePublicKey)
+}
+
+function _wrapAndSignMessage(msg, tracker = '') {
+  const wrapped = _wrapMessage(msg, tracker)
+  return crypto.signWithSize(wrapped)
 }
 
 function createMsgTracker() {
@@ -161,12 +182,11 @@ function createGossipTracker() {
 }
 
 // Our own P2P version of the network tell, with a sign added
-export async function tell(nodes, route, message, logged = false, tracker = '') {
+export async function tell(nodes: any[], route, message, logged = false, tracker = '') {
   let msgSize = cUninitializedSize
   if (tracker === '') {
     tracker = createMsgTracker()
   }
-  const promises = []
 
   if (commsCounters) {
     nestedCountersInstance.countEvent('comms-route', `tell ${route}`, nodes.length)
@@ -175,18 +195,53 @@ export async function tell(nodes, route, message, logged = false, tracker = '') 
     /* prettier-ignore */ nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `tell ${route} recipients:${nodes.length}`)
   }
 
+  msgSize = config.p2p.useSignaturesForAuth
+    ? await signedMultiTell(nodes, message, tracker, msgSize, route, logged)
+    : await taggedMultiTell(nodes, message, tracker, msgSize, route, logged)
+  return msgSize
+}
+
+async function taggedMultiTell(
+  nodes: any[],
+  message: any,
+  tracker: string,
+  msgSize: number,
+  route: any,
+  logged: boolean
+) {
+  const promises = []
   for (const node of nodes) {
     if (node.id === Self.id) {
       if (logFlags.p2pNonFatal) info('p2p/Comms:tell: Not telling self')
       continue
     }
     const signedMessage = _wrapAndTagMessage(message, tracker, node)
-    msgSize = signedMessage.tag_msgSize
+    msgSize = signedMessage.msgSize
     if (logFlags.p2pNonFatal) info(`signed and tagged gossip`, utils.stringifyReduceLimit(signedMessage))
     promises.push(network.tell([node], route, signedMessage, logged))
   }
   try {
     await Promise.all(promises)
+  } catch (err) {
+    warn('P2P TELL: failed', err)
+  }
+  return msgSize
+}
+
+async function signedMultiTell(
+  nodes: any[],
+  message: any,
+  tracker: string,
+  msgSize: number,
+  route: any,
+  logged: boolean
+) {
+  const signedMessage = _wrapAndSignMessage(message, tracker)
+  msgSize = signedMessage.msgSize
+  const nonSelfNodes = nodes.filter((node) => node.id !== Self.id)
+  if (logFlags.p2pNonFatal) info(`signed and tagged gossip`, utils.stringifyReduceLimit(signedMessage))
+  try {
+    await network.tell(nonSelfNodes, route, signedMessage, logged)
   } catch (err) {
     warn('P2P TELL: failed', err)
   }
@@ -210,16 +265,18 @@ export async function ask(node, route: string, message = {}, logged = false, tra
     /* prettier-ignore */ nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `ask ${route} recipients: 1`)
   }
 
-  const signedMessage = _wrapAndTagMessage(message, tracker, node)
-  let signedResponse
+  const msgWithAuth = config.p2p.useSignaturesForAuth
+    ? await _wrapAndSignMessage(message, tracker)
+    : await _wrapAndTagMessage(message, tracker, node)
+  let respWithAuth
   try {
-    signedResponse = await network.ask(node, route, signedMessage, logged, extraTime)
+    respWithAuth = await network.ask(node, route, msgWithAuth, logged, extraTime)
   } catch (err) {
     error('P2P: ask: network.ask: ' + err)
     return false
   }
   try {
-    const [response] = _extractPayload(signedResponse, [node])
+    const [response] = _extractPayload(respWithAuth, [node])
     if (!response) {
       throw new Error(
         `Unable to verify response to ask request: ${route} -- ${JSON.stringify(message)} from node: ${
@@ -259,21 +316,25 @@ export function registerInternal(route, handler) {
        * shardus
        */
       const node = NodeList.nodes.get(sender)
-      const signedResponse = _wrapAndTagMessage({ ...response, isResponse: true }, tracker, node)
+      const message = { ...response, isResponse: true }
+      const respWithAuth = config.p2p.useSignaturesForAuth
+        ? await _wrapAndSignMessage(message, tracker)
+        : await _wrapAndTagMessage(message, tracker, node)
+
       if (logFlags.verbose && logFlags.p2pNonFatal) {
         info(
-          `The signed wrapped response to send back: ${utils.stringifyReduceLimit(signedResponse)} size:${
-            signedResponse.tag_msgSize
+          `The signed wrapped response to send back: ${utils.stringifyReduceLimit(respWithAuth)} size:${
+            respWithAuth.msgSize
           }`
         )
       }
       if (route !== 'gossip') {
         logger.playbackLog(sender, 'self', 'InternalRecvResp', route, tracker, response)
       }
-      await respond(signedResponse)
+      await respond(respWithAuth)
 
       //return the message size in bytes
-      return signedResponse.tag_msgSize
+      return respWithAuth.msgSize
     }
     // Checks to see if we can extract the actual payload from the wrapped message
     const payloadArray = _extractPayload(
@@ -354,7 +415,7 @@ export async function sendGossip(
   }
 
   let gossipFactor = config.p2p.gossipFactor
-  if(factor > 0){
+  if (factor > 0) {
     gossipFactor = factor
   }
   let recipientIdxs

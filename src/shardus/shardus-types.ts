@@ -628,6 +628,8 @@ export interface ServerConfiguration {
     detectLostSyncing?: boolean
     /** limit the scaling group to a max number of nodes */
     scaleGroupLimit?: number
+    /** this is to switch to signature based auth for gossip messages. default: false */
+    useSignaturesForAuth?: boolean
   }
   /** Server IP configuration */
   ip?: {

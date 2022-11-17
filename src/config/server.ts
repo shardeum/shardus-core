@@ -56,6 +56,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     experimentalSnapshot: true,
     detectLostSyncing: true,
     scaleGroupLimit: 25,
+    useSignaturesForAuth: false,
   },
   ip: {
     externalIp: '0.0.0.0',
