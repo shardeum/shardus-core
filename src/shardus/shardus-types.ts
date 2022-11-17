@@ -721,6 +721,10 @@ export interface ServerConfiguration {
     robustQueryDebug: boolean
     /** pretty sure we don't want this ever but making a config so we can AB test as needed */
     forwardTXToSyncingNeighbors: boolean
+    /** flag to toggle recording accepted app transactions in db */
+    recordAcceptedTx: boolean
+    /** flag to toggle recording app account states in db */
+    recordAccountStates: boolean
   }
   /** Options for the statistics module */
   statistics?: {

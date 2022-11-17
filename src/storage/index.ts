@@ -19,6 +19,7 @@ import P2PApoptosis = require('../p2p/Apoptosis')
 import { config } from '../p2p/Context'
 
 interface Storage {
+  serverConfig: ShardusTypes.StrictServerConfiguration
   profiler: Profiler
   mainLogger: Log4js.Logger
   fatalLogger: Log4js.Logger
@@ -39,6 +40,7 @@ class Storage {
   constructor(
     baseDir: string,
     config: ShardusTypes.StrictStorageConfiguration,
+    serverConfig: ShardusTypes.StrictServerConfiguration,
     logger: Logger,
     profiler: Profiler
   ) {
@@ -50,6 +52,7 @@ class Storage {
 
     // this.storage = new BetterSqlite3Storage(models, config, logger, baseDir, this.profiler)
     this.storage = new Sqlite3Storage(models, config, logger, baseDir, this.profiler)
+    this.serverConfig = serverConfig
     this.stateManager = null
   }
 
@@ -477,6 +480,7 @@ class Storage {
   }
 
   async addAcceptedTransactions(acceptedTransactions) {
+    if (this.serverConfig.debug.recordAcceptedTx != true) return
     this._checkInit()
     try {
       await this._create(this.storageModels.acceptedTxs, acceptedTransactions, {
@@ -554,6 +558,7 @@ class Storage {
   }
 
   async addAccountStates(accountStates) {
+    if (this.serverConfig.debug.recordAccountStates != true) return
     this._checkInit()
     try {
       // Adding { createOrReplace: true }  helps fix some issues we were having, but may make it hard to catch certain types of mistakes. (since it will suppress duped key issue)

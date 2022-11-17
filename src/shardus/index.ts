@@ -121,7 +121,7 @@ class Shardus extends EventEmitter {
     this.fatalLogger = this.logger.getLogger('fatal')
     this.appLogger = this.logger.getLogger('app')
     this.exitHandler = new ExitHandler(this.memoryReporting, this.nestedCounters)
-    this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
+    this.storage = new Storage(config.baseDir, storageConfig, config, this.logger, this.profiler)
     Context.setStorageContext(this.storage)
     this.crypto = new Crypto(this.config, this.logger, this.storage)
     Context.setCryptoContext(this.crypto)
