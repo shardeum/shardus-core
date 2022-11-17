@@ -5038,7 +5038,7 @@ class TransactionQueue {
     for (let queueEntry of this.newAcceptedTxQueueTempInjest) {
       if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
         let tx = queueEntry.acceptedTx
-        if (logFlags.verbose) console.log('getAccountQueueCount: found upstream tx in the injested queue:', `currentNonce: ${tx.appData.nonce}, queueCount: ${tx.appData.queueCount}, txNonce: ${tx.appData.txNonce}, queueStatus: ${queueEntry.state} hasFinalData: ${queueEntry.hasValidFinalData} accountDataSet: ${queueEntry.accountDataSet}`);
+        if (logFlags.verbose) console.log('getAccountQueueCount: found upstream tx in the injested queue:', `appData: ${JSON.stringify(tx.appData)}`);
         count++
       }
     }
@@ -5049,7 +5049,7 @@ class TransactionQueue {
           committingAppData.push(tx.appData)
           continue
         }
-        if (logFlags.verbose) console.log('getAccountQueueCount: found upstream tx in the newAccepted queue:', `currentNonce: ${tx.appData.nonce}, queueCount: ${tx.appData.queueCount}, txNonce: ${tx.appData.txNonce}, queueStatus: ${queueEntry.state} hasFinalData: ${queueEntry.hasValidFinalData} accountDataSet: ${queueEntry.accountDataSet}`);
+        if (logFlags.verbose) console.log('getAccountQueueCount: found upstream tx in the newAccepted queue:', `appData: ${JSON.stringify(tx.appData)}`);
         count++
       }
     }
