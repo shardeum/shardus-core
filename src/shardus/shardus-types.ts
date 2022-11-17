@@ -660,6 +660,11 @@ export interface ServerConfiguration {
   mode?: ServerMode
   /** Server Debug module configuration */
   debug?: {
+    /**
+     * This value control whether a node check itself to be in authorized before sending out scaling request
+     */
+    ignoreScaleGossipSelfCheck?: boolean
+
     /** The loseReceiptChance parameter is a Float specifying a percentage chance to randomly drop a receipt (currently doesn’t do anything) */
     loseReceiptChance?: number
     /** The loseTxChance parameter is a Float specifying a percentage chance to randomly drop a transaction. */

@@ -71,6 +71,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     console: false,
   },
   debug: {
+    ignoreScaleGossipSelfCheck: false,
     loseReceiptChance: 0,
     loseTxChance: 0,
     canDataRepair: false,

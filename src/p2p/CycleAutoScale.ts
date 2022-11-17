@@ -4,7 +4,7 @@ import { logFlags } from '../logger'
 import { P2P } from '@shardus/types'
 import { sleep, validateTypes, fastIsPicked } from '../utils'
 import * as Comms from './Comms'
-import { config, crypto, logger } from './Context'
+import { config, crypto, logger, stateManager } from './Context'
 import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
@@ -41,6 +41,12 @@ const gossipScaleRoute: P2P.P2PTypes.GossipHandler<P2P.CycleAutoScaleTypes.Signe
       warn('No payload provided for the `scaling` request.')
       return
     }
+
+    const id = payload.nodeId
+    if (_canThisNodeSendScaleRequests(id) !== true) {
+      return
+    }
+
     const added = addExtScalingRequest(payload)
     if (!added) return
     Comms.sendGossip('scaling', payload, tracker, sender, NodeList.byIdOrder, false, 2)
@@ -131,7 +137,7 @@ export function requestNetworkUpsize() {
     return
   }
 
-  if (_canThisNodeSendScaleRequests() === false) {
+  if (_canThisNodeSendScaleRequests(Self.id) === false && config.debug.ignoreScaleGossipSelfCheck === false) {
     return
   }
 
@@ -144,7 +150,7 @@ export function requestNetworkDownsize() {
     return
   }
 
-  if (_canThisNodeSendScaleRequests() === false) {
+  if (_canThisNodeSendScaleRequests(Self.id) === false && config.debug.ignoreScaleGossipSelfCheck === false) {
     return
   }
 
@@ -211,7 +217,7 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
 //note we will need the ablity to check if other nodes also meet this requirement
 //so that we can reject input from nodes that are not permitted to send a vote
 //to do that well we need to make it easy to get the index of a node by ID
-function _canThisNodeSendScaleRequests() {
+function _canThisNodeSendScaleRequests(_nodeId: string) {
   let scaleVoteLimits = config.p2p.scaleGroupLimit > 0
   if (scaleVoteLimits === false) {
     return true
@@ -224,19 +230,12 @@ function _canThisNodeSendScaleRequests() {
   }
   let canSendGossip = false
   let offset = CycleChain.newest.counter //todo something more random
-  let ourIndex = -1
-  let ourNodeID = Self.id
-  //might be nicer to get calculate this in another location.  This does exist in state manager, but would require some refactoring to share it in a nice way
-  for (let i = 0; i < numActiveNodes; i++) {
-    let node: P2P.NodeListTypes.Node = NodeList.activeByIdOrder[i] as P2P.NodeListTypes.Node
-    if (node.id === ourNodeID) {
-      ourIndex = i
-      break
-    }
-  }
-  if (ourIndex === -1) {
-    return false
-  }
+  let nodeInfo = stateManager.currentCycleShardData.nodeShardDataMap.get(_nodeId)
+
+  // no such node in the list 
+  if(!nodeInfo) return false
+
+  const ourIndex = nodeInfo.ourNodeIndex
 
   canSendGossip = fastIsPicked(ourIndex, numActiveNodes, config.p2p.scaleGroupLimit, offset)
 
