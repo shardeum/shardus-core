@@ -774,7 +774,6 @@ class TransactionQueue {
         filter,
         note
       )
-      console.log('thant: savedSomething for the txNonce: ', queueEntry.acceptedTx.appData.txNonce, savedSomething)
       queueEntry.accountDataSet = true
       this.profiler.scopedProfileSectionEnd('commit_setAccount')
       if (savedSomething) {
@@ -4240,7 +4239,6 @@ class TransactionQueue {
                     'awaitFinalData_passed',
                     false
                   )
-                  console.log('thant: checkAndSetAccountData for the txNonce: ', queueEntry.acceptedTx.appData.txNonce)
                   queueEntry.accountDataSet = true
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,

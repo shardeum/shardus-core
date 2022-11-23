@@ -1474,8 +1474,8 @@ class ShardFunctions {
     const homePartition = thisNode.homePartition
 
     let partition =
-      this.modulo(homePartition - (2 * shardGlobals.consensusRadius + 1), shardGlobals.numPartitions) - 1
-    let maxScanNeeded = 2 * (2 * shardGlobals.consensusRadius + 1) + 1
+      this.modulo(homePartition - (shardGlobals.consensusRadius + shardGlobals.nodesPerEdge), shardGlobals.numPartitions) - 1
+    let maxScanNeeded = (2 * shardGlobals.consensusRadius) + (2 * shardGlobals.nodesPerEdge) + 1
     if (maxScanNeeded > activeNodes.length) maxScanNeeded = activeNodes.length
     let once = false
     for (let i = 0; i < maxScanNeeded; i++) {
@@ -1509,7 +1509,7 @@ class ShardFunctions {
         edgeNodes.push(node)
       }
     }
-    // console.log('Running getCombinedNodeList', shardGlobals, thisNode, nodeShardDataMap)
+    // console.log('Running getCombinedNodeList', shardGlobals, thisNode, nodeShardDataMap, edgeNodes)
     // console.log('Home Partition', thisNode.homePartition)
     // console.log(
     //   'nodeThatStoreOurPartition',
