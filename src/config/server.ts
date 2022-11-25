@@ -98,7 +98,6 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     oldPartitionSystem: false,
     dumpAccountReportFromSQL: false,
     profiler: false,
-    optimizedTXConsenus: true,
     robustQueryDebug: false,
     forwardTXToSyncingNeighbors: false,
     recordAcceptedTx: false,

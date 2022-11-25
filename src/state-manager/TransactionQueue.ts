@@ -777,21 +777,7 @@ class TransactionQueue {
       queueEntry.accountDataSet = true
       this.profiler.scopedProfileSectionEnd('commit_setAccount')
       if (savedSomething) {
-        if (this.config.debug.optimizedTXConsenus) {
-          //todo implement if we need it?
-        } else {
-          if (queueEntry.appliedReceipt && queueEntry.appliedReceipt.appliedVotes) {
-            if (!this.config.debug.disableTxCoverageReport) {
-              this.txCoverageMap[queueEntry.logID] = queueEntry.appliedReceipt.appliedVotes.length
-            }
-          } else {
-            this.mainLogger.error(
-              `commitConsensedTransaction  savedSomething: ${savedSomething}; it does not have appliedVotes field in the ${utils.stringifyReduce(
-                queueEntry.originalData
-              )}`
-            )
-          }
-        }
+        //todo implement if we need it?
       }
 
       if (logFlags.verbose) {
@@ -3320,11 +3306,9 @@ class TransactionQueue {
         let hasReceivedApplyReceiptForRepair = queueEntry.appliedReceiptForRepair != null
         let shortID = queueEntry.logID //`${utils.makeShortHash(queueEntry.acceptedTx.id)}`
 
-        if (this.config.debug.optimizedTXConsenus) {
-          hasApplyReceipt = queueEntry.appliedReceipt2 != null
-          hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt2 != null
-          hasReceivedApplyReceiptForRepair = queueEntry.appliedReceiptForRepair2 != null
-        }
+        hasApplyReceipt = queueEntry.appliedReceipt2 != null
+        hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt2 != null
+        hasReceivedApplyReceiptForRepair = queueEntry.appliedReceiptForRepair2 != null
 
         // on the off chance we are here with a pass of fail state remove this from the queue.
         // log fatal because we do not want to get to this situation.
@@ -3492,11 +3476,7 @@ class TransactionQueue {
                     let seen = this.processQueue_accountSeen(seenAccounts, queueEntry)
 
                     this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-                    if (this.config.debug.optimizedTXConsenus) {
-                      this.queueEntryRequestMissingReceipt(queueEntry)
-                    } else {
-                      this.queueEntryRequestMissingReceipt_old(queueEntry)
-                    }
+                    this.queueEntryRequestMissingReceipt(queueEntry)
 
                     /* prettier-ignore */ nestedCountersInstance.countEvent('txMissingReceipt', `txAge > timeM3 => ask for receipt now. state:${queueEntry.state} globalMod:${queueEntry.globalModification} seen:${seen}`)
                     queueEntry.waitForReceiptOnly = true
@@ -3988,19 +3968,8 @@ class TransactionQueue {
                   // shouldSendReceipt = queueEntry.recievedAppliedReceipt == null
 
                   if (shouldSendReceipt) {
-                    if (this.config.debug.optimizedTXConsenus) {
-                      if (queueEntry.appliedReceipt2) {
-                        // Broadcast the receipt, only if we made one (try produce can early out if we received one)
-                        let awaitStart = Date.now()
-                        await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
-                        this.updateSimpleStatsObject(
-                          processStats.awaitStats,
-                          'shareAppliedReceipt',
-                          Date.now() - awaitStart
-                        )
-                      }
-                    } else {
-                      // Broadcast the receipt
+                    if (queueEntry.appliedReceipt2) {
+                      // Broadcast the receipt, only if we made one (try produce can early out if we received one)
                       let awaitStart = Date.now()
                       await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
                       this.updateSimpleStatsObject(
@@ -4321,48 +4290,25 @@ class TransactionQueue {
               try {
                 let canCommitTX = true
                 let hasReceiptFail = false
-                if (this.config.debug.optimizedTXConsenus) {
-                  if (queueEntry.noConsensus === true) {
-                    // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
-                    if (queueEntry.preApplyTXResult.passed === false) {
-                      canCommitTX = false
-                    }
-                  } else if (queueEntry.appliedReceipt2 != null) {
-                    // the final state of the queue entry will be pass or fail based on the receipt
-                    if (queueEntry.appliedReceipt2.result === false) {
-                      canCommitTX = false
-                      hasReceiptFail = true
-                    }
-                  } else if (queueEntry.recievedAppliedReceipt2 != null) {
-                    // the final state of the queue entry will be pass or fail based on the receipt
-                    if (queueEntry.recievedAppliedReceipt2.result === false) {
-                      canCommitTX = false
-                      hasReceiptFail = false
-                    }
-                  } else {
+                if (queueEntry.noConsensus === true) {
+                  // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
+                  if (queueEntry.preApplyTXResult.passed === false) {
                     canCommitTX = false
+                  }
+                } else if (queueEntry.appliedReceipt2 != null) {
+                  // the final state of the queue entry will be pass or fail based on the receipt
+                  if (queueEntry.appliedReceipt2.result === false) {
+                    canCommitTX = false
+                    hasReceiptFail = true
+                  }
+                } else if (queueEntry.recievedAppliedReceipt2 != null) {
+                  // the final state of the queue entry will be pass or fail based on the receipt
+                  if (queueEntry.recievedAppliedReceipt2.result === false) {
+                    canCommitTX = false
+                    hasReceiptFail = false
                   }
                 } else {
-                  if (queueEntry.noConsensus === true) {
-                    // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
-                    if (queueEntry.preApplyTXResult.passed === false) {
-                      canCommitTX = false
-                    }
-                  } else if (queueEntry.appliedReceipt != null) {
-                    // the final state of the queue entry will be pass or fail based on the receipt
-                    if (queueEntry.appliedReceipt.result === false) {
-                      canCommitTX = false
-                      hasReceiptFail = true
-                    }
-                  } else if (queueEntry.recievedAppliedReceipt != null) {
-                    // the final state of the queue entry will be pass or fail based on the receipt
-                    if (queueEntry.recievedAppliedReceipt.result === false) {
-                      canCommitTX = false
-                      hasReceiptFail = false
-                    }
-                  } else {
-                    canCommitTX = false
-                  }
+                  canCommitTX = false
                 }
 
                 /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `canCommitTX: ${canCommitTX} `)
@@ -4429,64 +4375,33 @@ class TransactionQueue {
               } finally {
                 this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
 
-                if (this.config.debug.optimizedTXConsenus) {
-                  if (queueEntry.noConsensus === true) {
-                    // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
-                    if (queueEntry.preApplyTXResult.passed === true) {
-                      queueEntry.state = 'pass'
-                    } else {
-                      queueEntry.state = 'fail'
-                    }
-                    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : noConsensus:${queueEntry.state} ${queueEntry.logID} `)
-                  } else if (queueEntry.appliedReceipt2 != null) {
-                    // the final state of the queue entry will be pass or fail based on the receipt
-                    if (queueEntry.appliedReceipt2.result === true) {
-                      queueEntry.state = 'pass'
-                    } else {
-                      queueEntry.state = 'fail'
-                    }
-                    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : Recpt:${queueEntry.state} ${queueEntry.logID} `)
-                  } else if (queueEntry.recievedAppliedReceipt2 != null) {
-                    // the final state of the queue entry will be pass or fail based on the receipt
-                    if (queueEntry.recievedAppliedReceipt2.result === true) {
-                      queueEntry.state = 'pass'
-                    } else {
-                      queueEntry.state = 'fail'
-                    }
-                    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : recvRecpt:${queueEntry.state} ${queueEntry.logID} `)
+                if (queueEntry.noConsensus === true) {
+                  // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
+                  if (queueEntry.preApplyTXResult.passed === true) {
+                    queueEntry.state = 'pass'
                   } else {
                     queueEntry.state = 'fail'
-                    /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`processAcceptedTxQueue2 commiting finished : no receipt ${queueEntry.logID} `)
                   }
+                  /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : noConsensus:${queueEntry.state} ${queueEntry.logID} `)
+                } else if (queueEntry.appliedReceipt2 != null) {
+                  // the final state of the queue entry will be pass or fail based on the receipt
+                  if (queueEntry.appliedReceipt2.result === true) {
+                    queueEntry.state = 'pass'
+                  } else {
+                    queueEntry.state = 'fail'
+                  }
+                  /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : Recpt:${queueEntry.state} ${queueEntry.logID} `)
+                } else if (queueEntry.recievedAppliedReceipt2 != null) {
+                  // the final state of the queue entry will be pass or fail based on the receipt
+                  if (queueEntry.recievedAppliedReceipt2.result === true) {
+                    queueEntry.state = 'pass'
+                  } else {
+                    queueEntry.state = 'fail'
+                  }
+                  /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : recvRecpt:${queueEntry.state} ${queueEntry.logID} `)
                 } else {
-                  if (queueEntry.noConsensus === true) {
-                    // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
-                    if (queueEntry.preApplyTXResult.passed === true) {
-                      queueEntry.state = 'pass'
-                    } else {
-                      queueEntry.state = 'fail'
-                    }
-                    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : noConsensus:${queueEntry.state} ${queueEntry.logID} `)
-                  } else if (queueEntry.appliedReceipt != null) {
-                    // the final state of the queue entry will be pass or fail based on the receipt
-                    if (queueEntry.appliedReceipt.result === true) {
-                      queueEntry.state = 'pass'
-                    } else {
-                      queueEntry.state = 'fail'
-                    }
-                    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : Recpt:${queueEntry.state} ${queueEntry.logID} `)
-                  } else if (queueEntry.recievedAppliedReceipt != null) {
-                    // the final state of the queue entry will be pass or fail based on the receipt
-                    if (queueEntry.recievedAppliedReceipt.result === true) {
-                      queueEntry.state = 'pass'
-                    } else {
-                      queueEntry.state = 'fail'
-                    }
-                    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : recvRecpt:${queueEntry.state} ${queueEntry.logID} `)
-                  } else {
-                    queueEntry.state = 'fail'
-                    /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`processAcceptedTxQueue2 commiting finished : no receipt ${queueEntry.logID} `)
-                  }
+                  queueEntry.state = 'fail'
+                  /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`processAcceptedTxQueue2 commiting finished : no receipt ${queueEntry.logID} `)
                 }
 
                 /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)

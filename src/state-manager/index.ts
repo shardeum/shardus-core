@@ -280,29 +280,7 @@ class StateManager {
     this.accountGlobals = new AccountGlobals(this, profiler, app, logger, storage, p2p, crypto, config)
     this.transactionQueue = new TransactionQueue(this, profiler, app, logger, storage, p2p, crypto, config)
 
-    if (this.config.debug.optimizedTXConsenus) {
-      this.transactionRepair = new TransactionRepair(
-        this,
-        profiler,
-        app,
-        logger,
-        storage,
-        p2p,
-        crypto,
-        config
-      )
-    } else {
-      this.transactionRepairOld = new TransactionRepairOld(
-        this,
-        profiler,
-        app,
-        logger,
-        storage,
-        p2p,
-        crypto,
-        config
-      )
-    }
+    this.transactionRepair = new TransactionRepair(this, profiler, app, logger, storage, p2p, crypto, config)
 
     this.transactionConsensus = new TransactionConsenus(
       this,
@@ -3285,38 +3263,20 @@ class StateManager {
   }
 
   hasReceipt(queueEntry: QueueEntry) {
-    if (this.config.debug.optimizedTXConsenus) {
-      return this.getReceipt2(queueEntry) != null
-    } else {
-      return this.getReceipt(queueEntry) != null
-    }
+    return this.getReceipt2(queueEntry) != null
   }
   getReceiptResult(queueEntry: QueueEntry) {
-    if (this.config.debug.optimizedTXConsenus) {
-      let receipt = this.getReceipt2(queueEntry)
-      if (receipt) {
-        return receipt.result
-      }
-    } else {
-      let receipt = this.getReceipt(queueEntry)
-      if (receipt) {
-        return receipt.result
-      }
+    let receipt = this.getReceipt2(queueEntry)
+    if (receipt) {
+      return receipt.result
     }
     return false
   }
 
   getReceiptVote(queueEntry: QueueEntry): AppliedVote {
-    if (this.config.debug.optimizedTXConsenus) {
-      let receipt = this.getReceipt2(queueEntry)
-      if (receipt) {
-        return receipt.appliedVote
-      }
-    } else {
-      let receipt = this.getReceipt(queueEntry)
-      if (receipt && receipt.appliedVotes && receipt.appliedVotes.length > 0) {
-        return receipt.appliedVotes[0]
-      }
+    let receipt = this.getReceipt2(queueEntry)
+    if (receipt) {
+      return receipt.appliedVote
     }
   }
 
@@ -3351,11 +3311,7 @@ class StateManager {
     for (let queueEntry of this.transactionQueue.newAcceptedTxQueue) {
       if (queueEntry.cycleToRecordOn === cycleToSave) {
         // make sure we have a receipt
-        let receipt: AppliedReceipt | AppliedReceipt2 = this.getReceipt(queueEntry)
-
-        if (this.config.debug.optimizedTXConsenus) {
-          receipt = this.getReceipt2(queueEntry)
-        }
+        let receipt: AppliedReceipt2 = this.getReceipt2(queueEntry)
 
         if (receipt == null) {
           //check  && queueEntry.globalModification === false because global accounts will not get a receipt, should this change?
@@ -3373,10 +3329,8 @@ class StateManager {
     for (let queueEntry of this.transactionQueue.archivedQueueEntries) {
       if (queueEntry.cycleToRecordOn === cycleToSave) {
         // make sure we have a receipt
-        let receipt: AppliedReceipt | AppliedReceipt2 = this.getReceipt(queueEntry)
-        if (this.config.debug.optimizedTXConsenus) {
-          receipt = this.getReceipt2(queueEntry)
-        }
+        let receipt: AppliedReceipt2 = this.getReceipt2(queueEntry)
+
         if (receipt == null) {
           //check  && queueEntry.globalModification === false
           //we dont expect expired TXs to have a receipt.  this should reduce log spam
@@ -3404,10 +3358,7 @@ class StateManager {
       }
       // console.log('accountData accountData', accountData)
       for (let partition of queueEntry.involvedPartitions) {
-        let receipt: AppliedReceipt | AppliedReceipt2 = this.getReceipt(queueEntry)
-        if (this.config.debug.optimizedTXConsenus) {
-          receipt = this.getReceipt2(queueEntry)
-        }
+        let receipt: AppliedReceipt2 = this.getReceipt2(queueEntry)
 
         let status = receipt.result === true ? 'applied' : 'rejected'
         let txHash = queueEntry.acceptedTx.txId
