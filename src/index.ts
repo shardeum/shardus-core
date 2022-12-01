@@ -7,6 +7,8 @@ import { compareObjectShape } from './utils'
 export { default as Shardus } from './shardus'
 export { ShardusTypes }
 
+export {nestedCountersInstance} from './utils/nestedCounters'
+
 // Temporary private export to avoid digging into shardus source code for
 // functions it otherwise wasn't exporting. ATTOW we have not decided on whether
 // a more permanent solution is proper.
