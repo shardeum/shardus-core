@@ -1118,7 +1118,7 @@ class Shardus extends EventEmitter {
 
   applyResponseAddReceiptData(
     resultObject: ShardusTypes.ApplyResponse,
-    appReceiptData: ShardusTypes.WrappedResponse,
+    appReceiptData: any,
     appReceiptDataHash: string
   ) {
     resultObject.appReceiptData = appReceiptData
@@ -1217,11 +1217,42 @@ class Shardus extends EventEmitter {
     }
   }
 
+  async getLocalOrRemoteCachedAppData(topic, dataId) {
+    if (this.p2p.allowTransactions()) {
+      return this.stateManager.cachedAppDataManager.getLocalOrRemoteCachedAppData(topic, dataId)
+    } else {
+      return null
+    }
+  }
+
   async getLocalOrRemoteAccountQueueCount(address): Promise<QueueCountsResult> {
     if (this.p2p.allowTransactions()) {
       return this.stateManager.getLocalOrRemoteAccountQueueCount(address)
     } else {
       return { count: 0, committingAppData: [] }
+    }
+  }
+
+  async registerCacheTopic(topic: string, maxCycleAge: number, maxCacheElements: number) {
+    try {
+      return this.stateManager.cachedAppDataManager.registerTopic(topic, maxCycleAge, maxCacheElements)
+    } catch (e) {
+      this.mainLogger.error(`Error while registerCacheTopic`, e)
+    }
+  }
+
+  async sendCorrespondingCachedAppData(
+    topic: string,
+    dataID: string,
+    appData: any,
+    cycle: number,
+    fromId: string,
+    txId: string
+  ) {
+    try {
+      await this.stateManager.cachedAppDataManager.sendCorrespondingCachedAppData(topic, dataID, appData, cycle, fromId, txId)
+    } catch (e) {
+      this.mainLogger.error(`Error while sendCorrespondingCachedAppData`, e)
     }
   }
 
@@ -1420,7 +1451,8 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.apply === 'function') {
-        applicationInterfaceImpl.apply = (inTx, wrappedStates, appData) => application.apply(inTx, wrappedStates, appData)
+        applicationInterfaceImpl.apply = (inTx, wrappedStates, appData) =>
+          application.apply(inTx, wrappedStates, appData)
       } else {
         throw new Error('Missing required interface function. apply()')
       }

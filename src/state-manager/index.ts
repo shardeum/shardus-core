@@ -38,6 +38,7 @@ import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
 import Depricated from './Depricated'
 import AccountPatcher from './AccountPatcher'
+import CachedAppDataManager from './CachedAppDataManager'
 import {
   CycleShardData,
   PartitionReceipt,
@@ -119,6 +120,7 @@ class StateManager {
   transactionConsensus: TransactionConsenus
   partitionObjects: PartitionObjects
   accountPatcher: AccountPatcher
+  cachedAppDataManager: CachedAppDataManager
   depricated: Depricated
 
   // syncTrackers:SyncTracker[];
@@ -295,6 +297,7 @@ class StateManager {
     this.partitionObjects = new PartitionObjects(this, profiler, app, logger, storage, p2p, crypto, config)
     this.depricated = new Depricated(this, profiler, app, logger, storage, p2p, crypto, config)
     this.accountPatcher = new AccountPatcher(this, profiler, app, logger, p2p, crypto, config)
+    this.cachedAppDataManager = new CachedAppDataManager(this, profiler, app, logger, crypto, p2p, config)
 
     // feature controls.
     // this.oldFeature_TXHashsetTest = true
@@ -1232,6 +1235,8 @@ class StateManager {
     this.transactionConsensus.setupHandlers()
 
     this.accountPatcher.setupHandlers()
+
+    this.cachedAppDataManager.setupHandlers()
 
     this.partitionStats.setupHandlers()
 
