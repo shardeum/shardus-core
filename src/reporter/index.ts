@@ -235,6 +235,7 @@ class Reporter {
     const txRejected = this.statisticsReport.txRejected
     const txExpired = this.statisticsReport.txExpired
     const txProcessed = this.statisticsReport.txProcessed
+    const countedEvents = this.statistics.getAllCountedEvents()
     const reportInterval = this.getReportInterval()
     const nodeIpInfo = ipInfo
 
@@ -318,6 +319,7 @@ class Reporter {
         globalSync,
         partitions,
         partitionsCovered,
+        countedEvents,
         currentLoad: {
           networkLoad: currentNetworkLoad,
           nodeLoad: currentNodeLoad,
@@ -334,6 +336,7 @@ class Reporter {
       if (this.stateManager != null && config.mode === 'debug' && !config.debug.disableTxCoverageReport) {
         this.stateManager.transactionQueue.resetTxCoverageMap()
       }
+      this.statistics.resetCountedEvents()
     } catch (e) {
       if (logFlags.error)
         this.mainLogger.error('startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack)
@@ -350,7 +353,7 @@ class Reporter {
 
   startReporting() {
     const self = this
-    
+
     if (this.reportingInterval) {
       return
     }

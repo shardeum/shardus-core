@@ -35,6 +35,7 @@ import SHARDUS_CONFIG from '../config'
 import { isApopMarkedNode } from '../p2p/Apoptosis'
 import { netConfig } from '../p2p/CycleCreator'
 import { startSaving } from './saveConsoleOutput'
+import { CountedEvent } from '../statistics/countedEvents'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
@@ -907,7 +908,6 @@ class Shardus extends EventEmitter {
     }
 
     try {
-
       // Perform basic validation of the transaction fields
       if (logFlags.verbose) this.mainLogger.debug('Performing initial validation of the transaction')
 
@@ -926,7 +926,7 @@ class Shardus extends EventEmitter {
           console.log('Dapp request to generate a new timestmap for the tx')
         }
         timestampReceipt = await this.stateManager.transactionConsensus.askTxnTimestampFromNode(tx, txId)
-        console.log('Network generated a timestamp', timestampReceipt);
+        console.log('Network generated a timestamp', timestampReceipt)
       }
       if (!injectedTimestamp && !timestampReceipt) {
         this.shardus_fatal(
@@ -1219,7 +1219,7 @@ class Shardus extends EventEmitter {
     if (this.p2p.allowTransactions()) {
       return this.stateManager.getLocalOrRemoteAccountQueueCount(address)
     } else {
-      return {count: 0, committingAppData: []}
+      return { count: 0, committingAppData: [] }
     }
   }
 
@@ -1866,6 +1866,20 @@ class Shardus extends EventEmitter {
     } else {
       this.fatalLogger.fatal(log)
     }
+  }
+
+  monitorEvent(category: string, name: string, count: number, message: string) {
+    nestedCountersInstance.countEvent(category, name, count)
+
+    if (logFlags.verbose) {
+      this.mainLogger.info(`Event received with info: {
+        eventCategory: ${category},
+        eventName: ${name},
+        eventMessage: ${count},
+      }`)
+    }
+
+    this.statistics.countEvent(category, name, count, message)
   }
 }
 

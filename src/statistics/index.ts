@@ -4,6 +4,7 @@ import { Readable } from 'stream'
 import { EventEmitter } from 'events'
 import * as utils from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { CountedEvent, CountedEventMap } from './countedEvents'
 
 interface Statistics {
   intervalDuration: number
@@ -21,6 +22,7 @@ interface Statistics {
   timers: any
   manualStats: { [name: string]: ManualRing }
   ringOverrides: { [override: string]: number }
+  countedEventMap: CountedEventMap
 }
 
 class Statistics extends EventEmitter {
@@ -51,6 +53,7 @@ class Statistics extends EventEmitter {
     this.timerDefs = timers
     this.manualStatDefs = manualStats
     this.ringOverrides = ringOverrides
+    this.countedEventMap = new Map()
 
     this.initialize()
 
@@ -103,6 +106,65 @@ class Statistics extends EventEmitter {
     if (!counter) throw new Error(`Counter '${counterName}' is undefined.`)
     counter.increment()
     nestedCountersInstance.countEvent('statistics', counterName)
+  }
+
+  /**
+   * Stores a new CountedEvent in a map
+   * @param category
+   * @param name
+   * @param count
+   * @param message
+   * @returns
+   */
+  countEvent(category: string, name: string, count: number, message: string): void {
+    const newEvent = {
+      eventCategory: category,
+      eventName: name,
+      eventCount: count,
+      eventMessages: [message],
+      eventTimestamps: [Date.now()],
+    }
+
+    const categoryExists = this.countedEventMap.has(category)
+    if (!categoryExists) {
+      this.countedEventMap.set(category, new Map().set(name, newEvent))
+      return
+    }
+
+    const eventCategory = this.countedEventMap.get(category)
+    const nameExists = eventCategory.has(name)
+    if (!nameExists) {
+      eventCategory.set(name, newEvent)
+      return
+    }
+
+    const currentCountedEvent = eventCategory.get(name)
+    currentCountedEvent.eventCount += count
+    currentCountedEvent.eventMessages.push(message)
+    currentCountedEvent.eventTimestamps.push(Date.now())
+  }
+
+  /**
+   * Get an array of all the CountedEvents
+   * @returns
+   */
+  getAllCountedEvents(): CountedEvent[] {
+    const countedEvents: CountedEvent[] = []
+
+    for (let eventCategories of this.countedEventMap.values()) {
+      for (let countedEvent of eventCategories.values()) {
+        countedEvents.push(countedEvent)
+      }
+    }
+
+    return countedEvents
+  }
+
+  /**
+   * Resets the internal CountedEventMap
+   */
+  resetCountedEvents() {
+    this.countedEventMap = new Map()
   }
 
   setManualStat(manualStatName, value: number) {
