@@ -164,7 +164,8 @@ export interface App {
   ): {
     timestamp: number
     id: string
-    keys: TransactionKeys
+    keys: TransactionKeys,
+    shardusMemoryPatterns: ShardusMemoryPatternsInput
   }
 
   /**
@@ -725,6 +726,8 @@ export interface ServerConfiguration {
     recordAcceptedTx: boolean
     /** flag to toggle recording app account states in db */
     recordAccountStates: boolean
+    /** use hints about the memory access patterns for better parallel processing */
+    useShardusMemoryPatterns: boolean
   }
   /** Options for the statistics module */
   statistics?: {
@@ -991,6 +994,14 @@ export interface AcceptedTx {
   keys: TransactionKeys
   data: OpaqueTransaction
   appData: any
+  shardusMemoryPatterns: ShardusMemoryPatternsInput
+}
+
+export type ShardusMemoryPatternsInput = {
+  ro: string[],
+  rw: string[],
+  wo: string[],
+  on: string[],
 }
 
 export interface TxReceipt {

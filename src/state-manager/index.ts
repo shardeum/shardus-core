@@ -74,7 +74,7 @@ import {
   RequestReceiptForTxResp_old,
   RequestAccountQueueCounts,
   QueueCountsResponse,
-  QueueCountsResult
+  QueueCountsResult,
 } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'

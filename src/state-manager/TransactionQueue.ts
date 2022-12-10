@@ -95,6 +95,11 @@ class TransactionQueue {
 
   stuckProcessReported: boolean
 
+
+  queueReads: Set<string>
+  queueWrites: Set<string>
+  queueReadWritesOld: Set<string>  
+
   constructor(
     stateManager: StateManager,
     profiler: Profiler,
@@ -344,7 +349,7 @@ class TransactionQueue {
     }
 
     // Ask App to crack open tx and return timestamp, id (hash), and keys
-    const { timestamp, id, keys } = this.app.crack(tx, appData)
+    const { timestamp, id, keys, shardusMemoryPatterns } = this.app.crack(tx, appData)
 
     // Check if we already have this tx in our queue
     let queueEntry = this.getQueueEntrySafe(id) // , payload.timestamp)
@@ -372,6 +377,7 @@ class TransactionQueue {
       keys,
       data: tx,
       appData,
+      shardusMemoryPatterns,
     }
 
     const noConsensus = false // this can only be true for a set command which will never come from an endpoint
@@ -1060,6 +1066,7 @@ class TransactionQueue {
         txKeys: keysResponse,
         executionShardKey: null,
         isInExecutionHome: true,
+        shardusMemoryPatternSets: null,
         noConsensus,
         collectedData: {},
         collectedFinalData: {},
@@ -1422,6 +1429,15 @@ class TransactionQueue {
         }
 
         this.computeTxSieveTime(txQueueEntry)
+
+        if(this.config.debug.useShardusMemoryPatterns && acceptedTx.shardusMemoryPatterns != null && acceptedTx.shardusMemoryPatterns.ro != null){
+          txQueueEntry.shardusMemoryPatternSets = {
+            ro: new Set(acceptedTx.shardusMemoryPatterns.ro),
+            rw: new Set(acceptedTx.shardusMemoryPatterns.rw),
+            wo: new Set(acceptedTx.shardusMemoryPatterns.wo),
+            on: new Set(acceptedTx.shardusMemoryPatterns.on),
+          }         
+        }
 
         this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
         this.newAcceptedTxQueueTempInjestByID.set(txQueueEntry.acceptedTx.txId, txQueueEntry)
@@ -3108,6 +3124,10 @@ class TransactionQueue {
       awaitStats: {},
     }
 
+    this.queueReads = new Set()
+    this.queueWrites = new Set()
+    this.queueReadWritesOld = new Set()
+
     try {
 
       nestedCountersInstance.countEvent('processing', 'processing-enter')
@@ -4635,6 +4655,10 @@ class TransactionQueue {
    * @param queueEntry
    */
   processQueue_accountSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry): boolean {
+    if(this.config.debug.useShardusMemoryPatterns && queueEntry.shardusMemoryPatternSets != null){
+      return this.processQueue_accountSeen2(seenAccounts, queueEntry)
+    }
+
     if (queueEntry.uniqueKeys == null) {
       //TSConversion double check if this needs extra logging
       return false
@@ -4656,6 +4680,11 @@ class TransactionQueue {
    * @param queueEntry
    */
   processQueue_markAccountsSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry) {
+    if(this.config.debug.useShardusMemoryPatterns && queueEntry.shardusMemoryPatternSets != null){
+      this.processQueue_markAccountsSeen2(seenAccounts, queueEntry)
+      return
+    }
+
     if (queueEntry.uniqueWritableKeys == null) {
       //TSConversion double check if this needs extra logging
       return
@@ -4667,6 +4696,111 @@ class TransactionQueue {
       }
     }
   }
+
+  // this.queueReads = new Set()
+  // this.queueWrites = new Set()
+  processQueue_accountSeen2(seenAccounts: SeenAccounts, queueEntry: QueueEntry): boolean {
+    if (queueEntry.uniqueKeys == null) {
+      //TSConversion double check if this needs extra logging
+      return false
+    }
+
+    if(queueEntry.shardusMemoryPatternSets != null){
+      //normal blocking for read write
+      for (const id of queueEntry.shardusMemoryPatternSets.rw) {
+        if(this.queueWrites.has(id)){
+          return true
+        }
+        if(this.queueReadWritesOld.has(id)){
+          return true
+        }
+        //also blocked by upstream reads
+        if(this.queueReads.has(id)){
+          return true
+        }
+      }
+      // in theory write only is not blocked by upstream writes
+      // but has to wait its turn if there is an uptream read
+      for (const id of queueEntry.shardusMemoryPatternSets.wo) {
+        //also blocked by upstream reads
+        if(this.queueReads.has(id)){
+          return true
+        }
+        if(this.queueReadWritesOld.has(id)){
+          return true
+        }
+      }
+
+      // write once...  also not blocked in theory, because the first op is a write
+      // this is a special case for something like code bytes that are written once
+      // and then immutable
+      // for (const id of queueEntry.shardusMemoryPatternSets.on) {
+      //   if(this.queueWrites.has(id)){
+      //     return true
+      //   }
+      //   if(this.queueWritesOld.has(id)){
+      //     return true
+      //   }
+      // }
+
+      //read only blocks for upstream writes
+      for (const id of queueEntry.shardusMemoryPatternSets.ro) {
+        if(this.queueWrites.has(id)){
+          return true
+        }
+        if(this.queueReadWritesOld.has(id)){
+          return true
+        }
+        //note blocked by upstream reads, because this read only operation 
+        //will not impact the upstream read
+      }  
+      
+      //we made it, not blocked 
+      return false 
+    }
+
+    for (let key of queueEntry.uniqueKeys) {
+      if (seenAccounts[key] != null) {
+        return true
+      }
+    }
+
+    return false
+  }
+  
+  processQueue_markAccountsSeen2(seenAccounts: SeenAccounts, queueEntry: QueueEntry) {
+    if (queueEntry.uniqueWritableKeys == null) {
+      //TSConversion double check if this needs extra logging
+      return
+    }
+
+    if(queueEntry.shardusMemoryPatternSets != null){
+      for (const id of queueEntry.shardusMemoryPatternSets.rw) {
+        this.queueWrites.add(id)
+        this.queueReads.add(id)
+      }
+      for (const id of queueEntry.shardusMemoryPatternSets.wo) {
+        this.queueWrites.add(id)
+      }
+      for (const id of queueEntry.shardusMemoryPatternSets.on) {
+        this.queueWrites.add(id)
+      }
+      for (const id of queueEntry.shardusMemoryPatternSets.ro) {
+        this.queueReads.add(id)
+      } 
+      return     
+    }
+
+    // only mark writeable keys as seen but we will check/clear against all keys
+    for (let key of queueEntry.uniqueWritableKeys) {
+      if (seenAccounts[key] == null) {
+        seenAccounts[key] = queueEntry
+      }
+      //old style memory access is treated as RW:
+      this.queueReadWritesOld.add(key)
+    }
+  }
+
 
   /**
    * processQueue_clearAccountsSeen

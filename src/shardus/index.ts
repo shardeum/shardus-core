@@ -960,7 +960,7 @@ class Shardus extends EventEmitter {
       }
 
       // Ask App to crack open tx and return timestamp, id (hash), and keys
-      const { timestamp, id, keys } = this.app.crack(timestampedTx, appData)
+      const { timestamp, id, keys, shardusMemoryPatterns } = this.app.crack(timestampedTx, appData)
       // console.log('app.crack results', timestamp, id, keys)
 
       // Validate the transaction timestamp
@@ -984,6 +984,8 @@ class Shardus extends EventEmitter {
 
       this.profiler.profileSectionStart('put')
 
+
+      //as ShardusMemoryPatternsInput
       // Pack into acceptedTx, and pass to StateManager
       const acceptedTX: ShardusTypes.AcceptedTx = {
         timestamp,
@@ -991,6 +993,7 @@ class Shardus extends EventEmitter {
         keys,
         data: timestampedTx,
         appData,
+        shardusMemoryPatterns: shardusMemoryPatterns,
       }
       if (logFlags.verbose) this.mainLogger.debug('Transaction validated')
       if (global === false) {
@@ -1425,6 +1428,7 @@ class Shardus extends EventEmitter {
             timestamp: oldValidateTxnFieldsResult.txnTimestamp,
             id: this.crypto.hash(inTx), // [TODO] [URGENT] We really shouldn't be doing this and should change all apps to use the new way and do their own hash
             keys: oldGetKeyFromTransactionResult,
+            shardusMemoryPatterns:null,
           }
           return newResult
         }

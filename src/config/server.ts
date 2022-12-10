@@ -102,6 +102,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     forwardTXToSyncingNeighbors: false,
     recordAcceptedTx: false,
     recordAccountStates: false,
+    useShardusMemoryPatterns: true,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {

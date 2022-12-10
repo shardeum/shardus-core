@@ -53,6 +53,9 @@ export type QueueEntry = {
   localKeys: {
     [x: string]: boolean
   }
+
+  shardusMemoryPatternSets : ShardusMemoryPatternsSets
+
   localCachedData: any
   syncCounter: number
   didSync: boolean
@@ -839,6 +842,9 @@ export type DebugDumpPartitions = {
 
 //queue process related:
 export type SeenAccounts = { [accountId: string]: QueueEntry | null }
+
+
+
 export type LocalCachedData = { [accountId: string]: any }
 //export type AllNewTXsById = {[accountId:string]: }
 export type AccountValuesByKey = { [accountId: string]: any }
@@ -1176,4 +1182,16 @@ export type CacheAppDataResponse = {
 export type CacheAppDataRequest = {
   topic: string,
   dataId: string
+}
+
+
+
+
+
+
+export type ShardusMemoryPatternsSets = {
+  ro: Set<string>,
+  rw: Set<string>,
+  wo: Set<string>,
+  on: Set<string>,
 }
