@@ -992,7 +992,6 @@ class Shardus extends EventEmitter {
         data: timestampedTx,
         appData,
       }
-      // console.log('acceptedTX', acceptedTX)
       if (logFlags.verbose) this.mainLogger.debug('Transaction validated')
       if (global === false) {
         //temp way to make global modifying TXs not over count
@@ -1003,7 +1002,6 @@ class Shardus extends EventEmitter {
         `${txId}`,
         `Transaction: ${utils.stringifyReduce(timestampedTx)}`
       )
-      console.log()
       this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(
         acceptedTX,
         /*send gossip*/ true,
@@ -1083,6 +1081,10 @@ class Shardus extends EventEmitter {
 
   getClosestNodesGlobal(hash, count) {
     return this.stateManager.getClosestNodesGlobal(hash, count)
+  }
+
+  getShardusProfiler() {
+    return profilerInstance
   }
 
   /**
@@ -1418,7 +1420,7 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.apply === 'function') {
-        applicationInterfaceImpl.apply = (inTx, wrappedStates) => application.apply(inTx, wrappedStates)
+        applicationInterfaceImpl.apply = (inTx, wrappedStates, appData) => application.apply(inTx, wrappedStates, appData)
       } else {
         throw new Error('Missing required interface function. apply()')
       }

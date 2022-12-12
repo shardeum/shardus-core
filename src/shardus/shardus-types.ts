@@ -188,7 +188,8 @@ export interface App {
    */
   apply: (
     inTx: OpaqueTransaction,
-    wrappedStates: { [accountId: string]: WrappedData }
+    wrappedStates: { [accountId: string]: WrappedData },
+    appData: any
   ) => Promise<ApplyResponse>
 
   /**

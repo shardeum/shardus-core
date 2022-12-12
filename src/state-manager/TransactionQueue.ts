@@ -480,6 +480,7 @@ class TransactionQueue {
     let isGlobalModifyingTX = queueEntry.globalModification === true
     let passedApply: boolean = false
     let applyResult: string
+    let appData = acceptedTX.appData
 
     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log('preApplyTransaction ' + timestamp + ' debugInfo:' + debugInfo)
     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('preApplyTransaction ' + timestamp + ' debugInfo:' + debugInfo)
@@ -550,8 +551,8 @@ class TransactionQueue {
       this.profiler.profileSectionStart('process-dapp.apply')
       this.profiler.scopedProfileSectionStart('apply_duration')
       const startTime = process.hrtime()
-      //I think Shardus.IncomingTransaction may be the wrong type here
-      applyResponse = await this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
+
+      applyResponse = await this.app.apply(tx as Shardus.OpaqueTransaction, wrappedStates, appData)
       const endTime = process.hrtime(startTime)
       queueEntry.txDebug.duration['apply_duration'] = endTime[1] / 1000000
       this.profiler.scopedProfileSectionEnd('apply_duration')
