@@ -296,10 +296,15 @@ async function forwardReceipts() {
   profilerInstance.scopedProfileSectionEnd('forwardReceipts')
 }
 
-export async function forwardAccounts(accounts: any[]) {
+export interface InitialAccountsData {
+  accounts: any[]
+  receipts: any[]
+}
+
+export async function forwardAccounts(data: InitialAccountsData) {
   if (!config.p2p.experimentalSnapshot) return
   const responses: any = {}
-  responses.ACCOUNT = accounts
+  responses.ACCOUNT = data
   if (recipients.size === 0) {
     console.log('No Connected Archiver To Forward!')
   }

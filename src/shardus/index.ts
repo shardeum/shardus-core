@@ -1342,8 +1342,8 @@ class Shardus extends EventEmitter {
     await this.stateManager._commitAccountCopies(accountCopies)
   }
 
-  async forwardAccounts(accounts: any[]) {
-    await Archivers.forwardAccounts(accounts)
+  async forwardAccounts(data: Archivers.InitialAccountsData) {
+    await Archivers.forwardAccounts(data)
   }
 
   // Expose dev public key to verify things on the app
