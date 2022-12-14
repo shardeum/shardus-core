@@ -82,9 +82,7 @@
     "countEndpointStart": -1,
     "countEndpointStop": -1,
     "hashedDevAuth": "",
-    "devPublicKey": "",
-    "newCacheFlow": true
-
+    "devPublicKey": ""
   },
   "statistics": {
     "save": true,

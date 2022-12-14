@@ -86,7 +86,6 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     countEndpointStop: -1,
     hashedDevAuth: '',
     devPublicKey: '',
-    newCacheFlow: true,
     debugNoTxVoting: false,
     ignoreRecieptChance: 0,
     ignoreVoteChance: 0,

@@ -717,7 +717,6 @@ export interface ServerConfiguration {
     //** hash of our dev auth key */
     hashedDevAuth?: string
     devPublicKey?: string
-    newCacheFlow?: boolean
     /** dump extra data for robust query even if in error/fatal logggin only mode */
     robustQueryDebug: boolean
     /** pretty sure we don't want this ever but making a config so we can AB test as needed */

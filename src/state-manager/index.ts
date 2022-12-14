@@ -11,21 +11,17 @@ import * as utils from '../utils'
 
 const stringify = require('fast-stable-stringify')
 
-const allZeroes64 = '0'.repeat(64)
-
 // not sure about this.
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
-import { throws } from 'assert'
 import * as Context from '../p2p/Context'
-import { potentiallyRemoved, activeByIdOrder, activeOthersByIdOrder } from '../p2p/NodeList'
+import { potentiallyRemoved, activeByIdOrder } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as NodeList from '../p2p/NodeList'
 import * as CycleChain from '../p2p/CycleChain'
-import { response } from 'express'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import PartitionStats from './PartitionStats'
 import AccountCache from './AccountCache'
@@ -3109,19 +3105,12 @@ class StateManager {
     this.profiler.profileSectionEnd('stateManager_processPreviousCycleSummaries_buildStatsReport')
 
     // build partition hashes from previous full cycle
-    let mainHashResults: MainHashResults = null
     if (this.feature_partitionHashes === true) {
       if (cycleShardValues && cycleShardValues.ourNode.status === 'active') {
         this.profiler.profileSectionStart(
           'stateManager_processPreviousCycleSummaries_buildPartitionHashesForNode'
         )
-        if (this.config.debug.newCacheFlow) {
-          this.accountCache.processCacheUpdates(cycleShardValues)
-        } else {
-          mainHashResults = this.accountCache.buildPartitionHashesForNode(cycleShardValues) //This needs to be replaced by something that
-          //processes data for a completed cycle in a consistent way.  mainHash reults are not needed anymore.
-          //they will not scale well with a large number of accounts.
-        }
+        this.accountCache.processCacheUpdates(cycleShardValues)
 
         this.profiler.profileSectionEnd(
           'stateManager_processPreviousCycleSummaries_buildPartitionHashesForNode'
@@ -3148,13 +3137,7 @@ class StateManager {
     }
 
     // Hook for Snapshot module to listen to after partition data is settled
-    this.eventEmitter.emit(
-      'cycleTxsFinalized',
-      cycleShardValues,
-      receiptMapResults,
-      statsClump,
-      mainHashResults
-    )
+    this.eventEmitter.emit('cycleTxsFinalized', cycleShardValues, receiptMapResults, statsClump)
     this.transactionConsensus.pruneTxTimestampCache()
 
     if (this.debugFeature_dumpAccountData === true) {
@@ -3166,10 +3149,6 @@ class StateManager {
         }
         this.lastShardReport = utils.stringifyReduce(partitionDump)
         this.shardLogger.debug(this.lastShardReport)
-      } else {
-        if (this.partitionObjects != null) {
-          this.dumpAccountDebugData2(mainHashResults) //more detailed work
-        }
       }
     }
 

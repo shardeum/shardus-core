@@ -173,9 +173,7 @@ class AccountCache {
     if (accountHashList.length === 0) {
       accountHashList.push(accountHashData)
       nestedCountersInstance.countEvent('cache', 'updateAccountHash: push as first entry')
-      if (this.config.debug.newCacheFlow) {
-        updateIsNewerHash = true
-      }
+      updateIsNewerHash = true
     } else {
       if (accountHashList.length > 0) {
         //0 is the most current entry, older entries for older cycles are after that
@@ -248,44 +246,9 @@ class AccountCache {
       }
     }
 
-    if (this.config.debug.newCacheFlow) {
-      if (updateIsNewerHash) {
-        this.cacheUpdateQueue.accountHashesSorted.push(accountHashData)
-        this.cacheUpdateQueue.accountIDs.push(accountId)
-      }
-    } else {
-      //update data in the accountHashesSorted list and record our lastSeenSortIndex index
-      if (updateIsNewerHash === true && onFutureCycle === false) {
-        let lastIndex = accountHashCacheHistory.lastSeenSortIndex
-        // lastIndex is used to clean our spot in history by setting data to null
-        //   this method of cleaning is used to avoid resizing the list constantly
-        //   the empty spaces get cleared out when buildPartitionHashesForNode is run
-        let index = this.insertIntoHistoryList(
-          accountId,
-          accountHashData,
-          this.accountsHashCache3.workingHistoryList,
-          lastIndex
-        )
-        accountHashCacheHistory.lastSeenSortIndex = index
-
-        nestedCountersInstance.countEvent('cache', 'updateAccountHash: update-working')
-      } else if (updateIsNewerHash === true && onFutureCycle === true) {
-        let lastIndex = -1
-        //if our queue index is for the future cycle then we can use this index as a lastIndex for the insert to use on cleaning
-        if (accountHashCacheHistory.queueIndex.id > this.accountsHashCache3.currentCalculationCycle) {
-          lastIndex = accountHashCacheHistory.queueIndex.idx
-        }
-        let index = this.insertIntoHistoryList(
-          accountId,
-          accountHashData,
-          this.accountsHashCache3.futureHistoryList,
-          lastIndex
-        )
-        accountHashCacheHistory.queueIndex.idx = index
-        accountHashCacheHistory.queueIndex.id = cycle
-
-        nestedCountersInstance.countEvent('cache', 'updateAccountHash: update-future')
-      }
+    if (updateIsNewerHash) {
+      this.cacheUpdateQueue.accountHashesSorted.push(accountHashData)
+      this.cacheUpdateQueue.accountIDs.push(accountId)
     }
   }
 
