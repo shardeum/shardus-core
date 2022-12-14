@@ -74,7 +74,11 @@ export function init() {
 }
 
 export function reset() {
-  /* prettier-ignore */ if (logFlags.verbose) console.log( 'Resetting auto-scale module', `Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}` )
+  if (logFlags && logFlags.verbose)
+    console.log(
+      'Resetting auto-scale module',
+      `Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`
+    )
   scalingRequested = false
   scalingRequestsCollector = new Map()
   requestedScalingType = null
@@ -233,7 +237,7 @@ function _canThisNodeSendScaleRequests(_nodeId: string) {
   let nodeInfo = stateManager.currentCycleShardData.nodeShardDataMap.get(_nodeId)
 
   // no such node in the list
-  if(!nodeInfo) return false
+  if (!nodeInfo) return false
 
   const ourIndex = nodeInfo.ourNodeIndex
 
