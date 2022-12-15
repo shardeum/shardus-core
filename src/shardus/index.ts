@@ -1076,10 +1076,11 @@ class Shardus extends EventEmitter {
    * getClosestNodes finds the closes nodes to a certain hash value
    * @param {string} hash any hash address (256bit 64 characters)
    * @param {number} count how many nodes to return
+   * @param {boolean} selfExclude
    * @returns {string[]} returns a list of nodes ids that are closest. roughly in order of closeness
    */
-  getClosestNodes(hash, count = 1) {
-    return this.stateManager.getClosestNodes(hash, count).map((node) => node.id)
+  getClosestNodes(hash, count = 1, selfExclude = false) {
+    return this.stateManager.getClosestNodes(hash, count, selfExclude).map((node) => node.id)
   }
 
   getClosestNodesGlobal(hash, count) {

@@ -2231,9 +2231,10 @@ class StateManager {
    * getClosestNodes
    * @param {string} hash
    * @param {number} count
+   * @param {boolean} selfExclude
    * @returns {Node[]}
    */
-  getClosestNodes(hash: string, count: number = 1): Shardus.Node[] {
+  getClosestNodes(hash: string, count: number = 1, selfExclude = false): Shardus.Node[] {
     if (this.currentCycleShardData == null) {
       throw new Error('getClosestNodes: network not ready')
     }
@@ -2250,6 +2251,9 @@ class StateManager {
     // HOMENODEMATHS consider using partition of the raw hash instead of home node of hash
     let homeNodeIndex = homeNode.ourNodeIndex
     let idToExclude = ''
+    if (selfExclude === true) {
+      idToExclude = Self.id
+    }
     let results = ShardFunctions.getNodesByProximity(
       cycleShardData.shardGlobals,
       cycleShardData.activeNodes,
