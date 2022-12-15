@@ -984,7 +984,6 @@ class Shardus extends EventEmitter {
 
       this.profiler.profileSectionStart('put')
 
-
       //as ShardusMemoryPatternsInput
       // Pack into acceptedTx, and pass to StateManager
       const acceptedTX: ShardusTypes.AcceptedTx = {
@@ -1254,7 +1253,14 @@ class Shardus extends EventEmitter {
     txId: string
   ) {
     try {
-      await this.stateManager.cachedAppDataManager.sendCorrespondingCachedAppData(topic, dataID, appData, cycle, fromId, txId)
+      await this.stateManager.cachedAppDataManager.sendCorrespondingCachedAppData(
+        topic,
+        dataID,
+        appData,
+        cycle,
+        fromId,
+        txId
+      )
     } catch (e) {
       this.mainLogger.error(`Error while sendCorrespondingCachedAppData`, e)
     }
@@ -1379,9 +1385,9 @@ class Shardus extends EventEmitter {
    * @param {App} application
    * @returns {App}
    */
-  _getApplicationInterface(application) {
+  _getApplicationInterface(application: ShardusTypes.App): ShardusTypes.App {
     if (logFlags.debug) this.mainLogger.debug('Start of _getApplicationInterfaces()')
-    const applicationInterfaceImpl: any = {}
+    const applicationInterfaceImpl: Partial<ShardusTypes.App> = {}
     try {
       if (application == null) {
         // throw new Error('Invalid Application Instance')
@@ -1396,13 +1402,11 @@ class Shardus extends EventEmitter {
          * instead of the new validate fn
          */
         applicationInterfaceImpl.validate = (inTx, appData) => {
-          const oldResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(
-            inTx,
-            appData
-          )
+          const oldResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(inTx)
           const newResult = {
             success: oldResult.success,
             reason: oldResult.reason,
+            status: oldResult.status,
           }
           return newResult
         }
@@ -1429,7 +1433,7 @@ class Shardus extends EventEmitter {
             timestamp: oldValidateTxnFieldsResult.txnTimestamp,
             id: this.crypto.hash(inTx), // [TODO] [URGENT] We really shouldn't be doing this and should change all apps to use the new way and do their own hash
             keys: oldGetKeyFromTransactionResult,
-            shardusMemoryPatterns:null,
+            shardusMemoryPatterns: null,
           }
           return newResult
         }
@@ -1441,11 +1445,7 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.txPreCrackData = async (tx, appData) =>
           application.txPreCrackData(tx, appData)
       } else {
-        //this is optional.
-        //const thisPtr = this
-        applicationInterfaceImpl.txPreCrackData = async function () {
-          //thisPtr.mainLogger.debug('no app.txPreCrackData() function defined')
-        }
+        applicationInterfaceImpl.txPreCrackData = async function () {}
       }
 
       if (typeof application.getTimestampFromTransaction === 'function') {
@@ -1501,7 +1501,6 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.getStateId = async (accountAddress, mustExist) =>
           application.getStateId(accountAddress, mustExist)
       } else {
-        // throw new Error('Missing required interface function. getStateId()')
         if (logFlags.debug) this.mainLogger.debug('getStateId not used by global server')
       }
 
@@ -1510,26 +1509,6 @@ class Shardus extends EventEmitter {
       } else {
         throw new Error('Missing required interface function. close()')
       }
-
-      // unused at the moment
-      // if (typeof (application.handleHttpRequest) === 'function') {
-      //   applicationInterfaceImpl.handleHttpRequest = async (httpMethod, uri, req, res) => application.handleHttpRequest(httpMethod, uri, req, res)
-      // } else {
-      //   // throw new Error('Missing required interface function. apply()')
-      // }
-
-      // // TEMP endpoints for workaround. delete this later.
-      // if (typeof (application.onAccounts) === 'function') {
-      //   applicationInterfaceImpl.onAccounts = async (req, res) => application.onAccounts(req, res)
-      // } else {
-      //   // throw new Error('Missing required interface function. apply()')
-      // }
-
-      // if (typeof (application.onGetAccount) === 'function') {
-      //   applicationInterfaceImpl.onGetAccount = async (req, res) => application.onGetAccount(req, res)
-      // } else {
-      //   // throw new Error('Missing required interface function. apply()')
-      // }
 
       // App.get_account_data (Acc_start, Acc_end, Max_records)
       // Provides the functionality defined for /get_accounts API
@@ -1581,16 +1560,6 @@ class Shardus extends EventEmitter {
         throw new Error('Missing required interface function. setAccountData()')
       }
 
-      // pass array of account copies to this (only looks at the data field) and it will reset the account state
-      // if (typeof application.resetAccountData === 'function') {
-      //   applicationInterfaceImpl.resetAccountData = async (accountRecords) =>
-      //     application.resetAccountData(accountRecords)
-      // } else {
-      //   throw new Error(
-      //     'Missing required interface function. resetAccountData()'
-      //   )
-      // }
-
       // pass array of account ids to this and it will delete the accounts
       if (typeof application.deleteAccountData === 'function') {
         applicationInterfaceImpl.deleteAccountData = async (addressList) =>
@@ -1616,7 +1585,6 @@ class Shardus extends EventEmitter {
       } else {
         applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) =>
           'getAccountDebugValue() missing on app'
-        // throw new Error('Missing required interface function. deleteLocalAccountData()')
       }
 
       if (typeof application.canDebugDropTx === 'function') {
@@ -1638,9 +1606,7 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.dataSummaryInit = async (blob, accountData) =>
           application.dataSummaryInit(blob, accountData)
       } else {
-        applicationInterfaceImpl.dataSummaryInit = async function (blob, accountData) {
-          //thisPtr.mainLogger.debug('no app.dataSummaryInit() function defined')
-        }
+        applicationInterfaceImpl.dataSummaryInit = async function (blob, accountData) {}
       }
       if (typeof application.dataSummaryUpdate === 'function') {
         applicationInterfaceImpl.dataSummaryUpdate = async (blob, accountDataBefore, accountDataAfter) =>
@@ -1650,26 +1616,20 @@ class Shardus extends EventEmitter {
           blob,
           accountDataBefore,
           accountDataAfter
-        ) {
-          //thisPtr.mainLogger.debug('no app.dataSummaryUpdate() function defined')
-        }
+        ) {}
       }
       if (typeof application.txSummaryUpdate === 'function') {
         applicationInterfaceImpl.txSummaryUpdate = async (blob, tx, wrappedStates) =>
           application.txSummaryUpdate(blob, tx, wrappedStates)
       } else {
-        applicationInterfaceImpl.txSummaryUpdate = async function (blob, tx, wrappedStates) {
-          //thisPtr.mainLogger.debug('no app.txSummaryUpdate() function defined')
-        }
+        applicationInterfaceImpl.txSummaryUpdate = async function (blob, tx, wrappedStates) {}
       }
 
       if (typeof application.getAccountTimestamp === 'function') {
-        //getAccountTimestamp(accountAddress, mustExist = true)
         applicationInterfaceImpl.getAccountTimestamp = async (accountAddress, mustExist) =>
           application.getAccountTimestamp(accountAddress, mustExist)
       } else {
         applicationInterfaceImpl.getAccountTimestamp = async function (accountAddress, mustExist) {
-          //thisPtr.mainLogger.debug('no app.getAccountTimestamp() function defined')
           return 0
         }
       }
@@ -1685,7 +1645,6 @@ class Shardus extends EventEmitter {
           }
         }
       }
-      //txSummaryUpdate: (blob: any, tx: any, wrappedStates: any)
       if (typeof application.validateJoinRequest === 'function') {
         applicationInterfaceImpl.validateJoinRequest = (data) => application.validateJoinRequest(data)
       }
@@ -1702,9 +1661,8 @@ class Shardus extends EventEmitter {
     }
     if (logFlags.debug) this.mainLogger.debug('End of _getApplicationInterfaces()')
 
-    // hack to force this to the correct answer.. not sure why other type correction methods did not work..
-    return /** @type {App} */ /** @type {unknown} */ applicationInterfaceImpl
-    // return applicationInterfaceImpl
+    // At this point, we have validated all the fields so a cast is appropriate
+    return applicationInterfaceImpl as ShardusTypes.App
   }
 
   /**

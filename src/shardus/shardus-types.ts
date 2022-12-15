@@ -164,7 +164,7 @@ export interface App {
   ): {
     timestamp: number
     id: string
-    keys: TransactionKeys,
+    keys: TransactionKeys
     shardusMemoryPatterns: ShardusMemoryPatternsInput
   }
 
@@ -234,7 +234,7 @@ export interface App {
   /**
    * A function that returns the timestamp for a given Account Address
    */
-  getAccountTimestamp?: (accountAddress: string, mustExist?: boolean) => number
+  getAccountTimestamp?: (accountAddress: string, mustExist?: boolean) => Promise<number>
 
   /**
    * A function that allows the app to look at a passed in account ane return the hash and timestamp
@@ -997,10 +997,10 @@ export interface AcceptedTx {
 }
 
 export type ShardusMemoryPatternsInput = {
-  ro: string[],
-  rw: string[],
-  wo: string[],
-  on: string[],
+  ro: string[]
+  rw: string[]
+  wo: string[]
+  on: string[]
 }
 
 export interface TxReceipt {
