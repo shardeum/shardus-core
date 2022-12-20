@@ -1436,7 +1436,10 @@ class TransactionQueue {
             rw: new Set(acceptedTx.shardusMemoryPatterns.rw),
             wo: new Set(acceptedTx.shardusMemoryPatterns.wo),
             on: new Set(acceptedTx.shardusMemoryPatterns.on),
-          }         
+          }  
+          nestedCountersInstance.countEvent('transactionQueue', 'shardusMemoryPatternSets included')
+        } else {
+          nestedCountersInstance.countEvent('transactionQueue', 'shardusMemoryPatternSets not included')
         }
 
         this.newAcceptedTxQueueTempInjest.push(txQueueEntry)

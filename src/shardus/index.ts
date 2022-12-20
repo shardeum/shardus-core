@@ -1402,7 +1402,7 @@ class Shardus extends EventEmitter {
          * instead of the new validate fn
          */
         applicationInterfaceImpl.validate = (inTx, appData) => {
-          const oldResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(inTx)
+          const oldResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(inTx, appData)
           const newResult = {
             success: oldResult.success,
             reason: oldResult.reason,
@@ -1428,7 +1428,7 @@ class Shardus extends EventEmitter {
           const oldGetKeyFromTransactionResult: ShardusTypes.TransactionKeys =
             application.getKeyFromTransaction(inTx)
           const oldValidateTxnFieldsResult: ShardusTypes.IncomingTransactionResult =
-            application.validateTxnFields(inTx)
+            application.validateTxnFields(inTx, null)
           const newResult = {
             timestamp: oldValidateTxnFieldsResult.txnTimestamp,
             id: this.crypto.hash(inTx), // [TODO] [URGENT] We really shouldn't be doing this and should change all apps to use the new way and do their own hash

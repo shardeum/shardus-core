@@ -182,7 +182,8 @@ export interface App {
    */
   // DEPRECATED in favor of `validate`
   validateTxnFields?: (
-    inTx: OpaqueTransaction // it is better to not use IncomingTransaction
+    inTx: OpaqueTransaction, // it is better to not use IncomingTransaction
+    appData: any
   ) => IncomingTransactionResult
   /**
    * A function responsible for applying an accepted transaction
