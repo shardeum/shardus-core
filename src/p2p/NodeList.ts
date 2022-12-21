@@ -4,9 +4,8 @@ import { P2P } from '@shardus/types'
 import { binarySearch, insertSorted, propComparator, propComparator2 } from '../utils'
 import { crypto, logger } from './Context'
 import * as CycleChain from './CycleChain'
-import { id } from './Self'
-import deepmerge = require('deepmerge')
-import { sync } from './Sync'
+import { id, emitter } from './Self'
+import { ShardusEvent } from '../shardus/shardus-types'
 
 /** STATE */
 
@@ -134,6 +133,14 @@ export function removeNode(id) {
   byIpPort.delete(ipPort(node.internalIp, node.internalPort))
   byPubKey.delete(node.publicKey)
   nodes.delete(id)
+
+  const emitParams: Omit<ShardusEvent, 'type'> = {
+    nodeId: node.publicKey,
+    reason: 'Node deactivated',
+    time: Date.now(),
+    publicKey: node.publicKey,
+  }
+  emitter.emit('node-deactivated', emitParams)
 }
 export function removeNodes(ids: string[]) {
   for (const id of ids) removeNode(id)
@@ -159,6 +166,14 @@ export function updateNode(update: P2P.NodeListTypes.Update) {
         // remove active node from syncing list
         console.log('updateNode: removing active node from syncing list')
         removeSyncingNode(node.id)
+
+        const emitParams: Omit<ShardusEvent, 'type'> = {
+          nodeId: node.publicKey,
+          reason: 'Node activated',
+          time: Date.now(),
+          publicKey: node.publicKey,
+        }
+        emitter.emit('node-activated', emitParams)
       }
     }
   }

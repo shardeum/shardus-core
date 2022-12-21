@@ -290,6 +290,7 @@ export interface App {
   txSummaryUpdate?: (blob: any, tx: any, wrappedStates: any) => void
   validateJoinRequest?: (data: any) => any
   getJoinData?: () => any
+  eventNotify?: (event: ShardusEvent) => void
 }
 
 export interface TransactionKeys {
@@ -1022,3 +1023,13 @@ export interface OpaqueTransaction extends ObjectAlias {}
 export type DeepRequired<T> = Required<{
   [P in keyof T]: T[P] extends object | undefined ? DeepRequired<Required<T[P]>> : T[P]
 }>
+
+type ShardusEventType = 'node-activated' | 'node-deactivated'
+
+export type ShardusEvent = {
+  type: ShardusEventType
+  nodeId: string
+  reason: string
+  time: number
+  publicKey: string
+}

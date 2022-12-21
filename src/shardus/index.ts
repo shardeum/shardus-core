@@ -635,6 +635,12 @@ class Shardus extends EventEmitter {
       // exits with status 0 so that PM2 can restart the process
       else this.exitHandler.exitUncleanly() // exits with status 0 so that PM2 can restart the process
     })
+    Self.emitter.on('node-activated', ({ ...params }) =>
+      this.app.eventNotify?.({ type: 'node-activated', ...params })
+    )
+    Self.emitter.on('node-deactivated', ({ ...params }) =>
+      this.app.eventNotify?.({ type: 'node-deactivated', ...params })
+    )
 
     Context.setShardusContext(this)
 
@@ -1650,6 +1656,9 @@ class Shardus extends EventEmitter {
       }
       if (typeof application.getJoinData === 'function') {
         applicationInterfaceImpl.getJoinData = () => application.getJoinData()
+      }
+      if (typeof application.eventNotify === 'function') {
+        applicationInterfaceImpl.eventNotify = application.eventNotify
       }
     } catch (ex) {
       this.shardus_fatal(
