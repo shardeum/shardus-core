@@ -330,18 +330,18 @@ export async function getFullNodesFromArchiver() {
   return fullNodeList
 }
 
-function getPublicNodeInfo() {
+export function getPublicNodeInfo() {
   const publicKey = Context.crypto.getPublicKey()
   const curvePublicKey = Context.crypto.convertPublicKeyToCurve(publicKey)
-  const status = { status: getNodeStatus(id) }
+  const status = { status: getNodeStatus(publicKey) }
   const nodeInfo = Object.assign({ id, publicKey, curvePublicKey }, network.ipInfo, status)
   return nodeInfo
 }
 
-function getNodeStatus(nodeId) {
-  const current = NodeList.activeByIdOrder
-  if (!current[nodeId]) return null
-  return current[nodeId].status
+function getNodeStatus(pubKey: string) {
+  const current = NodeList.byPubKey
+  if (current.get(pubKey)) return current.get(pubKey).status
+  return null
 }
 
 export function getThisNodeInfo() {

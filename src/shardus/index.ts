@@ -1699,6 +1699,10 @@ class Shardus extends EventEmitter {
     this.network.registerExternalGet('netconfig', async (req, res) => {
       res.json({ config: netConfig })
     })
+    this.network.registerExternalGet('nodeInfo', async (req, res) => {
+      const nodeInfo = Self.getPublicNodeInfo()
+      res.json({ nodeInfo: nodeInfo })
+    })
     // FOR internal testing. NEEDS to be removed for security purposes
     this.network.registerExternalPost('testGlobalAccountTX', isDebugModeMiddleware, async (req, res) => {
       try {
