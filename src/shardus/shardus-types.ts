@@ -291,6 +291,7 @@ export interface App {
   validateJoinRequest?: (data: any) => any
   getJoinData?: () => any
   eventNotify?: (event: ShardusEvent) => void
+  isReadyToJoin: () => Promise<boolean>
 }
 
 export interface TransactionKeys {

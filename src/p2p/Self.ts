@@ -1,5 +1,4 @@
 import * as events from 'events'
-import got from 'got'
 import * as log4js from 'log4js'
 import * as http from '../http'
 import { logFlags } from '../logger'
@@ -86,6 +85,12 @@ export async function startup(): Promise<boolean> {
         //not in witness mode
       }
 
+      const isReadyToJoin = await Context.shardus.app.isReadyToJoin()
+      if (!isReadyToJoin) {
+        // Wait for Context.config.p2p.cycleDuration and try again
+        throw new Error('Node not ready to join')
+      }
+
       // Otherwise, try to join the network
       ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
     } catch (err) {
@@ -141,7 +146,7 @@ async function witnessConditionsMet(activeNodes: P2P.P2PTypes.Node[]) {
 
 async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean) {
   // Check if you're the first node
-  const isFirst = await discoverNetwork(activeNodes)
+  const isFirst = discoverNetwork(activeNodes)
   if (isFirst) {
     // Join your own network and give yourself an ID
     const id = await Join.firstJoin()
@@ -268,28 +273,7 @@ async function contactArchiver() {
   return activeNodesSigned.nodeList
 }
 
-async function discoverNetwork(seedNodes) {
-  /**
-   * [AS] [TODO] [2020-02-05]
-   * We don't need this code anymore since we check time sync
-   * at the start of the Shardus.start.
-   *
-   * NOTE: Remove Self.checkTimeSynced too
-   */
-  // Check if our time is synced to network time server
-  // try {
-  //   // [TODO] - sometimes this fails due to the timeServers being off
-  //   //          try another backup method like Omar's timediff script
-  //   const timeSynced = await checkTimeSynced(Context.config.p2p.timeServers)
-  //   if (!timeSynced) {
-  //     warn(
-  //       'Local time out of sync with time server. Use NTP to keep system time in sync.'
-  //     )
-  //   }
-  // } catch (e) {
-  //   warn(e.message)
-  // }
-
+function discoverNetwork(seedNodes: P2P.P2PTypes.Node[]) {
   // Check if we are first seed node
   const isFirstSeed = checkIfFirstSeedNode(seedNodes)
   if (!isFirstSeed) {
@@ -300,28 +284,7 @@ async function discoverNetwork(seedNodes) {
   return true
 }
 
-// export async function checkTimeSynced(timeServers) {
-//   for (const host of timeServers) {
-//     try {
-//       const time = await Sntp.time({
-//         host,
-//         timeout: 10000,
-//       })
-//       return time.t <= Context.config.p2p.syncLimit
-//     } catch (e) {
-//       warn(`Couldn't fetch ntp time from server at ${host}`)
-//     }
-//   }
-//   try {
-//     const localTimeDiff = await calculateTimeDifference()
-//     return localTimeDiff <= Context.config.p2p.syncLimit * 1000
-//   } catch (e) {
-//     warn('local time is out of sync with google time server')
-//   }
-//   throw Error('Unable to check local time against time servers.')
-// }
-
-function checkIfFirstSeedNode(seedNodes) {
+function checkIfFirstSeedNode(seedNodes: P2P.P2PTypes.Node[]) {
   if (!seedNodes.length) throw new Error('Fatal: No seed nodes in seed list!')
   if (seedNodes.length > 1) return false
   const seed = seedNodes[0]

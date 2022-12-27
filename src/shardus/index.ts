@@ -1408,7 +1408,10 @@ class Shardus extends EventEmitter {
          * instead of the new validate fn
          */
         applicationInterfaceImpl.validate = (inTx, appData) => {
-          const oldResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(inTx, appData)
+          const oldResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(
+            inTx,
+            appData
+          )
           const newResult = {
             success: oldResult.success,
             reason: oldResult.reason,
@@ -1659,6 +1662,12 @@ class Shardus extends EventEmitter {
       }
       if (typeof application.eventNotify === 'function') {
         applicationInterfaceImpl.eventNotify = application.eventNotify
+      }
+      if (typeof application.isReadyToJoin === 'function') {
+        applicationInterfaceImpl.isReadyToJoin = application.isReadyToJoin
+      } else {
+        // If the app doesn't provide isReadyToJoin, assume it is always ready to join
+        applicationInterfaceImpl.isReadyToJoin = async () => true
       }
     } catch (ex) {
       this.shardus_fatal(
