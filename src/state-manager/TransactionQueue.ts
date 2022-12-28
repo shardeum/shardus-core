@@ -98,7 +98,7 @@ class TransactionQueue {
 
   queueReads: Set<string>
   queueWrites: Set<string>
-  queueReadWritesOld: Set<string>  
+  queueReadWritesOld: Set<string>
 
   constructor(
     stateManager: StateManager,
@@ -1436,7 +1436,7 @@ class TransactionQueue {
             rw: new Set(acceptedTx.shardusMemoryPatterns.rw),
             wo: new Set(acceptedTx.shardusMemoryPatterns.wo),
             on: new Set(acceptedTx.shardusMemoryPatterns.on),
-          }  
+          }
           nestedCountersInstance.countEvent('transactionQueue', 'shardusMemoryPatternSets included')
         } else {
           nestedCountersInstance.countEvent('transactionQueue', 'shardusMemoryPatternSets not included')
@@ -2379,7 +2379,7 @@ class TransactionQueue {
 
         this.profiler.profileSectionStart('process_dapp.getRelevantData')
         this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
-        let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
+        let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data, queueEntry.acceptedTx.appData)
         this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
         this.profiler.profileSectionEnd('process_dapp.getRelevantData')
 
@@ -2631,7 +2631,7 @@ class TransactionQueue {
 
         this.profiler.profileSectionStart('process_dapp.getRelevantData')
         this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
-        let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
+        let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data, queueEntry.acceptedTx.appData)
         this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
         this.profiler.profileSectionEnd('process_dapp.getRelevantData')
 
@@ -4754,12 +4754,12 @@ class TransactionQueue {
         if(this.queueReadWritesOld.has(id)){
           return true
         }
-        //note blocked by upstream reads, because this read only operation 
+        //note blocked by upstream reads, because this read only operation
         //will not impact the upstream read
-      }  
-      
-      //we made it, not blocked 
-      return false 
+      }
+
+      //we made it, not blocked
+      return false
     }
 
     for (let key of queueEntry.uniqueKeys) {
@@ -4770,7 +4770,7 @@ class TransactionQueue {
 
     return false
   }
-  
+
   processQueue_markAccountsSeen2(seenAccounts: SeenAccounts, queueEntry: QueueEntry) {
     if (queueEntry.uniqueWritableKeys == null) {
       //TSConversion double check if this needs extra logging
@@ -4790,8 +4790,8 @@ class TransactionQueue {
       }
       for (const id of queueEntry.shardusMemoryPatternSets.ro) {
         this.queueReads.add(id)
-      } 
-      return     
+      }
+      return
     }
 
     // only mark writeable keys as seen but we will check/clear against all keys

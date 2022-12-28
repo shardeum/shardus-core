@@ -1500,8 +1500,8 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.getRelevantData === 'function') {
-        applicationInterfaceImpl.getRelevantData = async (accountId, tx) =>
-          application.getRelevantData(accountId, tx)
+        applicationInterfaceImpl.getRelevantData = async (accountId, tx, appData: any) =>
+          application.getRelevantData(accountId, tx, appData)
       } else {
         throw new Error('Missing required interface function. getRelevantData()')
       }

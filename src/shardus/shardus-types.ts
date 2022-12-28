@@ -213,7 +213,7 @@ export interface App {
 
   updateAccountPartial: (wrappedState: WrappedResponse, localCache: any, applyResponse: ApplyResponse) => void
 
-  getRelevantData: (accountId: string, tx: object) => Promise<WrappedResponse>
+  getRelevantData: (accountId: string, tx: object, appData: any) => Promise<WrappedResponse>
 
   /**
    * A function responsible for getting timestamp from injected transaction
