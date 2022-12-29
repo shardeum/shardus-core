@@ -175,7 +175,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
   }
   */
 
-  applyNodeListChange(squasher.final)
+  applyNodeListChange(squasher.final, false, null)
 
   info('Synced to cycle', cycleToSyncTo.counter)
   info(`Sync complete; ${NodeList.activeByIdOrder.length} active nodes; ${CycleChain.cycles.length} cycles`)
@@ -244,7 +244,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   }
 
   const changes = parse(cycle)
-  applyNodeListChange(changes)
+  applyNodeListChange(changes, true, cycle)
   CycleChain.append(cycle)
 
   let nodeLimit = 2 //todo set this to a higher number, but for now I want to make sure it works in a small test
@@ -267,10 +267,14 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   }
 }
 
-function applyNodeListChange(change: P2P.CycleParserTypes.Change) {
+function applyNodeListChange(
+  change: P2P.CycleParserTypes.Change,
+  raiseEvents: boolean,
+  cycle: P2P.CycleCreatorTypes.CycleRecord | null
+) {
   NodeList.addNodes(change.added.map((joined) => NodeList.createNode(joined)))
-  NodeList.updateNodes(change.updated)
-  NodeList.removeNodes(change.removed)
+  NodeList.updateNodes(change.updated, raiseEvents, cycle)
+  NodeList.removeNodes(change.removed, raiseEvents, cycle)
 }
 
 export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.CycleCreatorTypes.CycleRecord> {

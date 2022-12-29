@@ -98,7 +98,7 @@ export function removeSyncingNode(id) {
   if (idx >= 0) syncingByIdOrder.splice(idx, 1)
 }
 
-export function removeNode(id) {
+export function removeNode(id, raiseEvents: boolean, cycle: P2P.CycleCreatorTypes.CycleRecord | null) {
   let idx
 
   // Omar added this so we don't crash if a node gets remove more than once
@@ -134,19 +134,29 @@ export function removeNode(id) {
   byPubKey.delete(node.publicKey)
   nodes.delete(id)
 
-  const emitParams: Omit<ShardusEvent, 'type'> = {
-    nodeId: node.publicKey,
-    reason: 'Node deactivated',
-    time: Date.now(),
-    publicKey: node.publicKey,
+  if (raiseEvents) {
+    const emitParams: Omit<ShardusEvent, 'type'> = {
+      nodeId: node.id,
+      reason: 'Node deactivated',
+      time: cycle.start,
+      publicKey: node.publicKey,
+    }
+    emitter.emit('node-deactivated', emitParams)
   }
-  emitter.emit('node-deactivated', emitParams)
 }
-export function removeNodes(ids: string[]) {
-  for (const id of ids) removeNode(id)
+export function removeNodes(
+  ids: string[],
+  raiseEvents: boolean,
+  cycle: P2P.CycleCreatorTypes.CycleRecord | null
+) {
+  for (const id of ids) removeNode(id, raiseEvents, cycle)
 }
 
-export function updateNode(update: P2P.NodeListTypes.Update) {
+export function updateNode(
+  update: P2P.NodeListTypes.Update,
+  raiseEvents: boolean,
+  cycle: P2P.CycleCreatorTypes.CycleRecord | null
+) {
   const node = nodes.get(update.id)
   if (node) {
     // Update node properties
@@ -167,19 +177,25 @@ export function updateNode(update: P2P.NodeListTypes.Update) {
         console.log('updateNode: removing active node from syncing list')
         removeSyncingNode(node.id)
 
-        const emitParams: Omit<ShardusEvent, 'type'> = {
-          nodeId: node.publicKey,
-          reason: 'Node activated',
-          time: Date.now(),
-          publicKey: node.publicKey,
+        if (raiseEvents) {
+          const emitParams: Omit<ShardusEvent, 'type'> = {
+            nodeId: node.id,
+            reason: 'Node activated',
+            time: cycle.start,
+            publicKey: node.publicKey,
+          }
+          emitter.emit('node-activated', emitParams)
         }
-        emitter.emit('node-activated', emitParams)
       }
     }
   }
 }
-export function updateNodes(updates: P2P.NodeListTypes.Update[]) {
-  for (const update of updates) updateNode(update)
+export function updateNodes(
+  updates: P2P.NodeListTypes.Update[],
+  raiseEvents: boolean,
+  cycle: P2P.CycleCreatorTypes.CycleRecord | null
+) {
+  for (const update of updates) updateNode(update, raiseEvents, cycle)
 }
 
 export function createNode(joined: P2P.JoinTypes.JoinedConsensor) {

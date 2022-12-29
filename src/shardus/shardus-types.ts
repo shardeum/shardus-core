@@ -1031,6 +1031,6 @@ export type ShardusEvent = {
   type: ShardusEventType
   nodeId: string
   reason: string
-  time: number
+  time: number //Time for 'node-activated' and 'node-deactivated' are the cycle start time in seconds, other event may use ms in the future
   publicKey: string
 }
