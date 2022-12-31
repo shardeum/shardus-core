@@ -292,6 +292,7 @@ export interface App {
   getJoinData?: () => any
   eventNotify?: (event: ShardusEvent) => void
   isReadyToJoin: () => Promise<boolean>
+  signAppData?: (type: string, hash: string, nodesToSign: number, appData: any) => Promise<SignAppDataResult>
 }
 
 export interface TransactionKeys {
@@ -1033,4 +1034,14 @@ export type ShardusEvent = {
   reason: string
   time: number //Time for 'node-activated' and 'node-deactivated' are the cycle start time in seconds, other event may use ms in the future
   publicKey: string
+}
+
+export type GetAppDataSignaturesResult = {
+  success: boolean
+  signatures: Sign[]
+}
+
+type SignAppDataResult = {
+  success: boolean
+  signature: Sign
 }

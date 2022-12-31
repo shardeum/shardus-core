@@ -14,16 +14,17 @@ import { logFlags } from '../logger'
 import { getNodeRequestingJoin } from './Join'
 import { P2P as P2PTypings } from '@shardus/types'
 import * as CycleAutoScale from './CycleAutoScale'
+import { ShardusTypes } from '../shardus'
 
 /* p2p functions */
 
-class P2P extends EventEmitter {
+export class P2P extends EventEmitter {
   registerInternal: (route: any, handler: any) => void
   registerGossipHandler: (type: any, handler: any) => void
   unregisterGossipHandler: (type: any) => void
   unregisterInternal: (route: any) => void
   ask: (
-    node: any,
+    node: ShardusTypes.Node,
     route: string,
     message?: {},
     logged?: boolean,
@@ -139,7 +140,7 @@ class P2P extends EventEmitter {
 export const p2p = new P2P()
 
 class State extends EventEmitter {
-  getNode(id) {
+  getNode(id: string) {
     return NodeList.nodes.get(id)
   }
 

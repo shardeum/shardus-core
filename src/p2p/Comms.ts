@@ -3,6 +3,7 @@ import { P2P } from '@shardus/types'
 import { Logger } from 'log4js'
 import { logFlags } from '../logger'
 import { setIsUpTs } from '../p2p/Lost'
+import { ShardusTypes } from '../shardus'
 import * as utils from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { cNoSizeTrack, cUninitializedSize } from '../utils/profiler'
@@ -182,7 +183,7 @@ function createGossipTracker() {
 }
 
 // Our own P2P version of the network tell, with a sign added
-export async function tell(nodes: any[], route, message, logged = false, tracker = '') {
+export async function tell(nodes: ShardusTypes.Node[], route, message, logged = false, tracker = '') {
   let msgSize = cUninitializedSize
   if (tracker === '') {
     tracker = createMsgTracker()
@@ -249,7 +250,14 @@ async function signedMultiTell(
 }
 
 // Our own P2P version of the network ask, with a sign added, and sign verified on other side
-export async function ask(node, route: string, message = {}, logged = false, tracker = '', extraTime = 0) {
+export async function ask(
+  node: ShardusTypes.Node,
+  route: string,
+  message = {},
+  logged = false,
+  tracker = '',
+  extraTime = 0
+) {
   if (tracker === '') {
     tracker = createMsgTracker()
   }

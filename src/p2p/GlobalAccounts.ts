@@ -65,13 +65,9 @@ export function init() {
 }
 
 export function setGlobal(address, value, when, source) {
-  /** [TODO] [AS] Replace with Self.id */
-  // if (logFlags.console) console.log(`SETGLOBAL: WE ARE: ${p2p.id.substring(0, 5)}`)
   if (logFlags.console) console.log(`SETGLOBAL: WE ARE: ${Self.id.substring(0, 5)}`)
 
   // Only do this if you're active
-  /** [TODO] [AS] Replace with Self.isActive */
-  // if (!p2p.isActive) {
   if (!Self.isActive) {
     if (logFlags.console) console.log('setGlobal: Not active yet')
     return

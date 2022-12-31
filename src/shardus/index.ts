@@ -64,7 +64,7 @@ interface Shardus {
   storage: Storage
   crypto: Crypto
   network: Network.NetworkClass
-  p2p: any
+  p2p: Wrapper.P2P
   debug: Debug
   appProvided: boolean
   app: ShardusTypes.App
@@ -1066,14 +1066,6 @@ class Shardus extends EventEmitter {
     return this.p2p.getLatestCycles(amount)
   }
 
-  getCycleMarker() {
-    return this.p2p.getCycleMarker()
-  }
-
-  // forwardAccounts(data: any) {
-  //   Archivers.forwardAccounts(data)
-  // }
-
   /**
    * @typedef {import('../shardus/index.js').Node} Node
    */
@@ -1084,7 +1076,7 @@ class Shardus extends EventEmitter {
    * @param {boolean} selfExclude
    * @returns {string[]} returns a list of nodes ids that are closest. roughly in order of closeness
    */
-  getClosestNodes(hash, count = 1, selfExclude = false) {
+  getClosestNodes(hash: string, count: number = 1, selfExclude: boolean = false): string[] {
     return this.stateManager.getClosestNodes(hash, count, selfExclude).map((node) => node.id)
   }
 
@@ -1362,13 +1354,6 @@ class Shardus extends EventEmitter {
   // Expose dev public key to verify things on the app
   getDevPublicKey() {
     return getDevPublicKey()
-  }
-
-  /**
-   * Checks if this node is active in the network
-   */
-  isActive() {
-    return this.p2p.isActive()
   }
 
   /**
@@ -1669,6 +1654,9 @@ class Shardus extends EventEmitter {
         // If the app doesn't provide isReadyToJoin, assume it is always ready to join
         applicationInterfaceImpl.isReadyToJoin = async () => true
       }
+      if (typeof application.signAppData === 'function') {
+        applicationInterfaceImpl.signAppData = application.signAppData
+      }
     } catch (ex) {
       this.shardus_fatal(
         `getAppInterface_ex`,
@@ -1703,6 +1691,20 @@ class Shardus extends EventEmitter {
       const nodeInfo = Self.getPublicNodeInfo()
       res.json({ nodeInfo: nodeInfo })
     })
+
+    this.p2p.registerInternal(
+      'sign-app-data',
+      async (
+        payload: { type: string; nodesToSign: string; hash: string; appData: any },
+        respond: (arg0: any) => any
+      ) => {
+        const { type, nodesToSign, hash, appData } = payload
+        const { success, signature } = await this.app.signAppData?.(type, hash, Number(nodesToSign), appData)
+
+        await respond({ success, signature })
+      }
+    )
+
     // FOR internal testing. NEEDS to be removed for security purposes
     this.network.registerExternalPost('testGlobalAccountTX', isDebugModeMiddleware, async (req, res) => {
       try {
@@ -1899,6 +1901,44 @@ class Shardus extends EventEmitter {
     }
 
     this.statistics.countEvent(category, name, count, message)
+  }
+
+  async getAppDataSignatures(
+    type: string,
+    hash: string,
+    nodesToSign: number,
+    appData: any
+  ): Promise<ShardusTypes.GetAppDataSignaturesResult> {
+    const closestNodesIds = this.getClosestNodes(hash, nodesToSign)
+
+    const closestNodes = closestNodesIds.map((nodeId) => this.p2p.state.getNode(nodeId))
+
+    const responses = await Promise.all(
+      closestNodes.map((node) => {
+        return this.p2p.ask(node, 'sign-app-data', {
+          type,
+          hash,
+          nodesToSign,
+          appData,
+        })
+      })
+    )
+
+    // Success is true if all of the signatures were successful
+    const success = responses.reduce((prev, curr) => {
+      if (curr.isResponse === true) {
+        return curr.success && prev
+      }
+
+      return prev
+    }, true)
+
+    const signatures = responses.map(({ signature }) => signature)
+
+    return {
+      success,
+      signatures,
+    }
   }
 }
 

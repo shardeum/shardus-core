@@ -187,7 +187,7 @@ export class NetworkClass extends EventEmitter {
     console.log(`Internal server running on port ${this.ipInfo.internalPort}...`)
   }
 
-  async tell(nodes, route, message, logged = false) {
+  async tell(nodes: Shardus.Node[], route: string, message, logged = false) {
     const data = { route, payload: message }
     const promises = []
     let id = ''
