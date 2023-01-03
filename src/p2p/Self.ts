@@ -85,12 +85,6 @@ export async function startup(): Promise<boolean> {
         //not in witness mode
       }
 
-      const isReadyToJoin = await Context.shardus.app.isReadyToJoin()
-      if (!isReadyToJoin) {
-        // Wait for Context.config.p2p.cycleDuration and try again
-        throw new Error('Node not ready to join')
-      }
-
       // Otherwise, try to join the network
       ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
     } catch (err) {
@@ -152,6 +146,12 @@ async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean)
     const id = await Join.firstJoin()
     // Return id and isFirst
     return { isFirst, id }
+  }
+
+  const isReadyToJoin = await Context.shardus.app.isReadyToJoin()
+  if (!isReadyToJoin) {
+    // Wait for Context.config.p2p.cycleDuration and try again
+    throw new Error('Node not ready to join')
   }
 
   // Remove yourself from activeNodes if you are present in them
