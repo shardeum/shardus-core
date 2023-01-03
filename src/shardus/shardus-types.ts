@@ -1041,7 +1041,9 @@ export type GetAppDataSignaturesResult = {
   signatures: Sign[]
 }
 
-type SignAppDataResult = {
+//I think we may need to add failure codes to this later so we can tell track what type of signature rejections
+//we are getting.
+export type SignAppDataResult = {
   success: boolean
   signature: Sign
 }
