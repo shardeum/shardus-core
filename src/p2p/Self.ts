@@ -148,12 +148,6 @@ async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean)
     return { isFirst, id }
   }
 
-  const isReadyToJoin = await Context.shardus.app.isReadyToJoin()
-  if (!isReadyToJoin) {
-    // Wait for Context.config.p2p.cycleDuration and try again
-    throw new Error('Node not ready to join')
-  }
-
   // Remove yourself from activeNodes if you are present in them
   const ourIdx = activeNodes.findIndex(
     (node) => node.ip === network.ipInfo.externalIp && node.port === network.ipInfo.externalPort
@@ -173,6 +167,13 @@ async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean)
 
   // Get latest cycle record from active nodes
   const latestCycle = await Sync.getNewestCycle(activeNodes)
+
+  const publicKey = Context.crypto.getPublicKey()
+  const isReadyToJoin = await Context.shardus.app.isReadyToJoin(latestCycle, publicKey, activeNodes)
+  if (!isReadyToJoin) {
+    // Wait for Context.config.p2p.cycleDuration and try again
+    throw new Error('Node not ready to join')
+  }
 
   // Create join request from latest cycle
   const request = await Join.createJoinRequest(latestCycle.previous)

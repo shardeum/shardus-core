@@ -1649,10 +1649,11 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.eventNotify = application.eventNotify
       }
       if (typeof application.isReadyToJoin === 'function') {
-        applicationInterfaceImpl.isReadyToJoin = application.isReadyToJoin
+        applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes) =>
+          application.isReadyToJoin(latestCycle, publicKey, activeNodes)
       } else {
         // If the app doesn't provide isReadyToJoin, assume it is always ready to join
-        applicationInterfaceImpl.isReadyToJoin = async () => true
+        applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes) => true
       }
       if (typeof application.signAppData === 'function') {
         applicationInterfaceImpl.signAppData = application.signAppData

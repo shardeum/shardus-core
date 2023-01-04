@@ -291,7 +291,7 @@ export interface App {
   validateJoinRequest?: (data: any) => any
   getJoinData?: () => any
   eventNotify?: (event: ShardusEvent) => void
-  isReadyToJoin: () => Promise<boolean>
+  isReadyToJoin: (latestCycle: Cycle, nodePublicKey: string, activeNodes: P2P.P2PTypes.Node[]) => Promise<boolean>
   signAppData?: (type: string, hash: string, nodesToSign: number, appData: any) => Promise<SignAppDataResult>
 }
 
