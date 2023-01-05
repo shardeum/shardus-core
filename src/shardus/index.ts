@@ -1088,6 +1088,29 @@ class Shardus extends EventEmitter {
     return profilerInstance
   }
 
+  validateActiveNodeSignatures(
+    hash: string,
+    signs: ShardusTypes.Sign[],
+    minRequired: number
+  ): { success: boolean; reason: string; validNodes?: ShardusTypes.Node[] } {
+    let validNodeCount = 0
+    // let validNodes = []
+    for (let i = 0; i < signs.length; i++) {
+      const nodePublicKey = signs[i].owner
+      const node = this.p2p.state.getNodeByPubKey(nodePublicKey)
+      if (node) {
+        validNodeCount++
+        // validNodes.push(node)
+      }
+      // early break loop
+      if (validNodeCount >= minRequired) {
+        // if (validNodes.length >= minRequired) {
+        return { success: true, reason: `Validated by ${minRequired} valid nodes!` }
+      }
+    }
+    return { success: false, reason: `Fail to verify enough valid nodes signatures` }
+  }
+
   /**
    * isNodeInDistance
    * @param {string} hash any hash address (256bit 64 characters)
