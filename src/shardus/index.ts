@@ -1912,18 +1912,29 @@ class Shardus extends EventEmitter {
   ): Promise<ShardusTypes.GetAppDataSignaturesResult> {
     const closestNodesIds = this.getClosestNodes(hash, nodesToSign)
 
-    const closestNodes = closestNodesIds.map((nodeId) => this.p2p.state.getNode(nodeId))
+    const filterNodeIds = closestNodesIds.filter((id) => id !== Self.id)
 
-    const responses = await Promise.all(
-      closestNodes.map((node) => {
-        return this.p2p.ask(node, 'sign-app-data', {
-          type,
-          hash,
-          nodesToSign,
-          appData,
+    const closestNodes = filterNodeIds.map((nodeId) => this.p2p.state.getNode(nodeId))
+
+    let responses = []
+    if (filterNodeIds.length > 0) {
+      responses = await Promise.all(
+        closestNodes.map((node) => {
+          return this.p2p.ask(node, 'sign-app-data', {
+            type,
+            hash,
+            nodesToSign,
+            appData,
+          })
         })
-      })
-    )
+      )
+    }
+
+    if (closestNodesIds.includes(Self.id)) {
+      const { success, signature } = await this.app.signAppData?.(type, hash, Number(nodesToSign), appData)
+      console.log(success, signature)
+      responses = [...responses, ...[{ success, signature }]]
+    }
 
     // Success is true if all of the signatures were successful
     const success = responses.reduce((prev, curr) => {
