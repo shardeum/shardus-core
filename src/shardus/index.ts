@@ -36,6 +36,7 @@ import { isApopMarkedNode } from '../p2p/Apoptosis'
 import { netConfig } from '../p2p/CycleCreator'
 import { startSaving } from './saveConsoleOutput'
 import { CountedEvent } from '../statistics/countedEvents'
+import { AccountData, WrappedData } from '../shardus/shardus-types'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
@@ -1678,6 +1679,13 @@ class Shardus extends EventEmitter {
         // If the app doesn't provide isReadyToJoin, assume it is always ready to join
         applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes) => true
       }
+      if (typeof application.updateNetworkChangeQueue === 'function') {
+        applicationInterfaceImpl.updateNetworkChangeQueue = async (account: ShardusTypes.WrappedData, appData: any) =>
+          application.updateNetworkChangeQueue(account, appData)
+      } else {
+        // If the app doesn't provide isReadyToJoin, assume it is always ready to join
+        applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes) => true
+      }
       if (typeof application.signAppData === 'function') {
         applicationInterfaceImpl.signAppData = application.signAppData
       }
@@ -1817,6 +1825,7 @@ class Shardus extends EventEmitter {
       let changes = account.data.listOfChanges as {
         cycle: number
         change: any
+        appData: any
       }[]
       if (!changes || !Array.isArray(changes)) {
         //this may get logged if we have a changeListGlobalAccount that does not have config settings on it.
@@ -1838,19 +1847,29 @@ class Shardus extends EventEmitter {
         //apply this change
         this.appliedConfigChanges.add(change.cycle)
         let changeObj = change.change
+        let appData = change.appData
 
-        this.patchObject(this.config, changeObj)
+        this.patchObject(this.config, changeObj, appData)
+
+        if (appData) {
+          const data: WrappedData[] = await this.app.updateNetworkChangeQueue(account, appData)
+          await this.stateManager.checkAndSetAccountData(
+            data,
+            'global network account update',
+            true
+          )
+        }
 
         this.p2p.configUpdated()
       }
     }
   }
 
-  patchObject(existingObject: any, changeObj: any) {
+  patchObject(existingObject: any, changeObj: any, appData: any) {
     for (const [key, value] of Object.entries(changeObj)) {
       if (existingObject[key] != null) {
         if (typeof value === 'object') {
-          this.patchObject(existingObject[key], value)
+          this.patchObject(existingObject[key], value, appData)
         } else {
           existingObject[key] = value
           this.mainLogger.info(`patched ${key} to ${value}`)

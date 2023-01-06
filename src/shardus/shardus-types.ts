@@ -293,6 +293,7 @@ export interface App {
   eventNotify?: (event: ShardusEvent) => void
   isReadyToJoin: (latestCycle: Cycle, nodePublicKey: string, activeNodes: P2P.P2PTypes.Node[]) => Promise<boolean>
   signAppData?: (type: string, hash: string, nodesToSign: number, appData: any) => Promise<SignAppDataResult>
+  updateNetworkChangeQueue?: (account: WrappedData, appData: any) => Promise<WrappedData[]>
 }
 
 export interface TransactionKeys {
