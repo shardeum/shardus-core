@@ -15,6 +15,7 @@
   },
   "scripts": {
     "lint": "eslint './src/**/*.ts'",
+    "lint-windows": "eslint ./src/**/*.ts",
     "ensure:node-version": "node -e \"'v' + require('./package.json').engines.node == process.version || process.exit(1)\"",
     "clean": "shx rm -rf dist build",
     "create:folders": "shx mkdir -p dist",
