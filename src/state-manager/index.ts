@@ -2259,7 +2259,12 @@ class StateManager {
       true
     )
 
-    return results
+    // Filter unique nodes
+    const uniqueNodes = results.filter((node, index, self) => {
+      return self.findIndex(({ id }) => id === node.id) === index
+    })
+
+    return uniqueNodes
   }
 
   _distanceSortAsc(a: SimpleDistanceObject, b: SimpleDistanceObject) {
