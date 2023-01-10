@@ -1090,11 +1090,10 @@ class Shardus extends EventEmitter {
   }
 
   validateActiveNodeSignatures(
-    hash: string,
     signedAppData: any,
     signs: ShardusTypes.Sign[],
     minRequired: number
-  ): { success: boolean; reason: string; validNodes?: ShardusTypes.Node[] } {
+  ): { success: boolean; reason: string } {
     let validNodeCount = 0
     // let validNodes = []
     let appData = {...signedAppData}
@@ -1108,7 +1107,6 @@ class Shardus extends EventEmitter {
       const isValid = this.crypto.verify(appData, nodePublicKey)
       if (node && isValid) {
         validNodeCount++
-        // validNodes.push(node)
       }
       // early break loop
       if (validNodeCount >= minRequired) {
