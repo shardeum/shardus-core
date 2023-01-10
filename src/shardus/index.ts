@@ -1091,15 +1091,22 @@ class Shardus extends EventEmitter {
 
   validateActiveNodeSignatures(
     hash: string,
+    signedAppData: any,
     signs: ShardusTypes.Sign[],
     minRequired: number
   ): { success: boolean; reason: string; validNodes?: ShardusTypes.Node[] } {
     let validNodeCount = 0
     // let validNodes = []
+    let appData = {...signedAppData}
+    if (appData.signs) delete appData.signs
+    if (appData.sign) delete appData.sign
     for (let i = 0; i < signs.length; i++) {
-      const nodePublicKey = signs[i].owner
+      const sign = signs[i]
+      const nodePublicKey = sign.owner
+      appData.sign = sign // attach the node's sig for verification
       const node = this.p2p.state.getNodeByPubKey(nodePublicKey)
-      if (node) {
+      const isValid = this.crypto.verify(appData, nodePublicKey)
+      if (node && isValid) {
         validNodeCount++
         // validNodes.push(node)
       }
