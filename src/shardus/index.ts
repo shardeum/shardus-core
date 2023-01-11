@@ -600,7 +600,7 @@ class Shardus extends EventEmitter {
       }
       this.exitHandler.exitCleanly() // exits with status 0 so that PM2 can restart the process
     })
-    Self.emitter.on('apoptosized', async (restart: boolean, callstack: string, message: string) => {
+    Self.emitter.on('apoptosized', async (callstack: string, message: string, restart: boolean) => {
       // Omar - Why are we trying to call the functions in modules directly before exiting.
       //        The modules have already registered shutdown functions with the exitHandler.
       //        We should let exitHandler handle the shutdown process.
@@ -634,7 +634,7 @@ class Shardus extends EventEmitter {
       }
       if (restart) this.exitHandler.exitCleanly()
       // exits with status 0 so that PM2 can restart the process
-      else this.exitHandler.exitUncleanly() // exits with status 0 so that PM2 can restart the process
+      else this.exitHandler.exitUncleanly() // exits with status 1 so that PM2 CANNOT restart the process
     })
     Self.emitter.on('node-activated', ({ ...params }) =>
       this.app.eventNotify?.({ type: 'node-activated', ...params })
@@ -1111,10 +1111,16 @@ class Shardus extends EventEmitter {
       // early break loop
       if (validNodeCount >= minRequired) {
         // if (validNodes.length >= minRequired) {
-        return { success: true, reason: `Validated by ${minRequired} valid nodes!` }
+        return {
+          success: true,
+          reason: `Validated by ${minRequired} valid nodes!`,
+        }
       }
     }
-    return { success: false, reason: `Fail to verify enough valid nodes signatures` }
+    return {
+      success: false,
+      reason: `Fail to verify enough valid nodes signatures`,
+    }
   }
 
   /**
@@ -1685,8 +1691,10 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes) => true
       }
       if (typeof application.updateNetworkChangeQueue === 'function') {
-        applicationInterfaceImpl.updateNetworkChangeQueue = async (account: ShardusTypes.WrappedData, appData: any) =>
-          application.updateNetworkChangeQueue(account, appData)
+        applicationInterfaceImpl.updateNetworkChangeQueue = async (
+          account: ShardusTypes.WrappedData,
+          appData: any
+        ) => application.updateNetworkChangeQueue(account, appData)
       } else {
         // If the app doesn't provide isReadyToJoin, assume it is always ready to join
         applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes) => true
@@ -1732,7 +1740,12 @@ class Shardus extends EventEmitter {
     this.p2p.registerInternal(
       'sign-app-data',
       async (
-        payload: { type: string; nodesToSign: string; hash: string; appData: any },
+        payload: {
+          type: string
+          nodesToSign: string
+          hash: string
+          appData: any
+        },
         respond: (arg0: any) => any
       ) => {
         const { type, nodesToSign, hash, appData } = payload
@@ -1858,11 +1871,7 @@ class Shardus extends EventEmitter {
 
         if (appData) {
           const data: WrappedData[] = await this.app.updateNetworkChangeQueue(account, appData)
-          await this.stateManager.checkAndSetAccountData(
-            data,
-            'global network account update',
-            true
-          )
+          await this.stateManager.checkAndSetAccountData(data, 'global network account update', true)
         }
 
         this.p2p.configUpdated()
