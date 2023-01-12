@@ -114,6 +114,12 @@ class ExitHandler {
         // await this.exitCleanly()
         await this.exitUncleanly('SIGINT')
       })
+      //gracefull shutdown suppport in windows. should mirror what SIGINT does in linux
+      process.on('message', async (msg) => {
+        if (msg == 'shutdown') {
+          await this.exitUncleanly('message:shutdown')
+        }
+      })
     }
     if (sigterm) {
       process.on('SIGTERM', async () => {
