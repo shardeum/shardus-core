@@ -29,7 +29,6 @@ import AccountSync from './AccountSync'
 import AccountGlobals from './AccountGlobals'
 import TransactionQueue from './TransactionQueue'
 import TransactionRepair from './TransactionRepair'
-import TransactionRepairOld from './TransactionRepairOld'
 import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
 import Depricated from './Depricated'
@@ -112,7 +111,6 @@ class StateManager {
   accountGlobals: AccountGlobals
   transactionQueue: TransactionQueue
   private transactionRepair: TransactionRepair
-  private transactionRepairOld: TransactionRepairOld
   transactionConsensus: TransactionConsenus
   partitionObjects: PartitionObjects
   accountPatcher: AccountPatcher
@@ -3574,12 +3572,9 @@ class StateManager {
     return filteredNodes
   }
 
-  getTxRepair(): TransactionRepair | TransactionRepairOld {
+  getTxRepair(): TransactionRepair {
     if (this.transactionRepair) {
       return this.transactionRepair
-    }
-    if (this.transactionRepairOld) {
-      return this.transactionRepairOld
     }
   }
 
