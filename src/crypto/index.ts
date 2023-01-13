@@ -1,9 +1,12 @@
 import * as crypto from '@shardus/crypto-utils'
+import { ChildProcess, fork } from 'child_process'
+import fs from 'fs'
 import Log4js from 'log4js'
-import { fork, ChildProcess } from 'child_process'
+import Logger from '../logger'
 import * as Shardus from '../shardus/shardus-types'
-import Logger, { logFlags } from '../logger'
 import Storage from '../storage'
+
+const KeypairFile = 'secrets.json'
 
 interface Crypto {
   config: Shardus.StrictServerConfiguration
@@ -33,8 +36,15 @@ class Crypto {
     crypto.init(this.config.crypto.hashKey)
     const keypair = await this.storage.getProperty('keypair')
     if (!keypair) {
+      // check for keypair in file system
+      let fsKeypair = this.readKeypairFromFile()
+      if (fsKeypair && fsKeypair.secretKey && fsKeypair.publicKey) {
+        this.keypair = fsKeypair
+      }
+
       this.mainLogger.info('Keypair unable to be loaded from database. Generating new keypair...')
       this.keypair = this._generateKeypair()
+      this.writeKeypairToFile(this.keypair)
       await this.storage.setProperty('keypair', this.keypair)
       this.mainLogger.info('New keypair successfully generated and saved to database.')
     } else {
@@ -45,6 +55,18 @@ class Crypto {
       secretKey: crypto.convertSkToCurve(this.keypair.secretKey),
       publicKey: crypto.convertPkToCurve(this.keypair.publicKey),
     }
+  }
+
+  writeKeypairToFile(keypair) {
+    fs.writeFileSync(KeypairFile, JSON.stringify(keypair))
+  }
+
+  readKeypairFromFile() {
+    if (fs.existsSync(KeypairFile)) {
+      const fileData = fs.readFileSync(KeypairFile)
+      return JSON.parse(fileData.toString())
+    }
+    return null
   }
 
   _generateKeypair() {
