@@ -39,7 +39,13 @@ class Crypto {
       // check for keypair in file system
       let fsKeypair = this.readKeypairFromFile()
       if (fsKeypair && fsKeypair.secretKey && fsKeypair.publicKey) {
+        this.mainLogger.info('Keypair loaded from file')
         this.keypair = fsKeypair
+        this.curveKeypair = {
+          secretKey: crypto.convertSkToCurve(this.keypair.secretKey),
+          publicKey: crypto.convertPkToCurve(this.keypair.publicKey),
+        }
+        return
       }
 
       this.mainLogger.info('Keypair unable to be loaded from database. Generating new keypair...')
