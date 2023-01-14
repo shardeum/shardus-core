@@ -2,13 +2,15 @@ import * as crypto from '@shardus/crypto-utils'
 import { ChildProcess, fork } from 'child_process'
 import fs from 'fs'
 import Log4js from 'log4js'
-import Logger from '../logger'
+import path from 'path'
+import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 
-const KeypairFile = 'secrets.json'
+let KeypairFile = 'secrets.json'
 
 interface Crypto {
+  baseDir: string
   config: Shardus.StrictServerConfiguration
   mainLogger: Log4js.Logger
   storage: Storage
@@ -22,7 +24,8 @@ interface Crypto {
 }
 
 class Crypto {
-  constructor(config: Shardus.StrictServerConfiguration, logger: Logger, storage: Storage) {
+  constructor(baseDir: string, config: Shardus.StrictServerConfiguration, logger: Logger, storage: Storage) {
+    this.baseDir = baseDir
     this.config = config
     this.mainLogger = logger.getLogger('main')
     this.storage = storage
@@ -33,26 +36,34 @@ class Crypto {
   }
 
   async init() {
+
+    KeypairFile = path.join( this.baseDir, KeypairFile)
     crypto.init(this.config.crypto.hashKey)
     const keypair = await this.storage.getProperty('keypair')
     if (!keypair) {
-      // check for keypair in file system
-      let fsKeypair = this.readKeypairFromFile()
-      if (fsKeypair && fsKeypair.secretKey && fsKeypair.publicKey) {
-        this.mainLogger.info('Keypair loaded from file')
-        this.keypair = fsKeypair
-        this.curveKeypair = {
-          secretKey: crypto.convertSkToCurve(this.keypair.secretKey),
-          publicKey: crypto.convertPkToCurve(this.keypair.publicKey),
+      try{
+        // check for keypair in file system
+        let fsKeypair = this.readKeypairFromFile()
+        if (fsKeypair && fsKeypair.secretKey && fsKeypair.publicKey) {
+          this.mainLogger.info('Keypair loaded from file ' + KeypairFile)
+          this.keypair = fsKeypair
+          this.curveKeypair = {
+            secretKey: crypto.convertSkToCurve(this.keypair.secretKey),
+            publicKey: crypto.convertPkToCurve(this.keypair.publicKey),
+          }
+          return
         }
-        return
-      }
 
-      this.mainLogger.info('Keypair unable to be loaded from database. Generating new keypair...')
-      this.keypair = this._generateKeypair()
-      this.writeKeypairToFile(this.keypair)
-      await this.storage.setProperty('keypair', this.keypair)
-      this.mainLogger.info('New keypair successfully generated and saved to database.')
+        this.mainLogger.info('Keypair unable to be loaded from database. Generating new keypair...')
+        this.keypair = this._generateKeypair()
+        this.writeKeypairToFile(this.keypair)
+        await this.storage.setProperty('keypair', this.keypair)
+        this.mainLogger.info('New keypair successfully generated and saved to database. written to: ' + KeypairFile)
+
+      } catch(e){
+        if (logFlags.error) this.mainLogger.error(`error ${JSON.stringify(e)}`)
+        
+      }
     } else {
       this.mainLogger.info('Keypair loaded successfully from database.')
       this.keypair = keypair
