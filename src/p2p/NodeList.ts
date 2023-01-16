@@ -140,6 +140,7 @@ export function removeNode(id, raiseEvents: boolean, cycle: P2P.CycleCreatorType
       reason: 'Node deactivated',
       time: cycle.start,
       publicKey: node.publicKey,
+      cycleNumber: cycle.counter
     }
     emitter.emit('node-deactivated', emitParams)
   }
@@ -183,6 +184,7 @@ export function updateNode(
             reason: 'Node activated',
             time: cycle.start,
             publicKey: node.publicKey,
+            cycleNumber: cycle.counter
           }
           emitter.emit('node-activated', emitParams)
         }
