@@ -44,11 +44,23 @@ export const groupResolvePromises = async <T>(
   evaluationFn: (res: T) => boolean,
   maxLosses: number,
   minWins: number
-): Promise<{ success: boolean; wins: T[]; losses: T[] }> => {
+): Promise<{ success: boolean; wins: T[]; losses: T[]; errors: any[] }> => {
   let wins: T[] = [],
     losses: T[] = [],
     winCount: number = 0,
-    lossCount: number = 0
+    lossCount: number = 0,
+    errs = []
+
+  if (maxLosses < 0 || maxLosses > promiseList.length || minWins < 0 || minWins > promiseList.length) {
+    return new Promise((resolve) => {
+      resolve({
+        success: false,
+        wins: wins,
+        losses: losses,
+        errors: ['invalid conditions'],
+      })
+    })
+  }
 
   return new Promise((resolve, reject) => {
     for (let i = 0; i < promiseList.length; i++) {
@@ -64,24 +76,101 @@ export const groupResolvePromises = async <T>(
             lossCount++
           }
 
-          if (winCount >= minWins) {
+          const status = computePromiseGroupStatus(winCount, minWins, lossCount, maxLosses)
+          if (status != undefined) {
             resolve({
-              success: true,
+              success: status,
               wins: wins,
               losses: losses,
-            })
-          }
-          if (lossCount >= maxLosses) {
-            resolve({
-              success: false,
-              wins: wins,
-              losses: losses,
+              errors: errs,
             })
           }
         })
         .catch((error) => {
-          reject(error)
+          errs.push(error)
+          lossCount++
+          const status = computePromiseGroupStatus(winCount, minWins, lossCount, maxLosses)
+          if (status != undefined) {
+            resolve({
+              success: status,
+              wins: wins,
+              losses: losses,
+              errors: errs,
+            })
+          }
         })
     }
   })
+}
+
+export const groupRacePromises = async <T>(
+  promiseList: Promise<T>[],
+  evaluationFn: (res: T) => boolean,
+  maxLosses: number,
+  minWins: number
+): Promise<{ success: boolean; wins: T[]; losses: T[]; errors: any[] }> => {
+  let wins: T[] = [],
+    losses: T[] = [],
+    winCount: number = 0,
+    lossCount: number = 0,
+    errs = []
+
+  if (maxLosses < 0 || maxLosses > promiseList.length || minWins < 0 || minWins > promiseList.length) {
+    return new Promise((resolve) => {
+      resolve({
+        success: false,
+        wins: wins,
+        losses: losses,
+        errors: ['invalid conditions'],
+      })
+    })
+  }
+
+  return new Promise((resolve, reject) => {
+    Promise.race(promiseList)
+      .then((value) => {
+        const evalStatus = evaluationFn(value)
+        if (evalStatus) {
+          wins.push(value)
+          winCount++
+        } else {
+          losses.push(value)
+          lossCount++
+        }
+
+        const status = computePromiseGroupStatus(winCount, minWins, lossCount, maxLosses)
+        if (status != undefined) {
+          resolve({
+            success: status,
+            wins: wins,
+            losses: losses,
+            errors: errs,
+          })
+        }
+      })
+      .catch((error) => {
+        errs.push(error)
+        lossCount++
+        const status = computePromiseGroupStatus(winCount, minWins, lossCount, maxLosses)
+        if (status != undefined) {
+          resolve({
+            success: status,
+            wins: wins,
+            losses: losses,
+            errors: errs,
+          })
+        }
+      })
+  })
+}
+
+const computePromiseGroupStatus = (
+  winCount: number,
+  minWins: number,
+  lossCount: number,
+  maxLosses: number
+): boolean | undefined => {
+  if (winCount >= minWins) return true
+  if (lossCount >= maxLosses) return false
+  return undefined
 }
