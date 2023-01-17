@@ -51,18 +51,7 @@ export const groupResolvePromises = async <T>(
     lossCount: number = 0,
     errs = []
 
-  if (maxLosses < 0 || maxLosses > promiseList.length || minWins < 0 || minWins > promiseList.length) {
-    return new Promise((resolve) => {
-      resolve({
-        success: false,
-        wins: wins,
-        losses: losses,
-        errors: ['invalid conditions'],
-      })
-    })
-  }
-
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     for (let i = 0; i < promiseList.length; i++) {
       let promise = promiseList[i]
       promise
@@ -115,18 +104,7 @@ export const groupRacePromises = async <T>(
     lossCount: number = 0,
     errs = []
 
-  if (maxLosses < 0 || maxLosses > promiseList.length || minWins < 0 || minWins > promiseList.length) {
-    return new Promise((resolve) => {
-      resolve({
-        success: false,
-        wins: wins,
-        losses: losses,
-        errors: ['invalid conditions'],
-      })
-    })
-  }
-
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     Promise.race(promiseList)
       .then((value) => {
         const evalStatus = evaluationFn(value)
