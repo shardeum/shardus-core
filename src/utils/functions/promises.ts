@@ -92,56 +92,6 @@ export const groupResolvePromises = async <T>(
   })
 }
 
-export const groupRacePromises = async <T>(
-  promiseList: Promise<T>[],
-  evaluationFn: (res: T) => boolean,
-  maxLosses: number,
-  minWins: number
-): Promise<{ success: boolean; wins: T[]; losses: T[]; errors: any[] }> => {
-  let wins: T[] = [],
-    losses: T[] = [],
-    winCount: number = 0,
-    lossCount: number = 0,
-    errs = []
-
-  return new Promise((resolve) => {
-    Promise.race(promiseList)
-      .then((value) => {
-        const evalStatus = evaluationFn(value)
-        if (evalStatus) {
-          wins.push(value)
-          winCount++
-        } else {
-          losses.push(value)
-          lossCount++
-        }
-
-        const status = computePromiseGroupStatus(winCount, minWins, lossCount, maxLosses)
-        if (status != undefined) {
-          resolve({
-            success: status,
-            wins: wins,
-            losses: losses,
-            errors: errs,
-          })
-        }
-      })
-      .catch((error) => {
-        errs.push(error)
-        lossCount++
-        const status = computePromiseGroupStatus(winCount, minWins, lossCount, maxLosses)
-        if (status != undefined) {
-          resolve({
-            success: status,
-            wins: wins,
-            losses: losses,
-            errors: errs,
-          })
-        }
-      })
-  })
-}
-
 const computePromiseGroupStatus = (
   winCount: number,
   minWins: number,

@@ -52,45 +52,7 @@ test('groupResolvePromises() > should exit early due to total losses', async () 
   expect(res.success).toBe(false)
 })
 
-test('groupRacePromises() > should exit early due to total wins', async () => {
-  const evaluationFunction = (data): boolean => {
-    if (data == 'resolved') return true
-    else return false
-  }
-
-  const res = await groupResolvePromises(
-    [generatePromise('resolved', 10), generatePromise('resolved', 20), generatePromise('rejected', 100)],
-    evaluationFunction,
-    1,
-    2
-  )
-  console.log(res)
-
-  expect(res.losses.length).toBe(0)
-  expect(res.wins.length).toBe(2)
-  expect(res.success).toBe(true)
-})
-
-test('groupRacePromises() > should exit early due to total losses', async () => {
-  const evaluationFunction = (data): boolean => {
-    if (data == 'resolved') return true
-    else return false
-  }
-
-  const res = await groupResolvePromises(
-    [generatePromise('resolved', 100), generatePromise('rejected', 10), generatePromise('rejected', 20)],
-    evaluationFunction,
-    2,
-    1
-  )
-  console.log(res)
-
-  expect(res.losses.length).toBe(2)
-  expect(res.wins.length).toBe(0)
-  expect(res.success).toBe(false)
-})
-
-test('groupRacePromises() > should exit early due to total losses with rejected promises', async () => {
+test('groupResolvePromises() > should exit early due to total losses with rejected promises', async () => {
   const evaluationFunction = (data): boolean => {
     if (data == 'resolved') return true
     else return false

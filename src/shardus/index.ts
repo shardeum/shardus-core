@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import { Handler } from 'express'
 import Log4js from 'log4js'
 import path from 'path'
+import SHARDUS_CONFIG from '../config'
 import Crypto from '../crypto'
 import Debug, { getDevPublicKey } from '../debug'
 import ExitHandler from '../exit-handler'
@@ -9,10 +10,12 @@ import LoadDetection from '../load-detection'
 import Logger, { logFlags, LogFlags } from '../logger'
 import * as Network from '../network'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { isApopMarkedNode } from '../p2p/Apoptosis'
 import * as Archivers from '../p2p/Archivers'
 import * as Context from '../p2p/Context'
 import * as AutoScaling from '../p2p/CycleAutoScale'
 import * as CycleChain from '../p2p/CycleChain'
+import { netConfig } from '../p2p/CycleCreator'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
 import { reportLost } from '../p2p/Lost'
 import * as Self from '../p2p/Self'
@@ -20,23 +23,18 @@ import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
 import * as ShardusTypes from '../shardus/shardus-types'
+import { WrappedData } from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
-import { WrappedResponses, QueueCountsResult } from '../state-manager/state-manager-types'
+import { QueueCountsResult } from '../state-manager/state-manager-types'
 import Statistics from '../statistics'
 import Storage from '../storage'
 import * as utils from '../utils'
-import { inRangeOfCurrentTime } from '../utils'
+import { groupResolvePromises, inRangeOfCurrentTime } from '../utils'
 import MemoryReporting from '../utils/memoryReporting'
 import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
-import { time } from 'console'
-import SHARDUS_CONFIG from '../config'
-import { isApopMarkedNode } from '../p2p/Apoptosis'
-import { netConfig } from '../p2p/CycleCreator'
 import { startSaving } from './saveConsoleOutput'
-import { CountedEvent } from '../statistics/countedEvents'
-import { AccountData, WrappedData } from '../shardus/shardus-types'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
@@ -1964,9 +1962,10 @@ class Shardus extends EventEmitter {
     type: string,
     hash: string,
     nodesToSign: number,
-    appData: any
+    appData: any,
+    allowedBackupNodes: number = 0
   ): Promise<ShardusTypes.GetAppDataSignaturesResult> {
-    const closestNodesIds = this.getClosestNodes(hash, nodesToSign)
+    const closestNodesIds = this.getClosestNodes(hash, nodesToSign + allowedBackupNodes)
 
     const filterNodeIds = closestNodesIds.filter((id) => id !== Self.id)
 
@@ -1974,7 +1973,7 @@ class Shardus extends EventEmitter {
 
     let responses = []
     if (filterNodeIds.length > 0) {
-      responses = await Promise.all(
+      const groupPromiseResp = await groupResolvePromises(
         closestNodes.map((node) => {
           return this.p2p.ask(node, 'sign-app-data', {
             type,
@@ -1982,8 +1981,21 @@ class Shardus extends EventEmitter {
             nodesToSign,
             appData,
           })
-        })
+        }),
+        (res) => {
+          if (res.success) return true
+          return false
+        },
+        allowedBackupNodes,
+        nodesToSign
       )
+
+      if (groupPromiseResp.success) responses = groupPromiseResp.wins
+      else
+        return {
+          success: groupPromiseResp.success,
+          signatures: [],
+        }
     }
 
     if (closestNodesIds.includes(Self.id)) {
@@ -1992,20 +2004,12 @@ class Shardus extends EventEmitter {
       responses = [...responses, ...[{ success, signature }]]
     }
 
-    // Success is true if all of the signatures were successful
-    const success = responses.reduce((prev, curr) => {
-      if (curr.isResponse === true) {
-        return curr.success && prev
-      }
-
-      return prev
-    }, true)
-
     const signatures = responses.map(({ signature }) => signature)
+    if (logFlags.verbose) this.mainLogger.debug('Signatures for get signed app data request', signatures)
 
     return {
-      success,
-      signatures,
+      success: true,
+      signatures: signatures,
     }
   }
 }
