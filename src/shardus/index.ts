@@ -1096,7 +1096,7 @@ class Shardus extends EventEmitter {
   ): { success: boolean; reason: string } {
     let validNodeCount = 0
     // let validNodes = []
-    let appData = {...signedAppData}
+    let appData = { ...signedAppData }
     if (appData.signs) delete appData.signs
     if (appData.sign) delete appData.sign
     for (let i = 0; i < signs.length; i++) {

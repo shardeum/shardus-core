@@ -34,6 +34,54 @@ export const robustPromiseAll = async (promises) => {
     // Otherwise, we were able to resolve so we push it to the resolved array
     resolved.push(result)
   }
+  Promise
   // We return two arrays, one of the resolved promises, and one of the errors
   return [resolved, errors]
+}
+
+export const groupResolvePromises = async <T>(
+  promiseList: Promise<T>[],
+  evaluationFn: (res: T) => boolean,
+  maxLosses: number,
+  minWins: number
+): Promise<{ success: boolean; wins: T[]; losses: T[] }> => {
+  let wins: T[] = [],
+    losses: T[] = [],
+    winCount: number = 0,
+    lossCount: number = 0
+
+  return new Promise((resolve, reject) => {
+    for (let i = 0; i < promiseList.length; i++) {
+      let promise = promiseList[i]
+      promise
+        .then((value) => {
+          const evalStatus = evaluationFn(value)
+          if (evalStatus) {
+            wins.push(value)
+            winCount++
+          } else {
+            losses.push(value)
+            lossCount++
+          }
+
+          if (winCount >= minWins) {
+            resolve({
+              success: true,
+              wins: wins,
+              losses: losses,
+            })
+          }
+          if (lossCount >= maxLosses) {
+            resolve({
+              success: false,
+              wins: wins,
+              losses: losses,
+            })
+          }
+        })
+        .catch((error) => {
+          reject(error)
+        })
+    }
+  })
 }
