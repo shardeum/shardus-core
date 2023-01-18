@@ -55,7 +55,7 @@ export const getClosestHash = (targetHash, hashes) => {
   return closest
 }
 
-export const makeShortHash = (x, n = 4) => {
+export const makeShortHash = (x, n = 4): string => {
   if (!x) {
     return x
   }
@@ -321,7 +321,12 @@ export function humanFileSize(size: number): string {
   return value + ' ' + ['B', 'kB', 'MB', 'GB', 'TB'][i]
 }
 
-export function fastIsPicked(ourIndex: number, groupSize: number, numToPick: number, offset: number=0):boolean{
+export function fastIsPicked(
+  ourIndex: number,
+  groupSize: number,
+  numToPick: number,
+  offset: number = 0
+): boolean {
   let isPicked = false
   let fstride = groupSize / numToPick
   let finalOffset = ourIndex + offset
@@ -329,7 +334,7 @@ export function fastIsPicked(ourIndex: number, groupSize: number, numToPick: num
   steps = Math.round(steps)
   let fendPoint = steps * fstride
   let endpoint = Math.round(fendPoint)
-  if(endpoint === finalOffset) {
+  if (endpoint === finalOffset) {
     isPicked = true
   }
   return isPicked

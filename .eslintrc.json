@@ -15,7 +15,6 @@
     "prettier"
   ],
   "ignorePatterns": [
-    "profiler.ts",
     "nestedCounters.ts",
     "memoryReporting.ts",
     "stringifyReduce.ts",

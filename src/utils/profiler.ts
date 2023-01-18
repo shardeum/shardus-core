@@ -1,21 +1,21 @@
-import * as Context from '../p2p/Context'
+/* eslint-disable security/detect-object-injection */
 import * as Self from '../p2p/Self'
-import { nestedCountersInstance } from '../utils/nestedCounters'
-import { memoryReportingInstance } from '../utils/memoryReporting'
-import { sleep } from '../utils/functions/time'
-import { resolveTxt } from 'dns'
-import { isDebugModeMiddleware } from '../network/debugMiddleware'
-import { humanFileSize } from '.'
+import Statistics from '../statistics'
+import * as Context from '../p2p/Context'
 
-const NS_PER_SEC = 1e9
+import { sleep } from '../utils/functions/time'
+import { humanFileSize } from '.'
+import { nestedCountersInstance } from '../utils/nestedCounters'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { memoryReportingInstance } from '../utils/memoryReporting'
 
 const cDefaultMin = 1e12
 const cDefaultMinBig = BigInt(cDefaultMin)
 
-let profilerSelfReporting = false
+const profilerSelfReporting = false
 
 interface Profiler {
-  sectionTimes: any
+  sectionTimes: { [name: string]: SectionStat }
   // instance: Profiler
 }
 
@@ -50,6 +50,24 @@ type SectionStat = BigNumberStat & {
   reentryCountEver: number
 }
 
+type TimesDataReport = {
+  name: string
+  minMs: number
+  maxMs: number
+  totalMs: number
+  avgMs: number
+  c: number
+  data: NumberStat | Record<string, unknown>
+  dataReq: NumberStat | Record<string, unknown>
+}
+
+type ScopedTimesDataReport = {
+  scopedTimes: TimesDataReport[]
+  cycle?: number
+  node?: string
+  id?: string
+}
+
 export interface NodeLoad {
   internal: number
   external: number
@@ -57,13 +75,13 @@ export interface NodeLoad {
 
 export let profilerInstance: Profiler
 class Profiler {
-  sectionTimes: any
+  sectionTimes: { [name: string]: SectionStat }
   scopedSectionTimes: { [name: string]: SectionStat }
   eventCounters: Map<string, Map<string, number>>
   stackHeight: number
   netInternalStackHeight: number
   netExternalStackHeight: number
-  statisticsInstance: any
+  statisticsInstance: Statistics
 
   constructor() {
     this.sectionTimes = {}
@@ -79,13 +97,13 @@ class Profiler {
     this.profileSectionStart('_internal_total', true)
   }
 
-  setStatisticsInstance(statistics) {
+  setStatisticsInstance(statistics: Statistics): void {
     this.statisticsInstance = statistics
   }
 
-  registerEndpoints() {
+  registerEndpoints(): void {
     Context.network.registerExternalGet('perf', isDebugModeMiddleware, (req, res) => {
-      let result = this.printAndClearReport(1)
+      const result = this.printAndClearReport()
       //res.json({result })
 
       res.write(result)
@@ -93,7 +111,7 @@ class Profiler {
     })
 
     Context.network.registerExternalGet('perf-scoped', isDebugModeMiddleware, (req, res) => {
-      let result = this.printAndClearScopedReport(1)
+      const result = this.printAndClearScopedReport()
       //res.json({result })
 
       res.write(result)
@@ -108,7 +126,7 @@ class Profiler {
       res.write(`counts reset at ${new Date()}\n`)
 
       // hit "perf" endpoint to clear perf stats
-      this.printAndClearReport(1)
+      this.printAndClearReport()
       this.clearScopedTimes()
 
       if (this.statisticsInstance) this.statisticsInstance.clearRing('txProcessed')
@@ -125,8 +143,8 @@ class Profiler {
       res.write(`PORT: ${Self.port}\n`)
 
       // write "memory" results
-      let toMB = 1 / 1000000
-      let report = process.memoryUsage()
+      const toMB = 1 / 1000000
+      const report = process.memoryUsage()
       res.write(`\n=> MEMORY RESULTS\n`)
       res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
       res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
@@ -175,19 +193,19 @@ class Profiler {
       }
 
       // write "perf" results
-      let result = this.printAndClearReport(1)
+      const result = this.printAndClearReport()
       res.write(`\n=> PERF RESULTS\n`)
       res.write(result)
       res.write(`\n===========================\n`)
 
       // write scoped-perf results
-      let scopedPerfResult = this.printAndClearScopedReport(1)
+      const scopedPerfResult = this.printAndClearScopedReport()
       res.write(`\n=> SCOPED PERF RESULTS\n`)
       res.write(scopedPerfResult)
       res.write(`\n===========================\n`)
 
       // write "counts" results
-      let arrayReport = nestedCountersInstance.arrayitizeAndSort(nestedCountersInstance.eventCounters)
+      const arrayReport = nestedCountersInstance.arrayitizeAndSort(nestedCountersInstance.eventCounters)
       res.write(`\n=> COUNTS RESULTS\n`)
       res.write(`${Date.now()}\n`)
       nestedCountersInstance.printArrayReport(arrayReport, res, 0)
@@ -197,7 +215,7 @@ class Profiler {
     })
   }
 
-  profileSectionStart(sectionName, internal = false) {
+  profileSectionStart(sectionName: string, internal = false): void {
     let section = this.sectionTimes[sectionName]
 
     if (section != null && section.started === true) {
@@ -206,8 +224,9 @@ class Profiler {
     }
 
     if (section == null) {
-      let t = BigInt(0)
-      section = { name: sectionName, total: t, c: 0, internal }
+      const t = BigInt(0)
+      // The type assertion used below is done because we know that the remaining fields of SectionStat will be added to the section variable as the execution progresses.
+      section = { name: sectionName, total: t, c: 0, internal } as SectionStat
       this.sectionTimes[sectionName] = section
     }
 
@@ -238,15 +257,14 @@ class Profiler {
     }
   }
 
-  profileSectionEnd(sectionName, internal = false) {
-    let section = this.sectionTimes[sectionName]
+  profileSectionEnd(sectionName: string, internal = false): void {
+    const section: SectionStat = this.sectionTimes[sectionName]
     if (section == null || section.started === false) {
       if (profilerSelfReporting) nestedCountersInstance.countEvent('profiler-end-error', sectionName)
       return
     }
 
     section.end = process.hrtime.bigint()
-
     section.total += section.end - section.start
     section.started = false
 
@@ -273,11 +291,7 @@ class Profiler {
     }
   }
 
-  scopedProfileSectionStart(
-    sectionName: string,
-    internal: boolean = false,
-    messageSize: number = cNoSizeTrack
-  ) {
+  scopedProfileSectionStart(sectionName: string, internal = false, messageSize: number = cNoSizeTrack): void {
     let section: SectionStat = this.scopedSectionTimes[sectionName]
 
     if (section != null && section.started === true) {
@@ -326,7 +340,7 @@ class Profiler {
 
     // update request size stats
     if (messageSize != cNoSizeTrack && messageSize != cUninitializedSize) {
-      let stat = section.req
+      const stat = section.req
       stat.total += messageSize
       stat.c += 1
       if (messageSize > stat.max) stat.max = messageSize
@@ -339,7 +353,7 @@ class Profiler {
     section.c++
   }
 
-  scopedProfileSectionEnd(sectionName: string, messageSize: number = cNoSizeTrack) {
+  scopedProfileSectionEnd(sectionName: string, messageSize: number = cNoSizeTrack): void {
     const section = this.scopedSectionTimes[sectionName]
     if (section == null || section.started === false) {
       if (profilerSelfReporting) return
@@ -357,7 +371,7 @@ class Profiler {
 
     //if we get a valid size let track stats on it
     if (messageSize != cNoSizeTrack && messageSize != cUninitializedSize) {
-      let stat = section.resp
+      const stat = section.resp
       stat.total += messageSize
       stat.c += 1
       if (messageSize > stat.max) stat.max = messageSize
@@ -366,19 +380,20 @@ class Profiler {
     }
   }
 
-  cleanInt(x) {
+  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+  cleanInt(x): number {
     x = Number(x)
     return x >= 0 ? Math.floor(x) : Math.ceil(x)
   }
 
-  getTotalBusyInternal(): any {
+  getTotalBusyInternal(): { duty: number; netInternlDuty: number; netExternlDuty: number } {
     if (profilerSelfReporting) nestedCountersInstance.countEvent('profiler-note', 'getTotalBusyInternal')
 
     this.profileSectionEnd('_internal_total', true)
-    let internalTotalBusy = this.sectionTimes['_internal_totalBusy']
-    let internalTotal = this.sectionTimes['_internal_total']
-    let internalNetInternl = this.sectionTimes['_internal_net-internl']
-    let internalNetExternl = this.sectionTimes['_internal_net-externl']
+    const internalTotalBusy = this.sectionTimes['_internal_totalBusy']
+    const internalTotal = this.sectionTimes['_internal_total']
+    const internalNetInternl = this.sectionTimes['_internal_net-internl']
+    const internalNetExternl = this.sectionTimes['_internal_net-externl']
     let duty = BigInt(0)
     let netInternlDuty = BigInt(0)
     let netExternlDuty = BigInt(0)
@@ -412,20 +427,20 @@ class Profiler {
     }
   }
 
-  clearTimes() {
-    for (let key in this.sectionTimes) {
+  clearTimes(): void {
+    for (const key in this.sectionTimes) {
       if (key.startsWith('_internal')) continue
 
-      if (this.sectionTimes.hasOwnProperty(key)) {
-        let section = this.sectionTimes[key]
+      if (Object.prototype.hasOwnProperty.call(this.sectionTimes, key)) {
+        const section = this.sectionTimes[key]
         section.total = BigInt(0)
       }
     }
   }
-  clearScopedTimes() {
-    for (let key in this.scopedSectionTimes) {
-      if (this.scopedSectionTimes.hasOwnProperty(key)) {
-        let section = this.scopedSectionTimes[key]
+  clearScopedTimes(): void {
+    for (const key in this.scopedSectionTimes) {
+      if (Object.prototype.hasOwnProperty.call(this.scopedSectionTimes, key)) {
+        const section = this.scopedSectionTimes[key]
         section.total = BigInt(0)
         section.max = BigInt(0)
         section.min = cDefaultMinBig
@@ -451,23 +466,20 @@ class Profiler {
     }
   }
 
-  printAndClearReport(delta?: number): string {
+  printAndClearReport(): string {
     this.profileSectionEnd('_total', true)
-
     let result = 'Profile Sections:\n'
-    let d1 = this.cleanInt(1e6) // will get us ms
-    let divider = BigInt(d1)
+    const d1 = this.cleanInt(1e6) // will get us ms
+    const divider = BigInt(d1)
 
-    let totalSection = this.sectionTimes['_total']
-    let totalBusySection = this.sectionTimes['_totalBusy']
-    //console.log('totalSection from printAndClearReport', totalSection)
+    const totalSection = this.sectionTimes['_total']
 
-    let lines = []
-    for (let key in this.sectionTimes) {
+    const lines = []
+    for (const key in this.sectionTimes) {
       if (key.startsWith('_internal')) continue
 
-      if (this.sectionTimes.hasOwnProperty(key)) {
-        let section = this.sectionTimes[key]
+      if (Object.prototype.hasOwnProperty.call(this.sectionTimes, key)) {
+        const section = this.sectionTimes[key]
 
         // result += `${section.name}: total ${section.total /
         //   divider} avg:${section.total / (divider * BigInt(section.c))} ,  ` // ${section.total} :
@@ -476,10 +488,10 @@ class Profiler {
         if (totalSection.total > BigInt(0)) {
           duty = (BigInt(100) * section.total) / totalSection.total
         }
-        let totalMs = section.total / divider
-        let dutyStr = `${duty}`.padStart(4)
-        let totalStr = `${totalMs}`.padStart(13)
-        let line = `${dutyStr}% ${section.name.padEnd(30)}, ${totalStr}ms, #:${section.c}`
+        const totalMs = section.total / divider
+        const dutyStr = `${duty}`.padStart(4)
+        const totalStr = `${totalMs}`.padStart(13)
+        const line = `${dutyStr}% ${section.name.padEnd(30)}, ${totalStr}ms, #:${section.c}`
         //section.total = BigInt(0)
 
         lines.push({ line, totalMs })
@@ -496,15 +508,15 @@ class Profiler {
     return result
   }
 
-  printAndClearScopedReport(delta?: number): string {
+  printAndClearScopedReport(): string {
     let result = 'Scoped Profile Sections:\n'
-    let d1 = this.cleanInt(1e6) // will get us ms
-    let divider = BigInt(d1)
+    const d1 = this.cleanInt(1e6) // will get us ms
+    const divider = BigInt(d1)
 
-    let lines = []
-    for (let key in this.scopedSectionTimes) {
-      if (this.scopedSectionTimes.hasOwnProperty(key)) {
-        let section = this.scopedSectionTimes[key]
+    const lines = []
+    for (const key in this.scopedSectionTimes) {
+      if (Object.prototype.hasOwnProperty.call(this.scopedSectionTimes, key)) {
+        const section = this.scopedSectionTimes[key]
         const percent = BigInt(100)
         const avgMs = Number((section.avg * percent) / divider) / 100
         const maxMs = Number((section.max * percent) / divider) / 100
@@ -518,7 +530,7 @@ class Profiler {
         )}, Max: ${maxMs}ms,  Min: ${minMs}ms,  Total: ${totalMs}ms, #:${section.c}`
 
         if (section.resp.c > 0) {
-          let dataReport = {
+          const dataReport = {
             total: humanFileSize(section.resp.total),
             min: humanFileSize(section.resp.min),
             max: humanFileSize(section.resp.max),
@@ -527,9 +539,9 @@ class Profiler {
           }
           line += ' resp:' + JSON.stringify(dataReport)
         }
-        let numberStat = section.req
+        const numberStat = section.req
         if (numberStat.c > 0) {
-          let dataReport = {
+          const dataReport = {
             total: humanFileSize(numberStat.total),
             min: humanFileSize(numberStat.min),
             max: humanFileSize(numberStat.max),
@@ -549,14 +561,14 @@ class Profiler {
     return result
   }
 
-  scopedTimesDataReport(): any {
-    let d1 = this.cleanInt(1e6) // will get us ms
-    let divider = BigInt(d1)
+  scopedTimesDataReport(): ScopedTimesDataReport {
+    const d1 = this.cleanInt(1e6) // will get us ms
+    const divider = BigInt(d1)
 
-    let times = []
-    for (let key in this.scopedSectionTimes) {
-      if (this.scopedSectionTimes.hasOwnProperty(key)) {
-        let section = this.scopedSectionTimes[key]
+    const times: TimesDataReport[] = []
+    for (const key in this.scopedSectionTimes) {
+      if (Object.prototype.hasOwnProperty.call(this.scopedSectionTimes, key)) {
+        const section = this.scopedSectionTimes[key]
         const percent = BigInt(100)
         const avgMs = Number((section.avg * percent) / divider) / 100
         const maxMs = Number((section.max * percent) / divider) / 100
@@ -565,10 +577,10 @@ class Profiler {
         if (section.c === 0) {
           minMs = 0
         }
-        let data = {}
-        let dataReq = {}
+        let data: NumberStat | Record<string, unknown> = {}
+        let dataReq: NumberStat | Record<string, unknown> = {}
         if (section.resp.c > 0) {
-          let dataReport = {
+          const dataReport = {
             total: section.resp.total,
             min: section.resp.min,
             max: section.resp.max,
@@ -577,9 +589,9 @@ class Profiler {
           }
           data = dataReport
         }
-        let numberStat = section.req
+        const numberStat = section.req
         if (numberStat.c > 0) {
-          let dataReport = {
+          const dataReport = {
             total: humanFileSize(numberStat.total),
             min: humanFileSize(numberStat.min),
             max: humanFileSize(numberStat.max),
@@ -592,8 +604,7 @@ class Profiler {
         times.push({ name: section.name, minMs, maxMs, totalMs, avgMs, c: section.c, data, dataReq })
       }
     }
-    let scopedTimes = { scopedTimes: times }
-    return scopedTimes
+    return { scopedTimes: times }
   }
 }
 
