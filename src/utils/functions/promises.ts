@@ -34,7 +34,6 @@ export const robustPromiseAll = async (promises) => {
     // Otherwise, we were able to resolve so we push it to the resolved array
     resolved.push(result)
   }
-  Promise
   // We return two arrays, one of the resolved promises, and one of the errors
   return [resolved, errors]
 }
