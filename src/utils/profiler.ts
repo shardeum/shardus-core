@@ -90,6 +90,7 @@ class Profiler {
     this.netInternalStackHeight = 0
     this.netExternalStackHeight = 0
     this.statisticsInstance = null
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     profilerInstance = this
 
     this.profileSectionStart('_total', true)
