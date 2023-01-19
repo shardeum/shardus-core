@@ -2,10 +2,10 @@ import { mod } from '../'
 
 export function getLinearSeededGossip(nodeIdxs, myIdx, gossipFactor, startingSeed, seedFalloff, hop = 0) {
   const nodeCount = nodeIdxs.length
-  let unique = []
-  let gossipToList = []
+  const unique = []
+  const gossipToList = []
   for (let i = 0; i < gossipFactor; i++) {
-    gossipToList[i] = (gossipFactor * myIdx + i + 1) % nodeCount
+    gossipToList.push((gossipFactor * myIdx + i + 1) % nodeCount)
   }
   let extraFactor = startingSeed - hop * seedFalloff
   extraFactor = Math.min(extraFactor, nodeCount / 2)
@@ -13,7 +13,7 @@ export function getLinearSeededGossip(nodeIdxs, myIdx, gossipFactor, startingSee
     let i = 0
     let addedNode = 0
     while (addedNode < extraFactor && i < 2 * nodeCount) {
-      let randomId = Math.floor(Math.random() * nodeCount)
+      const randomId = Math.floor(Math.random() * nodeCount)
       if (!gossipToList.includes(randomId)) {
         gossipToList.push(randomId)
         addedNode += 1
@@ -22,7 +22,8 @@ export function getLinearSeededGossip(nodeIdxs, myIdx, gossipFactor, startingSee
     }
   }
   for (let i = 0; i < gossipToList.length; i++) {
-    let next = gossipToList[i]
+    // eslint-disable-next-line security/detect-object-injection
+    const next = gossipToList[i]
     if (next === myIdx) {
       continue
     } // make sure we don't send to self
@@ -35,7 +36,7 @@ export function getLinearSeededGossip(nodeIdxs, myIdx, gossipFactor, startingSee
 }
 
 function gossip_factor(n, f, i) {
-  let fb, r
+  let fb
   fb = Math.floor(3 * Math.log2(n))
   if (fb + f > n) {
     fb = n - f - 0
@@ -43,7 +44,7 @@ function gossip_factor(n, f, i) {
   if (fb > 20) {
     fb = 20
   }
-  r = n - i * fb
+  const r = n - i * fb
   if (r < fb) {
     fb = r
   }
@@ -55,7 +56,7 @@ function gossip_factor(n, f, i) {
 }
 
 function gossip_offset(n, f, i) {
-  let fb, r, j
+  let fb, r
   if (n < 2) {
     return i
   }
@@ -66,7 +67,7 @@ function gossip_offset(n, f, i) {
   if (fb > 20) {
     fb = 20
   }
-  j = Math.floor(n / fb)
+  const j = Math.floor(n / fb)
   if (i <= j) {
     r = i * fb + i * (f - 1)
   } else {
@@ -76,15 +77,15 @@ function gossip_offset(n, f, i) {
 }
 
 export function getLinearGossipBurstList(numberOfNodes, gossipFactor, myIdx, originIdx) {
-  let list = []
-  let distance, factor0, offset, nodeIdx
+  const list = []
+  let offset, nodeIdx
 
   if (gossipFactor >= numberOfNodes) {
     gossipFactor = numberOfNodes - 1
   }
 
-  distance = mod(myIdx - originIdx, numberOfNodes)
-  factor0 = gossip_factor(numberOfNodes, gossipFactor, distance)
+  const distance = mod(myIdx - originIdx, numberOfNodes)
+  const factor0 = gossip_factor(numberOfNodes, gossipFactor, distance)
   offset = gossip_offset(numberOfNodes, gossipFactor, distance)
   offset = (originIdx + offset + 1) % numberOfNodes
 
@@ -101,7 +102,7 @@ export function getLinearGossipBurstList(numberOfNodes, gossipFactor, myIdx, ori
 }
 
 export function getLinearGossipList(numberOfNodes, gossipFactor, myIdx, isOrigin) {
-  let list = []
+  const list = []
   let nodeIdx
   if (gossipFactor >= numberOfNodes) {
     gossipFactor = numberOfNodes - 1
@@ -124,9 +125,9 @@ export function getLinearGossipList(numberOfNodes, gossipFactor, myIdx, isOrigin
       originFactor = 20
     }
 
-    let offIdx = (gossipFactor * myIdx + 1) % numberOfNodes
+    const offIdx = (gossipFactor * myIdx + 1) % numberOfNodes
     for (let k = 1; k <= originFactor; k++) {
-      let nodeIdx = mod(offIdx - k, numberOfNodes)
+      const nodeIdx = mod(offIdx - k, numberOfNodes)
       if (myIdx === nodeIdx) {
         continue
       }
@@ -159,6 +160,7 @@ export function getRandomGossipIn(nodeIdxs, fanOut, myIdx) {
     }
     let k = 0
     for (; k < results.length; k++) {
+      // eslint-disable-next-line security/detect-object-injection
       if (r === results[k]) {
         break
       }

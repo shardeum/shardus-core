@@ -20,7 +20,6 @@
     "sortingCompareFunctions.ts",
     "json.ts",
     "iterables.ts",
-    "gossip.ts",
     "general.ts",
     "arrays.ts",
     "FastRandomIterator.ts",
