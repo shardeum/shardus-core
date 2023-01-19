@@ -10,11 +10,13 @@ export const mod = (n, m) => {
 }
 
 export function propComparator<T>(prop: keyof T) {
+  // eslint-disable-next-line security/detect-object-injection
   const comparator = (a: T, b: T) => (a[prop] > b[prop] ? 1 : a[prop] < b[prop] ? -1 : 0)
   return comparator
 }
 
 export function propComparator2<T>(prop: keyof T, prop2: keyof T) {
+  /* eslint-disable security/detect-object-injection */
   const comparator = (a: T, b: T) =>
     a[prop] === b[prop]
       ? a[prop2] === b[prop2]
@@ -25,6 +27,7 @@ export function propComparator2<T>(prop: keyof T, prop2: keyof T) {
       : a[prop] > b[prop]
       ? 1
       : -1
+  /* eslint-enable security/detect-object-injection */
   return comparator
 }
 
@@ -85,7 +88,7 @@ export const short = (x: string, n = 4) => {
 }
 
 export const debugExpand = (value: string) => {
-  let res = value.slice(0, 4) + '0'.repeat(55) + value.slice(5, 5 + 5)
+  const res = value.slice(0, 4) + '0'.repeat(55) + value.slice(5, 5 + 5)
   return res
 }
 
@@ -124,7 +127,8 @@ export function validateTypes(inp, def) {
     o: 'object',
   }
   const fields = Object.keys(def)
-  for (let name of fields) {
+  for (const name of fields) {
+    /* eslint-disable security/detect-object-injection */
     const types = def[name]
     const opt = types.substr(-1, 1) === '?' ? 1 : 0
     if (inp[name] === undefined && !opt) return name + ' is required'
@@ -135,7 +139,7 @@ export function validateTypes(inp, def) {
       for (let t = 0; t < types.length - opt; t++) {
         let it = map[typeof inp[name]]
         it = Array.isArray(inp[name]) ? 'a' : it
-        let is = types.substr(t, 1)
+        const is = types.substr(t, 1)
         if (it === is) {
           found = 1
           break
@@ -143,6 +147,7 @@ export function validateTypes(inp, def) {
       }
       if (!found) return name + ' must be' + be
     }
+    /* eslint-enable security/detect-object-injection */
   }
   return ''
 }
@@ -153,12 +158,14 @@ export function errorToStringFull(error) {
 
 export function sumObject(sumObject, toAddObject) {
   for (const [key, val] of Object.entries(sumObject)) {
-    let otherVal = toAddObject[key]
+    // eslint-disable-next-line security/detect-object-injection
+    const otherVal = toAddObject[key]
     if (otherVal == null) {
       continue
     }
     switch (typeof val) {
       case 'number':
+        // eslint-disable-next-line security/detect-object-injection
         sumObject[key] = val + otherVal
         break
       default:
@@ -178,7 +185,8 @@ export function generateObjectSchema(obj, options = { arrTypeDiversity: false })
   }
 
   for (const [key, value] of Object.entries(obj)) {
-    if (obj.hasOwnProperty(key) && obj[key] !== null) {
+    /* eslint-disable security/detect-object-injection */
+    if (obj[key] !== null) {
       if (value.constructor === Object) {
         schema[key] = generateObjectSchema(value, { arrTypeDiversity: options.arrTypeDiversity })
       } else if (Array.isArray(value)) {
@@ -187,6 +195,7 @@ export function generateObjectSchema(obj, options = { arrTypeDiversity: false })
         schema[key] = typeof value
       }
     }
+    /* eslint-enable security/detect-object-injection */
   }
   return schema
 }
@@ -207,6 +216,7 @@ export function generateArraySchema(arr: unknown[], options = { diversity: false
 
   for (let i = 0; i < arr.length; i++) {
     // let's return 'any' when array is holding multiple types
+    /* eslint-disable security/detect-object-injection */
     if (i > 0 && arr[i].constructor !== arr[i - 1].constructor) {
       if (options.diversity) {
         return 'any[]'
@@ -226,6 +236,7 @@ export function generateArraySchema(arr: unknown[], options = { diversity: false
     } else {
       schema = `${typeof arr[i]}[]`
     }
+    /* eslint-enable security/detect-object-injection */
   }
 
   return schema
@@ -239,8 +250,8 @@ export function generateArraySchema(arr: unknown[], options = { diversity: false
 // Note idol object does not accept type diversive array like this { arr: ['doe', 1, false] } will throw errors.
 export function compareObjectShape(idol, admirer) {
   let isValid
-  let error
-  let defectoChain = []
+  let error = undefined
+  const defectoChain = []
 
   let idol_schema
   try {
@@ -276,17 +287,19 @@ export function compareObjectShape(idol, admirer) {
     const bigger_obj = l1 >= l2 ? worshipped : worshipper
 
     for (const key in bigger_obj) {
+      /* eslint-disable security/detect-object-injection */
       const DEFECTOR_FOUND = smartComparator(worshipped[key], worshipper[key]) === false
 
       if (DEFECTOR_FOUND) {
         // save the path to the prop , Example: ['server', 'log']
         defectoChain.push(key)
-        if (worshipped.hasOwnProperty(key) && worshipped[key].constructor === Object) {
+        if (worshipped[key] && worshipped[key].constructor === Object) {
           return defectoHunter(worshipped[key], worshipper[key])
         } else {
           return { [key]: worshipper[key] }
         }
       }
+      /* eslint-enable security/detect-object-injection */
     }
   }
 
@@ -305,8 +318,11 @@ export function isEqualOrNewerVersion(oldVer: string, newVer: string) {
   }
   const oldParts = oldVer.split('.')
   const newParts = newVer.split('.')
-  for (var i = 0; i < newParts.length; i++) {
+  for (let i = 0; i < newParts.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection
     const a = ~~newParts[i] // parse int
+    if (oldParts.length <= i) return false
+    // eslint-disable-next-line security/detect-object-injection
     const b = ~~oldParts[i] // parse int
     if (a > b) return true
     if (a < b) return false
@@ -316,24 +332,20 @@ export function isEqualOrNewerVersion(oldVer: string, newVer: string) {
 
 // adapted from stack overflow post
 export function humanFileSize(size: number): string {
-  const i = size == 0 ? 0 : Math.floor(Math.log(size) / Math.log(1024))
+  const i = Math.max(size == 0 ? 0 : Math.floor(Math.log(size) / Math.log(1024)), 4)
   const value = Number(size / Math.pow(1024, i)).toFixed(2)
+  // eslint-disable-next-line security/detect-object-injection
   return value + ' ' + ['B', 'kB', 'MB', 'GB', 'TB'][i]
 }
 
-export function fastIsPicked(
-  ourIndex: number,
-  groupSize: number,
-  numToPick: number,
-  offset: number = 0
-): boolean {
+export function fastIsPicked(ourIndex: number, groupSize: number, numToPick: number, offset = 0): boolean {
   let isPicked = false
-  let fstride = groupSize / numToPick
-  let finalOffset = ourIndex + offset
+  const fstride = groupSize / numToPick
+  const finalOffset = ourIndex + offset
   let steps = finalOffset / fstride
   steps = Math.round(steps)
-  let fendPoint = steps * fstride
-  let endpoint = Math.round(fendPoint)
+  const fendPoint = steps * fstride
+  const endpoint = Math.round(fendPoint)
   if (endpoint === finalOffset) {
     isPicked = true
   }

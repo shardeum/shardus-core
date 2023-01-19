@@ -20,7 +20,6 @@
     "sortingCompareFunctions.ts",
     "json.ts",
     "iterables.ts",
-    "general.ts",
     "arrays.ts",
     "FastRandomIterator.ts",
     "sqlite3storage.ts",
