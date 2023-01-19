@@ -16,8 +16,6 @@ type CounterArray = {
   subArray: CounterArray
 }[]
 
-export let nestedCountersInstance: NestedCounters
-
 class NestedCounters {
   eventCounters: Map<string, CounterNode>
   rareEventCounters: Map<string, CounterNode>
@@ -28,7 +26,6 @@ class NestedCounters {
     this.eventCounters = new Map()
     this.rareEventCounters = new Map()
     this.crypto = null
-    nestedCountersInstance = this
     this.infLoopDebug = false
   }
 
@@ -198,4 +195,5 @@ class NestedCounters {
   }
 }
 
+export const nestedCountersInstance = new NestedCounters()
 export default NestedCounters

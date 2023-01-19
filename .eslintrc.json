@@ -15,7 +15,6 @@
     "prettier"
   ],
   "ignorePatterns": [
-    "nestedCounters.ts",
     "memoryReporting.ts",
     "stringifyReduce.ts",
     "sortingCompareFunctions.ts",
