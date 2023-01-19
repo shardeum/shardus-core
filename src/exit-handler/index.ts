@@ -1,7 +1,5 @@
 import Log4js from 'log4js'
 import * as Context from '../p2p/Context'
-import MemoryReporting from '../utils/memoryReporting'
-import NestedCounters from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 
 interface ExitHandler {
