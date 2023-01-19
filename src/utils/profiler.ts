@@ -1,4 +1,3 @@
-/* eslint-disable security/detect-object-injection */
 import * as Self from '../p2p/Self'
 import Statistics from '../statistics'
 import * as Context from '../p2p/Context'
@@ -216,6 +215,7 @@ class Profiler {
   }
 
   profileSectionStart(sectionName: string, internal = false): void {
+    // eslint-disable-next-line security/detect-object-injection
     let section = this.sectionTimes[sectionName]
 
     if (section != null && section.started === true) {
@@ -227,6 +227,7 @@ class Profiler {
       const t = BigInt(0)
       // The type assertion used below is done because we know that the remaining fields of SectionStat will be added to the section variable as the execution progresses.
       section = { name: sectionName, total: t, c: 0, internal } as SectionStat
+      // eslint-disable-next-line security/detect-object-injection
       this.sectionTimes[sectionName] = section
     }
 
@@ -258,6 +259,7 @@ class Profiler {
   }
 
   profileSectionEnd(sectionName: string, internal = false): void {
+    // eslint-disable-next-line security/detect-object-injection
     const section: SectionStat = this.sectionTimes[sectionName]
     if (section == null || section.started === false) {
       if (profilerSelfReporting) nestedCountersInstance.countEvent('profiler-end-error', sectionName)
@@ -292,6 +294,7 @@ class Profiler {
   }
 
   scopedProfileSectionStart(sectionName: string, internal = false, messageSize: number = cNoSizeTrack): void {
+    // eslint-disable-next-line security/detect-object-injection
     let section: SectionStat = this.scopedSectionTimes[sectionName]
 
     if (section != null && section.started === true) {
@@ -335,6 +338,7 @@ class Profiler {
         reentryCount: 0,
         reentryCountEver: 0,
       }
+      // eslint-disable-next-line security/detect-object-injection
       this.scopedSectionTimes[sectionName] = section
     }
 
@@ -354,6 +358,7 @@ class Profiler {
   }
 
   scopedProfileSectionEnd(sectionName: string, messageSize: number = cNoSizeTrack): void {
+    // eslint-disable-next-line security/detect-object-injection
     const section = this.scopedSectionTimes[sectionName]
     if (section == null || section.started === false) {
       if (profilerSelfReporting) return
@@ -431,6 +436,7 @@ class Profiler {
       if (key.startsWith('_internal')) continue
 
       if (Object.prototype.hasOwnProperty.call(this.sectionTimes, key)) {
+        // eslint-disable-next-line security/detect-object-injection
         const section = this.sectionTimes[key]
         section.total = BigInt(0)
       }
@@ -439,6 +445,7 @@ class Profiler {
   clearScopedTimes(): void {
     for (const key in this.scopedSectionTimes) {
       if (Object.prototype.hasOwnProperty.call(this.scopedSectionTimes, key)) {
+        // eslint-disable-next-line security/detect-object-injection
         const section = this.scopedSectionTimes[key]
         section.total = BigInt(0)
         section.max = BigInt(0)
@@ -478,6 +485,7 @@ class Profiler {
       if (key.startsWith('_internal')) continue
 
       if (Object.prototype.hasOwnProperty.call(this.sectionTimes, key)) {
+        // eslint-disable-next-line security/detect-object-injection
         const section = this.sectionTimes[key]
 
         // result += `${section.name}: total ${section.total /
@@ -515,6 +523,7 @@ class Profiler {
     const lines = []
     for (const key in this.scopedSectionTimes) {
       if (Object.prototype.hasOwnProperty.call(this.scopedSectionTimes, key)) {
+        // eslint-disable-next-line security/detect-object-injection
         const section = this.scopedSectionTimes[key]
         const percent = BigInt(100)
         const avgMs = Number((section.avg * percent) / divider) / 100
@@ -567,6 +576,7 @@ class Profiler {
     const times: TimesDataReport[] = []
     for (const key in this.scopedSectionTimes) {
       if (Object.prototype.hasOwnProperty.call(this.scopedSectionTimes, key)) {
+        // eslint-disable-next-line security/detect-object-injection
         const section = this.scopedSectionTimes[key]
         const percent = BigInt(100)
         const avgMs = Number((section.avg * percent) / divider) / 100
