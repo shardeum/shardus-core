@@ -380,8 +380,7 @@ class Profiler {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  cleanInt(x): number {
+  cleanInt(x: number): number {
     x = Number(x)
     return x >= 0 ? Math.floor(x) : Math.ceil(x)
   }
