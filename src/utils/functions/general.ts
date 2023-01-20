@@ -186,7 +186,7 @@ export function generateObjectSchema(obj, options = { arrTypeDiversity: false })
 
   for (const [key, value] of Object.entries(obj)) {
     /* eslint-disable security/detect-object-injection */
-    if (obj[key] !== null) {
+    if (Object.prototype.hasOwnProperty.call(obj, key) && obj[key] !== null) {
       if (value.constructor === Object) {
         schema[key] = generateObjectSchema(value, { arrTypeDiversity: options.arrTypeDiversity })
       } else if (Array.isArray(value)) {
@@ -293,7 +293,7 @@ export function compareObjectShape(idol, admirer) {
       if (DEFECTOR_FOUND) {
         // save the path to the prop , Example: ['server', 'log']
         defectoChain.push(key)
-        if (worshipped[key] && worshipped[key].constructor === Object) {
+        if (Object.prototype.hasOwnProperty.call(worshipped, key) && worshipped[key].constructor === Object) {
           return defectoHunter(worshipped[key], worshipper[key])
         } else {
           return { [key]: worshipper[key] }
