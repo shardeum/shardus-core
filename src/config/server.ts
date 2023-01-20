@@ -6,6 +6,10 @@ const SERVER_CONFIG: StrictServerConfiguration = {
   transactionExpireTime: 5,
   crypto: {
     hashKey: '69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc',
+    keyPairConfig: {
+      useKeyPairFromFile: true,
+      keyPairJsonFile: 'secrets.json',
+    },
   },
   p2p: {
     ipServer: 'api.ipify.org/?format=json',

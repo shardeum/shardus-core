@@ -7,8 +7,6 @@ import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 
-let KeypairFile = 'secrets.json'
-
 interface Crypto {
   baseDir: string
   config: Shardus.StrictServerConfiguration
@@ -36,51 +34,58 @@ class Crypto {
   }
 
   async init() {
-
-    KeypairFile = path.join( this.baseDir, KeypairFile)
     crypto.init(this.config.crypto.hashKey)
+
     const keypair = await this.storage.getProperty('keypair')
-    if (!keypair) {
-      try{
-        // check for keypair in file system
-        let fsKeypair = this.readKeypairFromFile()
-        if (fsKeypair && fsKeypair.secretKey && fsKeypair.publicKey) {
-          this.mainLogger.info('Keypair loaded from file ' + KeypairFile)
-          this.keypair = fsKeypair
-          this.curveKeypair = {
-            secretKey: crypto.convertSkToCurve(this.keypair.secretKey),
-            publicKey: crypto.convertPkToCurve(this.keypair.publicKey),
-          }
-          return
-        }
-
-        this.mainLogger.info('Keypair unable to be loaded from database. Generating new keypair...')
-        this.keypair = this._generateKeypair()
-        this.writeKeypairToFile(this.keypair)
-        await this.storage.setProperty('keypair', this.keypair)
-        this.mainLogger.info('New keypair successfully generated and saved to database. written to: ' + KeypairFile)
-
-      } catch(e){
-        if (logFlags.error) this.mainLogger.error(`error ${JSON.stringify(e)}`)
-        
-      }
-    } else {
-      this.mainLogger.info('Keypair loaded successfully from database.')
+    if (keypair) {
+      this.mainLogger.info('Keypair loaded from database', this.getKeyPairFile())
       this.keypair = keypair
+      this.setCurveKeyPair(this.keypair)
+      return
     }
-    this.curveKeypair = {
-      secretKey: crypto.convertSkToCurve(this.keypair.secretKey),
-      publicKey: crypto.convertPkToCurve(this.keypair.publicKey),
+
+    if (this.config.crypto.keyPairConfig.useKeyPairFromFile) {
+      let fsKeypair = this.readKeypairFromFile()
+      if (fsKeypair && fsKeypair.secretKey && fsKeypair.publicKey) {
+        this.keypair = fsKeypair
+        this.mainLogger.info('Keypair loaded from file', this.getKeyPairFile())
+        this.setCurveKeyPair(this.keypair)
+        return
+      }
     }
+
+    try {
+      this.mainLogger.info('Unable to load keypair. Generating new...')
+      this.keypair = this._generateKeypair()
+      if (this.config.crypto.keyPairConfig.useKeyPairFromFile) this.writeKeypairToFile(this.keypair)
+      await this.storage.setProperty('keypair', this.keypair)
+      this.mainLogger.info('New keypair successfully generated and saved to database.')
+      this.setCurveKeyPair(this.keypair)
+    } catch (e) {
+      if (logFlags.error) this.mainLogger.error(`error ${JSON.stringify(e)}`)
+    }
+  }
+
+  setCurveKeyPair(keypair) {
+    if (keypair) {
+      this.curveKeypair = {
+        secretKey: crypto.convertSkToCurve(this.keypair.secretKey),
+        publicKey: crypto.convertPkToCurve(this.keypair.publicKey),
+      }
+    }
+  }
+
+  getKeyPairFile(): string {
+    return path.join(this.baseDir, this.config.crypto.keyPairConfig.keyPairJsonFile)
   }
 
   writeKeypairToFile(keypair) {
-    fs.writeFileSync(KeypairFile, JSON.stringify(keypair))
+    fs.writeFileSync(this.getKeyPairFile(), JSON.stringify(keypair))
   }
 
   readKeypairFromFile() {
-    if (fs.existsSync(KeypairFile)) {
-      const fileData = fs.readFileSync(KeypairFile)
+    if (fs.existsSync(this.getKeyPairFile())) {
+      const fileData = fs.readFileSync(this.getKeyPairFile())
       return JSON.parse(fileData.toString())
     }
     return null

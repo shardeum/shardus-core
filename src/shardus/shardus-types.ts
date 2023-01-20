@@ -550,6 +550,12 @@ export interface ServerConfiguration {
   crypto?: {
     /** The hashkey parameter is a String that is used to initialize the crypto module, which is used for the cryptographic functions within shardus */
     hashKey?: string
+    /** All config related to the node keypair */
+    keyPairConfig?: {
+      useKeyPairFromFile?: boolean
+      /** The file location to save and fetch the keypair from. The secrets will use the baseDir to look for the file */
+      keyPairJsonFile?: string
+    }
   }
   /** P2P module configuration */
   p2p?: {
