@@ -291,7 +291,11 @@ export interface App {
   validateJoinRequest?: (data: any) => any
   getJoinData?: () => any
   eventNotify?: (event: ShardusEvent) => void
-  isReadyToJoin: (latestCycle: Cycle, nodePublicKey: string, activeNodes: P2P.P2PTypes.Node[]) => Promise<boolean>
+  isReadyToJoin: (
+    latestCycle: Cycle,
+    nodePublicKey: string,
+    activeNodes: P2P.P2PTypes.Node[]
+  ) => Promise<boolean>
   signAppData?: (type: string, hash: string, nodesToSign: number, appData: any) => Promise<SignAppDataResult>
   updateNetworkChangeQueue?: (account: WrappedData, appData: any) => Promise<WrappedData[]>
 }
@@ -732,6 +736,8 @@ export interface ServerConfiguration {
     recordAccountStates: boolean
     /** use hints about the memory access patterns for better parallel processing */
     useShardusMemoryPatterns: boolean
+    /** Clean untrusted input that endpoints receive to improve security. Config setting to AB test and judge perf it*/
+    sanitizeInput: boolean
   }
   /** Options for the statistics module */
   statistics?: {

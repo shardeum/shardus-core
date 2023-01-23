@@ -102,6 +102,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     recordAcceptedTx: false,
     recordAccountStates: false,
     useShardusMemoryPatterns: true,
+    sanitizeInput: false,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {
