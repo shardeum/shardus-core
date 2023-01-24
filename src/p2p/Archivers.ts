@@ -525,6 +525,9 @@ export function registerRoutes() {
   })
 
   Comms.registerGossipHandler('leavingarchiver', async (payload, sender, tracker) => {
+    if (payload === undefined || payload === null) return warn('Archiver leave payload empty.')
+    if (sender === undefined || sender === null) return warn('Archiver leave sender empty.')
+    if (tracker === undefined || tracker === null) return warn('Archiver leave tracker empty.')
     profilerInstance.scopedProfileSectionStart('leavingarchiver')
     try {
       if (logFlags.console) console.log('Leave request gossip received:', payload)
