@@ -68,6 +68,26 @@ class Statistics extends EventEmitter {
       const statsReadStream = this.getStream()
       statsReadStream.pipe(fileWriteStream)
     }
+    this.context.network.registerExternalGet('tx-stats', (req, res) => {
+      try {
+        // todo: reject if request is not coming from node operator dashboard
+        let stats: any = {
+          txInjected: 0,
+          txApplied: 0,
+          txRejected: 0,
+          txProcessed: 0,
+          txExpired: 0,
+        }
+        stats.txInjected += this.getPreviousElement('txInjected') || 0
+        stats.txApplied += this.getPreviousElement('txApplied') || 0
+        stats.txRejected += this.getPreviousElement('txRejected') || 0
+        stats.txExpired += this.getPreviousElement('txExpired') || 0
+        stats.txProcessed += this.getPreviousElement('txProcessed') || 0
+        return res.json(stats)
+      } catch (e) {
+        console.log(`Error getting stats: ${JSON.stringify(e)}`);
+      }
+    })
   }
 
   initialize() {

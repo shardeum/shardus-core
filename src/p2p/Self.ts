@@ -51,6 +51,7 @@ export function init() {
   Sync.init()
   CycleCreator.init()
   GlobalAccounts.init()
+  NodeList.init()
 
   // Create a logger for yourself
   p2pLogger = Context.logger.getLogger('p2p')

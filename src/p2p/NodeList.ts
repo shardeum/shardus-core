@@ -2,8 +2,9 @@ import { Logger } from 'log4js'
 import { stringify } from '@shardus/crypto-utils'
 import { P2P } from '@shardus/types'
 import { binarySearch, insertSorted, propComparator, propComparator2 } from '../utils'
-import { crypto, logger } from './Context'
+import { crypto, logger, network } from './Context'
 import * as CycleChain from './CycleChain'
+import * as Join from './Join'
 import { id, emitter } from './Self'
 import { ShardusEvent } from '../shardus/shardus-types'
 
@@ -30,6 +31,20 @@ reset()
 
 export function init() {
   p2pLogger = logger.getLogger('p2p')
+  network.registerExternalGet('network-stats', (req, res) => {
+    try {
+      // todo: reject if request is not coming from node operator dashboard
+      const networkStats = {
+        active: activeByIdOrder.length,
+        syncing: syncingByIdOrder.length,
+        standby: Join.getNodeRequestingJoin().length,
+        desired: CycleChain.newest.desired
+      }
+      return res.json(networkStats)
+    } catch (e) {
+      console.log(`Error getting load: ${e.message}`)
+    }
+  })
 }
 
 export function reset() {

@@ -66,6 +66,16 @@ class LoadDetection extends EventEmitter {
       console.log('reset load detection to normal behavior')
       res.send('reset load detection to normal behavior')
     })
+    Context.network.registerExternalGet('load', (req, res) => {
+      try {
+        // todo: reject if request is not coming from node operator dashboard
+        const load = this.getCurrentLoad()
+        const nodeLoad = this.getCurrentNodeLoad()
+        return res.json({load, nodeLoad})
+      } catch (e) {
+        console.log(`Error getting load: ${e.message}`);
+      }
+    })
   }
 
   /**
