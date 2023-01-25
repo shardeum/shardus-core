@@ -1,6 +1,5 @@
 import deepmerge from 'deepmerge'
 import { Handler } from 'express'
-import { isDeepStrictEqual } from 'util'
 import { version } from '../../package.json'
 import * as http from '../http'
 import { logFlags } from '../logger'
@@ -16,8 +15,7 @@ import * as Self from './Self'
 import { robustQuery } from './Utils'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { reportLost } from './Lost'
-import { join } from 'path'
+import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 
 /** STATE */
 
@@ -45,7 +43,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
   handler: (req, res) => {
     const joinRequest = req.body
     if (CycleCreator.currentQuarter < 1) {
-      // if currentQuater <= 0 then we are not ready
+      // if currentQuarter <= 0 then we are not ready
       res.end()
       return
     }
@@ -335,6 +333,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
     cycleMarker: 's',
     nodeInfo: 'o',
     sign: 'o',
+    version: 's',
   })
   if (err) {
     warn('join bad joinRequest ' + err)
@@ -365,6 +364,16 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
     )
     return false
   }
+
+  // Reject gossip from unknown nodes
+  if (joinRequest.sign.owner != joinRequest.nodeInfo.publicKey) {
+    const signer = NodeList.byPubKey.get(joinRequest.sign.owner)
+    if (!signer && signer.status != NodeStatus.ACTIVE) {
+      warn('Got join request from unknown node')
+      return false
+    }
+  }
+
   let selectionKey
 
   if (typeof shardus.app.validateJoinRequest === 'function') {
@@ -395,6 +404,10 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
   seen.add(node.publicKey)
 
   // Return if we already know about this node
+  if (NodeList.byPubKey.has(joinRequest.nodeInfo.publicKey)) {
+    if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, already a known node.')
+    return false
+  }
   const ipPort = NodeList.ipPort(node.internalIp, node.internalPort)
   if (NodeList.byIpPort.has(ipPort)) {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Cannot add join request for this node, already a known node.', JSON.stringify(NodeList.byIpPort.get(ipPort)))
