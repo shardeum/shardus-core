@@ -23,13 +23,17 @@ export const sortTimestampAsc = (a, b) => {
 }
 
 export const sortAscProp = (a, b, propName) => {
+  // eslint-disable-next-line security/detect-object-injection
   const aVal = a[propName]
+  // eslint-disable-next-line security/detect-object-injection
   const bVal = b[propName]
   return aVal === bVal ? 0 : aVal < bVal ? -1 : 1
 }
 
 export const sortDecProp = (a, b, propName) => {
+  // eslint-disable-next-line security/detect-object-injection
   const aVal = a[propName]
+  // eslint-disable-next-line security/detect-object-injection
   const bVal = b[propName]
   return aVal === bVal ? 0 : aVal > bVal ? -1 : 1
 }

@@ -17,7 +17,6 @@
   "ignorePatterns": [
     "memoryReporting.ts",
     "stringifyReduce.ts",
-    "sortingCompareFunctions.ts",
     "json.ts",
     "iterables.ts",
     "arrays.ts",
