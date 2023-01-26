@@ -3,10 +3,9 @@ import * as utils from '../utils'
 import Crypto from '../crypto'
 import Shardus from '../shardus'
 import * as CycleCreator from '../p2p/CycleCreator'
-const os = require('os')
+import os from 'os'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-const process = require('process')
-import { resourceUsage } from 'process'
+import process, { resourceUsage } from 'process'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import * as NodeList from '../p2p/NodeList'
 import { spawn } from 'child_process'
@@ -30,10 +29,11 @@ class MemoryReporting {
   crypto: Crypto
   report: MemItem[]
   shardus: Shardus
-  lastCPUTimes: any[]
+  lastCPUTimes: object[]
 
   constructor(shardus: Shardus) {
     this.crypto = null
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     memoryReportingInstance = this
     this.report = []
     this.shardus = shardus
@@ -253,6 +253,7 @@ class MemoryReporting {
       for (const [key, value] of Object.entries(cpu.times)) {
         const time = Number(value)
         total += time
+        // eslint-disable-next-line security/detect-object-injection
         timeObj[key] = value
       }
       timeObj['total'] = total
@@ -271,6 +272,7 @@ class MemoryReporting {
     let percentTotal = 0
 
     for (let i = 0; i < currentTimes.length; i++) {
+      /* eslint-disable security/detect-object-injection */
       const currentTimeEntry = currentTimes[i]
       const lastTimeEntry = this.lastCPUTimes[i]
       const deltaTimeObj = {}
@@ -286,6 +288,7 @@ class MemoryReporting {
       percentTotal += percentTimes['user'] || 0
       percentTotal += percentTimes['nice'] || 0
       percentTotal += percentTimes['sys'] || 0
+      /* eslint-enable security/detect-object-injection */
     }
 
     this.lastCPUTimes = currentTimes
@@ -306,6 +309,7 @@ class MemoryReporting {
     const multiStats = this.shardus.statistics.getMultiStatReport('cpuPercent')
 
     multiStats.allVals.forEach((val, index) => {
+      // eslint-disable-next-line security/detect-object-injection
       multiStats.allVals[index] = Math.round(val * 100)
     })
     multiStats.min = this.roundTo3decimals(multiStats.min * 100)

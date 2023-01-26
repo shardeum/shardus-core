@@ -15,7 +15,6 @@
     "prettier"
   ],
   "ignorePatterns": [
-    "memoryReporting.ts",
     "stringifyReduce.ts",
     "json.ts",
     "iterables.ts",
