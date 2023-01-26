@@ -567,6 +567,30 @@ class TransactionQueue {
         throw Error('null response from app.apply')
       }
 
+      // check accountWrites of applyResponse
+      for (let account of applyResponse.accountWrites) {
+        const homeNode = ShardFunctions.findHomeNode(
+          this.stateManager.currentCycleShardData.shardGlobals,
+          account.accountId,
+          this.stateManager.currentCycleShardData.parititionShardDataMap
+        )
+        let isUnexpectedAccountWrite = false
+        for (let storageNode of homeNode.nodeThatStoreOurParitionFull) {
+
+          let isStorageNodeInTxGroup = queueEntry.transactionGroup.map(node => node.id).includes(storageNode.id)
+          if (!isStorageNodeInTxGroup) {
+            isUnexpectedAccountWrite = true
+            if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction Storage node ${storageNode.id} of accountId ${account.accountId} is not in transaction group`);
+            break
+          }
+        }
+        if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction isUnexpectedAccountWrite for account ${account.accountId}`, isUnexpectedAccountWrite)
+        if (isUnexpectedAccountWrite) {
+          applyResponse.failed = true
+          applyResponse.failMessage = `preApplyTransaction unexpected account ${account.accountId} is not covered by transaction group`
+        }
+      }
+
       if (applyResponse.failed === true) {
         passedApply = false
         applyResult = applyResponse.failMessage
