@@ -1,8 +1,8 @@
 import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
 import { StateManager, P2P } from '@shardus/types'
-
-const stringify = require('fast-stable-stringify')
+import stringify from 'fast-stable-stringify'
+import log4js from 'log4js'
 
 type ShardGlobals = StateManager.shardFunctionTypes.ShardGlobals
 type ShardInfo = StateManager.shardFunctionTypes.ShardInfo
@@ -15,8 +15,8 @@ type AddressRange = StateManager.shardFunctionTypes.AddressRange
 
 class ShardFunctions {
   static logger: Logger = null
-  static mainLogger: any = null
-  static fatalLogger: any = null
+  static mainLogger: log4js.Logger = null
+  static fatalLogger: log4js.Logger = null
 
   /**
    * calculateShardGlobals
@@ -388,7 +388,7 @@ class ShardFunctions {
   static computeNodePartitionDataMap(
     shardGlobals: ShardGlobals,
     nodeShardDataMap: NodeShardDataMap,
-    nodesToGenerate: P2P.NodeListTypes.Node[],//Shardus.Node[],
+    nodesToGenerate: P2P.NodeListTypes.Node[], //Shardus.Node[],
     partitionShardDataMap: PartitionShardDataMap,
     activeNodes: Shardus.Node[],
     extendedData: boolean,
@@ -467,6 +467,7 @@ class ShardFunctions {
       if (nodeShardData.ourNodeIndex === -1) {
         for (let i = 0; i < activeNodes.length; i++) {
           nodeShardData.ourNodeIndex = i
+          // eslint-disable-next-line security/detect-object-injection
           if (activeNodes[i].id >= node.id) {
             break
           }
@@ -874,6 +875,7 @@ class ShardFunctions {
     return bStart < aStart || bEnd > aEnd
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static setEpandedLeft(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
     return bStart < aStart
   }
@@ -1229,9 +1231,7 @@ class ShardFunctions {
     const numPartitions = shardGlobals.numPartitions
     // 2^32  4294967296 or 0xFFFFFFFF + 1
     const size = Math.round((0xffffffff + 1) / numPartitions)
-    const preround = addressNum / size
     let homePartition = Math.floor(addressNum / size)
-    const asdf = preround
     if (homePartition === numPartitions) {
       homePartition = homePartition - 1
     }
@@ -1244,7 +1244,7 @@ class ShardFunctions {
     address: string,
     partitionShardDataMap: Map<number, ShardInfo>
   ): NodeShardData | null {
-    const { homePartition, addressNum } = ShardFunctions.addressToPartition(shardGlobals, address)
+    const { homePartition } = ShardFunctions.addressToPartition(shardGlobals, address)
     const partitionShard = partitionShardDataMap.get(homePartition)
 
     if (partitionShard == null) {
@@ -1328,7 +1328,7 @@ class ShardFunctions {
    * @param {Shardus.Node[]} listB
    * @returns {array} result [results, extras]  TODO, convert the array response to a type object that has results and extras
    */
-  static mergeNodeLists(listA: Shardus.Node[], listB: Shardus.Node[]): any[] {
+  static mergeNodeLists(listA: Shardus.Node[], listB: Shardus.Node[]): Shardus.Node[][] {
     const results = [] as Shardus.Node[]
     const extras = [] as Shardus.Node[]
     const nodeSet = new Set()
@@ -1435,8 +1435,7 @@ class ShardFunctions {
     // -is there a smart way to cache results.
     // -is there a more efficient way to pre calculate this (but keep in mind we may need to be lazy about shard calculations in the future)
     // -  instead of looking at all nodes could we pick a staring point and expand our search
-    for (let i = 0; i < activeNodes.length; i++) {
-      const node = activeNodes[i]
+    for (const node of activeNodes) {
       if (exclude.includes(node.id)) {
         continue
       }
@@ -1465,7 +1464,7 @@ class ShardFunctions {
     thisNode: NodeShardData,
     nodeShardDataMap: NodeShardDataMap,
     activeNodes: Shardus.Node[]
-  ): any {
+  ): Record<string, P2P.NodeListTypes.Node[]> {
     const consensusNodeForOurNode = [] as Shardus.Node[]
     const consensusNodeForOurNodeFull = [] as Shardus.Node[]
     const nodeThatStoreOurPartition = [] as Shardus.Node[]
@@ -1474,10 +1473,13 @@ class ShardFunctions {
     const homePartition = thisNode.homePartition
 
     let partition =
-      this.modulo(homePartition - (shardGlobals.consensusRadius + shardGlobals.nodesPerEdge), shardGlobals.numPartitions) - 1
-    let maxScanNeeded = (2 * shardGlobals.consensusRadius) + (2 * shardGlobals.nodesPerEdge) + 1
+      this.modulo(
+        homePartition - (shardGlobals.consensusRadius + shardGlobals.nodesPerEdge),
+        shardGlobals.numPartitions
+      ) - 1
+    let maxScanNeeded = 2 * shardGlobals.consensusRadius + 2 * shardGlobals.nodesPerEdge + 1
     if (maxScanNeeded > activeNodes.length) maxScanNeeded = activeNodes.length
-    let once = false
+
     for (let i = 0; i < maxScanNeeded; i++) {
       let isInConsensusRange = false
       let isInPartitionRange = false
@@ -1485,8 +1487,8 @@ class ShardFunctions {
       if (partition >= activeNodes.length) {
         partition = 0
       }
-      once = true
 
+      // eslint-disable-next-line security/detect-object-injection
       const node = activeNodes[partition]
 
       if (node == thisNode.node) {
@@ -1565,6 +1567,7 @@ class ShardFunctions {
       }
       once = true
 
+      // eslint-disable-next-line security/detect-object-injection
       const node = activeNodes[index]
       index++
 
@@ -1598,6 +1601,7 @@ class ShardFunctions {
       if (index < 0) {
         index = activeNodes.length - 1
       }
+      // eslint-disable-next-line security/detect-object-injection
       const node = activeNodes[index]
       index--
 
@@ -1657,6 +1661,7 @@ class ShardFunctions {
         return Object.values(results)
       }
       once = true
+      // eslint-disable-next-line security/detect-object-injection
       const node = activeNodes[rightIndex]
 
       if (!node) {
@@ -1684,6 +1689,7 @@ class ShardFunctions {
         return Object.values(results)
       }
       once = true
+      // eslint-disable-next-line security/detect-object-injection
       const node = activeNodes[leftIndex]
 
       if (!node) {
@@ -1703,14 +1709,14 @@ class ShardFunctions {
    * position should be the position of the home node
    * @param {number} position
    * @param {number} radius
-   * @param {any[]} exclude
-   * @param {any[]} allNodes
+   * @param {string[]} exclude
+   * @param {P2P.NodeListTypes.Node[]} allNodes
    */
   static getNeigborNodesInRange(
     position: number,
     radius: number,
-    exclude: any[],
-    allNodes: any[]
+    exclude: string[],
+    allNodes: P2P.NodeListTypes.Node[]
   ): Shardus.Node[] {
     // let allNodes = this.p2p.state.getNodesOrdered() // possibly faster version that does not need a copy
     const results = [] as Shardus.Node[]
@@ -1730,8 +1736,7 @@ class ShardFunctions {
 
     // if we need to scan all the nodes, just do that here in a simple way
     if (scanAmount >= allNodes.length) {
-      for (let i = 0; i < allNodes.length; i++) {
-        const node = allNodes[i]
+      for (const node of allNodes) {
         if (exclude.includes(node.id)) {
           continue
         }
@@ -1755,6 +1760,7 @@ class ShardFunctions {
       if (scanIndex >= allNodes.length) {
         scanIndex = 0
       }
+      // eslint-disable-next-line security/detect-object-injection
       const node = allNodes[scanIndex]
       if (exclude.includes(node.id)) {
         scanIndex++
@@ -1814,6 +1820,7 @@ class ShardFunctions {
       if (leftScanIndex < 0) {
         leftScanIndex = allNodes.length - 1
       }
+      // eslint-disable-next-line security/detect-object-injection
       let node = allNodes[rightScanIndex]
       if (node.id !== excludeID) {
         if (node.status === 'active') {
@@ -1828,6 +1835,7 @@ class ShardFunctions {
         break // done, because we don't need the left index.
       }
 
+      // eslint-disable-next-line security/detect-object-injection
       node = allNodes[leftScanIndex]
       if (node.id !== excludeID) {
         if (node.status === 'active') {
@@ -1859,7 +1867,7 @@ class ShardFunctions {
    * @param {string} highAddress
    * TSConversion  fix up any[] with a wrapped object.
    */
-  static findCenterAddressPair(lowAddress: string, highAddress: string): any[] {
+  static findCenterAddressPair(lowAddress: string, highAddress: string): string[] {
     const leftAddressNum = parseInt(lowAddress.slice(0, 8), 16)
     const nodeAddressNum = parseInt(highAddress.slice(0, 8), 16)
 
