@@ -31,7 +31,7 @@ import {
   RequestReceiptForTxResp_old,
   ProcessQueueStats,
   SimpleNumberStats,
-  QueueCountsResult
+  QueueCountsResult,
 } from './state-manager-types'
 
 const stringify = require('fast-stable-stringify')
@@ -94,7 +94,6 @@ class TransactionQueue {
   lastProcessStats: { [limitName: string]: ProcessQueueStats }
 
   stuckProcessReported: boolean
-
 
   queueReads: Set<string>
   queueWrites: Set<string>
@@ -573,8 +572,8 @@ class TransactionQueue {
         for (let account of applyResponse.accountWrites) {
           const homeNode = ShardFunctions.findHomeNode(
             this.stateManager.currentCycleShardData.shardGlobals,
-          account.accountId,
-          this.stateManager.currentCycleShardData.parititionShardDataMap
+            account.accountId,
+            this.stateManager.currentCycleShardData.parititionShardDataMap
           )
           let isUnexpectedAccountWrite = false
           for (let storageNode of homeNode.nodeThatStoreOurParitionFull) {
@@ -1157,7 +1156,7 @@ class TransactionQueue {
         txSieveTime: 0,
         debug: {},
         voteCastAge: 0,
-        accountDataSet: false
+        accountDataSet: false,
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1456,7 +1455,11 @@ class TransactionQueue {
 
         this.computeTxSieveTime(txQueueEntry)
 
-        if(this.config.debug.useShardusMemoryPatterns && acceptedTx.shardusMemoryPatterns != null && acceptedTx.shardusMemoryPatterns.ro != null){
+        if (
+          this.config.debug.useShardusMemoryPatterns &&
+          acceptedTx.shardusMemoryPatterns != null &&
+          acceptedTx.shardusMemoryPatterns.ro != null
+        ) {
           txQueueEntry.shardusMemoryPatternSets = {
             ro: new Set(acceptedTx.shardusMemoryPatterns.ro),
             rw: new Set(acceptedTx.shardusMemoryPatterns.rw),
@@ -2405,7 +2408,11 @@ class TransactionQueue {
 
         this.profiler.profileSectionStart('process_dapp.getRelevantData')
         this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
-        let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data, queueEntry.acceptedTx.appData)
+        let data = await this.app.getRelevantData(
+          key,
+          queueEntry.acceptedTx.data,
+          queueEntry.acceptedTx.appData
+        )
         this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
         this.profiler.profileSectionEnd('process_dapp.getRelevantData')
 
@@ -2657,7 +2664,11 @@ class TransactionQueue {
 
         this.profiler.profileSectionStart('process_dapp.getRelevantData')
         this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
-        let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data, queueEntry.acceptedTx.appData)
+        let data = await this.app.getRelevantData(
+          key,
+          queueEntry.acceptedTx.data,
+          queueEntry.acceptedTx.appData
+        )
         this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
         this.profiler.profileSectionEnd('process_dapp.getRelevantData')
 
@@ -3158,21 +3169,20 @@ class TransactionQueue {
     this.queueReadWritesOld = new Set()
 
     try {
-
       nestedCountersInstance.countEvent('processing', 'processing-enter')
 
-      if (this.newAcceptedTxQueueTempInjest.length > 5000){
-        nestedCountersInstance.countEvent('stateManager', `newAcceptedTxQueueTempInjest>5000 leftRunning:${this.newAcceptedTxQueueRunning} noShardCalcs:${this.stateManager.currentCycleShardData == null} `)
+      if (this.newAcceptedTxQueueTempInjest.length > 5000) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent( 'stateManager', `newAcceptedTxQueueTempInjest>5000 leftRunning:${this.newAcceptedTxQueueRunning} noShardCalcs:${ this.stateManager.currentCycleShardData == null } ` )
 
         //report rare counter once
-        if(this.stuckProcessReported === false){
+        if (this.stuckProcessReported === false) {
           this.stuckProcessReported = true
-          nestedCountersInstance.countRareEvent('stateManager', `newAcceptedTxQueueTempInjest>5000 leftRunning:${this.newAcceptedTxQueueRunning} noShardCalcs:${this.stateManager.currentCycleShardData == null} `)
+          /* prettier-ignore */ nestedCountersInstance.countRareEvent( 'stateManager', `newAcceptedTxQueueTempInjest>5000 leftRunning:${this.newAcceptedTxQueueRunning} noShardCalcs:${ this.stateManager.currentCycleShardData == null } ` )
         }
       }
 
       if (this.newAcceptedTxQueueRunning === true) {
-        nestedCountersInstance.countEvent('stateManager', 'newAcceptedTxQueueRunning === true')
+        /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'newAcceptedTxQueueRunning === true')
         return
       }
       this.newAcceptedTxQueueRunning = true
@@ -4684,7 +4694,7 @@ class TransactionQueue {
    * @param queueEntry
    */
   processQueue_accountSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry): boolean {
-    if(this.config.debug.useShardusMemoryPatterns && queueEntry.shardusMemoryPatternSets != null){
+    if (this.config.debug.useShardusMemoryPatterns && queueEntry.shardusMemoryPatternSets != null) {
       return this.processQueue_accountSeen2(seenAccounts, queueEntry)
     }
 
@@ -4709,7 +4719,7 @@ class TransactionQueue {
    * @param queueEntry
    */
   processQueue_markAccountsSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry) {
-    if(this.config.debug.useShardusMemoryPatterns && queueEntry.shardusMemoryPatternSets != null){
+    if (this.config.debug.useShardusMemoryPatterns && queueEntry.shardusMemoryPatternSets != null) {
       this.processQueue_markAccountsSeen2(seenAccounts, queueEntry)
       return
     }
@@ -4734,17 +4744,17 @@ class TransactionQueue {
       return false
     }
 
-    if(queueEntry.shardusMemoryPatternSets != null){
+    if (queueEntry.shardusMemoryPatternSets != null) {
       //normal blocking for read write
       for (const id of queueEntry.shardusMemoryPatternSets.rw) {
-        if(this.queueWrites.has(id)){
+        if (this.queueWrites.has(id)) {
           return true
         }
-        if(this.queueReadWritesOld.has(id)){
+        if (this.queueReadWritesOld.has(id)) {
           return true
         }
         //also blocked by upstream reads
-        if(this.queueReads.has(id)){
+        if (this.queueReads.has(id)) {
           return true
         }
       }
@@ -4752,10 +4762,10 @@ class TransactionQueue {
       // but has to wait its turn if there is an uptream read
       for (const id of queueEntry.shardusMemoryPatternSets.wo) {
         //also blocked by upstream reads
-        if(this.queueReads.has(id)){
+        if (this.queueReads.has(id)) {
           return true
         }
-        if(this.queueReadWritesOld.has(id)){
+        if (this.queueReadWritesOld.has(id)) {
           return true
         }
       }
@@ -4774,10 +4784,10 @@ class TransactionQueue {
 
       //read only blocks for upstream writes
       for (const id of queueEntry.shardusMemoryPatternSets.ro) {
-        if(this.queueWrites.has(id)){
+        if (this.queueWrites.has(id)) {
           return true
         }
-        if(this.queueReadWritesOld.has(id)){
+        if (this.queueReadWritesOld.has(id)) {
           return true
         }
         //note blocked by upstream reads, because this read only operation
@@ -4803,7 +4813,7 @@ class TransactionQueue {
       return
     }
 
-    if(queueEntry.shardusMemoryPatternSets != null){
+    if (queueEntry.shardusMemoryPatternSets != null) {
       for (const id of queueEntry.shardusMemoryPatternSets.rw) {
         this.queueWrites.add(id)
         this.queueReads.add(id)
@@ -4829,7 +4839,6 @@ class TransactionQueue {
       this.queueReadWritesOld.add(key)
     }
   }
-
 
   /**
    * processQueue_clearAccountsSeen
@@ -5093,11 +5102,11 @@ class TransactionQueue {
   getAccountQueueCount(accountID: string, remote: boolean = false): QueueCountsResult {
     nestedCountersInstance.countEvent('stateManager', `getAccountQueueCount`)
     let count = 0
-    let committingAppData: Shardus.AcceptedTx["appData"] = []
+    let committingAppData: Shardus.AcceptedTx['appData'] = []
     for (let queueEntry of this.newAcceptedTxQueueTempInjest) {
       if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
         let tx = queueEntry.acceptedTx
-        if (logFlags.verbose) console.log('getAccountQueueCount: found upstream tx in the injested queue:', `appData: ${JSON.stringify(tx.appData)}`);
+        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the injested queue:', `appData: ${JSON.stringify(tx.appData)}` )
         count++
       }
     }
@@ -5108,11 +5117,11 @@ class TransactionQueue {
           committingAppData.push(tx.appData)
           continue
         }
-        if (logFlags.verbose) console.log('getAccountQueueCount: found upstream tx in the newAccepted queue:', `appData: ${JSON.stringify(tx.appData)}`);
+        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the newAccepted queue:', `appData: ${JSON.stringify(tx.appData)}` )
         count++
       }
     }
-    if (logFlags.verbose) console.log(`getAccountQueueCount: remote:${remote} ${count} acc:${utils.stringifyReduce(accountID)}`)
+    /* prettier-ignore */ if (logFlags.verbose) console.log(`getAccountQueueCount: remote:${remote} ${count} acc:${utils.stringifyReduce(accountID)}`)
     return { count, committingAppData }
   }
 }
