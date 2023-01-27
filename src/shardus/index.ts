@@ -1988,7 +1988,7 @@ class Shardus extends EventEmitter {
           return false
         },
         allowedBackupNodes,
-        nodesToSign
+        Math.min(nodesToSign, filterNodeIds.length)
       )
 
       if (groupPromiseResp.success) responses = groupPromiseResp.wins
