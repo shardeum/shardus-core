@@ -744,6 +744,8 @@ export interface ServerConfiguration {
     useShardusMemoryPatterns: boolean
     /** Clean untrusted input that endpoints receive to improve security. Config setting to AB test and judge perf it*/
     sanitizeInput: boolean
+    /** test if the TX group changes sizes after an apply() */
+    checkTxGroupChanges: boolean
   }
   /** Options for the statistics module */
   statistics?: {

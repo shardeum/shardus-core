@@ -568,26 +568,28 @@ class TransactionQueue {
       }
 
       // check accountWrites of applyResponse
-      for (let account of applyResponse.accountWrites) {
-        const homeNode = ShardFunctions.findHomeNode(
-          this.stateManager.currentCycleShardData.shardGlobals,
+      if (this.config.debug.checkTxGroupChanges && applyResponse.accountWrites.length > 0) {
+        let transactionGroupIDs = new Set(queueEntry.transactionGroup.map((node) => node.id))
+        for (let account of applyResponse.accountWrites) {
+          const homeNode = ShardFunctions.findHomeNode(
+            this.stateManager.currentCycleShardData.shardGlobals,
           account.accountId,
           this.stateManager.currentCycleShardData.parititionShardDataMap
-        )
-        let isUnexpectedAccountWrite = false
-        for (let storageNode of homeNode.nodeThatStoreOurParitionFull) {
-
-          let isStorageNodeInTxGroup = queueEntry.transactionGroup.map(node => node.id).includes(storageNode.id)
-          if (!isStorageNodeInTxGroup) {
-            isUnexpectedAccountWrite = true
-            if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction Storage node ${storageNode.id} of accountId ${account.accountId} is not in transaction group`);
-            break
+          )
+          let isUnexpectedAccountWrite = false
+          for (let storageNode of homeNode.nodeThatStoreOurParitionFull) {
+            let isStorageNodeInTxGroup = transactionGroupIDs.has(storageNode.id)
+            if (!isStorageNodeInTxGroup) {
+              isUnexpectedAccountWrite = true
+              /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug( `preApplyTransaction Storage node ${storageNode.id} of accountId ${account.accountId} is not in transaction group` )
+              break
+            }
           }
-        }
-        if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction isUnexpectedAccountWrite for account ${account.accountId}`, isUnexpectedAccountWrite)
-        if (isUnexpectedAccountWrite) {
-          applyResponse.failed = true
-          applyResponse.failMessage = `preApplyTransaction unexpected account ${account.accountId} is not covered by transaction group`
+          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug( `preApplyTransaction isUnexpectedAccountWrite for account ${account.accountId}`, isUnexpectedAccountWrite )
+          if (isUnexpectedAccountWrite) {
+            applyResponse.failed = true
+            applyResponse.failMessage = `preApplyTransaction unexpected account ${account.accountId} is not covered by transaction group`
+          }
         }
       }
 
