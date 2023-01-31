@@ -329,10 +329,10 @@ export async function createJoinRequest(
   return signedJoinReq
 }
 
-export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
+export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean {
   if (Self.p2pIgnoreJoinRequests === true) {
     if (logFlags.p2pNonFatal) info(`Join request ignored. p2pIgnoreJoinRequests === true`)
-    return
+    return false
   }
 
   //  Validate joinReq
@@ -365,7 +365,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
     warn('join bad joinRequest.sign ' + err)
     return false
   }
-  if (!isEqualOrNewerVersion(version, joinRequest.version)) {
+  if (config.p2p.checkVersion && !isEqualOrNewerVersion(version, joinRequest.version)) {
     warn(
       `version number is old. Our node version is ${version}. Join request node version is ${joinRequest.version}`
     )

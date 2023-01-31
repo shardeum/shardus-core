@@ -62,6 +62,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     detectLostSyncing: true,
     scaleGroupLimit: 25,
     useSignaturesForAuth: false,
+    checkVersion: false,
   },
   ip: {
     externalIp: '0.0.0.0',

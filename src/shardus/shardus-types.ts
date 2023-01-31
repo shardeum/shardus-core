@@ -650,6 +650,8 @@ export interface ServerConfiguration {
     scaleGroupLimit?: number
     /** this is to switch to signature based auth for gossip messages. default: false */
     useSignaturesForAuth?: boolean
+    /** should the shardus core version be checked */
+    checkVersion: boolean
   }
   /** Server IP configuration */
   ip?: {
