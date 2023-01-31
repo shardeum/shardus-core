@@ -13,6 +13,7 @@ import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
+import { isBogonIP } from '../utils/functions/checkIP'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
@@ -25,6 +26,8 @@ let requests: P2P.JoinTypes.JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
 
 let lastLoggedCycle = 0
+
+let allowBogon = false
 
 /** ROUTES */
 
@@ -46,6 +49,10 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       // if currentQuarter <= 0 then we are not ready
       res.end()
       return
+    }
+
+    if (Self.isFirst && isBogonIP(joinRequest.nodeInfo.externalIp)) {
+      allowBogon = true
     }
 
     //  Validate of joinReq is done in addJoinRequest
@@ -374,6 +381,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
     }
   }
 
+  if (isBogonIP(joinRequest.nodeInfo.externalIp) && !allowBogon) {
+    warn('Got join request from Bogon IP')
+    return false
+  }
+
   let selectionKey
 
   if (typeof shardus.app.validateJoinRequest === 'function') {
@@ -488,6 +500,12 @@ export async function submitJoin(
   const selectedNodes = utils.getRandom(nodes, Math.min(nodes.length, 5))
   const promises = []
   if (logFlags.p2pNonFatal) info(`Sending join request to ${selectedNodes.map((n) => `${n.ip}:${n.port}`)}`)
+
+  // Check if network allows bogon IPs, set our own flag accordingly
+  if (selectedNodes.some((node) => isBogonIP(node.ip))) {
+    allowBogon = true
+  }
+
   for (const node of selectedNodes) {
     try {
       promises.push(
