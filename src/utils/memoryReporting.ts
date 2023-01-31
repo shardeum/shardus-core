@@ -91,7 +91,8 @@ class MemoryReporting {
     })
 
     Context.network.registerExternalGet('top', isDebugModeMiddleware, (req, res) => {
-      const top = spawn('top', ['-n', '10'])
+      // This would work well in linux OS.
+      const top = spawn('top', ['b', '-n', '10', '1'])
       top.stdout.on('data', (dataBuffer) => {
         res.write(dataBuffer)
         top.kill()
