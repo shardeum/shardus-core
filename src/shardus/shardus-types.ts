@@ -577,6 +577,8 @@ export interface ServerConfiguration {
     maxRejoinTime?: number
     /** The seedList parameter is a String specifying the url for the seedNode server that the application will communicate with. */
     // seedList?: string
+    /** The dynamicBogonFiltering is a boolean specifying if the network should dynamically filter Bogon IPs */
+    dynamicBogonFiltering: boolean
     /** The difficulty parameter is an Integer specifying the proof of work difficulty to prevent network spam. */
     difficulty?: number
     /** The queryDelay parameter is an Integer specifying the amount of time (in seconds) to delay between cycle phase. */

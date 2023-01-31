@@ -30,6 +30,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     cycleDuration: 30,
     maxRejoinTime: 20,
     difficulty: 2,
+    dynamicBogonFiltering: true,
     queryDelay: 1,
     gossipRecipients: 8,
     gossipFactor: 4,

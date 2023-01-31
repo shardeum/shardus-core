@@ -386,9 +386,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
     return false
   }
 
-  if (isBogonIP(joinRequest.nodeInfo.externalIp) && !allowBogon) {
-    warn('Got join request from Bogon IP')
-    return false
+  if (config.p2p.dynamicBogonFiltering) {
+    if (isBogonIP(joinRequest.nodeInfo.externalIp) && !allowBogon) {
+      warn('Got join request from Bogon IP')
+      return false
+    }
   }
 
   let selectionKey
