@@ -51,7 +51,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       return
     }
 
-    if (Self.isFirst && isBogonIP(joinRequest.nodeInfo.externalIp)) {
+    if (NodeList.activeByIdOrder.length === 1 && Self.isFirst && isBogonIP(joinRequest.nodeInfo.externalIp)) {
       allowBogon = true
     }
 
