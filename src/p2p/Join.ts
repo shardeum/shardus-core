@@ -13,7 +13,7 @@ import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
-import { isBogonIP } from '../utils/functions/checkIP'
+import { isBogonIP, isIPv6 } from '../utils/functions/checkIP'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
@@ -379,6 +379,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
       warn('Got join request from unknown node')
       return false
     }
+  }
+
+  if (isIPv6(joinRequest.nodeInfo.externalIp)) {
+    warn('Got join request from IPv6')
+    return false
   }
 
   if (isBogonIP(joinRequest.nodeInfo.externalIp) && !allowBogon) {

@@ -1,3 +1,17 @@
+export function isIPv6(ip: string) {
+  const slicedArr = ip.split(':')
+  if (slicedArr.length !== 8) return false
+
+  for (let str of slicedArr) {
+    // Check if string is a valid regex
+    const hexRegex = /^[0-9A-Fa-f]+$/
+    if (str.length < 0 || str.length > 4) return false
+    if (str.match(hexRegex) == null) return false
+  }
+
+  return true
+}
+
 export function isBogonIP(ip) {
   const ipArr = getIpArr(ip)
   return isPrivateIP(ipArr) || isReservedIP(ipArr)
