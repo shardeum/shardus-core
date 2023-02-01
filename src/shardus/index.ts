@@ -1,3 +1,4 @@
+import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 import { EventEmitter } from 'events'
 import { Handler } from 'express'
 import Log4js from 'log4js'
@@ -1054,8 +1055,34 @@ class Shardus extends EventEmitter {
    * Returns node info given a node id
    * @param {*} id The nodeId of this node
    */
-  getNode(id) {
+  getNode(id: string): ShardusTypes.Node {
     return this.p2p.state.getNode(id)
+  }
+
+  getNodeByPubKey(id: string): ShardusTypes.Node {
+    return this.p2p.state.getNodeByPubKey(id)
+  }
+
+  isNodeActiveByPubKey(pubKey: string): boolean {
+    const node = this.p2p.state.getNodeByPubKey(pubKey)
+    if (node == null) {
+      return false
+    }
+    if (node.status !== NodeStatus.ACTIVE) {
+      return false
+    }
+    return true
+  }
+
+  isNodeActive(id: string): boolean {
+    const node = this.p2p.state.getNode(id)
+    if (node == null) {
+      return false
+    }
+    if (node.status !== NodeStatus.ACTIVE) {
+      return false
+    }
+    return true
   }
 
   /**
