@@ -54,6 +54,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
     if (NodeList.activeByIdOrder.length === 1 && Self.isFirst && isBogonIP(joinRequest.nodeInfo.externalIp)) {
       allowBogon = true
     }
+    nestedCountersInstance.countEvent('p2p', `join-allow-bogon-firstnode:${allowBogon}`)
 
     //  Validate of joinReq is done in addJoinRequest
     if (addJoinRequest(joinRequest)) {
@@ -366,30 +367,34 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
     return false
   }
   if (config.p2p.checkVersion && !isEqualOrNewerVersion(version, joinRequest.version)) {
-    warn(
-      `version number is old. Our node version is ${version}. Join request node version is ${joinRequest.version}`
-    )
+    /* prettier-ignore */ warn( `version number is old. Our node version is ${version}. Join request node version is ${joinRequest.version}` )
+    nestedCountersInstance.countEvent('p2p', `join-reject-version ${joinRequest.version}`)
     return false
   }
 
-  // Reject gossip from unknown nodes
+  //If the node that signed the request is not the same as the node that is joining
   if (joinRequest.sign.owner != joinRequest.nodeInfo.publicKey) {
-    const signer = NodeList.byPubKey.get(joinRequest.sign.owner)
-    if (!signer && signer.status != NodeStatus.ACTIVE) {
-      warn('Got join request from unknown node')
-      return false
-    }
+    /* prettier-ignore */ warn(`join-reject owner != publicKey ${{sign:joinRequest.sign.owner, info:joinRequest.nodeInfo.publicKey}}`)
+    nestedCountersInstance.countEvent('p2p', `join-reject owner != publicKey`)
+    return false
   }
 
   if (isIPv6(joinRequest.nodeInfo.externalIp)) {
     warn('Got join request from IPv6')
+    nestedCountersInstance.countEvent('p2p', `join-reject-ipv6`)
     return false
   }
 
   if (config.p2p.dynamicBogonFiltering) {
-    if (isBogonIP(joinRequest.nodeInfo.externalIp) && !allowBogon) {
-      warn('Got join request from Bogon IP')
-      return false
+    try {
+      //this can thow an error if the ip is an invalid format
+      if (isBogonIP(joinRequest.nodeInfo.externalIp) && !allowBogon) {
+        warn('Got join request from Bogon IP')
+        nestedCountersInstance.countEvent('p2p', `join-reject-bogon`)
+        return false
+      }
+    } catch (er) {
+      nestedCountersInstance.countEvent('p2p', `join-reject-bogon-ex:${er}`)
     }
   }
 
@@ -400,6 +405,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
       let validationResponse = shardus.app.validateJoinRequest(joinRequest)
       if (validationResponse.success !== true) {
         warn(`Validation of join request data is failed!`)
+        nestedCountersInstance.countEvent('p2p', `join-reject-dapp`)
         return false
       }
       if (typeof validationResponse.data === 'string') {
@@ -407,6 +413,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
       }
     } catch (e) {
       warn(`shardus.app.validateJoinRequest failed due to ${e}`)
+      nestedCountersInstance.countEvent('p2p', `join-reject-ex ${e}`)
       return false
     }
   }
@@ -415,6 +422,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
 
   // Check if this node has already been seen this cycle
   if (seen.has(node.publicKey)) {
+    if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-seen-pubkey`)
     if (logFlags.p2pNonFatal) info('Node has already been seen this cycle. Unable to add join request.')
     return false
   }
@@ -430,7 +438,8 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
   const ipPort = NodeList.ipPort(node.internalIp, node.internalPort)
   if (NodeList.byIpPort.has(ipPort)) {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Cannot add join request for this node, already a known node.', JSON.stringify(NodeList.byIpPort.get(ipPort)))
-    const node = NodeList.byIpPort.get(ipPort)
+    // const node = NodeList.byIpPort.get(ipPort)
+    if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-already-known`)
     return false
   }
 
@@ -457,6 +466,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
   })
   if (last && requests.length >= toAccept && !crypto.isGreaterHash(selectionNum, last.selectionNum)) {
     if (logFlags.p2pNonFatal) info('Join request not better than lowest, not added.')
+    if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-hash-not-good-enough`)
     return false
   }
 
@@ -469,6 +479,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
   // Check the signature as late as possible since it is expensive
   if (!crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)) {
     warn('join bad sign ' + JSON.stringify(joinRequest))
+    nestedCountersInstance.countEvent('p2p', `join-reject-bad-sign`)
     return false
   }
   // Insert sorted into best list if we made it this far
@@ -512,6 +523,7 @@ export async function submitJoin(
   if (selectedNodes.some((node) => isBogonIP(node.ip))) {
     allowBogon = true
   }
+  nestedCountersInstance.countEvent('p2p', `join-allow-bogon-submit:${allowBogon}`)
 
   for (const node of selectedNodes) {
     try {
