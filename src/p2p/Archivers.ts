@@ -630,11 +630,18 @@ export function registerRoutes() {
 
     const leaveRequest = req.body
     if (logFlags.p2pNonFatal) info(`Archiver leave request received: ${JSON.stringify(leaveRequest)}`)
-    res.json({ success: true })
+
+    if(!archivers.get(leaveRequest.nodeInfo.publicKey)){
+      return res.json({success: false, error: 'Not a valid archiver to be sending leave request, archiver does not found in active archiver list'})
+    }
 
     const accepted = await addLeaveRequest(leaveRequest)
-    if (!accepted) return warn('Archiver leave request not accepted.')
+    if (!accepted){
+      warn('Archiver leave request not accepted.')
+      return res.json({ success: false, error: 'Archiver leave request rejected' })
+    } 
     if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')
+    return res.json({ success: true })
   })
   Comms.registerGossipHandler('joinarchiver', async (payload, sender, tracker) => {
     profilerInstance.scopedProfileSectionStart('joinarchiver')
@@ -666,6 +673,9 @@ export function registerRoutes() {
     if (tracker === undefined || tracker === null) return warn('Archiver leave tracker empty.')
     profilerInstance.scopedProfileSectionStart('leavingarchiver')
     try {
+      if (NodeList.nodes.get(sender)==null){
+        return warn('Archiver leave gossip came from invalid consensor');
+      }
       if (logFlags.console) console.log('Leave request gossip received:', payload)
       const existingLeaveRequest = leaveRequests.find(
         (j) => j.nodeInfo.publicKey === payload.nodeInfo.publicKey
