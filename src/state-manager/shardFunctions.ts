@@ -1435,7 +1435,10 @@ class ShardFunctions {
     // -is there a smart way to cache results.
     // -is there a more efficient way to pre calculate this (but keep in mind we may need to be lazy about shard calculations in the future)
     // -  instead of looking at all nodes could we pick a staring point and expand our search
-    for (const node of activeNodes) {
+    for (let i = 0; i < activeNodes.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection
+      const node = activeNodes[i]
+
       if (exclude.includes(node.id)) {
         continue
       }
@@ -1736,7 +1739,9 @@ class ShardFunctions {
 
     // if we need to scan all the nodes, just do that here in a simple way
     if (scanAmount >= allNodes.length) {
-      for (const node of allNodes) {
+      for (let i = 0; i < allNodes.length; i++) {
+        // eslint-disable-next-line security/detect-object-injection
+        const node = allNodes[i]
         if (exclude.includes(node.id)) {
           continue
         }
