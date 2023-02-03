@@ -17,6 +17,7 @@ import { isBogonIP, isIPv6 } from '../utils/functions/checkIP'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
+import { isPortReachable } from '../utils/isPortReachable'
 
 /** STATE */
 
@@ -43,7 +44,7 @@ const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
 const joinRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'join',
-  handler: (req, res) => {
+  handler: async (req, res) => {
     const joinRequest = req.body
     if (CycleCreator.currentQuarter < 1) {
       // if currentQuarter <= 0 then we are not ready
@@ -56,8 +57,23 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
     }
     nestedCountersInstance.countEvent('p2p', `join-allow-bogon-firstnode:${allowBogon}`)
 
+    const externalIp = joinRequest.nodeInfo.externalIp
+    const externalPort = joinRequest.nodeInfo.externalPort
+    const internalIp = joinRequest.nodeInfo.internalIp
+    const internalPort = joinRequest.nodeInfo.internalPort
+
+    const externalPortReachable = await isPortReachable({ host: externalIp, port: externalPort })
+    const internalPortReachable = await isPortReachable({ host: internalIp, port: internalPort })
+
+    if (!externalPortReachable || !internalPortReachable) {
+      res.end()
+      return
+    }
+
     //  Validate of joinReq is done in addJoinRequest
-    if (addJoinRequest(joinRequest)) {
+    const validJoinRequest = await addJoinRequest(joinRequest)
+
+    if (validJoinRequest) {
       Comms.sendGossip('gossip-join', joinRequest, '', null, NodeList.byIdOrder, true)
       nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
     }
