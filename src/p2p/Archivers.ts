@@ -632,7 +632,7 @@ export function registerRoutes() {
     if (logFlags.p2pNonFatal) info(`Archiver leave request received: ${JSON.stringify(leaveRequest)}`)
 
     if(!archivers.get(leaveRequest.nodeInfo.publicKey)){
-      return res.json({success: false, error: 'Not a valid archiver to be sending leave request, archiver does not found in active archiver list'})
+      return res.json({success: false, error: 'Not a valid archiver to be sending leave request, archiver was not found in active archiver list'})
     }
 
     const accepted = await addLeaveRequest(leaveRequest)
