@@ -20,7 +20,13 @@ export function isIPv6(ip: string) {
  * @returns
  */
 export function isBogonIP(ip) {
-  const ipArr = getIpArr(ip)
+  let ipArr
+  try {
+    ipArr = getIpArr(ip)
+  } catch (e) {
+    console.log(ip, e)
+    return true
+  }
   return isPrivateIP(ipArr) || isReservedIP(ipArr)
 }
 
@@ -39,8 +45,9 @@ function getIpArr(ip: string) {
       throw new Error('Invalid IP address provided')
     }
   }
-
-  return slicedArr
+  // Change to numbers Array
+  const numArray = [Number(ip[0]), Number(ip[1]), Number(ip[2]), Number(ip[3])]
+  return numArray
 }
 
 function isPrivateIP(ip) {

@@ -401,17 +401,15 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
     return false
   }
 
-  if (config.p2p.dynamicBogonFiltering) {
-    try {
-      //this can thow an error if the ip is an invalid format
-      if (isBogonIP(joinRequest.nodeInfo.externalIp) && !allowBogon) {
-        warn('Got join request from Bogon IP')
-        nestedCountersInstance.countEvent('p2p', `join-reject-bogon`)
-        return false
-      }
-    } catch (er) {
-      nestedCountersInstance.countEvent('p2p', `join-reject-bogon-ex:${er}`)
+  try {
+    //this can thow an error if the ip is an invalid format
+    if (isBogonIP(joinRequest.nodeInfo.externalIp) && !allowBogon) {
+      warn('Got join request from Bogon IP')
+      nestedCountersInstance.countEvent('p2p', `join-reject-bogon`)
+      return false
     }
+  } catch (er) {
+    nestedCountersInstance.countEvent('p2p', `join-reject-bogon-ex:${er}`)
   }
 
   let selectionKey
@@ -536,8 +534,10 @@ export async function submitJoin(
   if (logFlags.p2pNonFatal) info(`Sending join request to ${selectedNodes.map((n) => `${n.ip}:${n.port}`)}`)
 
   // Check if network allows bogon IPs, set our own flag accordingly
-  if (selectedNodes.some((node) => isBogonIP(node.ip))) {
-    allowBogon = true
+  if (config.p2p.dynamicBogonFiltering) {
+    if (nodes.some((node) => isBogonIP(node.ip))) {
+      allowBogon = true
+    }
   }
   nestedCountersInstance.countEvent('p2p', `join-allow-bogon-submit:${allowBogon}`)
 
