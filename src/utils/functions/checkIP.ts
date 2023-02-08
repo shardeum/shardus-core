@@ -46,7 +46,7 @@ function getIpArr(ip: string) {
     }
   }
   // Change to numbers Array
-  const numArray = [Number(ip[0]), Number(ip[1]), Number(ip[2]), Number(ip[3])]
+  const numArray = [Number(slicedArr[0]), Number(slicedArr[1]), Number(slicedArr[2]), Number(slicedArr[3])]
   return numArray
 }
 
