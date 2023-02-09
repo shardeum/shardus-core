@@ -17,6 +17,8 @@ import * as NodeList from './NodeList'
 import * as Sync from './Sync'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getRandom } from '../utils'
+import { isBogonIP, isInvalidIP } from '../utils/functions/checkIP'
+import { allowBogon } from './Join'
 
 /** STATE */
 
@@ -89,6 +91,9 @@ export async function startup(): Promise<boolean> {
       // Otherwise, try to join the network
       ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
     } catch (err) {
+      if (err.message.startsWith('Fatal:')) {
+        throw err
+      }
       warn('Error while joining network:')
       warn(err)
       warn(err.stack)
@@ -178,6 +183,14 @@ async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean)
 
   // Create join request from latest cycle
   const request = await Join.createJoinRequest(latestCycle.previous)
+
+  //we can't use allowBogon lag yet because its value is detected later.
+  //it is possible to throw out any invalid IPs at this point
+  if (Context.config.p2p.rejectBogonOutboundJoin || Context.config.p2p.forceBogonFilteringOn) {
+    if (isInvalidIP(request.nodeInfo.externalIp)) {
+      throw new Error(`Fatal: Node cannot join with invalid external IP: ${request.nodeInfo.externalIp}`)
+    }
+  }
 
   // Figure out when Q1 is from the latestCycle
   const { startQ1, startQ4 } = calcIncomingTimes(latestCycle)

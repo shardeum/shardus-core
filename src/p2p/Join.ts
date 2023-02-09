@@ -13,7 +13,7 @@ import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
-import { isBogonIP, isIPv6 } from '../utils/functions/checkIP'
+import { isBogonIP, isInvalidIP, isIPv6 } from '../utils/functions/checkIP'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
@@ -28,7 +28,7 @@ let seen: Set<P2P.P2PTypes.Node['publicKey']>
 
 let lastLoggedCycle = 0
 
-let allowBogon = false
+export let allowBogon = false
 
 /** ROUTES */
 
@@ -52,7 +52,12 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       return
     }
 
-    if (NodeList.activeByIdOrder.length === 1 && Self.isFirst && isBogonIP(joinRequest.nodeInfo.externalIp)) {
+    if (
+      NodeList.activeByIdOrder.length === 1 &&
+      Self.isFirst &&
+      isBogonIP(joinRequest.nodeInfo.externalIp) &&
+      config.p2p.forceBogonFilteringOn === false
+    ) {
       allowBogon = true
     }
     nestedCountersInstance.countEvent('p2p', `join-allow-bogon-firstnode:${allowBogon}`)
@@ -402,11 +407,20 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
   }
 
   try {
-    //this can thow an error if the ip is an invalid format
-    if (isBogonIP(joinRequest.nodeInfo.externalIp) && !allowBogon) {
-      warn('Got join request from Bogon IP')
-      nestedCountersInstance.countEvent('p2p', `join-reject-bogon`)
-      return false
+    //test or bogon IPs and reject the join request if they appear
+    if (allowBogon === false) {
+      if (isBogonIP(joinRequest.nodeInfo.externalIp)) {
+        warn('Got join request from Bogon IP')
+        nestedCountersInstance.countEvent('p2p', `join-reject-bogon`)
+        return false
+      }
+    } else {
+      //even if not checking bogon still reject other invalid IPs that would be unusable
+      if (isInvalidIP(joinRequest.nodeInfo.externalIp)) {
+        warn('Got join request from invalid reserved IP')
+        nestedCountersInstance.countEvent('p2p', `join-reject-reserved`)
+        return false
+      }
     }
   } catch (er) {
     nestedCountersInstance.countEvent('p2p', `join-reject-bogon-ex:${er}`)
@@ -534,12 +548,28 @@ export async function submitJoin(
   if (logFlags.p2pNonFatal) info(`Sending join request to ${selectedNodes.map((n) => `${n.ip}:${n.port}`)}`)
 
   // Check if network allows bogon IPs, set our own flag accordingly
-  if (config.p2p.dynamicBogonFiltering) {
+  if (config.p2p.dynamicBogonFiltering && config.p2p.forceBogonFilteringOn === false) {
     if (nodes.some((node) => isBogonIP(node.ip))) {
       allowBogon = true
     }
   }
   nestedCountersInstance.countEvent('p2p', `join-allow-bogon-submit:${allowBogon}`)
+
+  //Check for bad IPs before a join request is sent out
+  if (config.p2p.rejectBogonOutboundJoin || config.p2p.forceBogonFilteringOn) {
+    if (allowBogon === false) {
+      if (isBogonIP(joinRequest.nodeInfo.externalIp)) {
+        throw new Error(`Fatal: Node cannot join with bogon external IP: ${joinRequest.nodeInfo.externalIp}`)
+      }
+    } else {
+      //even if not checking bogon still reject other invalid IPs that would be unusable
+      if (isInvalidIP(joinRequest.nodeInfo.externalIp)) {
+        throw new Error(
+          `Fatal: Node cannot join with invalid external IP: ${joinRequest.nodeInfo.externalIp}`
+        )
+      }
+    }
+  }
 
   for (const node of selectedNodes) {
     try {

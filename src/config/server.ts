@@ -31,6 +31,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     maxRejoinTime: 20,
     difficulty: 2,
     dynamicBogonFiltering: true,
+    forceBogonFilteringOn: false, //should turn this on for releases or dev testing
+    rejectBogonOutboundJoin: true,
     queryDelay: 1,
     gossipRecipients: 8,
     gossipFactor: 4,

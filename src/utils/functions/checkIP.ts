@@ -30,13 +30,30 @@ export function isBogonIP(ip) {
   return isPrivateIP(ipArr) || isReservedIP(ipArr)
 }
 
+/**
+ * check if ip is invalid for lan use.
+ * call getIpArr can throw an error if the format is wrong
+ * @param ip
+ * @returns
+ */
+export function isInvalidIP(ip) {
+  let ipArr
+  try {
+    ipArr = getIpArr(ip)
+  } catch (e) {
+    console.log(ip, e)
+    return true
+  }
+  return isReservedIP(ipArr)
+}
+
 function getIpArr(ip: string) {
   const slicedArr = ip.split('.')
   if (slicedArr.length !== 4) {
     throw new Error('Invalid IP address provided')
   }
 
-  for (let number of slicedArr) {
+  for (const number of slicedArr) {
     const num = Number(number)
     if (num.toString() !== number) {
       throw new Error('Leading zero detected. Invalid IP address')
@@ -89,3 +106,11 @@ function isReservedIP(ip) {
     (ip[0] === 255 && ip[1] === 255 && ip[2] === 255 && ip[3] === 255)
   )
 }
+
+// function is0Network(ip) {
+//   return (
+//     // 0.0.0.0/8 "This" network
+//     ip[0] === 0 ||
+//     ip[0] === 127
+//   )
+// }

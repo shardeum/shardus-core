@@ -579,6 +579,10 @@ export interface ServerConfiguration {
     // seedList?: string
     /** The dynamicBogonFiltering is a boolean specifying if the network should dynamically filter Bogon IPs */
     dynamicBogonFiltering: boolean
+    /** hack to force filtering to be on, can remove this after more testing */
+    forceBogonFilteringOn: boolean
+    /** check if we are about to send a bogon IP in a join request. (not this is a good node behavoir may need it off for testing) */
+    rejectBogonOutboundJoin: boolean
     /** The difficulty parameter is an Integer specifying the proof of work difficulty to prevent network spam. */
     difficulty?: number
     /** The queryDelay parameter is an Integer specifying the amount of time (in seconds) to delay between cycle phase. */
