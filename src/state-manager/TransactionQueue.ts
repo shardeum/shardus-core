@@ -5052,7 +5052,7 @@ class TransactionQueue {
     return consenusGroup
   }
 
-  getRandomConsensusNodeForAccount(accountID: string): Shardus.Node {
+  getRandomConsensusNodeForAccount(accountID: string, excludeNodeIds: string[] = []): Shardus.Node {
     let { homePartition } = ShardFunctions.addressToPartition(
       this.stateManager.currentCycleShardData.shardGlobals,
       accountID
@@ -5060,8 +5060,10 @@ class TransactionQueue {
     let homeShardData = this.stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
     //dont need to copy list
     let consenusGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull
-    let node = consenusGroup[Math.floor(Math.random() * consenusGroup.length)]
-    return node
+
+    // remove excluded consensus nodes
+    let filteredConsensusGroup = consenusGroup.filter(node => excludeNodeIds.indexOf(node.id) === -1)
+    return filteredConsensusGroup[Math.floor(Math.random() * filteredConsensusGroup.length)]
   }
 
   getStorageGroupForAccount(accountID: string): Shardus.Node[] {

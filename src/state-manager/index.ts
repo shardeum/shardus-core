@@ -1994,48 +1994,60 @@ class StateManager {
     }
 
     if (accountIsRemote) {
-      const randomConsensusNode = this.transactionQueue.getRandomConsensusNodeForAccount(address)
-      if (randomConsensusNode == null) {
-        throw new Error(`getLocalOrRemoteAccountQueueCount: no consensus node found`)
-      }
+      const maxRetry = 3
+      let success = false
+      let retryCount = 0
+      let triedConsensusNodeIds: string[] = []
 
-      // Node Precheck!
-      if (
-        this.isNodeValidForInternalMessage(
-          randomConsensusNode.id,
-          'getLocalOrRemoteAccountQueueCount',
-          true,
-          true
-        ) === false
-      ) {
-        /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'getLocalOrRemoteAccountQueueCount: isNodeValidForInternalMessage failed, no retry')
-        return null
-      }
-
-      let message: RequestAccountQueueCounts = { accountIds: [address] }
-      let r: QueueCountsResponse | boolean = await this.p2p.ask(
-        randomConsensusNode,
-        'get_account_queue_count',
-        message
-      )
-      if (r === false) {
-        if (logFlags.error) this.mainLogger.error('ASK FAIL getLocalOrRemoteAccountQueueCount r === false')
-      }
-
-      let result = r as QueueCountsResponse
-      if (result != null && result.counts != null && result.counts.length > 0) {
-        count = result.counts[0]
-        committingAppData = result.committingAppData[0]
-        /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts response: ${count} address:${utils.stringifyReduce(address)}`)
-      } else {
-        if (result == null) {
-          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data 2: result == null')
-        } else if (result.counts == null) {
-          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data 2: result.counts == null ' + utils.stringifyReduce(result))
-        } else if (result.counts.length <= 0) {
-          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data 2: result.counts.length <= 0 ' + utils.stringifyReduce(result))
+      while (success === false && retryCount < maxRetry) {
+        retryCount += 1
+        const randomConsensusNode = this.transactionQueue.getRandomConsensusNodeForAccount(address, triedConsensusNodeIds)
+        if (randomConsensusNode == null) {
+          this.statemanager_fatal('getLocalOrRemoteAccountQueueCount', `No consensus node found for account ${address}, retry ${retryCount}`)
+          continue // will retry another node if counts permit
         }
-        /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts failed: ${utils.stringifyReduce(result)} address:${utils.stringifyReduce(address)}`)
+        // record already tried consensus node
+        triedConsensusNodeIds.push(randomConsensusNode.id)
+
+        // Node Precheck!
+        if (
+          this.isNodeValidForInternalMessage(
+            randomConsensusNode.id,
+            'getLocalOrRemoteAccountQueueCount',
+            true,
+            true
+          ) === false
+        ) {
+          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, `getLocalOrRemoteAccountQueueCount: isNodeValidForInternalMessage failed, retry ${retryCount}`)
+          continue // will retry another node if counts permit
+        }
+
+        let message: RequestAccountQueueCounts = { accountIds: [address] }
+        let r: QueueCountsResponse | boolean = await this.p2p.ask(
+          randomConsensusNode,
+          'get_account_queue_count',
+          message
+        )
+        if (r === false) {
+          if (logFlags.error) this.mainLogger.error('ASK FAIL getLocalOrRemoteAccountQueueCount r === false')
+        }
+
+        let result = r as QueueCountsResponse
+        if (result != null && result.counts != null && result.counts.length > 0) {
+          count = result.counts[0]
+          committingAppData = result.committingAppData[0]
+          success = true
+          /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts response: ${count} address:${utils.stringifyReduce(address)}`)
+        } else {
+          if (result == null) {
+            /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data 2: result == null')
+          } else if (result.counts == null) {
+            /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data 2: result.counts == null ' + utils.stringifyReduce(result))
+          } else if (result.counts.length <= 0) {
+            /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data 2: result.counts.length <= 0 ' + utils.stringifyReduce(result))
+          }
+          /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts failed: ${utils.stringifyReduce(result)} address:${utils.stringifyReduce(address)}`)
+        }
       }
     } else {
       // we are local!
