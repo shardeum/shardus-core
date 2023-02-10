@@ -345,7 +345,16 @@ export async function getFullNodesFromArchiver() {
   return fullNodeList
 }
 
-export function getPublicNodeInfo() {
+//todo should move to p2p types
+export type NodeInfo = {
+  id: string
+  publicKey: any
+  curvePublicKey: string
+} & network.IPInfo & {
+    status: P2P.P2PTypes.NodeStatus
+  }
+
+export function getPublicNodeInfo(): NodeInfo {
   const publicKey = Context.crypto.getPublicKey()
   const curvePublicKey = Context.crypto.convertPublicKeyToCurve(publicKey)
   const status = { status: getNodeStatus(publicKey) }

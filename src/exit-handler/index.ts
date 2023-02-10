@@ -1,7 +1,21 @@
 import Log4js from 'log4js'
 import * as Context from '../p2p/Context'
 import { profilerInstance } from '../utils/profiler'
+import { getPublicNodeInfo, NodeInfo } from '../p2p/Self'
+import path from 'path'
+import fs from 'fs'
+import * as NodeList from '../p2p/NodeList'
+import * as Self from '../p2p/Self'
 
+interface ExitSummary {
+  message: string
+  exitTime: number
+  totalActiveTime: number
+  nodeInfo: NodeInfo
+  lastRotationIndex: { idx: number; total: number }
+  activeNodes: number
+  lastActiveTime: number
+}
 interface ExitHandler {
   exited: boolean
   syncFuncs: Map<string, Function>
@@ -9,16 +23,42 @@ interface ExitHandler {
   exitLogger: Log4js.Logger
   memStats: any
   counters: any
+  logDir: string
+  activeStartTime: number
+  lastActiveTime: number
+  lastRotationIndex: { idx: number; total: number }
 }
 
 class ExitHandler {
-  constructor(_memoryReporting: any, _nestedCounters: any) {
+  constructor(logDir: string, _memoryReporting: any, _nestedCounters: any) {
     this.exited = false
     this.syncFuncs = new Map()
     this.asyncFuncs = new Map()
     this.memStats = _memoryReporting
     this.counters = _nestedCounters
     this.exitLogger = Context.logger.getLogger('exit')
+    this.logDir = logDir
+
+    Self.emitter.once('active', () => {
+      let cycles = Context.p2p.getLatestCycles(1)
+      if (cycles.length > 0) {
+        this.activeStartTime = cycles[0].start * 1000
+      }
+    })
+
+    Self.emitter.on('cycle_q1_start', () => {
+      if (Self.isActive) {
+        let rotatationIndex = NodeList.getAgeIndex()
+        if (rotatationIndex.idx >= 0) {
+          this.lastRotationIndex = rotatationIndex
+        }
+        let cycles = Context.p2p.getLatestCycles(1)
+        if (cycles.length > 0) {
+          this.lastActiveTime = cycles[0].start * 1000
+        }
+      }
+      this.writeNodeProgress()
+    })
   }
 
   // Modules can use this to register synchronous cleanup functions
@@ -104,7 +144,61 @@ class ExitHandler {
     this.counters.printArrayReport(arrayReport, fakeStream, 0)
     profilerInstance.scopedProfileSectionEnd('counts')
     this.exitLogger.fatal(log.join(''))
+
+    this.writeExitSummary(msg)
   }
+
+  //not exactly an exit statement but is similar to our exit report
+  //will overwrite with the latest info
+  writeNodeProgress() {
+    let nodeProgress = {
+      nodeInfo: null,
+      lastRotationIndex: this.lastRotationIndex,
+      activeNodes: NodeList.activeByIdOrder.length,
+      lastActiveTime: this.lastActiveTime,
+    }
+
+    try {
+      nodeProgress.nodeInfo = getPublicNodeInfo()
+    } catch (er) {}
+
+    try {
+      let filePath = path.join(this.logDir, 'node-progress.json')
+      let content = JSON.stringify(nodeProgress, null, 2)
+      fs.writeFileSync(filePath, content, { encoding: 'utf8', flag: 'w' })
+    } catch (er) {}
+  }
+
+  writeExitSummary(msg: string) {
+    let exitSummary: ExitSummary = {
+      message: msg,
+      exitTime: Date.now(),
+      totalActiveTime: 0,
+      nodeInfo: null,
+      lastRotationIndex: this.lastRotationIndex,
+      activeNodes: NodeList.activeByIdOrder.length,
+      lastActiveTime: this.lastActiveTime,
+    }
+
+    if (this.activeStartTime > 0 && this.lastActiveTime > 0) {
+      exitSummary.totalActiveTime = this.lastActiveTime - this.activeStartTime
+    }
+
+    try {
+      exitSummary.nodeInfo = getPublicNodeInfo()
+    } catch (er) {}
+
+    try {
+      exitSummary.nodeInfo = getPublicNodeInfo()
+    } catch (er) {}
+
+    try {
+      let filePath = path.join(this.logDir, 'exit-summary.json')
+      let content = JSON.stringify(exitSummary, null, 2)
+      fs.writeFileSync(filePath, content, { encoding: 'utf8', flag: 'w' })
+    } catch (er) {}
+  }
+
   // Used for adding event listeners for the SIGINT and SIGTERM signals
   addSigListeners(sigint = true, sigterm = true) {
     if (sigint) {

@@ -38,7 +38,7 @@ export function init() {
         active: activeByIdOrder.length,
         syncing: syncingByIdOrder.length,
         standby: Join.getNodeRequestingJoin().length,
-        desired: CycleChain.newest.desired
+        desired: CycleChain.newest.desired,
       }
       return res.json(networkStats)
     } catch (e) {
@@ -155,7 +155,7 @@ export function removeNode(id, raiseEvents: boolean, cycle: P2P.CycleCreatorType
       reason: 'Node deactivated',
       time: cycle.start,
       publicKey: node.publicKey,
-      cycleNumber: cycle.counter
+      cycleNumber: cycle.counter,
     }
     emitter.emit('node-deactivated', emitParams)
   }
@@ -199,7 +199,7 @@ export function updateNode(
             reason: 'Node activated',
             time: cycle.start,
             publicKey: node.publicKey,
-            cycleNumber: cycle.counter
+            cycleNumber: cycle.counter,
           }
           emitter.emit('node-activated', emitParams)
         }
@@ -255,6 +255,20 @@ export function getDebug() {
     CYCLECHAIN: ${stringify(CycleChain.cycles)}
   `
   return output
+}
+
+/**
+ * The index starts at 1, not 0.  1 is the youngest node, idx === total is the oldest node.
+ * @returns {idx: number, total: number} - idx is the index of the node in the list, total is the total number of nodes in the list
+ */
+export function getAgeIndex(): { idx: number; total: number } {
+  const totalNodes = byJoinOrder.length
+  for (let i = 0; i < byJoinOrder.length; i++) {
+    if (byJoinOrder[i].id === id) {
+      return { idx: totalNodes - i, total: totalNodes }
+    }
+  }
+  return { idx: -1, total: totalNodes }
 }
 
 /** ROUTES */

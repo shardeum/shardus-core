@@ -115,14 +115,15 @@ class Shardus extends EventEmitter {
     Context.setLoggerContext(this.logger)
     Snapshot.initLogger()
 
+    const logDir = path.join(config.baseDir, logsConfig.dir)
     if (logsConfig.saveConsoleOutput) {
-      startSaving(path.join(config.baseDir, logsConfig.dir))
+      startSaving(logDir)
     }
 
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
     this.appLogger = this.logger.getLogger('app')
-    this.exitHandler = new ExitHandler(this.memoryReporting, this.nestedCounters)
+    this.exitHandler = new ExitHandler(logDir, this.memoryReporting, this.nestedCounters)
     this.storage = new Storage(config.baseDir, storageConfig, config, this.logger, this.profiler)
     Context.setStorageContext(this.storage)
     this.crypto = new Crypto(config.baseDir, this.config, this.logger, this.storage)
