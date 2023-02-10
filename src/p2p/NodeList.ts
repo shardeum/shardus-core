@@ -7,6 +7,7 @@ import * as CycleChain from './CycleChain'
 import * as Join from './Join'
 import { id, emitter } from './Self'
 import { ShardusEvent } from '../shardus/shardus-types'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 /** STATE */
 
@@ -43,6 +44,13 @@ export function init() {
       return res.json(networkStats)
     } catch (e) {
       console.log(`Error getting load: ${e.message}`)
+    }
+  })
+  network.registerExternalGet('age-index', isDebugModeMiddleware, (req, res) => {
+    try {
+      return res.json(getAgeIndex())
+    } catch (e) {
+      console.log(`Error getting age index: ${e.message}`)
     }
   })
 }
