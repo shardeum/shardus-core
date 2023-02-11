@@ -22,8 +22,6 @@
     "**/crypto/index.ts",
     "betterSqlite3storage.ts",
     "state-manager-types.ts",
-    "TransactionRepairOld.ts",
-    "TransactionRepair.ts",
     "TransactionQueue.ts",
     "PartitionStats.ts",
     "Depricated.ts",

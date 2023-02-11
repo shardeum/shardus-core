@@ -1,7 +1,6 @@
 import * as Shardus from '../shardus/shardus-types'
 import { StateManager as StateManagerTypes } from '@shardus/types'
 import * as utils from '../utils'
-const stringify = require('fast-stable-stringify')
 
 import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
@@ -9,24 +8,10 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import ShardFunctions from './shardFunctions'
-import { time } from 'console'
 import StateManager from '.'
-import { json } from 'sequelize/types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { potentiallyRemoved } from '../p2p/NodeList'
-import * as CycleChain from '../p2p/CycleChain'
-import {
-  QueueEntry,
-  AppliedVote,
-  AccountHashCache,
-  RequestStateForTxResp,
-  AppliedReceipt,
-  RequestTxResp,
-  RequestReceiptForTxResp,
-  AppliedReceipt2,
-  WrappedResponses,
-} from './state-manager-types'
-import { stat } from 'fs'
+import { QueueEntry, AppliedVote, AccountHashCache, RequestStateForTxResp } from './state-manager-types'
+import { Logger as log4jsLogger } from 'log4js'
 
 class TransactionRepair {
   app: Shardus.App
@@ -39,10 +24,10 @@ class TransactionRepair {
   storage: Storage
   stateManager: StateManager
 
-  mainLogger: any
-  fatalLogger: any
-  shardLogger: any
-  statsLogger: any
+  mainLogger: log4jsLogger
+  fatalLogger: log4jsLogger
+  shardLogger: log4jsLogger
+  statsLogger: log4jsLogger
   statemanager_fatal: (key: string, log: string) => void
 
   constructor(
@@ -92,14 +77,14 @@ class TransactionRepair {
     //let dataApplied = 0
     //let failedHash = 0
     //let numUpToDateAccounts = 0
-    let updatedAccountAndHashes = []
-    let localUpdatedAccountAndHashes = []
+    const updatedAccountAndHashes = []
+    const localUpdatedAccountAndHashes = []
 
     //let localAccUsed = 0
     //let localAccSkipped = 0
     //let skipNonStored = 0
 
-    let stats = {
+    const stats = {
       requestObjectCount: 0,
       requestsMade: 0,
       responseFails: 0,
@@ -118,13 +103,13 @@ class TransactionRepair {
       rangeErr: 0,
     }
 
-    let allKeys = []
-    let repairFix = true
+    const allKeys = []
+    const repairFix = true
     let keysList = []
-    let voteHashMap: Map<string, string> = new Map()
-    let localReadyRepairs: Map<string, Shardus.WrappedResponse> = new Map()
+    const voteHashMap: Map<string, string> = new Map()
+    const localReadyRepairs: Map<string, Shardus.WrappedResponse> = new Map()
 
-    let nonStoredKeys = []
+    const nonStoredKeys = []
 
     try {
       this.stateManager.dataRepairsStarted++
@@ -138,9 +123,9 @@ class TransactionRepair {
         nestedCountersInstance.countEvent('repair1', 'init-normal')
       }
 
-      let txLogID = queueEntry.logID // queueEntry.logID
+      const txLogID = queueEntry.logID // queueEntry.logID
       // Need to build a list of what accounts we need, what state they should be in and who to get them from
-      let requestObjects: {
+      const requestObjects: {
         [id: string]: {
           appliedVote: AppliedVote
           voteIndex: number
@@ -150,9 +135,9 @@ class TransactionRepair {
           alternates: string[]
         }
       } = {}
-      let appliedVote = queueEntry.appliedReceiptForRepair2.appliedVote
+      const appliedVote = queueEntry.appliedReceiptForRepair2.appliedVote
 
-      let voters = queueEntry.appliedReceiptForRepair2.signatures
+      const voters = queueEntry.appliedReceiptForRepair2.signatures
       //shuffle the array
       utils.shuffleArray(voters)
 
@@ -175,17 +160,18 @@ class TransactionRepair {
       // Build a request object for each key involved.
       // once we have a valid request object add in alternate nodes we could use as a backup
 
-      let upToDateAccounts: { [id: string]: boolean } = {}
+      const upToDateAccounts: { [id: string]: boolean } = {}
 
       this.profiler.profileSectionEnd('repair_init')
 
       //TODO!! figure out if we need to check shard data from different cycle!!!
       //there are several place like this in the code. search for testAddressInRange
-      let nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
+      const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
         this.stateManager.currentCycleShardData.nodeShardData
 
       for (let i = 0; i < appliedVote.account_id.length; i++) {
-        let accountID = appliedVote.account_id[i]
+        /* eslint-disable security/detect-object-injection */
+        const accountID = appliedVote.account_id[i]
         //only check for stored keys.  TODO task. make sure nodeShardData is from correct cycle!
         //TODO is there a better way/time to build this knowlege set?
         if (ShardFunctions.testAddressInRange(accountID, nodeShardData.storedPartitions) === false) {
@@ -195,6 +181,7 @@ class TransactionRepair {
         }
 
         voteHashMap.set(appliedVote.account_id[i], appliedVote.account_state_hash_after[i])
+        /* eslint-enable security/detect-object-injection */
       }
 
       if (repairFix) {
@@ -213,15 +200,15 @@ class TransactionRepair {
       //if we have some pre applied data that results in the correct states we can use it instead of asking other nodeds for data
       //This will only work if the node was in the execution group
       if (repairFix) {
-        let applyResponse = queueEntry?.preApplyTXResult?.applyResponse
+        const applyResponse = queueEntry?.preApplyTXResult?.applyResponse
         if (applyResponse != null) {
           if (applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
-            for (let writtenAccount of applyResponse.accountWrites) {
-              let key = writtenAccount.accountId
-              let shortKey = utils.stringifyReduce(key)
-              let goalHash = voteHashMap.get(key)
-              let data = writtenAccount.data
-              let hashObj = this.stateManager.accountCache.getAccountHash(key)
+            for (const writtenAccount of applyResponse.accountWrites) {
+              const key = writtenAccount.accountId
+              const shortKey = utils.stringifyReduce(key)
+              const goalHash = voteHashMap.get(key)
+              const data = writtenAccount.data
+              const hashObj = this.stateManager.accountCache.getAccountHash(key)
 
               if (goalHash != null && goalHash === data.stateId) {
                 localReadyRepairs.set(key, data)
@@ -234,8 +221,8 @@ class TransactionRepair {
                   continue
                 }
 
-                let dataToSet = [data]
-                let failedHashes = await this.stateManager.checkAndSetAccountData(
+                const dataToSet = [data]
+                const failedHashes = await this.stateManager.checkAndSetAccountData(
                   dataToSet,
                   `tx:${txLogID} repairToMatchReceipt`,
                   true
@@ -268,7 +255,7 @@ class TransactionRepair {
 
       // STEP 1
       // Build a list of request objects
-      for (let key of keysList) {
+      for (const key of keysList) {
         stats.rLoop1++
 
         if (localReadyRepairs.has(key)) {
@@ -277,29 +264,31 @@ class TransactionRepair {
         }
 
         let coveredKey = false
-        let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(key)
-        let shortKey = utils.stringifyReduce(key)
+        const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(key)
+        const shortKey = utils.stringifyReduce(key)
         //It modifying global.
         for (let i = 0; i < voters.length; i++) {
+          /* eslint-disable security/detect-object-injection */
           stats.rLoop2++
 
-          let voter = voters[i]
-          let node = this.stateManager.p2p.state.getNodeByPubKey(voter.owner)
+          const voter = voters[i]
+          const node = this.stateManager.p2p.state.getNodeByPubKey(voter.owner)
           if (node == null) {
             continue
           }
-          let node_id = node.id
+          const node_id = node.id
           for (let j = 0; j < appliedVote.account_id.length; j++) {
             stats.rLoop3++
-            let id = appliedVote.account_id[j]
-            let hash = appliedVote.account_state_hash_after[j]
+            const id = appliedVote.account_id[j]
+            const hash = appliedVote.account_state_hash_after[j]
             if (id === key && hash != null) {
               if (upToDateAccounts[id] === true) {
                 continue
               }
 
-              let hashObj = this.stateManager.accountCache.getAccountHash(key)
+              const hashObj = this.stateManager.accountCache.getAccountHash(key)
               if (hashObj != null) {
+                // eslint-disable-next-line security/detect-possible-timing-attacks
                 if (hashObj.h === hash) {
                   upToDateAccounts[id] = true
                   stats.numUpToDateAccounts++
@@ -307,14 +296,14 @@ class TransactionRepair {
                   break
                 }
               }
-
+              /* eslint-enable security/detect-object-injection */
               if (repairFix) {
                 if (hashObj != null && hashObj.t > queueEntry.acceptedTx.timestamp) {
                   nestedCountersInstance.countEvent('repair1', 'skip account repair, we have a newer copy')
                   continue
                 }
               }
-
+              /* eslint-disable security/detect-object-injection */
               if (requestObjects[key] != null) {
                 //todo perf delay these checks for jit.
                 if (node_id !== this.stateManager.currentCycleShardData.ourNode.id) {
@@ -323,6 +312,7 @@ class TransactionRepair {
                     requestObjects[key].alternates.push(node_id)
                   }
                 }
+                /* eslint-enable security/detect-object-injection */
                 continue //we already have this request ready to go
               }
               stats.rLoop4++
@@ -338,7 +328,7 @@ class TransactionRepair {
                 /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `this.stateManager.currentCycleShardData.nodeShardDataMap.has(node_id) === false ${utils.stringifyReduce(node_id)}  acc:${shortKey}`)
                 continue
               }
-              let nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData =
+              const nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData =
                 this.stateManager.currentCycleShardData.nodeShardDataMap.get(node_id)
 
               if (nodeShardInfo == null) {
@@ -360,7 +350,7 @@ class TransactionRepair {
                 }
               }
 
-              let objectToSet = {
+              const objectToSet = {
                 appliedVote,
                 voteIndex: j,
                 accountHash: hash,
@@ -369,10 +359,10 @@ class TransactionRepair {
                 alternates: [],
               }
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `setting key ${utils.stringifyReduce(key)} ${utils.stringifyReduce(objectToSet)}  acc:${shortKey}`)
+              // eslint-disable-next-line security/detect-object-injection
               requestObjects[key] = objectToSet
               allKeys.push(key)
               stats.requestObjectCount++
-            } else {
             }
           }
         }
@@ -387,11 +377,12 @@ class TransactionRepair {
 
       // STEP 2
       // repair each unique key, if needed by asking an appropirate node for account state
-      for (let key of allKeys) {
-        let shortKey = utils.stringifyReduce(key)
+      for (const key of allKeys) {
+        /* eslint-disable security/detect-object-injection */
+        const shortKey = utils.stringifyReduce(key)
         if (requestObjects[key] != null) {
-          let requestObject = requestObjects[key]
-
+          const requestObject = requestObjects[key]
+          /* eslint-enable security/detect-object-injection */
           if (requestObject == null) {
             /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `requestObject == null  acc:${shortKey}`)
             continue
@@ -450,8 +441,9 @@ class TransactionRepair {
                     return
                   }
                 }
-                let altId = requestObject.alternates[alternateIndex]
-                let nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData =
+                // eslint-disable-next-line security/detect-object-injection
+                const altId = requestObject.alternates[alternateIndex]
+                const nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData =
                   this.stateManager.currentCycleShardData.nodeShardDataMap.get(altId)
                 if (nodeShardInfo != null) {
                   node = nodeShardInfo.node
@@ -473,7 +465,7 @@ class TransactionRepair {
                 break
               }
 
-              let relationString = '' //ShardFunctions.getNodeRelation(homeNodeShardData, this.stateManager.currentCycleShardData.ourNode.id)
+              const relationString = '' //ShardFunctions.getNodeRelation(homeNodeShardData, this.stateManager.currentCycleShardData.ourNode.id)
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_ask', `${txLogID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}  acc:${shortKey}`)
 
               if (outerloopCount < 2) {
@@ -496,7 +488,7 @@ class TransactionRepair {
 
               // if our data is already good no need to ask for it again
               if (this.stateManager.accountCache.hasAccount(requestObject.accountId)) {
-                let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(
+                const accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(
                   requestObject.accountId
                 )
                 if (accountMemData.h === requestObject.accountHash) {
@@ -513,7 +505,7 @@ class TransactionRepair {
                 nestedCountersInstance.countEvent('repair1', 'asking')
 
                 stats.requestsMade++
-                let message = {
+                const message = {
                   key: requestObject.accountId,
                   hash: requestObject.accountHash,
                   txid: queueEntry.acceptedTx.txId,
@@ -544,9 +536,9 @@ class TransactionRepair {
               } finally {
                 this.profiler.profileSectionEnd('repair_asking_for_data')
               }
-              let dataCountReturned = 0
-              let accountIdsReturned = []
-              for (let data of result.stateList) {
+              const dataCountReturned = 0
+              const accountIdsReturned = []
+              for (const data of result.stateList) {
                 try {
                   stats.dataRecieved++
                   this.profiler.profileSectionStart('repair_saving_account_data')
@@ -559,7 +551,7 @@ class TransactionRepair {
 
                   if (repairFix) {
                     //some temp checking.  A just in time check to see if we dont need to save this account.
-                    let hashObj = this.stateManager.accountCache.getAccountHash(key)
+                    const hashObj = this.stateManager.accountCache.getAccountHash(key)
                     if (hashObj != null && hashObj.t > data.timestamp) {
                       /* prettier-ignore */ nestedCountersInstance.countEvent('repair1', 'skip account repair 2, we have a newer copy')
                       continue
@@ -567,8 +559,8 @@ class TransactionRepair {
                   }
 
                   //Commit the data
-                  let dataToSet = [data]
-                  let failedHashes = await this.stateManager.checkAndSetAccountData(
+                  const dataToSet = [data]
+                  const failedHashes = await this.stateManager.checkAndSetAccountData(
                     dataToSet,
                     `tx:${txLogID} repairToMatchReceipt`,
                     true
@@ -594,14 +586,14 @@ class TransactionRepair {
 
                   if (beforeData == null) {
                     //prevDataCopy
-                    let wrappedAccountDataBefore = queueEntry.collectedData[data.accountId]
+                    const wrappedAccountDataBefore = queueEntry.collectedData[data.accountId]
                     if (wrappedAccountDataBefore != null) {
                       beforeData = wrappedAccountDataBefore.data
                     }
                   }
                   if (beforeData == null) {
                     nestedCountersInstance.countEvent('repair1', 'getAccountDataByList')
-                    let results = await this.app.getAccountDataByList([data.accountId])
+                    const results = await this.app.getAccountDataByList([data.accountId])
                     beforeData = results[0]
                     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 ${utils.stringifyReduce(data.accountId)}  tx:${txLogID}  acc:${shortKey} h:${utils.stringifyReduce(data.stateId)}`)
                     if (beforeData == null) {
@@ -620,7 +612,7 @@ class TransactionRepair {
                     // }
 
                     // important to update the timestamp.  There are various reasons it could be incorrectly set to 0
-                    let { timestamp: updatedTimestamp, hash: updatedHash } =
+                    const { timestamp: updatedTimestamp, hash: updatedHash } =
                       this.app.getTimestampAndHashFromAccount(data.data)
                     if (data.timestamp != updatedTimestamp) {
                       /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 timstamp had to be corrected from ${data.timestamp} to ${updatedTimestamp}   tx:${txLogID}  acc:${shortKey} hash:${utils.stringifyReduce(updatedHash)} `)
@@ -632,13 +624,12 @@ class TransactionRepair {
                     // this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data, 'repairToMatchReceipt')
 
                     // record state table data
-                    let { timestamp: oldtimestamp, hash: oldhash } =
-                      this.app.getTimestampAndHashFromAccount(beforeData)
+                    let { hash: oldhash } = this.app.getTimestampAndHashFromAccount(beforeData)
 
-                    let hashNeededUpdate = oldhash !== result.beforeHashes[data.accountId]
+                    const hashNeededUpdate = oldhash !== result.beforeHashes[data.accountId]
                     oldhash = result.beforeHashes[data.accountId]
 
-                    let stateTableResults: Shardus.StateTableObject = {
+                    const stateTableResults: Shardus.StateTableObject = {
                       accountId: data.accountId,
                       txId: queueEntry.acceptedTx.txId,
                       stateBefore: oldhash,
@@ -647,7 +638,7 @@ class TransactionRepair {
                     }
 
                     let updateStateTable = true
-                    let timeStampMatches = updatedTimestamp === queueEntry.acceptedTx.timestamp
+                    const timeStampMatches = updatedTimestamp === queueEntry.acceptedTx.timestamp
                     let test2 = false
                     if (timeStampMatches === false) {
                       if (this.stateManager.accountGlobals.isGlobalAccount(data.accountId)) {
@@ -656,7 +647,7 @@ class TransactionRepair {
                       }
                     }
 
-                    let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(data.accountId)
+                    const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(data.accountId)
                     let test3 = false
                     if (isGlobal) {
                       if (oldhash === updatedHash) {
@@ -668,8 +659,9 @@ class TransactionRepair {
                     let test4 = false
                     let branch4 = -1
                     if (isGlobal === false) {
-                      let hash = this.stateManager.accountCache.getAccountHash(data.accountId)
+                      const hash = this.stateManager.accountCache.getAccountHash(data.accountId)
 
+                      // eslint-disable-next-line security/detect-possible-timing-attacks
                       if (hash != null) {
                         test4 = hash.h === updatedHash
                         branch4 = 1
@@ -750,10 +742,10 @@ class TransactionRepair {
         //we wont have account hashes for everything in a sharded context!
         //need a keylist of stored accounts only.. or filter the
         //keylist sooner!
-        let badHashKeys = []
-        let noHashKeys = []
-        for (let key of keysList) {
-          let hashObj = this.stateManager.accountCache.getAccountHash(key)
+        const badHashKeys = []
+        const noHashKeys = []
+        for (const key of keysList) {
+          const hashObj = this.stateManager.accountCache.getAccountHash(key)
           if (hashObj == null) {
             noHashKeys.push(key)
             continue
@@ -774,7 +766,7 @@ class TransactionRepair {
 
         queueEntry.hasValidFinalData = true
 
-        let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(
+        const repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(
           updatedAccountAndHashes
         )}  localUpdatedAccountAndHashes:${utils.stringifyReduce(localUpdatedAccountAndHashes)} state:${
           queueEntry.state
