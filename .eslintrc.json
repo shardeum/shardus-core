@@ -24,7 +24,6 @@
     "state-manager-types.ts",
     "TransactionQueue.ts",
     "PartitionStats.ts",
-    "Depricated.ts",
     "DataSourceHelper.ts",
     "AccountSync.ts",
     "AccountPatcher.ts",

@@ -1,21 +1,17 @@
 import * as Shardus from '../shardus/shardus-types'
-import * as utils from '../utils'
-const stringify = require('fast-stable-stringify')
-
 import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
-import Logger, { logFlags } from '../logger'
-import ShardFunctions from './shardFunctions'
-import { time } from 'console'
+import Logger from '../logger'
 import StateManager from '.'
+import {Logger as log4jsLogger} from 'log4js'
 
 // const cHashSetStepSize = 4
 // const cHashSetTXStepSize = 2
 // const cHashSetDataStepSize = 2
 
-class Depricated {
+class Deprecated {
   app: Shardus.App
   crypto: Crypto
   config: Shardus.ServerConfiguration
@@ -26,10 +22,10 @@ class Depricated {
   storage: Storage
   stateManager: StateManager
 
-  mainLogger: any
-  fatalLogger: any
-  shardLogger: any
-  statsLogger: any
+  mainLogger: log4jsLogger
+  fatalLogger: log4jsLogger
+  shardLogger: log4jsLogger
+  statsLogger: log4jsLogger
   statemanager_fatal: (key: string, log: string) => void
 
   // sentReceipts: Map<string, boolean>
@@ -88,15 +84,15 @@ class Depricated {
 
   //NOT used but seem possibly usefull...
   purgeTransactionData() {
-    let tsStart = 0
-    let tsEnd = 0
+    const tsStart = 0
+    const tsEnd = 0
     this.storage.clearAcceptedTX(tsStart, tsEnd)
   }
 
   purgeStateTableData() {
     // do this by timestamp maybe..
     // this happnes on a slower scale.
-    let tsEnd = 0 // todo get newest time to keep
+    const tsEnd = 0 // todo get newest time to keep
     this.storage.clearAccountStateTableOlderThan(tsEnd)
   }
 
@@ -6809,4 +6805,4 @@ class Depricated {
   // }
 }
 
-export default Depricated
+export default Deprecated

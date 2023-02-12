@@ -31,7 +31,7 @@ import TransactionQueue from './TransactionQueue'
 import TransactionRepair from './TransactionRepair'
 import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
-import Depricated from './Depricated'
+import Deprecated from './Deprecated'
 import AccountPatcher from './AccountPatcher'
 import CachedAppDataManager from './CachedAppDataManager'
 import {
@@ -115,7 +115,7 @@ class StateManager {
   partitionObjects: PartitionObjects
   accountPatcher: AccountPatcher
   cachedAppDataManager: CachedAppDataManager
-  depricated: Depricated
+  depricated: Deprecated
 
   // syncTrackers:SyncTracker[];
   shardValuesByCycle: Map<number, CycleShardData>
@@ -289,7 +289,7 @@ class StateManager {
       config
     )
     this.partitionObjects = new PartitionObjects(this, profiler, app, logger, storage, p2p, crypto, config)
-    this.depricated = new Depricated(this, profiler, app, logger, storage, p2p, crypto, config)
+    this.depricated = new Deprecated(this, profiler, app, logger, storage, p2p, crypto, config)
     this.accountPatcher = new AccountPatcher(this, profiler, app, logger, p2p, crypto, config)
     this.cachedAppDataManager = new CachedAppDataManager(this, profiler, app, logger, crypto, p2p, config)
 
@@ -2001,9 +2001,15 @@ class StateManager {
 
       while (success === false && retryCount < maxRetry) {
         retryCount += 1
-        const randomConsensusNode = this.transactionQueue.getRandomConsensusNodeForAccount(address, triedConsensusNodeIds)
+        const randomConsensusNode = this.transactionQueue.getRandomConsensusNodeForAccount(
+          address,
+          triedConsensusNodeIds
+        )
         if (randomConsensusNode == null) {
-          this.statemanager_fatal('getLocalOrRemoteAccountQueueCount', `No consensus node found for account ${address}, retry ${retryCount}`)
+          this.statemanager_fatal(
+            'getLocalOrRemoteAccountQueueCount',
+            `No consensus node found for account ${address}, retry ${retryCount}`
+          )
           continue // will retry another node if counts permit
         }
         // record already tried consensus node
