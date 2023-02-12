@@ -1,0 +1,73 @@
+
+There are 5 different tx counts being reported by nodes to the monitor:
+  txInjected
+  txProcessed
+  txApplied
+  txRejected
+  txExpired
+
+Note that all reporting by nodes is based on trusting the nodes to report correctly. Any bad node
+could send bad numbers and cause the values displayed in the monitor to be wrong.
+
+txInjected
+  https://gitlab.com/shardus/global/shardus-global-server/-/blob/master/src/shardus/index.ts#L1000
+  * if a client injects the tx to multiple nodes it will be counted by all of them.
+  * There is no way to ensure the injected tx is counted only once.
+  * We do not show this in the monitor because it can be over counted. Also txProcessed would be
+    the same if txs are not being rejected or expired.
+txRejected
+  * If a client injects the tx to multiple nodes it will be counted by all of them.
+  * It is possible some nodes may accept the tx and others reject it; In such a case it should be counted as 
+    accepted even if one node accepts it. But this can only be done at the monitor and not by reporting nodes.
+  * We decided to show txRejected in the monitor just to see if any txs are being rejected by the network
+    even though the actual count could be over counted.
+  * The only way injected and rejected txs can be counted correctly is if the reporting nodes sends a 
+    short txid of all txs that were injected and rejected and the monitor can make sure that same txids are not 
+    counted twice. No plan currently to do this.
+  https://gitlab.com/shardus/global/shardus-global-server/-/blob/master/src/shardus/index.ts#L863
+    node still syncing
+  https://gitlab.com/shardus/global/shardus-global-server/-/blob/master/src/shardus/index.ts#L868
+    node does not have cycle shard data
+  https://gitlab.com/shardus/global/shardus-global-server/-/blob/master/src/shardus/index.ts#L884
+    network is not allowing application txs
+  https://gitlab.com/shardus/global/shardus-global-server/-/blob/master/src/shardus/index.ts#L895
+    network is not allowing application txs
+  https://gitlab.com/shardus/global/shardus-global-server/-/blob/master/src/shardus/index.ts#L905
+    node is overloaded
+  https://gitlab.com/shardus/global/shardus-global-server/-/blob/master/src/shardus/index.ts#L936
+    timestamp not given and network could not create one; rejected because no timestamp for the tx
+  https://gitlab.com/shardus/global/shardus-global-server/-/blob/master/src/shardus/index.ts#L980
+    timestamp is expired; actually out of range and not within +-1 second of time on node
+
+txProcessed
+  https://gitlab.com/shardus/global/shardus-global-server/-/blob/master/src/state-manager/TransactionQueue.ts#L895
+  https://gitlab.com/shardus/global/shardus-global-server/-/blob/master/src/state-manager/TransactionQueue.ts#L4232
+  * This is being counted once even though many nodes process the tx. If the node is the first node mentioned in the 
+    array of nodes that are processing this tx (transactionGroup array) then it emits an event for 'txProcessed' and 
+    this causes a counter in the stats module to increment. The rest of the nodes don't count it so this is how we 
+    make sure that a tx does not get counted multiple times.
+
+txApplied
+  https://gitlab.com/shardus/global/shardus-global-server/-/blob/master/src/state-manager/TransactionQueue.ts#L898
+  * This is being counted by all nodes and not just the first node in the tx group; so it is probably over counted 
+    it is not protected behind a check to ensure it is counted once like txProcessed.
+  * Not sure if it should also count after line 4232
+  * We are not showing this in the monitor, probably because it is being over counted.
+
+txExpired
+  * Not sure how this is counting since all increment lines seem to be commented out.
+  https://gitlab.com/search?search=%27txExpired%27&nav_source=navbar&project_id=13190534&group_id=5578363&search_code=true&repository_ref=master
+
+txFailed
+  * We don't count this, but if we did it would the processed txs that did not get accepted or expired.
+
+The flow of transactions would be:
+  * txInjected
+    * txRejected
+    * txProcessed
+      * txApplied
+      * txFailed
+      * txExpired
+
+
+
