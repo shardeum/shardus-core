@@ -71,18 +71,21 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
     const internalPortReachable = await isPortReachable({ host: internalIp, port: internalPort })
 
     if (!externalPortReachable || !internalPortReachable) {
-      res.end()
-      return
+      return res.json({
+        success: false,
+        fatal: true,
+        reason: "Port numbers are not reachable",
+      })
     }
 
     //  Validate of joinReq is done in addJoinRequest
     const validJoinRequest = await addJoinRequest(joinRequest)
 
-    if (validJoinRequest) {
+    if (validJoinRequest.success) {
       Comms.sendGossip('gossip-join', joinRequest, '', null, NodeList.byIdOrder, true)
       nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
     }
-    res.end()
+    return res.json(validJoinRequest)
   },
 }
 
@@ -118,7 +121,7 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
     if (CycleCreator.currentQuarter >= 3) return
 
     //  Validate of payload is done in addJoinRequest
-    if (addJoinRequest(payload))
+    if (addJoinRequest(payload).success)
       Comms.sendGossip('gossip-join', payload, tracker, sender, NodeList.byIdOrder, false)
   } finally {
     profilerInstance.scopedProfileSectionEnd('gossip-join')
@@ -351,10 +354,14 @@ export async function createJoinRequest(
   return signedJoinReq
 }
 
-export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean {
+export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): {success: boolean, reason: string, fatal: boolean} {
   if (Self.p2pIgnoreJoinRequests === true) {
     if (logFlags.p2pNonFatal) info(`Join request ignored. p2pIgnoreJoinRequests === true`)
-    return false
+    return {
+      success: false,
+      fatal: false,
+      reason: `Join request ignored. p2pIgnoreJoinRequests === true`,
+    }
   }
 
   //  Validate joinReq
@@ -366,7 +373,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
   })
   if (err) {
     warn('join bad joinRequest ' + err)
-    return false
+    return {
+      success: false,
+      reason: `Bad join request object structure`,
+      fatal: true,
+    }
   }
   err = utils.validateTypes(joinRequest.nodeInfo, {
     activeTimestamp: 'n',
@@ -380,30 +391,50 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
   })
   if (err) {
     warn('join bad joinRequest.nodeInfo ' + err)
-    return false
+    return {
+      success: false,
+      reason: "Bad nodeInfo object structure within join request",
+      fatal: true,
+    }
   }
   err = utils.validateTypes(joinRequest.sign, { owner: 's', sig: 's' })
   if (err) {
     warn('join bad joinRequest.sign ' + err)
-    return false
+    return {
+      success: false,
+      reason: "Bad signature object structure within join request",
+      fatal: true,
+    }
   }
   if (config.p2p.checkVersion && !isEqualOrNewerVersion(version, joinRequest.version)) {
     /* prettier-ignore */ warn( `version number is old. Our node version is ${version}. Join request node version is ${joinRequest.version}` )
     nestedCountersInstance.countEvent('p2p', `join-reject-version ${joinRequest.version}`)
-    return false
+    return {
+      success: false,
+      reason: `Old shardus core version, please statisfy at least ${version}`,
+      fatal: true,
+    }
   }
 
   //If the node that signed the request is not the same as the node that is joining
   if (joinRequest.sign.owner != joinRequest.nodeInfo.publicKey) {
     /* prettier-ignore */ warn(`join-reject owner != publicKey ${{sign:joinRequest.sign.owner, info:joinRequest.nodeInfo.publicKey}}`)
     nestedCountersInstance.countEvent('p2p', `join-reject owner != publicKey`)
-    return false
+    return {
+      success: false,
+      reason: `Bad signature, sign owner and node attempted joining mismatched`,
+      fatal: true,
+    }
   }
 
   if (isIPv6(joinRequest.nodeInfo.externalIp)) {
     warn('Got join request from IPv6')
     nestedCountersInstance.countEvent('p2p', `join-reject-ipv6`)
-    return false
+    return {
+      success: false,
+      reason: `Bad ip version, IPv6 are not accepted`,
+      fatal: true,
+    }
   }
 
   try {
@@ -412,14 +443,22 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
       if (isBogonIP(joinRequest.nodeInfo.externalIp)) {
         warn('Got join request from Bogon IP')
         nestedCountersInstance.countEvent('p2p', `join-reject-bogon`)
-        return false
+        return {
+          success: false,
+          reason: `Bad ip, bogon ip not accepted`,
+          fatal: true,
+        }
       }
     } else {
       //even if not checking bogon still reject other invalid IPs that would be unusable
       if (isInvalidIP(joinRequest.nodeInfo.externalIp)) {
         warn('Got join request from invalid reserved IP')
         nestedCountersInstance.countEvent('p2p', `join-reject-reserved`)
-        return false
+        return {
+          success: false,
+          reason: `Bad ip, reserved ip not accepted`,
+          fatal: true,
+        }
       }
     }
   } catch (er) {
@@ -434,7 +473,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
       if (validationResponse.success !== true) {
         warn(`Validation of join request data is failed!`)
         nestedCountersInstance.countEvent('p2p', `join-reject-dapp`)
-        return false
+        return {
+          success: validationResponse.success,
+          reason: validationResponse.reason,
+          fatal: validationResponse.fatal,
+        }
       }
       if (typeof validationResponse.data === 'string') {
         selectionKey = validationResponse.data
@@ -442,7 +485,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
     } catch (e) {
       warn(`shardus.app.validateJoinRequest failed due to ${e}`)
       nestedCountersInstance.countEvent('p2p', `join-reject-ex ${e}`)
-      return false
+        return {
+          success: false,
+          reason: "Could not validate join request, thus rejecting",
+          fatal: true,
+        }
     }
   }
   const node = joinRequest.nodeInfo
@@ -452,7 +499,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
   if (seen.has(node.publicKey)) {
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-seen-pubkey`)
     if (logFlags.p2pNonFatal) info('Node has already been seen this cycle. Unable to add join request.')
-    return false
+        return {
+          success: false,
+          reason: "Node has already been seen this cycle. Unable to add join request.",
+          fatal: true,
+        }
   }
 
   // Mark node as seen for this cycle
@@ -461,14 +512,22 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
   // Return if we already know about this node
   if (NodeList.byPubKey.has(joinRequest.nodeInfo.publicKey)) {
     if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, already a known node.')
-    return false
+        return {
+          success: false,
+          reason: "Cannot add join request for this node, already a known node.",
+          fatal: true,
+        }
   }
   const ipPort = NodeList.ipPort(node.internalIp, node.internalPort)
   if (NodeList.byIpPort.has(ipPort)) {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Cannot add join request for this node, already a known node.', JSON.stringify(NodeList.byIpPort.get(ipPort)))
     // const node = NodeList.byIpPort.get(ipPort)
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-already-known`)
-    return false
+        return {
+          success: false,
+          reason: "Cannot add join request for this node, already a known node.",
+          fatal: true,
+        }
   }
 
   // Compute how many join request to accept
@@ -495,7 +554,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
   if (last && requests.length >= toAccept && !crypto.isGreaterHash(selectionNum, last.selectionNum)) {
     if (logFlags.p2pNonFatal) info('Join request not better than lowest, not added.')
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-hash-not-good-enough`)
-    return false
+        return {
+          success: false,
+          reason: "Join request not better than lowest, not added",
+          fatal: false,
+        }
   }
 
   // TODO: call into application
@@ -508,7 +571,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
   if (!crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)) {
     warn('join bad sign ' + JSON.stringify(joinRequest))
     nestedCountersInstance.countEvent('p2p', `join-reject-bad-sign`)
-    return false
+        return {
+          success: false,
+          reason: "Bad signature",
+          fatal: true,
+        }
   }
   // Insert sorted into best list if we made it this far
   utils.insertSorted(requests, { ...joinRequest, selectionNum }, (a, b) =>
@@ -525,7 +592,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): boolean 
     //    info(`Over maxJoinedPerCycle; removed ${over} requests from join requests`)
   }
 
-  return true
+    return {
+      success: true,
+      reason: "Join request accepted",
+      fatal: false,
+    }
 }
 
 export async function firstJoin() {
@@ -574,12 +645,20 @@ export async function submitJoin(
   for (const node of selectedNodes) {
     try {
       promises.push(
-        http.post(`${node.ip}:${node.port}/join`, joinRequest).catch((err) => {
+        http.post(`${node.ip}:${node.port}/join`, joinRequest)
+          .then((res)=>{
+            console.log('addJoinRequest: response',res);
+            if(res.fatal){
+              throw new Error(`Fatal Join request Reason: ${res.reason}, Response: ${res}`)
+            }
+          })
+          .catch((err) => {
           error(`Join: submitJoin: Error posting join request to ${node.ip}:${node.port}`, err)
+          throw new Error(err)
         })
       )
     } catch (err) {
-      error(`Join: submitJoin: Error posting join request to ${node.ip}:${node.port}`, err)
+      throw new Error(`Join: submitJoin: Error posting join request to ${node.ip}:${node.port}: Error: ${err}`)
     }
   }
   await Promise.all(promises)
@@ -639,4 +718,9 @@ function warn(...msg) {
 function error(...msg) {
   const entry = `Join: ${msg.join(' ')}`
   p2pLogger.error(entry)
+}
+
+function fatal(...msg) {
+  const entry = `Comms: ${msg.join(' ')}`
+  p2pLogger.fatal(entry)
 }
