@@ -1717,6 +1717,13 @@ class Shardus extends EventEmitter {
         // If the app doesn't provide isReadyToJoin, assume it is always ready to join
         applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes) => true
       }
+      if (typeof application.getNodeInfoAppData === 'function') {
+        applicationInterfaceImpl.getNodeInfoAppData = () =>
+          application.getNodeInfoAppData()
+      } else {
+        // If the app doesn't provide getNodeInfoAppData, assume it returns empty obj
+        applicationInterfaceImpl.getNodeInfoAppData = () => {}
+      }
       if (typeof application.updateNetworkChangeQueue === 'function') {
         applicationInterfaceImpl.updateNetworkChangeQueue = async (
           account: ShardusTypes.WrappedData,
@@ -1761,7 +1768,8 @@ class Shardus extends EventEmitter {
     })
     this.network.registerExternalGet('nodeInfo', async (req, res) => {
       const nodeInfo = Self.getPublicNodeInfo()
-      res.json({ nodeInfo: nodeInfo })
+      const appData = this.app.getNodeInfoAppData()
+      res.json({ nodeInfo: {...nodeInfo, appData}})
     })
 
     this.p2p.registerInternal(

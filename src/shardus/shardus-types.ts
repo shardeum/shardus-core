@@ -296,6 +296,8 @@ export interface App {
     nodePublicKey: string,
     activeNodes: P2P.P2PTypes.Node[]
   ) => Promise<boolean>
+
+  getNodeInfoAppData?: () => any
   signAppData?: (type: string, hash: string, nodesToSign: number, appData: any) => Promise<SignAppDataResult>
   updateNetworkChangeQueue?: (account: WrappedData, appData: any) => Promise<WrappedData[]>
 }
