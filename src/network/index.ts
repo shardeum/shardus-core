@@ -591,6 +591,10 @@ class ConnectTest extends EventEmitter {
 }
 
 export async function checkTimeSynced(timeServers) {
+  // Ignore time check if debug flag is set
+  if (config.debug.ignoreTimeCheck === true) return true
+
+  // Check if local time is within 5 minutes of time servers
   for (const host of timeServers) {
     try {
       const time = await Sntp.time({

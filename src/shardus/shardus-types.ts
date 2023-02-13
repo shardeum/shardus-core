@@ -756,6 +756,8 @@ export interface ServerConfiguration {
     sanitizeInput: boolean
     /** test if the TX group changes sizes after an apply() */
     checkTxGroupChanges: boolean
+    /** Flag to toggle startup check that makes sure system time is within acceptable range of time from NTP Server */
+    ignoreTimeCheck: boolean
   }
   /** Options for the statistics module */
   statistics?: {
