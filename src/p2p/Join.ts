@@ -354,7 +354,8 @@ export async function createJoinRequest(
   return signedJoinReq
 }
 
-export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): {success: boolean, reason: string, fatal: boolean} {
+export interface JoinRequestResponse {success: boolean, reason: string, fatal: boolean}
+export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse {
   if (Self.p2pIgnoreJoinRequests === true) {
     if (logFlags.p2pNonFatal) info(`Join request ignored. p2pIgnoreJoinRequests === true`)
     return {
@@ -646,22 +647,19 @@ export async function submitJoin(
     try {
       promises.push(
         http.post(`${node.ip}:${node.port}/join`, joinRequest)
-          .then((res)=>{
-            console.log('addJoinRequest: response',res);
-            if(res.fatal){
-              throw new Error(`Fatal Join request Reason: ${res.reason}, Response: ${res}`)
-            }
-          })
-          .catch((err) => {
-          error(`Join: submitJoin: Error posting join request to ${node.ip}:${node.port}`, err)
-          throw new Error(err)
-        })
       )
     } catch (err) {
-      throw new Error(`Join: submitJoin: Error posting join request to ${node.ip}:${node.port}: Error: ${err}`)
+      throw new Error(`Fatal: submitJoin: Error posting join request to ${node.ip}:${node.port}: Error: ${err}`)
     }
   }
-  await Promise.all(promises)
+
+  return Promise.all(promises).then((responses: JoinRequestResponse[])=>{
+    for(const res of responses){
+      if(res.fatal){
+        throw new Error(`Fatal: Join request Reason: ${res.reason}`)
+      }
+    }
+  })
 }
 
 export async function fetchJoined(activeNodes) {
@@ -720,7 +718,3 @@ function error(...msg) {
   p2pLogger.error(entry)
 }
 
-function fatal(...msg) {
-  const entry = `Comms: ${msg.join(' ')}`
-  p2pLogger.fatal(entry)
-}
