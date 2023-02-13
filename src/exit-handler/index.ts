@@ -59,6 +59,8 @@ class ExitHandler {
       }
       this.writeNodeProgress()
     })
+
+    this.writeStartSummary()
   }
 
   // Modules can use this to register synchronous cleanup functions
@@ -156,6 +158,11 @@ class ExitHandler {
       lastRotationIndex: this.lastRotationIndex,
       activeNodes: NodeList.activeByIdOrder.length,
       lastActiveTime: this.lastActiveTime,
+      totalActiveTime: 0,
+    }
+
+    if (this.activeStartTime > 0 && this.lastActiveTime > 0) {
+      nodeProgress.totalActiveTime = this.lastActiveTime - this.activeStartTime
     }
 
     try {
@@ -195,6 +202,20 @@ class ExitHandler {
     try {
       let filePath = path.join(this.logDir, 'exit-summary.json')
       let content = JSON.stringify(exitSummary, null, 2)
+      fs.writeFileSync(filePath, content, { encoding: 'utf8', flag: 'w' })
+    } catch (er) {}
+  }
+
+  writeStartSummary() {
+    //need to figure out what else to write?
+    //todo, add support for appData
+    let startSummary = {
+      startTime: Date.now(),
+    }
+
+    try {
+      let filePath = path.join(this.logDir, 'start-summary.json')
+      let content = JSON.stringify(startSummary, null, 2)
       fs.writeFileSync(filePath, content, { encoding: 'utf8', flag: 'w' })
     } catch (er) {}
   }
