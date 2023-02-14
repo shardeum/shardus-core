@@ -8,6 +8,7 @@ import * as NodeList from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 
 interface ExitSummary {
+  status: string
   message: string
   exitTime: number
   totalActiveTime: number
@@ -88,12 +89,12 @@ class ExitHandler {
   }
 
   // Exits after cleaning up with all registered functions
-  async exitCleanly(exitProcess = true) {
+  async exitCleanly(exitType: string, message: string, exitProcess = true) {
     if (this.exited) return
     this.exited = true
     this._cleanupSync()
     try {
-      this.runExitLog('Being exited cleanly')
+      this.runExitLog(true, exitType, message)
       await this._cleanupAsync()
     } catch (e) {
       console.error(e)
@@ -102,13 +103,13 @@ class ExitHandler {
     if (exitProcess) process.exit()
   }
 
-  async exitUncleanly(SIG_TYPE?: string) {
+  async exitUncleanly(exitType: string, message: string) {
     if (this.exited) return
     this.exited = true
     this._cleanupSync()
 
     try {
-      this.runExitLog(`Being exited uncleanly with signal type: ${SIG_TYPE}`)
+      this.runExitLog(false, exitType, message)
       await this._cleanupAsync()
     } catch (e) {
       console.error(e)
@@ -117,8 +118,8 @@ class ExitHandler {
     process.exit(1) // exiting with status 1 causes our modified PM2 to not restart the process
   }
 
-  runExitLog(msg: string) {
-    this.exitLogger.fatal(msg)
+  runExitLog(isCleanExit: boolean, exitType: string, msg: string) {
+    this.exitLogger.fatal(`isCleanExit: ${isCleanExit}  exitType: ${exitType}  msg: ${msg}`)
     let log: string[] = []
     const fakeStream = {
       write: (data: string) => {
@@ -147,7 +148,7 @@ class ExitHandler {
     profilerInstance.scopedProfileSectionEnd('counts')
     this.exitLogger.fatal(log.join(''))
 
-    this.writeExitSummary(msg)
+    this.writeExitSummary(isCleanExit, exitType, msg)
   }
 
   //not exactly an exit statement but is similar to our exit report
@@ -176,8 +177,9 @@ class ExitHandler {
     } catch (er) {}
   }
 
-  writeExitSummary(msg: string) {
+  writeExitSummary(isCleanExit: boolean, exitType: string, msg: string) {
     let exitSummary: ExitSummary = {
+      status: '',
       message: msg,
       exitTime: Date.now(),
       totalActiveTime: 0,
@@ -185,6 +187,21 @@ class ExitHandler {
       lastRotationIndex: this.lastRotationIndex,
       activeNodes: NodeList.activeByIdOrder.length,
       lastActiveTime: this.lastActiveTime,
+    }
+
+    // a bet of logic here to sort out what is a clean vs. warning vs. error exit
+    if (isCleanExit) {
+      if (exitType === `Apoptosized`) {
+        exitSummary.status = 'Exit with warning'
+      } else {
+        exitSummary.status = 'Exited cleanly'
+      }
+    } else {
+      if (exitType === 'SIGINT') {
+        exitSummary.status = 'Exit with warning'
+      } else if (exitType === 'SIGTERM' || exitType === 'message:shutdown') {
+        exitSummary.status = 'Exit with error'
+      } else exitSummary.status = 'Exit with error'
     }
 
     if (this.activeStartTime > 0 && this.lastActiveTime > 0) {
@@ -225,19 +242,19 @@ class ExitHandler {
     if (sigint) {
       process.on('SIGINT', async () => {
         // await this.exitCleanly()
-        await this.exitUncleanly('SIGINT')
+        await this.exitUncleanly('SIGINT', 'Process exited with SIGINT')
       })
       //gracefull shutdown suppport in windows. should mirror what SIGINT does in linux
       process.on('message', async (msg) => {
         if (msg == 'shutdown') {
-          await this.exitUncleanly('message:shutdown')
+          await this.exitUncleanly('message:shutdown', 'Process exited with shutdown message')
         }
       })
     }
     if (sigterm) {
       process.on('SIGTERM', async () => {
         // await this.exitCleanly()
-        await this.exitUncleanly('SIGTERM')
+        await this.exitUncleanly('SIGTERM', 'Process exited with SIGTERM')
       })
     }
   }

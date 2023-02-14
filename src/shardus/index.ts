@@ -599,7 +599,7 @@ class Shardus extends EventEmitter {
         this.reporter.stopReporting()
         await this.reporter.reportRemoved(Self.id)
       }
-      this.exitHandler.exitCleanly() // exits with status 0 so that PM2 can restart the process
+      this.exitHandler.exitCleanly(`removed`, `removed from network in normal conditions`) // exits with status 0 so that PM2 can restart the process
     })
     Self.emitter.on('apoptosized', async (callstack: string, message: string, restart: boolean) => {
       // Omar - Why are we trying to call the functions in modules directly before exiting.
@@ -633,9 +633,13 @@ class Shardus extends EventEmitter {
         this.reporter.stopReporting()
         await this.reporter.reportRemoved(Self.id)
       }
-      if (restart) this.exitHandler.exitCleanly()
+      if (restart)
+        this.exitHandler.exitCleanly(
+          `Apoptosized`,
+          `apoptosized by network but exiting cleanly for a restart`
+        )
       // exits with status 0 so that PM2 can restart the process
-      else this.exitHandler.exitUncleanly() // exits with status 1 so that PM2 CANNOT restart the process
+      else this.exitHandler.exitUncleanly(`Apoptosized`, `apoptosized by network`) // exits with status 1 so that PM2 CANNOT restart the process
     })
     Self.emitter.on('node-activated', ({ ...params }) =>
       this.app.eventNotify?.({ type: 'node-activated', ...params })
@@ -1718,8 +1722,7 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes) => true
       }
       if (typeof application.getNodeInfoAppData === 'function') {
-        applicationInterfaceImpl.getNodeInfoAppData = () =>
-          application.getNodeInfoAppData()
+        applicationInterfaceImpl.getNodeInfoAppData = () => application.getNodeInfoAppData()
       } else {
         // If the app doesn't provide getNodeInfoAppData, assume it returns empty obj
         applicationInterfaceImpl.getNodeInfoAppData = () => {}
@@ -1769,7 +1772,7 @@ class Shardus extends EventEmitter {
     this.network.registerExternalGet('nodeInfo', async (req, res) => {
       const nodeInfo = Self.getPublicNodeInfo()
       const appData = this.app.getNodeInfoAppData()
-      res.json({ nodeInfo: {...nodeInfo, appData}})
+      res.json({ nodeInfo: { ...nodeInfo, appData } })
     })
 
     this.p2p.registerInternal(
@@ -1835,7 +1838,7 @@ class Shardus extends EventEmitter {
       // this.exitHandler.exitCleanly()
 
       this.mainLogger.info(`exitUncleanly: logFatalAndExit`)
-      this.exitHandler.exitUncleanly()
+      this.exitHandler.exitUncleanly('Unhandled Exception', err.message)
     }
     process.on('uncaughtException', (err) => {
       logFatalAndExit(err)
