@@ -1099,6 +1099,14 @@ class Shardus extends EventEmitter {
   }
 
   /**
+   * This function return number of active in the latest cycle. 
+   */
+  getNumActiveNodes(){
+    const latestCycle = this.p2p.getLatestCycles(1)[0];
+    return latestCycle ? latestCycle.active : 0;
+  }
+
+  /**
    * @typedef {import('../shardus/index.js').Node} Node
    */
   /**
