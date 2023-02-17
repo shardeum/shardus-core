@@ -1,17 +1,14 @@
 import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
-const stringify = require('fast-stable-stringify')
-
-import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
+import Profiler, { cUninitializedSize } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
-import ShardFunctions from './shardFunctions'
-import { time } from 'console'
 import StateManager from '.'
 import { GlobalAccountReportResp } from './state-manager-types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { Logger as Log4jsLogger } from 'log4js'
 
 class AccountGlobals {
   app: Shardus.App
@@ -24,14 +21,13 @@ class AccountGlobals {
   storage: Storage
   stateManager: StateManager
 
-  mainLogger: any
-  fatalLogger: any
-  shardLogger: any
-  statsLogger: any
+  mainLogger: Log4jsLogger
+  fatalLogger: Log4jsLogger
+  shardLogger: Log4jsLogger
+  statsLogger: Log4jsLogger
   statemanager_fatal: (key: string, log: string) => void
 
   globalAccountSet: Set<string>
-  // knownGlobals: { [id: string]: boolean } // will just use the above set now as a simplification
   hasknownGlobals: boolean
 
   /** Need the ablity to get account copies and use them later when applying a transaction. how to use the right copy or even know when to use this at all? */
@@ -68,8 +64,6 @@ class AccountGlobals {
     this.statemanager_fatal = stateManager.statemanager_fatal
 
     this.globalAccountSet = new Set()
-    //this.globalAccountRepairBank = new Map()
-    //this.knownGlobals = {}
     this.hasknownGlobals = false
   }
 
@@ -77,26 +71,25 @@ class AccountGlobals {
     this.p2p.registerInternal(
       'get_globalaccountreport',
       async (
-        payload: any,
-        respond: (arg0: GlobalAccountReportResp) => any,
-        sender,
-        tracker: string,
+        _payload: unknown,
+        respond: (arg0: GlobalAccountReportResp) => Promise<number>,
+        _sender: unknown,
+        _tracker: string,
         msgSize: number
       ) => {
         this.profiler.scopedProfileSectionStart('get_globalaccountreport', false, msgSize)
         let responseSize = cUninitializedSize
         try {
-          let result = {
+          const result = {
             combinedHash: '',
             accounts: [],
             ready: this.stateManager.appFinishedSyncing,
           } as GlobalAccountReportResp
 
-          let globalAccountKeys = this.globalAccountSet.keys()
+          const globalAccountKeys = this.globalAccountSet.keys()
 
-          let toQuery: string[] = []
+          const toQuery: string[] = []
 
-          let responded = false
           console.log(
             'Running get_globalaccountreport',
             this.stateManager.accountSync.globalAccountsSynced,
@@ -110,10 +103,6 @@ class AccountGlobals {
           ) {
             result.ready = false
             await respond(result)
-            responded = true
-
-            //should just return here, but I want coutners below to help verify the fix! 20210624
-            //return
           }
 
           //TODO: Perf  could do things faster by pulling from cache, but would need extra testing:
@@ -129,24 +118,9 @@ class AccountGlobals {
           //   }
           //   result.accounts.push(report)
           // }
-          for (let key of globalAccountKeys) {
+          for (const key of globalAccountKeys) {
             toQuery.push(key)
           }
-
-          // I Think this section can be depricated.  The appFinishedSyncing check above should be enough to bail when it is appropriate
-          // const useGlobalAccount = true
-          // if (this.p2p.isFirstSeed && useGlobalAccount) {
-          //   //TODO: SOON this will mess up dapps that dont use global accounts.  update: maybe add a config to specify if there will be no global accounts for a network. pls discuss fix with group.
-          //   if(toQuery.length === 0 && this.stateManager.appFinishedSyncing === false){
-          //     /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `HACKFIX - first node needs to wait! ready:${result.ready} responded:${responded}`)
-          //     result.ready = false
-          //     if(responded === false){
-          //       this.statemanager_fatal('get_globalaccountreport -first seed has no globals', `get_globalaccountreport -first seed has no globals. ready:${result.ready} responded:${responded}`)
-          //       await respond(result)
-          //     }
-          //     return
-          //   }
-          // }
 
           if (result.ready === false) {
             nestedCountersInstance.countEvent(`sync`, `HACKFIX - forgot to return!`)
@@ -164,16 +138,8 @@ class AccountGlobals {
             this.stateManager.fifoUnlock('accountModification', ourLockID)
           }
           if (accountData != null) {
-            for (let wrappedAccount of accountData) {
-              // let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
-              // wrappedAccountInQueueRef.seenInQueue = false
-              // if (this.lastSeenAccountsMap != null) {
-              //   let queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
-              //   if (queueEntry != null) {
-              //     wrappedAccountInQueueRef.seenInQueue = true
-              //   }
-              // }
-              let report = {
+            for (const wrappedAccount of accountData) {
+              const report = {
                 id: wrappedAccount.accountId,
                 hash: wrappedAccount.stateId,
                 timestamp: wrappedAccount.timestamp,
@@ -194,20 +160,12 @@ class AccountGlobals {
     )
   }
 
-  // sortByTimestamp(a: any, b: any): number {
-  //   return utils.sortAscProp(a, b, 'timestamp')
-  // }
-
   /**
    * isGlobalAccount
    * is the account global
    * @param accountID
    */
   isGlobalAccount(accountID: string): boolean {
-    // if (this.stateManager.accountSync.globalAccountsSynced === false) {
-    //   return this.knownGlobals[accountID] === true
-    // }
-
     return this.globalAccountSet.has(accountID)
   }
 
@@ -221,13 +179,10 @@ class AccountGlobals {
    * This will get an early global report (note does not have account data, just id,hash,timestamp)
    */
   async getGlobalListEarly() {
-    let globalReport: GlobalAccountReportResp = await this.stateManager.accountSync.getRobustGlobalReport()
+    const globalReport: GlobalAccountReportResp = await this.stateManager.accountSync.getRobustGlobalReport()
 
-    //this.knownGlobals = {}
-    let temp = []
-    for (let report of globalReport.accounts) {
-      //this.knownGlobals[report.id] = true
-
+    const temp = []
+    for (const report of globalReport.accounts) {
       temp.push(report.id)
 
       //set this as a known global
@@ -242,13 +197,13 @@ class AccountGlobals {
     globalAccountSummary: { id: string; state: string; ts: number }[]
     globalStateHash: string
   } {
-    let globalAccountSummary = []
-    for (let globalID in this.globalAccountSet.keys()) {
-      let accountHash = this.stateManager.accountCache.getAccountHash(globalID)
-      let summaryObj = { id: globalID, state: accountHash.h, ts: accountHash.t }
+    const globalAccountSummary = []
+    for (const globalID in this.globalAccountSet.keys()) {
+      const accountHash = this.stateManager.accountCache.getAccountHash(globalID)
+      const summaryObj = { id: globalID, state: accountHash.h, ts: accountHash.t }
       globalAccountSummary.push(summaryObj)
     }
-    let globalStateHash = this.crypto.hash(globalAccountSummary)
+    const globalStateHash = this.crypto.hash(globalAccountSummary)
     return { globalAccountSummary, globalStateHash }
   }
 }

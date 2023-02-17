@@ -31,7 +31,6 @@
     "DataSourceHelper.ts",
     "AccountSync.ts",
     "AccountPatcher.ts",
-    "AccountGlobals.ts",
     "snapshotFunctions.ts",
     "partition-gossip.ts",
     "shardus-types.ts",
