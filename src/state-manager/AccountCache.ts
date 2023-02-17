@@ -13,6 +13,7 @@ import {
   AccountHashCacheHistory,
   AccountHashCacheList,
 } from './state-manager-types'
+import { Logger as Log4jsLogger } from 'log4js'
 
 class AccountCache {
   app: Shardus.App
@@ -22,10 +23,10 @@ class AccountCache {
 
   logger: Logger
 
-  mainLogger: any
-  fatalLogger: any
-  shardLogger: any
-  statsLogger: any
+  mainLogger: Log4jsLogger
+  fatalLogger: Log4jsLogger
+  shardLogger: Log4jsLogger
+  statsLogger: Log4jsLogger
 
   accountsHashCache3: AccountHashCacheMain3 //This is the main storage
 
@@ -79,13 +80,13 @@ class AccountCache {
      */
   ///////////////
 
-  updateAccountHash(accountId: string, hash: string, timestamp: number, cycle: number) {
-    if (hash == null) {
-      let stack = new Error().stack
+  updateAccountHash(accountId: string, accountHash: string, timestamp: number, cycle: number) {
+    if (accountHash == null) {
+      const stack = new Error().stack
       this.statemanager_fatal('updateAccountHash hash=null', 'updateAccountHash hash=null' + stack)
     }
     if (cycle < 0 || cycle == null) {
-      let stack = new Error().stack
+      const stack = new Error().stack
       this.statemanager_fatal(
         `updateAccountHash cycle == ${cycle}`,
         `updateAccountHash cycle == ${cycle} ${stack}`
@@ -132,7 +133,6 @@ class AccountCache {
     }
 
     let updateIsNewerHash = false
-    let onFutureCycle = cycle > this.accountsHashCache3.currentCalculationCycle
 
     //last state cycle gets set if our node has an account that it no longer covers.  I am not sure we will be able to track this in the future.
     //and that may not matter.
@@ -150,12 +150,12 @@ class AccountCache {
       accountHashCacheHistory.lastUpdateCycle = cycle
     }
 
-    let accountHashList: AccountHashCache[] = accountHashCacheHistory.accountHashList
+    const accountHashList: AccountHashCache[] = accountHashCacheHistory.accountHashList
 
     //accountHashList is a small history list for just this account.
     // this next section determines if we just insert to an empty list or adding to the head
     // this also keeps the list from growing by popping the tail when it is too long
-    let accountHashData: AccountHashCache = { t: timestamp, h: hash, c: cycle }
+    const accountHashData: AccountHashCache = { t: timestamp, h: accountHash, c: cycle }
 
     if (accountHashList.length === 0) {
       accountHashList.push(accountHashData)
@@ -164,13 +164,13 @@ class AccountCache {
     } else {
       if (accountHashList.length > 0) {
         //0 is the most current entry, older entries for older cycles are after that
-        let current = accountHashList[0]
+        const current = accountHashList[0]
 
         // the latest update is for the same cycle
         if (current.c === cycle) {
           if (timestamp > current.t) {
             //update current
-            current.h = hash
+            current.h = accountHash
             current.t = timestamp
 
             updateIsNewerHash = true
@@ -206,10 +206,11 @@ class AccountCache {
           let idx = 0
           let doInsert = true
           for (let i = 0; i < accountHashList.length; i++) {
-            let hashCacheEntry = accountHashList[i]
+            // eslint-disable-next-line security/detect-object-injection
+            const hashCacheEntry = accountHashList[i]
             //if we found and entry for this cycle then update it
             if (hashCacheEntry.c === cycle) {
-              hashCacheEntry.h = hash
+              hashCacheEntry.h = accountHash
               hashCacheEntry.t = timestamp
               doInsert = false
               break
@@ -257,7 +258,7 @@ class AccountCache {
     if (this.accountsHashCache3.accountHashMap.has(accountId) === false) {
       return null
     }
-    let accountHashCacheHistory: AccountHashCacheHistory =
+    const accountHashCacheHistory: AccountHashCacheHistory =
       this.accountsHashCache3.accountHashMap.get(accountId)
     if (accountHashCacheHistory.accountHashList.length > 0) {
       //0 is the newest?
@@ -282,23 +283,14 @@ class AccountCache {
   }
 
   // currently a sync function, dont have correct buffers for async
-  processCacheUpdates(
-    cycleShardData: CycleShardData,
-    debugAC3: AccountHashCacheMain3 = null,
-    debugAccount: string = null
-  ): void {
-    // OFFLINE DEBUGGING
-    // if(debugAC3 != null){
-    //   this.accountsHashCache3 = debugAC3
-    // }
-
+  processCacheUpdates(cycleShardData: CycleShardData): void {
     //the line below is too slow.. needs to be in an ultra verbose categor that we dont have, so for now you have to uncomment it on manually
     //if (logFlags.verbose) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
 
-    let cycleToProcess = cycleShardData.cycleNumber
-    let nextCycleToProcess = cycleToProcess + 1
+    const cycleToProcess = cycleShardData.cycleNumber
+    const nextCycleToProcess = cycleToProcess + 1
 
-    let nextCacheUpdateQueue: AccountHashCacheList = {
+    const nextCacheUpdateQueue: AccountHashCacheList = {
       accountHashesSorted: [],
       accountIDs: [],
     }
@@ -309,12 +301,14 @@ class AccountCache {
 
     // process the working list.  split data into partitions and build a new list with nulled spots cleared out
     for (let index = 0; index < this.cacheUpdateQueue.accountIDs.length; index++) {
-      let accountHashData: AccountHashCache = this.cacheUpdateQueue.accountHashesSorted[index]
+      // eslint-disable-next-line security/detect-object-injection
+      const accountHashData: AccountHashCache = this.cacheUpdateQueue.accountHashesSorted[index]
       if (accountHashData == null) {
         //if this is null then it is blank entry (by design how we remove from the array at run time and retain perf)
         continue
       }
-      let accountID = this.cacheUpdateQueue.accountIDs[index]
+      // eslint-disable-next-line security/detect-object-injection
+      const accountID = this.cacheUpdateQueue.accountIDs[index]
       if (accountID == null) {
         //should never be null if accountHashData was not null
         this.statemanager_fatal(
@@ -355,23 +349,23 @@ class AccountCache {
     this.accountsHashCache3.currentCalculationCycle = nextCycleToProcess
   }
 
-  getAccountDebugObject(id: string): any {
-    let accountHashFull = this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(id)
+  getAccountDebugObject(id: string) {
+    const accountHashFull = this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(id)
     return accountHashFull
   }
 
   //temp to hide some internal fields
-  getDebugStats(): any[] {
-    let workingAccounts = this.accountsHashCache3.workingHistoryList.accountIDs.length
+  getDebugStats(): [number, number] {
+    const workingAccounts = this.accountsHashCache3.workingHistoryList.accountIDs.length
     //this.addToReport('StateManager','AccountsCache', 'workingAccounts', cacheCount )
-    let mainMap = this.accountsHashCache3.accountHashMap.size
+    const mainMap = this.accountsHashCache3.accountHashMap.size
     //this.addToReport('StateManager','AccountsCache', 'mainMap', cacheCount2 )
 
     return [workingAccounts, mainMap]
   }
 
   getAccountHashHistoryItem(accountID: string): AccountHashCacheHistory {
-    let accountHashCacheHistory: AccountHashCacheHistory =
+    const accountHashCacheHistory: AccountHashCacheHistory =
       this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(accountID)
     return accountHashCacheHistory
   }

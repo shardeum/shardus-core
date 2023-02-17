@@ -32,7 +32,6 @@
     "AccountSync.ts",
     "AccountPatcher.ts",
     "AccountGlobals.ts",
-    "AccountCache.ts",
     "snapshotFunctions.ts",
     "partition-gossip.ts",
     "shardus-types.ts",

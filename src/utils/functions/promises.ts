@@ -44,15 +44,16 @@ export const groupResolvePromises = async <T>(
   maxLosses: number,
   minWins: number
 ): Promise<{ success: boolean; wins: T[]; losses: T[]; errors: any[] }> => {
-  let wins: T[] = [],
-    losses: T[] = [],
-    winCount: number = 0,
-    lossCount: number = 0,
-    errs = []
+  const wins: T[] = []
+  const losses: T[] = []
+  let winCount = 0
+  let lossCount = 0
+  const errs = []
 
   return new Promise((resolve) => {
     for (let i = 0; i < promiseList.length; i++) {
-      let promise = promiseList[i]
+      // eslint-disable-next-line security/detect-object-injection
+      const promise = promiseList[i]
       promise
         .then((value) => {
           const evalStatus = evaluationFn(value)
