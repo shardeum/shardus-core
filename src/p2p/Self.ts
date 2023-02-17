@@ -322,11 +322,11 @@ async function getActiveNodesFromArchiver(archiver: P2P.P2PTypes.Node) {
         nodeInfo,
       }),
       false,
-      5000
+      10000
     )
   } catch (e) {
-    nestedCountersInstance.countRareEvent('fatal', 'Could not get seed list from seed node server')
-    throw Error(`Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
+    nestedCountersInstance.countRareEvent('archiver_nodelist', 'Could not get seed list from seed node server')
+    throw Error(`Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
   }
   if (logFlags.p2pNonFatal) info(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
   return seedListSigned
