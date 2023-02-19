@@ -89,7 +89,7 @@ export async function startup(): Promise<boolean> {
       }
 
       // Otherwise, try to join the network
-      ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
+      ; ({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
     } catch (err) {
       if (err.message.startsWith('Fatal:')) {
         throw err
@@ -259,8 +259,23 @@ async function syncCycleChain() {
 
 async function contactArchiver() {
   const availableArchivers = Context.config.p2p.existingArchivers
-  const archiver: P2P.P2PTypes.Node = getRandom(availableArchivers, 1)[0]
-  const activeNodesSigned = await getActiveNodesFromArchiver(archiver)
+  let retry = 3
+  let failArchivers: string[] = []
+  let archiver: P2P.P2PTypes.Node
+  let activeNodesSigned
+  while (retry > 0) {
+    try {
+      archiver = getRandom(availableArchivers, 1)[0]
+      if (!failArchivers.includes(archiver.ip)) failArchivers.push(archiver.ip)
+      activeNodesSigned = await getActiveNodesFromArchiver(archiver)
+      break // To stop this loop if it gets the response without failing
+    } catch (e) {
+      if (retry === 1) {
+        throw Error(`Could not get seed list from seed node server ${failArchivers}`)
+      }
+    }
+    retry--
+  }
   if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
     throw Error('Fatal: _getSeedNodes seed list was not signed by archiver!')
   }
@@ -325,8 +340,12 @@ async function getActiveNodesFromArchiver(archiver: P2P.P2PTypes.Node) {
       10000
     )
   } catch (e) {
-    nestedCountersInstance.countRareEvent('archiver_nodelist', 'Could not get seed list from seed node server')
-    throw Error(`Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
+    nestedCountersInstance.countRareEvent(
+      'archiver_nodelist',
+      'Could not get seed list from seed node server'
+    )
+    warn(`Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
+    throw Error(e.message)
   }
   if (logFlags.p2pNonFatal) info(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
   return seedListSigned
@@ -351,8 +370,8 @@ export type NodeInfo = {
   publicKey: any
   curvePublicKey: string
 } & network.IPInfo & {
-    status: P2P.P2PTypes.NodeStatus
-  }
+  status: P2P.P2PTypes.NodeStatus
+}
 
 export function getPublicNodeInfo(): NodeInfo {
   const publicKey = Context.crypto.getPublicKey()
