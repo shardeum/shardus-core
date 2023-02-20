@@ -27,7 +27,6 @@
     "TransactionRepair.ts",
     "TransactionQueue.ts",
     "TransactionConsensus.ts",
-    "SyncTracker.ts",
     "PartitionStats.ts",
     "Depricated.ts",
     "DataSourceHelper.ts",

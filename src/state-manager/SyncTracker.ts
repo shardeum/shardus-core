@@ -1,23 +1,8 @@
 import * as Shardus from '../shardus/shardus-types'
 import { StateManager as StateManagerTypes } from '@shardus/types'
 import * as utils from '../utils'
-const stringify = require('fast-stable-stringify')
 
-import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
-
-//import { SimpleRange } from "./state-manager-types"
-import {
-  SimpleRange,
-  AccountStateHashReq,
-  AccountStateHashResp,
-  GetAccountStateReq,
-  GetAccountData3Req,
-  GetAccountDataByRangeSmart,
-  GlobalAccountReportResp,
-  GetAccountData3Resp,
-  CycleShardData,
-  QueueEntry,
-} from './state-manager-types'
+import { SimpleRange, GlobalAccountReportResp, GetAccountData3Resp, QueueEntry } from './state-manager-types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import AccountSync from './AccountSync'
 import { logFlags } from '../logger'
@@ -84,7 +69,7 @@ export default class SyncTracker {
     index: number,
     range: StateManagerTypes.shardFunctionTypes.BasicAddressRange,
     cycle: number,
-    initalSync: boolean = false
+    initalSync = false
   ) {
     // let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false,
     //isGlobalSyncTracker: false, globalAddressMap: {}, isPartOfInitialSync:initalSync, keys:{}  } as SyncTracker // partition,
@@ -103,7 +88,7 @@ export default class SyncTracker {
     this.dataSourceHelper = new DataSourceHelper(this.accountSync.stateManager)
   }
 
-  initGlobal(accountSync: AccountSync, p2p: P2P, index: number, cycle: number, initalSync: boolean = false) {
+  initGlobal(accountSync: AccountSync, p2p: P2P, index: number, cycle: number, initalSync = false) {
     // let syncTracker = { range: {}, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false,
     //isGlobalSyncTracker: true, globalAddressMap: {}, isPartOfInitialSync:initalSync, keys:{} } as SyncTracker // partition,
     this.reset()
@@ -149,15 +134,15 @@ export default class SyncTracker {
 
         this.partitionStartTimeStamp = Date.now()
 
-        let lowAddress = this.addressRange.low
-        let highAddress = this.addressRange.high
+        const lowAddress = this.addressRange.low
+        const highAddress = this.addressRange.high
         partition = `${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)}`
 
         /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `sync partition: ${partition} start: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber}`)
 
         //this.accountSync.readyforTXs = true //Do not open the floodgates of queuing stuffs.
 
-        let accountsSaved = await this.syncAccountData2(lowAddress, highAddress)
+        const accountsSaved = await this.syncAccountData2(lowAddress, highAddress)
         /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: partition: ${partition}, syncAccountData2 done.`)
 
         nestedCountersInstance.countEvent(
@@ -214,7 +199,7 @@ export default class SyncTracker {
       retry = false
 
       try {
-        let partition = 'globals!'
+        const partition = 'globals!'
 
         let remainingAccountsToSync = []
         this.partitionStartTimeStamp = Date.now()
@@ -232,7 +217,7 @@ export default class SyncTracker {
 
         //Get globals list and hash.
 
-        let globalReport: GlobalAccountReportResp = await this.accountSync.getRobustGlobalReport()
+        const globalReport: GlobalAccountReportResp = await this.accountSync.getRobustGlobalReport()
 
         //TODO should convert to a larger list of valid nodes
         this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
@@ -247,13 +232,13 @@ export default class SyncTracker {
         /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC:  syncStateDataGlobals globalReport: ${utils.stringifyReduce(globalReport)} `)
 
         let accountReportsByID: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
-        for (let report of globalReport.accounts) {
+        for (const report of globalReport.accounts) {
           remainingAccountsToSync.push(report.id)
 
           accountReportsByID[report.id] = report
         }
         let accountData: Shardus.WrappedData[] = []
-        let accountDataById: { [id: string]: Shardus.WrappedData } = {}
+        const accountDataById: { [id: string]: Shardus.WrappedData } = {}
         let globalReport2: GlobalAccountReportResp = { ready: false, combinedHash: '', accounts: [] }
         let maxTries = 20
 
@@ -302,8 +287,8 @@ export default class SyncTracker {
           //This is a current non issue though.
 
           //Get accounts.
-          let message = { accountIds: remainingAccountsToSync }
-          let result = await this.p2p.ask(
+          const message = { accountIds: remainingAccountsToSync }
+          const result = await this.p2p.ask(
             this.dataSourceHelper.dataSourceNode,
             'get_account_data_by_list',
             message
@@ -335,21 +320,21 @@ export default class SyncTracker {
 
           this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
 
-          let accountReportsByID2: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
-          for (let report of globalReport2.accounts) {
+          const accountReportsByID2: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
+          for (const report of globalReport2.accounts) {
             accountReportsByID2[report.id] = report
           }
 
           hasAllGlobalData = true
           remainingAccountsToSync = []
-          for (let account of accountData) {
+          for (const account of accountData) {
             accountDataById[account.accountId] = account
             //newer copies will overwrite older ones in this map
           }
           //check the full report for any missing data
-          for (let report of globalReport2.accounts) {
+          for (const report of globalReport2.accounts) {
             /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts `)
-            let data = accountDataById[report.id]
+            const data = accountDataById[report.id]
             if (data == null) {
               //we dont have the data
               hasAllGlobalData = false
@@ -366,22 +351,21 @@ export default class SyncTracker {
           accountReportsByID = accountReportsByID2
         }
 
-        let dataToSet = []
-        let cycleNumber = this.accountSync.stateManager.currentCycleShardData.cycleNumber // Math.max(1, this.accountSync.stateManager.currentCycleShardData.cycleNumber-1 ) //kinda hacky?
+        const dataToSet = []
 
-        let goodAccounts: Shardus.WrappedData[] = []
+        const goodAccounts: Shardus.WrappedData[] = []
 
         //Write the data! and set global memory data!.  set accounts copy data too.
-        for (let report of globalReport2.accounts) {
+        for (const report of globalReport2.accounts) {
           /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts 2`)
-          let accountData = accountDataById[report.id]
+          const accountData = accountDataById[report.id]
           if (accountData != null) {
             dataToSet.push(accountData)
             goodAccounts.push(accountData)
           }
         }
 
-        let failedHashes = await this.accountSync.stateManager.checkAndSetAccountData(
+        const failedHashes = await this.accountSync.stateManager.checkAndSetAccountData(
           dataToSet,
           'syncStateDataGlobals',
           true
@@ -432,8 +416,8 @@ export default class SyncTracker {
     }
     let totalAccountsSaved = 0
 
-    let queryLow = lowAddress
-    let queryHigh = highAddress
+    const queryLow = lowAddress
+    const queryHigh = highAddress
 
     let moreDataRemaining = true
 
@@ -519,7 +503,7 @@ export default class SyncTracker {
       }
 
       // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
-      let message = {
+      const message = {
         accountStart: queryLow,
         accountEnd: queryHigh,
         tsStart: startTime,
@@ -555,7 +539,7 @@ export default class SyncTracker {
       }
 
       // TSConversion need to consider better error handling here!
-      let result: GetAccountData3Resp = r as GetAccountData3Resp
+      const result: GetAccountData3Resp = r as GetAccountData3Resp
 
       if (result == null) {
         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceHelper.dataSourceNode.id}`)
@@ -575,14 +559,14 @@ export default class SyncTracker {
         continue
       }
       // accountData is in the form [{accountId, stateId, data}] for n accounts.
-      let accountData = result.data.wrappedAccounts
-      let lastUpdateNeeded = result.data.lastUpdateNeeded
+      const accountData = result.data.wrappedAccounts
+      const lastUpdateNeeded = result.data.lastUpdateNeeded
 
-      let lastLowQuery = lowTimeQuery
+      const lastLowQuery = lowTimeQuery
 
       // get the timestamp of the last account data received so we can use it as the low timestamp for our next query
       if (accountData.length > 0) {
-        let lastAccount = accountData[accountData.length - 1]
+        const lastAccount = accountData[accountData.length - 1]
         if (lastAccount.timestamp > lowTimeQuery) {
           lowTimeQuery = lastAccount.timestamp
           startTime = lowTimeQuery
@@ -593,7 +577,7 @@ export default class SyncTracker {
       let sameAsLastTS = 0
       let lastLoopTS = -1
       //need to track some counters to help with offset calculations
-      for (let account of accountData) {
+      for (const account of accountData) {
         if (account.timestamp === lastLowQuery) {
           sameAsStartTS++
         }
@@ -610,12 +594,13 @@ export default class SyncTracker {
       let dataDuplicated = true
       if (loopCount > 0) {
         while (accountData.length > 0 && dataDuplicated) {
-          let stateData = accountData[0]
+          const stateData = accountData[0]
           dataDuplicated = false
 
           //todo get rid of this in next verision
           for (let i = this.combinedAccountData.length - 1; i >= 0; i--) {
-            let existingStateData = this.combinedAccountData[i]
+            // eslint-disable-next-line security/detect-object-injection
+            const existingStateData = this.combinedAccountData[i]
             if (
               existingStateData.timestamp === stateData.timestamp &&
               existingStateData.accountId === stateData.accountId
@@ -660,13 +645,14 @@ export default class SyncTracker {
       }
 
       // if we have any accounts in wrappedAccounts2
-      let accountData2 = result.data.wrappedAccounts2
+      const accountData2 = result.data.wrappedAccounts2
       if (accountData2.length > 0) {
         while (accountData.length > 0 && dataDuplicated) {
-          let stateData = accountData2[0]
+          const stateData = accountData2[0]
           dataDuplicated = false
           for (let i = this.combinedAccountData.length - 1; i >= 0; i--) {
-            let existingStateData = this.combinedAccountData[i]
+            // eslint-disable-next-line security/detect-object-injection
+            const existingStateData = this.combinedAccountData[i]
             if (
               existingStateData.timestamp === stateData.timestamp &&
               existingStateData.accountId === stateData.accountId
@@ -727,8 +713,8 @@ export default class SyncTracker {
 
       //process combinedAccountData right away and then clear it
       if (this.combinedAccountData.length > 0) {
-        let accountToSave = this.combinedAccountData.length
-        let accountsSaved = await this.processAccountDataNoStateTable2()
+        const accountToSave = this.combinedAccountData.length
+        const accountsSaved = await this.processAccountDataNoStateTable2()
         totalAccountsSaved += accountsSaved
         if (logFlags.debug)
           this.accountSync.mainLogger.debug(
@@ -747,39 +733,41 @@ export default class SyncTracker {
     this.missingAccountData = []
     this.mapAccountData = {}
     // create a fast lookup map for the accounts we have.  Perf.  will need to review if this fits into memory.  May need a novel structure.
-    let account
+    let account: Shardus.WrappedData
     for (let i = 0; i < this.combinedAccountData.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection
       account = this.combinedAccountData[i]
       this.mapAccountData[account.accountId] = account
     }
 
-    let accountKeys = Object.keys(this.mapAccountData)
-    let uniqueAccounts = accountKeys.length
-    let initialCombinedAccountLength = this.combinedAccountData.length
+    const accountKeys = Object.keys(this.mapAccountData)
+    const uniqueAccounts = accountKeys.length
+    const initialCombinedAccountLength = this.combinedAccountData.length
     if (uniqueAccounts < initialCombinedAccountLength) {
       // keep only the newest copies of each account:
       // we need this if using a time based datasync
       this.combinedAccountData = []
-      for (let accountID of accountKeys) {
+      for (const accountID of accountKeys) {
+        // eslint-disable-next-line security/detect-object-injection
         this.combinedAccountData.push(this.mapAccountData[accountID])
       }
     }
 
-    let missingTXs = 0
-    let handledButOk = 0
-    let otherMissingCase = 0
-    let futureStateTableEntry = 0
+    const missingTXs = 0
+    const handledButOk = 0
+    const otherMissingCase = 0
+    const futureStateTableEntry = 0
 
     /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: processAccountData unique accounts: ${uniqueAccounts}  initial combined len: ${initialCombinedAccountLength}`)
 
     this.accountsWithStateConflict = []
-    let goodAccounts: Shardus.WrappedData[] = []
-    let noSyncData = 0
-    let noMatches = 0
-    let outOfDateNoTxs = 0
-    let unhandledCase = 0
-    let fix1Worked = 0
-    for (let account of this.combinedAccountData) {
+    const goodAccounts: Shardus.WrappedData[] = []
+    const noSyncData = 0
+    const noMatches = 0
+    const outOfDateNoTxs = 0
+    const unhandledCase = 0
+    const fix1Worked = 0
+    for (const account of this.combinedAccountData) {
       goodAccounts.push(account)
     }
 
@@ -788,7 +776,7 @@ export default class SyncTracker {
         `DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs} futureStateTableEntry:${futureStateTableEntry} unhandledCase:${unhandledCase} fix1Worked:${fix1Worked}`
       )
     // failedHashes is a list of accounts that failed to match the hash reported by the server
-    let failedHashes = await this.accountSync.stateManager.checkAndSetAccountData(
+    const failedHashes = await this.accountSync.stateManager.checkAndSetAccountData(
       goodAccounts,
       'syncNonGlobals:processAccountDataNoStateTable',
       true
@@ -809,7 +797,7 @@ export default class SyncTracker {
       this.failedAccounts = this.failedAccounts.concat(failedHashes)
     }
 
-    let accountsSaved = await this.accountSync.stateManager.writeCombinedAccountDataToBackups(
+    const accountsSaved = await this.accountSync.stateManager.writeCombinedAccountDataToBackups(
       goodAccounts,
       failedHashes
     )
@@ -843,7 +831,7 @@ export default class SyncTracker {
       this.accountSync.clearSyncData()
       this.accountSync.skipSync()
       //make sync trackers clean up
-      for (let syncTracker of this.accountSync.syncTrackers) {
+      for (const syncTracker of this.accountSync.syncTrackers) {
         syncTracker.syncFinished = true
       }
 
