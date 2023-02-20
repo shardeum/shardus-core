@@ -4,6 +4,7 @@ export function reversed<T>(thing: Iterable<T>) {
   const reverseIterator = {
     next: () => {
       const done = i < 0
+      // eslint-disable-next-line security/detect-object-injection
       const value = done ? undefined : arr[i]
       i--
       return { value, done }
@@ -26,6 +27,7 @@ export function randomShifted<T>(thing: Iterable<T>) {
   const reverseIterator = {
     next: () => {
       const done = i < 0
+      // eslint-disable-next-line security/detect-object-injection
       const value = done ? undefined : arr[i]
       i--
       return { value, done }

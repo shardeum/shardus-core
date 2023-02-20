@@ -29,7 +29,7 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
       } else if (val instanceof Map) {
         // let mapContainer = {stringifyReduce_map_2_array:[...val.entries()]}
         // return stringifyReduce(mapContainer)
-        let mapContainer = {
+        const mapContainer = {
           dataType: 'stringifyReduce_map_2_array',
           value: Array.from(val.entries()), // or with spread: value: [...originalObject]
         }
@@ -40,9 +40,11 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
           str = '['
           max = val.length - 1
           for (i = 0; i < max; i++) {
+            // eslint-disable-next-line security/detect-object-injection
             str += stringifyReduce(val[i], true) + ','
           }
           if (max > -1) {
+            // eslint-disable-next-line security/detect-object-injection
             str += stringifyReduce(val[i], true)
           }
           return str + ']'
@@ -53,7 +55,9 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
           str = ''
           i = 0
           while (i < max) {
+            // eslint-disable-next-line security/detect-object-injection
             key = keys[i]
+            // eslint-disable-next-line security/detect-object-injection
             propVal = stringifyReduce(val[key], false)
             if (propVal !== undefined) {
               if (str) {
@@ -71,9 +75,10 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
     case 'function':
     case 'undefined':
       return isArrayProp ? null : undefined
-    case 'string':
+    case 'string': {
       const reduced = makeShortHash(val)
       return JSON.stringify(reduced)
+    }
     default:
       if (typeof val === 'bigint') {
         val = val.toString()
@@ -106,12 +111,14 @@ export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean) =>
           str = '['
           max = val.length - 1
           for (i = 0; i < max; i++) {
+            // eslint-disable-next-line security/detect-object-injection
             str += stringifyReduceLimit(val[i], limit - str.length, true) + ','
             if (str.length > limit) {
               return str + 'LIMIT'
             }
           }
           if (max > -1) {
+            // eslint-disable-next-line security/detect-object-injection
             str += stringifyReduceLimit(val[i], limit - str.length, true)
           }
           return str + ']'
@@ -122,7 +129,8 @@ export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean) =>
           str = ''
           i = 0
           while (i < max) {
-            key = keys[i]
+            key = keys[Number(i)]
+            // eslint-disable-next-line security/detect-object-injection
             propVal = stringifyReduceLimit(val[key], limit - str.length, false)
             if (propVal !== undefined) {
               if (str) {
@@ -144,9 +152,10 @@ export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean) =>
     case 'function':
     case 'undefined':
       return isArrayProp ? null : undefined
-    case 'string':
+    case 'string': {
       const reduced = makeShortHash(val)
       return JSON.stringify(reduced)
+    }
     default:
       if (typeof val === 'bigint') {
         val = val.toString()
@@ -183,14 +192,15 @@ export const reviverExpander = (key, value) => {
     }
   }
   if (typeof value === 'string' && value.length === 10 && value[4] === 'x') {
-    let res = value.slice(0, 4) + '0'.repeat(55) + value.slice(5, 5 + 5)
+    const res = value.slice(0, 4) + '0'.repeat(55) + value.slice(5, 5 + 5)
     return res
   }
   return value
 }
 
 //Figure out certain chunky objects and store them in their own table
-export const stringifyReduceMemoize = (val, isArrayProp?: boolean) => {}
+// commenting stringifyReduceMemoize as its not being used anywhere
+//export const stringifyReduceMemoize = (val, isArrayProp?: boolean) => {}
 
 export const reviverMemoize = (key, value) => {
   if (typeof value === 'object' && value !== null) {

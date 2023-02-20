@@ -15,9 +15,6 @@
     "prettier"
   ],
   "ignorePatterns": [
-    "stringifyReduce.ts",
-    "json.ts",
-    "iterables.ts",
     "arrays.ts",
     "FastRandomIterator.ts",
     "sqlite3storage.ts",
