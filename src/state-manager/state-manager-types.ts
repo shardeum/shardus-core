@@ -54,7 +54,7 @@ export type QueueEntry = {
     [x: string]: boolean
   }
 
-  shardusMemoryPatternSets : ShardusMemoryPatternsSets
+  shardusMemoryPatternSets: ShardusMemoryPatternsSets
 
   localCachedData: any
   syncCounter: number
@@ -162,6 +162,7 @@ export type QueueEntry = {
   debug: {
     /** Final data that we are waiting for */
     waitingOn?: string
+    loggedStats1?: boolean
   }
 }
 
@@ -743,10 +744,12 @@ export type RequestStateForTxReqPost = { txid: string; timestamp: number; key: s
 
 export type GetAccountDataWithQueueHintsResp = { accountData: Shardus.WrappedDataFromQueue[] | null }
 
-
 export type RequestAccountQueueCounts = { accountIds: string[] }
-export type QueueCountsResponse = { counts: number[], committingAppData: QueueEntry["acceptedTx"]["appData"][] }
-export type QueueCountsResult = {count: number, committingAppData: Shardus.AcceptedTx["appData"]}
+export type QueueCountsResponse = {
+  counts: number[]
+  committingAppData: QueueEntry['acceptedTx']['appData'][]
+}
+export type QueueCountsResult = { count: number; committingAppData: Shardus.AcceptedTx['appData'] }
 
 export type GlobalAccountReportResp = {
   ready: boolean
@@ -842,8 +845,6 @@ export type DebugDumpPartitions = {
 
 //queue process related:
 export type SeenAccounts = { [accountId: string]: QueueEntry | null }
-
-
 
 export type LocalCachedData = { [accountId: string]: any }
 //export type AllNewTXsById = {[accountId:string]: }
@@ -1175,23 +1176,18 @@ export type CacheTopic = {
 }
 
 export type CacheAppDataResponse = {
-  topic: string,
+  topic: string
   cachedAppData: CachedAppData
 }
 
 export type CacheAppDataRequest = {
-  topic: string,
+  topic: string
   dataId: string
 }
 
-
-
-
-
-
 export type ShardusMemoryPatternsSets = {
-  ro: Set<string>,
-  rw: Set<string>,
-  wo: Set<string>,
-  on: Set<string>,
+  ro: Set<string>
+  rw: Set<string>
+  wo: Set<string>
+  on: Set<string>
 }
