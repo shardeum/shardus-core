@@ -32,7 +32,6 @@
     "TransactionConsensus.ts",
     "SyncTracker.ts",
     "PartitionStats.ts",
-    "PartitionObjects.ts",
     "Depricated.ts",
     "DataSourceHelper.ts",
     "AccountSync.ts",

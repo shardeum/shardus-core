@@ -1,25 +1,19 @@
-import * as Shardus from '../shardus/shardus-types'
-import { StateManager as StateManagerTypes } from '@shardus/types'
-import * as utils from '../utils'
-const stringify = require('fast-stable-stringify')
-
-import Profiler from '../utils/profiler'
-import { P2PModuleContext as P2P } from '../p2p/Context'
-import Storage from '../storage'
+import { Logger as Log4jsLogger } from 'log4js'
+import StateManager from '.'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
+import { P2PModuleContext as P2P } from '../p2p/Context'
+import * as Shardus from '../shardus/shardus-types'
+import Storage from '../storage'
+import * as utils from '../utils'
+import Profiler from '../utils/profiler'
 import ShardFunctions from './shardFunctions'
-import { time } from 'console'
-import StateManager from '.'
-import Depricated from './Depricated'
 import {
   PartitionCycleReport,
   PartitionObject,
   PartitionResult,
   TempTxRecord,
   TxTallyList,
-  CycleShardData,
-  MainHashResults,
 } from './state-manager-types'
 
 class PartitionObjects {
@@ -33,10 +27,10 @@ class PartitionObjects {
   storage: Storage
   stateManager: StateManager
 
-  mainLogger: any
-  fatalLogger: any
-  shardLogger: any
-  statsLogger: any
+  mainLogger: Log4jsLogger
+  fatalLogger: Log4jsLogger
+  shardLogger: Log4jsLogger
+  statsLogger: Log4jsLogger
   statemanager_fatal: (key: string, log: string) => void
 
   nextCycleReportToSend: PartitionCycleReport
@@ -100,7 +94,7 @@ class PartitionObjects {
     this.allPartitionResponsesByCycleByPartition = {}
 
     // the original way this was setup was to reset and apply repair results one partition at a time.
-    // this could create issue if we have a TX spanning multiple paritions that are locally owned.
+    // this could create issue if we have a TX spanning multiple partitions that are locally owned.
     this.resetAndApplyPerPartition = false
   }
 
@@ -123,10 +117,9 @@ class PartitionObjects {
   getPartitionReport(consensusOnly: boolean, smallHashes: boolean): PartitionCycleReport {
     let response: PartitionCycleReport = {} // {res:[], cycleNumber:-1}
     if (this.nextCycleReportToSend != null) {
-      let shardValues = this.stateManager.shardValuesByCycle.get(this.nextCycleReportToSend.cycleNumber)
-      let shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
-      let consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
-      let consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
+      const shardValues = this.stateManager.shardValuesByCycle.get(this.nextCycleReportToSend.cycleNumber)
+      const consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
+      const consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
 
       response = { res: [], cycleNumber: this.nextCycleReportToSend.cycleNumber }
       if (
@@ -135,11 +128,11 @@ class PartitionObjects {
       ) {
         // consensusOnly hashes
         if (smallHashes === true) {
-          for (let r of this.nextCycleReportToSend.res) {
+          for (const r of this.nextCycleReportToSend.res) {
             r.h = utils.makeShortHash(r.h)
           }
         }
-        for (let r of this.nextCycleReportToSend.res) {
+        for (const r of this.nextCycleReportToSend.res) {
           if (consensusOnly) {
             //check if partition is in our range!
             if (
@@ -173,6 +166,7 @@ class PartitionObjects {
    *    ######## ##    ## ########        ##         #######  #### ##    ##    ##     ######
    */
 
+  // eslint-disable-next-line
   setupHandlers() {}
 }
 
