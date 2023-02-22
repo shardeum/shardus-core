@@ -1,30 +1,22 @@
-import * as Shardus from '../shardus/shardus-types'
 import { StateManager as StateManagerTypes } from '@shardus/types'
-import * as utils from '../utils'
-import { P2PModuleContext as P2P } from '../p2p/Context'
+import { Logger as Log4jsLogger } from 'log4js'
+import StateManager from '.'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
+import { P2PModuleContext as P2P } from '../p2p/Context'
+import * as Shardus from '../shardus/shardus-types'
+import * as utils from '../utils'
+import { reversed } from '../utils'
+import Profiler, { profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions'
-import StateManager from '.'
-import { nestedCountersInstance } from '../utils/nestedCounters'
-import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import {
+  CacheAppDataRequest,
+  CacheAppDataResponse,
   CachedAppData,
   CacheTopic,
-  CacheAppDataResponse,
-  CacheAppDataRequest,
   QueueEntry,
-  AccountHashCache,
-  AccountHashCacheMain3,
-  CycleShardData,
-  MainHashResults,
-  AccountHashCacheHistory,
-  AccountHashCacheList,
-  PartitionHashResults,
-  GetAccountDataWithQueueHintsResp,
   StringNodeObjectMap,
 } from './state-manager-types'
-import { reversed } from '../utils'
 
 class CachedAppDataManager {
   app: Shardus.App
@@ -35,10 +27,10 @@ class CachedAppDataManager {
 
   logger: Logger
 
-  mainLogger: any
-  fatalLogger: any
-  shardLogger: any
-  statsLogger: any
+  mainLogger: Log4jsLogger
+  fatalLogger: Log4jsLogger
+  shardLogger: Log4jsLogger
+  statsLogger: Log4jsLogger
 
   statemanager_fatal: (key: string, log: string) => void
   stateManager: StateManager
@@ -77,11 +69,11 @@ class CachedAppDataManager {
   }
 
   setupHandlers() {
-    this.p2p.registerInternal('send_cachedAppData', async (payload: CacheAppDataResponse, respond: any) => {
+    this.p2p.registerInternal('send_cachedAppData', async (payload: CacheAppDataResponse) => {
       profilerInstance.scopedProfileSectionStart('send_cachedAppData')
       try {
-        let cachedAppData = payload.cachedAppData
-        let existingCachedAppData = this.getCachedItem(payload.topic, cachedAppData.dataID)
+        const cachedAppData = payload.cachedAppData
+        const existingCachedAppData = this.getCachedItem(payload.topic, cachedAppData.dataID)
         if (existingCachedAppData) {
           console.log(`We have already processed this cached data`, cachedAppData)
           return
@@ -95,11 +87,11 @@ class CachedAppDataManager {
       }
     })
 
-    this.p2p.registerInternal('get_cached_app_data', async (payload: CacheAppDataRequest, respond: any) => {
+    this.p2p.registerInternal('get_cached_app_data', async (payload: CacheAppDataRequest, respond) => {
       profilerInstance.scopedProfileSectionStart('get_cached_app_data')
       try {
-        let { topic, dataId } = payload
-        let foundCachedAppData = this.getCachedItem(topic, dataId)
+        const { topic, dataId } = payload
+        const foundCachedAppData = this.getCachedItem(topic, dataId)
         if (foundCachedAppData == null) {
           this.mainLogger.error(`Cannot find cached data for topic: ${topic}, dataId: ${dataId}`)
         }
@@ -135,7 +127,7 @@ class CachedAppDataManager {
     return cachedAppData
   }
 
-  insertCachedItem(topic: string, dataID: string, appData: any, cycle: number) {
+  insertCachedItem(topic: string, dataID: string, appData, cycle: number) {
     const cachedAppData: CachedAppData = {
       dataID,
       appData,
@@ -158,7 +150,7 @@ class CachedAppDataManager {
     const filteredCachedAppDataArray: CachedAppData[] = []
     for (const cachedAppData of reversed(cacheTopic.cachedAppDataArray)) {
       count += 1
-      let cycleAge = this.stateManager.currentCycleShardData.cycleNumber - cachedAppData.cycle
+      const cycleAge = this.stateManager.currentCycleShardData.cycleNumber - cachedAppData.cycle
       if (cycleAge > maxCycleAge || count > maxCacheElements) {
         if (logFlags.verbose)
           this.mainLogger.debug(
@@ -179,7 +171,7 @@ class CachedAppDataManager {
   async sendCorrespondingCachedAppData(
     topic: string,
     dataID: string,
-    appData: any,
+    appData: any, // eslint-disable-line @typescript-eslint/no-explicit-any
     cycle: number,
     formId: string,
     txId: string
@@ -197,17 +189,17 @@ class CachedAppDataManager {
     let correspondingAccNodes: Shardus.Node[] = []
     const dataKeysWeHave = []
     const dataValuesWeHave = []
-    const datas: { [accountID: string]: any } = {}
-    const remoteShardsByKey: { [accountID: string]: StateManagerTypes.shardFunctionTypes.NodeShardData } = {} // shard homenodes that we do not have the data for.
+    const dataMap: { [accountID: string]: any } = {} // eslint-disable-line @typescript-eslint/no-explicit-any
+    const remoteShardsByKey: { [accountID: string]: StateManagerTypes.shardFunctionTypes.NodeShardData } = {} // shard home nodes that we do not have the data for.
     let loggedPartition = false
 
-    let localHomeNode = ShardFunctions.findHomeNode(
+    const localHomeNode = ShardFunctions.findHomeNode(
       this.stateManager.currentCycleShardData.shardGlobals,
       fromKey,
       this.stateManager.currentCycleShardData.parititionShardDataMap
     )
 
-    let remoteHomeNode = ShardFunctions.findHomeNode(
+    const remoteHomeNode = ShardFunctions.findHomeNode(
       this.stateManager.currentCycleShardData.shardGlobals,
       dataID,
       this.stateManager.currentCycleShardData.parititionShardDataMap
@@ -245,13 +237,13 @@ class CachedAppDataManager {
         const data = appData
 
         if (isGlobalKey === false) {
-          datas[key] = data
+          dataMap[key] = data // eslint-disable-line security/detect-object-injection
           dataKeysWeHave.push(key)
           dataValuesWeHave.push(data)
         }
         this.insertCachedItem(topic, dataID, data, cycle)
       } else {
-        remoteShardsByKey[key] = remoteHomeNode
+        remoteShardsByKey[key] = remoteHomeNode // eslint-disable-line security/detect-object-injection
       }
     }
 
@@ -262,7 +254,7 @@ class CachedAppDataManager {
     const doOnceNodeAccPair = new Set<string>() //can skip  node+acc if it happens more than once.
 
     for (const key of uniqueKeys) {
-      for (let key2 of uniqueKeys) {
+      for (const key2 of uniqueKeys) {
         if (key !== key2) {
           const ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex(
             (a) => a.id === ourNodeData.node.id
@@ -276,53 +268,53 @@ class CachedAppDataManager {
           const ourSendingGroupSize = localHomeNode.consensusNodeForOurNodeFull.length
           const targetConsensusGroupSize = remoteHomeNode.consensusNodeForOurNodeFull.length
           const targetEdgeGroupSize = remoteHomeNode.edgeNodes.length
-          const pachedListSize = remoteHomeNode.patchedOnNodes.length
-          const indicies = ShardFunctions.debugFastStableCorrespondingIndicies(
+          const patchedListSize = remoteHomeNode.patchedOnNodes.length
+          const indices = ShardFunctions.debugFastStableCorrespondingIndicies(
             ourSendingGroupSize,
             targetConsensusGroupSize,
             ourLocalConsensusIndex + 1
           )
-          const edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(
+          const edgeIndices = ShardFunctions.debugFastStableCorrespondingIndicies(
             ourSendingGroupSize,
             targetEdgeGroupSize,
             ourLocalConsensusIndex + 1
           )
 
-          let patchIndicies = []
+          let patchIndices = []
           if (remoteHomeNode.patchedOnNodes.length > 0) {
-            patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(
+            patchIndices = ShardFunctions.debugFastStableCorrespondingIndicies(
               ourSendingGroupSize,
               remoteHomeNode.patchedOnNodes.length,
               ourLocalConsensusIndex + 1
             )
           }
-          for (const index of indicies) {
+          for (const index of indices) {
             const node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
             if (node != null && node.id !== ourNodeData.node.id) {
               nodesToSendTo[node.id] = node
               consensusNodeIds.push(node.id)
             }
           }
-          for (const index of edgeIndicies) {
+          for (const index of edgeIndices) {
             const node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
             if (node != null && node.id !== ourNodeData.node.id) {
               nodesToSendTo[node.id] = node
               edgeNodeIds.push(node.id)
             }
           }
-          for (const index of patchIndicies) {
+          for (const index of patchIndices) {
             const node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
 
             if (node != null && node.id !== ourNodeData.node.id) {
               nodesToSendTo[node.id] = node
             }
           }
-          let cacheAppDataToSend: CachedAppData = {
+          const cacheAppDataToSend: CachedAppData = {
             dataID,
             appData,
             cycle,
           }
-          let message: CacheAppDataResponse = { topic, cachedAppData: cacheAppDataToSend }
+          const message: CacheAppDataResponse = { topic, cachedAppData: cacheAppDataToSend }
           for (const [accountID, node] of Object.entries(nodesToSendTo)) {
             const keyPair = accountID + key
             if (node != null && doOnceNodeAccPair.has(keyPair) === false) {
@@ -338,13 +330,13 @@ class CachedAppDataManager {
                 dataID,
                 `sendCorrespondingCachedAppData nodesToSendTo:${
                   Object.keys(nodesToSendTo).length
-                } doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${JSON.stringify(
-                  indicies
-                )} edgeIndicies:${JSON.stringify(edgeIndicies)} patchIndicies:${JSON.stringify(
-                  patchIndicies
+                } doOnceNodeAccPair:${doOnceNodeAccPair.size} indices:${JSON.stringify(
+                  indices
+                )} edgeIndicies:${JSON.stringify(edgeIndices)} patchIndicies:${JSON.stringify(
+                  patchIndices
                 )}  doOnceNodeAccPair: ${JSON.stringify([
                   ...doOnceNodeAccPair.keys(),
-                ])} ourLocalConsensusIndex:${ourLocalConsensusIndex} ourSendingGroupSize:${ourSendingGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} pachedListSize:${pachedListSize}`
+                ])} ourLocalConsensusIndex:${ourLocalConsensusIndex} ourSendingGroupSize:${ourSendingGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} patchedListSize:${patchedListSize}`
               )
             }
           }
@@ -359,7 +351,7 @@ class CachedAppDataManager {
               this.stateManager.currentCycleShardData.ourNode.id
             )
             /* prettier-ignore */
-            if (logFlags.playback) this.logger.playbackLogNote("shrd_sendCorrespondingCachedAppData", `${dataID}`, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${dataID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`);
+            if (logFlags.playback) this.logger.playbackLogNote("shrd_sendCorrespondingCachedAppData", `${dataID}`, `remoteRel: ${remoteRelation} localRel: ${localRelation} qId: ${dataID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsensusNodes${utils.stringifyReduce(consensusNodeIds)}`);
 
             // Filter nodes before we send tell()
             const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
@@ -373,10 +365,10 @@ class CachedAppDataManager {
               if (logFlags.error) this.mainLogger.error("tellCorrespondingNodes: filterValidNodesForInternalMessage no valid nodes left to try");
               return null
             }
-            const filterdCorrespondingAccNodes = filteredNodes
+            const filteredCorrespondingAccNodes = filteredNodes
 
             // TODO Perf: need a tellMany enhancement.  that will minimize signing and stringify required!
-            this.p2p.tell(filterdCorrespondingAccNodes, 'send_cachedAppData', message)
+            this.p2p.tell(filteredCorrespondingAccNodes, 'send_cachedAppData', message)
           }
         }
       }
@@ -393,7 +385,7 @@ class CachedAppDataManager {
     if (this.stateManager.currentCycleShardData == null) {
       throw new Error('getLocalOrRemoteCachedAppData: network not ready')
     }
-    let address = dataId
+    const address = dataId
 
     let forceLocalGlobalLookup = false
 
@@ -427,7 +419,6 @@ class CachedAppDataManager {
           true
         ) === false
       ) {
-        //throw new Error(`getLocalOrRemoteAccount: no retry implmented yet`)
         /* prettier-ignore */
         if (logFlags.verbose) this.stateManager.getAccountFailDump(address, "getLocalOrRemoteCachedAppData: isNodeValidForInternalMessage failed, no retry");
         return null
