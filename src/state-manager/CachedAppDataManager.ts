@@ -127,7 +127,7 @@ class CachedAppDataManager {
     return cachedAppData
   }
 
-  insertCachedItem(topic: string, dataID: string, appData, cycle: number) {
+  insertCachedItem(topic: string, dataID: string, appData: unknown, cycle: number) {
     const cachedAppData: CachedAppData = {
       dataID,
       appData,
@@ -171,7 +171,7 @@ class CachedAppDataManager {
   async sendCorrespondingCachedAppData(
     topic: string,
     dataID: string,
-    appData: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    appData: unknown,
     cycle: number,
     formId: string,
     txId: string
