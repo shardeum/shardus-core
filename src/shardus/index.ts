@@ -931,6 +931,8 @@ class Shardus extends EventEmitter {
 
       const injectedTimestamp = this.app.getTimestampFromTransaction(tx, appData)
 
+      //this tx id is not good.. need to ask dapp for it!
+      //may be moot though where it matters
       const txId = this.crypto.hash(tx)
       let timestampReceipt: ShardusTypes.TimestampReceipt
       if (!injectedTimestamp || injectedTimestamp === -1) {
@@ -1099,11 +1101,25 @@ class Shardus extends EventEmitter {
   }
 
   /**
-   * This function return number of active in the latest cycle. 
+   * This function return number of active in the latest cycle.
    */
-  getNumActiveNodes(){
-    const latestCycle = this.p2p.getLatestCycles(1)[0];
-    return latestCycle ? latestCycle.active : 0;
+  getNumActiveNodes() {
+    let lastCycle = CycleChain.getNewest()
+    if (lastCycle == null) {
+      nestedCountersInstance.countEvent('debug', 'getNumActiveNodes lastCycle == null')
+      return 0
+    }
+    nestedCountersInstance.countEvent('debug', `getNumActiveNodes lastCycle.active: ${lastCycle.active}`)
+
+    const latestCycle = this.p2p.getLatestCycles(1)[0]
+
+    if (latestCycle == null) {
+      nestedCountersInstance.countEvent('debug', 'getNumActiveNodes latestCycle == null')
+      return 0
+    }
+    nestedCountersInstance.countEvent('debug', `getNumActiveNodes latestCycle.active: ${latestCycle.active}`)
+
+    return latestCycle ? latestCycle.active : 0
   }
 
   /**
@@ -1653,6 +1669,13 @@ class Shardus extends EventEmitter {
       } else {
         applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) =>
           'getAccountDebugValue() missing on app'
+      }
+
+      //getSimpleTxDebugValue(tx)
+      if (typeof application.getSimpleTxDebugValue === 'function') {
+        applicationInterfaceImpl.getSimpleTxDebugValue = (tx) => application.getSimpleTxDebugValue(tx)
+      } else {
+        applicationInterfaceImpl.getSimpleTxDebugValue = (tx) => ''
       }
 
       if (typeof application.canDebugDropTx === 'function') {

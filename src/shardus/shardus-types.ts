@@ -276,6 +276,8 @@ export interface App {
 
   getAccountDebugValue: (wrappedAccount: WrappedData) => string
 
+  getSimpleTxDebugValue?: (tx: unknown) => string
+
   canDebugDropTx?: (tx: unknown) => boolean
 
   /**

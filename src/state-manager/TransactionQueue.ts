@@ -3960,6 +3960,7 @@ class TransactionQueue {
                     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`processAcceptedTxQueue2 txResult problem txid:${queueEntry.logID} res: ${utils.stringifyReduce(txResult)} `)
                     queueEntry.waitForReceiptOnly = true
                     queueEntry.state = 'consensing'
+                    //TODO: need to flag this case so that it does not artificially increase the network load
                   }
                 } catch (ex) {
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug('processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -4563,6 +4564,8 @@ class TransactionQueue {
     queueEntry.state = 'expired'
     this.removeFromQueue(queueEntry, currentIndex)
 
+    /* prettier-ignore */ nestedCountersInstance.countEvent( 'txExpired', `tx: ${this.app.getSimpleTxDebugValue(queueEntry.acceptedTx?.data)}` )
+
     //This is really important.  If we are going to expire a TX, then look to see if we already have a receipt for it.
     //If so, then just go into async receipt repair mode for the TX AFTER it has been expired and removed from the queue
     if (queueEntry.appliedReceiptFinal2 != null) {
@@ -5062,7 +5065,7 @@ class TransactionQueue {
     let consenusGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull
 
     // remove excluded consensus nodes
-    let filteredConsensusGroup = consenusGroup.filter(node => excludeNodeIds.indexOf(node.id) === -1)
+    let filteredConsensusGroup = consenusGroup.filter((node) => excludeNodeIds.indexOf(node.id) === -1)
     return filteredConsensusGroup[Math.floor(Math.random() * filteredConsensusGroup.length)]
   }
 
