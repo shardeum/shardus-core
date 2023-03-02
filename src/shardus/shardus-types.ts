@@ -1077,3 +1077,9 @@ export type SignAppDataResult = {
   success: boolean
   signature: Sign
 }
+
+export interface ValidatorNodeDetails {
+  ip: string
+  port: number
+  publicKey: string
+}
