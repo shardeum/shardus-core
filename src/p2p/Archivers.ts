@@ -24,12 +24,23 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 let p2pLogger
 
 export let archivers: Map<P2P.ArchiversTypes.JoinedArchiver['publicKey'], P2P.ArchiversTypes.JoinedArchiver>
-let recipients: Map<P2P.ArchiversTypes.JoinedArchiver['publicKey'], P2P.ArchiversTypes.DataRecipient>
+// TODO: Update any with appropriate type
+export let recipients: Map<
+  P2P.ArchiversTypes.JoinedArchiver['publicKey'],
+  P2P.ArchiversTypes.DataRecipient | any
+>
 
 let joinRequests: P2P.ArchiversTypes.Request[]
 let leaveRequests: P2P.ArchiversTypes.Request[]
 let receiptForwardInterval: Timeout | null = null
 export let connectedSockets = {}
+let lastSentCycle = -1
+let maxArchiversSupport = 2 // Make this as part of the network config
+
+export enum DataRequestTypes {
+  SUBSCRIBE = 'SUBSCRIBE',
+  UNSUBSCRIBE = 'UNSUBSCRIBE',
+}
 
 /** FUNCTIONS */
 
@@ -235,6 +246,7 @@ export function updateArchivers(record) {
   }
 }
 
+// Add data type of dataRequests used in experimentalSnapshot
 export function addDataRecipient(
   nodeInfo: P2P.ArchiversTypes.JoinedArchiver,
   dataRequests: P2P.ArchiversTypes.DataRequest<
@@ -242,6 +254,17 @@ export function addDataRecipient(
   >[]
 ) {
   if (logFlags.console) console.log('Adding data recipient..', arguments)
+  if (config.p2p.experimentalSnapshot) {
+    const recipient = {
+      nodeInfo,
+      dataRequestCycle: dataRequests['dataRequestCycle'],
+      curvePk: crypto.convertPublicKeyToCurve(nodeInfo.publicKey),
+    }
+    lastSentCycle = recipient.dataRequestCycle - 1
+    if (logFlags.console) console.log(`dataRequests: ${nodeInfo.ip}:${nodeInfo.port}`)
+    recipients.set(nodeInfo.publicKey, recipient)
+    return
+  }
   const recipient = {
     nodeInfo,
     // TODO: dataRequest should be an array
@@ -341,6 +364,45 @@ export function removeDataRecipient(publicKey) {
 export function sendData() {
   if (logFlags.console) console.log('Recient List before sending data')
   if (logFlags.console) console.log(recipients)
+  const responses: P2P.ArchiversTypes.DataResponse['responses'] = {}
+  if (config.p2p.experimentalSnapshot) {
+    if (recipients.size === 0) return
+    // Get latest cycles since lastSentCycle
+    const cycleRecords = getCycleChain(lastSentCycle + 1)
+    const cyclesWithMarker = []
+    for (let i = 0; i < cycleRecords.length; i++) {
+      if (logFlags.console)
+        console.log('cycleRecords counter to sent to the archiver', cycleRecords[i].counter)
+      cyclesWithMarker.push({
+        ...cycleRecords[i],
+        marker: computeCycleMarker(cycleRecords[i]),
+      })
+    }
+    // Update lastSentCycle
+    if (cyclesWithMarker.length > 0) {
+      lastSentCycle = cyclesWithMarker[cyclesWithMarker.length - 1].counter
+    }
+    // Add to responses
+    responses.CYCLE = cyclesWithMarker
+    for (const [publicKey, recipient] of recipients) {
+      const dataResponse: P2P.ArchiversTypes.DataResponse = {
+        publicKey: crypto.getPublicKey(),
+        responses,
+        recipient: publicKey,
+      }
+      // Tag dataResponse
+      const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
+      try {
+        // console.log('connected socketes', publicKey, connectedSockets)
+        if (io.sockets.sockets[connectedSockets[publicKey]])
+          io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
+        else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
+      } catch (e) {
+        error('Run into issue in forwarding cycles data', e)
+      }
+    }
+    return
+  }
   for (const [publicKey, recipient] of recipients) {
     // const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
     const responses: P2P.ArchiversTypes.DataResponse['responses'] = {}
@@ -465,6 +527,9 @@ export function addArchiverConnection(publicKey, socketId) {
 }
 
 export function removeArchiverConnection(publicKey) {
+  if (io.sockets.sockets[connectedSockets[publicKey]]) {
+    io.sockets.sockets[connectedSockets[publicKey]].disconnect()
+  }
   delete connectedSockets[publicKey]
 }
 
@@ -580,6 +645,21 @@ export function registerRoutes() {
     }
 
     info('Tag in data request is valid')
+    if (config.p2p.experimentalSnapshot) {
+      if (dataRequest.dataRequestType === DataRequestTypes.SUBSCRIBE) {
+        if (recipients.size >= maxArchiversSupport) {
+          const maxArchiversSupportErr = 'Max archivers support reached'
+          warn(maxArchiversSupportErr)
+          return res.json({ success: false, error: maxArchiversSupportErr })
+        }
+        addDataRecipient(dataRequest.nodeInfo, dataRequest)
+      }
+      if (dataRequest.dataRequestType === DataRequestTypes.UNSUBSCRIBE) {
+        removeDataRecipient(dataRequest.publicKey)
+        removeArchiverConnection(dataRequest.publicKey)
+      }
+      return res.json({ success: true })
+    }
 
     delete dataRequest.publicKey
     delete dataRequest.tag

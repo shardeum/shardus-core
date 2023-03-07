@@ -286,6 +286,13 @@ async function contactArchiver() {
     if (Archivers.addJoinRequest(joinRequest) === false) {
       throw Error('Fatal: _getSeedNodes archivers join request not accepted by us!')
     }
+    if (Context.config.p2p.experimentalSnapshot) {
+      const firstNodeDataRequest: any = {
+        dataRequestCycle: activeNodesSigned.dataRequestCycle,
+      }
+      Archivers.addDataRecipient(joinRequest.nodeInfo, firstNodeDataRequest)
+      return activeNodesSigned.nodeList
+    }
   }
   const dataRequestCycle = activeNodesSigned.dataRequestCycle
   const dataRequestStateMetaData = activeNodesSigned.dataRequestStateMetaData

@@ -380,26 +380,25 @@ class Shardus extends EventEmitter {
     try {
       this.io = (await this.network.setup(Network.ipInfo)) as SocketIO.Server
       Context.setIOContext(this.io)
-      let maxArchiversSupport = 2 // Make this as part of the network config
       this.io.on('connection', (socket: any) => {
         console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
         socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
           console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
-          for (const [key, value] of Object.entries(Archivers.connectedSockets)) {
-            if (key === ARCHIVER_PUBLIC_KEY) {
+          if (Archivers.recipients.get(ARCHIVER_PUBLIC_KEY)) {
+            if (Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY]) {
               Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
             }
-          }
-          if (Object.keys(Archivers.connectedSockets).length >= maxArchiversSupport) {
-            console.log(`There are already ${maxArchiversSupport} archivers connected for data transfer!`)
+            Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
+          } else {
             socket.disconnect()
-            return
+            console.log(
+              'Archiver is not found in the recipients list and kill the socket connection',
+              ARCHIVER_PUBLIC_KEY
+            )
           }
-          Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
         })
         socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
           console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
-          Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
           Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
         })
       })
