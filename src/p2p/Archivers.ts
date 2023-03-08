@@ -260,7 +260,11 @@ export function addDataRecipient(
       dataRequestCycle: dataRequests['dataRequestCycle'],
       curvePk: crypto.convertPublicKeyToCurve(nodeInfo.publicKey),
     }
-    lastSentCycle = recipient.dataRequestCycle - 1
+    if (lastSentCycle > recipient.dataRequestCycle) {
+      // If the dataRequestCycle is behind many cycles, Set it to 10 cycles before the current cycle
+      if (lastSentCycle - recipient.dataRequestCycle > 10) lastSentCycle = lastSentCycle - 10
+      else lastSentCycle = recipient.dataRequestCycle
+    }
     if (logFlags.console) console.log(`dataRequests: ${nodeInfo.ip}:${nodeInfo.port}`)
     recipients.set(nodeInfo.publicKey, recipient)
     return
@@ -366,7 +370,10 @@ export function sendData() {
   if (logFlags.console) console.log(recipients)
   const responses: P2P.ArchiversTypes.DataResponse['responses'] = {}
   if (config.p2p.experimentalSnapshot) {
-    if (recipients.size === 0) return
+    if (recipients.size === 0) {
+      lastSentCycle = CycleCreator.currentCycle
+      return
+    }
     // Get latest cycles since lastSentCycle
     const cycleRecords = getCycleChain(lastSentCycle + 1)
     const cyclesWithMarker = []
