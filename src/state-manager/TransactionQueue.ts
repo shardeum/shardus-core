@@ -570,10 +570,15 @@ class TransactionQueue {
       if (this.config.debug.checkTxGroupChanges && applyResponse.accountWrites.length > 0) {
         let transactionGroupIDs = new Set(queueEntry.transactionGroup.map((node) => node.id))
         for (let account of applyResponse.accountWrites) {
+          let txGroupCycle = queueEntry.txGroupCycle
+          if (txGroupCycle > CycleChain.newest.counter) {
+            txGroupCycle = CycleChain.newest.counter
+          }
+          let cycleShardDataForTx = this.stateManager.shardValuesByCycle.get(txGroupCycle)
           const homeNode = ShardFunctions.findHomeNode(
-            this.stateManager.currentCycleShardData.shardGlobals,
+            cycleShardDataForTx.shardGlobals,
             account.accountId,
-            this.stateManager.currentCycleShardData.parititionShardDataMap
+            cycleShardDataForTx.parititionShardDataMap
           )
           let isUnexpectedAccountWrite = false
           for (let storageNode of homeNode.nodeThatStoreOurParitionFull) {
