@@ -147,5 +147,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,
+  features: {
+    fixHomeNodeCheckForTXGroupChanges: false,
+  },
 }
 export default SERVER_CONFIG
