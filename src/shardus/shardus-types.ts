@@ -841,6 +841,11 @@ export interface ServerConfiguration {
     /** Sets if the execute in one shard feature is active */
     executeInOneShard?: boolean
   }
+  /** Options for enabling features on the network at specific versions */
+  features?: {
+    /** Enabled at shardeum v1.1.3. Fixes homeNode check for TX group changes: https://gitlab.com/shardus/global/shardus-global-server/-/merge_requests/268 */
+    fixHomeNodeCheckForTXGroupChanges?: boolean
+  }
 }
 
 export interface LogsConfiguration {
