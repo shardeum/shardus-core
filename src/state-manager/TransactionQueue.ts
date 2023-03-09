@@ -575,11 +575,21 @@ class TransactionQueue {
             txGroupCycle = CycleChain.newest.counter
           }
           let cycleShardDataForTx = this.stateManager.shardValuesByCycle.get(txGroupCycle)
-          const homeNode = ShardFunctions.findHomeNode(
-            cycleShardDataForTx.shardGlobals,
-            account.accountId,
-            cycleShardDataForTx.parititionShardDataMap
-          )
+          const fixHomeNodeCheckForTXGroupChanges =
+            this.config.features.fixHomeNodeCheckForTXGroupChanges ?? false
+
+          const homeNode = fixHomeNodeCheckForTXGroupChanges
+            ? ShardFunctions.findHomeNode(
+                cycleShardDataForTx.shardGlobals,
+                account.accountId,
+                cycleShardDataForTx.parititionShardDataMap
+              )
+            : ShardFunctions.findHomeNode(
+                this.stateManager.currentCycleShardData.shardGlobals,
+                account.accountId,
+                this.stateManager.currentCycleShardData.parititionShardDataMap
+              )
+
           let isUnexpectedAccountWrite = false
           for (let storageNode of homeNode.nodeThatStoreOurParitionFull) {
             let isStorageNodeInTxGroup = transactionGroupIDs.has(storageNode.id)
