@@ -42,6 +42,10 @@ export enum DataRequestTypes {
   UNSUBSCRIBE = 'UNSUBSCRIBE',
 }
 
+// This is to check if the new archiver data subscriptions feature is activated in shardeum v1.1.3
+// We can remove later after v1.1.3 upgrade
+export let archiverDataSubscriptionsUpdateFeatureActivated = false
+
 /** FUNCTIONS */
 
 /** CycleCreator Functions */
@@ -254,7 +258,19 @@ export function addDataRecipient(
   >[]
 ) {
   if (logFlags.console) console.log('Adding data recipient..', arguments)
-  if (config.p2p.experimentalSnapshot) {
+  if (config.p2p.experimentalSnapshot && config.features.archiverDataSubscriptionsUpdate) {
+    // This is to flush out previous archiver connections when it first activated
+    if (!archiverDataSubscriptionsUpdateFeatureActivated) {
+      console.log('archiverDataSubscriptionsUpdateFeatureActivated', connectedSockets, recipients)
+      for (const [key, value] of Object.entries(connectedSockets)) {
+        removeArchiverConnection(key)
+      }
+      for (const [key, value] of recipients) {
+        recipients.delete(key)
+      }
+      archiverDataSubscriptionsUpdateFeatureActivated = true
+      console.log('archiverDataSubscriptionsUpdateFeatureActivated', connectedSockets, recipients)
+    }
     const recipient = {
       nodeInfo,
       dataRequestCycle: dataRequests['dataRequestCycle'],
@@ -369,7 +385,7 @@ export function sendData() {
   if (logFlags.console) console.log('Recient List before sending data')
   if (logFlags.console) console.log(recipients)
   const responses: P2P.ArchiversTypes.DataResponse['responses'] = {}
-  if (config.p2p.experimentalSnapshot) {
+  if (config.p2p.experimentalSnapshot && config.features.archiverDataSubscriptionsUpdate) {
     if (recipients.size === 0) {
       lastSentCycle = CycleCreator.currentCycle
       return
@@ -652,7 +668,7 @@ export function registerRoutes() {
     }
 
     info('Tag in data request is valid')
-    if (config.p2p.experimentalSnapshot) {
+    if (config.p2p.experimentalSnapshot && config.features.archiverDataSubscriptionsUpdate) {
       if (dataRequest.dataRequestType === DataRequestTypes.SUBSCRIBE) {
         if (recipients.size >= maxArchiversSupport) {
           const maxArchiversSupportErr = 'Max archivers support reached'

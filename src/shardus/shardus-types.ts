@@ -845,6 +845,8 @@ export interface ServerConfiguration {
   features?: {
     /** Enabled at shardeum v1.1.3. Fixes homeNode check for TX group changes: https://gitlab.com/shardus/global/shardus-global-server/-/merge_requests/268 */
     fixHomeNodeCheckForTXGroupChanges?: boolean
+    /** To enable at shardeum v1.1.3 */
+    archiverDataSubscriptionsUpdate?: boolean
   }
 }
 

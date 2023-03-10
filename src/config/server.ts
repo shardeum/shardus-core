@@ -149,6 +149,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
   mode: ServerMode.Debug,
   features: {
     fixHomeNodeCheckForTXGroupChanges: false,
+    archiverDataSubscriptionsUpdate: false,
   },
 }
 export default SERVER_CONFIG
