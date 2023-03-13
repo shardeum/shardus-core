@@ -183,7 +183,7 @@ class CachedAppDataManager {
       throw new Error('sendCorrespondingCachedAppData: dataId == null')
     }
     const queueEntry: QueueEntry = this.stateManager.transactionQueue.getQueueEntry(txId)
-    const fromKey = queueEntry.executionShardKey
+    const fromKey = queueEntry.executionShardKey ? queueEntry.executionShardKey : queueEntry.txKeys.allKeys[0]
     const uniqueKeys = [fromKey, dataID]
     const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
     let correspondingAccNodes: Shardus.Node[] = []
