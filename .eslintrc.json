@@ -22,7 +22,6 @@
     "**/crypto/index.ts",
     "betterSqlite3storage.ts",
     "state-manager-types.ts",
-    "TransactionQueue.ts",
     "PartitionStats.ts",
     "DataSourceHelper.ts",
     "AccountSync.ts",
