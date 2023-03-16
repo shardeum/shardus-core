@@ -32,6 +32,14 @@ import {
   QueueCountsResult,
 } from './state-manager-types'
 
+import stringify from 'fast-stable-stringify'
+import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
+import { Logger as L4jsLogger } from 'log4js';
+
+interface Receipt {
+    tx: AcceptedTx,
+}
+
 const txStatBucketSize = {
   default: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 10000],
 }
@@ -47,10 +55,10 @@ class TransactionQueue {
   storage: Storage
   stateManager: StateManager
 
-  mainLogger: any
-  fatalLogger: any
-  shardLogger: any
-  statsLogger: any
+  mainLogger: L4jsLogger
+  fatalLogger: L4jsLogger
+  shardLogger: L4jsLogger
+  statsLogger: L4jsLogger
   statemanager_fatal: (key: string, log: string) => void
 
   newAcceptedTxQueue: QueueEntry[]
@@ -61,7 +69,7 @@ class TransactionQueue {
   newAcceptedTxQueueByID: Map<string, QueueEntry>
   newAcceptedTxQueueTempInjestByID: Map<string, QueueEntry>
   archivedQueueEntriesByID: Map<string, QueueEntry>
-  receiptsToForward: any[]
+  receiptsToForward: Receipt[]
   forwardedReceipts: Map<string, boolean>
   oldNotForwardedReceipts: Map<string, boolean>
   lastReceiptForwardResetTimestamp: number
@@ -79,7 +87,7 @@ class TransactionQueue {
 
   executeInOneShard: boolean
 
-  txCoverageMap: any
+  txCoverageMap: { [key: symbol]: unknown }
 
   /** This is a set of updates to rework how TXs can time out in the queue.  After a enough testing this should become the default and we can remove the old code */
   queueTimingFixes: boolean
@@ -149,7 +157,7 @@ class TransactionQueue {
       this.executeInOneShard = true
     }
 
-    this.txCoverageMap = new Map()
+    this.txCoverageMap = {}
 
     this.queueTimingFixes = true
 
@@ -235,7 +243,7 @@ class TransactionQueue {
 
     this.p2p.registerInternal(
       'spread_tx_to_group_syncing',
-      async (payload: Shardus.AcceptedTx, respondWrapped, sender) => {
+      async (payload: Shardus.AcceptedTx, _respondWrapped: unknown, sender: Node) => {
         profilerInstance.scopedProfileSectionStart('spread_tx_to_group_syncing')
         try {
           //handleSharedTX will also validate fields
@@ -248,7 +256,7 @@ class TransactionQueue {
 
     this.p2p.registerGossipHandler(
       'spread_tx_to_group',
-      async (payload, sender, tracker, msgSize: number) => {
+      async (payload: { data: Shardus.OpaqueTransaction; appData: unknown }, sender: Node, tracker: string, msgSize: number) => {
         profilerInstance.scopedProfileSectionStart('spread_tx_to_group', false, msgSize)
         let respondSize = cUninitializedSize
         try {
@@ -294,7 +302,7 @@ class TransactionQueue {
      */
     this.p2p.registerInternal(
       'request_state_for_tx',
-      async (payload: RequestStateForTxReq, respond: (arg0: RequestStateForTxResp) => any) => {
+      async (payload: RequestStateForTxReq, respond: (arg0: RequestStateForTxResp) => unknown) => {
         profilerInstance.scopedProfileSectionStart('request_state_for_tx')
         try {
           const response: RequestStateForTxResp = { stateList: [], beforeHashes: {}, note: '', success: false }
@@ -330,7 +338,7 @@ class TransactionQueue {
     )
   }
 
-  handleSharedTX(tx: Shardus.OpaqueTransaction, appData: any, sender: Shardus.Node): QueueEntry {
+  handleSharedTX(tx: Shardus.OpaqueTransaction, appData: unknown, sender: Shardus.Node): QueueEntry {
     // Perform fast validation of the transaction fields
     const validateResult = this.app.validate(tx, appData)
     if (validateResult.success === false) {
@@ -1055,7 +1063,7 @@ class TransactionQueue {
 
   routeAndQueueAcceptedTransaction(
     acceptedTx: AcceptedTx,
-    sendGossip: boolean = true,
+    sendGossip = true,
     sender: Shardus.Node | null,
     globalModification: boolean,
     noConsensus: boolean
@@ -1691,7 +1699,7 @@ class TransactionQueue {
 
           // find a random node to ask that is not us
           let node = null
-          let randomIndex
+          let randomIndex: number
           let foundValidNode = false
           let maxTries = 1000
 
@@ -2089,7 +2097,7 @@ class TransactionQueue {
    * @param {QueueEntry} queueEntry
    * @returns {Node[]}
    */
-  queueEntryGetTransactionGroup(queueEntry: QueueEntry, tryUpdate: boolean = false): Shardus.Node[] {
+  queueEntryGetTransactionGroup(queueEntry: QueueEntry, tryUpdate = false): Shardus.Node[] {
     if (this.stateManager.currentCycleShardData == null) {
       throw new Error('queueEntryGetTransactionGroup: currentCycleShardData == null')
     }
@@ -2456,7 +2464,7 @@ class TransactionQueue {
       return
     }
 
-    let message
+    let message: { stateList: unknown[]; txid: string }
     let edgeNodeIds = []
     let consensusNodeIds = []
 
@@ -2700,7 +2708,7 @@ class TransactionQueue {
       return
     }
 
-    let message
+    let message: { stateList: unknown[]; txid: string }
     let edgeNodeIds = []
     let consensusNodeIds = []
 
@@ -2889,7 +2897,7 @@ class TransactionQueue {
     }
     const keysToShare = Object.keys(wrappedStates)
 
-    let message
+    let message: { stateList: Shardus.WrappedResponse[]; txid: string }
     let edgeNodeIds = []
     let consensusNodeIds = []
 
@@ -4573,7 +4581,7 @@ class TransactionQueue {
   }
 
   addReceiptToForward(queueEntry: QueueEntry) {
-    const netId: string = '123abc'
+    const netId = '123abc'
     // const receipt = this.stateManager.getReceipt(queueEntry)
     // const status = receipt.result === true ? 'applied' : 'rejected'
     const status = this.stateManager.getReceiptResult(queueEntry) === true ? 'applied' : 'rejected'
@@ -5101,7 +5109,7 @@ class TransactionQueue {
     return length
   }
 
-  getAccountQueueCount(accountID: string, remote: boolean = false): QueueCountsResult {
+  getAccountQueueCount(accountID: string, remote = false): QueueCountsResult {
     nestedCountersInstance.countEvent('stateManager', `getAccountQueueCount`)
     let count = 0
     const committingAppData: Shardus.AcceptedTx['appData'] = []
