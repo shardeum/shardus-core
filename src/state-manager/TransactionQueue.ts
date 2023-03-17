@@ -34,10 +34,10 @@ import {
 
 import stringify from 'fast-stable-stringify'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
-import { Logger as L4jsLogger } from 'log4js';
+import { Logger as L4jsLogger } from 'log4js'
 
 interface Receipt {
-    tx: AcceptedTx,
+  tx: AcceptedTx
 }
 
 const txStatBucketSize = {
@@ -256,7 +256,12 @@ class TransactionQueue {
 
     this.p2p.registerGossipHandler(
       'spread_tx_to_group',
-      async (payload: { data: Shardus.OpaqueTransaction; appData: unknown }, sender: Node, tracker: string, msgSize: number) => {
+      async (
+        payload: { data: Shardus.OpaqueTransaction; appData: unknown },
+        sender: Node,
+        tracker: string,
+        msgSize: number
+      ) => {
         profilerInstance.scopedProfileSectionStart('spread_tx_to_group', false, msgSize)
         let respondSize = cUninitializedSize
         try {
@@ -305,7 +310,12 @@ class TransactionQueue {
       async (payload: RequestStateForTxReq, respond: (arg0: RequestStateForTxResp) => unknown) => {
         profilerInstance.scopedProfileSectionStart('request_state_for_tx')
         try {
-          const response: RequestStateForTxResp = { stateList: [], beforeHashes: {}, note: '', success: false }
+          const response: RequestStateForTxResp = {
+            stateList: [],
+            beforeHashes: {},
+            note: '',
+            success: false,
+          }
           // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
           let queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
           if (queueEntry == null) {
@@ -506,9 +516,7 @@ class TransactionQueue {
         wrappedState.prevDataCopy = utils.deepCopy(wrappedState.data)
 
         // important to update the wrappedState timestamp here to prevent bad timestamps from propagating the system
-        const { timestamp: updatedTimestamp } = this.app.getTimestampAndHashFromAccount(
-          wrappedState.data
-        )
+        const { timestamp: updatedTimestamp } = this.app.getTimestampAndHashFromAccount(wrappedState.data)
         wrappedState.timestamp = updatedTimestamp
 
         // check if current account timestamp is too new for this TX
@@ -4391,7 +4399,6 @@ class TransactionQueue {
                   //} finally {
                   this.profiler.profileSectionEnd('commit')
                   //}
-
                 }
 
                 if (this.config.p2p.experimentalSnapshot) this.addReceiptToForward(queueEntry)
