@@ -37,13 +37,10 @@ export default class DataSourceHelper {
       return
     }
 
-    let queryLow
-    let queryHigh
+    const queryLow = lowAddress
+    const queryHigh = highAddress
 
-    queryLow = lowAddress
-    queryHigh = highAddress
-
-    let centerNode = ShardFunctions.getCenterHomeNode(
+    const centerNode = ShardFunctions.getCenterHomeNode(
       this.stateManager.currentCycleShardData.shardGlobals,
       this.stateManager.currentCycleShardData.parititionShardDataMap,
       lowAddress,
@@ -61,12 +58,12 @@ export default class DataSourceHelper {
       this.stateManager.p2p.id,
       40
     )
-    let nodesInProximity = nodes.length
+    const nodesInProximity = nodes.length
     nodes = nodes.filter(this.removePotentiallyRemovedNodes)
-    let filteredNodes1 = nodes.length
-    let filteredNodes = []
-    for (let node of nodes) {
-      let nodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(node.id)
+    const filteredNodes1 = nodes.length
+    const filteredNodes = []
+    for (const node of nodes) {
+      const nodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(node.id)
       if (nodeShardData != null) {
         if (ShardFunctions.testAddressInRange(queryLow, nodeShardData.consensusPartitions) === false) {
           /* prettier-ignore */ if (logFlags.error) this.stateManager.mainLogger.error(`node cant fit range: queryLow:${queryLow}  ${utils.stringifyReduce(nodeShardData.consensusPartitions)}  `)
@@ -80,7 +77,7 @@ export default class DataSourceHelper {
       }
     }
     nodes = filteredNodes
-    let filteredNodes2 = nodes.length
+    const filteredNodes2 = nodes.length
     if (nodes.length > 0) {
       this.dataSourceNodeList = nodes
       this.dataSourceNode = nodes[Math.floor(Math.random() * nodes.length)]
@@ -125,7 +122,7 @@ export default class DataSourceHelper {
 
   tryRestartList(debugString): boolean {
     this.dataSourceNodeIndex = 0
-    let numNodes = this.dataSourceNodeList.length
+    const numNodes = this.dataSourceNodeList.length
 
     //allow a list restart if we have a small number of nodes
     if (numNodes > 3) {
