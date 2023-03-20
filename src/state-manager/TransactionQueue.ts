@@ -3075,11 +3075,10 @@ class TransactionQueue {
     }
     const lines = []
     lines.push(`=> Total Transactions: ${totalTxCount}`)
-    for (const key in collector) {
+    for (const [key, collectorForThisKey] of Object.entries(collector)) {
       lines.push(`\n => Tx ${key}: \n`)
-      const collectorForThisKey = collector[key]
       for (let i = 0; i < Object.keys(collectorForThisKey).length; i++) {
-        const time = Object.keys(collectorForThisKey)[i]
+        const time = Object.keys(collectorForThisKey).at(i)
         const arr = collectorForThisKey[time]
         if (!arr) continue
         const percentage = (arr.length / totalTxCount) * 100
@@ -3257,14 +3256,14 @@ class TransactionQueue {
           // reverse loop because the news (largest timestamp) values are at the end of the array
           // todo faster version (binary search? to find where we need to insert)
           let index = this.newAcceptedTxQueue.length - 1
-          let lastTx = this.newAcceptedTxQueue[index]
+          let lastTx = this.newAcceptedTxQueue.at(index)
           while (
             index >= 0 &&
             (timestamp > lastTx.txKeys.timestamp ||
               (timestamp === lastTx.txKeys.timestamp && txId < lastTx.acceptedTx.txId))
           ) {
             index--
-            lastTx = this.newAcceptedTxQueue[index]
+            lastTx = this.newAcceptedTxQueue.at(index)
           }
 
           const age = Date.now() - timestamp
@@ -3341,7 +3340,7 @@ class TransactionQueue {
         if (currentIndex < 0) {
           break
         }
-        const queueEntry: QueueEntry = this.newAcceptedTxQueue[currentIndex]
+        const queueEntry: QueueEntry = this.newAcceptedTxQueue.at(currentIndex)
         const txTime = queueEntry.txKeys.timestamp
         const txAge = currentTime - txTime
         // current queue entry is younger than timeM, so nothing to do yet.
@@ -4208,8 +4207,8 @@ class TransactionQueue {
                   this.stateManager.currentCycleShardData.nodeShardData
 
                 for (let i = 0; i < vote.account_id.length; i++) {
-                  const accountID = vote.account_id[i]
-                  const accountHash = vote.account_state_hash_after[i]
+                  const accountID = vote.account_id.at(i)
+                  const accountHash = vote.account_state_hash_after.at(i)
 
                   //only check for stored keys.
                   if (
@@ -4247,7 +4246,7 @@ class TransactionQueue {
                   const rawAccounts = []
                   const accountRecords: Shardus.WrappedData[] = []
                   for (let i = 0; i < vote.account_id.length; i++) {
-                    const accountID = vote.account_id[i]
+                    const accountID = vote.account_id.at(i)
                     //skip accounts we don't store
                     if (accountsNotStored.has(accountID)) {
                       continue
