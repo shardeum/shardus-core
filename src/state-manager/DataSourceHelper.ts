@@ -1,28 +1,7 @@
 import * as Shardus from '../shardus/shardus-types'
-import { StateManager as StateManagerTypes } from '@shardus/types'
 import * as utils from '../utils'
-const stringify = require('fast-stable-stringify')
-
-import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
-
-//import { SimpleRange } from "./state-manager-types"
-import {
-  SimpleRange,
-  AccountStateHashReq,
-  AccountStateHashResp,
-  GetAccountStateReq,
-  GetAccountData3Req,
-  GetAccountDataByRangeSmart,
-  GlobalAccountReportResp,
-  GetAccountData3Resp,
-  CycleShardData,
-  QueueEntry,
-} from './state-manager-types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import AccountSync from './AccountSync'
 import { logFlags } from '../logger'
-import { errorToStringFull } from '../utils'
-import * as Comms from '../p2p/Comms'
 import ShardFunctions from './shardFunctions'
 import StateManager from '.'
 import { potentiallyRemoved } from '../p2p/NodeList'
