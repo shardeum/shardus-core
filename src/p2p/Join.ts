@@ -22,6 +22,7 @@ import { isPortReachable } from '../utils/isPortReachable'
 /** STATE */
 
 let p2pLogger
+let mainLogger 
 
 let requests: P2P.JoinTypes.JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
@@ -141,7 +142,7 @@ const routes = {
 
 export function init() {
   p2pLogger = logger.getLogger('p2p')
-
+  mainLogger = logger.getLogger('main')
   // Init state
   reset()
 
@@ -659,6 +660,7 @@ export async function submitJoin(
 
   return Promise.all(promises).then((responses: JoinRequestResponse[]) => {
     for (const res of responses) {
+      mainLogger.info(`Join Request Response: ${JSON.stringify(res)}`)
       if (res.fatal) {
         throw new Error(`Fatal: Join request Reason: ${res.reason}`)
       }
