@@ -23,7 +23,6 @@
     "betterSqlite3storage.ts",
     "state-manager-types.ts",
     "PartitionStats.ts",
-    "DataSourceHelper.ts",
     "AccountSync.ts",
     "AccountPatcher.ts",
     "snapshotFunctions.ts",
