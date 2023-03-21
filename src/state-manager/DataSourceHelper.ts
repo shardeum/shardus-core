@@ -95,7 +95,7 @@ export default class DataSourceHelper {
    * tryNextDataSourceNode
    * @param debugString
    */
-  tryNextDataSourceNode(debugString): boolean {
+  tryNextDataSourceNode(debugString: string): boolean {
     this.dataSourceNodeIndex++
     /* prettier-ignore */ if (logFlags.error) this.stateManager.mainLogger.error(`tryNextDataSourceNode ${debugString} try next node: ${this.dataSourceNodeIndex}`)
     if (this.dataSourceNodeIndex >= this.dataSourceNodeList.length) {
@@ -120,7 +120,7 @@ export default class DataSourceHelper {
     return true
   }
 
-  tryRestartList(debugString): boolean {
+  tryRestartList(debugString: string): boolean {
     this.dataSourceNodeIndex = 0
     const numNodes = this.dataSourceNodeList.length
 
@@ -142,7 +142,7 @@ export default class DataSourceHelper {
     return this.dataSourceNodeList.length
   }
 
-  removePotentiallyRemovedNodes(node) {
+  removePotentiallyRemovedNodes(node: Shardus.Node) {
     return potentiallyRemoved.has(node.id) != true
   }
 }
