@@ -4607,7 +4607,11 @@ class TransactionQueue {
     let txResult = utils.short(txResultFullHash)
 
     const txReceiptToPass = {
-      tx: { ...queueEntry.acceptedTx },
+      tx: {
+        originalTxData: queueEntry.acceptedTx.data['tx'] || queueEntry.acceptedTx.data,
+        txId: txHash,
+        timestamp: queueEntry.acceptedTx.timestamp,
+      },
       cycle: queueEntry.cycleToRecordOn,
       result: { txIdShort, txResult },
       accounts: [],
@@ -4645,6 +4649,7 @@ class TransactionQueue {
     }
 
     txReceiptToPass.accounts = [...Object.values(accountsToAdd)]
+    // console.log('acceptedTx', queueEntry.acceptedTx)
     // console.log('txReceiptToPass', txReceiptToPass.tx.txId, txReceiptToPass)
 
     // console.log('App Receipt', queueEntry.preApplyTXResult.applyResponse.appReceiptData)
