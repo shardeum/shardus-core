@@ -8,7 +8,7 @@ import { potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import * as utils from '../utils'
-import { errorToStringFull, getLinearGossipBurstList, inRangeOfCurrentTime } from '../utils'
+import { errorToStringFull, inRangeOfCurrentTime } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions'
@@ -26,18 +26,12 @@ import {
   StringBoolObjectMap,
   StringNodeObjectMap,
   WrappedResponses,
-  Cycle,
-  AppliedReceipt,
   RequestReceiptForTxResp_old,
   ProcessQueueStats,
   SimpleNumberStats,
   QueueCountsResult,
 } from './state-manager-types'
 
-const stringify = require('fast-stable-stringify')
-
-const http = require('../http')
-const allZeroes64 = '0'.repeat(64)
 const txStatBucketSize = {
   default: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 10000],
 }
@@ -177,7 +171,7 @@ class TransactionQueue {
   setupHandlers() {
     this.p2p.registerInternal(
       'broadcast_state',
-      async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }, respond: any) => {
+      async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
         profilerInstance.scopedProfileSectionStart('broadcast_state')
         try {
           // Save the wrappedAccountState with the rest our queue data
@@ -206,7 +200,7 @@ class TransactionQueue {
 
     this.p2p.registerInternal(
       'broadcast_finalstate',
-      async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }, respond: any) => {
+      async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
         profilerInstance.scopedProfileSectionStart('broadcast_finalstate')
         try {
           // make sure we have it
@@ -241,7 +235,7 @@ class TransactionQueue {
 
     this.p2p.registerInternal(
       'spread_tx_to_group_syncing',
-      async (payload: Shardus.AcceptedTx, respondWrapped, sender, tracker) => {
+      async (payload: Shardus.AcceptedTx, respondWrapped, sender) => {
         profilerInstance.scopedProfileSectionStart('spread_tx_to_group_syncing')
         try {
           //handleSharedTX will also validate fields
@@ -1256,13 +1250,6 @@ class TransactionQueue {
             this.stateManager.currentCycleShardData.shardGlobals,
             txQueueEntry.executionShardKey
           )
-          let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
-            this.stateManager.currentCycleShardData.nodeShardData
-          // let nodeStoresThisPartition = ShardFunctions.testInRange(homePartition, ourNodeShardData.storedPartitions)
-          // if(nodeStoresThisPartition === false){
-          //   //before being in the set that stores the partition was enough, but we want to make it just the consensus nodes
-          //   //txQueueEntry.isInExecutionHome = false
-          // }
 
           let homeShardData =
             this.stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
@@ -2111,11 +2098,6 @@ class TransactionQueue {
     }
     if (queueEntry.transactionGroup != null && tryUpdate != true) {
       return queueEntry.transactionGroup
-    }
-
-    if (tryUpdate) {
-      if (queueEntry.cycleToRecordOn === this.stateManager.currentCycleShardData.cycleNumber) {
-      }
     }
 
     let txGroup: Shardus.Node[] = []
@@ -4332,7 +4314,6 @@ class TransactionQueue {
               }
 
               let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
-              let localCachedData = queueEntry.localCachedData
 
               //TODO apply the data we got!!! (override wrapped states)
               // if(this.executeInOneShard){
@@ -4380,7 +4361,7 @@ class TransactionQueue {
                   this.profiler.profileSectionStart('commit')
 
                   let awaitStart = Date.now()
-                  let commitResult = await this.commitConsensedTransaction(queueEntry)
+                  let _commitResult = await this.commitConsensedTransaction(queueEntry)
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
                     'commitConsensedTransaction',
@@ -4404,9 +4385,6 @@ class TransactionQueue {
                   this.profiler.profileSectionEnd('commit')
                   //}
 
-                  if (commitResult != null && commitResult.success) {
-                  }
-                } else {
                 }
 
                 if (this.config.p2p.experimentalSnapshot) this.addReceiptToForward(queueEntry)
