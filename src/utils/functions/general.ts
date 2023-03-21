@@ -9,6 +9,17 @@ export const mod = (n, m) => {
   return ((n % m) + m) % m
 }
 
+/**
+ * lerp from v0 to v1 by a
+ * @param v0 the start value
+ * @param v1 the end value
+ * @param a the amount to lerp by (0-1) 0 being v0 and 1 being v1. 0.5 being halfway between v0 and v1
+ * @returns
+ */
+export const lerp = (v0: number, v1: number, a: number) => {
+  return v0 * (1 - a) + v1 * a
+}
+
 export function propComparator<T>(prop: keyof T) {
   // eslint-disable-next-line security/detect-object-injection
   const comparator = (a: T, b: T) => (a[prop] > b[prop] ? 1 : a[prop] < b[prop] ? -1 : 0)

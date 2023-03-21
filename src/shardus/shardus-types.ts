@@ -648,6 +648,10 @@ export interface ServerConfiguration {
     amountToGrow?: number
     /** The amountToShrink parameter is an Integer specifying the amount of nodes to REMOVE from the number of desired nodes the network wants. */
     amountToShrink?: number
+    /** The 0-1 multipler to active nodes of how many nodes we can shrink by in one cycle.  This is a cap but will be at least amountToShrink */
+    maxShrinkMultiplier?: number
+    /** When 0 there will be no scaling when 1 the full scaling factor will be applied */
+    scaleInfluenceForShrink?: number
     /** max desired nodes based on a multiplier of our active node count */
     maxDesiredMultiplier?: number
     /** If witenss mode is true, node will not join the network but help other nodes to sync the data */

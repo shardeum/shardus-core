@@ -1,6 +1,6 @@
 import { Logger } from 'log4js'
 import { P2P } from '@shardus/types'
-import { insertSorted, validateTypes } from '../utils'
+import { insertSorted, lerp, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { config, logger } from './Context'
 import * as NodeList from './NodeList'
@@ -128,15 +128,24 @@ export function getExpiredRemoved(
   let scaleDownRemove = 0
   if (active - desired > 0) scaleDownRemove = active - desired
 
-  //only let the scale factor impart a partial influence
-  let scaledAmountToShrink = Math.floor(
-    0.5 * (config.p2p.amountToShrink * CycleCreator.scaleFactor + config.p2p.amountToShrink)
-  )
+  //only let the scale factor impart a partial influence based on scaleInfluenceForShrink
+  let scaledAmountToShrink: number
+  {
+    const scaleInfluence = config.p2p.scaleInfluenceForShrink
+    const nonScaledAmount = config.p2p.amountToShrink
+    const scaledAmount = config.p2p.amountToShrink * CycleCreator.scaleFactor
+    scaledAmountToShrink = Math.floor(lerp(nonScaledAmount, scaledAmount, scaleInfluence))
+  }
 
   //limit the scale down by scaledAmountToShrink
   if (scaleDownRemove > scaledAmountToShrink) {
     scaleDownRemove = scaledAmountToShrink
   }
+
+  //maxActiveNodesToRemove is a percent of the active nodes that is set as a 0-1 value in maxShrinkMultiplier
+  //this is to prevent the network from shrinking too fast
+  //make sure the value is at least 1
+  const maxActiveNodesToRemove = Math.max(Math.floor(config.p2p.maxShrinkMultiplier * active), 1)
 
   let cycle = CycleChain.newest.counter
   if (cycle > lastLoggedCycle && scaleDownRemove > 0) {
@@ -147,6 +156,7 @@ export function getExpiredRemoved(
           cycle,
           scaleFactor: CycleCreator.scaleFactor,
           scaleDownRemove,
+          maxActiveNodesToRemove,
           desired,
           active,
           scaledAmountToShrink,
@@ -164,7 +174,18 @@ export function getExpiredRemoved(
     maxRemove = Math.max(maxRemove, scaleDownRemove)
   }
 
+  // never remove more nodes than the difference between active and desired
   if (maxRemove > active - desired) maxRemove = active - desired
+
+  // final clamp of max remove, but only if it is more than amountToShrink
+  // to avoid messing up the calculation above this next part can only make maxRemove smaller
+  if (maxRemove > config.p2p.amountToShrink) {
+    //maxActiveNodesToRemove is a percent of the active nodes that is set as a 0-1 value in maxShrinkMultiplier
+    if (maxRemove > maxActiveNodesToRemove) {
+      //yes, this max could be baked in earlier, but I like it here for clarity
+      maxRemove = Math.max(config.p2p.amountToShrink, maxActiveNodesToRemove)
+    }
+  }
 
   // Oldest node has index 0
   for (const node of NodeList.byJoinOrder) {
