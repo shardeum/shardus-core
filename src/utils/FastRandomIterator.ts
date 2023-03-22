@@ -11,7 +11,7 @@ export default class FastRandomIterator {
 
   sparseSet: Set<number> = null
 
-  constructor(arraySize: number, par: number = -1, strideSize: number = -1) {
+  constructor(arraySize: number, par = -1, strideSize = -1) {
     this.iteratorIndex = 0
     this.arraySize = arraySize
 
@@ -88,7 +88,7 @@ export default class FastRandomIterator {
     if (this.iteratorIndex >= this.arraySize) {
       return -1
     }
-    let nextIndex
+    let nextIndex: number
     //if we are using the Sparse algorithm:
     if (this.sparseSet != null) {
       let nextIndex = Math.floor(Math.random() * this.arraySize)
