@@ -333,6 +333,7 @@ class TransactionQueue {
           }
 
           for (const key of payload.keys) {
+            // eslint-disable-next-line security/detect-object-injection
             const data = queueEntry.originalData[key] // collectedData
             if (data) {
               //response.stateList.push(JSON.parse(data))
@@ -460,6 +461,7 @@ class TransactionQueue {
     //only hash one account state per account. the most recent one!
     const filteredAccountStates = []
     for (let i = accountStates.length - 1; i >= 0; i--) {
+      // eslint-disable-next-line security/detect-object-injection
       const accountState: Shardus.StateTableObject = accountStates[i]
 
       if (seenAccounts.has(accountState.accountId) === true) {
@@ -506,6 +508,7 @@ class TransactionQueue {
     // may only need this in the case where we have hopped over to another shard or additional
     // accounts were passed in.  And that me handled earlier.
 
+    /* eslint-disable security/detect-object-injection */
     for (const key of uniqueKeys) {
       if (wrappedStates[key] == null) {
         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log(`preApplyTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
@@ -526,6 +529,7 @@ class TransactionQueue {
         }
       }
     }
+    /* eslint-enable security/detect-object-injection */
 
     if (!accountTimestampsAreOK) {
       if (logFlags.verbose) this.mainLogger.debug('preApplyTransaction pretest failed: ' + timestamp)
@@ -761,6 +765,7 @@ class TransactionQueue {
         //looks like this next line could be wiping out state from just above that used accountWrites
         //we have a task to refactor his code that needs to happen for executeInOneShard to work
         wrappedStates = {}
+        /* eslint-disable security/detect-object-injection */
         for (const key of Object.keys(queueEntry.collectedFinalData)) {
           const finalAccount = queueEntry.collectedFinalData[key]
           const accountId = finalAccount.accountId
@@ -772,6 +777,7 @@ class TransactionQueue {
 
           wrappedStates[key] = finalAccount
         }
+        /* eslint-enable security/detect-object-injection */
         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction collectedFinalData tx:${queueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
       }
 
@@ -815,6 +821,7 @@ class TransactionQueue {
       const note = `setAccountData: tx:${queueEntry.logID} in commitConsensedTransaction. `
 
       for (const key of Object.keys(queueEntry.localKeys)) {
+        // eslint-disable-next-line security/detect-object-injection
         filter[key] = 1
       }
 
@@ -998,6 +1005,7 @@ class TransactionQueue {
           nestedCountersInstance.countRareEvent('fatal', 'updateHomeInformation homeNode == null')
           throw new Error(`updateHomeInformation homeNode == null ${key}`)
         }
+        // eslint-disable-next-line security/detect-object-injection
         txQueueEntry.homeNodes[key] = homeNode
         if (homeNode == null) {
           /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` routeAndQueueAcceptedTransaction: ${key} `)
@@ -1035,6 +1043,8 @@ class TransactionQueue {
     }
   }
 
+
+  /* eslint-disable security/detect-object-injection */
   tryInvloveAccount(txId: string, address: string, isRead: boolean): boolean {
     const queueEntry = this.getQueueEntry(txId)
 
@@ -1058,6 +1068,7 @@ class TransactionQueue {
     }
     return true
   }
+  /* eslint-enable security/detect-object-injection */
 
   /***
    *    ######## ##    ##  #######  ##     ## ######## ##     ## ########
@@ -1243,6 +1254,7 @@ class TransactionQueue {
             return false
           }
 
+          // eslint-disable-next-line security/detect-object-injection
           keyHash[key] = true
         }
         txQueueEntry.uniqueKeys = Object.keys(keyHash)
@@ -1275,6 +1287,7 @@ class TransactionQueue {
           txQueueEntry.executionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
           const ourID = this.stateManager.currentCycleShardData.ourNode.id
           for (let idx = 0; idx < txQueueEntry.executionGroup.length; idx++) {
+            // eslint-disable-next-line security/detect-object-injection
             const node = txQueueEntry.executionGroup[idx]
             txQueueEntry.executionIdSet.add(node.id)
             if (node.id === ourID) {
@@ -1620,6 +1633,7 @@ class TransactionQueue {
     }
     let dataCollected = 0
     for (const key of queueEntry.uniqueKeys) {
+      // eslint-disable-next-line security/detect-object-injection
       if (queueEntry.collectedData[key] != null) {
         dataCollected++
       }
@@ -1641,6 +1655,7 @@ class TransactionQueue {
     }
     const missingAccounts = []
     for (const key of queueEntry.uniqueKeys) {
+      // eslint-disable-next-line security/detect-object-injection
       if (queueEntry.collectedData[key] == null) {
         missingAccounts.push(key)
       }
@@ -1677,6 +1692,7 @@ class TransactionQueue {
 
     const allKeys = []
     for (const key of queueEntry.uniqueKeys) {
+      // eslint-disable-next-line security/detect-object-injection
       if (queueEntry.collectedData[key] == null) {
         allKeys.push(key)
       }
@@ -1689,6 +1705,7 @@ class TransactionQueue {
     //let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
 
     for (const key of queueEntry.uniqueKeys) {
+      // eslint-disable-next-line security/detect-object-injection
       if (queueEntry.collectedData[key] == null && queueEntry.requests[key] == null) {
         let keepTrying = true
         let triesLeft = 5
@@ -1700,6 +1717,7 @@ class TransactionQueue {
             break
           }
           triesLeft--
+          // eslint-disable-next-line security/detect-object-injection
           const homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
 
           // let node = consensusGroup[nodeIndex]
@@ -1718,6 +1736,7 @@ class TransactionQueue {
             randomIndex = this.stateManager.getRandomInt(
               homeNodeShardData.consensusNodeForOurNodeFull.length - 1
             )
+            // eslint-disable-next-line security/detect-object-injection
             node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
             if (maxTries < 0) {
               //FAILED
@@ -1753,6 +1772,7 @@ class TransactionQueue {
           // Todo: expand this to grab a consensus node from any of the involved consensus nodes.
 
           for (const key2 of allKeys) {
+            // eslint-disable-next-line security/detect-object-injection
             queueEntry.requests[key2] = node
           }
 
@@ -1818,6 +1838,7 @@ class TransactionQueue {
             //consider deleteing these instead?
             //TSConversion changed to a delete opertaion should double check this
             //queueEntry.requests[key2] = null
+            // eslint-disable-next-line security/detect-object-injection
             delete queueEntry.requests[key2]
           }
 
@@ -1892,8 +1913,10 @@ class TransactionQueue {
           break
         }
         triesLeft--
+        // eslint-disable-next-line security/detect-object-injection
         const homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
 
+        // eslint-disable-next-line security/detect-object-injection
         const node = consensusGroup[nodeIndex]
         nodeIndex++
 
@@ -2017,8 +2040,10 @@ class TransactionQueue {
           break
         }
         triesLeft--
+        // eslint-disable-next-line security/detect-object-injection
         const homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
 
+        // eslint-disable-next-line security/detect-object-injection
         const node = consensusGroup[nodeIndex]
         nodeIndex++
 
@@ -2121,6 +2146,7 @@ class TransactionQueue {
 
     let hasNonGlobalKeys = false
     for (const key of queueEntry.uniqueKeys) {
+      // eslint-disable-next-line security/detect-object-injection
       const homeNode = queueEntry.homeNodes[key]
       // txGroup = Array.concat(txGroup, homeNode.nodeThatStoreOurParitionFull)
       if (homeNode == null) {
@@ -2180,6 +2206,7 @@ class TransactionQueue {
             homePartition,
             nodeShardData.storedPartitions
           )
+          /* eslint-disable security/detect-object-injection */
           if (nodeStoresThisPartition === true && uniqueNodes[nodeID] == null) {
             //setting this will cause it to end up in the transactionGroup
             uniqueNodes[nodeID] = nodeShardData.node
@@ -2192,6 +2219,7 @@ class TransactionQueue {
               scratch1[nodeID] = true
             }
           }
+          /* eslint-enable security/detect-object-injection */
         }
       }
 
@@ -2244,6 +2272,7 @@ class TransactionQueue {
     if (queueEntry.ourNodeInTransactionGroup) {
       const ourID = this.stateManager.currentCycleShardData.ourNode.id
       for (let idx = 0; idx < txGroup.length; idx++) {
+        // eslint-disable-next-line security/detect-object-injection
         const node = txGroup[idx]
         if (node.id === ourID) {
           queueEntry.ourTXGroupIndex = idx
@@ -2297,6 +2326,7 @@ class TransactionQueue {
 
     let hasNonGlobalKeys = false
     for (const key of queueEntry.uniqueKeys) {
+      // eslint-disable-next-line security/detect-object-injection
       const homeNode = queueEntry.homeNodes[key]
       if (homeNode == null) {
         if (logFlags.verbose) this.mainLogger.debug('queueEntryGetConsensusGroup homenode:null')
@@ -2374,6 +2404,7 @@ class TransactionQueue {
       // let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
       // todo : if this works maybe a nicer or faster version could be used
       let hasKey = false
+      // eslint-disable-next-line security/detect-object-injection
       const homeNode = queueEntry.homeNodes[key]
       if (homeNode.node.id === ourNodeData.node.id) {
         hasKey = true
@@ -2443,15 +2474,18 @@ class TransactionQueue {
         }
 
         if (isGlobalKey === false) {
+          // eslint-disable-next-line security/detect-object-injection
           datas[key] = data
           dataKeysWeHave.push(key)
           dataValuesWeHave.push(data)
         }
 
+        // eslint-disable-next-line security/detect-object-injection
         queueEntry.localKeys[key] = true
         // add this data to our own queue entry!!
         this.queueEntryAddData(queueEntry, data)
       } else {
+        // eslint-disable-next-line security/detect-object-injection
         remoteShardsByKey[key] = queueEntry.homeNodes[key]
       }
     }
@@ -2480,10 +2514,13 @@ class TransactionQueue {
     const doOnceNodeAccPair = new Set<string>() //can skip  node+acc if it happens more than once.
 
     for (const key of queueEntry.uniqueKeys) {
+      // eslint-disable-next-line security/detect-object-injection
       if (datas[key] != null) {
         for (const key2 of queueEntry.uniqueKeys) {
           if (key !== key2) {
+            // eslint-disable-next-line security/detect-object-injection
             const localHomeNode = queueEntry.homeNodes[key]
+            // eslint-disable-next-line security/detect-object-injection
             const remoteHomeNode = queueEntry.homeNodes[key2]
 
             // //can ignore nodes not in the execution group since they will not be running apply
@@ -2551,6 +2588,7 @@ class TransactionQueue {
             }
 
             const dataToSend = []
+            // eslint-disable-next-line security/detect-object-injection
             dataToSend.push(datas[key]) // only sending just this one key at a time
             message = { stateList: dataToSend, txid: queueEntry.acceptedTx.txId }
 
@@ -2630,6 +2668,7 @@ class TransactionQueue {
       // let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
       // todo : if this works maybe a nicer or faster version could be used
       let hasKey = false
+      // eslint-disable-next-line security/detect-object-injection
       const homeNode = queueEntry.homeNodes[key]
       if (homeNode.node.id === ourNodeData.node.id) {
         hasKey = true
@@ -2699,15 +2738,18 @@ class TransactionQueue {
         }
 
         if (isGlobalKey === false) {
+          // eslint-disable-next-line security/detect-object-injection
           datas[key] = data
           dataKeysWeHave.push(key)
           dataValuesWeHave.push(data)
         }
 
+        // eslint-disable-next-line security/detect-object-injection
         queueEntry.localKeys[key] = true
         // add this data to our own queue entry!!
         this.queueEntryAddData(queueEntry, data)
       } else {
+        // eslint-disable-next-line security/detect-object-injection
         remoteShardsByKey[key] = queueEntry.homeNodes[key]
       }
     }
@@ -2724,10 +2766,13 @@ class TransactionQueue {
     const doOnceNodeAccPair = new Set<string>() //can skip  node+acc if it happens more than once.
 
     for (const key of queueEntry.uniqueKeys) {
+      // eslint-disable-next-line security/detect-object-injection
       if (datas[key] != null) {
         for (const key2 of queueEntry.uniqueKeys) {
           if (key !== key2) {
+            // eslint-disable-next-line security/detect-object-injection
             const localHomeNode = queueEntry.homeNodes[key]
+            // eslint-disable-next-line security/detect-object-injection
             const remoteHomeNode = queueEntry.homeNodes[key2]
 
             const ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex(
@@ -2805,6 +2850,7 @@ class TransactionQueue {
             }
 
             const dataToSend = []
+            // eslint-disable-next-line security/detect-object-injection
             dataToSend.push(datas[key]) // only sending just this one key at a time
             message = { stateList: dataToSend, txid: queueEntry.acceptedTx.txId }
 
@@ -2920,7 +2966,9 @@ class TransactionQueue {
       nodesToSendTo = {}
       doOnceNodeAccPair = new Set<string>()
 
+      // eslint-disable-next-line security/detect-object-injection
       if (wrappedStates[key] != null) {
+        // eslint-disable-next-line security/detect-object-injection
         let accountHomeNode = queueEntry.homeNodes[key]
 
         if (accountHomeNode == null) {
@@ -3009,6 +3057,7 @@ class TransactionQueue {
         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${JSON.stringify(indicies)} edgeIndicies:${JSON.stringify(edgeIndicies)} patchIndicies:${JSON.stringify(patchIndicies)}  doOnceNodeAccPair: ${JSON.stringify([...doOnceNodeAccPair.keys()])} ourLocalExecutionSetIndex:${ourLocalExecutionSetIndex} ourSendingGroupSize:${ourSendingGroupSize} consensusListSize:${consensusListSize} edgeListSize:${edgeListSize} pachedListSize:${pachedListSize}`)
 
         const dataToSend: Shardus.WrappedResponse[] = []
+        // eslint-disable-next-line security/detect-object-injection
         dataToSend.push(datas[key]) // only sending just this one key at a time
         message = { stateList: dataToSend, txid: queueEntry.acceptedTx.txId }
         if (correspondingAccNodes.length > 0) {
@@ -3056,6 +3105,7 @@ class TransactionQueue {
     const collector = {}
     const totalTxCount = this.txDebugStatList.length
 
+    /* eslint-disable security/detect-object-injection */
     for (const txStat of this.txDebugStatList) {
       for (const key in txStat.duration) {
         if (!collector[key]) {
@@ -3073,12 +3123,16 @@ class TransactionQueue {
         }
       }
     }
+    /* eslint-enable security/detect-object-injection */
+
     const lines = []
     lines.push(`=> Total Transactions: ${totalTxCount}`)
     for (const [key, collectorForThisKey] of Object.entries(collector)) {
       lines.push(`\n => Tx ${key}: \n`)
       for (let i = 0; i < Object.keys(collectorForThisKey).length; i++) {
+        // eslint-disable-next-line security/detect-object-injection
         const time = Object.keys(collectorForThisKey)[i]
+        // eslint-disable-next-line security/detect-object-injection
         const arr = collectorForThisKey[time]
         if (!arr) continue
         const percentage = (arr.length / totalTxCount) * 100
@@ -3256,6 +3310,7 @@ class TransactionQueue {
           // reverse loop because the news (largest timestamp) values are at the end of the array
           // todo faster version (binary search? to find where we need to insert)
           let index = this.newAcceptedTxQueue.length - 1
+          // eslint-disable-next-line security/detect-object-injection
           let lastTx = this.newAcceptedTxQueue[index]
           while (
             index >= 0 &&
@@ -3263,6 +3318,7 @@ class TransactionQueue {
               (timestamp === lastTx.txKeys.timestamp && txId < lastTx.acceptedTx.txId))
           ) {
             index--
+            // eslint-disable-next-line security/detect-object-injection
             lastTx = this.newAcceptedTxQueue[index]
           }
 
@@ -3340,6 +3396,7 @@ class TransactionQueue {
         if (currentIndex < 0) {
           break
         }
+        // eslint-disable-next-line security/detect-object-injection
         const queueEntry: QueueEntry = this.newAcceptedTxQueue[currentIndex]
         const txTime = queueEntry.txKeys.timestamp
         const txAge = currentTime - txTime
@@ -3925,6 +3982,7 @@ class TransactionQueue {
 
                     // make sure our data wrappers are upt to date with the correct hash and timstamp
                     for (const key of Object.keys(queueEntry.collectedData)) {
+                      // eslint-disable-next-line security/detect-object-injection
                       const wrappedAccount = queueEntry.collectedData[key]
                       const { timestamp, hash } = this.app.getTimestampAndHashFromAccount(wrappedAccount.data)
                       if (wrappedAccount.timestamp != timestamp) {
@@ -4206,6 +4264,7 @@ class TransactionQueue {
                 const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
                   this.stateManager.currentCycleShardData.nodeShardData
 
+                /* eslint-disable security/detect-object-injection */
                 for (let i = 0; i < vote.account_id.length; i++) {
                   const accountID = vote.account_id[i]
                   const accountHash = vote.account_state_hash_after[i]
@@ -4230,6 +4289,8 @@ class TransactionQueue {
                     break
                   }
                 }
+                /* eslint-enable security/detect-object-injection */
+
                 if (failed === true) {
                   this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
                   queueEntry.state = 'await repair'
@@ -4245,6 +4306,7 @@ class TransactionQueue {
                   //This matters for certain daps only.  No longer important to shardeum
                   const rawAccounts = []
                   const accountRecords: Shardus.WrappedData[] = []
+                  /* eslint-disable security/detect-object-injection */
                   for (let i = 0; i < vote.account_id.length; i++) {
                     const accountID = vote.account_id[i]
                     //skip accounts we don't store
@@ -4255,6 +4317,7 @@ class TransactionQueue {
                     rawAccounts.push(wrappedAccount.data)
                     accountRecords.push(wrappedAccount)
                   }
+                  /* eslint-enable security/detect-object-injection */
                   //await this.app.setAccountData(rawAccounts)
                   const awaitStart = Date.now()
                   await this.stateManager.checkAndSetAccountData(
@@ -4717,6 +4780,7 @@ class TransactionQueue {
       return false
     }
     for (const key of queueEntry.uniqueKeys) {
+      // eslint-disable-next-line security/detect-object-injection
       if (seenAccounts[key] != null) {
         return true
       }
@@ -4743,11 +4807,13 @@ class TransactionQueue {
       return
     }
     // only mark writeable keys as seen but we will check/clear against all keys
+    /* eslint-disable security/detect-object-injection */
     for (const key of queueEntry.uniqueWritableKeys) {
       if (seenAccounts[key] == null) {
         seenAccounts[key] = queueEntry
       }
     }
+    /* eslint-enable security/detect-object-injection */
   }
 
   // this.queueReads = new Set()
@@ -4813,6 +4879,7 @@ class TransactionQueue {
     }
 
     for (const key of queueEntry.uniqueKeys) {
+      // eslint-disable-next-line security/detect-object-injection
       if (seenAccounts[key] != null) {
         return true
       }
@@ -4845,6 +4912,7 @@ class TransactionQueue {
     }
 
     // only mark writeable keys as seen but we will check/clear against all keys
+    /* eslint-disable security/detect-object-injection */
     for (const key of queueEntry.uniqueWritableKeys) {
       if (seenAccounts[key] == null) {
         seenAccounts[key] = queueEntry
@@ -4852,6 +4920,7 @@ class TransactionQueue {
       //old style memory access is treated as RW:
       this.queueReadWritesOld.add(key)
     }
+    /* eslint-enable security/detect-object-injection */
   }
 
   /**
@@ -4866,11 +4935,13 @@ class TransactionQueue {
       //TSConversion double check if this needs extra logging
       return
     }
+    /* eslint-disable security/detect-object-injection */
     for (const key of queueEntry.uniqueKeys) {
       if (seenAccounts[key] === queueEntry) {
         seenAccounts[key] = null
       }
     }
+    /* eslint-enable security/detect-object-injection */
   }
 
   /**
@@ -4885,12 +4956,14 @@ class TransactionQueue {
       //TSConversion double check if this needs extra logging
       return queueEntry.logID + ' uniqueKeys empty error'
     }
+    /* eslint-disable security/detect-object-injection */
     for (const key of queueEntry.uniqueKeys) {
       if (queueEntry.collectedData[key] != null) {
         debugStr +=
           utils.makeShortHash(key) + ' : ' + app.getAccountDebugValue(queueEntry.collectedData[key]) + ', '
       }
     }
+    /* eslint-enable security/detect-object-injection */
     //}
     return debugStr
   }
@@ -5027,6 +5100,7 @@ class TransactionQueue {
     statName: string,
     duration: number
   ) {
+    // eslint-disable-next-line security/detect-object-injection
     let statsEntry = statsObj[statName]
     if (statsEntry == null) {
       statsEntry = {
@@ -5036,6 +5110,7 @@ class TransactionQueue {
         count: 0,
         average: 0,
       }
+      // eslint-disable-next-line security/detect-object-injection
       statsObj[statName] = statsEntry
     }
     statsEntry.count++
