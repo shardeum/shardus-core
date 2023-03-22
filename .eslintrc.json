@@ -16,7 +16,6 @@
   ],
   "ignorePatterns": [
     "arrays.ts",
-    "FastRandomIterator.ts",
     "sqlite3storage.ts",
     "sequelizeStorage.ts",
     "**/crypto/index.ts",
