@@ -34,7 +34,7 @@ export default class FastRandomIterator {
       this.strideSize = Math.floor(strideSize)
 
       //let forceSimpleCalc = (par * (strideSize / arraySize)) // using stride size was too complicated..
-      let forceSimpleCalc = par / arraySize
+      const forceSimpleCalc = par / arraySize
       parForcesSimpleMode = forceSimpleCalc > 0.1 //if we will pick more than 10% of the array then just go with simple
     }
 
@@ -101,21 +101,21 @@ export default class FastRandomIterator {
     }
 
     // FastSimple and Simple methods start here
-    let randomFetchIndex =
+    const randomFetchIndex =
       Math.floor(Math.random() * (this.arraySize - this.iteratorIndex)) + this.iteratorIndex
     //The simple fast algorithm
     if (this.indexList != null) {
       nextIndex = this.indexList[randomFetchIndex]
-      let indexValueToSwap = this.indexList[this.iteratorIndex]
+      const indexValueToSwap = this.indexList[this.iteratorIndex]
       this.indexList[randomFetchIndex] = indexValueToSwap
 
       this.iteratorIndex++
       return nextIndex
     } else {
       //the Fast algorithm
-      let currentStrideKey = Math.floor(this.iteratorIndex / this.strideSize)
-      let hasCurrentStride = this.indexStrides[currentStrideKey] !== undefined //.has(currentStrideKey)
-      let currentStrideStart = currentStrideKey * this.strideSize
+      const currentStrideKey = Math.floor(this.iteratorIndex / this.strideSize)
+      const hasCurrentStride = this.indexStrides[currentStrideKey] !== undefined //.has(currentStrideKey)
+      const currentStrideStart = currentStrideKey * this.strideSize
 
       let currentStride: number[]
       if (hasCurrentStride === false) {
@@ -129,9 +129,9 @@ export default class FastRandomIterator {
         currentStride = this.indexStrides[currentStrideKey] //.get(currentStrideKey)
       }
 
-      let fetchStrideKey = Math.floor(randomFetchIndex / this.strideSize)
-      let fetchStrideStart = fetchStrideKey * this.strideSize
-      let hasFetchStride = this.indexStrides[fetchStrideKey] !== undefined //.has(fetchStrideKey)
+      const fetchStrideKey = Math.floor(randomFetchIndex / this.strideSize)
+      const fetchStrideStart = fetchStrideKey * this.strideSize
+      const hasFetchStride = this.indexStrides[fetchStrideKey] !== undefined //.has(fetchStrideKey)
       let fetchStride: number[]
       if (hasFetchStride === false) {
         // fill a new stride
@@ -144,10 +144,10 @@ export default class FastRandomIterator {
         fetchStride = this.indexStrides[fetchStrideKey] //.get(fetchStrideKey)
       }
 
-      let fetchStrideLocalDestIndex = randomFetchIndex - fetchStrideStart
+      const fetchStrideLocalDestIndex = randomFetchIndex - fetchStrideStart
       nextIndex = fetchStride[fetchStrideLocalDestIndex]
 
-      let indexValueToSwap = currentStride[this.iteratorIndex - currentStrideStart]
+      const indexValueToSwap = currentStride[this.iteratorIndex - currentStrideStart]
       fetchStride[fetchStrideLocalDestIndex] = indexValueToSwap
 
       this.iteratorIndex++
