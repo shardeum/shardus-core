@@ -3,7 +3,7 @@ const maxStrideSize = 100
 
 export default class FastRandomIterator {
   strideSize: number
-  indexStrides: any[] //Map<number, number[]>
+  indexStrides: { [key: number]: number[] } //Map<number, number[]>
   arraySize: number
   iteratorIndex: number
 
@@ -114,7 +114,7 @@ export default class FastRandomIterator {
     } else {
       //the Fast algorithm
       let currentStrideKey = Math.floor(this.iteratorIndex / this.strideSize)
-      let hasCurrentStride = this.indexStrides[currentStrideKey] //.has(currentStrideKey)
+      let hasCurrentStride = this.indexStrides[currentStrideKey] !== undefined //.has(currentStrideKey)
       let currentStrideStart = currentStrideKey * this.strideSize
 
       let currentStride: number[]
@@ -131,7 +131,7 @@ export default class FastRandomIterator {
 
       let fetchStrideKey = Math.floor(randomFetchIndex / this.strideSize)
       let fetchStrideStart = fetchStrideKey * this.strideSize
-      let hasFetchStride = this.indexStrides[fetchStrideKey] //.has(fetchStrideKey)
+      let hasFetchStride = this.indexStrides[fetchStrideKey] !== undefined //.has(fetchStrideKey)
       let fetchStride: number[]
       if (hasFetchStride === false) {
         // fill a new stride
