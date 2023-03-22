@@ -4438,7 +4438,7 @@ class TransactionQueue {
                   this.profiler.profileSectionStart('commit')
 
                   const awaitStart = Date.now()
-                  const _commitResult = await this.commitConsensedTransaction(queueEntry)
+                  await this.commitConsensedTransaction(queueEntry)
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
                     'commitConsensedTransaction',
@@ -5120,7 +5120,7 @@ class TransactionQueue {
   }
 
   finalizeSimpleStatsObject(statsObj: { [statName: string]: SimpleNumberStats }) {
-    for (const [_key, value] of Object.entries(statsObj)) {
+    for (const [, value] of Object.entries(statsObj)) {
       if (value.count) {
         value.average = value.total / value.count
       }
