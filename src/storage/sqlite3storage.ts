@@ -9,10 +9,46 @@ import * as Snapshot from '../snapshot'
 import * as utils from '../utils'
 import Profiler from '../utils/profiler'
 import { config, crypto, logger } from '../p2p/Context'
-import { logFlags } from '../logger'
+import Logger, { logFlags } from '../logger'
 
 const Op = Sequelize.Op
 const sqlite3 = require('sqlite3').verbose()
+import { Database } from 'sqlite3'
+import { ColumnDescription } from 'sequelize'
+import { ModelAttributes } from '.'
+
+type GenericObject = { [key: symbol]: unknown }
+
+type OperationOptions = {
+    createOrReplace?: boolean;
+    raw?: boolean;
+    order?: { length: number; };
+    limit?: number;
+}
+
+interface ParamEntry {
+  name: string
+  type?: string
+  v1?: string
+  v2?: string
+  sql?: string
+  vals?: string[]
+}
+
+interface ModelData {
+  tableName: string
+  columns: string[]
+  columnsString: string
+  substitutionString: string
+  isColumnJSON: { [key: string]: boolean }
+  JSONkeys: string[]
+
+  insertOrReplaceString?: string
+  insertString?: string
+  selectString?: string
+  updateString?: string
+  deleteString?: string
+}
 
 interface Sqlite3Storage {
   baseDir: string

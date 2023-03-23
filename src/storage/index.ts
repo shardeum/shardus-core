@@ -1,7 +1,7 @@
 import Log4js from 'log4js'
 // const fs = require('fs')
 // const path = require('path')
-import { Op } from 'sequelize'
+import { ColumnDescription, Op } from 'sequelize'
 import Logger, { logFlags } from '../logger'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
@@ -17,6 +17,8 @@ import Sqlite3Storage from './sqlite3storage'
 import P2PApoptosis = require('../p2p/Apoptosis')
 
 import { config } from '../p2p/Context'
+
+export type ModelAttributes = { [column: string]: ColumnDescription };
 
 interface Storage {
   serverConfig: ShardusTypes.StrictServerConfiguration
