@@ -12,6 +12,8 @@ import { config } from '../p2p/Context'
 import Logger, { logFlags } from '../logger'
 
 const Op = Sequelize.Op
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const sqlite3 = require('sqlite3').verbose()
 import { Database } from 'sqlite3'
 import { ColumnDescription } from 'sequelize'
@@ -104,6 +106,7 @@ class Sqlite3Storage {
       // eslint-disable-next-line no-prototype-builtins
       if (modelAttributes.hasOwnProperty(key)) {
         modelData.columns.push(key)
+        // eslint-disable-next-line security/detect-object-injection
         const value = modelAttributes[key]
 
         let type: string | ColumnDescription = value.type
@@ -112,15 +115,18 @@ class Sqlite3Storage {
           // if (logFlags.console) console.log(' TYPE MISSING!!!! ' + key)
         }
         if (type.toString() === Sequelize.JSON.toString()) {
+          // eslint-disable-next-line security/detect-object-injection
           modelData.isColumnJSON[key] = true
           modelData.JSONkeys.push(key)
           // if (logFlags.console) console.log(`JSON column: ${key}`)
         } else {
+          // eslint-disable-next-line security/detect-object-injection
           modelData.isColumnJSON[key] = false
         }
       }
     }
     for (let i = 0; i < modelData.columns.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection
       const key = modelData.columns[i]
       modelData.columnsString += key
       modelData.substitutionString += '?'
@@ -137,6 +143,7 @@ class Sqlite3Storage {
 
     // if (logFlags.console) console.log(`Create model data for table: ${tableName} => ${stringify(modelData)}`)
     // if (logFlags.console) console.log()
+    // eslint-disable-next-line security/detect-object-injection
     this.storageModels[tableName] = modelData
 
     // todo base this off of models
@@ -282,8 +289,10 @@ class Sqlite3Storage {
       const inputs = []
       // if (logFlags.console) console.log('columns: ' + stringify(table.columns))
       for (const column of table.columns) {
+        // eslint-disable-next-line security/detect-object-injection
         let value = object[column]
 
+        // eslint-disable-next-line security/detect-object-injection
         if (table.isColumnJSON[column]) {
           value = stringify(value)
         }
@@ -445,6 +454,7 @@ class Sqlite3Storage {
       if (paramsObj.hasOwnProperty(key)) {
         const paramEntry: ParamEntry = { name: key }
 
+        // eslint-disable-next-line security/detect-object-injection
         const value = paramsObj[key]
         if (utils.isObject(value) && table.isColumnJSON[paramEntry.name] === false) {
           // WHERE column_name BETWEEN value1 AND value2;
@@ -513,6 +523,7 @@ class Sqlite3Storage {
       if (i === 0) {
         whereString += ' WHERE '
       }
+      // eslint-disable-next-line security/detect-object-injection
       const paramEntry = paramsArray[i]
       whereString += '(' + paramEntry.sql + ')'
       if (i < paramsArray.length - 1) {
@@ -527,6 +538,7 @@ class Sqlite3Storage {
     let valueArray = []
     let resultString = ''
     for (let i = 0; i < paramsArray.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection
       const paramEntry = paramsArray[i]
       resultString += paramEntry.sql
       if (i < paramsArray.length - 1) {
@@ -545,6 +557,7 @@ class Sqlite3Storage {
     if (optionsObj.order) {
       optionsString += ' ORDER BY '
       for (let i = 0; i < optionsObj.order.length; i++) {
+        // eslint-disable-next-line security/detect-object-injection
         const orderEntry = optionsObj.order[i]
         optionsString += ` ${orderEntry[0]} ${orderEntry[1]} `
         if (i < optionsObj.order.length - 1) {
