@@ -8,7 +8,7 @@ import * as Shardus from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import * as utils from '../utils'
 import Profiler from '../utils/profiler'
-import { config, crypto, logger } from '../p2p/Context'
+import { config } from '../p2p/Context'
 import Logger, { logFlags } from '../logger'
 
 const Op = Sequelize.Op
@@ -100,9 +100,7 @@ class Sqlite3Storage {
       isColumnJSON: {},
       JSONkeys: [],
     }
-    let key
-    for (const attr in modelAttributes) {
-      key = attr
+    for (const key in modelAttributes) {
       // eslint-disable-next-line no-prototype-builtins
       if (modelAttributes.hasOwnProperty(key)) {
         modelData.columns.push(key)
@@ -123,7 +121,7 @@ class Sqlite3Storage {
       }
     }
     for (let i = 0; i < modelData.columns.length; i++) {
-      key = modelData.columns[i]
+      const key = modelData.columns[i]
       modelData.columnsString += key
       modelData.substitutionString += '?'
       if (i < modelData.columns.length - 1) {
