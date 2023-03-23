@@ -401,6 +401,7 @@ class Sqlite3Storage {
       this.profiler.profileSectionEnd('db')
     }
   }
+
   _delete(table: ModelData, where: GenericObject, opts: OperationOptions) {
     try {
       this.profiler.profileSectionStart('db')
@@ -585,6 +586,7 @@ class Sqlite3Storage {
       })
     })
   }
+
   get(sql: string, params = []) {
     return new Promise((resolve, reject) => {
       this.db.get(sql, params, (err: Error, result: unknown) => {
@@ -612,6 +614,7 @@ class Sqlite3Storage {
       })
     })
   }
+
   allOld(sql: string, params = []) {
     return new Promise((resolve, reject) => {
       this.oldDb.all(sql, params, (err: Error, rows: unknown[]) => {
