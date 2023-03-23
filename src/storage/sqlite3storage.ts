@@ -450,8 +450,7 @@ class Sqlite3Storage {
     }
     const paramsArray = []
     for (const key in paramsObj) {
-      // eslint-disable-next-line no-prototype-builtins
-      if (paramsObj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(paramsObj, key)) {
         const paramEntry: ParamEntry = { name: key }
 
         // eslint-disable-next-line security/detect-object-injection
