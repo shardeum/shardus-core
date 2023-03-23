@@ -53,7 +53,7 @@ class Storage {
     // this.storage = new SequelizeStorage(models, config, logger, baseDir, this.profiler)
 
     // this.storage = new BetterSqlite3Storage(models, config, logger, baseDir, this.profiler)
-    this.storage = new Sqlite3Storage(models, config, logger, baseDir, this.profiler)
+    this.storage = new Sqlite3Storage(models as [string, ModelAttributes][], config, logger, baseDir, this.profiler)
     this.serverConfig = serverConfig
     this.stateManager = null
   }

@@ -56,16 +56,22 @@ interface Sqlite3Storage {
   profiler: Profiler
   mainLogger: Log4js.Logger
   initialized: boolean
-  storageModels: any
-  db: any
-  oldDb: any
+  storageModels: { [tableName: string]: ModelData }
+  db: Database
+  oldDb: Database
 }
 
 class Sqlite3Storage {
   oldDBPath: string
 
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
-  constructor(models, storageConfig, logger, baseDir, profiler) {
+  constructor(
+    models: [string, ModelAttributes][],
+    storageConfig: Shardus.StrictStorageConfiguration,
+    logger: Logger,
+    baseDir: string,
+    profiler: Profiler
+  ) {
     this.baseDir = baseDir
     this.storageConfig = storageConfig
     this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
@@ -83,15 +89,17 @@ class Sqlite3Storage {
     }
   }
 
-  sqlite3Define(modelName, modelAttributes) {
+  sqlite3Define(modelName: string, modelAttributes: ModelAttributes) {
     const tableName = modelName
 
-    const modelData: any = { tableName }
-    modelData.columns = []
-    modelData.columnsString = ''
-    modelData.substitutionString = ''
-    modelData.isColumnJSON = {}
-    modelData.JSONkeys = []
+    const modelData: ModelData = {
+      tableName,
+      columns: [],
+      columnsString: '',
+      substitutionString: '',
+      isColumnJSON: {},
+      JSONkeys: [],
+    }
     let key
     for (const attr in modelAttributes) {
       key = attr
@@ -100,7 +108,7 @@ class Sqlite3Storage {
         modelData.columns.push(key)
         const value = modelAttributes[key]
 
-        let type = value.type
+        let type: string | ColumnDescription = value.type
         if (!type) {
           type = value
           // if (logFlags.console) console.log(' TYPE MISSING!!!! ' + key)
@@ -161,7 +169,7 @@ class Sqlite3Storage {
     const dbDir = path.parse(this.storageConfig.options.storage).dir
 
     // Rename dbDir if it exists
-    let oldDirPath
+    let oldDirPath: fs.PathLike
     try {
       oldDirPath = dbDir + '-old-' + Date.now()
 
@@ -251,11 +259,11 @@ class Sqlite3Storage {
     if (this.oldDb) await this.oldDb.close()
   }
 
-  async runCreate(createStatement) {
+  async runCreate(createStatement: string) {
     await this.run(createStatement)
   }
 
-  _create(table, object, opts) {
+  _create(table: ModelData, object: unknown, opts: OperationOptions) {
     try {
       this.profiler.profileSectionStart('db')
       // if (logFlags.console) console.log('_create2: ' + stringify(object))
@@ -293,7 +301,7 @@ class Sqlite3Storage {
     }
   }
 
-  async _read(table, params, opts) {
+  async _read(table: ModelData, params: GenericObject, opts: OperationOptions) {
     try {
       this.profiler.profileSectionStart('db')
       // return table.findAll({ where, ...opts })
@@ -326,7 +334,7 @@ class Sqlite3Storage {
       this.profiler.profileSectionEnd('db')
     }
   }
-  async _readOld(table, params, opts) {
+  async _readOld(table: ModelData, params: GenericObject, opts: OperationOptions) {
     try {
       this.profiler.profileSectionStart('db')
       // return table.findAll({ where, ...opts })
@@ -360,7 +368,7 @@ class Sqlite3Storage {
     }
   }
 
-  _update(table, values, where, opts) {
+  _update(table: ModelData, values: GenericObject, where: GenericObject, opts: OperationOptions) {
     try {
       this.profiler.profileSectionStart('db')
       // return table.update(values, { where, ...opts })
@@ -386,7 +394,7 @@ class Sqlite3Storage {
       this.profiler.profileSectionEnd('db')
     }
   }
-  _delete(table, where, opts) {
+  _delete(table: ModelData, where: GenericObject, opts: OperationOptions) {
     try {
       this.profiler.profileSectionStart('db')
       // if (!where) {
@@ -409,7 +417,7 @@ class Sqlite3Storage {
     }
   }
 
-  _rawQuery(queryString, valueArray) {
+  _rawQuery(queryString: string, valueArray: unknown[]) {
     // return this.sequelize.query(query, { model: table })
     try {
       this.profiler.profileSectionStart('db')
@@ -419,7 +427,7 @@ class Sqlite3Storage {
     }
   }
 
-  _rawQueryOld(queryString, valueArray) {
+  _rawQueryOld(queryString: string, valueArray: unknown[]) {
     // return this.sequelize.query(query, { model: table })
     try {
       this.profiler.profileSectionStart('db')
@@ -429,7 +437,7 @@ class Sqlite3Storage {
     }
   }
 
-  params2Array(paramsObj, table) {
+  params2Array(paramsObj: GenericObject, table: ModelData) {
     if (paramsObj === null || paramsObj === undefined) {
       return []
     }
@@ -437,7 +445,7 @@ class Sqlite3Storage {
     for (const key in paramsObj) {
       // eslint-disable-next-line no-prototype-builtins
       if (paramsObj.hasOwnProperty(key)) {
-        const paramEntry: any = { name: key }
+        const paramEntry: ParamEntry = { name: key }
 
         const value = paramsObj[key]
         if (utils.isObject(value) && table.isColumnJSON[paramEntry.name] === false) {
@@ -500,7 +508,7 @@ class Sqlite3Storage {
     return paramsArray
   }
 
-  paramsToWhereStringAndValues(paramsArray) {
+  paramsToWhereStringAndValues(paramsArray: { sql: string; vals: string[] }[]) {
     let whereValueArray = []
     let whereString = ''
     for (let i = 0; i < paramsArray.length; i++) {
@@ -517,7 +525,7 @@ class Sqlite3Storage {
     return { whereString, whereValueArray }
   }
 
-  paramsToAssignmentStringAndValues(paramsArray) {
+  paramsToAssignmentStringAndValues(paramsArray: { sql: string; vals: string[] }[]) {
     let valueArray = []
     let resultString = ''
     for (let i = 0; i < paramsArray.length; i++) {
@@ -531,7 +539,7 @@ class Sqlite3Storage {
     return { resultString, valueArray }
   }
 
-  options2string(optionsObj) {
+  options2string(optionsObj: OperationOptions) {
     if (optionsObj === null || optionsObj === undefined) {
       return ''
     }
@@ -554,9 +562,9 @@ class Sqlite3Storage {
   }
 
   // run/get/all promise wraps from this tutorial: https://stackabuse.com/a-sqlite-tutorial-with-node-js/
-  run(sql, params = []) {
+  run(sql: string, params = []) {
     return new Promise((resolve, reject) => {
-      this.db.run(sql, params, function (err) {
+      this.db.run(sql, params, function (err: Error) {
         if (err) {
           if (logFlags.console) console.log('Error running sql ' + sql)
           if (logFlags.console) console.log(err)
@@ -567,9 +575,9 @@ class Sqlite3Storage {
       })
     })
   }
-  get(sql, params = []) {
+  get(sql: string, params = []) {
     return new Promise((resolve, reject) => {
-      this.db.get(sql, params, (err, result) => {
+      this.db.get(sql, params, (err: Error, result: unknown) => {
         if (err) {
           if (logFlags.console) console.log('Error running sql: ' + sql)
           if (logFlags.console) console.log(err)
@@ -581,9 +589,9 @@ class Sqlite3Storage {
     })
   }
 
-  all(sql, params = []) {
+  all(sql: string, params = []) {
     return new Promise((resolve, reject) => {
-      this.db.all(sql, params, (err, rows) => {
+      this.db.all(sql, params, (err: Error, rows: unknown[]) => {
         if (err) {
           if (logFlags.console) console.log('Error running sql: ' + sql)
           if (logFlags.console) console.log(err)
@@ -594,9 +602,9 @@ class Sqlite3Storage {
       })
     })
   }
-  allOld(sql, params = []) {
+  allOld(sql: string, params = []) {
     return new Promise((resolve, reject) => {
-      this.oldDb.all(sql, params, (err, rows) => {
+      this.oldDb.all(sql, params, (err: Error, rows: unknown[]) => {
         if (err) {
           if (logFlags.console) console.log('Error running sql: ' + sql)
           if (logFlags.console) console.log(err)
@@ -610,7 +618,7 @@ class Sqlite3Storage {
 }
 
 // From: https://stackoverflow.com/a/21196961
-async function _ensureExists(dir) {
+async function _ensureExists(dir: string) {
   return new Promise<void>((resolve, reject) => {
     fs.mkdir(dir, { recursive: true }, (err) => {
       if (err) {
