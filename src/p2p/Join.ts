@@ -476,7 +476,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
     try {
       let validationResponse = shardus.app.validateJoinRequest(joinRequest)
       if (validationResponse.success !== true) {
-        warn(`Validation of join request data is failed!`)
+        error(`Validation of join request data is failed due to ${validationResponse.reason || 'unknown reason'}`)
         nestedCountersInstance.countEvent('p2p', `join-reject-dapp`)
         return {
           success: validationResponse.success,
