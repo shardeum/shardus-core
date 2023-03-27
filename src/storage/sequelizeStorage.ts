@@ -2,25 +2,27 @@ import Log4js from 'log4js'
 import * as Shardus from '../shardus/shardus-types'
 import fs from 'fs'
 import path from 'path'
-import { Sequelize } from 'sequelize'
+import { Model, ModelCtor, Sequelize } from 'sequelize'
 import Profiler from '../utils/profiler'
-import Logger, { logFlags } from '../logger'
+import Logger from '../logger'
+import { ModelAttributes } from '.'
+import { Where } from 'sequelize/types/utils'
 
 interface SequelizeStorage {
   baseDir: string
-  models: any
+  models: [string, ModelAttributes][]
   storageConfig: Shardus.StrictStorageConfiguration
   profiler: Profiler
   mainLogger: Log4js.Logger
   sequelize: Sequelize
-  storageModels: any
+  storageModels: { [key: string]: ModelCtor<Model<unknown, unknown>> }
   initialized: boolean
 }
 
 class SequelizeStorage {
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
   constructor(
-    models: any,
+    models: [string, ModelAttributes][],
     storageConfig: Shardus.StrictStorageConfiguration,
     logger: Logger,
     baseDir: string,
@@ -41,8 +43,7 @@ class SequelizeStorage {
     await _ensureExists(dbDir)
     this.mainLogger.info('Created Database directory.')
     // Start Sequelize and load models
-    //@ts-ignore
-    this.sequelize = new Sequelize(...Object.values(this.storageConfig))
+    this.sequelize = new Sequelize(...Object.values(this.storageConfig) as unknown[])
     for (let [modelName, modelAttributes] of this.models) this.sequelize.define(modelName, modelAttributes)
     this.storageModels = this.sequelize.models
     this.initialized = false
@@ -60,38 +61,38 @@ class SequelizeStorage {
     await this.sequelize.close()
   }
 
-  async dropAndCreateModel(model) {
+  async dropAndCreateModel(model: ModelCtor<Model<unknown, unknown>>) {
     await model.sync({ force: true })
   }
 
   _checkInit() {
     if (!this.initialized) throw new Error('Storage not initialized.')
   }
-  _create(table, values, opts) {
+  _create(table: ModelCtor<Model<unknown, unknown>>, values: unknown[], opts: { [key: string]: unknown }) {
     if (Array.isArray(values)) {
       return table.bulkCreate(values, opts)
     }
     return table.create(values, opts)
   }
-  _read(table, where, opts) {
+  _read(table: ModelCtor<Model<unknown, unknown>>, where: Where, opts: { [key: string]: unknown }) {
     return table.findAll({ where, ...opts })
   }
-  _update(table, values, where, opts) {
+  _update(table: ModelCtor<Model<unknown, unknown>>, values: unknown, where: Where, opts: { [key: string]: unknown }) {
     return table.update(values, { where, ...opts })
   }
-  _delete(table, where, opts) {
+  _delete(table: ModelCtor<Model<unknown, unknown>>, where: Where, opts: { [key: string]: unknown }) {
     if (!where) {
       return table.destroy({ ...opts })
     }
     return table.destroy({ where, ...opts })
   }
-  _rawQuery(table, query) {
+  _rawQuery(table: ModelCtor<Model<unknown, unknown>>, query: string | { query: string; values: unknown[] }) {
     return this.sequelize.query(query, { model: table })
   }
 }
 
 // From: https://stackoverflow.com/a/21196961
-async function _ensureExists(dir) {
+async function _ensureExists(dir: fs.PathLike) {
   return new Promise<void>((resolve, reject) => {
     fs.mkdir(dir, { recursive: true }, (err) => {
       if (err) {
