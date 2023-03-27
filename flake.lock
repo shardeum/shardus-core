@@ -2,11 +2,11 @@
   "nodes": {
     "nixpkgs": {
       "locked": {
-        "lastModified": 1678875422,
-        "narHash": "sha256-T3o6NcQPwXjxJMn2shz86Chch4ljXgZn746c2caGxd8=",
+        "lastModified": 1679793451,
+        "narHash": "sha256-JafTtgMDATE8dZOImBhWMA9RCn9AP8FVOpN+9K/tTlg=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "126f49a01de5b7e35a43fd43f891ecf6d3a51459",
+        "rev": "0cd51a933d91078775b300cf0f29aa3495231aa2",
         "type": "github"
       },
       "original": {
@@ -43,11 +43,11 @@
         "utils": "utils"
       },
       "locked": {
-        "lastModified": 1678464148,
-        "narHash": "sha256-RpNjhjV8Lw6BZhEx4uKYDHHKUQvtOuk3Z92Sb5F2ZwU=",
+        "lastModified": 1679930458,
+        "narHash": "sha256-wZwQxgLY7PbwAf81Qui3UzASea3Rh6U28SsovkkJWUg=",
         "ref": "nix-flake",
-        "rev": "c77e6fbb4e0e1ddadbfe68a2a9b9b37e9d4b69b0",
-        "revCount": 73,
+        "rev": "a00575404ff45216c29682c74c4e902d452f8e20",
+        "revCount": 75,
         "type": "git",
         "url": "https://gitlab.com/shardus/tools/shardus-cli"
       },
