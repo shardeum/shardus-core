@@ -16,7 +16,6 @@
   ],
   "ignorePatterns": [
     "arrays.ts",
-    "sequelizeStorage.ts",
     "**/crypto/index.ts",
     "betterSqlite3storage.ts",
     "state-manager-types.ts",
