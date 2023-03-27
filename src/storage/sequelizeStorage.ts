@@ -39,16 +39,16 @@ class SequelizeStorage {
 
   async init() {
     // Create dbDir if it doesn't exist
-    let dbDir = path.parse(this.storageConfig.options.storage).dir
+    const dbDir = path.parse(this.storageConfig.options.storage).dir
     await _ensureExists(dbDir)
     this.mainLogger.info('Created Database directory.')
     // Start Sequelize and load models
     this.sequelize = new Sequelize(...Object.values(this.storageConfig) as unknown[])
-    for (let [modelName, modelAttributes] of this.models) this.sequelize.define(modelName, modelAttributes)
+    for (const [modelName, modelAttributes] of this.models) this.sequelize.define(modelName, modelAttributes)
     this.storageModels = this.sequelize.models
     this.initialized = false
     // Create tables for models in DB if they don't exist
-    for (let model of Object.values(this.storageModels) as any) {
+    for (const model of Object.values(this.storageModels)) {
       await model.sync()
       this._rawQuery(model, 'PRAGMA synchronous = OFF')
       this._rawQuery(model, 'PRAGMA journal_mode = MEMORY')
