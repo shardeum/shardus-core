@@ -78,6 +78,17 @@ class LoadDetection extends EventEmitter {
     })
   }
 
+  configUpdated() {
+    if (this.desiredTxTime !== Context.config.loadDetection.desiredTxTime) {
+      this.desiredTxTime = typeof Context.config.loadDetection.desiredTxTime === 'string' ? Number(Context.config.loadDetection.desiredTxTime) : Context.config.loadDetection.desiredTxTime
+      console.log('Config updated for loadDetection.desiredTxTime', this.desiredTxTime)
+      nestedCountersInstance.countEvent(
+        'loadRelated',
+        `desiredTxTime config updated`
+      )
+    }
+  }
+
   /**
    * Returns a number between 0 and 1 indicating the current load.
    */

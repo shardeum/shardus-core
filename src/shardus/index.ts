@@ -1967,6 +1967,7 @@ class Shardus extends EventEmitter {
         }
 
         this.p2p.configUpdated()
+        this.loadDetection.configUpdated()
       }
     }
   }
