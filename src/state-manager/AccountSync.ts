@@ -388,14 +388,14 @@ class AccountSync {
       }
     )
 
-    Context.network.registerExternalGet('sync-statement', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('sync-statement', isDebugModeMiddleware, (_req, res) => {
       res.write(`${utils.stringifyReduce(this.syncStatement)}\n`)
 
       res.end()
     })
 
     //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('sync-statement-all', isDebugModeMiddleware, async (req, res) => {
+    Context.network.registerExternalGet('sync-statement-all', isDebugModeMiddleware, async (_req, res) => {
       try {
         //wow, why does Context.p2p not work..
         const activeNodes = Wrapper.p2p.state.getNodes()
@@ -430,33 +430,33 @@ class AccountSync {
       res.end()
     })
 
-    Context.network.registerExternalGet('forceFinishSync', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('forceFinishSync', isDebugModeMiddleware, (_req, res) => {
       res.write(`sync forcing complete. \n`)
       this.forceSyncComplete = true
       res.end()
     })
 
-    Context.network.registerExternalGet('dataSourceTest', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('dataSourceTest', isDebugModeMiddleware, (_req, res) => {
       this.dataSourceTest = !this.dataSourceTest
       res.write(`dataSourceTest = ${this.dataSourceTest} \n`)
       res.end()
     })
-    Context.network.registerExternalGet('syncFail1', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('syncFail1', isDebugModeMiddleware, (_req, res) => {
       this.debugFail1 = !this.debugFail1
       res.write(`debugFail1 = ${this.debugFail1} \n`)
       res.end()
     })
-    Context.network.registerExternalGet('syncFail2', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('syncFail2', isDebugModeMiddleware, (_req, res) => {
       this.debugFail2 = !this.debugFail2
       res.write(`debugFail2 = ${this.debugFail2} \n`)
       res.end()
     })
-    Context.network.registerExternalGet('syncFail3', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('syncFail3', isDebugModeMiddleware, (_req, res) => {
       this.debugFail3 = !this.debugFail3
       res.write(`debugFail3 = ${this.debugFail3} \n`)
       res.end()
     })
-    Context.network.registerExternalGet('syncFail4', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('syncFail4', isDebugModeMiddleware, (_req, res) => {
       this.debugFail4 = !this.debugFail4
       res.write(`debugFail4 = ${this.debugFail4} \n`)
       res.end()
