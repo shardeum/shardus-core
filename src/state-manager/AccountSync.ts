@@ -485,7 +485,7 @@ class AccountSync {
 
     //not great, but this currently triggers the storage init in the dapp
     //todo: replace with a specific   initDappStorage() function
-    await this.app.deleteLocalAccountData()
+    this.app.deleteLocalAccountData()
 
     // Dont sync if first node
     if (this.p2p.isFirstSeed || safetyMode) {
@@ -536,7 +536,7 @@ class AccountSync {
     if (logFlags.console) console.log('syncStateData start')
     // delete and re-create some tables before we sync:
     await this.storage.clearAppRelatedState()
-    await this.app.deleteLocalAccountData()
+    this.app.deleteLocalAccountData()
 
     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: starting syncStateData`)
 
