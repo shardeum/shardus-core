@@ -1,7 +1,6 @@
 import * as Shardus from '../shardus/shardus-types'
 import { StateManager as StateManagerTypes } from '@shardus/types'
 import * as utils from '../utils'
-const stringify = require('fast-stable-stringify')
 
 import Profiler, { cUninitializedSize } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
@@ -9,32 +8,25 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import ShardFunctions from './shardFunctions'
-import { time } from 'console'
 import StateManager from '.'
-import { isNullOrUndefined } from 'util'
 import { robustQuery } from '../p2p/Utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
 import * as Self from '../p2p/Self'
-import { potentiallyRemoved } from '../p2p/NodeList'
 import {
-  SimpleRange,
   AccountStateHashReq,
   AccountStateHashResp,
   GetAccountStateReq,
   GetAccountData3Req,
   GetAccountDataByRangeSmart,
   GlobalAccountReportResp,
-  GetAccountData3Resp,
   CycleShardData,
 } from './state-manager-types'
 import { safetyModeVals } from '../snapshot'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { errorToStringFull } from '../utils'
 import SyncTracker from './SyncTracker'
-
-const allZeroes64 = '0'.repeat(64)
 
 type SyncStatment = {
   p2pJoinTime: number
@@ -593,13 +585,11 @@ class AccountSync {
 
     let useGlobalAccounts = true // this should stay true now.
 
-    //@ts-ignore
     if (useGlobalAccounts === true) {
       this.createSyncTrackerByForGlobals(cycle, true)
     }
 
     this.syncStatement.timeBeforeDataSync2 = (Date.now() - Self.p2pSyncEnd) / 1000
-    //@ts-ignore
     if (useGlobalAccounts === true) {
       // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
       await this.stateManager.accountGlobals.getGlobalListEarly()
@@ -1158,11 +1148,6 @@ class AccountSync {
                 let old = queueEntry.transactionGroup
                 queueEntry.transactionGroup = null
                 this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-                //@ts-ignore ourNodeInTransactionGroup is updated by queueEntryGetTransactionGroup
-                // if(queueEntry.ourNodeInTransactionGroup === true){
-                //   queueEntry.conensusGroup = null
-                //   this.stateManager.transactionQueue.queueEntryGetConsensusGroup(queueEntry)
-                // }
 
                 //Restore the TX group, because we only want to know what nodes were in the group at the time of the TX
                 queueEntry.transactionGroup = old
