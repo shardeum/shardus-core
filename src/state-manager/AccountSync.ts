@@ -548,6 +548,7 @@ class AccountSync {
     }
 
     //wait untill we have valid shard data
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     hasValidShardData = await this.waitForValidShardData(hasValidShardData)
 
     this.syncStatement.cycleStarted = this.stateManager.currentCycleShardData.cycleNumber
@@ -1100,6 +1101,7 @@ class AccountSync {
     let initalSyncRemaining = 0
     if (this.syncTrackers != null) {
       for (let i = this.syncTrackers.length - 1; i >= 0; i--) {
+        // eslint-disable-next-line security/detect-object-injection
         const syncTracker = this.syncTrackers[i]
 
         if (syncTracker.isPartOfInitialSync) {
@@ -1113,6 +1115,7 @@ class AccountSync {
           for (const queueEntry of syncTracker.queueEntries) {
             //need to decrement this per key
             for (const key of queueEntry.uniqueKeys) {
+              // eslint-disable-next-line security/detect-object-injection
               if (syncTracker.keys[key] === true) {
                 queueEntry.syncCounter--
               }
@@ -1329,9 +1332,11 @@ class AccountSync {
   getSyncTracker(address: string): SyncTracker | null {
     // return the sync tracker.
     for (let i = 0; i < this.syncTrackers.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection
       const syncTracker = this.syncTrackers[i]
 
       // test global first, because it wont have a range
+      // eslint-disable-next-line security/detect-object-injection
       if (syncTracker.isGlobalSyncTracker === true && syncTracker.globalAddressMap[address] === true) {
         return syncTracker
       }
@@ -1361,6 +1366,7 @@ class AccountSync {
     const addressHigh = partitionShardData.homeRange.high
     // return the sync tracker.
     for (let i = 0; i < this.syncTrackers.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection
       const syncTracker = this.syncTrackers[i]
       // if (syncTracker.isGlobalSyncTracker === true && syncTracker.globalAddressMap[address] === true) {
       //   return syncTracker
