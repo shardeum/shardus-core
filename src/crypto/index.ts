@@ -200,11 +200,10 @@ class Crypto {
 
   _runProofOfWorkGenerator(generator: string, seed: unknown, difficulty: number) {
     // Fork a child process to compute the PoW, if it doesn't exist
-    // @ts-ignore for seems to have a funky definition so ignoring it for now.  could be good to go back and research this.
     if (!this.powGenerators[generator]) {
       this.powGenerators[generator] = fork(generator, undefined, { cwd: __dirname })
     }
-    const promise = new Promise((resolve, reject) => {
+    const promise = new Promise((resolve) => {
       this.powGenerators[generator].on('message', (powObj) => {
         this._stopProofOfWorkGenerator(generator)
         resolve(powObj)
@@ -220,7 +219,7 @@ class Crypto {
 
   _stopProofOfWorkGenerator(generator: string) {
     if (!this.powGenerators[generator]) return Promise.resolve('not running')
-    const promise = new Promise((resolve, reject) => {
+    const promise = new Promise((resolve) => {
       this.powGenerators[generator].on('close', (signal) => {
         delete this.powGenerators[generator]
         resolve(signal)
