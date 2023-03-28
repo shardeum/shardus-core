@@ -766,8 +766,8 @@ class AccountSync {
   private initRangesToSync(
     nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData,
     homePartition: number,
-    chunksGuide: number = 4,
-    minSyncRangeGuide: number = 1
+    chunksGuide = 4,
+    minSyncRangeGuide = 1
   ): StateManagerTypes.shardFunctionTypes.AddressRange[] {
     //let chunksGuide = 4
     // todo consider making minSyncRangeGuide = 3 or 4..
@@ -1293,7 +1293,7 @@ class AccountSync {
   createSyncTrackerByRange(
     range: StateManagerTypes.shardFunctionTypes.BasicAddressRange,
     cycle: number,
-    initalSync: boolean = false
+    initalSync = false
   ): SyncTracker {
     const index = this.syncTrackerIndex++
 
@@ -1309,7 +1309,7 @@ class AccountSync {
     return syncTracker
   }
 
-  createSyncTrackerByForGlobals(cycle: number, initalSync: boolean = false): SyncTracker {
+  createSyncTrackerByForGlobals(cycle: number, initalSync = false): SyncTracker {
     const index = this.syncTrackerIndex++
 
     const syncTracker = new SyncTracker()
