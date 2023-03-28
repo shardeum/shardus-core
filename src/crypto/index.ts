@@ -50,7 +50,7 @@ class Crypto {
     }
 
     if (this.config.crypto.keyPairConfig.useKeyPairFromFile) {
-      let fsKeypair = this.readKeypairFromFile()
+      const fsKeypair = this.readKeypairFromFile()
       if (fsKeypair && fsKeypair.secretKey && fsKeypair.publicKey) {
         this.keypair = fsKeypair
         this.mainLogger.info('Keypair loaded from file', this.getKeyPairFile())
