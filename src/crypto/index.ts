@@ -7,12 +7,17 @@ import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 
+interface Keypair {
+  publicKey?: crypto.publicKey
+  secretKey?: crypto.secretKey
+}
+
 interface Crypto {
   baseDir: string
   config: Shardus.StrictServerConfiguration
   mainLogger: Log4js.Logger
   storage: Storage
-  keypair: any
+  keypair: Keypair
   curveKeypair: {
     publicKey?: crypto.curvePublicKey
     secretKey?: crypto.curveSecretKey
@@ -66,7 +71,7 @@ class Crypto {
     }
   }
 
-  setCurveKeyPair(keypair) {
+  setCurveKeyPair(keypair: Keypair) {
     if (keypair) {
       this.curveKeypair = {
         secretKey: crypto.convertSkToCurve(this.keypair.secretKey),
@@ -79,7 +84,7 @@ class Crypto {
     return path.join(this.baseDir, this.config.crypto.keyPairConfig.keyPairJsonFile)
   }
 
-  writeKeypairToFile(keypair) {
+  writeKeypairToFile(keypair: Keypair) {
     fs.writeFileSync(this.getKeyPairFile(), JSON.stringify(keypair))
   }
 
@@ -118,7 +123,7 @@ class Crypto {
     return sharedKey
   }
 
-  tag(obj: any, recipientCurvePk: crypto.curvePublicKey) {
+  tag(obj: unknown, recipientCurvePk: crypto.curvePublicKey) {
     const objCopy = JSON.parse(crypto.stringify(obj))
     const sharedKey = this.getSharedKey(recipientCurvePk)
     crypto.tagObj(objCopy, sharedKey)
@@ -135,7 +140,7 @@ class Crypto {
    * @param recipientCurvePk
    * @returns
    */
-  tagWithSize(obj: any, recipientCurvePk: crypto.curvePublicKey) {
+  tagWithSize(obj: unknown, recipientCurvePk: crypto.curvePublicKey) {
     const strEncoded = crypto.stringify(obj)
     const msgSize = strEncoded.length //get the message size
     const objCopy = JSON.parse(strEncoded)
@@ -145,43 +150,43 @@ class Crypto {
     return objCopy
   }
 
-  signWithSize(obj: any) {
+  signWithSize(obj: { msgSize: number, [key: string]: unknown }) {
     const wrappedMsgStr = crypto.stringify(obj)
     const msgLength = wrappedMsgStr.length
     obj.msgSize = msgLength
     return this.sign(obj)
   }
 
-  authenticate(obj: any, senderCurvePk: crypto.curvePublicKey) {
+  authenticate(obj: crypto.TaggedObject, senderCurvePk: crypto.curvePublicKey) {
     const sharedKey = this.getSharedKey(senderCurvePk)
     return crypto.authenticateObj(obj, sharedKey)
   }
 
-  sign(obj: any) {
+  sign(obj: { [key: string]: unknown }) {
     const objCopy = JSON.parse(crypto.stringify(obj))
     crypto.signObj(objCopy, this.keypair.secretKey, this.keypair.publicKey)
     return objCopy
   }
 
-  verify(obj, expectedPk?) {
+  verify(obj: crypto.SignedObject, expectedPk?: string) {
     if (expectedPk) {
       if (obj.sign.owner !== expectedPk) return false
     }
     return crypto.verifyObj(obj)
   }
 
-  hash(obj) {
+  hash(obj: { [key: string]: unknown }) {
     if (!obj.sign) {
       return crypto.hashObj(obj)
     }
     return crypto.hashObj(obj, true)
   }
 
-  isGreaterHash(hash1, hash2) {
+  isGreaterHash(hash1: string | number, hash2: string | number) {
     return hash1 > hash2
   }
 
-  getComputeProofOfWork(seed, difficulty) {
+  getComputeProofOfWork(seed: unknown, difficulty: number) {
     return this._runProofOfWorkGenerator('./computePowGenerator.js', seed, difficulty)
   }
 
@@ -193,7 +198,7 @@ class Crypto {
     this.powGenerators = {}
   }
 
-  _runProofOfWorkGenerator(generator: string, seed, difficulty: number) {
+  _runProofOfWorkGenerator(generator: string, seed: unknown, difficulty: number) {
     // Fork a child process to compute the PoW, if it doesn't exist
     // @ts-ignore for seems to have a funky definition so ignoring it for now.  could be good to go back and research this.
     if (!this.powGenerators[generator]) {
