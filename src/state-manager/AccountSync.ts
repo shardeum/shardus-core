@@ -249,7 +249,7 @@ class AccountSync {
         this.profiler.scopedProfileSectionStart('get_account_state_hash', false, msgSize)
         let responseSize = cUninitializedSize
         try {
-          let result = {} as AccountStateHashResp
+          const result = {} as AccountStateHashResp
 
           if (this.softSync_checkInitialFlag && this.initalSyncFinished === false) {
             //not ready?
@@ -260,7 +260,7 @@ class AccountSync {
           }
 
           // yikes need to potentially hash only N records at a time and return an array of hashes
-          let stateHash = await this.stateManager.transactionQueue.getAccountsStateHash(
+          const stateHash = await this.stateManager.transactionQueue.getAccountsStateHash(
             payload.accountStart,
             payload.accountEnd,
             payload.tsStart,
@@ -288,20 +288,20 @@ class AccountSync {
       'get_account_state',
       async (
         payload: GetAccountStateReq,
-        respond: (arg0: { accountStates: Shardus.StateTableObject[] }) => any,
-        sender,
-        tracker: string,
+        respond: (arg0: { accountStates: Shardus.StateTableObject[] }) => Promise<number>,
+        _sender: unknown,
+        _tracker: string,
         msgSize: number
       ) => {
         if (this.config.stateManager == null) {
           throw new Error('this.config.stateManager == null') //TODO TSConversion  would be nice to eliminate some of these config checks.
         }
         this.profiler.scopedProfileSectionStart('get_account_state', false, msgSize)
-        let result = {} as { accountStates: Shardus.StateTableObject[] }
+        const result = {} as { accountStates: Shardus.StateTableObject[] }
 
         // max records set artificially low for better test coverage
         // todo m11: make configs for how many records to query
-        let accountStates = await this.storage.queryAccountStateTable(
+        const accountStates = await this.storage.queryAccountStateTable(
           payload.accountStart,
           payload.accountEnd,
           payload.tsStart,
@@ -309,7 +309,7 @@ class AccountSync {
           this.config.stateManager.stateTableBucketSize
         )
         result.accountStates = accountStates
-        let responseSize = await respond(result)
+        const responseSize = await respond(result)
         this.profiler.scopedProfileSectionEnd('get_account_state', responseSize)
       }
     )
@@ -324,7 +324,7 @@ class AccountSync {
         msgSize: number
       ) => {
         this.profiler.scopedProfileSectionStart('get_account_data3', false, msgSize)
-        let result = {} as { data: GetAccountDataByRangeSmart } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
+        const result = {} as { data: GetAccountDataByRangeSmart } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
         let accountData: GetAccountDataByRangeSmart | null = null
         let ourLockID = -1
         try {
@@ -349,7 +349,7 @@ class AccountSync {
         this.stateManager.testAccountDataWrapped(accountData.wrappedAccounts2)
 
         result.data = accountData
-        let responseSize = await respond(result)
+        const responseSize = await respond(result)
         this.profiler.scopedProfileSectionEnd('get_account_data3', responseSize)
       }
     )
@@ -370,7 +370,7 @@ class AccountSync {
         msgSize: number
       ) => {
         this.profiler.scopedProfileSectionStart('get_account_data_by_list', false, msgSize)
-        let result = {} as { accountData: Shardus.WrappedData[] | null }
+        const result = {} as { accountData: Shardus.WrappedData[] | null }
         let accountData = null
         let ourLockID = -1
         try {
@@ -382,7 +382,7 @@ class AccountSync {
         //PERF Disiable this in production or performance testing.
         this.stateManager.testAccountDataWrapped(accountData)
         result.accountData = accountData
-        let responseSize = await respond(result)
+        const responseSize = await respond(result)
         this.profiler.scopedProfileSectionEnd('get_account_data_by_list', responseSize)
       }
     )
@@ -397,10 +397,10 @@ class AccountSync {
     Context.network.registerExternalGet('sync-statement-all', isDebugModeMiddleware, async (req, res) => {
       try {
         //wow, why does Context.p2p not work..
-        let activeNodes = Wrapper.p2p.state.getNodes()
+        const activeNodes = Wrapper.p2p.state.getNodes()
         if (activeNodes) {
-          for (let node of activeNodes.values()) {
-            let getResp = await this.logger._internalHackGetWithResp(
+          for (const node of activeNodes.values()) {
+            const getResp = await this.logger._internalHackGetWithResp(
               `${node.externalIp}:${node.externalPort}/sync-statement`
             )
             console.log('getResp active', getResp.body)
@@ -409,10 +409,10 @@ class AccountSync {
           }
         }
         res.write(`joining nodes...\n`)
-        let joiningNodes = Wrapper.p2p.state.getNodesRequestingJoin()
+        const joiningNodes = Wrapper.p2p.state.getNodesRequestingJoin()
         if (joiningNodes) {
-          for (let node of joiningNodes.values()) {
-            let getResp = await this.logger._internalHackGetWithResp(
+          for (const node of joiningNodes.values()) {
+            const getResp = await this.logger._internalHackGetWithResp(
               `${node.externalIp}:${node.externalPort}/sync-statement`
             )
             console.log('getResp syncing', getResp.body)
@@ -578,12 +578,12 @@ class AccountSync {
     rangesToSync = this.initRangesToSync(nodeShardData, homePartition)
     this.syncStatement.syncRanges = rangesToSync.length
 
-    for (let range of rangesToSync) {
+    for (const range of rangesToSync) {
       // let nodes = ShardFunctions.getNodesThatCoverRange(this.stateManager.currentCycleShardData.shardGlobals, range.low, range.high, this.stateManager.currentCycleShardData.ourNode, this.stateManager.currentCycleShardData.activeNodes)
       this.createSyncTrackerByRange(range, cycle, true)
     }
 
-    let useGlobalAccounts = true // this should stay true now.
+    const useGlobalAccounts = true // this should stay true now.
 
     if (useGlobalAccounts === true) {
       this.createSyncTrackerByForGlobals(cycle, true)
@@ -605,7 +605,7 @@ class AccountSync {
     let running = true
     while (running) {
       try {
-        for (let syncTracker of this.syncTrackers) {
+        for (const syncTracker of this.syncTrackers) {
           if (this.dataSyncMainPhaseComplete === true) {
             // this get set if we force sync to finish
             running = false
@@ -674,9 +674,9 @@ class AccountSync {
           let cleared = 0
           let kept = 0
           let newTrackers = 0
-          let trackersToKeep = []
+          const trackersToKeep = []
           let keptGlobal = false
-          for (let syncTracker of this.syncTrackers) {
+          for (const syncTracker of this.syncTrackers) {
             //keep unfinished global sync trackers
             if (syncTracker.isGlobalSyncTracker === true && syncTracker.syncFinished === false) {
               trackersToKeep.push(syncTracker)
@@ -691,7 +691,7 @@ class AccountSync {
           //get fresh nodeShardData, homePartition and cycle so that we can re init the sync ranges.
           nodeShardData = this.stateManager.currentCycleShardData.nodeShardData
           console.log('RETRYSYNC: GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
-          let lastCycle = cycle
+          const lastCycle = cycle
           cycle = this.stateManager.currentCycleShardData.cycleNumber
           homePartition = nodeShardData.homePartition
           console.log(
@@ -708,7 +708,7 @@ class AccountSync {
           //init new non global trackers
           rangesToSync = this.initRangesToSync(nodeShardData, homePartition, 4, 4)
           this.syncStatement.syncRanges = rangesToSync.length
-          for (let range of rangesToSync) {
+          for (const range of rangesToSync) {
             this.createSyncTrackerByRange(range, cycle, true)
             newTrackers++
           }
@@ -742,7 +742,7 @@ class AccountSync {
       }
       if (this.stateManager.currentCycleShardData != null) {
         if (this.stateManager.currentCycleShardData.hasCompleteData == false) {
-          let temp = this.p2p.state.getActiveNodes(null)
+          const temp = this.p2p.state.getActiveNodes(null)
           if (logFlags.playback)
             this.logger.playbackLogNote(
               'shrd_sync_waitForShardData',
@@ -769,7 +769,7 @@ class AccountSync {
   ): StateManagerTypes.shardFunctionTypes.AddressRange[] {
     //let chunksGuide = 4
     // todo consider making minSyncRangeGuide = 3 or 4..
-    let syncRangeGoal = Math.max(
+    const syncRangeGoal = Math.max(
       minSyncRangeGuide,
       Math.min(
         chunksGuide,
@@ -778,7 +778,7 @@ class AccountSync {
     )
     let partitionsCovered = 0
     let partitionsPerRange = 1
-    let rangesToSync = [] //, rangesToSync: StateManagerTypes.shardFunctionTypes.AddressRange[]
+    const rangesToSync = [] //, rangesToSync: StateManagerTypes.shardFunctionTypes.AddressRange[]
 
     if (nodeShardData.storedPartitions.rangeIsSplit === true) {
       partitionsCovered =
@@ -799,13 +799,13 @@ class AccountSync {
       let i = 0
       while (currentEnd < end) {
         currentEnd = Math.min(currentStart + partitionsPerRange, end)
-        let range = ShardFunctions.partitionToAddressRange2(
+        const range = ShardFunctions.partitionToAddressRange2(
           this.stateManager.currentCycleShardData.shardGlobals,
           currentStart,
           currentEnd
         )
 
-        let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
+        const { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
         range.high = address1
 
         if (nextLowAddress != null) {
@@ -826,13 +826,13 @@ class AccountSync {
 
       while (currentEnd < end) {
         currentEnd = Math.min(currentStart + partitionsPerRange, end)
-        let range = ShardFunctions.partitionToAddressRange2(
+        const range = ShardFunctions.partitionToAddressRange2(
           this.stateManager.currentCycleShardData.shardGlobals,
           currentStart,
           currentEnd
         )
 
-        let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
+        const { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
         range.high = address1
 
         if (nextLowAddress != null) {
@@ -854,8 +854,8 @@ class AccountSync {
           `syncRangeGoal ${syncRangeGoal}  chunksGuide:${chunksGuide} numPartitions:${this.stateManager.currentCycleShardData.shardGlobals.numPartitions} partitionsPerRange:${partitionsPerRange}`
         )
 
-      let start = nodeShardData.storedPartitions.partitionStart
-      let end = nodeShardData.storedPartitions.partitionEnd
+      const start = nodeShardData.storedPartitions.partitionStart
+      const end = nodeShardData.storedPartitions.partitionEnd
 
       let currentStart = start
       let currentEnd = 0
@@ -863,13 +863,13 @@ class AccountSync {
       let i = 0
       while (currentEnd < end) {
         currentEnd = Math.min(currentStart + partitionsPerRange, end)
-        let range = ShardFunctions.partitionToAddressRange2(
+        const range = ShardFunctions.partitionToAddressRange2(
           this.stateManager.currentCycleShardData.shardGlobals,
           currentStart,
           currentEnd
         )
 
-        let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
+        const { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
         range.high = address1
 
         if (nextLowAddress != null) {
@@ -886,7 +886,7 @@ class AccountSync {
     // if we don't have a range to sync yet manually sync the whole range.
     if (rangesToSync.length === 0) {
       if (logFlags.console) console.log(`syncStateData ranges: pushing full range, no ranges found`)
-      let range = ShardFunctions.partitionToAddressRange2(
+      const range = ShardFunctions.partitionToAddressRange2(
         this.stateManager.currentCycleShardData.shardGlobals,
         0,
         this.stateManager.currentCycleShardData.shardGlobals.numPartitions - 1
@@ -917,14 +917,14 @@ class AccountSync {
 
     this.lastWinningGlobalReportNodes = []
 
-    let equalFn = (a: GlobalAccountReportResp, b: GlobalAccountReportResp) => {
+    const equalFn = (a: GlobalAccountReportResp, b: GlobalAccountReportResp) => {
       // these fail cases should not count towards forming an hash consenus
       if (a.combinedHash == null || a.combinedHash === '') {
         return false
       }
       return a.combinedHash === b.combinedHash
     }
-    let queryFn = async (node: Shardus.Node) => {
+    const queryFn = async (node: Shardus.Node) => {
       // Node Precheck!
       if (
         this.stateManager.isNodeValidForInternalMessage(node.id, 'getRobustGlobalReport', true, true) ===
@@ -956,7 +956,7 @@ class AccountSync {
       return result
     }
     //can ask any active nodes for global data.
-    let nodes: Shardus.Node[] = this.stateManager.currentCycleShardData.activeNodes
+    const nodes: Shardus.Node[] = this.stateManager.currentCycleShardData.activeNodes
     // let nodes = this.getActiveNodesInRange(lowAddress, highAddress) // this.p2p.state.getActiveNodes(this.p2p.id)
     if (nodes.length === 0) {
       if (logFlags.debug) this.mainLogger.debug(`no nodes available`)
@@ -966,7 +966,7 @@ class AccountSync {
     let result
     let winners
     try {
-      let robustQueryResult = await robustQuery(nodes, queryFn, equalFn, 3, false)
+      const robustQueryResult = await robustQuery(nodes, queryFn, equalFn, 3, false)
 
       // if we did not get a result at all wait, log and retry
       if (robustQueryResult === null) {
@@ -1044,7 +1044,7 @@ class AccountSync {
     await utils.sleep(1000)
 
     let anyNonGlobalSyncTrackersLeft = false
-    for (let syncTracker of this.syncTrackers) {
+    for (const syncTracker of this.syncTrackers) {
       if (syncTracker.isGlobalSyncTracker === false && syncTracker.syncFinished === false) {
         anyNonGlobalSyncTrackersLeft = true
       }
@@ -1057,7 +1057,7 @@ class AccountSync {
       this.skipSync()
 
       //make sync trackers clean up
-      for (let syncTracker of this.syncTrackers) {
+      for (const syncTracker of this.syncTrackers) {
         syncTracker.syncFinished = true
       }
       return
@@ -1099,7 +1099,7 @@ class AccountSync {
     let initalSyncRemaining = 0
     if (this.syncTrackers != null) {
       for (let i = this.syncTrackers.length - 1; i >= 0; i--) {
-        let syncTracker = this.syncTrackers[i]
+        const syncTracker = this.syncTrackers[i]
 
         if (syncTracker.isPartOfInitialSync) {
           initalSyncRemaining++
@@ -1109,9 +1109,9 @@ class AccountSync {
           /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeClear', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
           // allow syncing queue entries to resume!
-          for (let queueEntry of syncTracker.queueEntries) {
+          for (const queueEntry of syncTracker.queueEntries) {
             //need to decrement this per key
-            for (let key of queueEntry.uniqueKeys) {
+            for (const key of queueEntry.uniqueKeys) {
               if (syncTracker.keys[key] === true) {
                 queueEntry.syncCounter--
               }
@@ -1120,7 +1120,7 @@ class AccountSync {
 
             if (queueEntry.syncCounter <= 0) {
               // dont adjust a
-              let found = this.stateManager.transactionQueue.getQueueEntry(queueEntry.acceptedTx.txId)
+              const found = this.stateManager.transactionQueue.getQueueEntry(queueEntry.acceptedTx.txId)
               if (!found) {
                 this.logger.playbackLogNote(
                   'shrd_sync_wakeupTX_skip1',
@@ -1143,9 +1143,9 @@ class AccountSync {
                 continue
               }
 
-              let before = queueEntry.ourNodeInTransactionGroup
+              const before = queueEntry.ourNodeInTransactionGroup
               if (queueEntry.ourNodeInTransactionGroup === false) {
-                let old = queueEntry.transactionGroup
+                const old = queueEntry.transactionGroup
                 queueEntry.transactionGroup = null
                 this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
 
@@ -1228,8 +1228,8 @@ class AccountSync {
         //   we work on a copy of the list
         //   we start the loop over again if any work was done.  this allows us to pick up changes that got added in later
         startedCount = 0
-        let arrayCopy = this.syncTrackers.slice(0)
-        for (let syncTracker of arrayCopy) {
+        const arrayCopy = this.syncTrackers.slice(0)
+        for (const syncTracker of arrayCopy) {
           if (syncTracker.syncStarted === false) {
             // let partition = syncTracker.partition
             /* prettier-ignore */ if (logFlags.console) console.log(`rtsyncTracker start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
@@ -1253,12 +1253,12 @@ class AccountSync {
       )
 
       //clear out sync trackers and let repair handle it if needed.
-      let cleared = this.syncTrackers.length
-      let kept = 0
-      let newTrackers = 0
+      const cleared = this.syncTrackers.length
+      const kept = 0
+      const newTrackers = 0
 
-      let cycle = this.stateManager.currentCycleShardData.cycleNumber
-      let lastCycle = cycle - 1
+      const cycle = this.stateManager.currentCycleShardData.cycleNumber
+      const lastCycle = cycle - 1
 
       /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: runtime. lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({ cleared, kept, newTrackers })}`)
 
@@ -1291,9 +1291,9 @@ class AccountSync {
     cycle: number,
     initalSync: boolean = false
   ): SyncTracker {
-    let index = this.syncTrackerIndex++
+    const index = this.syncTrackerIndex++
 
-    let syncTracker = new SyncTracker()
+    const syncTracker = new SyncTracker()
     syncTracker.initByRange(this, this.p2p, index, range, cycle, initalSync)
 
     this.syncTrackers.push(syncTracker) // we should maintain this order.
@@ -1306,9 +1306,9 @@ class AccountSync {
   }
 
   createSyncTrackerByForGlobals(cycle: number, initalSync: boolean = false): SyncTracker {
-    let index = this.syncTrackerIndex++
+    const index = this.syncTrackerIndex++
 
-    let syncTracker = new SyncTracker()
+    const syncTracker = new SyncTracker()
     syncTracker.initGlobal(this, this.p2p, index, cycle, initalSync)
 
     this.syncTrackers.push(syncTracker) // we should maintain this order.
@@ -1328,7 +1328,7 @@ class AccountSync {
   getSyncTracker(address: string): SyncTracker | null {
     // return the sync tracker.
     for (let i = 0; i < this.syncTrackers.length; i++) {
-      let syncTracker = this.syncTrackers[i]
+      const syncTracker = this.syncTrackers[i]
 
       // test global first, because it wont have a range
       if (syncTracker.isGlobalSyncTracker === true && syncTracker.globalAddressMap[address] === true) {
@@ -1353,14 +1353,14 @@ class AccountSync {
     if (cycleShardData == null) {
       return null
     }
-    let partitionShardData: StateManagerTypes.shardFunctionTypes.ShardInfo =
+    const partitionShardData: StateManagerTypes.shardFunctionTypes.ShardInfo =
       cycleShardData.parititionShardDataMap.get(partitionID)
 
-    let addressLow = partitionShardData.homeRange.low
-    let addressHigh = partitionShardData.homeRange.high
+    const addressLow = partitionShardData.homeRange.low
+    const addressHigh = partitionShardData.homeRange.high
     // return the sync tracker.
     for (let i = 0; i < this.syncTrackers.length; i++) {
-      let syncTracker = this.syncTrackers[i]
+      const syncTracker = this.syncTrackers[i]
       // if (syncTracker.isGlobalSyncTracker === true && syncTracker.globalAddressMap[address] === true) {
       //   return syncTracker
       // }
