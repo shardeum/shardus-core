@@ -556,12 +556,6 @@ class AccountSync {
     this.syncStatement.numNodesOnStart = this.stateManager.currentCycleShardData.activeNodes.length
     this.syncStatement.p2pJoinTime = Self.p2pJoinTime
 
-    // //DO NOT CHECK IN
-    // if(this.syncStatement.numNodesOnStart >= 15) {
-    //   nestedCountersInstance.countEvent('hack', 'force default logs on')
-    //   this.logger.setDefaultFlags()
-    // }
-
     let nodeShardData = this.stateManager.currentCycleShardData.nodeShardData
     /* prettier-ignore */ if (logFlags.console) console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
 
@@ -581,7 +575,6 @@ class AccountSync {
     this.syncStatement.syncRanges = rangesToSync.length
 
     for (const range of rangesToSync) {
-      // let nodes = ShardFunctions.getNodesThatCoverRange(this.stateManager.currentCycleShardData.shardGlobals, range.low, range.high, this.stateManager.currentCycleShardData.ourNode, this.stateManager.currentCycleShardData.activeNodes)
       this.createSyncTrackerByRange(range, cycle, true)
     }
 
@@ -730,7 +723,6 @@ class AccountSync {
         }
       }
     }
-    // /* prettier-ignore */ if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
     if (logFlags.console) console.log('syncStateData end' + '   time:' + Date.now())
   }
 
@@ -769,7 +761,6 @@ class AccountSync {
     chunksGuide = 4,
     minSyncRangeGuide = 1
   ): StateManagerTypes.shardFunctionTypes.AddressRange[] {
-    //let chunksGuide = 4
     // todo consider making minSyncRangeGuide = 3 or 4..
     const syncRangeGoal = Math.max(
       minSyncRangeGuide,
@@ -914,9 +905,6 @@ class AccountSync {
    *
    */
   async getRobustGlobalReport(): Promise<GlobalAccountReportResp> {
-    // this.p2p.registerInternal('get_globalaccountreport', async (payload:any, respond: (arg0: GlobalAccountReportResp) => any) => {
-    //   let result = {combinedHash:"", accounts:[]} as GlobalAccountReportResp
-
     this.lastWinningGlobalReportNodes = []
 
     const equalFn = (a: GlobalAccountReportResp, b: GlobalAccountReportResp) => {
@@ -1021,10 +1009,6 @@ class AccountSync {
     }
     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport found a winner.  results: ${utils.stringifyReduce(result)}`)
 
-    // this.dataSourceNodeIndex = 0
-    // this.dataSourceNode = winners[this.dataSourceNodeIndex] // Todo random index
-    // this.dataSourceNodeList = winners
-
     this.lastWinningGlobalReportNodes = winners as Shardus.Node[]
 
     return result as GlobalAccountReportResp
@@ -1040,9 +1024,6 @@ class AccountSync {
     this.clearSyncData()
 
     // using set timeout before we resume to prevent infinite stack depth.
-    // setTimeout(async () => {
-    //   await this.syncStateDataForPartition(this.currentPartition)
-    // }, 1000)
     await utils.sleep(1000)
 
     let anyNonGlobalSyncTrackersLeft = false
@@ -1069,7 +1050,6 @@ class AccountSync {
     this.syncStatement.failAndRestart++
 
     //TODO proper restart not useing global var
-    //await this.syncStateDataForRange2() //this.currentRange)
   }
 
   /**
@@ -1120,7 +1100,6 @@ class AccountSync {
                 queueEntry.syncCounter--
               }
             }
-            //queueEntry.syncCounter--
 
             if (queueEntry.syncCounter <= 0) {
               // dont adjust a
@@ -1181,11 +1160,6 @@ class AccountSync {
                     queueEntry.txKeys.allKeys
                   )}`
                 )
-              // } else {
-              //   /* prettier-ignore */ if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_wakeupTXcancel', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`)
-              //   queueEntry.state = 'canceled'
-              //   queueEntry.didWakeup = true
-              // }
             }
           }
           syncTracker.queueEntries = []
@@ -1217,8 +1191,6 @@ class AccountSync {
    * syncRuntimeTrackers
    */
   async syncRuntimeTrackers(): Promise<void> {
-    // await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them // I think we can skip this.
-
     if (this.runtimeSyncTrackerSyncing === true) {
       return
     }
@@ -1235,7 +1207,6 @@ class AccountSync {
         const arrayCopy = this.syncTrackers.slice(0)
         for (const syncTracker of arrayCopy) {
           if (syncTracker.syncStarted === false) {
-            // let partition = syncTracker.partition
             /* prettier-ignore */ if (logFlags.console) console.log(`rtsyncTracker start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
             /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('rt_shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
@@ -1342,14 +1313,9 @@ class AccountSync {
       }
 
       // need to see if address is in range. if so return the tracker.
-      // if (ShardFunctions.testAddressInRange(address, syncTracker.range)) {
-      //if(syncTracker.isGlobalSyncTracker){
       if (syncTracker.range.low <= address && address <= syncTracker.range.high) {
         return syncTracker
       }
-      //}else{
-
-      //}
     }
     return null
   }
@@ -1368,9 +1334,7 @@ class AccountSync {
     for (let i = 0; i < this.syncTrackers.length; i++) {
       // eslint-disable-next-line security/detect-object-injection
       const syncTracker = this.syncTrackers[i]
-      // if (syncTracker.isGlobalSyncTracker === true && syncTracker.globalAddressMap[address] === true) {
-      //   return syncTracker
-      // }
+
       // need to see if address is in range. if so return the tracker.
       if (syncTracker.range.low <= addressLow && addressHigh <= syncTracker.range.high) {
         return syncTracker
@@ -1421,10 +1385,6 @@ class AccountSync {
   setGlobalSyncFinished() {
     this.globalAccountsSynced = true
   }
-
-  // onlyConsensusNodes(node){
-  //   return potentiallyRemoved.has(node.id) != true
-  // }
 }
 
 export default AccountSync
