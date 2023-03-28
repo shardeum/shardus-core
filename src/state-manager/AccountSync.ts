@@ -27,6 +27,7 @@ import { safetyModeVals } from '../snapshot'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { errorToStringFull } from '../utils'
 import SyncTracker from './SyncTracker'
+import { Logger as L4jsLogger } from 'log4js'
 
 type SyncStatment = {
   p2pJoinTime: number
@@ -68,10 +69,10 @@ class AccountSync {
   p2p: P2P
   storage: Storage
 
-  mainLogger: any
-  fatalLogger: any
-  shardLogger: any
-  statsLogger: any
+  mainLogger: L4jsLogger
+  fatalLogger: L4jsLogger
+  shardLogger: L4jsLogger
+  statsLogger: L4jsLogger
 
   dataSyncMainPhaseComplete: boolean
   globalAccountsSynced: boolean
@@ -241,9 +242,9 @@ class AccountSync {
       'get_account_state_hash',
       async (
         payload: AccountStateHashReq,
-        respond: (arg0: AccountStateHashResp) => any,
-        sender,
-        tracker: string,
+        respond: (arg0: AccountStateHashResp) => Promise<number>,
+        _sender: unknown,
+        _tracker: string,
         msgSize: number
       ) => {
         this.profiler.scopedProfileSectionStart('get_account_state_hash', false, msgSize)
@@ -318,9 +319,9 @@ class AccountSync {
       'get_account_data3',
       async (
         payload: GetAccountData3Req,
-        respond: (arg0: { data: GetAccountDataByRangeSmart }) => any,
-        sender,
-        tracker: string,
+        respond: (arg0: { data: GetAccountDataByRangeSmart }) => Promise<number>,
+        _sender: unknown,
+        _tracker: string,
         msgSize: number
       ) => {
         this.profiler.scopedProfileSectionStart('get_account_data3', false, msgSize)
@@ -363,10 +364,10 @@ class AccountSync {
     this.p2p.registerInternal(
       'get_account_data_by_list',
       async (
-        payload: { accountIds: any },
-        respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any,
-        sender,
-        tracker: string,
+        payload: { accountIds: string[] },
+        respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => Promise<number>,
+        _sender: unknown,
+        _tracker: string,
         msgSize: number
       ) => {
         this.profiler.scopedProfileSectionStart('get_account_data_by_list', false, msgSize)
@@ -963,8 +964,8 @@ class AccountSync {
       return // nothing to do
     }
     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery getRobustGlobalReport ${utils.stringifyReduce(nodes.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
-    let result
-    let winners
+    let result: { ready: unknown; combinedHash?: string; accounts?: { id: string; hash: string; timestamp: number }[] }
+    let winners: string | unknown[]
     try {
       const robustQueryResult = await robustQuery(nodes, queryFn, equalFn, 3, false)
 
