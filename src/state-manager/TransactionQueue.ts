@@ -1043,7 +1043,6 @@ class TransactionQueue {
     }
   }
 
-
   /* eslint-disable security/detect-object-injection */
   tryInvloveAccount(txId: string, address: string, isRead: boolean): boolean {
     const queueEntry = this.getQueueEntry(txId)
@@ -3989,6 +3988,7 @@ class TransactionQueue {
                         wrappedAccount.timestamp = timestamp
                         nestedCountersInstance.countEvent('transactionQueue', 'correctedTimestamp')
                       }
+                      // eslint-disable-next-line security/detect-possible-timing-attacks
                       if (wrappedAccount.stateId != hash) {
                         wrappedAccount.stateId = hash
                         nestedCountersInstance.countEvent('transactionQueue', 'correctedHash')
