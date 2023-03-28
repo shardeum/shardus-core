@@ -19,7 +19,6 @@
     "betterSqlite3storage.ts",
     "state-manager-types.ts",
     "PartitionStats.ts",
-    "AccountSync.ts",
     "AccountPatcher.ts",
     "snapshotFunctions.ts",
     "partition-gossip.ts",
