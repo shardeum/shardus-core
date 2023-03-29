@@ -41,6 +41,7 @@ export default class FastRandomIterator {
     if (arraySize < 100 || strideSize > arraySize || parForcesSimpleMode) {
       this.indexList = new Array(arraySize)
       for (let i = 0; i < arraySize; ++i) {
+        // eslint-disable-next-line security/detect-object-injection
         this.indexList[i] = i
       }
     } else {
@@ -84,6 +85,7 @@ export default class FastRandomIterator {
     this.sparseSet = new Set()
   }
 
+  /* eslint-disable security/detect-object-injection */
   getNextIndex(): number {
     if (this.iteratorIndex >= this.arraySize) {
       return -1
@@ -153,5 +155,6 @@ export default class FastRandomIterator {
       this.iteratorIndex++
       return nextIndex
     }
+    /* eslint-enable security/detect-object-injection */
   }
 }
