@@ -7,6 +7,8 @@ import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 
+type HashableObject = { sign?: boolean, [key: symbol]: unknown }
+
 interface Keypair {
   publicKey?: crypto.publicKey
   secretKey?: crypto.secretKey
@@ -162,7 +164,7 @@ class Crypto {
     return crypto.authenticateObj(obj, sharedKey)
   }
 
-  sign(obj: { [key: string]: unknown }) {
+  sign(obj: unknown) {
     const objCopy = JSON.parse(crypto.stringify(obj))
     crypto.signObj(objCopy, this.keypair.secretKey, this.keypair.publicKey)
     return objCopy
@@ -175,8 +177,8 @@ class Crypto {
     return crypto.verifyObj(obj)
   }
 
-  hash(obj: { [key: string]: unknown }) {
-    if (!obj.sign) {
+  hash(obj: HashableObject | unknown) {
+    if (!(obj as HashableObject).sign) {
       return crypto.hashObj(obj)
     }
     return crypto.hashObj(obj, true)
