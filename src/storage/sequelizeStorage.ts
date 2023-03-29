@@ -94,6 +94,8 @@ class SequelizeStorage {
 // From: https://stackoverflow.com/a/21196961
 async function _ensureExists(dir: fs.PathLike) {
   return new Promise<void>((resolve, reject) => {
+    // probably safe; creates an empty folder
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     fs.mkdir(dir, { recursive: true }, (err) => {
       if (err) {
         // Ignore err if folder exists
