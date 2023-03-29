@@ -152,6 +152,8 @@ class Sqlite3Storage {
   async deleteFolder(path: string) {
     //recursive delete of db folder
     try {
+      // probably safe; only deletes what is supposed to be the old db folder
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
       fs.rmdirSync(path, { recursive: true, maxRetries: 5 })
       //why does this not work: it was added in v14.14 !!!
       //fs.rmSync(dbDir, { recursive: true, force: true, maxRetries : 5 })
@@ -181,6 +183,8 @@ class Sqlite3Storage {
       this.oldDBPath = oldDirPath
 
       if (this.storageConfig.options.saveOldDBFiles) {
+        // likely safe; uses database paths determined by config
+        // eslint-disable-next-line security/detect-non-literal-fs-filename
         fs.renameSync(dbDir, oldDirPath)
         if (oldDirPath) {
           this.mainLogger.info('Setting old data path. this will cause safety mode?' + oldDirPath)
@@ -188,7 +192,9 @@ class Sqlite3Storage {
           this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
         }
       } else {
-        // for now we rename it not matter what and delete it later
+        // for now we rename it not matter what and delete it later.
+        // likely safe; uses database paths determined by config
+        // eslint-disable-next-line security/detect-non-literal-fs-filename
         fs.renameSync(dbDir, oldDirPath)
         if (oldDirPath) {
           this.mainLogger.info('Setting old data path. this will cause safety mode?' + oldDirPath)
@@ -633,6 +639,9 @@ class Sqlite3Storage {
 // From: https://stackoverflow.com/a/21196961
 async function _ensureExists(dir: string) {
   return new Promise<void>((resolve, reject) => {
+    // likely safe; only creates an empty directory and is only used here with a
+    // database directory determined by config
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     fs.mkdir(dir, { recursive: true }, (err) => {
       if (err) {
         // Ignore err if folder exists
