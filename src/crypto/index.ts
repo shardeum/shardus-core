@@ -87,11 +87,16 @@ class Crypto {
   }
 
   writeKeypairToFile(keypair: Keypair) {
+    // probably safe; accesses keypair defined by config
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     fs.writeFileSync(this.getKeyPairFile(), JSON.stringify(keypair))
   }
 
   readKeypairFromFile() {
+    // probably safe; accesses keypair defined by config
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     if (fs.existsSync(this.getKeyPairFile())) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
       const fileData = fs.readFileSync(this.getKeyPairFile())
       return JSON.parse(fileData.toString())
     }
@@ -117,9 +122,11 @@ class Crypto {
   }
 
   getSharedKey(curvePk: crypto.curvePublicKey) {
+    // eslint-disable-next-line security/detect-object-injection
     let sharedKey = this.sharedKeys[curvePk]
     if (!sharedKey) {
       sharedKey = crypto.generateSharedKey(this.curveKeypair.secretKey, curvePk)
+      // eslint-disable-next-line security/detect-object-injection
       this.sharedKeys[curvePk] = sharedKey
     }
     return sharedKey
@@ -195,11 +202,13 @@ class Crypto {
   stopAllGenerators() {
     // tslint:disable-next-line: forin
     for (const generator in this.powGenerators) {
+      // eslint-disable-next-line security/detect-object-injection
       this.powGenerators[generator].kill()
     }
     this.powGenerators = {}
   }
 
+  /* eslint-disable security/detect-object-injection */
   _runProofOfWorkGenerator(generator: string, seed: unknown, difficulty: number) {
     // Fork a child process to compute the PoW, if it doesn't exist
     if (!this.powGenerators[generator]) {
@@ -218,7 +227,9 @@ class Crypto {
     // Return a promise the resolves to a valid { nonce, hash }
     return promise
   }
+  /* eslint-enable security/detect-object-injection */
 
+  /* eslint-disable security/detect-object-injection */
   _stopProofOfWorkGenerator(generator: string) {
     if (!this.powGenerators[generator]) return Promise.resolve('not running')
     const promise = new Promise((resolve) => {
@@ -232,6 +243,7 @@ class Crypto {
     }
     return promise
   }
+  /* eslint-enable security/detect-object-injection */
 }
 
 // tslint:disable-next-line: no-default-export
