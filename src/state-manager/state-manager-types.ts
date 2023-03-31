@@ -1,15 +1,3 @@
-//import { AccountData } from "../shardus/shardus-types";
-
-//import { WrappedData } from "../shardus/shardus-types";
-
-// import { Node } from "../p2p/NodeList";
-
-//import { WrappedResponse } from "../shardus/shardus-types";
-
-//import { ShardGlobals } from "./shardFunctionTypes";
-
-//import { WrappedData } from "../shardus/shardus-types";
-//imports up top break the export, boo.
 import * as Shardus from '../shardus/shardus-types'
 import { StateManager } from '@shardus/types'
 export { App, Cycle, Sign, AcceptedTx, ApplyResponse } from '../shardus/shardus-types'
@@ -56,13 +44,13 @@ export type QueueEntry = {
 
   shardusMemoryPatternSets: ShardusMemoryPatternsSets
 
-  localCachedData: any
+  localCachedData: LocalCachedData
   syncCounter: number
   didSync: boolean
   queuedBeforeMainSyncComplete: boolean // todo debug related, so we may want to remove it to save mememory eventually
   didWakeup: boolean
   txGroupDebug: string
-  syncKeys: any[]
+  syncKeys: unknown[]
   logstate: string // logging state
   requests: { [key: string]: Shardus.Node } // map of account keys to the node that we are requesting the account data from
   globalModification: boolean
@@ -138,7 +126,7 @@ export type QueueEntry = {
   //collectedData for repair
   debugFail_voteFlip: boolean
 
-  debugFail_failNoRepair: Boolean
+  debugFail_failNoRepair: boolean
   /**Short hash string for the TX ID. for logging  */
   logID: string
 
@@ -153,7 +141,7 @@ export type QueueEntry = {
   involvedReads: { [accountID: string]: boolean }
   involvedWrites: { [accountID: string]: boolean }
 
-  executionDebug?: any
+  executionDebug?: ExecutionDebug
   txDebug?: TxDebug
   txSieveTime: number
   accountDataSet: boolean
@@ -298,7 +286,7 @@ export type PartitionObject = {
   /**
    * todo more specific data export type
    */
-  Chain: any[]
+  Chain: unknown[]
 }
 /**
  * a partition result
@@ -347,8 +335,8 @@ export type GenericHashSetEntry = {
   /**
    * the object/vote we are pinned to.  todo make this a export type!!
    */
-  pinObj?: any
-  ownVotes?: any[]
+  pinObj?: unknown
+  ownVotes?: unknown[]
 }
 /**
  * extends GenericHashSetEntry some generic data that represents a vote for hash set comparison
@@ -402,12 +390,12 @@ export type TxTallyList = {
    * AcceptedTx?
    */
   passed: number[]
-  txs: any[]
+  txs: unknown[]
   processed: boolean
   /**
    * below 0 for not redacted. a value above zero indicates the cycle this was redacted
    */
-  states: any[]
+  states: unknown[]
   /**
    * this gets added on when we are reparing something newTxList seems to have a different format than existing types.
    */
@@ -417,22 +405,15 @@ export type TxTallyList = {
 export type NewTXList = {
   hashes: string[]
   passed: number[]
-  txs: any[]
+  txs: unknown[]
   thashes: string[]
   tpassed: number[]
-  ttxs: any[]
-  tstates: any[]
-  states: any[]
+  ttxs: unknown[]
+  tstates: unknown[]
+  states: unknown[]
   processed: boolean
 }
 
-//export type Node = import("../shardus").Node;
-
-// export type ShardGlobals = any;
-// export type NodeShardData = any;
-// export type ShardInfo = any;
-// export type AddressRange = any;
-// export type BasicAddressRange = any;
 /**
  * a partition reciept that contains one copy of of the data and all of the signatures for that data
  */
@@ -546,7 +527,7 @@ export type ExtendedVote = Vote & {
   val: string
   lowestIndex: number
   voteTally: { i: number; p: number }[] // number[] // { i: index, p: hashListEntry.votePower }
-  votesseen: any
+  votesseen: unknown
   finalIdx: number
 }
 
@@ -577,7 +558,7 @@ export type StringCountEntryObjectMap = { [vote: string]: CountEntry }
 //let accountCopy = { accountId: accountEntry.accountId, data: accountEntry.data, timestamp: accountEntry.timestamp, hash: accountEntry.stateId, cycleNumber }
 export type AccountCopy = {
   accountId: string
-  data: any
+  data: unknown
   timestamp: number
   hash: string
   cycleNumber: number
@@ -701,23 +682,23 @@ export type GetTransactionsByListReq = { Tx_ids: string[] }
 
 export type TransactionsByPartitionReq = {
   cycle: number
-  tx_indicies: any
+  tx_indicies: unknown
   hash: string
   partitionId: number
-  debugSnippets: any
+  debugSnippets: unknown
 }
 export type TransactionsByPartitionResp = {
   success: boolean
-  acceptedTX?: any
-  passFail?: any[]
-  statesList?: any[]
+  acceptedTX?: unknown
+  passFail?: unknown[]
+  statesList?: unknown[]
 }
 
-export type GetPartitionTxidsReq = { Partition_id: any; Cycle_number: string }
+export type GetPartitionTxidsReq = { Partition_id: unknown; Cycle_number: string }
 
-export type RouteToHomeNodeReq = { txid: any; timestamp: any; acceptedTx: Shardus.AcceptedTx }
+export type RouteToHomeNodeReq = { txid: unknown; timestamp: unknown; acceptedTx: Shardus.AcceptedTx }
 
-export type RequestStateForTxReq = { txid: string; timestamp: number; keys: any }
+export type RequestStateForTxReq = { txid: string; timestamp: number; keys: string[] }
 export type RequestStateForTxResp = {
   stateList: Shardus.WrappedResponse[]
   beforeHashes: { [accountID: string]: string }
@@ -738,7 +719,6 @@ export type RequestReceiptForTxReq = { txid: string; timestamp: number }
 export type RequestReceiptForTxResp_old = { receipt: AppliedReceipt; note: string; success: boolean }
 
 export type RequestReceiptForTxResp = { receipt: AppliedReceipt2; note: string; success: boolean }
-//export type RequestStateForTxResp = { stateList: any[]; note: string; success:boolean }
 
 export type RequestStateForTxReqPost = { txid: string; timestamp: number; key: string; hash: string }
 
@@ -838,7 +818,7 @@ export type DebugDumpPartitions = {
   nodesCovered: DebugDumpNodesCovered
   allNodeIds: string[]
   globalAccountIDs: string[]
-  globalAccountSummary: any[]
+  globalAccountSummary: unknown[]
   globalStateHash: string
   calculationTime: number
 }
@@ -846,9 +826,9 @@ export type DebugDumpPartitions = {
 //queue process related:
 export type SeenAccounts = { [accountId: string]: QueueEntry | null }
 
-export type LocalCachedData = { [accountId: string]: any }
+export type LocalCachedData = { [accountId: string]: unknown }
 //export type AllNewTXsById = {[accountId:string]: }
-export type AccountValuesByKey = { [accountId: string]: any }
+export type AccountValuesByKey = { [accountId: string]: unknown }
 
 // repair related
 export type StatusMap = { [txid: string]: number }
@@ -879,49 +859,6 @@ export type FifoLock = {
   lastLock: number
 }
 export type FifoLockObjectMap = { [lockID: string]: FifoLock }
-
-// export type ReceiptMap = {[txId:string] : string[]  }
-
-// export type ReceiptMapResult = {
-//     cycle:number;
-//     partition:number;
-//     receiptMap:ReceiptMap;
-//     txCount:number
-// }
-
-// export type OpaqueBlob = any //Shardus is not supposed to know about the details of this, it is up to the dapp to define
-
-// //Shardus wrapper for a summary blob.  Has information that is needed for the reduce algorithm
-// export type SummaryBlob = {
-//     latestCycle: number; //The highest cycle that was used in this summary.
-//     counter:number;
-//     errorNull:number;
-//     partition:number;
-//     opaqueBlob:OpaqueBlob;
-// }
-
-// //A collection of blobs that share the same cycle.  For TX summaries
-// export type SummaryBlobCollection = {
-//     cycle:number;
-//     blobsByPartition:Map<number, SummaryBlob>;
-// }
-
-// // Stats collected for a cycle
-// export type StatsClump = {
-//     error:boolean;
-//     cycle:number;
-//     dataStats:SummaryBlob[];
-//     txStats:SummaryBlob[];
-//     covered:number[];
-//     coveredParititionCount:number;
-//     skippedParitionCount:number;
-// }
-
-// cache
-// export type AccountMemoryCache = {
-//     t: number;  //timestamp
-//     h: string;  //hash.  todo, a compact form acceptable?
-// }
 
 export type AccountHashCache = {
   t: number //timestamp
@@ -976,12 +913,6 @@ export type AccountHashCacheMain3 = {
   //queue stuff here that we are not ready for yet
   futureHistoryList: AccountHashCacheList
 }
-
-// export type AccountReport = {
-//     id: string;  // id
-//     h: string;  // hash
-//     t: number; // timestamp
-// }
 
 export type PartitionHashResults = {
   partition: number
@@ -1164,7 +1095,7 @@ export type ProcessQueueStats = {
 
 export type CachedAppData = {
   dataID: string
-  appData: any
+  appData: unknown
   cycle: number
 }
 
@@ -1191,4 +1122,16 @@ export type ShardusMemoryPatternsSets = {
   rw: Set<string>
   wo: Set<string>
   on: Set<string>
+}
+
+export type ExecutionDebug = {
+  process1?: unknown
+  a?: unknown
+  processElapsed?: unknown
+  log?: unknown
+  log1?: unknown
+  log2?: unknown
+  log3?: unknown
+  txResult?: unknown
+  logBusy?: unknown
 }

@@ -3943,7 +3943,7 @@ class TransactionQueue {
                   queueEntry.state = 'await final data'
                 }
               }
-              queueEntry.executionDebug.processElaped = Date.now() - time
+              queueEntry.executionDebug.processElapsed = Date.now() - time
             }
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           }

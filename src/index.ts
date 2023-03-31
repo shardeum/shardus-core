@@ -6,6 +6,7 @@ import { compareObjectShape } from './utils'
 
 export { default as Shardus } from './shardus'
 export { ShardusTypes }
+export { CachedAppData } from './state-manager/state-manager-types'
 
 export { nestedCountersInstance } from './utils/nestedCounters'
 

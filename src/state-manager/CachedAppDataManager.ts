@@ -385,7 +385,7 @@ class CachedAppDataManager {
     }
   }
 
-  async getLocalOrRemoteCachedAppData(topic: string, dataId: string): Promise<CachedAppData | null> {
+  async getLocalOrRemoteCachedAppData(topic: string, dataId: string): Promise<unknown> {
     let cachedAppData: CachedAppData | null = null
 
     if (this.stateManager.currentCycleShardData == null) {
