@@ -15,7 +15,6 @@
     "prettier"
   ],
   "ignorePatterns": [
-    "betterSqlite3storage.ts",
     "state-manager-types.ts",
     "AccountPatcher.ts",
     "shardus-types.ts",

@@ -18,7 +18,42 @@ import P2PApoptosis = require('../p2p/Apoptosis')
 
 import { config } from '../p2p/Context'
 
+/** A type alias to avoid both `any` and having to spell this type out any time
+* we want to use it. */
+export type GenericObject = { [key: symbol]: unknown }
+
 export type ModelAttributes = { [column: string]: ColumnDescription };
+
+export interface ModelData {
+  tableName: string
+  columns: string[]
+  columnsString: string
+  substitutionString: string
+  isColumnJSON: { [key: string]: boolean }
+  JSONkeys: string[]
+
+  insertOrReplaceString?: string
+  insertString?: string
+  selectString?: string
+  updateString?: string
+  deleteString?: string
+}
+
+export type OperationOptions = {
+    createOrReplace?: boolean;
+    raw?: boolean;
+    order?: { length: number; };
+    limit?: number;
+}
+
+export interface ParamEntry {
+  name: string
+  type?: string
+  v1?: string
+  v2?: string
+  sql?: string
+  vals?: string[]
+}
 
 interface Storage {
   serverConfig: ShardusTypes.StrictServerConfiguration
