@@ -592,6 +592,7 @@ class TransactionQueue {
       this.profiler.scopedProfileSectionStart('apply_duration')
       const startTime = process.hrtime()
 
+      this.setDebugLastAwaitedCallInner('stateManager.transactionQueue.app.apply(tx)')
       applyResponse = await this.app.apply(tx as Shardus.OpaqueTransaction, wrappedStates, appData)
       const endTime = process.hrtime(startTime)
       queueEntry.txDebug.duration['apply_duration'] = endTime[1] / 1000000
@@ -723,9 +724,11 @@ class TransactionQueue {
 
       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock outer: ${utils.stringifyReduce(uniqueKeys)} `)
       // TODO Perf (for sharded networks).  consider if we can remove this lock
+      this.setDebugLastAwaitedCallInner('this.stateManager.bulkFifoLockAccounts')
       ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(uniqueKeys)
       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock inner: ${utils.stringifyReduce(uniqueKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
 
+      this.setDebugLastAwaitedCallInner('this.stateManager.fifoLock')
       ourLockID = await this.stateManager.fifoLock('accountModification')
 
       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log(`commitConsensedTransaction tx:${queueEntry.logID} ts:${timestamp} Applying!`)
@@ -850,6 +853,7 @@ class TransactionQueue {
       this.profiler.scopedProfileSectionStart('commit_setAccount')
       const endTime = process.hrtime(startTime)
       queueEntry.txDebug.duration['commit_setAccount'] = endTime[1] / 1000000
+      this.setDebugLastAwaitedCallInner('this.stateManager.setAccount')
       // wrappedStates are side effected for now
       savedSomething = await this.stateManager.setAccount(
         wrappedStates,
@@ -910,6 +914,7 @@ class TransactionQueue {
             )
           }
         }
+        this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.storage.addAccountStates')
         await this.storage.addAccountStates(stateTableResults)
       }
 
@@ -960,6 +965,7 @@ class TransactionQueue {
 
     const repairing = false
     // TODO ARCH REVIEW:  do we still need this table (answer: yes for sync. for now.).  do we need to await writing to it?
+    this.setDebugLastAwaitedCallInner('stateManager.updateAccountsCopyTable')
     await this.stateManager.updateAccountsCopyTable(upgradedAccountDataList, repairing, timestamp)
 
     //the first node in the TX group will emit txProcessed.  I think this it to prevent over reporting (one node per tx group will report)
@@ -2472,6 +2478,7 @@ class TransactionQueue {
 
         this.profiler.profileSectionStart('process_dapp.getRelevantData')
         this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
+        this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.app.getRelevantData')
         let data = await this.app.getRelevantData(
           key,
           queueEntry.acceptedTx.data,
@@ -2736,6 +2743,7 @@ class TransactionQueue {
 
         this.profiler.profileSectionStart('process_dapp.getRelevantData')
         this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
+        this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.app.getRelevantData')
         let data = await this.app.getRelevantData(
           key,
           queueEntry.acceptedTx.data,
@@ -2923,7 +2931,7 @@ class TransactionQueue {
    * @param queueEntry
    * @returns
    */
-  async tellCorrespondingNodesFinalData(queueEntry: QueueEntry) {
+  tellCorrespondingNodesFinalData(queueEntry: QueueEntry) {
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData - start: ${queueEntry.logID}`)
 
     if (this.stateManager.currentCycleShardData == null) {
@@ -3427,6 +3435,9 @@ class TransactionQueue {
         if (currentIndex < 0) {
           break
         }
+
+        this.clearDebugAwaitStrings()
+
         // eslint-disable-next-line security/detect-object-injection
         const queueEntry: QueueEntry = this._transactionQueue[currentIndex]
         const txTime = queueEntry.txKeys.timestamp
@@ -3827,12 +3838,14 @@ class TransactionQueue {
                 const awaitStart = Date.now()
 
                 if (this.executeInOneShard === true) {
-                  this.setDebugLastAwaitedCall('this.tellCorrespondingNodes(queueEntry)')
+                  this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodes(queueEntry)')
                   await this.tellCorrespondingNodes(queueEntry)
+                  this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodes(queueEntry)-complete')
                 } else {
-                  this.setDebugLastAwaitedCall('this.tellCorrespondingNodesOld(queueEntry)')
+                  this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodesOld(queueEntry)')
                   //specific fixes were needed for tellCorrespondingNodes.  tellCorrespondingNodesOld is the old version before fixes
                   await this.tellCorrespondingNodesOld(queueEntry)
+                  this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodesOld(queueEntry)-complete')
                 }
 
                 this.updateSimpleStatsObject(
@@ -4001,8 +4014,9 @@ class TransactionQueue {
                   }
                   queueEntry.executionDebug.log2 = 'call pre apply'
                   const awaitStart = Date.now()
-                  this.setDebugLastAwaitedCall('this.preApplyTransaction(queueEntry)')
+                  this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.preApplyTransaction(queueEntry)')
                   const txResult = await this.preApplyTransaction(queueEntry)
+                  this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.preApplyTransaction(queueEntry)-complete')
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
                     'preApplyTransaction',
@@ -4164,10 +4178,11 @@ class TransactionQueue {
                   ) {
                     //forward all finished data to corresponding nodes
                     const awaitStart = Date.now()
-                    this.setDebugLastAwaitedCall(
-                      'this.stateManager.transactionConsensus.tellCorrespondingNodesFinalData()'
-                    )
-                    await this.tellCorrespondingNodesFinalData(queueEntry)
+                    // this.setDebugLastAwaitedCall(
+                    //   'this.stateManager.transactionConsensus.tellCorrespondingNodesFinalData()'
+                    // )
+                    // we do not need to await here
+                    this.tellCorrespondingNodesFinalData(queueEntry)
                     this.updateSimpleStatsObject(
                       processStats.awaitStats,
                       'tellCorrespondingNodesFinalData',
@@ -4375,6 +4390,9 @@ class TransactionQueue {
                     'awaitFinalData_passed',
                     false
                   )
+                  this.setDebugLastAwaitedCall(
+                    'this.stateManager.transactionConsensus.checkAndSetAccountData()-complete'
+                  )
                   queueEntry.accountDataSet = true
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
@@ -4492,6 +4510,9 @@ class TransactionQueue {
                     'this.stateManager.transactionConsensus.commitConsensedTransaction()'
                   )
                   await this.commitConsensedTransaction(queueEntry)
+                  this.setDebugLastAwaitedCall(
+                    'this.stateManager.transactionConsensus.commitConsensedTransaction()-complete'
+                  )
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
                     'commitConsensedTransaction',
@@ -5331,13 +5352,22 @@ class TransactionQueue {
 
   setDebugLastAwaitedCall(label: string) {
     this.debugLastAwaitedCall = label
+    this.debugLastAwaitedCallInner = ''
+    this.debugLastAwaitedAppCall = ''
   }
 
   setDebugLastAwaitedCallInner(label: string) {
     this.debugLastAwaitedCallInner = label
+    this.debugLastAwaitedAppCall = ''
   }
   setDebugSetLastAppAwait(label: string) {
     this.debugLastAwaitedAppCall = label
+  }
+
+  clearDebugAwaitStrings() {
+    this.debugLastAwaitedCall = ''
+    this.debugLastAwaitedCallInner = ''
+    this.debugLastAwaitedAppCall = ''
   }
 }
 
