@@ -475,7 +475,7 @@ class Shardus extends EventEmitter {
         ],
         watchers: {
           queueLength: () =>
-            this.stateManager ? this.stateManager.transactionQueue.newAcceptedTxQueue.length : 0,
+            this.stateManager ? this.stateManager.transactionQueue._transactionQueue.length : 0,
           executeQueueLength: () =>
             this.stateManager ? this.stateManager.transactionQueue.getExecuteQueueLength() : 0,
           serverLoad: () => (this.loadDetection ? this.loadDetection.getCurrentLoad() : 0),
@@ -1165,6 +1165,10 @@ class Shardus extends EventEmitter {
 
   getShardusProfiler() {
     return profilerInstance
+  }
+
+  setDebugSetLastAppAwait(label: string) {
+    this.stateManager?.transactionQueue.setDebugSetLastAppAwait(label)
   }
 
   validateActiveNodeSignatures(

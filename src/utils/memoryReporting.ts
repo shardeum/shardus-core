@@ -170,7 +170,7 @@ class MemoryReporting {
     //todo integrate this into the main stats tsv
     if (this.shardus && this.shardus.stateManager) {
       const numActiveNodes = NodeList.activeByIdOrder.length
-      const queueCount = this.shardus.stateManager.transactionQueue.newAcceptedTxQueue.length
+      const queueCount = this.shardus.stateManager.transactionQueue._transactionQueue.length
       const archiveQueueCount = this.shardus.stateManager.transactionQueue.archivedQueueEntries.length
 
       outStr += ` nds:${numActiveNodes} qCt:${queueCount} aAr:${archiveQueueCount}`
@@ -210,9 +210,9 @@ class MemoryReporting {
       this.addToReport('StateManager', 'AccountsCache', 'workingAccounts', cacheDbg[0])
       this.addToReport('StateManager', 'AccountsCache', 'mainMap', cacheDbg[1])
 
-      const queueCount = this.shardus.stateManager.transactionQueue.newAcceptedTxQueue.length
+      const queueCount = this.shardus.stateManager.transactionQueue._transactionQueue.length
       this.addToReport('StateManager', 'TXQueue', 'queueCount', queueCount)
-      const pendingQueueCount = this.shardus.stateManager.transactionQueue.newAcceptedTxQueueTempInjest.length
+      const pendingQueueCount = this.shardus.stateManager.transactionQueue.pendingTransactionQueue.length
       this.addToReport('StateManager', 'TXQueue', 'pendingQueueCount', pendingQueueCount)
       const archiveQueueCount = this.shardus.stateManager.transactionQueue.archivedQueueEntries.length
       this.addToReport('StateManager', 'TXQueue', 'archiveQueueCount', archiveQueueCount)

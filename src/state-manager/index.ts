@@ -895,7 +895,7 @@ class StateManager {
       this.accountSync.syncStatement.internalFlag = true
     }
 
-    this.tryStartAcceptedQueue()
+    this.tryStartTransactionProcessingQueue()
 
     if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_mainphaseComplete', ` `, `  `)
   }
@@ -1677,6 +1677,10 @@ class StateManager {
       }
       res.json(debugNodeList)
     })
+
+    Context.network.registerExternalGet('debug-stuck-processing', isDebugModeMiddleware, (req, res) => {
+      res.json(this.transactionQueue.getDebugProccessingStatus())
+    })
   }
 
   _unregisterEndpoints() {
@@ -1726,13 +1730,13 @@ class StateManager {
    *     ######   #######  ##     ## ########
    */
 
-  tryStartAcceptedQueue() {
+  tryStartTransactionProcessingQueue() {
     if (!this.accountSync.dataSyncMainPhaseComplete) {
       nestedCountersInstance.countEvent('processing', 'data sync pending')
       return
     }
-    if (!this.transactionQueue.newAcceptedTxQueueRunning) {
-      this.transactionQueue.processAcceptedTxQueue()
+    if (!this.transactionQueue.transactionProcessingQueueRunning) {
+      this.transactionQueue.processTransactions()
     }
     // with the way the new lists are setup we lost our ablity to interrupt the timer but i am not sure that matters as much
     // else if (this.transactionQueue.newAcceptedTxQueue.length > 0 || this.transactionQueue.newAcceptedTxQueueTempInjest.length > 0) {
@@ -1741,17 +1745,17 @@ class StateManager {
   }
 
   async _firstTimeQueueAwait() {
-    if (this.transactionQueue.newAcceptedTxQueueRunning) {
+    if (this.transactionQueue.transactionProcessingQueueRunning) {
       this.statemanager_fatal(`queueAlreadyRunning`, 'DATASYNC: newAcceptedTxQueueRunning')
       return
     }
 
-    /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('_firstTimeQueueAwait', `this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue.newAcceptedTxQueue.length} this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue.newAcceptedTxQueue.length}`)
+    /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('_firstTimeQueueAwait', `this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue._transactionQueue.length} this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue._transactionQueue.length}`)
 
     // process and keep only TXs that will change local data.
     let newList = []
-    if (this.transactionQueue.newAcceptedTxQueueTempInjest.length > 0) {
-      for (let txQueueEntry of this.transactionQueue.newAcceptedTxQueueTempInjest) {
+    if (this.transactionQueue.pendingTransactionQueue.length > 0) {
+      for (let txQueueEntry of this.transactionQueue.pendingTransactionQueue) {
         if (this.transactionQueue.txWillChangeLocalData(txQueueEntry) === true) {
           newList.push(txQueueEntry)
           nestedCountersInstance.countEvent('stateManager', '_firstTimeQueueAwait kept TX')
@@ -1762,9 +1766,9 @@ class StateManager {
         }
       }
     }
-    this.transactionQueue.newAcceptedTxQueueTempInjest = newList
+    this.transactionQueue.pendingTransactionQueue = newList
 
-    await this.transactionQueue.processAcceptedTxQueue(true)
+    await this.transactionQueue.processTransactions(true)
 
     if (this.accountSync.syncStatement.internalFlag === true) {
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
@@ -2355,7 +2359,7 @@ class StateManager {
   }
 
   _clearQueue() {
-    this.transactionQueue.newAcceptedTxQueue = []
+    this.transactionQueue._transactionQueue = []
   }
 
   async cleanup() {
@@ -3029,6 +3033,9 @@ class StateManager {
         // if (this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active') {
         //   this.calculateChangeInCoverage()
         // }
+
+        this.transactionQueue.checkForStuckProcessing()
+
         let lastCycle = CycleChain.getNewest()
         if (lastCycle == null) {
           return
@@ -3317,7 +3324,7 @@ class StateManager {
     // txsMapEVMReceipt: {[id:string]:unknown[]};
 
     let queueEntriesToSave: QueueEntry[] = []
-    for (let queueEntry of this.transactionQueue.newAcceptedTxQueue) {
+    for (let queueEntry of this.transactionQueue._transactionQueue) {
       if (queueEntry.cycleToRecordOn === cycleToSave) {
         // make sure we have a receipt
         let receipt: AppliedReceipt2 = this.getReceipt2(queueEntry)

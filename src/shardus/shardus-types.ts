@@ -835,6 +835,8 @@ export interface ServerConfiguration {
     syncWithAccountOffset: boolean
     /** this will control if the account copies table functions */
     useAccountCopiesTable: boolean
+    /** How long before we decide that processingn is stuck */
+    stuckProcessingLimit: number
   }
   /** Options for sharding calculations */
   sharding?: {

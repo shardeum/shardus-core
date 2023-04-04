@@ -61,13 +61,13 @@ class TransactionQueue {
   statsLogger: L4jsLogger
   statemanager_fatal: (key: string, log: string) => void
 
-  newAcceptedTxQueue: QueueEntry[]
-  newAcceptedTxQueueTempInjest: QueueEntry[]
+  _transactionQueue: QueueEntry[] //old name: newAcceptedTxQueue
+  pendingTransactionQueue: QueueEntry[] //old name: newAcceptedTxQueueTempInjest
   archivedQueueEntries: QueueEntry[]
   txDebugStatList: TxDebug[]
 
-  newAcceptedTxQueueByID: Map<string, QueueEntry>
-  newAcceptedTxQueueTempInjestByID: Map<string, QueueEntry>
+  _transactionQueueByID: Map<string, QueueEntry> //old name: newAcceptedTxQueueByID
+  pendingTransactionQueueByID: Map<string, QueueEntry> //old name: newAcceptedTxQueueTempInjestByID
   archivedQueueEntriesByID: Map<string, QueueEntry>
   receiptsToForward: Receipt[]
   forwardedReceipts: Map<string, boolean>
@@ -79,7 +79,7 @@ class TransactionQueue {
   queueRestartCounter: number
 
   archivedQueueEntryMaxCount: number
-  newAcceptedTxQueueRunning: boolean //archivedQueueEntryMaxCount is a maximum amount of queue entries to store, usually we should never have this many stored since tx age will be used to clean up the list
+  transactionProcessingQueueRunning: boolean //archivedQueueEntryMaxCount is a maximum amount of queue entries to store, usually we should never have this many stored since tx age will be used to clean up the list
 
   processingLastRunTime: number
   processingMinRunBreak: number
@@ -95,11 +95,21 @@ class TransactionQueue {
   /** process loop stats.  This map contains the latest and the last of each time overage category */
   lastProcessStats: { [limitName: string]: ProcessQueueStats }
 
-  stuckProcessReported: boolean
+  largePendingQueueReported: boolean
 
   queueReads: Set<string>
   queueWrites: Set<string>
   queueReadWritesOld: Set<string>
+
+  isStuckProcessing: boolean
+  stuckProcessingCount: number
+  stuckProcessingCyclesCount: number
+
+  debugLastAwaitedCall: string
+  debugLastAwaitedCallInner: string
+  debugLastAwaitedAppCall: string
+  debugLastProcessingQueueStartTime: number
+  debugRecentQueueEntry: QueueEntry
 
   constructor(
     stateManager: StateManager,
@@ -130,8 +140,8 @@ class TransactionQueue {
     this.queueEntryCounter = 0
     this.queueRestartCounter = 0
 
-    this.newAcceptedTxQueue = []
-    this.newAcceptedTxQueueTempInjest = []
+    this._transactionQueue = []
+    this.pendingTransactionQueue = []
     this.archivedQueueEntries = []
     this.txDebugStatList = []
     this.receiptsToForward = []
@@ -139,13 +149,13 @@ class TransactionQueue {
     this.oldNotForwardedReceipts = new Map()
     this.lastReceiptForwardResetTimestamp = Date.now()
 
-    this.newAcceptedTxQueueByID = new Map()
-    this.newAcceptedTxQueueTempInjestByID = new Map()
+    this._transactionQueueByID = new Map()
+    this.pendingTransactionQueueByID = new Map()
     this.archivedQueueEntriesByID = new Map()
 
     this.archivedQueueEntryMaxCount = 5000 // was 50000 but this too high
     // 10k will fit into memory and should persist long enough at desired loads
-    this.newAcceptedTxQueueRunning = false
+    this.transactionProcessingQueueRunning = false
 
     this.processingLastRunTime = 0
     this.processingMinRunBreak = 10 //20 //200ms breaks between processing loops
@@ -163,7 +173,18 @@ class TransactionQueue {
 
     this.lastProcessStats = {}
 
-    this.stuckProcessReported = false
+    this.largePendingQueueReported = false
+
+    this.isStuckProcessing = false
+    this.stuckProcessingCount = 0
+    this.stuckProcessingCyclesCount = 0
+
+    this.debugLastAwaitedCall = ''
+    this.debugLastAwaitedCallInner = ''
+    this.debugLastAwaitedAppCall = ''
+    this.debugLastProcessingQueueStartTime = 0
+
+    this.debugRecentQueueEntry = null
   }
 
   /***
@@ -1501,12 +1522,12 @@ class TransactionQueue {
           nestedCountersInstance.countEvent('transactionQueue', 'shardusMemoryPatternSets not included')
         }
 
-        this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
-        this.newAcceptedTxQueueTempInjestByID.set(txQueueEntry.acceptedTx.txId, txQueueEntry)
+        this.pendingTransactionQueue.push(txQueueEntry)
+        this.pendingTransactionQueueByID.set(txQueueEntry.acceptedTx.txId, txQueueEntry)
 
         /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_txPreQueued', `${txQueueEntry.logID}`, `${txQueueEntry.logID} gm:${txQueueEntry.globalModification}`)
         // start the queue if needed
-        this.stateManager.tryStartAcceptedQueue()
+        this.stateManager.tryStartTransactionProcessingQueue()
       } catch (error) {
         /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${txQueueEntry.logID} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
         this.statemanager_fatal(
@@ -1537,7 +1558,7 @@ class TransactionQueue {
    * @param txid
    */
   getQueueEntry(txid: string): QueueEntry | null {
-    const queueEntry = this.newAcceptedTxQueueByID.get(txid)
+    const queueEntry = this._transactionQueueByID.get(txid)
     if (queueEntry === undefined) {
       return null
     }
@@ -1550,9 +1571,9 @@ class TransactionQueue {
    * @param txid
    */
   getQueueEntrySafe(txid: string): QueueEntry | null {
-    let queueEntry = this.newAcceptedTxQueueByID.get(txid)
+    let queueEntry = this._transactionQueueByID.get(txid)
     if (queueEntry === undefined) {
-      queueEntry = this.newAcceptedTxQueueTempInjestByID.get(txid)
+      queueEntry = this.pendingTransactionQueueByID.get(txid)
       if (queueEntry === undefined) {
         return null
       }
@@ -3160,8 +3181,8 @@ class TransactionQueue {
     queueEntry.txDebug.duration['queue_sit_time'] = queueEntry.txDebug.dequeueHrTime[1] / 1000000
     this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx.txId)
     if (queueEntry.txDebug) this.dumpTxDebugToStatList(queueEntry)
-    this.newAcceptedTxQueue.splice(currentIndex, 1)
-    this.newAcceptedTxQueueByID.delete(queueEntry.acceptedTx.txId)
+    this._transactionQueue.splice(currentIndex, 1)
+    this._transactionQueueByID.delete(queueEntry.acceptedTx.txId)
 
     queueEntry.archived = true
     //compact the queue entry before we push it!
@@ -3212,7 +3233,13 @@ class TransactionQueue {
    *    ##        ##    ##  ##     ## ##    ## ##       ##    ## ##    ##
    *    ##        ##     ##  #######   ######  ########  ######   ######
    */
-  async processAcceptedTxQueue(firstTime = false) {
+  /**
+   * Run our main processing queue untill there is nothing that we can do
+   * old name: processAcceptedTxQueue
+   * @param firstTime
+   * @returns
+   */
+  async processTransactions(firstTime = false) {
     const seenAccounts: SeenAccounts = {}
     let pushedProfilerTag = null
     const startTime = Date.now()
@@ -3228,6 +3255,9 @@ class TransactionQueue {
       awaitStats: {},
     }
 
+    //this may help in the case where the queue has halted
+    this.lastProcessStats['current'] = processStats
+
     this.queueReads = new Set()
     this.queueWrites = new Set()
     this.queueReadWritesOld = new Set()
@@ -3235,21 +3265,23 @@ class TransactionQueue {
     try {
       nestedCountersInstance.countEvent('processing', 'processing-enter')
 
-      if (this.newAcceptedTxQueueTempInjest.length > 5000) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent( 'stateManager', `newAcceptedTxQueueTempInjest>5000 leftRunning:${this.newAcceptedTxQueueRunning} noShardCalcs:${ this.stateManager.currentCycleShardData == null } ` )
+      if (this.pendingTransactionQueue.length > 5000) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent( 'stateManager', `newAcceptedTxQueueTempInjest>5000 leftRunning:${this.transactionProcessingQueueRunning} noShardCalcs:${ this.stateManager.currentCycleShardData == null } ` )
 
         //report rare counter once
-        if (this.stuckProcessReported === false) {
-          this.stuckProcessReported = true
-          /* prettier-ignore */ nestedCountersInstance.countRareEvent( 'stateManager', `newAcceptedTxQueueTempInjest>5000 leftRunning:${this.newAcceptedTxQueueRunning} noShardCalcs:${ this.stateManager.currentCycleShardData == null } ` )
+        if (this.largePendingQueueReported === false) {
+          this.largePendingQueueReported = true
+          /* prettier-ignore */ nestedCountersInstance.countRareEvent( 'stateManager', `newAcceptedTxQueueTempInjest>5000 leftRunning:${this.transactionProcessingQueueRunning} noShardCalcs:${ this.stateManager.currentCycleShardData == null } ` )
         }
       }
 
-      if (this.newAcceptedTxQueueRunning === true) {
+      if (this.transactionProcessingQueueRunning === true) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'newAcceptedTxQueueRunning === true')
         return
       }
-      this.newAcceptedTxQueueRunning = true
+      this.transactionProcessingQueueRunning = true
+      this.isStuckProcessing = false
+      this.debugLastProcessingQueueStartTime = Date.now()
 
       // ensure there is some rest between processing loops
       const timeSinceLastRun = startTime - this.processingLastRunTime
@@ -3273,7 +3305,7 @@ class TransactionQueue {
         return
       }
 
-      if (this.newAcceptedTxQueue.length === 0 && this.newAcceptedTxQueueTempInjest.length === 0) {
+      if (this._transactionQueue.length === 0 && this.pendingTransactionQueue.length === 0) {
         return
       }
 
@@ -3293,8 +3325,8 @@ class TransactionQueue {
       const app = this.app
 
       // process any new queue entries that were added to the temporary list
-      if (this.newAcceptedTxQueueTempInjest.length > 0) {
-        for (const txQueueEntry of this.newAcceptedTxQueueTempInjest) {
+      if (this.pendingTransactionQueue.length > 0) {
+        for (const txQueueEntry of this.pendingTransactionQueue) {
           if (this.txWillChangeLocalData(txQueueEntry) === true) {
             nestedCountersInstance.countEvent('stateManager', 'processAcceptedTxQueue injest: kept TX')
           } else {
@@ -3308,9 +3340,9 @@ class TransactionQueue {
           // Find the time sorted spot in our queue to insert this TX into
           // reverse loop because the news (largest timestamp) values are at the end of the array
           // todo faster version (binary search? to find where we need to insert)
-          let index = this.newAcceptedTxQueue.length - 1
+          let index = this._transactionQueue.length - 1
           // eslint-disable-next-line security/detect-object-injection
-          let lastTx = this.newAcceptedTxQueue[index]
+          let lastTx = this._transactionQueue[index]
           while (
             index >= 0 &&
             (timestamp > lastTx.txKeys.timestamp ||
@@ -3318,7 +3350,7 @@ class TransactionQueue {
           ) {
             index--
             // eslint-disable-next-line security/detect-object-injection
-            lastTx = this.newAcceptedTxQueue[index]
+            lastTx = this._transactionQueue[index]
           }
 
           const age = Date.now() - timestamp
@@ -3341,25 +3373,25 @@ class TransactionQueue {
 
           txQueueEntry.approximateCycleAge = this.stateManager.currentCycleShardData.cycleNumber
           //insert this tx into the main queue
-          this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
-          this.newAcceptedTxQueueByID.set(txQueueEntry.acceptedTx.txId, txQueueEntry)
+          this._transactionQueue.splice(index + 1, 0, txQueueEntry)
+          this._transactionQueueByID.set(txQueueEntry.acceptedTx.txId, txQueueEntry)
 
           processStats.inserted++
 
           /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${txQueueEntry.logID} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
           this.stateManager.eventEmitter.emit('txQueued', acceptedTx.txId)
         }
-        this.newAcceptedTxQueueTempInjest = []
-        this.newAcceptedTxQueueTempInjestByID.clear()
+        this.pendingTransactionQueue = []
+        this.pendingTransactionQueueByID.clear()
       }
 
-      let currentIndex = this.newAcceptedTxQueue.length - 1
+      let currentIndex = this._transactionQueue.length - 1
 
       let lastLog = 0
       currentIndex++ //increment once so we can handle the decrement at the top of the loop and be safe about continue statements
 
       let lastRest = Date.now()
-      while (this.newAcceptedTxQueue.length > 0) {
+      while (this._transactionQueue.length > 0) {
         // update current time with each pass through the loop
         currentTime = Date.now()
 
@@ -3396,9 +3428,12 @@ class TransactionQueue {
           break
         }
         // eslint-disable-next-line security/detect-object-injection
-        const queueEntry: QueueEntry = this.newAcceptedTxQueue[currentIndex]
+        const queueEntry: QueueEntry = this._transactionQueue[currentIndex]
         const txTime = queueEntry.txKeys.timestamp
         const txAge = currentTime - txTime
+
+        this.debugRecentQueueEntry = queueEntry
+
         // current queue entry is younger than timeM, so nothing to do yet.
         if (txAge < timeM) {
           break
@@ -4611,16 +4646,16 @@ class TransactionQueue {
       }
 
       // restart loop if there are still elements in it
-      if (this.newAcceptedTxQueue.length > 0 || this.newAcceptedTxQueueTempInjest.length > 0) {
+      if (this._transactionQueue.length > 0 || this.pendingTransactionQueue.length > 0) {
         this.processingLeftBusy = true
         setTimeout(() => {
-          this.stateManager.tryStartAcceptedQueue()
+          this.stateManager.tryStartTransactionProcessingQueue()
         }, 15)
       } else {
         this.processingLeftBusy = false
       }
 
-      this.newAcceptedTxQueueRunning = false
+      this.transactionProcessingQueueRunning = false
       this.processingLastRunTime = Date.now()
       this.stateManager.lastSeenAccountsMap = seenAccounts
 
@@ -5180,7 +5215,7 @@ class TransactionQueue {
   /** count the number of queue entries that will potentially execute on this node */
   getExecuteQueueLength(): number {
     let length = 0
-    for (const queueEntry of this.newAcceptedTxQueue) {
+    for (const queueEntry of this._transactionQueue) {
       //TODO shard hopping will have to consider if updating this value is imporant to how our load detection works.
       //probably not since it is a zero sum game if we move it
       if (queueEntry.isInExecutionHome) {
@@ -5194,14 +5229,14 @@ class TransactionQueue {
     nestedCountersInstance.countEvent('stateManager', `getAccountQueueCount`)
     let count = 0
     const committingAppData: Shardus.AcceptedTx['appData'] = []
-    for (const queueEntry of this.newAcceptedTxQueueTempInjest) {
+    for (const queueEntry of this.pendingTransactionQueue) {
       if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
         const tx = queueEntry.acceptedTx
         /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the injested queue:', `appData: ${JSON.stringify(tx.appData)}` )
         count++
       }
     }
-    for (const queueEntry of this.newAcceptedTxQueue) {
+    for (const queueEntry of this._transactionQueue) {
       if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
         const tx = queueEntry.acceptedTx
         if (queueEntry.state === 'commiting' && queueEntry.accountDataSet === false) {
@@ -5214,6 +5249,77 @@ class TransactionQueue {
     }
     /* prettier-ignore */ if (logFlags.verbose) console.log(`getAccountQueueCount: remote:${remote} ${count} acc:${utils.stringifyReduce(accountID)}`)
     return { count, committingAppData }
+  }
+
+  checkForStuckProcessing(): void {
+    const timeSinceLastProcessLoop = Date.now() - this.processingLastRunTime
+    const limitInMS = this.config.stateManager.stuckProcessingLimit * 1000
+
+    if (timeSinceLastProcessLoop > limitInMS) {
+      if (this.isStuckProcessing === false) {
+        this.isStuckProcessing = true
+        //we are now newly stuck processing
+        this.onProcesssingQueueStuck()
+        this.stuckProcessingCount++
+      }
+      nestedCountersInstance.countEvent('processing', 'processingStuckThisCycle')
+      this.stuckProcessingCyclesCount++
+    }
+  }
+
+  onProcesssingQueueStuck() {
+    //this.processTransactionQueueRunning
+
+    if (this.stuckProcessingCount === 0) {
+      //first time!
+      nestedCountersInstance.countRareEvent('processing', `onProcesssingQueueStuck`)
+
+      this.statemanager_fatal(
+        `onProcesssingQueueStuck`,
+        `onProcesssingQueueStuck: ${JSON.stringify(this.getDebugProccessingStatus())}`
+      )
+    }
+
+    //clear this map as it would be stale now
+    this.stateManager.lastSeenAccountsMap = null
+
+    //in the future we could tell the node to go apop?
+  }
+
+  getDebugProccessingStatus(): unknown {
+    let txDebug = ''
+    if (this.debugRecentQueueEntry != null) {
+      const app = this.app
+      const queueEntry = this.debugRecentQueueEntry
+      txDebug = `logID:${queueEntry.logID} state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification}`
+      txDebug += ` qId: ${queueEntry.entryID} values: ${this.processQueue_debugAccountData(
+        queueEntry,
+        app
+      )} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`
+    }
+    return {
+      isStuckProcessing: this.isStuckProcessing,
+      stuckProcessingCount: this.stuckProcessingCount,
+      stuckProcessingCyclesCount: this.stuckProcessingCyclesCount,
+      processingLastRunTime: this.processingLastRunTime,
+      debugLastProcessingQueueStartTime: this.debugLastProcessingQueueStartTime,
+      debugLastAwaitedCall: this.debugLastAwaitedCall,
+      debugLastAwaitedCallInner: this.debugLastAwaitedCallInner,
+      debugLastAwaitedAppCall: this.debugLastAwaitedAppCall,
+      txDebug,
+      //todo get the transaction we are stuck on. what type is it? id etc.
+    }
+  }
+
+  setDebugLastAwaitedCall(label: string) {
+    this.debugLastAwaitedCall = label
+  }
+
+  setDebugLastAwaitedCallInner(label: string) {
+    this.debugLastAwaitedCallInner = label
+  }
+  setDebugSetLastAppAwait(label: string) {
+    this.debugLastAwaitedAppCall = label
   }
 }
 
