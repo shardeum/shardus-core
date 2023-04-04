@@ -27,7 +27,7 @@ import PartitionStats from './PartitionStats'
 import AccountCache from './AccountCache'
 import AccountSync from './AccountSync'
 import AccountGlobals from './AccountGlobals'
-import TransactionQueue from './TransactionQueue'
+import TransactionQueue, { DebugComplete } from './TransactionQueue'
 import TransactionRepair from './TransactionRepair'
 import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
@@ -1121,8 +1121,9 @@ class StateManager {
 
             let tryToCorrectStats = true
             if (tryToCorrectStats) {
-              this.transactionQueue.setDebugLastAwaitedCallInner('ths.app.getAccountDataByList')
+              /* prettier-ignore */ this.transactionQueue.setDebugLastAwaitedCallInner('ths.app.getAccountDataByList')
               let accounts = await this.app.getAccountDataByList([wrapedAccount.accountId])
+              /* prettier-ignore */ this.transactionQueue.setDebugLastAwaitedCallInner('ths.app.getAccountDataByList', DebugComplete.Completed)
               if (accounts != null && accounts.length === 1) {
                 this.partitionStats.statsDataSummaryUpdate(
                   cycleToRecordOn,
@@ -1169,8 +1170,9 @@ class StateManager {
     }
     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`setAccountData toAdd:${accountsToAdd.length}  failed:${failedHashes.length}`)
     /* prettier-ignore */ if (logFlags.verbose) console.log(`setAccountData toAdd:${accountsToAdd.length}  failed:${failedHashes.length}`)
-    this.transactionQueue.setDebugLastAwaitedCallInner('ths.app.setAccountData')
+    /* prettier-ignore */ this.transactionQueue.setDebugLastAwaitedCallInner('ths.app.setAccountData')
     await this.app.setAccountData(accountsToAdd)
+    /* prettier-ignore */ this.transactionQueue.setDebugLastAwaitedCallInner('ths.app.setAccountData', DebugComplete.Completed)
     return failedHashes
   }
 
@@ -2460,11 +2462,13 @@ class StateManager {
 
       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`${note} setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)} hash:${utils.makeShortHash(wrappedData.stateId)} ts:${wrappedData.timestamp}`)
       if (wrappedData.isPartial) {
-        this.transactionQueue.setDebugLastAwaitedCallInner('this.app.updateAccountPartial')
+        /* prettier-ignore */ this.transactionQueue.setDebugLastAwaitedCallInner('this.app.updateAccountPartial')
         await this.app.updateAccountPartial(wrappedData, localCachedData[key], applyResponse)
+        /* prettier-ignore */ this.transactionQueue.setDebugLastAwaitedCallInner('this.app.updateAccountPartial', DebugComplete.Completed)
       } else {
-        this.transactionQueue.setDebugLastAwaitedCallInner('this.app.updateAccountFull')
+        /* prettier-ignore */ this.transactionQueue.setDebugLastAwaitedCallInner('this.app.updateAccountFull')
         await this.app.updateAccountFull(wrappedData, localCachedData[key], applyResponse)
+        /* prettier-ignore */ this.transactionQueue.setDebugLastAwaitedCallInner('this.app.updateAccountFull', DebugComplete.Completed)
       }
       savedSomething = true
     }
