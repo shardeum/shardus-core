@@ -3827,8 +3827,10 @@ class TransactionQueue {
                 const awaitStart = Date.now()
 
                 if (this.executeInOneShard === true) {
+                  this.setDebugLastAwaitedCall('this.tellCorrespondingNodes(queueEntry)')
                   await this.tellCorrespondingNodes(queueEntry)
                 } else {
+                  this.setDebugLastAwaitedCall('this.tellCorrespondingNodesOld(queueEntry)')
                   //specific fixes were needed for tellCorrespondingNodes.  tellCorrespondingNodesOld is the old version before fixes
                   await this.tellCorrespondingNodesOld(queueEntry)
                 }
@@ -3999,6 +4001,7 @@ class TransactionQueue {
                   }
                   queueEntry.executionDebug.log2 = 'call pre apply'
                   const awaitStart = Date.now()
+                  this.setDebugLastAwaitedCall('this.preApplyTransaction(queueEntry)')
                   const txResult = await this.preApplyTransaction(queueEntry)
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
@@ -4050,6 +4053,9 @@ class TransactionQueue {
                       const awaitStart = Date.now()
 
                       queueEntry.voteCastAge = txAge
+                      this.setDebugLastAwaitedCall(
+                        'this.stateManager.transactionConsensus.createAndShareVote(queueEntry)'
+                      )
                       await this.stateManager.transactionConsensus.createAndShareVote(queueEntry)
                       this.updateSimpleStatsObject(
                         processStats.awaitStats,
@@ -4118,6 +4124,9 @@ class TransactionQueue {
                     if (queueEntry.appliedReceipt2) {
                       // Broadcast the receipt, only if we made one (try produce can early out if we received one)
                       const awaitStart = Date.now()
+                      this.setDebugLastAwaitedCall(
+                        'this.stateManager.transactionConsensus.shareAppliedReceipt()'
+                      )
                       await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
                       this.updateSimpleStatsObject(
                         processStats.awaitStats,
@@ -4155,6 +4164,9 @@ class TransactionQueue {
                   ) {
                     //forward all finished data to corresponding nodes
                     const awaitStart = Date.now()
+                    this.setDebugLastAwaitedCall(
+                      'this.stateManager.transactionConsensus.tellCorrespondingNodesFinalData()'
+                    )
                     await this.tellCorrespondingNodesFinalData(queueEntry)
                     this.updateSimpleStatsObject(
                       processStats.awaitStats,
@@ -4355,6 +4367,9 @@ class TransactionQueue {
                   /* eslint-enable security/detect-object-injection */
                   //await this.app.setAccountData(rawAccounts)
                   const awaitStart = Date.now()
+                  this.setDebugLastAwaitedCall(
+                    'this.stateManager.transactionConsensus.checkAndSetAccountData()'
+                  )
                   await this.stateManager.checkAndSetAccountData(
                     accountRecords,
                     'awaitFinalData_passed',
@@ -4473,6 +4488,9 @@ class TransactionQueue {
                   this.profiler.profileSectionStart('commit')
 
                   const awaitStart = Date.now()
+                  this.setDebugLastAwaitedCall(
+                    'this.stateManager.transactionConsensus.commitConsensedTransaction()'
+                  )
                   await this.commitConsensedTransaction(queueEntry)
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
