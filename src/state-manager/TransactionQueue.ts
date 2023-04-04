@@ -83,7 +83,7 @@ class TransactionQueue {
 
   processingLastRunTime: number
   processingMinRunBreak: number
-  processingLeftBusy: boolean
+  transactionQueueHasRemainingWork: boolean
 
   executeInOneShard: boolean
 
@@ -159,7 +159,7 @@ class TransactionQueue {
 
     this.processingLastRunTime = 0
     this.processingMinRunBreak = 10 //20 //200ms breaks between processing loops
-    this.processingLeftBusy = false
+    this.transactionQueueHasRemainingWork = false
 
     this.executeInOneShard = false
 
@@ -3291,7 +3291,7 @@ class TransactionQueue {
         nestedCountersInstance.countEvent('processing', 'resting')
       }
 
-      if (this.processingLeftBusy && timeSinceLastRun > 500) {
+      if (this.transactionQueueHasRemainingWork && timeSinceLastRun > 500) {
         this.statemanager_fatal(
           `processAcceptedTxQueue left busy and waited too long to restart`,
           `processAcceptedTxQueue left busy and waited too long to restart ${timeSinceLastRun / 1000} `
@@ -4665,12 +4665,12 @@ class TransactionQueue {
 
       // restart loop if there are still elements in it
       if (this._transactionQueue.length > 0 || this.pendingTransactionQueue.length > 0) {
-        this.processingLeftBusy = true
+        this.transactionQueueHasRemainingWork = true
         setTimeout(() => {
           this.stateManager.tryStartTransactionProcessingQueue()
         }, 15)
       } else {
-        this.processingLeftBusy = false
+        this.transactionQueueHasRemainingWork = false
       }
 
       this.transactionProcessingQueueRunning = false
