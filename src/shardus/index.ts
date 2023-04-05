@@ -28,6 +28,7 @@ import { WrappedData } from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
 import { QueueCountsResult } from '../state-manager/state-manager-types'
+import { DebugComplete } from '../state-manager/TransactionQueue'
 import Statistics from '../statistics'
 import Storage from '../storage'
 import * as utils from '../utils'
@@ -1167,8 +1168,8 @@ class Shardus extends EventEmitter {
     return profilerInstance
   }
 
-  setDebugSetLastAppAwait(label: string) {
-    this.stateManager?.transactionQueue.setDebugSetLastAppAwait(label)
+  setDebugSetLastAppAwait(label: string, complete = DebugComplete.Incomplete) {
+    this.stateManager?.transactionQueue.setDebugSetLastAppAwait(label, complete)
   }
 
   validateActiveNodeSignatures(
