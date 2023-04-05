@@ -3,6 +3,7 @@ import StateManager from '.'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import { P2PModuleContext as P2P } from '../p2p/Context'
+import * as Apoptosis from '../p2p/Apoptosis'
 import * as CycleChain from '../p2p/CycleChain'
 import { potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
@@ -106,14 +107,22 @@ class TransactionQueue {
   queueWrites: Set<string>
   queueReadWritesOld: Set<string>
 
+  /** is the processing queue currently considered stuck */
   isStuckProcessing: boolean
+  /** this s how many times the processing queue has transitioned from unstuck to stuck */
   stuckProcessingCount: number
+  /** this is how many cycles processing is stuck becuase it has not run recently  */
   stuckProcessingCyclesCount: number
+  /** this is how many cycles processing is stuck and we can confirm the queue did not finish  */
+  stuckProcessingQueueLockedCyclesCount: number
 
+  /** these three strings help us have a trail if the processing queue becomes stuck */
   debugLastAwaitedCall: string
   debugLastAwaitedCallInner: string
   debugLastAwaitedAppCall: string
+
   debugLastProcessingQueueStartTime: number
+
   debugRecentQueueEntry: QueueEntry
 
   constructor(
@@ -183,6 +192,7 @@ class TransactionQueue {
     this.isStuckProcessing = false
     this.stuckProcessingCount = 0
     this.stuckProcessingCyclesCount = 0
+    this.stuckProcessingQueueLockedCyclesCount = 0
 
     this.debugLastAwaitedCall = ''
     this.debugLastAwaitedCallInner = ''
@@ -3394,6 +3404,31 @@ class TransactionQueue {
             txQueueEntry.state = 'consensing'
           }
 
+          // do not injest tranactions that are long expired. there could be 10k+ of them if we are restarting the processing queue
+          if (age > timeM3 * 5 && this.stateManager.config.stateManager.discardVeryOldPendingTX === true) {
+            nestedCountersInstance.countEvent('txExpired', 'txExpired3 > M3 * 5. pendingTransactionQueue')
+
+            // let hasApplyReceipt = txQueueEntry.appliedReceipt != null
+            // let hasReceivedApplyReceipt = txQueueEntry.recievedAppliedReceipt != null
+
+            // const shortID = txQueueEntry.logID //`${utils.makeShortHash(queueEntry.acceptedTx.id)}`
+            // //const hasReceipt = receipt2 != null
+
+            // hasApplyReceipt = txQueueEntry.appliedReceipt2 != null
+            // hasReceivedApplyReceipt = txQueueEntry.recievedAppliedReceipt2 != null
+
+            //   this.statemanager_fatal(
+            //     `txExpired3 > M3. pendingTransactionQueue`,
+            //     `txExpired txAge > timeM3 pendingTransactionQueue ` +
+            //       `txid: ${shortID} state: ${txQueueEntry.state} hasAll:${txQueueEntry.hasAll} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${age}`
+            //   )
+
+            //   //probably some alternative TX queue cleanup that should happen similar to setTXExpired
+            //   //this.setTXExpired(queueEntry, currentIndex, 'm3 general')
+
+            continue
+          }
+
           txQueueEntry.approximateCycleAge = this.stateManager.currentCycleShardData.cycleNumber
           //insert this tx into the main queue
           this._transactionQueue.splice(index + 1, 0, txQueueEntry)
@@ -5306,6 +5341,13 @@ class TransactionQueue {
       }
       nestedCountersInstance.countEvent('processing', 'processingStuckThisCycle')
       this.stuckProcessingCyclesCount++
+      if (this.transactionProcessingQueueRunning) {
+        this.stuckProcessingQueueLockedCyclesCount++
+      }
+
+      if (this.config.stateManager.autoUnstickProcessing === true) {
+        this.fixStuckProcessing()
+      }
     }
   }
 
@@ -5326,6 +5368,9 @@ class TransactionQueue {
     this.stateManager.lastSeenAccountsMap = null
 
     //in the future we could tell the node to go apop?
+    if (this.config.stateManager.apopFromStuckProcessing === true) {
+      Apoptosis.apoptosizeSelf('Apoptosized due to stuck processing')
+    }
   }
 
   getDebugProccessingStatus(): unknown {
@@ -5341,8 +5386,10 @@ class TransactionQueue {
     }
     return {
       isStuckProcessing: this.isStuckProcessing,
+      transactionProcessingQueueRunning: this.transactionProcessingQueueRunning,
       stuckProcessingCount: this.stuckProcessingCount,
       stuckProcessingCyclesCount: this.stuckProcessingCyclesCount,
+      stuckProcessingQueueLockedCyclesCount: this.stuckProcessingQueueLockedCyclesCount,
       processingLastRunTime: this.processingLastRunTime,
       debugLastProcessingQueueStartTime: this.debugLastProcessingQueueStartTime,
       debugLastAwaitedCall: this.debugLastAwaitedCall,
@@ -5351,6 +5398,34 @@ class TransactionQueue {
       txDebug,
       //todo get the transaction we are stuck on. what type is it? id etc.
     }
+  }
+
+  clearStuckProcessingDebugVars() {
+    this.isStuckProcessing = false
+    this.debugLastAwaitedCall = ''
+    this.debugLastAwaitedCallInner = ''
+    this.debugLastAwaitedAppCall = ''
+    this.debugRecentQueueEntry = null
+    this.debugLastProcessingQueueStartTime = 0
+
+    this.stuckProcessingCount = 0
+    this.stuckProcessingCyclesCount = 0
+    this.stuckProcessingQueueLockedCyclesCount = 0
+  }
+
+  fixStuckProcessing() {
+    if (this.config.stateManager.autoUnstickProcessing === false) {
+      return
+    }
+    nestedCountersInstance.countRareEvent('processing', `unstickProcessing`)
+    this.clearStuckProcessingDebugVars()
+
+    //clear this map as it would be stale now
+    this.stateManager.lastSeenAccountsMap = null
+    //unlock the queu so it can start again
+    this.transactionProcessingQueueRunning = false
+
+    this.stateManager.tryStartTransactionProcessingQueue()
   }
 
   setDebugLastAwaitedCall(label: string, complete = DebugComplete.Incomplete) {

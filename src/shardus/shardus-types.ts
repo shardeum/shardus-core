@@ -837,6 +837,12 @@ export interface ServerConfiguration {
     useAccountCopiesTable: boolean
     /** How long before we decide that processingn is stuck */
     stuckProcessingLimit: number
+    //** auto fix stuck processing.  this is a stopgap method */
+    autoUnstickProcessing: boolean
+    //** auto apop with stuck processing.  this is a stopgap method */
+    apopFromStuckProcessing: boolean
+    //** if we have very old pending TX this allows us to discard them */
+    discardVeryOldPendingTX: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

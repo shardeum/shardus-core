@@ -1685,6 +1685,18 @@ class StateManager {
     Context.network.registerExternalGet('debug-stuck-processing', isDebugModeMiddleware, (req, res) => {
       res.json(this.transactionQueue.getDebugProccessingStatus())
     })
+
+    Context.network.registerExternalGet('debug-fix-stuck-processing', isDebugModeMiddleware, (req, res) => {
+      let response = 'not stuck'
+
+      const isStuck = this.transactionQueue.isStuckProcessing
+      if (isStuck) {
+        response = JSON.stringify(this.transactionQueue.getDebugProccessingStatus())
+        this.transactionQueue.fixStuckProcessing()
+      }
+      res.write(response)
+      res.end()
+    })
   }
 
   _unregisterEndpoints() {
