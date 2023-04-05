@@ -206,6 +206,15 @@ class Reporter {
     return 'unknown'
   }
 
+  getAppData(): string {
+    if (typeof Context.shardus.app.getNodeInfoAppData === 'function') {
+      const appData = Context.shardus.app.getNodeInfoAppData()
+      return appData
+    }
+
+    return 'unknown'
+  }
+
   checkIsNodeLost(nodeId) {
     const lostNodeIds = CycleChain.getNewest().lost
     if (lostNodeIds.length === 0) return false
@@ -248,6 +257,7 @@ class Reporter {
     const reportInterval = this.getReportInterval()
     const nodeIpInfo = ipInfo
     const appVersion = this.getAppVersion()
+    const appData = this.getAppData()
 
     let repairsStarted = 0
     let repairsFinished = 0
@@ -343,6 +353,7 @@ class Reporter {
         isRefuted: isNodeRefuted,
         shardusVersion: packageJson.version,
         appVersion,
+        appData,
       })
       if (this.stateManager != null && config.mode === 'debug' && !config.debug.disableTxCoverageReport) {
         this.stateManager.transactionQueue.resetTxCoverageMap()
