@@ -11,6 +11,12 @@ export function shuffleArray<T>(array: T[]) {
 }
 
 // From: https://stackoverflow.com/a/19270021
+/**
+ * Gets a random subset of size n from the array
+ * @param arr
+ * @param n
+ * @returns
+ */
 export function getRandom<T>(arr: T[], n: number): T[] {
   let len = arr.length
   const taken = new Array(len)
