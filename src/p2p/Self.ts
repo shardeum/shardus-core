@@ -89,7 +89,7 @@ export async function startup(): Promise<boolean> {
       }
 
       // Otherwise, try to join the network
-      ; ({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
+      ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
     } catch (err) {
       if (err.message.startsWith('Fatal:')) {
         throw err
@@ -259,10 +259,12 @@ async function syncCycleChain() {
 
 async function contactArchiver() {
   const availableArchivers = Context.config.p2p.existingArchivers
-  let retry = 3
-  let failArchivers: string[] = []
+  const maxRetries = 3
+  let retry = maxRetries
+  const failArchivers: string[] = []
   let archiver: P2P.P2PTypes.Node
-  let activeNodesSigned
+  let activeNodesSigned: SignedActiveNodesFromArchiver
+
   while (retry > 0) {
     try {
       archiver = getRandom(availableArchivers, 1)[0]
@@ -276,9 +278,20 @@ async function contactArchiver() {
     }
     retry--
   }
-  if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
-    throw Error('Fatal: _getSeedNodes seed list was not signed by archiver!')
+
+  if (activeNodesSigned.nodeList.length === 0) {
+    throw new Error(
+      `Fatal: getActiveNodesFromArchiver returned an empty list after ${
+        maxRetries - retry
+      } attempts from seed node servers ${failArchivers}`
+    )
   }
+  if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
+    throw Error(
+      `Fatal: _getSeedNodes seed list was not signed by archiver!. Archiver: ${archiver.ip}, signature: ${activeNodesSigned.sign}`
+    )
+  }
+
   const joinRequest: P2P.ArchiversTypes.Request | undefined = activeNodesSigned.joinRequest as
     | P2P.ArchiversTypes.Request
     | undefined
@@ -331,7 +344,13 @@ function checkIfFirstSeedNode(seedNodes: P2P.P2PTypes.Node[]) {
   return false
 }
 
-async function getActiveNodesFromArchiver(archiver: P2P.P2PTypes.Node) {
+type SignedActiveNodesFromArchiver = P2P.P2PTypes.SignedObject & {
+  nodeList: P2P.P2PTypes.Node[]
+}
+
+async function getActiveNodesFromArchiver(
+  archiver: P2P.P2PTypes.Node
+): Promise<SignedActiveNodesFromArchiver> {
   const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
   const nodeInfo = getPublicNodeInfo()
   let seedListSigned: P2P.P2PTypes.SignedObject & {
@@ -377,8 +396,8 @@ export type NodeInfo = {
   publicKey: any
   curvePublicKey: string
 } & network.IPInfo & {
-  status: P2P.P2PTypes.NodeStatus
-}
+    status: P2P.P2PTypes.NodeStatus
+  }
 
 export function getPublicNodeInfo(): NodeInfo {
   const publicKey = Context.crypto.getPublicKey()
