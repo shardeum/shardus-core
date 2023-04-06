@@ -279,6 +279,13 @@ async function contactArchiver() {
     retry--
   }
 
+  // This probably cant happen but adding it for completeness
+  if (activeNodesSigned == null || activeNodesSigned.nodeList == null) {
+    throw Error(
+      `Fatal: activeNodesSigned == null || activeNodesSigned.nodeList == null Archiver: ${archiver.ip}`
+    )
+  }
+
   if (activeNodesSigned.nodeList.length === 0) {
     throw new Error(
       `Fatal: getActiveNodesFromArchiver returned an empty list after ${
