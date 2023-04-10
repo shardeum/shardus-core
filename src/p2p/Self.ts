@@ -294,8 +294,9 @@ async function contactArchiver() {
     )
   }
   if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
+    info(`Got signed seed list: ${JSON.stringify(activeNodesSigned)}`)
     throw Error(
-      `Fatal: _getSeedNodes seed list was not signed by archiver!. Archiver: ${archiver.ip}, signature: ${activeNodesSigned.sign}`
+      `Fatal: _getSeedNodes seed list was not signed by archiver!. Archiver: ${archiver.ip}:${archiver.port}, signature: ${activeNodesSigned.sign}`
     )
   }
 

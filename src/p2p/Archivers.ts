@@ -670,6 +670,11 @@ export function registerRoutes() {
     info('Tag in data request is valid')
     if (config.p2p.experimentalSnapshot && config.features.archiverDataSubscriptionsUpdate) {
       if (dataRequest.dataRequestType === DataRequestTypes.SUBSCRIBE) {
+        // if the archiver is already in the recipients list, remove it first
+        if (dataRequest.nodeInfo && recipients.has(dataRequest.nodeInfo.publicKey)) {
+          removeArchiverConnection(dataRequest.nodeInfo.publicKey)
+          recipients.delete(dataRequest.nodeInfo.publicKey)
+        }
         if (recipients.size >= maxArchiversSupport) {
           const maxArchiversSupportErr = 'Max archivers support reached'
           warn(maxArchiversSupportErr)
