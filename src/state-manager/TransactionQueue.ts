@@ -5429,17 +5429,17 @@ class TransactionQueue {
   }
 
   setDebugLastAwaitedCall(label: string, complete = DebugComplete.Incomplete) {
-    this.debugLastAwaitedCall = label + (complete === DebugComplete.Completed) ? ' complete' : ''
+    this.debugLastAwaitedCall = label + (complete === DebugComplete.Completed ? ' complete' : '')
     this.debugLastAwaitedCallInner = ''
     this.debugLastAwaitedAppCall = ''
   }
 
   setDebugLastAwaitedCallInner(label: string, complete = DebugComplete.Incomplete) {
-    this.debugLastAwaitedCallInner = label + (complete === DebugComplete.Completed) ? ' complete' : ''
+    this.debugLastAwaitedCallInner = label + (complete === DebugComplete.Completed ? ' complete' : '')
     this.debugLastAwaitedAppCall = ''
   }
   setDebugSetLastAppAwait(label: string, complete = DebugComplete.Incomplete) {
-    this.debugLastAwaitedAppCall = label + (complete === DebugComplete.Completed) ? ' complete' : ''
+    this.debugLastAwaitedAppCall = label + (complete === DebugComplete.Completed ? ' complete' : '')
   }
 
   clearDebugAwaitStrings() {
