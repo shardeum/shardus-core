@@ -5414,9 +5414,6 @@ class TransactionQueue {
   }
 
   fixStuckProcessing() {
-    if (this.config.stateManager.autoUnstickProcessing === false) {
-      return
-    }
     nestedCountersInstance.countRareEvent('processing', `unstickProcessing`)
     this.clearStuckProcessingDebugVars()
 
