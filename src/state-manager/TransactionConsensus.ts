@@ -1,14 +1,20 @@
-import * as Shardus from '../shardus/shardus-types'
-import { TimestampReceipt } from '../shardus/shardus-types'
-import * as utils from '../utils'
-import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
-import * as Context from '../p2p/Context'
-import { P2PModuleContext as P2P } from '../p2p/Context'
-import Storage from '../storage'
+import { CycleRecord } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
+import { Logger as log4jLogger } from 'log4js'
+import StateManager from '.'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
+import * as Comms from '../p2p/Comms'
+import * as Context from '../p2p/Context'
+import { P2PModuleContext as P2P } from '../p2p/Context'
+import * as CycleChain from '../p2p/CycleChain'
+import * as Self from '../p2p/Self'
+import * as Shardus from '../shardus/shardus-types'
+import { TimestampReceipt } from '../shardus/shardus-types'
+import Storage from '../storage'
+import * as utils from '../utils'
+import { nestedCountersInstance } from '../utils/nestedCounters'
+import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions'
-import StateManager from '.'
 import {
   AppliedReceipt,
   AppliedReceipt2,
@@ -17,12 +23,6 @@ import {
   QueueEntry,
   WrappedResponses,
 } from './state-manager-types'
-import { nestedCountersInstance } from '../utils/nestedCounters'
-import * as Self from '../p2p/Self'
-import * as CycleChain from '../p2p/CycleChain'
-import * as Comms from '../p2p/Comms'
-import { CycleRecord } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
-import { Logger as log4jLogger } from 'log4js'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -724,6 +724,7 @@ class TransactionConsenus {
    * @param queueEntry
    */
   async createAndShareVote(queueEntry: QueueEntry) {
+    this.profiler.profileSectionStart('createAndShareVote')
     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
 
     // TODO STATESHARDING4 CHECK VOTES PER CONSENSUS GROUP
@@ -867,10 +868,13 @@ class TransactionConsenus {
       }
       const filteredConsensusGroup = filteredNodes
 
+      this.profiler.profileSectionStart('createAndShareVote-tell')
       this.p2p.tell(filteredConsensusGroup, 'spread_appliedVoteHash', appliedVoteHash)
+      this.profiler.profileSectionEnd('createAndShareVote-tell')
     } else {
       nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote fail, no consensus group')
     }
+    this.profiler.profileSectionEnd('createAndShareVote')
   }
 
   /**

@@ -1,4 +1,3 @@
-import * as cryptoUtils from '@shardus/crypto-utils'
 import { P2P } from '@shardus/types'
 import { Logger } from 'log4js'
 import { logFlags } from '../logger'
@@ -6,7 +5,7 @@ import { setIsUpTs } from '../p2p/Lost'
 import { ShardusTypes } from '../shardus'
 import * as utils from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { cNoSizeTrack, cUninitializedSize } from '../utils/profiler'
+import { cNoSizeTrack, cUninitializedSize, profilerInstance } from '../utils/profiler'
 import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
@@ -184,6 +183,8 @@ function createGossipTracker() {
 
 // Our own P2P version of the network tell, with a sign added
 export async function tell(nodes: ShardusTypes.Node[], route, message, logged = false, tracker = '') {
+  profilerInstance.profileSectionStart('p2p-tell')
+  profilerInstance.profileSectionStart(`p2p-tell-${route}`)
   let msgSize = cUninitializedSize
   if (tracker === '') {
     tracker = createMsgTracker(route)
@@ -199,6 +200,8 @@ export async function tell(nodes: ShardusTypes.Node[], route, message, logged = 
   msgSize = config.p2p.useSignaturesForAuth
     ? await signedMultiTell(nodes, message, tracker, msgSize, route, logged)
     : await taggedMultiTell(nodes, message, tracker, msgSize, route, logged)
+  profilerInstance.profileSectionEnd('p2p-tell')
+  profilerInstance.profileSectionEnd(`p2p-tell-${route}`)
   return msgSize
 }
 
@@ -218,13 +221,13 @@ async function taggedMultiTell(
     }
     const signedMessage = _wrapAndTagMessage(message, tracker, node)
     msgSize = signedMessage.msgSize
-    if (logFlags.p2pNonFatal) info(`signed and tagged gossip`, utils.stringifyReduceLimit(signedMessage))
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`taggedMultiTell: signed and tagged gossip`, utils.stringifyReduceLimit(signedMessage))
     promises.push(network.tell([node], route, signedMessage, logged))
   }
   try {
     await Promise.all(promises)
   } catch (err) {
-    warn('P2P TELL: failed', err)
+    warn('taggedMultiTell: P2P TELL: failed', err)
   }
   return msgSize
 }
@@ -240,11 +243,11 @@ async function signedMultiTell(
   const signedMessage = _wrapAndSignMessage(message, tracker)
   msgSize = signedMessage.msgSize
   const nonSelfNodes = nodes.filter((node) => node.id !== Self.id)
-  if (logFlags.p2pNonFatal) info(`signed and tagged gossip`, utils.stringifyReduceLimit(signedMessage))
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`signedMultiTell: signed and tagged gossip`, utils.stringifyReduceLimit(signedMessage))
   try {
     await network.tell(nonSelfNodes, route, signedMessage, logged)
   } catch (err) {
-    warn('P2P TELL: failed', err)
+    warn('signedMultiTell: P2P TELL: failed', err)
   }
   return msgSize
 }
