@@ -1,20 +1,15 @@
 import * as Shardus from '../shardus/shardus-types'
 import { StateManager as StateManagerTypes } from '@shardus/types'
 import * as utils from '../utils'
-import * as CycleChain from '../p2p/CycleChain'
-const stringify = require('fast-stable-stringify')
-import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
+import Profiler, { profilerInstance } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
-import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
+import log4js from 'log4js'
 import ShardFunctions from './shardFunctions'
-import { debug, time } from 'console'
 import StateManager from '.'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as NodeList from '../p2p/NodeList'
-
-import * as Comms from '../p2p/Comms'
 import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
 import {
@@ -40,9 +35,27 @@ import {
 } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { errorToStringFull } from '../utils'
-import { promises } from 'dns'
 //import { all } from 'deepmerge'
 //import { Node } from '../p2p/Types'
+
+
+type AccountHashStats = {
+  matched: number;
+  visisted: number;
+  empty: number;
+  nullResults: number;
+  numRequests: number;
+  responses: number;
+  exceptions: number;
+  radixToReq: number;
+  actualRadixRequests: number;
+};
+
+type AccountStats = {
+  skipping: number,
+  multiRequests: number,
+  requested: number,
+}
 
 class AccountPatcher {
   app: Shardus.App
@@ -54,10 +67,10 @@ class AccountPatcher {
 
   logger: Logger
 
-  mainLogger: any
-  fatalLogger: any
-  shardLogger: any
-  statsLogger: any
+  mainLogger: log4js.Logger
+  fatalLogger: log4js.Logger
+  shardLogger: log4js.Logger
+  statsLogger: log4js.Logger
 
   statemanager_fatal: (key: string, log: string) => void
   stateManager: StateManager
@@ -92,7 +105,7 @@ class AccountPatcher {
   nonStoredRanges: { low: string; high: string }[]
   radixIsStored: Map<string, boolean>
 
-  lastRepairInfo: any
+  lastRepairInfo: string
 
   constructor(
     stateManager: StateManager,
@@ -161,7 +174,7 @@ class AccountPatcher {
     this.syncFailHistory = []
   }
 
-  hashObj(value: any) {
+  hashObj(value: unknown) {
     //could replace with a different cheaper hash!!
     return this.crypto.hash(value)
   }
@@ -199,25 +212,25 @@ class AccountPatcher {
       'get_trie_hashes',
       async (
         payload: HashTrieReq,
-        respond: (arg0: HashTrieResp) => any,
+        respond: (arg0: HashTrieResp) => number,
         sender,
         tracker: string,
         msgSize: number
       ) => {
         profilerInstance.scopedProfileSectionStart('get_trie_hashes', false, msgSize)
-        let result = { nodeHashes: [] } as HashTrieResp
+        const result = { nodeHashes: [] } as HashTrieResp
         let responseCount = 0
-        for (let radix of payload.radixList) {
-          let level = radix.length
-          let layerMap = this.shardTrie.layerMaps[level]
+        for (const radix of payload.radixList) {
+          const level = radix.length
+          const layerMap = this.shardTrie.layerMaps[level] // eslint-disable-line security/detect-object-injection
           if (layerMap == null) {
             /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_hashes badrange:${level}`)
             break
           }
 
-          let hashTrieNode = layerMap.get(radix)
+          const hashTrieNode = layerMap.get(radix)
           if (hashTrieNode != null) {
-            for (let childTreeNode of hashTrieNode.children) {
+            for (const childTreeNode of hashTrieNode.children) {
               if (childTreeNode != null) {
                 result.nodeHashes.push({ radix: childTreeNode.radix, hash: childTreeNode.hash })
                 responseCount++
@@ -230,7 +243,7 @@ class AccountPatcher {
 
         // todo could recored a split time here.. so we know time spend on handling the request vs sending the response?
         // that would not be completely accurate because the time to get the data is outide of this handler...
-        let respondSize = await respond(result)
+        const respondSize = await respond(result)
         profilerInstance.scopedProfileSectionEnd('get_trie_hashes', respondSize)
       }
     )
@@ -242,7 +255,7 @@ class AccountPatcher {
         try {
           //TODO use our own definition of current cycle.
           //use playlod cycle to filter out TXs..
-          let cycle = payload.cycle
+          const cycle = payload.cycle
 
           let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(payload.cycle)
           if (hashTrieSyncConsensus == null) {
@@ -253,7 +266,7 @@ class AccountPatcher {
             }
             this.hashTrieSyncConsensusByCycle.set(payload.cycle, hashTrieSyncConsensus)
 
-            let shardValues = this.stateManager.shardValuesByCycle.get(payload.cycle)
+            const shardValues = this.stateManager.shardValuesByCycle.get(payload.cycle)
             if (shardValues == null) {
               /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `sync_trie_hashes not ready c:${payload.cycle}`)
               return
@@ -266,7 +279,7 @@ class AccountPatcher {
 
           const node = NodeList.nodes.get(sender)
 
-          for (let nodeHashes of payload.nodeHashes) {
+          for (const nodeHashes of payload.nodeHashes) {
             //don't record the vote if we cant use it!
             // easier than filtering it out later on in the stream.
             if (this.isRadixStored(cycle, nodeHashes.radix) === false) {
@@ -280,11 +293,11 @@ class AccountPatcher {
               hashTrieSyncConsensus.radixHashVotes.set(nodeHashes.radix, hashVote)
               hashVote.allVotes.set(nodeHashes.hash, { count: 1, voters: [node] })
             } else {
-              let voteEntry = hashVote.allVotes.get(nodeHashes.hash)
+              const voteEntry = hashVote.allVotes.get(nodeHashes.hash)
               if (voteEntry == null) {
                 hashVote.allVotes.set(nodeHashes.hash, { count: 1, voters: [node] })
               } else {
-                let voteCount = voteEntry.count + 1
+                const voteCount = voteEntry.count + 1
                 voteEntry.count = voteCount
                 voteEntry.voters.push(node)
                 //hashVote.allVotes.set(nodeHashes.hash, votes + 1)
@@ -307,35 +320,35 @@ class AccountPatcher {
       'get_trie_accountHashes',
       async (
         payload: HashTrieReq,
-        respond: (arg0: HashTrieAccountsResp) => any,
+        respond: (arg0: HashTrieAccountsResp) => number,
         sender: string,
         tracker: string,
         msgSize: number
       ) => {
         profilerInstance.scopedProfileSectionStart('get_trie_accountHashes', false, msgSize)
         //nodeChildHashes: {radix:string, childAccounts:{accountID:string, hash:string}[]}[]
-        let result = {
+        const result = {
           nodeChildHashes: [],
           stats: { matched: 0, visisted: 0, empty: 0, childCount: 0 },
         } as HashTrieAccountsResp
 
-        let patcherMaxChildHashResponses = this.config.stateManager.patcherMaxChildHashResponses
+        const patcherMaxChildHashResponses = this.config.stateManager.patcherMaxChildHashResponses
 
-        for (let radix of payload.radixList) {
+        for (const radix of payload.radixList) {
           result.stats.visisted++
-          let level = radix.length
-          let layerMap = this.shardTrie.layerMaps[level]
+          const level = radix.length
+          const layerMap = this.shardTrie.layerMaps[level] // eslint-disable-line security/detect-object-injection
           if (layerMap == null) {
             /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_accountHashes badrange:${level}`)
             break
           }
 
-          let hashTrieNode = layerMap.get(radix)
+          const hashTrieNode = layerMap.get(radix)
           if (hashTrieNode != null && hashTrieNode.accounts != null) {
             result.stats.matched++
-            let childAccounts = []
+            const childAccounts = []
             result.nodeChildHashes.push({ radix, childAccounts })
-            for (let account of hashTrieNode.accounts) {
+            for (const account of hashTrieNode.accounts) {
               childAccounts.push({ accountID: account.accountID, hash: account.hash })
               result.stats.childCount++
             }
@@ -352,7 +365,7 @@ class AccountPatcher {
 
         /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_accountHashes c:${this.stateManager.currentCycleShardData.cycleNumber}`, result.stats.childCount)
 
-        let respondSize = await respond(result)
+        const respondSize = await respond(result)
         profilerInstance.scopedProfileSectionEnd('get_trie_accountHashes', respondSize)
       }
     )
@@ -361,17 +374,17 @@ class AccountPatcher {
       'get_account_data_by_hashes',
       async (
         payload: HashTrieAccountDataRequest,
-        respond: (arg0: HashTrieAccountDataResponse) => any,
+        respond: (arg0: HashTrieAccountDataResponse) => number,
         sender: string,
         tracker: string,
         msgSize: number
       ) => {
         profilerInstance.scopedProfileSectionStart('get_account_data_by_hashes', false, msgSize)
         nestedCountersInstance.countEvent('accountPatcher', `get_account_data_by_hashes`)
-        let result: HashTrieAccountDataResponse = { accounts: [], stateTableData: [] }
+        const result: HashTrieAccountDataResponse = { accounts: [], stateTableData: [] }
         try {
           //nodeChildHashes: {radix:string, childAccounts:{accountID:string, hash:string}[]}[]
-          let queryStats = {
+          const queryStats = {
             fix1: 0,
             fix2: 0,
             skip_localHashMismatch: 0,
@@ -381,15 +394,15 @@ class AccountPatcher {
             noResp: false,
           }
 
-          let hashMap = new Map()
-          let accountIDs = []
+          const hashMap = new Map()
+          const accountIDs = []
 
           //should limit on asking side, this is just a precaution
           if (payload.accounts.length > 900) {
             payload.accounts = payload.accounts.slice(0, 900)
           }
 
-          for (let accountHashEntry of payload.accounts) {
+          for (const accountHashEntry of payload.accounts) {
             // let radix = accountHashEntry.accountID.substr(0, this.treeMaxDepth)
             // let layerMap = this.shardTrie.layerMaps[this.treeMaxDepth]
             // let hashTrieNode = layerMap.get(radix)
@@ -405,24 +418,24 @@ class AccountPatcher {
             accountIDs.push(accountHashEntry.accountID)
           }
 
-          let accountData = await this.app.getAccountDataByList(accountIDs)
+          const accountData = await this.app.getAccountDataByList(accountIDs)
 
-          let skippedAccounts: AccountIDAndHash[] = []
-          let returnedAccounts: AccountIDAndHash[] = []
+          const skippedAccounts: AccountIDAndHash[] = []
+          const returnedAccounts: AccountIDAndHash[] = []
 
-          let accountsToGetStateTableDataFor = []
+          const accountsToGetStateTableDataFor = []
           //only return results that match the requested hash!
-          let accountDataFinal: Shardus.WrappedData[] = []
+          const accountDataFinal: Shardus.WrappedData[] = []
           if (accountData != null) {
-            for (let wrappedAccount of accountData) {
+            for (const wrappedAccount of accountData) {
               if (wrappedAccount == null || wrappedAccount.stateId == null || wrappedAccount.data == null) {
                 queryStats.fix2++
                 continue
               }
 
-              let { accountId, stateId, data: recordData } = wrappedAccount
-              let hash = this.app.calculateAccountHash(recordData)
-              if (stateId !== hash) {
+              const { accountId, stateId, data: recordData } = wrappedAccount
+              const accountHash = this.app.calculateAccountHash(recordData)
+              if (stateId !== accountHash) {
                 skippedAccounts.push({ accountID: accountId, hash: stateId })
                 queryStats.skip_localHashMismatch++
                 continue
@@ -485,7 +498,7 @@ class AccountPatcher {
             'get_account_data_by_hashes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack
           )
         }
-        let respondSize = await respond(result)
+        const respondSize = await respond(result)
         profilerInstance.scopedProfileSectionEnd('get_account_data_by_hashes', respondSize)
       }
     )
@@ -552,14 +565,14 @@ class AccountPatcher {
         // this.statemanager_fatal('debug shardTrie',`temp shardTrie ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}`)
         // res.write(`${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}\n`)
 
-        let trieRoot = this.shardTrie.layerMaps[0].values().next().value
+        const trieRoot = this.shardTrie.layerMaps[0].values().next().value
 
         //strip noisy fields
-        let tempString = JSON.stringify(trieRoot, utils.debugReplacer)
-        let processedObject = JSON.parse(tempString)
+        const tempString = JSON.stringify(trieRoot, utils.debugReplacer)
+        const processedObject = JSON.parse(tempString)
 
         // use stringify to put a stable sort on the object keys (important for comparisons)
-        let finalStr = utils.stringifyReduce(processedObject)
+        const finalStr = utils.stringifyReduce(processedObject)
 
         this.statemanager_fatal('debug shardTrie', `temp shardTrie ${finalStr}`)
         res.write(`${finalStr}\n`)
@@ -578,7 +591,7 @@ class AccountPatcher {
           let radix: string = req.query.radix as string
           if (radix.length > this.treeMaxDepth) radix = radix.slice(0, this.treeMaxDepth)
           const level = radix.length
-          const layerMap = this.shardTrie.layerMaps[level]
+          const layerMap = this.shardTrie.layerMaps[level] // eslint-disable-line security/detect-object-injection
 
           let hashTrieNode = layerMap.get(radix.toLowerCase())
           if (!subTree) {
@@ -640,8 +653,8 @@ class AccountPatcher {
               minVotes,
               allVotes: kvp,
             }
-            if (!hasEnoughVotes) notEnoughVotesRadix[radix] = simpleMap
-            if (!isRadixInSync) outOfSyncRadix[radix] = simpleMap
+            if (!hasEnoughVotes) notEnoughVotesRadix[radix] = simpleMap // eslint-disable-line security/detect-object-injection
+            if (!isRadixInSync) outOfSyncRadix[radix] = simpleMap // eslint-disable-line security/detect-object-injection
           }
         }
         return res.json({
@@ -712,7 +725,7 @@ class AccountPatcher {
     )
 
     Context.network.registerExternalGet('trie-repair-dump', isDebugModeMiddleware, (req, res) => {
-      res.write(`${utils.stringifyReduce(this.lastRepairInfo)}\n`)
+      res.write(`${this.lastRepairInfo}\n`)
       res.end()
     })
 
@@ -727,10 +740,10 @@ class AccountPatcher {
       try {
         //wow, why does Context.p2p not work..
         res.write(`last shard reports \n`)
-        let activeNodes = Wrapper.p2p.state.getNodes()
+        const activeNodes = Wrapper.p2p.state.getNodes()
         if (activeNodes) {
-          for (let node of activeNodes.values()) {
-            let getResp = await this.logger._internalHackGetWithResp(
+          for (const node of activeNodes.values()) {
+            const getResp = await this.logger._internalHackGetWithResp(
               `${node.externalIp}:${node.externalPort}/get-shard-dump`
             )
             res.write(`${node.externalIp}:${node.externalPort}; `)
@@ -749,11 +762,11 @@ class AccountPatcher {
       try {
         //wow, why does Context.p2p not work..
         res.write(`building shard report \n`)
-        let activeNodes = Wrapper.p2p.state.getNodes()
-        let lines = []
+        const activeNodes = Wrapper.p2p.state.getNodes()
+        const lines = []
         if (activeNodes) {
-          for (let node of activeNodes.values()) {
-            let getResp = await this.logger._internalHackGetWithResp(
+          for (const node of activeNodes.values()) {
+            const getResp = await this.logger._internalHackGetWithResp(
               `${node.externalIp}:${node.externalPort}/get-shard-dump`
             )
             if (getResp.body != null && getResp.body != '') {
@@ -782,16 +795,16 @@ class AccountPatcher {
         if (id.length === 10) {
           //short form..
           let found = false
-          let prefix = id.substr(0, 4)
-          let low = prefix + '0'.repeat(60)
-          let high = prefix + 'f'.repeat(60)
+          const prefix = id.substr(0, 4)
+          const low = prefix + '0'.repeat(60)
+          const high = prefix + 'f'.repeat(60)
 
-          let suffix = id.substr(5, 5)
-          let possibleAccounts = await this.app.getAccountDataByRange(low, high, 0, Date.now(), 100, 0, '')
+          const suffix = id.substr(5, 5)
+          const possibleAccounts = await this.app.getAccountDataByRange(low, high, 0, Date.now(), 100, 0, '')
 
           res.write(`searching ${possibleAccounts.length} accounts \n`)
 
-          for (let account of possibleAccounts) {
+          for (const account of possibleAccounts) {
             if (account.accountId.endsWith(suffix)) {
               res.write(`found full account ${id} => ${account.accountId} \n`)
               id = account.accountId
@@ -808,10 +821,10 @@ class AccountPatcher {
           }
         }
 
-        let trieAccount = this.getAccountTreeInfo(id)
-        let accountHash = this.stateManager.accountCache.getAccountHash(id)
-        let accountHashFull = this.stateManager.accountCache.getAccountDebugObject(id) //this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(id)
-        let accountData = await this.app.getAccountDataByList([id])
+        const trieAccount = this.getAccountTreeInfo(id)
+        const accountHash = this.stateManager.accountCache.getAccountHash(id)
+        const accountHashFull = this.stateManager.accountCache.getAccountDebugObject(id) //this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(id)
+        const accountData = await this.app.getAccountDataByList([id])
 
         res.write(`trieAccount: ${JSON.stringify(trieAccount)} \n`)
         res.write(`accountHash: ${JSON.stringify(accountHash)} \n`)
@@ -843,15 +856,14 @@ class AccountPatcher {
       try {
         if (id.length === 10) {
           //short form..
-          let found = false
-          let prefix = id.substr(0, 4)
-          let low = prefix + '0'.repeat(60)
-          let high = prefix + 'f'.repeat(60)
+          const prefix = id.substr(0, 4)
+          const low = prefix + '0'.repeat(60)
+          const high = prefix + 'f'.repeat(60)
 
-          let suffix = id.substr(5, 5)
-          let possibleAccounts = await this.app.getAccountDataByRange(low, high, 0, Date.now(), 100, 0, '')
+          const suffix = id.substr(5, 5)
+          const possibleAccounts = await this.app.getAccountDataByRange(low, high, 0, Date.now(), 100, 0, '')
 
-          for (let account of possibleAccounts) {
+          for (const account of possibleAccounts) {
             if (account.accountId.endsWith(suffix)) {
               possibleAccountsIds.push(account.accountId)
             }
@@ -873,7 +885,7 @@ class AccountPatcher {
             const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(accountId)
             const storedNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(accountId)
 
-            resObj[accountId] = {
+            resObj[accountId] = { // eslint-disable-line security/detect-object-injection
               consensusNodes: consensusNodes.map((node) => {
                 return {
                   id: node.id,
@@ -919,9 +931,9 @@ class AccountPatcher {
   }
 
   getAccountTreeInfo(accountID: string): TrieAccount {
-    let radix = accountID.substr(0, this.treeMaxDepth)
+    const radix = accountID.substr(0, this.treeMaxDepth)
 
-    let treeNode = this.shardTrie.layerMaps[this.treeMaxDepth].get(radix)
+    const treeNode = this.shardTrie.layerMaps[this.treeMaxDepth].get(radix)
     if (treeNode == null || treeNode.accountTempMap == null) {
       return null
     }
@@ -940,10 +952,10 @@ class AccountPatcher {
 
   upateShardTrie(cycle: number): HashTrieUpdateStats {
     //we start with the later of nodes at max depth, and will build upwards one layer at a time
-    let currentLayer = this.treeMaxDepth
+    const currentLayer = this.treeMaxDepth
     let treeNodeQueue: HashTrieNode[] = []
 
-    let updateStats = {
+    const updateStats = {
       leafsUpdated: 0,
       leafsCreated: 0,
       updatedNodesPerLevel: new Array(this.treeMaxDepth + 1).fill(0),
@@ -956,16 +968,16 @@ class AccountPatcher {
     }
 
     //feed account data into lowest layer, generates list of treeNodes
-    let currentMap = this.shardTrie.layerMaps[currentLayer]
+    let currentMap = this.shardTrie.layerMaps[currentLayer] // eslint-disable-line security/detect-object-injection
     if (currentMap == null) {
       currentMap = new Map()
-      this.shardTrie.layerMaps[currentLayer] = currentMap
+      this.shardTrie.layerMaps[currentLayer] = currentMap // eslint-disable-line security/detect-object-injection
     }
 
     //process accounts that need updating.  Create nodes as needed
     for (let i = 0; i < this.accountUpdateQueue.length; i++) {
-      let tx = this.accountUpdateQueue[i]
-      let key = tx.accountID.slice(0, currentLayer)
+      const tx = this.accountUpdateQueue[i] // eslint-disable-line security/detect-object-injection
+      const key = tx.accountID.slice(0, currentLayer)
       let leafNode = currentMap.get(key)
       if (leafNode == null) {
         //init a leaf node.
@@ -1018,10 +1030,10 @@ class AccountPatcher {
 
     //remove accoutns from the trie.  this happens if our node no longer carries them in storage range.
     for (let i = 0; i < this.accountRemovalQueue.length; i++) {
-      let accountID = this.accountRemovalQueue[i]
+      const accountID = this.accountRemovalQueue[i] // eslint-disable-line security/detect-object-injection
 
-      let key = accountID.slice(0, currentLayer)
-      let treeNode = currentMap.get(key)
+      const key = accountID.slice(0, currentLayer)
+      const treeNode = currentMap.get(key)
       if (treeNode == null) {
         continue //already gone!
       }
@@ -1037,7 +1049,7 @@ class AccountPatcher {
       if (treeNode.accounts == null) {
         treeNode.accounts = []
       }
-      let removed = treeNode.accountTempMap.delete(accountID)
+      const removed = treeNode.accountTempMap.delete(accountID)
       if (removed) {
         removedAccounts++
         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('accountPatcher', `upateShardTrie ${utils.makeShortHash(accountID)}`, `upateShardTrie remove ${utils.makeShortHash(accountID)} `)
@@ -1059,7 +1071,7 @@ class AccountPatcher {
 
     //look at updated leaf nodes.  Sort accounts and update hash values
     for (let i = 0; i < treeNodeQueue.length; i++) {
-      let treeNode = treeNodeQueue[i]
+      const treeNode = treeNodeQueue[i] // eslint-disable-line security/detect-object-injection
 
       if (treeNode.updated === true) {
         //treeNode.accountTempMap != null){
@@ -1077,7 +1089,7 @@ class AccountPatcher {
 
         updateStats.totalHashes++
         updateStats.totalAccountsHashed = updateStats.totalAccountsHashed + treeNode.accounts.length
-        updateStats.updatedNodesPerLevel[currentLayer] = updateStats.updatedNodesPerLevel[currentLayer] + 1
+        updateStats.updatedNodesPerLevel[currentLayer] = updateStats.updatedNodesPerLevel[currentLayer] + 1 // eslint-disable-line security/detect-object-injection
       }
     }
 
@@ -1088,17 +1100,17 @@ class AccountPatcher {
     let parentTreeNodeQueue = []
     //treenode queue has updated treeNodes from each loop, gets fed into next loop
     for (let i = currentLayer - 1; i >= 0; i--) {
-      currentMap = this.shardTrie.layerMaps[i]
+      currentMap = this.shardTrie.layerMaps[i] // eslint-disable-line security/detect-object-injection
       if (currentMap == null) {
         currentMap = new Map()
-        this.shardTrie.layerMaps[i] = currentMap
+        this.shardTrie.layerMaps[i] = currentMap // eslint-disable-line security/detect-object-injection
       }
       //loop each node in treeNodeQueue (nodes from the previous level down)
       for (let j = 0; j < treeNodeQueue.length; j++) {
-        let treeNode = treeNodeQueue[j]
+        const treeNode = treeNodeQueue[j] // eslint-disable-line security/detect-object-injection
 
         //compute parent nodes.
-        let parentKey = treeNode.radix.slice(0, i)
+        const parentKey = treeNode.radix.slice(0, i)
         // fast? 0-15 conversion
         let index = treeNode.radix.charCodeAt(i)
         index = index < 90 ? index - 48 : index - 87
@@ -1118,12 +1130,13 @@ class AccountPatcher {
         }
 
         //if we have not set this child yet then count it
-        if (parentTreeNode.children[index] == null) {
+        if (parentTreeNode.children[index] == null) { // eslint-disable-line security/detect-object-injection
           parentTreeNode.nonSparseChildCount++
         }
 
-        parentTreeNode.children[index] = treeNode //assign position
-        parentTreeNode.childHashes[index] = treeNode.hash
+        //assign position
+        parentTreeNode.children[index] = treeNode // eslint-disable-line security/detect-object-injection
+        parentTreeNode.childHashes[index] = treeNode.hash // eslint-disable-line security/detect-object-injection
 
         //insert new parent nodes if we have not yet, guided by updated flag
         if (parentTreeNode.updated === false) {
@@ -1142,7 +1155,7 @@ class AccountPatcher {
         treeNode.updated = false //finished update of this node.
       }
 
-      updateStats.updatedNodesPerLevel[i] = parentTreeNodeQueue.length
+      updateStats.updatedNodesPerLevel[i] = parentTreeNodeQueue.length // eslint-disable-line security/detect-object-injection
 
       //when we are one step below the sync depth add in incompete parents for hash updates!
       // if(i === this.treeSyncDepth + 1){
@@ -1153,13 +1166,13 @@ class AccountPatcher {
 
       //loop and compute hashes of parents
       for (let j = 0; j < parentTreeNodeQueue.length; j++) {
-        let parentTreeNode = parentTreeNodeQueue[j]
+        const parentTreeNode = parentTreeNodeQueue[j] // eslint-disable-line security/detect-object-injection
         parentTreeNode.hash = this.hashObj(parentTreeNode.childHashes)
 
         updateStats.totalHashes++
         updateStats.totalNodesHashed = updateStats.totalNodesHashed + parentTreeNode.nonSparseChildCount
-        updateStats.hashedChildrenPerLevel[i] =
-          updateStats.hashedChildrenPerLevel[i] + parentTreeNode.nonSparseChildCount
+        updateStats.hashedChildrenPerLevel[i] = // eslint-disable-line security/detect-object-injection
+          updateStats.hashedChildrenPerLevel[i] + parentTreeNode.nonSparseChildCount // eslint-disable-line security/detect-object-injection
       }
       //set the parents to the treeNodeQueue so we can loop and work on the next layer up
       treeNodeQueue = parentTreeNodeQueue
@@ -1177,10 +1190,10 @@ class AccountPatcher {
     let incompleteRanges = []
 
     //get the min and max non covered area
-    let shardValues = this.stateManager.shardValuesByCycle.get(cycle)
+    const shardValues = this.stateManager.shardValuesByCycle.get(cycle)
 
-    let consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
-    let consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
+    const consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
+    const consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
 
     incompleteRanges = this.getNonParitionRanges(
       shardValues,
@@ -1196,10 +1209,10 @@ class AccountPatcher {
     let incompleteRanges = []
 
     //get the min and max non covered area
-    let shardValues = this.stateManager.shardValuesByCycle.get(cycle)
+    const shardValues = this.stateManager.shardValuesByCycle.get(cycle)
     if (shardValues) {
-      let consensusStartPartition = shardValues.nodeShardData.storedPartitions.partitionStart
-      let consensusEndPartition = shardValues.nodeShardData.storedPartitions.partitionEnd
+      const consensusStartPartition = shardValues.nodeShardData.storedPartitions.partitionStart
+      const consensusEndPartition = shardValues.nodeShardData.storedPartitions.partitionEnd
 
       incompleteRanges = this.getNonParitionRanges(
         shardValues,
@@ -1213,9 +1226,9 @@ class AccountPatcher {
   }
 
   getSyncTrackerRanges(): { low: string; high: string }[] {
-    let incompleteRanges = []
+    const incompleteRanges = []
 
-    for (let syncTracker of this.stateManager.accountSync.syncTrackers) {
+    for (const syncTracker of this.stateManager.accountSync.syncTrackers) {
       if (syncTracker.syncFinished === false && syncTracker.isGlobalSyncTracker === false) {
         incompleteRanges.push({
           low: syncTracker.range.low.substr(0, this.treeSyncDepth),
@@ -1245,10 +1258,10 @@ class AccountPatcher {
     endPartition: number,
     depth: number
   ): { low: string; high: string }[] {
-    let incompleteRanges = []
+    const incompleteRanges = []
 
-    let shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
-    let numPartitions = shardGlobals.numPartitions
+    const shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
+    const numPartitions = shardGlobals.numPartitions
 
     if (startPartition === 0 && endPartition === numPartitions - 1) {
       //nothing to mark incomplete our node covers the whole range with its consensus
@@ -1261,13 +1274,13 @@ class AccountPatcher {
       //incompletePartition:            1       2
 
       //we may have two ranges to mark
-      let incompletePartition1 = endPartition + 1 // get the start of this
-      let incompletePartition2 = startPartition - 1 //get the end of this
+      const incompletePartition1 = endPartition + 1 // get the start of this
+      const incompletePartition2 = startPartition - 1 //get the end of this
 
-      let partition1 = shardValues.parititionShardDataMap.get(incompletePartition1)
-      let partition2 = shardValues.parititionShardDataMap.get(incompletePartition2)
+      const partition1 = shardValues.parititionShardDataMap.get(incompletePartition1)
+      const partition2 = shardValues.parititionShardDataMap.get(incompletePartition2)
 
-      let incompleteRange = {
+      const incompleteRange = {
         low: partition1.homeRange.low.substr(0, depth),
         high: partition2.homeRange.high.substr(0, depth),
       }
@@ -1288,10 +1301,10 @@ class AccountPatcher {
         // = numPartitions - 1 //special case, we stil want the start
         incompletePartition1 = numPartitions - 1
 
-        let partition1 = shardValues.parititionShardDataMap.get(incompletePartition2)
-        let partition2 = shardValues.parititionShardDataMap.get(incompletePartition1)
+        const partition1 = shardValues.parititionShardDataMap.get(incompletePartition2)
+        const partition2 = shardValues.parititionShardDataMap.get(incompletePartition1)
 
-        let incompleteRange = {
+        const incompleteRange = {
           low: partition1.homeRange.low.substr(0, depth),
           high: partition2.homeRange.high.substr(0, depth),
         }
@@ -1304,10 +1317,10 @@ class AccountPatcher {
         //incompletePartition2 = 0 //special case, we stil want the start
         incompletePartition2 = 0
 
-        let partition1 = shardValues.parititionShardDataMap.get(incompletePartition2)
-        let partition2 = shardValues.parititionShardDataMap.get(incompletePartition1)
+        const partition1 = shardValues.parititionShardDataMap.get(incompletePartition2)
+        const partition2 = shardValues.parititionShardDataMap.get(incompletePartition1)
 
-        let incompleteRange = {
+        const incompleteRange = {
           low: partition1.homeRange.low.substr(0, depth),
           high: partition2.homeRange.high.substr(0, depth),
         }
@@ -1317,16 +1330,16 @@ class AccountPatcher {
 
       //<-----CCCCC------>
       // 0   1     2    n-1
-      let partition1 = shardValues.parititionShardDataMap.get(0)
-      let partition2 = shardValues.parititionShardDataMap.get(incompletePartition1)
-      let incompleteRange = {
+      const partition1 = shardValues.parititionShardDataMap.get(0)
+      const partition2 = shardValues.parititionShardDataMap.get(incompletePartition1)
+      const incompleteRange = {
         low: partition1.homeRange.low.substr(0, depth),
         high: partition2.homeRange.high.substr(0, depth),
       }
 
-      let partition1b = shardValues.parititionShardDataMap.get(incompletePartition2)
-      let partition2b = shardValues.parititionShardDataMap.get(numPartitions - 1)
-      let incompleteRangeB = {
+      const partition1b = shardValues.parititionShardDataMap.get(incompletePartition2)
+      const partition2b = shardValues.parititionShardDataMap.get(numPartitions - 1)
+      const incompleteRangeB = {
         low: partition1b.homeRange.low.substr(0, depth),
         high: partition2b.homeRange.high.substr(0, depth),
       }
@@ -1352,13 +1365,13 @@ class AccountPatcher {
     }
 
     let isNotStored = false
-    for (let range of this.nonStoredRanges) {
+    for (const range of this.nonStoredRanges) {
       if (radix >= range.low && radix <= range.high) {
         isNotStored = true
         continue
       }
     }
-    let isStored = !isNotStored
+    const isStored = !isNotStored
     this.radixIsStored.set(radix, isStored)
     return isStored
   }
@@ -1391,14 +1404,14 @@ class AccountPatcher {
     }
 
     //map
-    let toFix = []
-    for (let value of consensusArray) {
+    const toFix = []
+    for (const value of consensusArray) {
       if (mapB == null) {
         toFix.push(value)
         continue
       }
 
-      let valueB = mapB.get(value.radix)
+      const valueB = mapB.get(value.radix)
       if (valueB == null) {
         //missing
         toFix.push(value)
@@ -1420,7 +1433,7 @@ class AccountPatcher {
    * @returns
    */
   findExtraBadKeys(consensusArray: RadixAndHash[], mapB: Map<string, HashTrieNode>): string[] {
-    let extraBadKeys = []
+    const extraBadKeys = []
     if (consensusArray == null) {
       this.statemanager_fatal(
         'findExtraBadKeys: consensusArray == null',
@@ -1428,22 +1441,22 @@ class AccountPatcher {
       )
       return []
     }
-    let parentKeys = new Set()
-    let goodKeys = new Set()
+    const parentKeys = new Set()
+    const goodKeys = new Set()
     //build sets of parents and good keys
-    for (let value of consensusArray) {
-      let parentKey = value.radix.slice(0, value.radix.length - 1)
+    for (const value of consensusArray) {
+      const parentKey = value.radix.slice(0, value.radix.length - 1)
       parentKeys.add(parentKey)
       goodKeys.add(value.radix)
     }
 
     //iterate all possible children of the parent keys and detect if we have extra keys that are not in the good list
-    for (let parentKey of parentKeys) {
+    for (const parentKey of parentKeys) {
       for (let i = 0; i < 16; i++) {
-        let childKey = parentKey + i.toString(16)
-        let weHaveKey = mapB.has(childKey)
+        const childKey = parentKey + i.toString(16)
+        const weHaveKey = mapB.has(childKey)
         if (weHaveKey) {
-          let theyHaveKey = goodKeys.has(childKey)
+          const theyHaveKey = goodKeys.has(childKey)
           if (theyHaveKey === false) {
             extraBadKeys.push(mapB.get(childKey).radix)
           }
@@ -1473,22 +1486,22 @@ class AccountPatcher {
    * @param cycle
    */
   computeCoverage(cycle: number) {
-    let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
+    const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
-    let coverageMap: Map<string, HashTrieRadixCoverage> = new Map() //map of sync radix to n
+    const coverageMap: Map<string, HashTrieRadixCoverage> = new Map() //map of sync radix to n
 
     hashTrieSyncConsensus.coverageMap = coverageMap
 
     //let nodeUsage = new Map()
-    for (let radixHash of hashTrieSyncConsensus.radixHashVotes.keys()) {
-      let coverage = coverageMap.get(radixHash)
+    for (const radixHash of hashTrieSyncConsensus.radixHashVotes.keys()) {
+      const coverage = coverageMap.get(radixHash)
       if (coverage == null) {
-        let votes = hashTrieSyncConsensus.radixHashVotes.get(radixHash)
-        let bestVote = votes.allVotes.get(votes.bestHash)
-        let potentialNodes = bestVote.voters
+        const votes = hashTrieSyncConsensus.radixHashVotes.get(radixHash)
+        const bestVote = votes.allVotes.get(votes.bestHash)
+        const potentialNodes = bestVote.voters
         //shuffle array of potential helpers
         //utils.shuffleArray(potentialNodes) //leaving non random to catch issues in testing.
-        let node = potentialNodes[0]
+        const node = potentialNodes[0]
         coverageMap.set(radixHash, { firstChoice: node, fullList: potentialNodes, refuted: new Set() })
         //let count = nodeUsage.get(node.id)
       }
@@ -1518,14 +1531,14 @@ class AccountPatcher {
    * @param cycle
    * @param nextNode pass true to start asking the next node in the list for data.
    */
-  getNodeForQuery(radix: string, cycle: number, nextNode: boolean = false) {
-    let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
-    let parentRadix = radix.substr(0, this.treeSyncDepth)
+  getNodeForQuery(radix: string, cycle: number, nextNode = false) {
+    const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
+    const parentRadix = radix.substr(0, this.treeSyncDepth)
 
-    let coverageEntry = hashTrieSyncConsensus.coverageMap.get(parentRadix)
+    const coverageEntry = hashTrieSyncConsensus.coverageMap.get(parentRadix)
 
     if (coverageEntry == null || coverageEntry.firstChoice == null) {
-      let numActiveNodes = this.stateManager.currentCycleShardData.activeNodes.length
+      const numActiveNodes = this.stateManager.currentCycleShardData.activeNodes.length
       this.statemanager_fatal(
         `getNodeForQuery null ${coverageEntry == null} ${
           coverageEntry?.firstChoice == null
@@ -1538,7 +1551,7 @@ class AccountPatcher {
     if (nextNode === true) {
       coverageEntry.refuted.add(coverageEntry.firstChoice.id)
       for (let i = 0; i < coverageEntry.fullList.length; i++) {
-        let node = coverageEntry.fullList[i]
+        const node = coverageEntry.fullList[i] // eslint-disable-line security/detect-object-injection
         if (node == null || coverageEntry.refuted.has(node.id)) {
           continue
         }
@@ -1559,11 +1572,10 @@ class AccountPatcher {
    * @param cycle
    */
   async getChildrenOf(radixHashEntries: RadixAndHash[], cycle: number): Promise<RadixAndHash[]> {
-    let result: HashTrieResp
     let nodeHashes: RadixAndHash[] = []
-    let requestMap: Map<Shardus.Node, HashTrieReq> = new Map()
-    for (let radixHash of radixHashEntries) {
-      let node = this.getNodeForQuery(radixHash.radix, cycle)
+    const requestMap: Map<Shardus.Node, HashTrieReq> = new Map()
+    for (const radixHash of radixHashEntries) {
+      const node = this.getNodeForQuery(radixHash.radix, cycle)
       if (node == null) {
         this.statemanager_fatal('getChildrenOf node null', 'getChildrenOf node null')
         continue
@@ -1586,10 +1598,10 @@ class AccountPatcher {
     //   }
     // }
 
-    let promises = []
-    for (let [key, value] of requestMap) {
+    const promises = []
+    for (const [key, value] of requestMap) {
       try {
-        let promise = this.p2p.ask(key, 'get_trie_hashes', value)
+        const promise = this.p2p.ask(key, 'get_trie_hashes', value)
         promises.push(promise)
       } catch (error) {
         this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + errorToStringFull(error))
@@ -1598,8 +1610,8 @@ class AccountPatcher {
 
     try {
       //TODO should we convert to Promise.allSettled?
-      let results = await Promise.all(promises)
-      for (let result of results) {
+      const results = await Promise.all(promises)
+      for (const result of results) {
         if (result != null && result.nodeHashes != null) {
           nodeHashes = nodeHashes.concat(result.nodeHashes)
         }
@@ -1627,16 +1639,14 @@ class AccountPatcher {
   async getChildAccountHashes(
     radixHashEntries: RadixAndHash[],
     cycle: number
-  ): Promise<{ radixAndChildHashes: RadixAndChildHashes[]; getAccountHashStats: any }> {
-    let result: HashTrieAccountsResp
+  ): Promise<{ radixAndChildHashes: RadixAndChildHashes[]; getAccountHashStats: AccountHashStats }> {
     let nodeChildHashes: RadixAndChildHashes[] = []
-    let allHashes: AccountIDAndHash[] = []
-    let requestMap: Map<Shardus.Node, HashTrieReq> = new Map()
+    const requestMap: Map<Shardus.Node, HashTrieReq> = new Map()
     let actualRadixRequests = 0
 
-    let patcherMaxLeafHashesPerRequest = this.config.stateManager.patcherMaxLeafHashesPerRequest
-    for (let radixHash of radixHashEntries) {
-      let node = this.getNodeForQuery(radixHash.radix, cycle)
+    const patcherMaxLeafHashesPerRequest = this.config.stateManager.patcherMaxLeafHashesPerRequest
+    for (const radixHash of radixHashEntries) {
+      const node = this.getNodeForQuery(radixHash.radix, cycle)
       if (node == null) {
         this.statemanager_fatal('getChildAccountHashes node null', 'getChildAccountHashes node null ')
         continue
@@ -1671,10 +1681,10 @@ class AccountPatcher {
     //   }
     // }
 
-    let promises = []
-    for (let [key, value] of requestMap) {
+    const promises = []
+    for (const [key, value] of requestMap) {
       try {
-        let promise = this.p2p.ask(key, 'get_trie_accountHashes', value)
+        const promise = this.p2p.ask(key, 'get_trie_accountHashes', value)
         promises.push(promise)
       } catch (error) {
         this.statemanager_fatal(
@@ -1684,7 +1694,7 @@ class AccountPatcher {
       }
     }
 
-    let getAccountHashStats = {
+    const getAccountHashStats: AccountHashStats = {
       matched: 0,
       visisted: 0,
       empty: 0,
@@ -1700,8 +1710,8 @@ class AccountPatcher {
 
     try {
       //TODO should we convert to Promise.allSettled?
-      let results = await Promise.all(promises)
-      for (let result of results) {
+      const results = await Promise.all(promises)
+      for (const result of results) {
         if (result != null && result.nodeChildHashes != null) {
           nodeChildHashes = nodeChildHashes.concat(result.nodeChildHashes)
           // for(let childHashes of result.nodeChildHashes){
@@ -1751,7 +1761,7 @@ class AccountPatcher {
    * @param cycle
    */
   isInSync(cycle) {
-    let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
+    const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
     if (hashTrieSyncConsensus == null) {
       return true
@@ -1763,11 +1773,11 @@ class AccountPatcher {
     // get our list of covered radix values for cycle X!!!
     // let inSync = true
 
-    let minVotes = this.calculateMinVotes()
+    const minVotes = this.calculateMinVotes()
 
-    for (let radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
-      let votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
-      let ourTrieNode = this.shardTrie.layerMaps[this.treeSyncDepth].get(radix)
+    for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
+      const votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
+      const ourTrieNode = this.shardTrie.layerMaps[this.treeSyncDepth].get(radix)
 
       //if we dont have the node we may have missed an account completely!
       if (ourTrieNode == null) {
@@ -1800,15 +1810,15 @@ class AccountPatcher {
         //oosRadix.push()
         if (logFlags.debug) {
           //overkill, need it for now
-          let kvp = []
-          for (let [key, value] of votesMap.allVotes.entries()) {
+          const kvp = []
+          for (const [key, value] of votesMap.allVotes.entries()) {
             kvp.push({
               id: key,
               count: value.count,
               nodeIDs: value.voters.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
             })
           }
-          let simpleMap = {
+          const simpleMap = {
             bestHash: votesMap.bestHash,
             bestVotes: votesMap.bestVotes,
             allVotes: kvp,
@@ -1849,16 +1859,16 @@ class AccountPatcher {
    */
   async findBadAccounts(cycle: number) {
     let badAccounts: AccountIDAndHash[] = []
-    let hashesPerLevel = Array(this.treeMaxDepth + 1).fill(0)
-    let checkedKeysPerLevel = Array(this.treeMaxDepth)
-    let badHashesPerLevel = Array(this.treeMaxDepth + 1).fill(0)
-    let requestedKeysPerLevel = Array(this.treeMaxDepth + 1).fill(0)
+    const hashesPerLevel = Array(this.treeMaxDepth + 1).fill(0)
+    const checkedKeysPerLevel = Array(this.treeMaxDepth)
+    const badHashesPerLevel = Array(this.treeMaxDepth + 1).fill(0)
+    const requestedKeysPerLevel = Array(this.treeMaxDepth + 1).fill(0)
 
     let level = this.treeSyncDepth
-    let badLayerMap = this.shardTrie.layerMaps[level]
-    let syncTrackerRanges = this.getSyncTrackerRanges()
+    let badLayerMap = this.shardTrie.layerMaps[level] // eslint-disable-line security/detect-object-injection
+    const syncTrackerRanges = this.getSyncTrackerRanges()
 
-    let stats = {
+    const stats = {
       testedSyncRadix: 0,
       skippedSyncRadix: 0,
       badSyncRadix: 0,
@@ -1876,27 +1886,27 @@ class AccountPatcher {
     }
     let extraBadKeys = []
 
-    let minVotes = this.calculateMinVotes()
+    const minVotes = this.calculateMinVotes()
 
-    let goodVotes: RadixAndHash[] = []
-    let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
-    for (let radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
-      let votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
+    const goodVotes: RadixAndHash[] = []
+    const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
+    for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
+      const votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
       let isSyncingRadix = false
 
       if (votesMap.bestVotes < minVotes) {
         stats.needsVotes++
         if (logFlags.debug) {
           //overkill, need it for now
-          let kvp = []
-          for (let [key, value] of votesMap.allVotes.entries()) {
+          const kvp = []
+          for (const [key, value] of votesMap.allVotes.entries()) {
             kvp.push({
               id: key,
               count: value.count,
               nodeIDs: value.voters.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
             })
           }
-          let simpleMap = {
+          const simpleMap = {
             bestHash: votesMap.bestHash,
             bestVotes: votesMap.bestVotes,
             allVotes: kvp,
@@ -1915,7 +1925,7 @@ class AccountPatcher {
       }
 
       //do we need to filter out a vote?
-      for (let range of syncTrackerRanges) {
+      for (const range of syncTrackerRanges) {
         if (radix >= range.low && radix <= range.high) {
           isSyncingRadix = true
           break
@@ -1942,10 +1952,10 @@ class AccountPatcher {
     }
 
     //record some debug info
-    badHashesPerLevel[level] = toFix.length
-    checkedKeysPerLevel[level] = toFix.map((x) => x.radix)
-    requestedKeysPerLevel[level] = goodVotes.length
-    hashesPerLevel[level] = goodVotes.length
+    badHashesPerLevel[level] = toFix.length // eslint-disable-line security/detect-object-injection
+    checkedKeysPerLevel[level] = toFix.map((x) => x.radix) // eslint-disable-line security/detect-object-injection
+    requestedKeysPerLevel[level] = goodVotes.length // eslint-disable-line security/detect-object-injection
+    hashesPerLevel[level] = goodVotes.length // eslint-disable-line security/detect-object-injection
 
     this.computeCoverage(cycle)
 
@@ -1954,8 +1964,8 @@ class AccountPatcher {
     while (level < this.treeMaxDepth && toFix.length > 0) {
       level++
       stats.checkedLevel = level
-      badLayerMap = this.shardTrie.layerMaps[level]
-      let childrenToDiff = await this.getChildrenOf(toFix, cycle)
+      badLayerMap = this.shardTrie.layerMaps[level] // eslint-disable-line security/detect-object-injection
+      const childrenToDiff = await this.getChildrenOf(toFix, cycle)
 
       toFix = this.diffConsenus(childrenToDiff, badLayerMap)
 
@@ -1967,41 +1977,42 @@ class AccountPatcher {
       }
 
       //record some debug info
-      badHashesPerLevel[level] = toFix.length
-      checkedKeysPerLevel[level] = toFix.map((x) => x.radix)
-      requestedKeysPerLevel[level] = childrenToDiff.length
-      hashesPerLevel[level] = childrenToDiff.length // badLayerMap.size ...badLayerMap could be null!
+      badHashesPerLevel[level] = toFix.length // eslint-disable-line security/detect-object-injection
+      checkedKeysPerLevel[level] = toFix.map((x) => x.radix) // eslint-disable-line security/detect-object-injection
+      requestedKeysPerLevel[level] = childrenToDiff.length // eslint-disable-line security/detect-object-injection
+      hashesPerLevel[level] = childrenToDiff.length// eslint-disable-line security/detect-object-injection
+      // badLayerMap.size ...badLayerMap could be null!
     }
 
     stats.leafsChecked = toFix.length
     //get bad accounts
-    let { radixAndChildHashes, getAccountHashStats } = await this.getChildAccountHashes(toFix, cycle)
+    const { radixAndChildHashes, getAccountHashStats } = await this.getChildAccountHashes(toFix, cycle)
     stats.getAccountHashStats = getAccountHashStats
 
     stats.leafResponses = radixAndChildHashes.length
 
     let accountHashesChecked = 0
-    for (let radixAndChildHash of radixAndChildHashes) {
+    for (const radixAndChildHash of radixAndChildHashes) {
       accountHashesChecked += radixAndChildHash.childAccounts.length
 
-      let badTreeNode = badLayerMap.get(radixAndChildHash.radix)
+      const badTreeNode = badLayerMap.get(radixAndChildHash.radix)
       if (badTreeNode != null) {
-        let accMap = new Map()
+        const accMap = new Map()
         if (badTreeNode.accounts != null) {
           for (let i = 0; i < badTreeNode.accounts.length; i++) {
-            accMap.set(badTreeNode.accounts[i].accountID, badTreeNode.accounts[i])
+            accMap.set(badTreeNode.accounts[i].accountID, badTreeNode.accounts[i]) // eslint-disable-line security/detect-object-injection
           }
         }
         for (let i = 0; i < radixAndChildHash.childAccounts.length; i++) {
-          let potentalGoodAcc = radixAndChildHash.childAccounts[i]
-          let potentalBadAcc = accMap.get(potentalGoodAcc.accountID)
+          const potentalGoodAcc = radixAndChildHash.childAccounts[i] // eslint-disable-line security/detect-object-injection
+          const potentalBadAcc = accMap.get(potentalGoodAcc.accountID)
 
           //check if our cache value has matching hash already.  The trie can lag behind.
           //  todo would be nice to find a way to reduce this, possibly by better control of syncing ranges.
           //   (we are not supposed to test syncing ranges , but maybe that is out of phase?)
 
           //only do this check if the account is new.  It was skipping potential oos situations.
-          let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(
+          const accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(
             potentalGoodAcc.accountID
           )
           if (accountMemData != null && accountMemData.h === potentalGoodAcc.hash) {
@@ -2015,7 +2026,7 @@ class AccountPatcher {
               }
 
               //this was in cache, but stale so we can reinstate the cache since it still matches the group consensus
-              let accountHashCacheHistory: AccountHashCacheHistory =
+              const accountHashCacheHistory: AccountHashCacheHistory =
                 this.stateManager.accountCache.getAccountHashHistoryItem(potentalGoodAcc.accountID)
               if (
                 accountHashCacheHistory != null &&
@@ -2088,7 +2099,7 @@ class AccountPatcher {
       return
     }
 
-    let accountData = { accountID, hash }
+    const accountData = { accountID, hash }
     this.accountUpdateQueue.push(accountData)
   }
 
@@ -2131,29 +2142,29 @@ class AccountPatcher {
    * @param cycle
    */
   async broadcastSyncHashes(cycle) {
-    let syncLayer = this.shardTrie.layerMaps[this.treeSyncDepth]
+    const syncLayer = this.shardTrie.layerMaps[this.treeSyncDepth]
 
-    let shardGlobals = this.stateManager.currentCycleShardData.shardGlobals
+    const shardGlobals = this.stateManager.currentCycleShardData.shardGlobals
 
-    let messageToNodeMap: Map<string, { node: Shardus.Node; message: HashTrieSyncTell }> = new Map()
+    const messageToNodeMap: Map<string, { node: Shardus.Node; message: HashTrieSyncTell }> = new Map()
 
-    let radixUsed: Map<string, Set<string>> = new Map()
+    const radixUsed: Map<string, Set<string>> = new Map()
 
-    let nonConsensusRanges = this.getNonConsensusRanges(cycle)
-    let nonStoredRanges = this.getNonStoredRanges(cycle)
-    let syncTrackerRanges = this.getSyncTrackerRanges()
+    const nonConsensusRanges = this.getNonConsensusRanges(cycle)
+    const nonStoredRanges = this.getNonStoredRanges(cycle)
+    const syncTrackerRanges = this.getSyncTrackerRanges()
     let hasNonConsensusRange = false
     let lastCycleNonConsensus = false
     let hasNonStorageRange = false
     let inSyncTrackerRange = false
 
-    let debugSyncSkipSet = new Set<string>()
-    let debugRadixSet = new Set<string>()
+    const debugSyncSkipSet = new Set<string>()
+    const debugRadixSet = new Set<string>()
 
-    let stats = {
+    const stats = {
       broadcastSkip: 0,
     }
-    for (let treeNode of syncLayer.values()) {
+    for (const treeNode of syncLayer.values()) {
       hasNonConsensusRange = false
       lastCycleNonConsensus = false
       hasNonStorageRange = false
@@ -2164,24 +2175,24 @@ class AccountPatcher {
       //Due to network shifting if we were consenus last cycle but still fully stored range we can send a hash.
       //Syncing operation will prevent us from sending a hash (because in theory we dont have complete account data)
 
-      for (let range of this.lastCycleNonConsensusRanges) {
+      for (const range of this.lastCycleNonConsensusRanges) {
         if (treeNode.radix >= range.low && treeNode.radix <= range.high) {
           lastCycleNonConsensus = true
         }
       }
-      for (let range of nonStoredRanges) {
+      for (const range of nonStoredRanges) {
         if (treeNode.radix >= range.low && treeNode.radix <= range.high) {
           hasNonStorageRange = true
         }
       }
-      for (let range of nonConsensusRanges) {
+      for (const range of nonConsensusRanges) {
         if (treeNode.radix >= range.low && treeNode.radix <= range.high) {
           hasNonConsensusRange = true
         }
       }
 
       //do we need to adjust what cycle we are looking at for syncing?
-      for (let range of syncTrackerRanges) {
+      for (const range of syncTrackerRanges) {
         if (treeNode.radix >= range.low && treeNode.radix <= range.high) {
           inSyncTrackerRange = true
         }
@@ -2208,16 +2219,16 @@ class AccountPatcher {
 
       //figure out who to send a hash to
       //build up a map of messages
-      let partitionRange = ShardFunctions.getPartitionRangeFromRadix(shardGlobals, treeNode.radix)
+      const partitionRange = ShardFunctions.getPartitionRangeFromRadix(shardGlobals, treeNode.radix)
       for (let i = partitionRange.low; i <= partitionRange.high; i++) {
-        let shardInfo = this.stateManager.currentCycleShardData.parititionShardDataMap.get(i)
+        const shardInfo = this.stateManager.currentCycleShardData.parititionShardDataMap.get(i)
 
         let sendToMap = shardInfo.coveredBy
         if (this.sendHashesToEdgeNodes) {
           sendToMap = shardInfo.storedBy
         }
 
-        for (let [key, value] of Object.entries(sendToMap)) {
+        for (const  value of Object.values(sendToMap)) {
           let messagePair = messageToNodeMap.get(value.id)
           if (messagePair == null) {
             messagePair = { node: value, message: { cycle, nodeHashes: [] } }
@@ -2249,9 +2260,9 @@ class AccountPatcher {
     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('accountPatcher', ``, `broadcast radixUsed syncing c:${cycle} set: ${[utils.stringifyReduce([...debugRadixSet.keys()])]}`)
 
     //send the messages we have built up.  (parallel waiting with promise.all)
-    let promises = []
-    for (let messageEntry of messageToNodeMap.values()) {
-      let promise = this.p2p.tell([messageEntry.node], 'sync_trie_hashes', messageEntry.message)
+    const promises = []
+    for (const messageEntry of messageToNodeMap.values()) {
+      const promise = this.p2p.tell([messageEntry.node], 'sync_trie_hashes', messageEntry.message)
       promises.push(promise)
     }
     await Promise.all(promises)
@@ -2276,39 +2287,39 @@ class AccountPatcher {
    */
   async updateTrieAndBroadCast(cycle) {
     //calculate sync levels!!
-    let shardValues = this.stateManager.shardValuesByCycle.get(cycle)
-    let shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
+    const shardValues = this.stateManager.shardValuesByCycle.get(cycle)
+    const shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
 
-    let minHashesPerRange = 4
+    const minHashesPerRange = 4
     // y = floor(log16((minHashesPerRange * max(1, x/consensusRange   ))))
     let syncDepthRaw =
       Math.log(
         minHashesPerRange * Math.max(1, shardGlobals.numPartitions / (shardGlobals.consensusRadius * 2 + 1))
       ) / Math.log(16)
     syncDepthRaw = Math.max(1, syncDepthRaw) // at least 1
-    let newSyncDepth = Math.ceil(syncDepthRaw)
+    const newSyncDepth = Math.ceil(syncDepthRaw)
 
     //This only happens when the depth of our tree change (based on num nodes above)
     //We have to partition the leaf node data into leafs of the correct level and rebuild the tree
     if (this.treeSyncDepth != newSyncDepth) {
       //todo add this in to prevent size flipflop..(better: some deadspace)  && newSyncDepth > this.treeSyncDepth){
-      let resizeStats = {
+        const resizeStats = {
         nodesWithAccounts: 0,
         nodesWithoutAccounts: 0,
       }
-      let newMaxDepth = newSyncDepth + 3 //todo the "+3" should be based on total number of stored accounts pre node (in a consensed way, needs to be on cycle chain)
+      const newMaxDepth = newSyncDepth + 3 //todo the "+3" should be based on total number of stored accounts pre node (in a consensed way, needs to be on cycle chain)
       //add more maps if needed  (+1 because we have a map level 0)
       while (this.shardTrie.layerMaps.length < newMaxDepth + 1) {
         this.shardTrie.layerMaps.push(new Map())
       }
 
       //detach all accounts.
-      let currentLeafMap = this.shardTrie.layerMaps[this.treeMaxDepth]
+      const currentLeafMap = this.shardTrie.layerMaps[this.treeMaxDepth]
 
       //put all accounts into queue to rebuild Tree!
-      for (let treeNode of currentLeafMap.values()) {
+      for (const treeNode of currentLeafMap.values()) {
         if (treeNode.accounts != null) {
-          for (let account of treeNode.accounts) {
+          for (const account of treeNode.accounts) {
             //this.updateAccountHash(account.accountID, account.hash)
 
             //need to unshift these, becasue they could be older than what is alread in the queue!!
@@ -2332,7 +2343,7 @@ class AccountPatcher {
 
       //better to just wipe out old parent nodes!
       for (let idx = 0; idx < newMaxDepth; idx++) {
-        this.shardTrie.layerMaps[idx].clear()
+        this.shardTrie.layerMaps[idx].clear() // eslint-disable-line security/detect-object-injection
       }
 
       if (newMaxDepth < this.treeMaxDepth) {
@@ -2348,7 +2359,7 @@ class AccountPatcher {
 
     /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, ` syncDepth:${this.treeSyncDepth} maxDepth :${this.treeMaxDepth}`)
 
-    let updateStats = this.upateShardTrie(cycle)
+    const updateStats = this.upateShardTrie(cycle)
 
     /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `totalAccountsHashed`, updateStats.totalAccountsHashed)
 
@@ -2378,21 +2389,21 @@ class AccountPatcher {
     // let updateStats = this.upateShardTrie(cycle)
     // nestedCountersInstance.countEvent(`accountPatcher`, `totalAccountsHashed`, updateStats.totalAccountsHashed)
 
-    let lastFail = this.failedLastTrieSync
+    const lastFail = this.failedLastTrieSync
 
     this.failedLastTrieSync = false
 
-    let trieRepairDump = {
+    const trieRepairDump = {
       cycle,
       stats: null,
       z_accountSummary: null,
     }
 
     if (logFlags.debug) {
-      let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
-      let debug = []
+      const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
+      const debug = []
       if (hashTrieSyncConsensus && hashTrieSyncConsensus.radixHashVotes) {
-        for (let [key, value] of hashTrieSyncConsensus.radixHashVotes) {
+        for (const [key, value] of hashTrieSyncConsensus.radixHashVotes) {
           debug.push({ radix: key, hash: value.bestHash, votes: value.bestVotes })
         }
       }
@@ -2424,7 +2435,7 @@ class AccountPatcher {
         failHistoryObject = this.syncFailHistory[this.syncFailHistory.length - 1]
       }
 
-      let results = await this.findBadAccounts(cycle)
+      const results = await this.findBadAccounts(cycle)
       /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `badAccounts c:${cycle} `, results.badAccounts.length)
       /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `accountHashesChecked c:${cycle}`, results.accountHashesChecked)
 
@@ -2441,7 +2452,7 @@ class AccountPatcher {
       //TODO figure out if the possible repairs will fully repair a given hash for a radix.
       // This could add some security but my concern is that it could create a situation where something unexpected prevents
       // repairing some of the data.
-      let preTestResults = this.simulateRepairs(cycle, results.badAccounts)
+      // const preTestResults = this.simulateRepairs(cycle, results.badAccounts)
 
       if (results.extraBadKeys.length > 0) {
         this.statemanager_fatal(
@@ -2451,7 +2462,7 @@ class AccountPatcher {
       }
 
       //request data for the list of bad accounts then update.
-      let { wrappedDataList, stateTableDataMap, getAccountStats } = await this.getAccountRepairData(
+      const { wrappedDataList, stateTableDataMap, getAccountStats } = await this.getAccountRepairData(
         cycle,
         results.badAccounts
       )
@@ -2459,10 +2470,10 @@ class AccountPatcher {
       //we need filter our list of possible account data to use for corrections.
       //it is possible the majority voters could send us account data that is older than what we have.
       //todo must sort out if we can go backwards...  (I had dropped some pre validation earlier, but need to rethink that)
-      let wrappedDataListFiltered: Shardus.WrappedData[] = []
-      let noChange = new Set()
-      let updateTooOld = new Set()
-      let filterStats = {
+      const wrappedDataListFiltered: Shardus.WrappedData[] = []
+      const noChange = new Set()
+      const updateTooOld = new Set()
+      const filterStats = {
         accepted: 0,
         tooOld: 0,
         sameTS: 0,
@@ -2473,9 +2484,9 @@ class AccountPatcher {
 
       // build a list of data that is good to use in this repair operation
       // Also, there is a section where cache accountHashCacheHistory.lastSeenCycle may get repaired.
-      for (let wrappedData of wrappedDataList) {
+      for (const wrappedData of wrappedDataList) {
         if (this.stateManager.accountCache.hasAccount(wrappedData.accountId)) {
-          let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(
+          const accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(
             wrappedData.accountId
           )
           // dont allow an older timestamp to overwrite a newer copy of data we have.
@@ -2498,7 +2509,7 @@ class AccountPatcher {
           if (wrappedData.timestamp === accountMemData.t) {
             let allowPatch = false
             // if we got here make sure to update the last seen cycle in case the cache needs to know it has current enough data
-            let accountHashCacheHistory: AccountHashCacheHistory =
+            const accountHashCacheHistory: AccountHashCacheHistory =
               this.stateManager.accountCache.getAccountHashHistoryItem(wrappedData.accountId)
             if (
               accountHashCacheHistory != null &&
@@ -2561,9 +2572,9 @@ class AccountPatcher {
         }
       }
 
-      let updatedAccounts: string[] = []
+      const updatedAccounts: string[] = []
       //save the account data.  note this will make sure account hashes match the wrappers and return failed hashes  that dont match
-      let failedHashes = await this.stateManager.checkAndSetAccountData(
+      const failedHashes = await this.stateManager.checkAndSetAccountData(
         wrappedDataListFiltered,
         `testAndPatchAccounts`,
         true,
@@ -2577,7 +2588,7 @@ class AccountPatcher {
           `isInSync = false cycle:${cycle}:  failed hashes:${failedHashes.length}`
         )
       }
-      let appliedFixes = Math.max(0, wrappedDataListFiltered.length - failedHashes.length)
+      const appliedFixes = Math.max(0, wrappedDataListFiltered.length - failedHashes.length)
       /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', 'writeCombinedAccountDataToBackups', Math.max(0,wrappedDataListFiltered.length - failedHashes.length))
       /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `p.repair applied c:${cycle} bad:${results.badAccounts.length} received:${wrappedDataList.length} failedH: ${failedHashes.length} filtered:${utils.stringifyReduce(filterStats)} stats:${utils.stringifyReduce(results.stats)} getAccountStats: ${utils.stringifyReduce(getAccountStats)} extraBadKeys:${results.extraBadKeys.length}`, appliedFixes)
 
@@ -2588,7 +2599,7 @@ class AccountPatcher {
         logLimit = 2000
       }
 
-      let repairedAccountSummary = utils.stringifyReduceLimit(
+      const repairedAccountSummary = utils.stringifyReduceLimit(
         wrappedDataListFiltered.map((account) => {
           return { a: account.accountId, h: account.stateId }
         }),
@@ -2628,14 +2639,14 @@ class AccountPatcher {
       //   wrappedDataUpdated.push(wrappedData)
       // }
 
-      let combinedAccountStateData: Shardus.StateTableObject[] = []
-      let updatedSet = new Set()
-      for (let updated of updatedAccounts) {
+      const combinedAccountStateData: Shardus.StateTableObject[] = []
+      const updatedSet = new Set()
+      for (const updated of updatedAccounts) {
         updatedSet.add(updated)
       }
-      for (let wrappedData of wrappedDataListFiltered) {
+      for (const wrappedData of wrappedDataListFiltered) {
         if (updatedSet.has(wrappedData.accountId)) {
-          let stateTableData = stateTableDataMap.get(wrappedData.stateId)
+          const stateTableData = stateTableDataMap.get(wrappedData.stateId)
           if (stateTableData != null) {
             combinedAccountStateData.push(stateTableData)
           }
@@ -2662,7 +2673,7 @@ class AccountPatcher {
       // }
       //check again if we are in sync
 
-      this.lastRepairInfo = trieRepairDump
+      this.lastRepairInfo = utils.stringifyReduce(this.lastRepairInfo)
 
       //update the repair count
       failHistoryObject.repaired += appliedFixes
@@ -2673,7 +2684,7 @@ class AccountPatcher {
       nestedCountersInstance.countEvent(`accountPatcher`, `inSync`)
 
       if (lastFail === true) {
-        let failHistoryObject = this.syncFailHistory[this.syncFailHistory.length - 1]
+        const failHistoryObject = this.syncFailHistory[this.syncFailHistory.length - 1]
         this.failEndCycle = cycle
         failHistoryObject.e = this.failEndCycle
         failHistoryObject.cycles = this.failEndCycle - this.failStartCycle
@@ -2697,10 +2708,10 @@ class AccountPatcher {
    * @param badAccounts
    */
   simulateRepairs(cycle: number, badAccounts: AccountIDAndHash[]): AccountPreTest[] {
-    let results = []
+    const results = []
 
-    for (let badAccount of badAccounts) {
-      let preTestResult = {
+    for (const badAccount of badAccounts) {
+      const preTestResult = {
         accountID: badAccount.accountID,
         hash: badAccount.hash,
         preTestStatus: 1 /*PreTestStatus.Valid*/,
@@ -2738,19 +2749,19 @@ class AccountPatcher {
   ): Promise<{
     wrappedDataList: Shardus.WrappedData[]
     stateTableDataMap: Map<string, Shardus.StateTableObject>
-    getAccountStats: any
+    getAccountStats: AccountStats
   }> {
     //pick which nodes to ask! /    //build up requests
-    let nodesBySyncRadix: Map<
+    const nodesBySyncRadix: Map<
       string,
       { node: Shardus.Node; request: { cycle; accounts: AccountIDAndHash[] } }
     > = new Map()
-    let accountHashMap = new Map()
+    const accountHashMap = new Map()
 
-    let wrappedDataList: Shardus.WrappedData[] = []
-    let stateTableDataMap: Map<string, Shardus.StateTableObject> = new Map()
+    const wrappedDataList: Shardus.WrappedData[] = []
+    const stateTableDataMap: Map<string, Shardus.StateTableObject> = new Map()
 
-    let getAccountStats = {
+    const getAccountStats: AccountStats = {
       skipping: 0,
       multiRequests: 0,
       requested: 0,
@@ -2758,8 +2769,8 @@ class AccountPatcher {
     }
 
     try {
-      for (let accountEntry of badAccounts) {
-        let syncRadix = accountEntry.accountID.substr(0, this.treeSyncDepth)
+      for (const accountEntry of badAccounts) {
+        const syncRadix = accountEntry.accountID.substr(0, this.treeSyncDepth)
         let requestEntry = nodesBySyncRadix.get(syncRadix)
 
         // let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(accountEntry.accountID)
@@ -2771,7 +2782,7 @@ class AccountPatcher {
         accountHashMap.set(accountEntry.accountID, accountEntry.hash)
         if (requestEntry == null) {
           //minor layer of security, we will ask a different node for the account than the one that gave us the hash
-          let nodeToAsk = this.getNodeForQuery(accountEntry.accountID, cycle, true)
+          const nodeToAsk = this.getNodeForQuery(accountEntry.accountID, cycle, true)
           if (nodeToAsk == null) {
             this.statemanager_fatal(
               'getAccountRepairData no node avail',
@@ -2785,20 +2796,20 @@ class AccountPatcher {
         requestEntry.request.accounts.push(accountEntry)
       }
 
-      let promises = []
-      let accountPerRequest = this.config.stateManager.patcherAccountsPerRequest
-      let maxAskCount = this.config.stateManager.patcherAccountsPerUpdate
-      for (let requestEntry of nodesBySyncRadix.values()) {
+      const promises = []
+      const accountPerRequest = this.config.stateManager.patcherAccountsPerRequest
+      const maxAskCount = this.config.stateManager.patcherAccountsPerUpdate
+      for (const requestEntry of nodesBySyncRadix.values()) {
         if (requestEntry.request.accounts.length > accountPerRequest) {
           let offset = 0
-          let allAccounts = requestEntry.request.accounts
+          const allAccounts = requestEntry.request.accounts
           let thisAskCount = 0
           while (
             offset < allAccounts.length &&
             Math.min(offset + accountPerRequest, allAccounts.length) < maxAskCount
           ) {
             requestEntry.request.accounts = allAccounts.slice(offset, offset + accountPerRequest)
-            let promise = this.p2p.ask(requestEntry.node, 'get_account_data_by_hashes', requestEntry.request)
+            const promise = this.p2p.ask(requestEntry.node, 'get_account_data_by_hashes', requestEntry.request)
             promises.push(promise)
             offset = offset + accountPerRequest
             getAccountStats.multiRequests++
@@ -2810,29 +2821,29 @@ class AccountPatcher {
 
           //would it be better to resync if we have a high number of errors?  not easy to answer this.
         } else {
-          let promise = this.p2p.ask(requestEntry.node, 'get_account_data_by_hashes', requestEntry.request)
+          const promise = this.p2p.ask(requestEntry.node, 'get_account_data_by_hashes', requestEntry.request)
           promises.push(promise)
           getAccountStats.requested = requestEntry.request.accounts.length
         }
       }
 
-      let promiseResults = await Promise.allSettled(promises) //as HashTrieAccountDataResponse[]
-      for (let promiseResult of promiseResults) {
+      const promiseResults = await Promise.allSettled(promises) //as HashTrieAccountDataResponse[]
+      for (const promiseResult of promiseResults) {
         if (promiseResult.status === 'rejected') {
           continue
         }
-        let result = promiseResult.value as HashTrieAccountDataResponse
+        const result = promiseResult.value as HashTrieAccountDataResponse
         //HashTrieAccountDataResponse
         if (result != null && result.accounts != null && result.accounts.length > 0) {
           if (result.stateTableData != null && result.stateTableData.length > 0) {
-            for (let stateTableData of result.stateTableData) {
+            for (const stateTableData of result.stateTableData) {
               stateTableDataMap.set(stateTableData.stateAfter, stateTableData)
             }
           }
 
           //wrappedDataList = wrappedDataList.concat(result.accounts)
-          for (let wrappedAccount of result.accounts) {
-            let desiredHash = accountHashMap.get(wrappedAccount.accountId)
+          for (const wrappedAccount of result.accounts) {
+            const desiredHash = accountHashMap.get(wrappedAccount.accountId)
             if (desiredHash != wrappedAccount.stateId) {
               //got account back but has the wrong stateID
               //nestedCountersInstance.countEvent('accountPatcher', 'getAccountRepairData wrong hash')
@@ -2881,22 +2892,21 @@ class AccountPatcher {
    * @param lines
    */
   processShardDump(stream, lines) {
-    let dataByParition = new Map()
+    const dataByParition = new Map()
 
-    let rangesCovered = []
-    let nodesListsCovered = []
-    let nodeLists = []
-    let numNodes = 0
+    const rangesCovered = []
+    const nodesListsCovered = []
+    const nodeLists = []
     let newestCycle = -1
-    let partitionObjects = []
-    for (let line of lines) {
-      let index = line.raw.indexOf('{"allNodeIds')
+    const partitionObjects = []
+    for (const line of lines) {
+      const index = line.raw.indexOf('{"allNodeIds')
       if (index >= 0) {
         let partitionStr = line.raw.slice(index)
         //this.generalLog(string)
         let partitionObj
         try {
-          partitionObj = JSON.parse(partitionStr)
+        const partitionObj = JSON.parse(partitionStr)
         } catch (error) {
           this.mainLogger.error('error parsing partitionObj', error, partitionStr)
           continue
@@ -2917,10 +2927,10 @@ class AccountPatcher {
       }
     }
 
-    for (let partitionObj of partitionObjects) {
+    for (const partitionObj of partitionObjects) {
       // we only want data for nodes that were active in the latest cycle.
       if (partitionObj.cycle === newestCycle) {
-        for (let partition of partitionObj.partitions) {
+        for (const partition of partitionObj.partitions) {
           let results = dataByParition.get(partition.parititionID)
           if (results == null) {
             results = []
@@ -2937,7 +2947,6 @@ class AccountPatcher {
         rangesCovered.push(partitionObj.rangesCovered)
         nodesListsCovered.push(partitionObj.nodesCovered)
         nodeLists.push(partitionObj.allNodeIds)
-        numNodes = partitionObj.allNodeIds.length
       }
     }
 
@@ -2947,10 +2956,10 @@ class AccountPatcher {
     // compare partition data: old system with data manual queried from app
     let allPassed = true
     // let uniqueVotesByPartition = new Array(numNodes).fill(0)
-    for (var [key, value] of dataByParition) {
-      let results = value
-      let votes = {}
-      for (let entry of results) {
+    for (const [key, value] of dataByParition) {
+      const results = value
+      const votes = {}
+      for (const entry of results) {
         if (entry.accounts.length === 0) {
           // new settings allow for not using accounts from sql
           continue
@@ -2958,21 +2967,21 @@ class AccountPatcher {
         entry.accounts.sort(function (a, b) {
           return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
         })
-        let string = utils.stringifyReduce(entry.accounts)
-        let voteEntry = votes[string]
+        const string = utils.stringifyReduce(entry.accounts)
+        let voteEntry = votes[string] // eslint-disable-line security/detect-object-injection
         if (voteEntry == null) {
           voteEntry = {}
           voteEntry.voteCount = 0
           voteEntry.ownerIds = []
-          votes[string] = voteEntry
+          votes[string] = voteEntry // eslint-disable-line security/detect-object-injection
         }
         voteEntry.voteCount++
-        votes[string] = voteEntry
+        votes[string] = voteEntry // eslint-disable-line security/detect-object-injection
 
         voteEntry.ownerIds.push(entry.ownerId)
       }
-      for (let key2 of Object.keys(votes)) {
-        let voteEntry = votes[key2]
+      for (const key2 of Object.keys(votes)) {
+        const voteEntry = votes[key2] // eslint-disable-line security/detect-object-injection
         let voters = ''
         if (key2 !== '[]') {
           voters = `---voters:${JSON.stringify(voteEntry.ownerIds)}`
@@ -2981,7 +2990,7 @@ class AccountPatcher {
         stream.write(`partition: ${key}  votes: ${voteEntry.voteCount} values: ${key2} \t\t\t${voters}\n`)
         // stream.write(`            ---voters: ${JSON.stringify(voteEntry.ownerIds)}\n`)
       }
-      let numUniqueVotes = Object.keys(votes).length
+      const numUniqueVotes = Object.keys(votes).length
       if (numUniqueVotes > 2 || (numUniqueVotes > 1 && votes['[]'] == null)) {
         allPassed = false
         stream.write(`partition: ${key} failed.  Too many different version of data: ${numUniqueVotes} \n`)
@@ -2994,33 +3003,33 @@ class AccountPatcher {
     // compare partition data 2: new system using the state manager cache
     let allPassed2 = true
     // let uniqueVotesByPartition = new Array(numNodes).fill(0)
-    for ([key, value] of dataByParition) {
-      let results = value
-      let votes = {}
-      for (let entry of results) {
+    for (const [key, value] of dataByParition) {
+      const results = value
+      const votes = {}
+      for (const entry of results) {
         // no account sort, we expect this to have a time sort!
         // entry.accounts.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
-        let fullString = utils.stringifyReduce(entry.accounts2)
+        const fullString = utils.stringifyReduce(entry.accounts2)
         let string = entry.partitionHash2
         if (string === undefined) {
           string = '[]'
         }
 
-        let voteEntry = votes[string]
+        let voteEntry = votes[string] // eslint-disable-line security/detect-object-injection
         if (voteEntry == null) {
           voteEntry = {}
           voteEntry.voteCount = 0
           voteEntry.ownerIds = []
           voteEntry.fullString = fullString
-          votes[string] = voteEntry
+          votes[string] = voteEntry // eslint-disable-line security/detect-object-injection
         }
         voteEntry.voteCount++
-        votes[string] = voteEntry
+        votes[string] = voteEntry // eslint-disable-line security/detect-object-injection
 
         voteEntry.ownerIds.push(entry.ownerId)
       }
-      for (let key2 of Object.keys(votes)) {
-        let voteEntry = votes[key2]
+      for (const key2 of Object.keys(votes)) {
+        const voteEntry = votes[key2] // eslint-disable-line security/detect-object-injection
         let voters = ''
         if (key2 !== '[]') {
           voters = `---voters:${JSON.stringify(voteEntry.ownerIds)}`
@@ -3031,7 +3040,7 @@ class AccountPatcher {
         )
         // stream.write(`            ---voters: ${JSON.stringify(voteEntry.ownerIds)}\n`)
       }
-      let numUniqueVotes = Object.keys(votes).length
+      const numUniqueVotes = Object.keys(votes).length
       if (numUniqueVotes > 2 || (numUniqueVotes > 1 && votes['[]'] == null)) {
         allPassed2 = false
         stream.write(`partition: ${key} failed.  Too many different version of data: ${numUniqueVotes} \n`)
@@ -3044,10 +3053,10 @@ class AccountPatcher {
       return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
     })
 
-    let isStored = function (i, rangeCovered) {
-      let key = i
-      let minP = rangeCovered.stMin
-      let maxP = rangeCovered.stMax
+    const isStored = function (i, rangeCovered) {
+      const key = i
+      const minP = rangeCovered.stMin
+      const maxP = rangeCovered.stMax
       if (minP === maxP) {
         if (i !== minP) {
           return false
@@ -3065,10 +3074,10 @@ class AccountPatcher {
       }
       return true
     }
-    let isConsensus = function (i, rangeCovered) {
-      let key = i
-      let minP = rangeCovered.cMin
-      let maxP = rangeCovered.cMax
+    const isConsensus = function (i, rangeCovered) {
+      const key = i
+      const minP = rangeCovered.cMin
+      const maxP = rangeCovered.cMax
       if (minP === maxP) {
         if (i !== minP) {
           return false
@@ -3087,11 +3096,11 @@ class AccountPatcher {
       return true
     }
 
-    for (let range of rangesCovered) {
+    for (const range of rangesCovered) {
       let partitionGraph = ''
       for (let i = 0; i < range.numP; i++) {
-        let isC = isConsensus(i, range)
-        let isSt = isStored(i, range)
+        const isC = isConsensus(i, range)
+        const isSt = isStored(i, range)
 
         if (i === range.hP) {
           partitionGraph += 'H'
@@ -3116,20 +3125,20 @@ class AccountPatcher {
     nodesListsCovered.sort(function (a, b) {
       return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
     })
-    for (let nodesCovered of nodesListsCovered) {
+    for (const nodesCovered of nodesListsCovered) {
       let partitionGraph = ''
-      let consensusMap = {}
-      let storedMap = {}
-      for (let entry of nodesCovered.consensus) {
+      const consensusMap = {}
+      const storedMap = {}
+      for (const entry of nodesCovered.consensus) {
         consensusMap[entry.idx] = { hp: entry.hp }
       }
-      for (let entry of nodesCovered.stored) {
+      for (const entry of nodesCovered.stored) {
         storedMap[entry.idx] = { hp: entry.hp }
       }
 
       for (let i = 0; i < nodesCovered.numP; i++) {
-        let isC = consensusMap[i] != null
-        let isSt = storedMap[i] != null
+        const isC = consensusMap[i] != null // eslint-disable-line security/detect-object-injection
+        const isSt = storedMap[i] != null // eslint-disable-line security/detect-object-injection
         if (i === nodesCovered.idx) {
           partitionGraph += 'O'
         } else if (isC && isSt) {
@@ -3150,7 +3159,7 @@ class AccountPatcher {
       )
     }
     stream.write(`\n\n`)
-    for (let list of nodeLists) {
+    for (const list of nodeLists) {
       stream.write(`${JSON.stringify(list)} \n`)
     }
 
@@ -3161,7 +3170,7 @@ class AccountPatcher {
     let minVotes = Math.ceil(
       this.stateManager.currentCycleShardData.shardGlobals.nodesPerConsenusGroup * 0.51
     )
-    let majorityOfActiveNodes = Math.ceil(this.stateManager.currentCycleShardData.activeNodes.length * 0.51)
+    const majorityOfActiveNodes = Math.ceil(this.stateManager.currentCycleShardData.activeNodes.length * 0.51)
     minVotes = Math.min(minVotes, majorityOfActiveNodes)
     minVotes = Math.max(1, minVotes)
     return minVotes
