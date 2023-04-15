@@ -84,6 +84,9 @@ interface Shardus {
   registerExternalPatch: RouteHandlerRegister
   _listeners: any
   appliedConfigChanges: Set<number>
+
+  debugForeverLoopCounter: number
+  debugForeverLoopsEnabled: boolean
 }
 
 /**
@@ -95,6 +98,8 @@ class Shardus extends EventEmitter {
     opts?: { customStringifier?: (val: any) => string }
   ) {
     super()
+    this.debugForeverLoopsEnabled = true
+    this.debugForeverLoopCounter = 0
     this.nestedCounters = nestedCountersInstance
     this.memoryReporting = new MemoryReporting(this)
     this.profiler = new Profiler()
@@ -692,6 +697,9 @@ class Shardus extends EventEmitter {
 
       this.updateDebug(lastCycle)
     })
+
+    //setup debug endpoints
+    this.setupDebugEndpoints()
   }
 
   /**
@@ -1400,6 +1408,49 @@ class Shardus extends EventEmitter {
 
   isAccountRemote(address: string): boolean {
     return this.stateManager.transactionQueue.isAccountRemote(address)
+  }
+
+  /**
+   * test once at the given probability to fail.  If it fails, log the message and return true.  If it doesnt fail, return false.
+   * @param failChance 0-1
+   * @param debugName
+   * @param key
+   * @param message
+   * @param verboseRequired
+   * @returns
+   */
+  testFailChance(
+    failChance: number,
+    debugName: string,
+    key: string,
+    message: string,
+    verboseRequired: boolean
+  ): boolean {
+    if (this.stateManager.testFailChance(failChance, debugName, key, message, verboseRequired)) {
+      return true
+    } else {
+      return false
+    }
+  }
+
+  async debugForeverLoop(tag: string) {
+    this.debugForeverLoopCounter++
+    /* prettier-ignore */ this.stateManager.transactionQueue.setDebugSetLastAppAwait('debugForeverLoop'+tag)
+    while (this.debugForeverLoopsEnabled) {
+      await utils.sleep(1000)
+    }
+    /* prettier-ignore */ this.stateManager.transactionQueue.setDebugSetLastAppAwait('debugForeverLoop'+tag, DebugComplete.Completed)
+  }
+
+  setupDebugEndpoints() {
+    Context.network.registerExternalGet('debug-toggle-foreverloop', isDebugModeMiddleware, (req, res) => {
+      this.debugForeverLoopsEnabled = !this.debugForeverLoopsEnabled
+      //optionally check the query param set and use that instead
+      if (req.query.set) {
+        this.debugForeverLoopsEnabled = req.query.set === 'true'
+      }
+      res.json(`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`)
+    })
   }
 
   /**

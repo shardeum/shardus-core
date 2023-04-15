@@ -811,6 +811,15 @@ class StateManager {
     return defaultValue
   }
 
+  /**
+   * test once at the given probability to fail.  If it fails, log the message and return true.  If it doesnt fail, return false.
+   * @param failChance
+   * @param debugName
+   * @param key
+   * @param message
+   * @param verboseRequired
+   * @returns
+   */
   testFailChance(
     failChance: number,
     debugName: string,
@@ -828,6 +837,7 @@ class StateManager {
         if (verboseRequired === false || logFlags.verbose) {
           this.logger.playbackLogNote(`dbg_fail_${debugName}`, key, message)
         }
+        nestedCountersInstance.countEvent('dbg_fail_', debugName ?? 'unknown')
       }
       return true
     }
