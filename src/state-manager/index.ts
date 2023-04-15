@@ -1689,11 +1689,20 @@ class StateManager {
     Context.network.registerExternalGet('debug-fix-stuck-processing', isDebugModeMiddleware, (req, res) => {
       let response = 'not stuck'
 
+      //initialize the variable clear with the value of the query parameter clear, the default is false
+      const clear = req.query.clear === 'true' || false
+
       const isStuck = this.transactionQueue.isStuckProcessing
       if (isStuck) {
         response = JSON.stringify(this.transactionQueue.getDebugProccessingStatus())
-        this.transactionQueue.fixStuckProcessing()
+        this.transactionQueue.fixStuckProcessing(clear)
       }
+      res.write(response)
+      res.end()
+    })
+
+    Context.network.registerExternalGet('debug-fifoLocks', isDebugModeMiddleware, (req, res) => {
+      const response = JSON.stringify(this.fifoLocks, null, 2)
       res.write(response)
       res.end()
     })

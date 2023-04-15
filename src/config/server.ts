@@ -150,6 +150,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     autoUnstickProcessing: false,
     apopFromStuckProcessing: false,
     discardVeryOldPendingTX: false,
+    transactionApplyTimeout: 7000, //todo set to -1 before release
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

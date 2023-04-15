@@ -843,6 +843,8 @@ export interface ServerConfiguration {
     apopFromStuckProcessing: boolean
     //** if we have very old pending TX this allows us to discard them */
     discardVeryOldPendingTX: boolean
+    //** if the apply function is stuck for two long we can bypass it, this is a bandaid fix. */
+    transactionApplyTimeout: number
   }
   /** Options for sharding calculations */
   sharding?: {

@@ -9,7 +9,7 @@ import { potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import * as utils from '../utils'
-import { errorToStringFull, inRangeOfCurrentTime } from '../utils'
+import { errorToStringFull, inRangeOfCurrentTime, withTimeout } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions'
@@ -121,6 +121,9 @@ class TransactionQueue {
   debugLastAwaitedCallInner: string
   debugLastAwaitedAppCall: string
 
+  debugLastAwaitedCallInnerStack: { [key: string]: number }
+  debugLastAwaitedAppCallStack: { [key: string]: number }
+
   debugLastProcessingQueueStartTime: number
 
   debugRecentQueueEntry: QueueEntry
@@ -198,6 +201,9 @@ class TransactionQueue {
     this.debugLastAwaitedCallInner = ''
     this.debugLastAwaitedAppCall = ''
     this.debugLastProcessingQueueStartTime = 0
+
+    this.debugLastAwaitedCallInnerStack = {}
+    this.debugLastAwaitedAppCallStack = {}
 
     this.debugRecentQueueEntry = null
   }
@@ -597,11 +603,15 @@ class TransactionQueue {
       // I think we need to consider adding reader-writer lock support so that a non written to global account is a "reader" lock: check but dont aquire
       // consider if it is safe to axe the use of fifolock accountModification.
 
+      /* prettier-ignore */ this.setDebugLastAwaitedCallInner('preApplyTransaction-bulkFifoLockAccounts')
       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` preApplyTransaction FIFO lock outer: ${utils.stringifyReduce(uniqueKeys)} `)
       ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(uniqueKeys)
       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` preApplyTransaction FIFO lock inner: ${utils.stringifyReduce(uniqueKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+      /* prettier-ignore */ this.setDebugLastAwaitedCallInner('preApplyTransaction-bulkFifoLockAccounts', DebugComplete.Completed)
 
+      /* prettier-ignore */ this.setDebugLastAwaitedCallInner('preApplyTransaction-fifoLock(accountModification)')
       ourLockID = await this.stateManager.fifoLock('accountModification')
+      /* prettier-ignore */ this.setDebugLastAwaitedCallInner('preApplyTransaction-fifoLock(accountModification)', DebugComplete.Completed)
 
       this.profiler.profileSectionStart('process-dapp.apply')
       this.profiler.scopedProfileSectionStart('apply_duration')
@@ -4065,7 +4075,28 @@ class TransactionQueue {
                   queueEntry.executionDebug.log2 = 'call pre apply'
                   const awaitStart = Date.now()
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.preApplyTransaction(queueEntry)')
-                  const txResult = await this.preApplyTransaction(queueEntry)
+                  let txResult = undefined
+                  if (this.config.stateManager.transactionApplyTimeout > 0) {
+                    //use the withTimeout from util/promises to call preApplyTransaction with a timeout
+                    txResult = await withTimeout<PreApplyAcceptedTransactionResult>(
+                      () => this.preApplyTransaction(queueEntry),
+                      this.config.stateManager.transactionApplyTimeout
+                    )
+                    if (txResult === 'timeout') {
+                      //if we got a timeout, we need to set the txResult to null
+                      txResult = null
+                      nestedCountersInstance.countEvent('processing', 'timeout-preApply')
+                      this.statemanager_fatal(
+                        'timeout-preApply',
+                        `preApplyTransaction timed out for txid: ${
+                          queueEntry.logID
+                        } ${this.getDebugProccessingStatus()}`
+                      )
+                    }
+                  } else {
+                    txResult = await this.preApplyTransaction(queueEntry)
+                  }
+
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.preApplyTransaction(queueEntry)', DebugComplete.Completed)
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
@@ -5346,7 +5377,7 @@ class TransactionQueue {
       }
 
       if (this.config.stateManager.autoUnstickProcessing === true) {
-        this.fixStuckProcessing()
+        this.fixStuckProcessing(false)
       }
     }
   }
@@ -5405,6 +5436,9 @@ class TransactionQueue {
     this.debugLastAwaitedCall = ''
     this.debugLastAwaitedCallInner = ''
     this.debugLastAwaitedAppCall = ''
+    this.debugLastAwaitedCallInnerStack = {}
+    this.debugLastAwaitedAppCallStack = {}
+
     this.debugRecentQueueEntry = null
     this.debugLastProcessingQueueStartTime = 0
 
@@ -5413,7 +5447,7 @@ class TransactionQueue {
     this.stuckProcessingQueueLockedCyclesCount = 0
   }
 
-  fixStuckProcessing() {
+  fixStuckProcessing(clearPendingTransactions: boolean) {
     nestedCountersInstance.countRareEvent('processing', `unstickProcessing`)
     this.clearStuckProcessingDebugVars()
 
@@ -5421,6 +5455,10 @@ class TransactionQueue {
     this.stateManager.lastSeenAccountsMap = null
     //unlock the queu so it can start again
     this.transactionProcessingQueueRunning = false
+
+    if (clearPendingTransactions) {
+      this.pendingTransactionQueue = []
+    }
 
     this.stateManager.tryStartTransactionProcessingQueue()
   }
@@ -5434,15 +5472,64 @@ class TransactionQueue {
   setDebugLastAwaitedCallInner(label: string, complete = DebugComplete.Incomplete) {
     this.debugLastAwaitedCallInner = label + (complete === DebugComplete.Completed ? ' complete' : '')
     this.debugLastAwaitedAppCall = ''
+
+    if (complete === DebugComplete.Incomplete) {
+      // eslint-disable-next-line security/detect-object-injection
+      if (this.debugLastAwaitedCallInnerStack[label] == null) {
+        // eslint-disable-next-line security/detect-object-injection
+        this.debugLastAwaitedCallInnerStack[label] = 1
+      } else {
+        // eslint-disable-next-line security/detect-object-injection
+        this.debugLastAwaitedCallInnerStack[label]++
+      }
+    } else {
+      //decrement the count if it is greater than 1, delete the key if the count is 1
+      // eslint-disable-next-line security/detect-object-injection
+      if (this.debugLastAwaitedCallInnerStack[label] != null) {
+        // eslint-disable-next-line security/detect-object-injection
+        if (this.debugLastAwaitedCallInnerStack[label] > 1) {
+          // eslint-disable-next-line security/detect-object-injection
+          this.debugLastAwaitedCallInnerStack[label]--
+        } else {
+          // eslint-disable-next-line security/detect-object-injection
+          delete this.debugLastAwaitedCallInnerStack[label]
+        }
+      }
+    }
   }
   setDebugSetLastAppAwait(label: string, complete = DebugComplete.Incomplete) {
     this.debugLastAwaitedAppCall = label + (complete === DebugComplete.Completed ? ' complete' : '')
-  }
 
+    if (complete === DebugComplete.Incomplete) {
+      // eslint-disable-next-line security/detect-object-injection
+      if (this.debugLastAwaitedAppCallStack[label] == null) {
+        // eslint-disable-next-line security/detect-object-injection
+        this.debugLastAwaitedAppCallStack[label] = 1
+      } else {
+        // eslint-disable-next-line security/detect-object-injection
+        this.debugLastAwaitedAppCallStack[label]++
+      }
+    } else {
+      //decrement the count if it is greater than 1, delete the key if the count is 1
+      // eslint-disable-next-line security/detect-object-injection
+      if (this.debugLastAwaitedAppCallStack[label] != null) {
+        // eslint-disable-next-line security/detect-object-injection
+        if (this.debugLastAwaitedAppCallStack[label] > 1) {
+          // eslint-disable-next-line security/detect-object-injection
+          this.debugLastAwaitedAppCallStack[label]--
+        } else {
+          // eslint-disable-next-line security/detect-object-injection
+          delete this.debugLastAwaitedAppCallStack[label]
+        }
+      }
+    }
+  }
   clearDebugAwaitStrings() {
     this.debugLastAwaitedCall = ''
     this.debugLastAwaitedCallInner = ''
     this.debugLastAwaitedAppCall = ''
+    this.debugLastAwaitedCallInnerStack = {}
+    this.debugLastAwaitedAppCallStack = {}
   }
 }
 

@@ -102,3 +102,38 @@ const computePromiseGroupStatus = (
   if (lossCount >= maxLosses) return false
   return undefined
 }
+
+/**
+ * Wraps an async function call with a max timeout.
+ * @param fn - The async function to call.
+ * @param timeoutMs - The maximum time in milliseconds to wait for the function to complete.
+ * @returns A promise that resolves with the function's return value, or "timeout" if the timeout expires first.
+ */
+export async function withTimeout<T>(fn: () => Promise<T>, timeoutMs: number): Promise<T | 'timeout'> {
+  let timer: NodeJS.Timeout | undefined
+
+  // Create a promise that resolves when the async function completes
+  const promise = fn()
+
+  // Create a promise that resolves after the specified timeout
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      clearTimeout(timer)
+      reject(new Error('Timeout'))
+    }, timeoutMs)
+  })
+
+  // Wait for either the async function or the timeout to complete
+  try {
+    const result = await Promise.race([promise, timeoutPromise])
+    if (timer) {
+      clearTimeout(timer)
+    }
+    return result
+  } catch (err) {
+    if (timer) {
+      clearTimeout(timer)
+    }
+    return 'timeout'
+  }
+}
