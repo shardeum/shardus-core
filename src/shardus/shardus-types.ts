@@ -845,6 +845,12 @@ export interface ServerConfiguration {
     discardVeryOldPendingTX: boolean
     //** if the apply function is stuck for two long we can bypass it, this is a bandaid fix. */
     transactionApplyTimeout: number
+    //** fixes for where we unlock fifolocks */
+    fifoUnlockFix: boolean
+    //** alternate fix for fifo fifolocks. fix in sync code to avoid a problematic  */
+    fifoUnlockFix2: boolean
+    //** alternate fix for fifo fifolocks. disable all fifo lock logic */
+    fifoUnlockFix3: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

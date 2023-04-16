@@ -1712,7 +1712,19 @@ class StateManager {
     })
 
     Context.network.registerExternalGet('debug-fifoLocks', isDebugModeMiddleware, (req, res) => {
+      const getAll = req.query.all === 'true' || false
+      let toPrint = this.fifoLocks
+      if (getAll === false) {
+        toPrint = this.getLockedFifoAccounts()
+      }
       const response = JSON.stringify(this.fifoLocks, null, 2)
+      res.write(response)
+      res.end()
+    })
+    Context.network.registerExternalGet('debug-fifoLocks-unlock', isDebugModeMiddleware, (req, res) => {
+      let unlockCount = this.forceUnlockAllFifoLocks()
+
+      const response = JSON.stringify({ unlockCount }, null, 2)
       res.write(response)
       res.end()
     })
@@ -2688,10 +2700,20 @@ class StateManager {
    *    ##       #### ##        #######           ########  #######   ######  ##    ##  ######
    */
   clearPartitionData() {
+    //review and remove?
+    if (this.config.stateManager.fifoUnlockFix) {
+      //force unlock before we clear because that there is a case
+      //where simply wiping the locks leaves a waiting loop stuck forever
+      this.forceUnlockAllFifoLocks()
+    }
     this.fifoLocks = {}
   }
 
   async fifoLock(fifoName: string): Promise<number> {
+    if (this.config.stateManager.fifoUnlockFix3 === true) {
+      return
+    }
+
     var stack = '' // new Error().stack
     if (logFlags.debug) this.mainLogger.debug(`fifoLock: ${fifoName} ${stack}`)
 
@@ -2739,6 +2761,10 @@ class StateManager {
   }
 
   fifoUnlock(fifoName: string, id: number) {
+    if (this.config.stateManager.fifoUnlockFix3 === true) {
+      return
+    }
+
     var stack = '' // new Error().stack
     if (logFlags.debug) this.mainLogger.debug(`fifoUnlock: ${fifoName} ${stack}`)
 
@@ -2759,6 +2785,9 @@ class StateManager {
    * @param {string[]} accountIDs
    */
   async bulkFifoLockAccounts(accountIDs: string[]) {
+    if (this.config.stateManager.fifoUnlockFix3 === true) {
+      return []
+    }
     // lock all the accounts we will modify
     let wrapperLockId = await this.fifoLock('atomicWrapper')
     let ourLocks = []
@@ -2782,6 +2811,9 @@ class StateManager {
    * @param {number[]} ourLocks
    */
   bulkFifoUnlockAccounts(accountIDs: string[], ourLocks: number[]) {
+    if (this.config.stateManager.fifoUnlockFix3 === true) {
+      return
+    }
     let seen: StringBoolObjectMap = {}
     // unlock the accounts we locked
     for (let i = 0; i < ourLocks.length; i++) {
@@ -2800,6 +2832,29 @@ class StateManager {
 
       this.fifoUnlock(accountID, ourLockID)
     }
+  }
+
+  getLockedFifoAccounts(): FifoLockObjectMap {
+    let results = {}
+    for (let [key, value] of Object.entries(this.fifoLocks)) {
+      if (value.queueLocked) {
+        results[key] = value
+      }
+    }
+    return results
+  }
+
+  forceUnlockAllFifoLocks(): number {
+    let locked = this.getLockedFifoAccounts()
+    let clearCount = 0
+    for (let [key, value] of Object.entries(locked)) {
+      value.queueLocked = false
+      value.waitingList = []
+      //value.queueCounter
+      //do we need to fix up counters
+      clearCount++
+    }
+    return clearCount
   }
 
   /***

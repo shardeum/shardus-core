@@ -5426,6 +5426,8 @@ class TransactionQueue {
       debugLastAwaitedCall: this.debugLastAwaitedCall,
       debugLastAwaitedCallInner: this.debugLastAwaitedCallInner,
       debugLastAwaitedAppCall: this.debugLastAwaitedAppCall,
+      debugLastAwaitedCallInnerStack: this.debugLastAwaitedCallInnerStack,
+      debugLastAwaitedAppCallStack: this.debugLastAwaitedAppCallStack,
       txDebug,
       //todo get the transaction we are stuck on. what type is it? id etc.
     }

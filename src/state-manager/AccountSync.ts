@@ -212,6 +212,13 @@ class AccountSync {
   // this clears state data related to the current partion we are syncinge
   clearSyncData() {
     //this seems out of place need to review it.
+    //....review if we should even clear locks
+
+    if (this.config.stateManager.fifoUnlockFix) {
+      //force unlock before we clear because that there is a case
+      //where simply wiping the locks leaves a waiting loop stuck forever
+      this.stateManager.forceUnlockAllFifoLocks()
+    }
     this.stateManager.fifoLocks = {}
   }
 
@@ -953,7 +960,11 @@ class AccountSync {
       return // nothing to do
     }
     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery getRobustGlobalReport ${utils.stringifyReduce(nodes.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
-    let result: { ready: unknown; combinedHash?: string; accounts?: { id: string; hash: string; timestamp: number }[] }
+    let result: {
+      ready: unknown
+      combinedHash?: string
+      accounts?: { id: string; hash: string; timestamp: number }[]
+    }
     let winners: string | unknown[]
     try {
       const robustQueryResult = await robustQuery(nodes, queryFn, equalFn, 3, false)
@@ -1216,7 +1227,10 @@ class AccountSync {
             syncTracker.syncFinished = true
 
             /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('rt_shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
-            this.clearSyncData()
+            if (this.config.stateManager.fifoUnlockFix2 === false) {
+              //this may be a source of runtime problems based on axing fifo locks is that even needed?
+              this.clearSyncData()
+            }
           }
         }
       } while (startedCount > 0)
