@@ -370,7 +370,7 @@ class StateManager {
     ShardFunctions.fatalLogger = this.fatalLogger
     ShardFunctions.mainLogger = this.mainLogger
 
-    this.clearPartitionData()
+    //this.clearPartitionData()
 
     this.registerEndpoints()
 
@@ -1722,7 +1722,7 @@ class StateManager {
       res.end()
     })
     Context.network.registerExternalGet('debug-fifoLocks-unlock', isDebugModeMiddleware, (req, res) => {
-      let unlockCount = this.forceUnlockAllFifoLocks()
+      let unlockCount = this.forceUnlockAllFifoLocks('debug-fifoLocks-unlock')
 
       const response = JSON.stringify({ unlockCount }, null, 2)
       res.write(response)
@@ -2699,15 +2699,17 @@ class StateManager {
    *    ##        ##  ##       ##     ##          ##       ##     ## ##    ## ##   ##  ##    ##
    *    ##       #### ##        #######           ########  #######   ######  ##    ##  ######
    */
-  clearPartitionData() {
-    //review and remove?
-    if (this.config.stateManager.fifoUnlockFix) {
-      //force unlock before we clear because that there is a case
-      //where simply wiping the locks leaves a waiting loop stuck forever
-      this.forceUnlockAllFifoLocks()
-    }
-    this.fifoLocks = {}
-  }
+
+  // This function was doing nothing
+  // clearPartitionData() {
+  //   //review and remove?
+  //   if (this.config.stateManager.fifoUnlockFix) {
+  //     //force unlock before we clear because that there is a case
+  //     //where simply wiping the locks leaves a waiting loop stuck forever
+  //     this.forceUnlockAllFifoLocks()
+  //   }
+  //   this.fifoLocks = {}
+  // }
 
   async fifoLock(fifoName: string): Promise<number> {
     if (this.config.stateManager.fifoUnlockFix3 === true) {
@@ -2849,7 +2851,9 @@ class StateManager {
     return results
   }
 
-  forceUnlockAllFifoLocks(): number {
+  forceUnlockAllFifoLocks(tag: string): number {
+    nestedCountersInstance.countEvent('processing', 'forceUnlockAllFifoLocks ' + tag)
+
     let locked = this.getLockedFifoAccounts()
     let clearCount = 0
     for (let [key, value] of Object.entries(locked)) {

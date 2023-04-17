@@ -211,15 +211,17 @@ class AccountSync {
 
   // this clears state data related to the current partion we are syncinge
   clearSyncData() {
-    //this seems out of place need to review it.
-    //....review if we should even clear locks
+    //older comments indicate it may be odd to clear fifo locks.
+    //this could even be a potential cause of the lock up since just setting fifoLocks to {} does not unstick waiting loops.
 
+    //Will leave this config off for now so we can try and catch the lock up in beta
     if (this.config.stateManager.fifoUnlockFix) {
       //force unlock before we clear because that there is a case
       //where simply wiping the locks leaves a waiting loop stuck forever
-      this.stateManager.forceUnlockAllFifoLocks()
+      this.stateManager.forceUnlockAllFifoLocks('clearSyncData')
+    } else {
+      this.stateManager.fifoLocks = {}
     }
-    this.stateManager.fifoLocks = {}
   }
 
   clearSyncTrackers() {

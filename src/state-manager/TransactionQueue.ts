@@ -4092,6 +4092,8 @@ class TransactionQueue {
                           queueEntry.logID
                         } ${this.getDebugProccessingStatus()}`
                       )
+                      //need to clear any stuck fifo locks.  Would be better to solve upstream problems.
+                      this.stateManager.forceUnlockAllFifoLocks('timeout-preApply')
                     }
                   } else {
                     txResult = await this.preApplyTransaction(queueEntry)
@@ -5377,7 +5379,9 @@ class TransactionQueue {
       }
 
       if (this.config.stateManager.autoUnstickProcessing === true) {
-        this.fixStuckProcessing(false)
+        this.fixStuckProcessing(true)
+        //seems we should do this too:
+        this.stateManager.forceUnlockAllFifoLocks('autoUnstickProcessing')
       }
     }
   }

@@ -845,11 +845,11 @@ export interface ServerConfiguration {
     discardVeryOldPendingTX: boolean
     //** if the apply function is stuck for two long we can bypass it, this is a bandaid fix. */
     transactionApplyTimeout: number
-    //** fixes for where we unlock fifolocks */
+    //** fixes for where we unlock fifolocks. the sync code was doing brute force clear of fifolocks that could be the cause of lockups!   */
     fifoUnlockFix: boolean
-    //** alternate fix for fifo fifolocks. fix in sync code to avoid a problematic  */
+    //** alternate fix for fifo fifolocks. related to the above fix.  but this one focus on avoiding calling clearSyncData in a potential problem spot   */
     fifoUnlockFix2: boolean
-    //** alternate fix for fifo fifolocks. disable all fifo lock logic */
+    //** alternate fix for fifo fifolocks. disable all fifo lock logic.  the atomic option */
     fifoUnlockFix3: boolean
   }
   /** Options for sharding calculations */
