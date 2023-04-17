@@ -5361,6 +5361,11 @@ class TransactionQueue {
     return { count, committingAppData }
   }
 
+  /**
+   * call this to test if the processing queue is stuck.
+   * currently this may return false positives if the queue is not stuck but is just slow
+   * autoUnstickProcessing will attempt to fix the stuck processing if set to true
+   */
   checkForStuckProcessing(): void {
     const timeSinceLastProcessLoop = Date.now() - this.processingLastRunTime
     const limitInMS = this.config.stateManager.stuckProcessingLimit * 1000
@@ -5386,9 +5391,10 @@ class TransactionQueue {
     }
   }
 
+  /**
+   * This is called when we detect that the processing queue is stuck
+   */
   onProcesssingQueueStuck() {
-    //this.processTransactionQueueRunning
-
     if (this.stuckProcessingCount === 0) {
       //first time!
       nestedCountersInstance.countRareEvent('processing', `onProcesssingQueueStuck`)
@@ -5453,6 +5459,10 @@ class TransactionQueue {
     this.stuckProcessingQueueLockedCyclesCount = 0
   }
 
+  /**
+   * Used to unblock and restart the processing queue if it gets stuck
+   * @param clearPendingTransactions if true, will clear the pending transaction queue. if false, will leave it alone
+   */
   fixStuckProcessing(clearPendingTransactions: boolean) {
     nestedCountersInstance.countRareEvent('processing', `unstickProcessing`)
     this.clearStuckProcessingDebugVars()
