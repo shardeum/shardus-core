@@ -1717,7 +1717,7 @@ class StateManager {
       if (getAll === false) {
         toPrint = this.getLockedFifoAccounts()
       }
-      const response = JSON.stringify(this.fifoLocks, null, 2)
+      const response = JSON.stringify(toPrint, null, 2)
       res.write(response)
       res.end()
     })
@@ -2740,7 +2740,10 @@ class StateManager {
     if (thisFifo.waitingList.length > 0 || thisFifo.queueLocked) {
       thisFifo.waitingList.push(entry)
       // wait till we are at the front of the queue, and the queue is not locked
-      while (thisFifo.waitingList[0]?.id !== ourID || thisFifo.queueLocked) {
+      while (
+        (thisFifo.waitingList.length > 0 && thisFifo.waitingList[0]?.id !== ourID) ||
+        thisFifo.queueLocked
+      ) {
         // todo perf optimization to reduce the amount of times we have to sleep (attempt to come out of sleep at close to the right time)
         let sleepEstimate = ourID - thisFifo.lastServed
         if (sleepEstimate < 1) {
