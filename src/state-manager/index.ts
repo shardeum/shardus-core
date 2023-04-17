@@ -2836,9 +2836,11 @@ class StateManager {
 
   getLockedFifoAccounts(): FifoLockObjectMap {
     let results = {}
-    for (let [key, value] of Object.entries(this.fifoLocks)) {
-      if (value.queueLocked) {
-        results[key] = value
+    if (this.fifoLocks != null) {
+      for (let [key, value] of Object.entries(this.fifoLocks)) {
+        if (value.queueLocked) {
+          results[key] = value
+        }
       }
     }
     return results
