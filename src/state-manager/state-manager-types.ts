@@ -876,6 +876,7 @@ export type FifoLock = {
   lastServed: number
   queueLocked: boolean
   lockOwner: number
+  lastLock: number
 }
 export type FifoLockObjectMap = { [lockID: string]: FifoLock }
 

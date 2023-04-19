@@ -2728,6 +2728,7 @@ class StateManager {
         lastServed: 0,
         queueLocked: false,
         lockOwner: 1,
+        lastLock: Date.now(),
       }
       this.fifoLocks[fifoName] = thisFifo
     }
@@ -2762,6 +2763,8 @@ class StateManager {
     thisFifo.queueLocked = true
     thisFifo.lockOwner = ourID
     thisFifo.lastServed = ourID
+    //this can be used to cleanup old fifo locks
+    thisFifo.lastLock = Date.now()
     return ourID
   }
 
@@ -2851,6 +2854,13 @@ class StateManager {
     return results
   }
 
+  /**
+   * this funtion will unlock all fifo locks that are currently locked
+   * ideally we should not be calling this, but it is currently needed
+   * as we try to transition to more stable fifo locks.
+   * @param tag
+   * @returns
+   */
   forceUnlockAllFifoLocks(tag: string): number {
     nestedCountersInstance.countEvent('processing', 'forceUnlockAllFifoLocks ' + tag)
 
@@ -2859,11 +2869,36 @@ class StateManager {
     for (let [key, value] of Object.entries(locked)) {
       value.queueLocked = false
       value.waitingList = []
+      //set this so we don't clean it up too soon.
+      value.lastLock = Date.now()
       //value.queueCounter
       //do we need to fix up counters
       clearCount++
     }
     return clearCount
+  }
+
+  /**
+   * now that we have fixes a but that was stomping fifo locks we could have a problem
+   * where the memory grows forever.  This function will clean up old locks that are no longer needed.
+   */
+  clearStaleFifoLocks() {
+    try {
+      let time = Date.now() - 1000 * 60 * 10 //10 minutes ago
+      const keysToDelete = []
+      for (let [key, value] of Object.entries(this.fifoLocks)) {
+        if (value.lastLock < time && value.queueLocked === false) {
+          keysToDelete.push(key)
+        }
+      }
+
+      for (let key of keysToDelete) {
+        delete this.fifoLocks[key]
+      }
+      nestedCountersInstance.countEvent('stateManager', 'clearStaleFifoLocks', keysToDelete.length)
+    } catch (err) {
+      this.mainLogger.error(`clearStaleFifoLocks: ${err}`)
+    }
   }
 
   /***
@@ -3069,6 +3104,9 @@ class StateManager {
         break
       }
     }
+
+    //periodically clear any fifo locks that are unlocked and have not been used in 10 minutes.
+    this.clearStaleFifoLocks()
 
     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle} ${removedtxByCycleByPartition} ${removedrecentPartitionObjectsByCycleByHash} ${removedrepairUpdateDataByCycle} ${removedpartitionObjectsByCycle} ${removepartitionReceiptsByCycleCounter} ${removeourPartitionReceiptsByCycleCounter} archQ:${archivedEntriesRemoved}`)
 

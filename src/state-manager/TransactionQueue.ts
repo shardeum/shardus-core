@@ -750,14 +750,14 @@ class TransactionQueue {
 
       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock outer: ${utils.stringifyReduce(uniqueKeys)} `)
       // TODO Perf (for sharded networks).  consider if we can remove this lock
-      /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.bulkFifoLockAccounts')
+      /* prettier-ignore */ this.setDebugLastAwaitedCallInner('commit this.stateManager.bulkFifoLockAccounts')
       ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(uniqueKeys)
-      /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.bulkFifoLockAccounts', DebugComplete.Completed)
+      /* prettier-ignore */ this.setDebugLastAwaitedCallInner('commit this.stateManager.bulkFifoLockAccounts', DebugComplete.Completed)
       /* prettier-ignore */ if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock inner: ${utils.stringifyReduce(uniqueKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
 
-      /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.fifoLock')
+      /* prettier-ignore */ this.setDebugLastAwaitedCallInner('commit this.stateManager.fifoLock')
       ourLockID = await this.stateManager.fifoLock('accountModification')
-      /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.fifoLock', DebugComplete.Completed)
+      /* prettier-ignore */ this.setDebugLastAwaitedCallInner('commit this.stateManager.fifoLock', DebugComplete.Completed)
 
       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log(`commitConsensedTransaction tx:${queueEntry.logID} ts:${timestamp} Applying!`)
       // /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))

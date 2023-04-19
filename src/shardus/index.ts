@@ -11,7 +11,7 @@ import LoadDetection from '../load-detection'
 import Logger, { logFlags, LogFlags } from '../logger'
 import * as Network from '../network'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
-import { isApopMarkedNode } from '../p2p/Apoptosis'
+import { apoptosizeSelf, isApopMarkedNode } from '../p2p/Apoptosis'
 import * as Archivers from '../p2p/Archivers'
 import * as Context from '../p2p/Context'
 import * as AutoScaling from '../p2p/CycleAutoScale'
@@ -1869,8 +1869,12 @@ class Shardus extends EventEmitter {
   _registerRoutes() {
     // DEBUG routes
     this.network.registerExternalPost('exit', isDebugModeMiddleware, async (req, res) => {
-      res.json({ success: true })
       await this.shutdown()
+      res.json({ success: true })
+    })
+    this.network.registerExternalPost('exit-apop', isDebugModeMiddleware, async (req, res) => {
+      apoptosizeSelf('Apoptosis called at exit-apop route')
+      res.json({ success: true })
     })
 
     this.network.registerExternalGet('config', isDebugModeMiddleware, async (req, res) => {

@@ -221,6 +221,7 @@ class AccountSync {
       this.stateManager.forceUnlockAllFifoLocks('clearSyncData')
     } else {
       this.stateManager.fifoLocks = {}
+      this.mainLogger.debug(`this.stateManager.fifoLocks cleared old way`)
     }
   }
 

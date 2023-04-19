@@ -151,8 +151,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     apopFromStuckProcessing: false,
     discardVeryOldPendingTX: false,
     transactionApplyTimeout: -1, //ms for timeout. something like 7000 is a starting point. todo set to -1 before release
-    fifoUnlockFix: false, //todo for production set this to false.
-    //disableSyncFifoClear:false //avoid clearing fifo locks when sync bails?
+    fifoUnlockFix: true, //enabled for testing
     fifoUnlockFix2: false,
     fifoUnlockFix3: false,
   },
