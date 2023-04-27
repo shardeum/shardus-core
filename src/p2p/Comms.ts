@@ -175,8 +175,8 @@ function _wrapAndSignMessage(msg, tracker = '') {
   return crypto.signWithSize(wrapped)
 }
 
-function createMsgTracker() {
-  return 'key_' + utils.makeShortHash(Self.id) + '_' + Date.now() + '_' + keyCounter++
+function createMsgTracker(route = '') {
+  return 'key_' + route + '_' + utils.makeShortHash(Self.id) + '_' + Date.now() + '_' + keyCounter++
 }
 function createGossipTracker() {
   return 'gkey_' + utils.makeShortHash(Self.id) + '_' + Date.now() + '_' + keyCounter++
@@ -186,7 +186,7 @@ function createGossipTracker() {
 export async function tell(nodes: ShardusTypes.Node[], route, message, logged = false, tracker = '') {
   let msgSize = cUninitializedSize
   if (tracker === '') {
-    tracker = createMsgTracker()
+    tracker = createMsgTracker(route)
   }
 
   if (commsCounters) {
@@ -259,7 +259,7 @@ export async function ask(
   extraTime = 0
 ) {
   if (tracker === '') {
-    tracker = createMsgTracker()
+    tracker = createMsgTracker(route)
   }
   if (node.id === Self.id) {
     if (logFlags.p2pNonFatal) info('p2p/Comms:ask: Not asking self')
