@@ -940,10 +940,12 @@ class AccountSync {
       if (result === false) {
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === false node:${utils.stringifyReduce(node.id)}`)
         result = { ready: false, msg: `result === false: ${Math.random()}` }
+        return result
       }
       if (result === null) {
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null node:${utils.stringifyReduce(node.id)}`)
         result = { ready: false, msg: `result === null: ${Math.random()}` }
+        return result
       }
 
       // TODO I dont know the best way to handle a non null network error here, below is something I had before but disabled for some reason
