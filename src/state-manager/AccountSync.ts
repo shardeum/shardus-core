@@ -914,7 +914,7 @@ class AccountSync {
    * getRobustGlobalReport
    *
    */
-  async getRobustGlobalReport(): Promise<GlobalAccountReportResp> {
+  async getRobustGlobalReport(tag = ''): Promise<GlobalAccountReportResp> {
     this.lastWinningGlobalReportNodes = []
 
     const equalFn = (a: GlobalAccountReportResp, b: GlobalAccountReportResp) => {
@@ -930,6 +930,7 @@ class AccountSync {
         this.stateManager.isNodeValidForInternalMessage(node.id, 'getRobustGlobalReport', true, true) ===
         false
       ) {
+        nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} invalid node to ask: ${utils.stringifyReduce(node.id)}`)
         return {
           ready: false,
           msg: `getRobustGlobalReport invalid node to ask: ${utils.stringifyReduce(node.id)}`,
@@ -938,11 +939,13 @@ class AccountSync {
 
       let result = await this.p2p.ask(node, 'get_globalaccountreport', {})
       if (result === false) {
+        nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} result === false`)
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === false node:${utils.stringifyReduce(node.id)}`)
         result = { ready: false, msg: `result === false: ${Math.random()}` }
         return result
       }
       if (result === null) {
+        nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} result === null`)
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null node:${utils.stringifyReduce(node.id)}`)
         result = { ready: false, msg: `result === null: ${Math.random()}` }
         return result
@@ -950,11 +953,13 @@ class AccountSync {
 
       // TODO I dont know the best way to handle a non null network error here, below is something I had before but disabled for some reason
       if (result != null && result.accounts == null) {
-        if (logFlags.error) this.mainLogger.error('ASK FAIL getRobustGlobalReport result.stateHash == null')
+        nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} result != null, result.stateHash == null. result: ${utils.stringifyReduce(result)}`)
+        if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result.stateHash == null, result: ${utils.stringifyReduce(result)}`)
         result = { ready: false, msg: `invalid data format: ${Math.random()}` }
       }
       if (result != null && result.ready === false) {
-        if (logFlags.error) this.mainLogger.error('ASK FAIL getRobustGlobalReport result.ready === false')
+        nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} result.ready = false`)
+        if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result.ready === false, result: ${utils.stringifyReduce(result)}`)
         result = { ready: false, msg: `not ready: ${Math.random()}` }
       }
       return result
@@ -963,6 +968,7 @@ class AccountSync {
     const nodes: Shardus.Node[] = this.stateManager.currentCycleShardData.activeNodes
     // let nodes = this.getActiveNodesInRange(lowAddress, highAddress) // this.p2p.state.getActiveNodes(this.p2p.id)
     if (nodes.length === 0) {
+      nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} no nodes available`)
       if (logFlags.debug) this.mainLogger.debug(`no nodes available`)
       return // nothing to do
     }
@@ -974,7 +980,7 @@ class AccountSync {
     }
     let winners: string | unknown[]
     try {
-      const robustQueryResult = await robustQuery(nodes, queryFn, equalFn, 3, false)
+      const robustQueryResult = await robustQuery(nodes, queryFn, equalFn, 3, false, false, true)
 
       // if we did not get a result at all wait, log and retry
       if (robustQueryResult === null) {
@@ -982,7 +988,7 @@ class AccountSync {
         /* prettier-ignore */ if (logFlags.console) console.log(`DATASYNC: getRobustGlobalReport results === null wait 10 seconds and try again. nodes:${nodes.length}  `)
         nestedCountersInstance.countEvent('sync', 'DATASYNC: getRobustGlobalReport results === null')
         await utils.sleep(10 * 1000) //wait 10 seconds and try again.
-        return await this.getRobustGlobalReport()
+        return await this.getRobustGlobalReport(tag + '_rt')
       }
 
       result = robustQueryResult.topResult
@@ -990,12 +996,12 @@ class AccountSync {
 
       // if the result is not robust wait, throw an execption
       if (robustQueryResult.isRobustResult == false) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug('getRobustGlobalReport: robustQuery isRobustResult == false')
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`getRobustGlobalReport: robustQuery isRobustResult == false, result: ${utils.stringifyReduce(result)}`)
         this.statemanager_fatal(
           `getRobustGlobalReport_nonRobust`,
-          'getRobustGlobalReport: robustQuery isRobustResult == false'
+          `getRobustGlobalReport: robustQuery isRobustResult == false, result: ${utils.stringifyReduce(result)}`
         )
-        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', 'DATASYNC: getRobustGlobalReport: robustQuery isRobustResult == false')
+        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport: robustQuery isRobustResult == false, result: ${utils.stringifyReduce(result)}`)
         throw new Error('FailAndRestartPartition_globalReport_A')
       }
 
@@ -1005,7 +1011,7 @@ class AccountSync {
         /* prettier-ignore */ if (logFlags.console) console.log(`DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again `)
         /* prettier-ignore */ nestedCountersInstance.countEvent('sync', 'DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again')
         await utils.sleep(10 * 1000) //wait 10 seconds and try again.
-        return await this.getRobustGlobalReport()
+        return await this.getRobustGlobalReport(tag + '_rt2')
       }
     } catch (ex) {
       // NOTE: no longer expecting an exception from robust query in cases where we do not have enough votes or respones!
@@ -1015,6 +1021,7 @@ class AccountSync {
         `getRobustGlobalReport_ex`,
         'getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
       )
+      nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} FailAndRestartPartition_globalReport_B ${ex.name}: ${ex.message}`)
       throw new Error('FailAndRestartPartition_globalReport_B')
     }
     if (!winners || winners.length === 0) {
@@ -1023,11 +1030,14 @@ class AccountSync {
         `getRobustGlobalReport_noWin`,
         `DATASYNC: getRobustGlobalReport no winners, going to throw fail and restart`
       ) // todo: consider if this is just an error
+      nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} no winner FailAndRestartPartition_globalReport_noWin`)
       throw new Error('FailAndRestartPartition_globalReport_noWin')
     }
     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport found a winner.  results: ${utils.stringifyReduce(result)}`)
 
     this.lastWinningGlobalReportNodes = winners as Shardus.Node[]
+    nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} winner found`)
+    nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} winner result: ${utils.stringifyReduce(result)}`)
 
     return result as GlobalAccountReportResp
   }

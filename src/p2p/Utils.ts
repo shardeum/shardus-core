@@ -4,6 +4,7 @@ import FastRandomIterator from '../utils/FastRandomIterator'
 import { logFlags } from '../logger'
 import { config } from './Context'
 import { stringifyReduce } from '../utils'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 export type QueryFunction<Node, Response> = (node: Node) => Promise<Response>
 
@@ -162,6 +163,8 @@ type RobustQueryResult = {
  * @param equalityFn
  * @param redundancy
  * @param shuffleNodes
+ * @param strictRedundancy
+ * @param extraDebugging
  */
 export async function robustQuery<Node = unknown, Response = unknown>(
   nodes: Node[] = [],
@@ -169,7 +172,8 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   equalityFn: EqualityFunction<Response> = util.isDeepStrictEqual,
   redundancy = 3,
   shuffleNodes = true,
-  strictRedundancy = false
+  strictRedundancy = false,
+  extraDebugging = false
 ): Promise<RobustQueryResult> {
   if (nodes.length === 0) throw new Error('No nodes given.')
   if (typeof queryFn !== 'function') {
@@ -181,7 +185,8 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   }
   if (redundancy > nodes.length) {
     if (strictRedundancy) {
-      if (logFlags.console || config.debug.robustQueryDebug)
+      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `not enough nodes to meet strictRedundancy`)
+      if (logFlags.console || config.debug.robustQueryDebug || extraDebugging)
         console.log('robustQuery: isRobustResult=false. not enough nodes to meet strictRedundancy')
       return { topResult: null, winningNodes: [], isRobustResult: false }
     }
@@ -199,7 +204,10 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     }
 
     add(response: Response, node: Node): TallyItem | null {
-      if (response === null) return null
+      if (response === null) {
+        if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `response is null`)
+        return null
+      }
       // We search to see if we've already seen this item before
       for (const item of this.items) {
         // If the value of the new item is not equal to the current item, we continue searching
@@ -285,20 +293,39 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     }
     const [results, errs] = await utils.robustPromiseAll(queries)
 
+    if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) {
+      console.log('robustQuery results', results)
+      console.log('robustQuery errs', errs)
+    }
+
     let finalResult: TallyItem
     for (const result of results) {
       const { response, node } = result
-      if (responses === null) continue // ignore null response; can be null if we tried to query ourself
+      if (response === null) {
+        if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `response is null`)
+        continue
+      } // ignore null response; can be null if we tried to query ourself
       finalResult = responses.add(response, node)
-      if (finalResult) break
+      if (finalResult) {
+        if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `got final result`)
+        break
+      }
+    }
+    if (extraDebugging) {
+      console.log('robustQuery tally items', responses.items)
+      console.log('robustQuery final result', finalResult)
     }
 
     for (const err of errs) {
-      if (logFlags.console || config.debug.robustQueryDebug) console.log('robustQuery: queryNodes:', err)
+      if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) console.log('robustQuery: err:', err)
       errors += 1
+      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `error: ${err.message}`)
     }
 
-    if (!finalResult) return null
+    if (!finalResult) {
+      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `no final result`)
+      return null
+    }
     return finalResult
   }
 
@@ -308,7 +335,8 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     tries += 1
     const toQuery = redundancy - responses.getHighestCount()
     if (nodes.length < toQuery) {
-      /* prettier-ignore */ if (logFlags.console || config.debug.robustQueryDebug) console.log('robustQuery: stopping since we ran out of nodes to query.')
+      /* prettier-ignore */ if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) console.log('robustQuery: stopping since we ran out of nodes to query.')
+      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `stopping since we ran out of nodes to query.`)
       break
     }
     let nodesToQuery: Node[]
@@ -324,14 +352,16 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     }
     finalResult = await queryNodes(nodesToQuery)
     if (tries >= 20) {
-      /* prettier-ignore */ if (logFlags.console || config.debug.robustQueryDebug) console.log('robustQuery: stopping after 20 tries.')
+      /* prettier-ignore */ if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) console.log('robustQuery: stopping after 20 tries.')
+      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `stopped after 20 tries`)
       break
     }
   }
   if (finalResult) {
     const isRobustResult = finalResult.count >= redundancy
-    if (config.debug.robustQueryDebug)
-      console.log(`robustQuery: stopping since we got a finalResult:${JSON.stringify(finalResult)}`)
+    if (config.debug.robustQueryDebug || extraDebugging)
+      console.log(`robustQuery: stopping since we got a finalResult:${stringifyReduce(finalResult)}`)
+    if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `stopping since we got finalResult:${stringifyReduce(finalResult)}`)
     return {
       topResult: finalResult.value,
       winningNodes: finalResult.nodes,
@@ -340,7 +370,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   } else {
     // Note:  We return the item that had the most nodes reporting it. However, the caller should know
     //        The calling code can now check isRobustResult to see if a topResult is valid
-    if (logFlags.console || config.debug.robustQueryDebug)
+    if (logFlags.console || config.debug.robustQueryDebug || extraDebugging)
       console.log(
         `robustQuery: Could not get ${redundancy} ${
           redundancy > 1 ? 'redundant responses' : 'response'
@@ -348,22 +378,24 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       )
     const highestCountItem = responses.getHighestCountItem()
     if (highestCountItem === null) {
-      if (config.debug.robustQueryDebug) {
+      if (config.debug.robustQueryDebug || extraDebugging) {
         console.log(
           `isRobustResult=false. highestCountItem=null robust tally dump: ${stringifyReduce(responses)}`
         )
       }
       //if there was no highestCountItem then we had no responses at all
-      /* prettier-ignore */ if (logFlags.console || config.debug.robustQueryDebug) console.log('robustQuery: isRobustResult=false. no responses at all')
+      /* prettier-ignore */ if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) console.log('robustQuery: isRobustResult=false. no responses at all')
+      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `isRobustResult=false. no responses at all`)
       return { topResult: null, winningNodes: [], isRobustResult: false }
     }
     //this isRobustResult should always be false if we get to this code.
     const isRobustResult = highestCountItem.count >= redundancy
     if (logFlags.console || config.debug.robustQueryDebug)
       console.log('robustQuery: isRobustResult=false. returning highest count response')
-    if (config.debug.robustQueryDebug) {
+    if (config.debug.robustQueryDebug || extraDebugging) {
       console.log(`isRobustResult=false. robust tally dump: ${stringifyReduce(responses)}`)
     }
+    if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `isRobustResult=false. returning highest count response. ${stringifyReduce(responses)}`)
     return {
       topResult: highestCountItem.value,
       winningNodes: highestCountItem.nodes,

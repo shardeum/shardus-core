@@ -2,6 +2,7 @@ import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
 import Profiler, { cUninitializedSize } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
+import * as CycleChain from '../p2p/CycleChain'
 import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
@@ -179,7 +180,7 @@ class AccountGlobals {
    * This will get an early global report (note does not have account data, just id,hash,timestamp)
    */
   async getGlobalListEarly() {
-    const globalReport: GlobalAccountReportResp = await this.stateManager.accountSync.getRobustGlobalReport()
+    const globalReport: GlobalAccountReportResp = await this.stateManager.accountSync.getRobustGlobalReport('getGlobalListEarly')
 
     const temp = []
     for (const report of globalReport.accounts) {

@@ -217,7 +217,7 @@ export default class SyncTracker {
 
         //Get globals list and hash.
 
-        const globalReport: GlobalAccountReportResp = await this.accountSync.getRobustGlobalReport()
+        const globalReport: GlobalAccountReportResp = await this.accountSync.getRobustGlobalReport('syncTrackerGlobal')
 
         //TODO should convert to a larger list of valid nodes
         this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
@@ -316,7 +316,7 @@ export default class SyncTracker {
           // add any new accounts to globalAccounts
           /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals get_account_data_by_list ${utils.stringifyReduce(result)} `)
 
-          globalReport2 = await this.accountSync.getRobustGlobalReport()
+          globalReport2 = await this.accountSync.getRobustGlobalReport('syncTrackerGlobal2')
 
           this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
 
