@@ -811,9 +811,18 @@ class Shardus extends EventEmitter {
       }
       return
     }
-    if (this.stateManager) await this.stateManager.accountSync.initialSyncMain(3)
-    // if (this.stateManager) await this.stateManager.accountSync.syncStateDataFast(3) // fast mode
     console.log('syncAppData')
+    if (this.stateManager) {
+      try {
+        await this.stateManager.accountSync.initialSyncMain(3)
+        console.log('syncAppData - initialSyncMain finished')
+      } catch (err) {
+        console.log(utils.formatErrorMessage(err))
+        apoptosizeSelf(`initialSyncMain-failed: ${err?.message}`)
+        return
+      }
+    }
+    // if (this.stateManager) await this.stateManager.accountSync.syncStateDataFast(3) // fast mode
     if (this.p2p.isFirstSeed) {
       await this.p2p.goActive()
       console.log('syncAppData - goActive')

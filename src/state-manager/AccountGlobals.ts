@@ -180,18 +180,37 @@ class AccountGlobals {
    * This will get an early global report (note does not have account data, just id,hash,timestamp)
    */
   async getGlobalListEarly() {
-    const globalReport: GlobalAccountReportResp = await this.stateManager.accountSync.getRobustGlobalReport('getGlobalListEarly')
+    let retriesLeft = 10
 
-    const temp = []
-    for (const report of globalReport.accounts) {
-      temp.push(report.id)
+    //This will try up to 10 times to get the global list
+    //if that fails we will throw an error that shoul cause an apop
+    while (this.hasknownGlobals === false) {
+      if (retriesLeft === 0) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', 'DATASYNC: getGlobalListEarly: failed to get global list after 10 retries')
+        this.fatalLogger.fatal(`DATASYNC: getGlobalListEarly: failed to get global list after 10 retries`)
+        throw new Error(`DATASYNC: getGlobalListEarly: failed to get global list after 10 retries`)
+      }
+      try {
+        const globalReport: GlobalAccountReportResp =
+          await this.stateManager.accountSync.getRobustGlobalReport('getGlobalListEarly')
+        const temp = []
+        for (const report of globalReport.accounts) {
+          temp.push(report.id)
 
-      //set this as a known global
-      this.globalAccountSet.add(report.id)
+          //set this as a known global
+          this.globalAccountSet.add(report.id)
+        }
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getGlobalListEarly: ${utils.stringifyReduce(temp)}`)
+        this.hasknownGlobals = true
+      } catch (err) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', 'DATASYNC: getRobustGlobalReport results === null')
+        await utils.sleep(10000)
+      } finally {
+        retriesLeft--
+      }
     }
-    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getGlobalListEarly: ${utils.stringifyReduce(temp)}`)
 
-    this.hasknownGlobals = true
+    /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getGlobalListEarly success:${this.hasknownGlobals}`)
   }
 
   getGlobalDebugReport(): {

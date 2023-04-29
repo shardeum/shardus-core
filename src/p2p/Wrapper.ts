@@ -15,6 +15,7 @@ import { getNodeRequestingJoin } from './Join'
 import { P2P as P2PTypings } from '@shardus/types'
 import * as CycleAutoScale from './CycleAutoScale'
 import { ShardusTypes } from '../shardus'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /* p2p functions */
 
@@ -113,6 +114,7 @@ export class P2P extends EventEmitter {
   */
 
   goActive() {
+    nestedCountersInstance.countEvent('p2p', 'goActive')
     const activePromise = new Promise<void>((resolve, reject) => {
       Self.emitter.on('active', () => resolve())
     })
