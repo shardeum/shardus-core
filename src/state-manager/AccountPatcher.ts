@@ -210,6 +210,10 @@ class AccountPatcher {
         for (let radix of payload.radixList) {
           let level = radix.length
           let layerMap = this.shardTrie.layerMaps[level]
+          if (layerMap == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_hashes badrange:${level}`)
+            break
+          }
 
           let hashTrieNode = layerMap.get(radix)
           if (hashTrieNode != null) {
@@ -321,6 +325,10 @@ class AccountPatcher {
           result.stats.visisted++
           let level = radix.length
           let layerMap = this.shardTrie.layerMaps[level]
+          if (layerMap == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_accountHashes badrange:${level}`)
+            break
+          }
 
           let hashTrieNode = layerMap.get(radix)
           if (hashTrieNode != null && hashTrieNode.accounts != null) {

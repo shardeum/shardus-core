@@ -493,6 +493,8 @@ class AccountSync {
   async initialSyncMain(requiredNodeCount: number) {
     const safetyMode = safetyModeVals.safetyMode
 
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-start`)
+
     //not great, but this currently triggers the storage init in the dapp
     //todo: replace with a specific   initDappStorage() function
     this.app.deleteLocalAccountData()
@@ -681,6 +683,7 @@ class AccountSync {
           let newTrackers = 0
           const trackersToKeep = []
           let keptGlobal = false
+          let addedGlobal = false
           for (const syncTracker of this.syncTrackers) {
             //keep unfinished global sync trackers
             if (syncTracker.isGlobalSyncTracker === true && syncTracker.syncFinished === false) {
@@ -708,6 +711,7 @@ class AccountSync {
           //init global if we did not complete syncing them before
           if (keptGlobal === false && this.globalAccountsSynced === false && useGlobalAccounts === true) {
             this.createSyncTrackerByForGlobals(cycle, true)
+            addedGlobal = true
           }
 
           //init new non global trackers
@@ -718,7 +722,7 @@ class AccountSync {
             newTrackers++
           }
 
-          /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({ cleared, kept, newTrackers })}`)
+          /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({keptGlobal, addedGlobal, cleared, kept, newTrackers })}`)
 
           continue //resume loop at top!
         } else {
@@ -734,6 +738,7 @@ class AccountSync {
       }
     }
     if (logFlags.console) console.log('syncStateData end' + '   time:' + Date.now())
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-end`)
   }
 
   private async waitForValidShardData(hasValidShardData: boolean) {

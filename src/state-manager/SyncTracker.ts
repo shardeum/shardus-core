@@ -195,6 +195,7 @@ export default class SyncTracker {
    */
   async syncStateDataGlobals() {
     let retry = true
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `syncStateDataGlobals-start`)
     while (retry) {
       retry = false
 
@@ -217,7 +218,9 @@ export default class SyncTracker {
 
         //Get globals list and hash.
 
-        const globalReport: GlobalAccountReportResp = await this.accountSync.getRobustGlobalReport('syncTrackerGlobal')
+        const globalReport: GlobalAccountReportResp = await this.accountSync.getRobustGlobalReport(
+          'syncTrackerGlobal'
+        )
 
         //TODO should convert to a larger list of valid nodes
         this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
@@ -380,6 +383,9 @@ export default class SyncTracker {
         if (failedHashes && failedHashes.length > 0) {
           throw new Error('setting global data falied')
         }
+
+        /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `syncStateDataGlobals complete accounts:${dataToSet.length}`)
+
         /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals complete synced ${dataToSet.length} accounts `)
       } catch (error) {
         if (error.message.includes('FailAndRestartPartition')) {
