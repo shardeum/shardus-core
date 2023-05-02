@@ -27,7 +27,7 @@ import { isApopMarkedNode } from './Apoptosis'
 /** STATE */
 
 // [TODO] - This enables the /kill /killother debug route and should be set to false after testing
-const allowKillRoute = true
+const allowKillRoute = false
 
 let p2pLogger
 
