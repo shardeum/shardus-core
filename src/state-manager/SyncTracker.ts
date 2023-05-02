@@ -98,6 +98,7 @@ export default class SyncTracker {
     this.queueEntries = []
     this.cycle = cycle
     this.index = index
+    this.isGlobalSyncTracker = true
     this.globalAddressMap = {}
     this.isPartOfInitialSync = initalSync
     this.keys = {}
