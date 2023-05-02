@@ -373,7 +373,8 @@ export function reportLost(target, reason) {
 }
 
 function getCheckerNode(id, cycle) {
-  const near = crypto.hash({ id, cycle })
+  const obj = { id, cycle }
+  const near = crypto.hash(obj)
   function compareNodes(i, r) {
     return i > r.id ? 1 : i < r.id ? -1 : 0
   }

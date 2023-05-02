@@ -291,7 +291,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       const node = nodes[i]
       queries.push(wrappedQuery(node))
     }
-    const [results, errs] = await utils.robustPromiseAll(queries)
+    const [results, errs] = await utils.robustPromiseAll<{ response: Response, node: Node }>(queries)
 
     if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) {
       console.log('robustQuery results', results)

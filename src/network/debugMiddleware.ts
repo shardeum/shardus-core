@@ -12,7 +12,8 @@ export const isDebugModeMiddleware = (_req, res, next) => {
     try {
       //auth with by checking a password against a hash
       if (_req.query.auth != null) {
-        const hashedAuth = Context.crypto.hash({ key: _req.query.auth })
+        const obj = { key: _req.query.auth }
+        const hashedAuth = Context.crypto.hash(obj)
         const hashedDevKey = getHashedDevKey()
         // can get a hash back if no key is set
         if (hashedDevKey === '') {

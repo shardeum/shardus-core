@@ -1,6 +1,6 @@
 import { groupResolvePromises } from '..'
 
-function generatePromise(data: any, delayInMs: number): Promise<string> {
+function generatePromise(data: string, delayInMs: number): Promise<string> {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve(data)
@@ -8,8 +8,8 @@ function generatePromise(data: any, delayInMs: number): Promise<string> {
   })
 }
 
-function generateRejectedPromise(data: any, delayInMs: number): Promise<string> {
-  return new Promise((resolve, reject) => {
+function generateRejectedPromise(data: string, delayInMs: number): Promise<string> {
+  return new Promise((_, reject) => {
     setTimeout(() => {
       reject(data)
     }, delayInMs)
@@ -17,7 +17,7 @@ function generateRejectedPromise(data: any, delayInMs: number): Promise<string> 
 }
 
 test('groupResolvePromises() > should exit early due to total wins', async () => {
-  const evaluationFunction = (data): boolean => {
+  const evaluationFunction = (data: string): boolean => {
     if (data == 'resolved') return true
     else return false
   }
@@ -35,7 +35,7 @@ test('groupResolvePromises() > should exit early due to total wins', async () =>
 })
 
 test('groupResolvePromises() > should exit early due to total losses', async () => {
-  const evaluationFunction = (data): boolean => {
+  const evaluationFunction = (data: string): boolean => {
     if (data == 'resolved') return true
     else return false
   }
@@ -53,7 +53,7 @@ test('groupResolvePromises() > should exit early due to total losses', async () 
 })
 
 test('groupResolvePromises() > should exit early due to total losses with rejected promises', async () => {
-  const evaluationFunction = (data): boolean => {
+  const evaluationFunction = (data: string): boolean => {
     if (data == 'resolved') return true
     else return false
   }

@@ -20,6 +20,9 @@ import * as NodeList from './NodeList'
 import Timeout = NodeJS.Timeout
 import { apoptosizeSelf } from './Apoptosis'
 import { randomInt } from 'crypto'
+import { CycleRecord } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
+import { StateMetaData } from '@shardus/types/build/src/p2p/SnapshotTypes'
+import { DataRequest } from '@shardus/types/build/src/p2p/ArchiversTypes'
 
 /** STATE */
 
@@ -271,9 +274,7 @@ export function updateArchivers(record) {
 // Add data type of dataRequests used in experimentalSnapshot
 export function addDataRecipient(
   nodeInfo: P2P.ArchiversTypes.JoinedArchiver,
-  dataRequests: P2P.ArchiversTypes.DataRequest<
-    P2P.CycleCreatorTypes.CycleRecord | P2P.SnapshotTypes.StateMetaData
-  >[]
+  dataRequests: { dataRequestCycle?: number } | DataRequest<CycleRecord | StateMetaData>[]
 ) {
   if (logFlags.console) console.log('Adding data recipient..', arguments)
   if (config.p2p.experimentalSnapshot && config.features.archiverDataSubscriptionsUpdate) {

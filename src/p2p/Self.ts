@@ -19,6 +19,7 @@ import * as GlobalAccounts from './GlobalAccounts'
 import * as Join from './Join'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
+import { SignedObject } from '@shardus/crypto-utils'
 
 /** STATE */
 
@@ -313,8 +314,8 @@ async function contactArchiver() {
       throw Error('Fatal: _getSeedNodes archivers join request not accepted by us!')
     }
     if (Context.config.p2p.experimentalSnapshot && Context.config.features.archiverDataSubscriptionsUpdate) {
-      const firstNodeDataRequest: any = {
-        dataRequestCycle: activeNodesSigned.dataRequestCycle,
+      const firstNodeDataRequest = {
+        dataRequestCycle: activeNodesSigned.dataRequestCycle as number,
       }
       Archivers.addDataRecipient(joinRequest.nodeInfo, firstNodeDataRequest)
       // Using this flag due to isFirst check is not working as expected yet in the first consensor-archiver connection establishment
@@ -392,10 +393,10 @@ async function getActiveNodesFromArchiver(
   return seedListSigned
 }
 
-export async function getFullNodesFromArchiver() {
+export async function getFullNodesFromArchiver(): Promise<SignedObject> {
   const archiver = Context.config.p2p.existingArchivers[0]
   const nodeListUrl = `http://${archiver.ip}:${archiver.port}/full-nodelist`
-  let fullNodeList
+  let fullNodeList: SignedObject
   try {
     fullNodeList = await http.get(nodeListUrl)
   } catch (e) {
@@ -408,7 +409,7 @@ export async function getFullNodesFromArchiver() {
 //todo should move to p2p types
 export type NodeInfo = {
   id: string
-  publicKey: any
+  publicKey: string
   curvePublicKey: string
 } & network.IPInfo & {
     status: P2P.P2PTypes.NodeStatus
@@ -457,12 +458,12 @@ export function setp2pIgnoreJoinRequests(value: boolean) {
   p2pIgnoreJoinRequests = value
 }
 
-function info(...msg) {
+function info(...msg: string[]) {
   const entry = `Self: ${msg.join(' ')}`
   p2pLogger.info(entry)
 }
 
-function warn(...msg) {
+function warn(...msg: string[]) {
   const entry = `Self: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }

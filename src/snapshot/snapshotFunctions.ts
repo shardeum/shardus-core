@@ -11,49 +11,21 @@ import ShardFunctions from '../state-manager/shardFunctions'
 import { Cycle, CycleShardData } from '../state-manager/state-manager-types'
 import { safetyModeVals, snapshotLogger } from './index'
 import { hashMap } from './partition-gossip'
+import { NetworkClass } from '../network'
 
-const { Transform } = require('stream')
 /** TYPES */
 
-const status: 'applied' | 'rejected' = 'applied'
-const tx = {
-  /* Unsigned transaction */
-}
 type txId = string
 type txId2 = string
 type ReceiptMap = Map<txId, txId2[]>
-interface PartitionBlock {
-  cycle: Cycle['counter']
-  partitionId: PartitionNum
-  receiptMap: ReceiptMap
-}
-interface Account {
-  accountId: string
-  hash: string
-}
-
-type PartitionRanges = Map<
-  StateManager.shardFunctionTypes.AddressRange['partition'],
-  StateManager.shardFunctionTypes.AddressRange
-  >
-
-type PartitionAccounts = Map<StateManager.shardFunctionTypes.AddressRange['partition'], Account[]>
 
 type PartitionNum = number
 
-enum offerResponse {
-  needed = 'needed',
-  notNeeded = 'not_needed',
-  tryLater = 'try_later',
-  sendTo = 'send_to',
-}
-
 const fakeReceipMap = new Map()
 
-export function calculatePartitionBlock(shard) {
+export function calculatePartitionBlock(shard: { ourStoredPartitions: number[] }) {
   const partitionToReceiptMap: Map<PartitionNum, ReceiptMap> = new Map()
   for (const partition of shard.ourStoredPartitions) {
-    const receiptMap: ReceiptMap = new Map()
     partitionToReceiptMap.set(partition, fakeReceipMap)
   }
   // set receiptMap for global partition
@@ -74,7 +46,7 @@ export function createNetworkHash(hashes: Map<number, string>): P2P.SnapshotType
 export function updateStateHashesByCycleMap(
   counter: Cycle['counter'],
   stateHash: P2P.SnapshotTypes.StateHashes,
-  stateHashesByCycle
+  stateHashesByCycle: Iterable<readonly [number, P2P.SnapshotTypes.StateHashes]>
 ) {
   const newStateHashByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.StateHashes> = new Map(
     stateHashesByCycle
@@ -86,7 +58,7 @@ export function updateStateHashesByCycleMap(
   newStateHashByCycle.set(counter, transformedStateHash)
   if (newStateHashByCycle.size > 100 && counter > 100) {
     const limit = counter - 100
-    for (const [key, value] of newStateHashByCycle) {
+    for (const [key] of newStateHashByCycle) {
       if (key < limit) {
         newStateHashByCycle.delete(key)
       }
@@ -98,7 +70,7 @@ export function updateStateHashesByCycleMap(
 export function updateReceiptHashesByCycleMap(
   counter: Cycle['counter'],
   receiptHash: P2P.SnapshotTypes.ReceiptHashes,
-  receiptHashesByCycle
+  receiptHashesByCycle: Iterable<readonly [number, P2P.SnapshotTypes.ReceiptHashes]>
 ) {
   const newReceiptHashesByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.ReceiptHashes> = new Map(
     receiptHashesByCycle
@@ -111,7 +83,7 @@ export function updateReceiptHashesByCycleMap(
   newReceiptHashesByCycle.set(counter, transformedStateHash)
   if (newReceiptHashesByCycle.size > 100 && counter > 100) {
     const limit = counter - 100
-    for (const [key, value] of newReceiptHashesByCycle) {
+    for (const [key] of newReceiptHashesByCycle) {
       if (key < limit) {
         newReceiptHashesByCycle.delete(key)
       }
@@ -123,7 +95,7 @@ export function updateReceiptHashesByCycleMap(
 export function updateSummaryHashesByCycleMap(
   counter: Cycle['counter'],
   summaryHashes: P2P.SnapshotTypes.SummaryHashes,
-  summaryHashesByCycle
+  summaryHashesByCycle: Iterable<readonly [number, P2P.SnapshotTypes.SummaryHashes]>
 ) {
   const newSummaryHashesByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.SummaryHashes> = new Map(
     summaryHashesByCycle
@@ -136,7 +108,7 @@ export function updateSummaryHashesByCycleMap(
   newSummaryHashesByCycle.set(counter, transformedSummaryHash)
   if (newSummaryHashesByCycle.size > 100 && counter > 100) {
     const limit = counter - 100
-    for (const [key, value] of newSummaryHashesByCycle) {
+    for (const [key] of newSummaryHashesByCycle) {
       if (key < limit) {
         newSummaryHashesByCycle.delete(key)
       }
@@ -227,7 +199,7 @@ export async function readOldPartitionHashes() {
 export async function calculateOldDataMap(
   shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
   nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap,
-  oldPartitionHashMap,
+  oldPartitionHashMap: Map<number, string>,
   lastSnapshotCycle: number
 ): Promise<Map<P2P.SnapshotTypes.PartitionNum, ShardusTypes.AccountsCopy[]>> {
   const partitionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap = new Map()
@@ -268,15 +240,17 @@ export async function calculateOldDataMap(
       )
       if (oldAccountCopiesInPartition) {
         const existingHash = oldPartitionHashMap.get(partitionId)
-        const oldAccountsWithoutCycleNumber = oldAccountCopiesInPartition.map((acc) => {
-          return {
-            accountId: acc.accountId,
-            data: acc.data,
-            timestamp: acc.timestamp,
-            hash: acc.hash,
-            isGlobal: acc.isGlobal,
+        const oldAccountsWithoutCycleNumber = oldAccountCopiesInPartition.map(
+          (acc: { accountId: string; data: unknown; timestamp: number; hash: string; isGlobal: boolean }) => {
+            return {
+              accountId: acc.accountId,
+              data: acc.data,
+              timestamp: acc.timestamp,
+              hash: acc.hash,
+              isGlobal: acc.isGlobal,
+            }
           }
-        })
+        )
         const computedHash = Context.crypto.hash(oldAccountsWithoutCycleNumber)
         log(`old accounts in partition: ${partitionId}: `, oldAccountCopiesInPartition)
         log(computedHash, existingHash)
@@ -299,15 +273,17 @@ export async function calculateOldDataMap(
     const oldGlobalAccounts = await Context.storage.getOldGlobalAccountCopies(lastSnapshotCycle)
     if (oldGlobalAccounts) {
       const existingGlobalHash = oldPartitionHashMap.get(-1)
-      const oldGlobalAccWithoutCycleNumber = oldGlobalAccounts.map((acc) => {
-        return {
-          accountId: acc.accountId,
-          data: acc.data,
-          timestamp: acc.timestamp,
-          hash: acc.hash,
-          isGlobal: acc.isGlobal,
+      const oldGlobalAccWithoutCycleNumber = oldGlobalAccounts.map(
+        (acc: { accountId: string; data: unknown; timestamp: number; hash: string; isGlobal: boolean }) => {
+          return {
+            accountId: acc.accountId,
+            data: acc.data,
+            timestamp: acc.timestamp,
+            hash: acc.hash,
+            isGlobal: acc.isGlobal,
+          }
         }
-      })
+      )
       const computedGlobalHash = Context.crypto.hash(oldGlobalAccWithoutCycleNumber)
       log('existing global hash', existingGlobalHash)
       log('computed global hash', computedGlobalHash)
@@ -322,7 +298,10 @@ export async function calculateOldDataMap(
   return oldDataMap
 }
 
-export function copyOldDataToDataToMigrate(oldDataMap, dataToMigrate) {
+export function copyOldDataToDataToMigrate(
+  oldDataMap: Map<number, ShardusTypes.AccountsCopy[]>,
+  dataToMigrate: Map<number, ShardusTypes.AccountsCopy[]>
+) {
   for (const [key, value] of oldDataMap) {
     if (!dataToMigrate.has(key)) {
       dataToMigrate.set(key, value)
@@ -330,7 +309,10 @@ export function copyOldDataToDataToMigrate(oldDataMap, dataToMigrate) {
   }
 }
 
-export function getMissingPartitions(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, oldDataMap) {
+export function getMissingPartitions(
+  shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
+  oldDataMap: Map<number, ShardusTypes.AccountsCopy[]>
+) {
   log('Checking missing partitions...')
   const missingPartitions = []
   const { homePartition } = ShardFunctions.addressToPartition(shardGlobals, Self.id)
@@ -357,8 +339,7 @@ export function getMissingPartitions(shardGlobals: StateManager.shardFunctionTyp
   }
   log('Partitions to check: ', partitionsToCheck)
   log('oldDataMap', oldDataMap)
-  for (let i = 0; i < partitionsToCheck.length; i++) {
-    const partitionId = partitionsToCheck[i]
+  for (const partitionId of partitionsToCheck) {
     if (!oldDataMap.has(partitionId)) {
       missingPartitions.push(partitionId)
     }
@@ -370,18 +351,23 @@ export function getMissingPartitions(shardGlobals: StateManager.shardFunctionTyp
   return missingPartitions
 }
 
-export function registerDownloadRoutes(network, oldDataMap, oldPartitionHashMap) {
+export function registerDownloadRoutes(
+  network: NetworkClass,
+  oldDataMap: Map<number, ShardusTypes.AccountsCopy[]>,
+  oldPartitionHashMap: Map<number, string>
+) {
   let dataToSend = {}
-  for (const [partitionId, value] of oldDataMap) {
+  for (const [partitionId] of oldDataMap) {
+    // eslint-disable-next-line security/detect-object-injection
     dataToSend[partitionId] = {
       data: oldDataMap.get(partitionId),
-      hash: oldPartitionHashMap.get(parseInt(partitionId)),
+      hash: oldPartitionHashMap.get(partitionId),
     }
   }
   dataToSend = JSON.stringify(dataToSend)
   if (logFlags.console) console.log('Registering download route', typeof dataToSend, dataToSend)
 
-  network.registerExternalGet('download-snapshot-data', (req, res) => {
+  network.registerExternalGet('download-snapshot-data', (_req, res) => {
     const readerStream = stream.Readable.from([dataToSend])
     const gzip = zlib.createGzip()
 
@@ -401,7 +387,7 @@ export function registerDownloadRoutes(network, oldDataMap, oldPartitionHashMap)
   })
 }
 
-export async function downloadDataFromNode(url) {
+export async function downloadDataFromNode(url: got.GotUrl) {
   log('Downloading snapshot data from server...', url)
   const res = await got(url, {
     timeout: 1000, //  Omar - setting this to 1 sec
@@ -428,14 +414,22 @@ export async function downloadDataFromNode(url) {
   })
 }
 
-export function convertMapToObj(inputMap) {
-  const obj = {}
-  for (const [key, value] of inputMap) {
-    obj[key] = value
+/** If necessary, convert `inputMap` to a plan object. If the value passed to
+ * this function is a `Map`, it will be converted. if it is not a `Map`,
+ * we'll just return the value as it was passed. */
+export function convertMapToObj(inputMap: Map<symbol, unknown> | object) {
+  if (inputMap instanceof Map) {
+    const obj = {}
+    for (const [key, value] of inputMap) {
+      // eslint-disable-next-line security/detect-object-injection
+      obj[key] = value
+    }
+    return obj
+  } else {
+    return inputMap
   }
-  return obj
 }
 
-function log(...things) {
+function log(...things: unknown[]) {
   if (logFlags.console) console.log('DBG', 'SNAPSHOT', ...things)
 }

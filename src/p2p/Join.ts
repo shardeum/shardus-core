@@ -553,10 +553,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
     is able to create a stronger selectionNum. If no selectionKey is provided,
     joining node public key and cycle number are hashed to calculate selectionNumber.
   */
-  const selectionNum = crypto.hash({
+  const obj = {
     cycleNumber: CycleChain.newest.counter,
     selectionKey: selectionKey ? selectionKey : node.publicKey,
-  })
+  }
+  const selectionNum = crypto.hash(obj)
   if (last && requests.length >= toAccept && !crypto.isGreaterHash(selectionNum, last.selectionNum)) {
     if (logFlags.p2pNonFatal) info('Join request not better than lowest, not added.')
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-hash-not-good-enough`)
@@ -701,7 +702,8 @@ function validateJoinRequest(request: P2P.JoinTypes.JoinRequest) {
 }
 
 export function computeNodeId(publicKey, cycleMarker) {
-  const nodeId = crypto.hash({ publicKey, cycleMarker })
+  const obj = { publicKey, cycleMarker }
+  const nodeId = crypto.hash(obj)
   if (logFlags.p2pNonFatal) {
     info(`Node ID computation: publicKey: ${publicKey}, cycleMarker: ${cycleMarker}`)
     info(`Node ID is: ${nodeId}`)

@@ -17,6 +17,7 @@ import * as utils from '../utils'
 import { profilerInstance } from '../utils/profiler'
 import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
+import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 
 console.log('StateManager', StateManager)
 console.log('StateManager type', StateManager.StateManagerTypes)

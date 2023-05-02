@@ -738,7 +738,8 @@ function cycleQuarterChanged(cycle: number, quarter: number) {
 function scoreCert(cert: P2P.CycleCreatorTypes.CycleCert): number {
   try {
     const id = NodeList.byPubKey.get(cert.sign.owner).id // get node id from cert pub key
-    const hid = crypto.hash({ id }) // Omar - use hash of id so the cert is not made by nodes that are near based on node id
+    const obj = { id }
+    const hid = crypto.hash(obj) // Omar - use hash of id so the cert is not made by nodes that are near based on node id
     const out = utils.XOR(cert.marker, hid)
     return out
   } catch (err) {

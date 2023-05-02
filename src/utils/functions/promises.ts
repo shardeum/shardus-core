@@ -1,9 +1,9 @@
 /**
  * Returns an array of two arrays, one will all resolved promises, and one with all rejected promises
  */
-export const robustPromiseAll = async (promises) => {
+export const robustPromiseAll = async <T, E = Error>(promises: Promise<T>[]): Promise<[T[], E[]]> => {
   // This is how we wrap a promise to prevent it from rejecting directing in the Promise.all and causing a short circuit
-  const wrapPromise = async (promise) => {
+  const wrapPromise = async <T, E = Error>(promise: Promise<T>): Promise<[T] | [null, E]> => {
     // We are trying to await the promise, and catching any rejections
     // We return an array, the first index being resolve, and the second being an error
     try {
@@ -38,12 +38,12 @@ export const robustPromiseAll = async (promises) => {
   return [resolved, errors]
 }
 
-export const groupResolvePromises = async <T>(
+export const groupResolvePromises = async <T, E = Error>(
   promiseList: Promise<T>[],
   evaluationFn: (res: T) => boolean,
   maxLosses: number,
   minWins: number
-): Promise<{ success: boolean; wins: T[]; losses: T[]; errors: any[] }> => {
+): Promise<{ success: boolean; wins: T[]; losses: T[]; errors: E[] }> => {
   const wins: T[] = []
   const losses: T[] = []
   let winCount = 0

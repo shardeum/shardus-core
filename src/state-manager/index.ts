@@ -3519,7 +3519,8 @@ class StateManager {
 
         let status = receipt.result === true ? 'applied' : 'rejected'
         let txHash = queueEntry.acceptedTx.txId
-        let txResultFullHash = this.crypto.hash({ tx: queueEntry.acceptedTx.data, status, netId })
+        const obj = { tx: queueEntry.acceptedTx.data, status, netId }
+        let txResultFullHash = this.crypto.hash(obj)
         let txIdShort = utils.short(txHash)
         let txResult = utils.short(txResultFullHash)
         if (receiptMapByPartition.has(partition)) {

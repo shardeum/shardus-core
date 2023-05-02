@@ -163,7 +163,7 @@ class MemoryReporting {
     }
   }
 
-  getMemoryStringBasic() {
+  getMemoryStringBasic(): string {
     const toMB = 1 / 1000000
     const report = process.memoryUsage()
     let outStr = `rss: ${(report.rss * toMB).toFixed(2)} MB`

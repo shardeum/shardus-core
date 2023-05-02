@@ -4801,7 +4801,8 @@ class TransactionQueue {
     const status = this.stateManager.getReceiptResult(queueEntry) === true ? 'applied' : 'rejected'
 
     const txHash = queueEntry.acceptedTx.txId
-    const txResultFullHash = this.crypto.hash({ tx: queueEntry.acceptedTx.data, status, netId })
+    const obj = { tx: queueEntry.acceptedTx.data, status, netId }
+    const txResultFullHash = this.crypto.hash(obj)
     const txIdShort = utils.short(txHash)
     const txResult = utils.short(txResultFullHash)
 
