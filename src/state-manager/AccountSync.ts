@@ -493,7 +493,7 @@ class AccountSync {
   async initialSyncMain(requiredNodeCount: number) {
     const safetyMode = safetyModeVals.safetyMode
 
-    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-start`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-start c:${this.stateManager.currentCycleShardData.cycleNumber} time: ${Date.now()}`)
 
     //not great, but this currently triggers the storage init in the dapp
     //todo: replace with a specific   initDappStorage() function
@@ -533,10 +533,7 @@ class AccountSync {
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.syncStatement)}`)
 
       this.syncStatmentIsComplete()
-      this.statemanager_fatal(
-        'shrd_sync_syncStatement-tempdebug',
-        `${utils.stringifyReduce(this.syncStatement)}`
-      )
+      /* prettier-ignore */ this.statemanager_fatal('shrd_sync_syncStatement-initialSyncMain-firstnode', `${utils.stringifyReduce(this.syncStatement)}` )
       return
     }
 
@@ -545,12 +542,12 @@ class AccountSync {
     this.syncStatement.timeBeforeDataSync = (Date.now() - Self.p2pSyncEnd) / 1000
 
     await utils.sleep(5000) // Temporary delay to make it easier to attach a debugger
-    if (logFlags.console) console.log('syncStateData start')
+    /* prettier-ignore */ console.log(`DATASYNC: initialSyncMain start c:${this.stateManager.currentCycleShardData.cycleNumber} time: ${Date.now()}`)
     // delete and re-create some tables before we sync:
     await this.storage.clearAppRelatedState()
     this.app.deleteLocalAccountData()
 
-    if (logFlags.debug) this.mainLogger.debug(`DATASYNC: starting syncStateData`)
+    /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: starting initialSyncMain c:${this.stateManager.currentCycleShardData.cycleNumber}`)
 
     this.requiredNodeCount = requiredNodeCount
 
@@ -659,19 +656,15 @@ class AccountSync {
         running = false
       } catch (error) {
         if (error.message.includes('reset-sync-ranges')) {
-          this.statemanager_fatal(
-            `mainSyncLoop_reset-sync-ranges`,
-            'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error)
-          )
+          /* prettier-ignore */ this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error) )
 
           if (breakCount > this.config.stateManager.maxDataSyncRestarts) {
-            this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges-givingUP`, 'too many tries')
+            /* prettier-ignore */ this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges-givingUP`, 'too many tries')
             running = false
             this.clearSyncTrackers()
 
             /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: too many exceptions in accound data sync.  Init apop`)
             this.stateManager.initApoptosisAndQuitSyncing('too many exceptions in accound data sync')
-
             return
           }
 
@@ -698,15 +691,11 @@ class AccountSync {
 
           //get fresh nodeShardData, homePartition and cycle so that we can re init the sync ranges.
           nodeShardData = this.stateManager.currentCycleShardData.nodeShardData
-          console.log('RETRYSYNC: GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
+          /* prettier-ignore */ console.log('RETRYSYNC: GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
           const lastCycle = cycle
           cycle = this.stateManager.currentCycleShardData.cycleNumber
           homePartition = nodeShardData.homePartition
-          console.log(
-            `RETRYSYNC: homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(
-              nodeShardData.storedPartitions
-            )}`
-          )
+          /* prettier-ignore */ console.log( `RETRYSYNC: homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce( nodeShardData.storedPartitions )}` )
 
           //init global if we did not complete syncing them before
           if (keptGlobal === false && this.globalAccountsSynced === false && useGlobalAccounts === true) {
@@ -721,15 +710,11 @@ class AccountSync {
             this.createSyncTrackerByRange(range, cycle, true)
             newTrackers++
           }
-
           /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({keptGlobal, addedGlobal, cleared, kept, newTrackers })}`)
-
+          /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: RETRYSYNC lastCycle: lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({keptGlobal, addedGlobal, cleared, kept, newTrackers })}`)
           continue //resume loop at top!
         } else {
-          this.statemanager_fatal(
-            `initialSyncMain unhandledEX`,
-            'initialSyncMain unhandledEX:' + errorToStringFull(error)
-          )
+          /* prettier-ignore */ this.statemanager_fatal( `initialSyncMain unhandledEX`, 'initialSyncMain unhandledEX:' + errorToStringFull(error) )
           running = false
 
           nestedCountersInstance.countRareEvent('sync', `initialSyncMain unhandledEX.  Init apop`)
@@ -737,8 +722,10 @@ class AccountSync {
         }
       }
     }
-    if (logFlags.console) console.log('syncStateData end' + '   time:' + Date.now())
-    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-end`)
+
+    /* prettier-ignore */ console.log( `DATASYNC: initialSyncMain end c:${this.stateManager.currentCycleShardData.cycleNumber} time: ${Date.now()}` )
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-end c:${this.stateManager.currentCycleShardData.cycleNumber} time: ${Date.now()} `)
+    /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: initialSyncMain end c:${this.stateManager.currentCycleShardData.cycleNumber}`)
   }
 
   private async waitForValidShardData(hasValidShardData: boolean) {
@@ -752,16 +739,7 @@ class AccountSync {
       if (this.stateManager.currentCycleShardData != null) {
         if (this.stateManager.currentCycleShardData.hasCompleteData == false) {
           const temp = this.p2p.state.getActiveNodes(null)
-          if (logFlags.playback)
-            this.logger.playbackLogNote(
-              'shrd_sync_waitForShardData',
-              ` `,
-              `hasCompleteData:${
-                this.stateManager.currentCycleShardData.hasCompleteData
-              } active:${utils.stringifyReduce(temp)} ${utils.stringifyReduce(
-                this.stateManager.currentCycleShardData
-              )} `
-            )
+          /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote( 'shrd_sync_waitForShardData', ` `, `hasCompleteData:${ this.stateManager.currentCycleShardData.hasCompleteData } active:${utils.stringifyReduce(temp)} ${utils.stringifyReduce( this.stateManager.currentCycleShardData )} ` )
         } else {
           hasValidShardData = true
         }
@@ -794,10 +772,7 @@ class AccountSync {
       partitionsCovered +=
         nodeShardData.storedPartitions.partitionEnd2 - nodeShardData.storedPartitions.partitionStart2
       partitionsPerRange = Math.max(Math.floor(partitionsCovered / syncRangeGoal), 1)
-      if (logFlags.console)
-        console.log(
-          `syncRangeGoal ${syncRangeGoal}  chunksGuide:${chunksGuide} numPartitions:${this.stateManager.currentCycleShardData.shardGlobals.numPartitions} partitionsPerRange:${partitionsPerRange}`
-        )
+      /* prettier-ignore */ if (logFlags.console) console.log( `syncRangeGoal ${syncRangeGoal}  chunksGuide:${chunksGuide} numPartitions:${this.stateManager.currentCycleShardData.shardGlobals.numPartitions} partitionsPerRange:${partitionsPerRange}` )
 
       let start = nodeShardData.storedPartitions.partitionStart1
       let end = nodeShardData.storedPartitions.partitionEnd1
@@ -857,10 +832,7 @@ class AccountSync {
       partitionsCovered =
         nodeShardData.storedPartitions.partitionEnd - nodeShardData.storedPartitions.partitionStart
       partitionsPerRange = Math.max(Math.floor(partitionsCovered / syncRangeGoal), 1)
-      if (logFlags.console)
-        console.log(
-          `syncRangeGoal ${syncRangeGoal}  chunksGuide:${chunksGuide} numPartitions:${this.stateManager.currentCycleShardData.shardGlobals.numPartitions} partitionsPerRange:${partitionsPerRange}`
-        )
+      /* prettier-ignore */ if (logFlags.console) console.log( `syncRangeGoal ${syncRangeGoal}  chunksGuide:${chunksGuide} numPartitions:${this.stateManager.currentCycleShardData.shardGlobals.numPartitions} partitionsPerRange:${partitionsPerRange}` )
 
       const start = nodeShardData.storedPartitions.partitionStart
       const end = nodeShardData.storedPartitions.partitionEnd
@@ -893,7 +865,7 @@ class AccountSync {
 
     // if we don't have a range to sync yet manually sync the whole range.
     if (rangesToSync.length === 0) {
-      if (logFlags.console) console.log(`syncStateData ranges: pushing full range, no ranges found`)
+      /* prettier-ignore */ if (logFlags.console) console.log(`initRangesToSync ranges: pushing full range, no ranges found`)
       const range = ShardFunctions.partitionToAddressRange2(
         this.stateManager.currentCycleShardData.shardGlobals,
         0,
@@ -901,7 +873,7 @@ class AccountSync {
       )
       rangesToSync.push(range)
     }
-    if (logFlags.console) console.log(`syncStateData ranges: ${utils.stringifyReduce(rangesToSync)}}`)
+    /* prettier-ignore */ if (logFlags.console) console.log(`initRangesToSync ranges: ${utils.stringifyReduce(rangesToSync)}}`)
 
     return rangesToSync
   }
@@ -956,13 +928,13 @@ class AccountSync {
       // The random numbers were kept to prevent the hash of results from being equal, but now custom equalFn takes care of this concern
       let result = await this.p2p.ask(node, 'get_globalaccountreport', {})
       if (result === false) {
-        nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} result === false`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} result === false`)
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === false node:${utils.stringifyReduce(node.id)}`)
         result = { ready: false, msg: `result === false: ${Math.random()}` }
         return result
       }
       if (result === null) {
-        nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} result === null`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} result === null`)
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null node:${utils.stringifyReduce(node.id)}`)
         result = { ready: false, msg: `result === null: ${Math.random()}` }
         return result
@@ -1145,24 +1117,12 @@ class AccountSync {
               // dont adjust a
               const found = this.stateManager.transactionQueue.getQueueEntry(queueEntry.acceptedTx.txId)
               if (!found) {
-                this.logger.playbackLogNote(
-                  'shrd_sync_wakeupTX_skip1',
-                  `${queueEntry.acceptedTx.txId}`,
-                  `not in active queue qId: ${queueEntry.entryID} ts: ${
-                    queueEntry.txKeys.timestamp
-                  } acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
-                )
+                /* prettier-ignore */ this.logger.playbackLogNote( 'shrd_sync_wakeupTX_skip1', `${queueEntry.acceptedTx.txId}`, `not in active queue qId: ${queueEntry.entryID} ts: ${ queueEntry.txKeys.timestamp } acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}` )
                 continue
               }
               // todo other stats to not mess with?
               if (queueEntry.state != 'syncing') {
-                this.logger.playbackLogNote(
-                  'shrd_sync_wakeupTX_skip2',
-                  `${queueEntry.acceptedTx.txId}`,
-                  `state!=syncing ${queueEntry.state} qId: ${queueEntry.entryID} ts: ${
-                    queueEntry.txKeys.timestamp
-                  } acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
-                )
+                /* prettier-ignore */ this.logger.playbackLogNote( 'shrd_sync_wakeupTX_skip2', `${queueEntry.acceptedTx.txId}`, `state!=syncing ${queueEntry.state} qId: ${queueEntry.entryID} ts: ${ queueEntry.txKeys.timestamp } acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}` )
                 continue
               }
 
@@ -1175,13 +1135,7 @@ class AccountSync {
                 //Restore the TX group, because we only want to know what nodes were in the group at the time of the TX
                 queueEntry.transactionGroup = old
                 if (logFlags.playback)
-                  this.logger.playbackLogNote(
-                    'shrd_sync_wakeupTX_txGroupUpdate',
-                    `${queueEntry.acceptedTx.txId}`,
-                    `new value: ${queueEntry.ourNodeInTransactionGroup}   qId: ${queueEntry.entryID} ts: ${
-                      queueEntry.txKeys.timestamp
-                    } acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
-                  )
+                  /* prettier-ignore */ this.logger.playbackLogNote( 'shrd_sync_wakeupTX_txGroupUpdate', `${queueEntry.acceptedTx.txId}`, `new value: ${queueEntry.ourNodeInTransactionGroup}   qId: ${queueEntry.entryID} ts: ${ queueEntry.txKeys.timestamp } acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}` )
               }
 
               queueEntry.txGroupDebug = `${before} -> ${queueEntry.ourNodeInTransactionGroup}`
@@ -1190,16 +1144,7 @@ class AccountSync {
               queueEntry.state = 'aging'
               queueEntry.didWakeup = true
               this.stateManager.transactionQueue.updateHomeInformation(queueEntry)
-              if (logFlags.playback)
-                this.logger.playbackLogNote(
-                  'shrd_sync_wakeupTX',
-                  `${queueEntry.acceptedTx.txId}`,
-                  `before: ${before} inTXGrp: ${queueEntry.ourNodeInTransactionGroup} qId: ${
-                    queueEntry.entryID
-                  } ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(
-                    queueEntry.txKeys.allKeys
-                  )}`
-                )
+              /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote( 'shrd_sync_wakeupTX', `${queueEntry.acceptedTx.txId}`, `before: ${before} inTXGrp: ${queueEntry.ourNodeInTransactionGroup} qId: ${ queueEntry.entryID } ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce( queueEntry.txKeys.allKeys )}` )
             }
           }
           syncTracker.queueEntries = []

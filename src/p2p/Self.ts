@@ -17,8 +17,7 @@ import * as NodeList from './NodeList'
 import * as Sync from './Sync'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getRandom } from '../utils'
-import { isBogonIP, isInvalidIP } from '../utils/functions/checkIP'
-import { allowBogon } from './Join'
+import { isInvalidIP } from '../utils/functions/checkIP'
 
 /** STATE */
 

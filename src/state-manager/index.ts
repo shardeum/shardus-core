@@ -897,10 +897,8 @@ class StateManager {
     if (this.accountSync.syncStatement.internalFlag === true) {
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
       this.accountSync.syncStatmentIsComplete()
-      this.statemanager_fatal(
-        'shrd_sync_syncStatement-tempdebug',
-        `${utils.stringifyReduce(this.accountSync.syncStatement)}`
-      )
+      /* prettier-ignore */ this.statemanager_fatal( 'shrd_sync_syncStatement-startCatchUpQueue', `${utils.stringifyReduce(this.accountSync.syncStatement)}` )
+      /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: syncStatement-startCatchUpQueue c:${this.currentCycleShardData.cycleNumber} ${utils.stringifyReduce(this.accountSync.syncStatement)}`)
     } else {
       this.accountSync.syncStatement.internalFlag = true
     }
@@ -1820,10 +1818,8 @@ class StateManager {
     if (this.accountSync.syncStatement.internalFlag === true) {
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
       this.accountSync.syncStatmentIsComplete()
-      this.statemanager_fatal(
-        'shrd_sync_syncStatement-tempdebug',
-        `${utils.stringifyReduce(this.accountSync.syncStatement)}`
-      )
+      /* prettier-ignore */ this.statemanager_fatal( 'shrd_sync_syncStatement-firstTimeQueueAwait', `${utils.stringifyReduce(this.accountSync.syncStatement)}` )
+      /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: syncStatement-firstTimeQueueAwait c:${this.currentCycleShardData.cycleNumber} ${utils.stringifyReduce(this.accountSync.syncStatement)}`)
     } else {
       this.accountSync.syncStatement.internalFlag = true
     }

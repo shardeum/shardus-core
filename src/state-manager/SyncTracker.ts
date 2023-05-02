@@ -145,32 +145,20 @@ export default class SyncTracker {
         const accountsSaved = await this.syncAccountData2(lowAddress, highAddress)
         /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: partition: ${partition}, syncAccountData2 done.`)
 
-        nestedCountersInstance.countEvent(
-          'sync',
-          `sync partition: ${partition} end: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} failedHashes:${this.failedAccounts.length}`
-        )
+        /* prettier-ignore */ nestedCountersInstance.countEvent( 'sync', `sync partition: ${partition} end: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} failedHashes:${this.failedAccounts.length}` )
         this.failedAccounts = [] //clear failed hashes.  We dont try to fix them for now.  let the patcher handle it.  could bring back old code if we change mind
       } catch (error) {
         if (error.message.includes('reset-sync-ranges')) {
-          this.accountSync.statemanager_fatal(
-            `syncStateDataForRange_reset-sync-ranges`,
-            'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error)
-          )
+          /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataForRange_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error) )
           //buble up:
           throw new Error('reset-sync-ranges')
         } else if (error.message.includes('FailAndRestartPartition')) {
-          if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
-          this.accountSync.statemanager_fatal(
-            `syncStateDataForRange_ex_failandrestart`,
-            'DATASYNC: FailAndRestartPartition: ' + errorToStringFull(error)
-          )
+          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
+          /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataForRange_ex_failandrestart`, 'DATASYNC: FailAndRestartPartition: ' + errorToStringFull(error) )
 
           retry = await this.tryRetry('syncStateDataForRange 1')
         } else {
-          this.accountSync.statemanager_fatal(
-            `syncStateDataForRange_ex`,
-            'syncStateDataForPartition failed: ' + errorToStringFull(error)
-          )
+          /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataForRange_ex`, 'syncStateDataForPartition failed: ' + errorToStringFull(error) )
           /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
 
           retry = await this.tryRetry('syncStateDataForRange 2')
@@ -217,7 +205,6 @@ export default class SyncTracker {
         //this.accountSync.readyforTXs = true //Do not open the floodgates of queuing stuffs.
 
         //Get globals list and hash.
-
         const globalReport: GlobalAccountReportResp = await this.accountSync.getRobustGlobalReport(
           'syncTrackerGlobal'
         )
@@ -237,7 +224,6 @@ export default class SyncTracker {
         let accountReportsByID: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
         for (const report of globalReport.accounts) {
           remainingAccountsToSync.push(report.id)
-
           accountReportsByID[report.id] = report
         }
         let accountData: Shardus.WrappedData[] = []
@@ -390,17 +376,11 @@ export default class SyncTracker {
       } catch (error) {
         if (error.message.includes('FailAndRestartPartition')) {
           /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
-          this.accountSync.statemanager_fatal(
-            `syncStateDataGlobals_ex_failandrestart`,
-            'DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + errorToStringFull(error)
-          )
+          /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataGlobals_ex_failandrestart`, 'DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + errorToStringFull(error) )
 
           retry = await this.tryRetry('syncStateDataGlobals 1 ')
         } else {
-          this.accountSync.statemanager_fatal(
-            `syncStateDataGlobals_ex`,
-            'syncStateDataGlobals failed: ' + errorToStringFull(error)
-          )
+          /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataGlobals_ex`, 'syncStateDataGlobals failed: ' + errorToStringFull(error) )
           /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
 
           retry = await this.tryRetry('syncStateDataGlobals 2')
@@ -529,10 +509,7 @@ export default class SyncTracker {
           5000 + moreAskTime
         ) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
       } catch (ex) {
-        this.accountSync.statemanager_fatal(
-          `syncAccountData2`,
-          `syncAccountData2 retries:${askRetriesLeft} ask: ` + errorToStringFull(ex)
-        )
+        /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncAccountData2`, `syncAccountData2 retries:${askRetriesLeft} ask: ` + errorToStringFull(ex) )
         //wait 5 sec
         await utils.sleep(5000)
         //max retries
@@ -695,10 +672,7 @@ export default class SyncTracker {
           }
         }
 
-        if (logFlags.debug)
-          this.accountSync.mainLogger.debug(
-            `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset} sameAsStartTS:${sameAsStartTS}`
-          )
+        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug( `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset} sameAsStartTS:${sameAsStartTS}` )
         if (accountData.length > 0) {
           this.combinedAccountData = this.combinedAccountData.concat(accountData)
         }
@@ -708,10 +682,7 @@ export default class SyncTracker {
       } else {
         //we got accounts this time so reset this flag to false
         stopIfNextLoopHasNoResults = false
-        if (logFlags.debug)
-          this.accountSync.mainLogger.debug(
-            `DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset} sameAsStartTS:${sameAsStartTS}`
-          )
+        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug( `DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset} sameAsStartTS:${sameAsStartTS}` )
         this.combinedAccountData = this.combinedAccountData.concat(accountData)
         loopCount++
         // await utils.sleep(500)
@@ -722,10 +693,7 @@ export default class SyncTracker {
         const accountToSave = this.combinedAccountData.length
         const accountsSaved = await this.processAccountDataNoStateTable2()
         totalAccountsSaved += accountsSaved
-        if (logFlags.debug)
-          this.accountSync.mainLogger.debug(
-            `DATASYNC: syncAccountData3 accountToSave: ${accountToSave} accountsSaved: ${accountsSaved}  offset:${offset} sameAsStartTS:${sameAsStartTS}`
-          )
+        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug( `DATASYNC: syncAccountData3 accountToSave: ${accountToSave} accountsSaved: ${accountsSaved}  offset:${offset} sameAsStartTS:${sameAsStartTS}` )
         //clear data
         this.combinedAccountData = []
       }
@@ -777,10 +745,7 @@ export default class SyncTracker {
       goodAccounts.push(account)
     }
 
-    if (logFlags.debug)
-      this.accountSync.mainLogger.debug(
-        `DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs} futureStateTableEntry:${futureStateTableEntry} unhandledCase:${unhandledCase} fix1Worked:${fix1Worked}`
-      )
+    /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug( `DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs} futureStateTableEntry:${futureStateTableEntry} unhandledCase:${unhandledCase} fix1Worked:${fix1Worked}` )
     // failedHashes is a list of accounts that failed to match the hash reported by the server
     const failedHashes = await this.accountSync.stateManager.checkAndSetAccountData(
       goodAccounts,
