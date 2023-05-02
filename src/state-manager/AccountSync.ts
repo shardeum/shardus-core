@@ -726,6 +726,7 @@ class AccountSync {
       }
     }
 
+    cycle = this.stateManager.currentCycleShardData?.cycleNumber
     /* prettier-ignore */ console.log( `DATASYNC: initialSyncMain end c${cycle} time: ${Date.now()}` )
     /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-end c${cycle} time: ${Date.now()} `)
     /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: initialSyncMain end c${cycle}`)
