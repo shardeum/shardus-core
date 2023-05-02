@@ -61,5 +61,7 @@ const generateContext = (seed) => {
   return { rand, randomInt }
 }
 
-exports = module.exports = generateContext
+exports = generateContext
 exports.generateSeed = generateSeed
+
+export default exports

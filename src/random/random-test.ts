@@ -1,4 +1,4 @@
-const Random = require('./index')
+import Random from './index';
 
 const random = Random()
 

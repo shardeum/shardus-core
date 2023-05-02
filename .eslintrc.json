@@ -22,7 +22,6 @@
     "AccountPatcher.ts",
     "partition-gossip.ts",
     "shardus-types.ts",
-    "random-test.ts",
     "Wrapper.ts",
     "Utils.ts",
     "Template.ts",
