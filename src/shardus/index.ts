@@ -389,8 +389,10 @@ class Shardus extends EventEmitter {
       let maxArchiversSupport = 2 // Make this as part of the network config
       this.io.on('connection', (socket: any) => {
         if (!Self || !Self.isActive) {
-          socket.disconnect()
-          console.log(`This node is not active yet and kill the socket connection!`)
+          if (!Self.allowConnectionToFirstNode) {
+            socket.disconnect()
+            console.log(`This node is not active yet and kill the socket connection!`)
+          }
         }
         if (this.config.features.archiverDataSubscriptionsUpdate) {
           console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)

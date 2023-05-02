@@ -28,6 +28,7 @@ let p2pLogger: log4js.Logger
 export let id: string
 export let isFirst: boolean
 export let isActive = false
+export let allowConnectionToFirstNode = false
 export let ip: string
 export let port: number
 
@@ -311,6 +312,8 @@ async function contactArchiver() {
         dataRequestCycle: activeNodesSigned.dataRequestCycle,
       }
       Archivers.addDataRecipient(joinRequest.nodeInfo, firstNodeDataRequest)
+      // Using this flag due to isFirst check is not working as expected yet in the first consensor-archiver connection establishment
+      allowConnectionToFirstNode = true
       return activeNodesSigned.nodeList
     }
   }
