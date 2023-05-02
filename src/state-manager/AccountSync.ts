@@ -493,7 +493,7 @@ class AccountSync {
   async initialSyncMain(requiredNodeCount: number) {
     const safetyMode = safetyModeVals.safetyMode
 
-    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-start c:${this.stateManager.currentCycleShardData.cycleNumber} time: ${Date.now()}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-start time: ${Date.now()}`)
 
     //not great, but this currently triggers the storage init in the dapp
     //todo: replace with a specific   initDappStorage() function
@@ -542,12 +542,12 @@ class AccountSync {
     this.syncStatement.timeBeforeDataSync = (Date.now() - Self.p2pSyncEnd) / 1000
 
     await utils.sleep(5000) // Temporary delay to make it easier to attach a debugger
-    /* prettier-ignore */ console.log(`DATASYNC: initialSyncMain start c:${this.stateManager.currentCycleShardData.cycleNumber} time: ${Date.now()}`)
+    /* prettier-ignore */ console.log(`DATASYNC: initialSyncMain start time: ${Date.now()}`)
     // delete and re-create some tables before we sync:
     await this.storage.clearAppRelatedState()
     this.app.deleteLocalAccountData()
 
-    /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: starting initialSyncMain c:${this.stateManager.currentCycleShardData.cycleNumber}`)
+    /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: starting initialSyncMain`)
 
     this.requiredNodeCount = requiredNodeCount
 
@@ -572,8 +572,11 @@ class AccountSync {
 
     let cycle = this.stateManager.currentCycleShardData.cycleNumber
 
-    let homePartition = nodeShardData.homePartition
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-gotcycle c${cycle} time: ${Date.now()}`)
+    /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: initialSyncMain-gotcycle c${cycle}`)
+    /* prettier-ignore */ console.log(`DATASYNC: initialSyncMain-gotcycle c${cycle} time: ${Date.now()}`)
 
+    let homePartition = nodeShardData.homePartition
     /* prettier-ignore */ if (logFlags.console) console.log(`homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
 
     // syncRangeGoal helps us calculate how many partitions per range we need to get our data in chunksGuide number of chunks.
@@ -723,9 +726,9 @@ class AccountSync {
       }
     }
 
-    /* prettier-ignore */ console.log( `DATASYNC: initialSyncMain end c:${this.stateManager.currentCycleShardData.cycleNumber} time: ${Date.now()}` )
-    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-end c:${this.stateManager.currentCycleShardData.cycleNumber} time: ${Date.now()} `)
-    /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: initialSyncMain end c:${this.stateManager.currentCycleShardData.cycleNumber}`)
+    /* prettier-ignore */ console.log( `DATASYNC: initialSyncMain end c${cycle} time: ${Date.now()}` )
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-end c${cycle} time: ${Date.now()} `)
+    /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: initialSyncMain end c${cycle}`)
   }
 
   private async waitForValidShardData(hasValidShardData: boolean) {
