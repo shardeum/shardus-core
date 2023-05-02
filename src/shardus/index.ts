@@ -388,10 +388,20 @@ class Shardus extends EventEmitter {
       Context.setIOContext(this.io)
       let maxArchiversSupport = 2 // Make this as part of the network config
       this.io.on('connection', (socket: any) => {
+        if (!Self || !Self.isActive) {
+          socket.disconnect()
+          console.log(`This node is not active yet and kill the socket connection!`)
+        }
         if (this.config.features.archiverDataSubscriptionsUpdate) {
           console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
           socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
             console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
+            // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
+            if (!Archivers.recipients || !Archivers.connectedSockets) {
+              socket.disconnect()
+              console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
+              return
+            }
             if (Archivers.recipients.get(ARCHIVER_PUBLIC_KEY)) {
               if (Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY]) {
                 Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
@@ -413,6 +423,12 @@ class Shardus extends EventEmitter {
           console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
           socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
             console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
+            // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
+            if (!Archivers.recipients || !Archivers.connectedSockets) {
+              socket.disconnect()
+              console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
+              return
+            }
             for (const [key, value] of Object.entries(Archivers.connectedSockets)) {
               if (key === ARCHIVER_PUBLIC_KEY) {
                 Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
