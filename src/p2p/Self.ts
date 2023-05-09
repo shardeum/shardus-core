@@ -1,11 +1,15 @@
+import { P2P } from '@shardus/types'
+import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 import * as events from 'events'
 import * as log4js from 'log4js'
 import * as http from '../http'
 import { logFlags } from '../logger'
 import * as network from '../network'
-import { P2P } from '@shardus/types'
 import * as snapshot from '../snapshot'
 import * as utils from '../utils'
+import { getRandom } from '../utils'
+import { isInvalidIP } from '../utils/functions/checkIP'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as Archivers from './Archivers'
 import * as Comms from './Comms'
 import * as Context from './Context'
@@ -15,9 +19,6 @@ import * as GlobalAccounts from './GlobalAccounts'
 import * as Join from './Join'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
-import { nestedCountersInstance } from '../utils/nestedCounters'
-import { getRandom } from '../utils'
-import { isInvalidIP } from '../utils/functions/checkIP'
 
 /** STATE */
 
@@ -409,18 +410,18 @@ export type NodeInfo = {
     status: P2P.P2PTypes.NodeStatus
   }
 
-export function getPublicNodeInfo(): NodeInfo {
+export function getPublicNodeInfo(reportStandby = false): NodeInfo {
   const publicKey = Context.crypto.getPublicKey()
   const curvePublicKey = Context.crypto.convertPublicKeyToCurve(publicKey)
-  const status = { status: getNodeStatus(publicKey) }
+  const status = { status: getNodeStatus(publicKey, reportStandby) }
   const nodeInfo = Object.assign({ id, publicKey, curvePublicKey }, network.ipInfo, status)
   return nodeInfo
 }
 
-function getNodeStatus(pubKey: string) {
+function getNodeStatus(pubKey: string, reportStandby = false) {
   const current = NodeList.byPubKey
   if (current.get(pubKey)) return current.get(pubKey).status
-  return null
+  return reportStandby ? NodeStatus.STANDBY : null
 }
 
 export function getThisNodeInfo() {
