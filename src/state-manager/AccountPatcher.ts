@@ -2892,13 +2892,13 @@ class AccountPatcher {
     for (let line of lines) {
       let index = line.raw.indexOf('{"allNodeIds')
       if (index >= 0) {
-        let string = line.raw.slice(index)
+        let partitionStr = line.raw.slice(index)
         //this.generalLog(string)
         let partitionObj
         try {
-          partitionObj = JSON.parse(string)
+          partitionObj = JSON.parse(partitionStr)
         } catch (error) {
-          this.mainLogger.error('error parsing partitionObj', error, string)
+          this.mainLogger.error('error parsing partitionObj', error, partitionStr)
           continue
         }
 

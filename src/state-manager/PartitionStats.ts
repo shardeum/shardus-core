@@ -870,13 +870,13 @@ class PartitionStats {
     for (let line of lines) {
       let index = line.raw.indexOf('{"covered')
       if (index >= 0) {
-        let string = line.raw.slice(index)
+        let statsStr = line.raw.slice(index)
         //this.generalLog(string)
         let statsObj
         try {
-          statsObj = JSON.parse(string)
+          statsObj = JSON.parse(statsStr)
         } catch (err) {
-          if (logFlags.error) this.mainLogger.error(`Fail to parse statsObj: ${string}`, err)
+          if (logFlags.error) this.mainLogger.error(`Fail to parse statsObj: ${statsStr}`, err)
           continue
         }
 
@@ -998,13 +998,13 @@ class PartitionStats {
     for (let line of lines) {
       let index = line.raw.indexOf('{"covered')
       if (index >= 0) {
-        let string = line.raw.slice(index)
+        let statsStr = line.raw.slice(index)
         //this.generalLog(string)
         let statsObj
         try {
-          statsObj = JSON.parse(string)
+          statsObj = JSON.parse(statsStr)
         } catch (err) {
-          if (logFlags.error) this.mainLogger.error(`Fail to parse statsObj: ${string}`, err)
+          if (logFlags.error) this.mainLogger.error(`Fail to parse statsObj: ${statsStr}`, err)
           continue
         }
         if (newestCycle > 0 && statsObj.cycle != newestCycle) {
