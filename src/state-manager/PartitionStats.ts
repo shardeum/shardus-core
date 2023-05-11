@@ -1107,7 +1107,8 @@ class PartitionStats {
     for (let statsObj of statsBlobs) {
       if (statsObj.cycleDebugNotes != null) {
         for (const [key, value] of Object.entries(statsObj.cycleDebugNotes)) {
-          if (value >= 1) {
+          let valueNum = value as number
+          if (valueNum >= 1) {
             stream.write(`${statsObj.owner} : ${JSON.stringify(statsObj.cycleDebugNotes)}`)
             break
           }
