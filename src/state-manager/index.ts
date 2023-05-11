@@ -2619,7 +2619,7 @@ class StateManager {
           try {
             accountData.data = JSON.parse(accountData.data as string)
           } catch (error) {
-            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` _commitAccountCopies fail to parse accountData.data: ${accountData.data} data: ${utils.stringifyReduce(accountData)}`)
+            /* prettier-ignore */ this.mainLogger.error(` _commitAccountCopies fail to parse accountData.data: ${accountData.data} data: ${utils.stringifyReduce(accountData)}`)
           }
         }
 
