@@ -2616,7 +2616,11 @@ class StateManager {
       for (let accountData of accountCopies) {
         // make sure the data is not a json string
         if (utils.isString(accountData.data)) {
-          accountData.data = JSON.parse(accountData.data as string)
+          try {
+            accountData.data = JSON.parse(accountData.data as string)
+          } catch (error) {
+            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` _commitAccountCopies fail to parse accountData.data: ${accountData.data} data: ${utils.stringifyReduce(accountData)}`)
+          }
         }
 
         if (accountData == null || accountData.data == null || accountData.accountId == null) {

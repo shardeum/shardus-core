@@ -2894,7 +2894,13 @@ class AccountPatcher {
       if (index >= 0) {
         let string = line.raw.slice(index)
         //this.generalLog(string)
-        let partitionObj = JSON.parse(string)
+        let partitionObj
+        try {
+          partitionObj = JSON.parse(string)
+        } catch (error) {
+          this.mainLogger.error('error parsing partitionObj', error, string)
+          continue
+        }
 
         if (newestCycle > 0 && partitionObj.cycle != newestCycle) {
           stream.write(
