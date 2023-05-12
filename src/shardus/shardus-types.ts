@@ -668,6 +668,8 @@ export interface ServerConfiguration {
     extraCyclesToKeep: number
     /** multiplier applied to cycle to keep before extraCyclesToKeep is added */
     extraCyclesToKeepMultiplier: number
+    /** Should the node remove itself from the network (apoptosize) if the network has stopped */
+    checkNetworkStopped: boolean
   }
   /** Server IP configuration */
   ip?: {

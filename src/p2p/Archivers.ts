@@ -1,23 +1,24 @@
-import deepmerge from 'deepmerge'
-import {
-  getStateHashes,
-  getReceiptHashes,
-  getSummaryHashes,
-  getReceiptMap,
-  getSummaryBlob,
-} from '../snapshot'
-import { validateTypes } from '../utils'
-import * as Comms from './Comms'
-import * as NodeList from './NodeList'
-import { crypto, logger, network, io, stateManager, config } from './Context'
-import { getCycleChain, computeCycleMarker, getNewest } from './CycleChain'
-import * as CycleCreator from './CycleCreator'
-import * as CycleParser from './CycleParser'
-import { logFlags } from '../logger'
 import { P2P, StateManager } from '@shardus/types'
-import { profilerInstance } from '../utils/profiler'
-import Timeout = NodeJS.Timeout
+import deepmerge from 'deepmerge'
+import * as http from '../http'
+import { logFlags } from '../logger'
+import {
+  getReceiptHashes,
+  getReceiptMap,
+  getStateHashes,
+  getSummaryBlob,
+  getSummaryHashes,
+} from '../snapshot'
+import { shuffleMapIterator, validateTypes } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { profilerInstance } from '../utils/profiler'
+import * as Comms from './Comms'
+import { config, crypto, io, logger, network, stateManager } from './Context'
+import { computeCycleMarker, getCycleChain } from './CycleChain'
+import * as CycleCreator from './CycleCreator'
+import * as NodeList from './NodeList'
+import Timeout = NodeJS.Timeout
+import { apoptosizeSelf } from './Apoptosis'
 
 /** STATE */
 
@@ -33,6 +34,8 @@ export let recipients: Map<
 let joinRequests: P2P.ArchiversTypes.Request[]
 let leaveRequests: P2P.ArchiversTypes.Request[]
 let receiptForwardInterval: Timeout | null = null
+let networkCheckInterval: Timeout | null = null
+let networkCheckInProgress = false
 export let connectedSockets = {}
 let lastSentCycle = -1
 let maxArchiversSupport = 2 // Make this as part of the network config
@@ -63,6 +66,18 @@ export function init() {
 
   if (config.p2p.experimentalSnapshot && !receiptForwardInterval) {
     receiptForwardInterval = setInterval(forwardReceipts, 10000)
+  }
+
+  if (config.p2p.checkNetworkStopped) {
+    networkCheckInterval = setInterval(() => {
+      hasNetworkStopped().then((stopped) => {
+        if (stopped) {
+          const msg = 'checkNetworkStopped: Network has stopped. Initiating apoptosis'
+          info(msg)
+          apoptosizeSelf(msg)
+        }
+      })
+    }, 1000 * 60 * 5)
   }
 }
 
@@ -337,6 +352,35 @@ async function forwardReceipts() {
   stateManager.transactionQueue.resetReceiptsToForward()
 
   profilerInstance.scopedProfileSectionEnd('forwardReceipts')
+}
+
+/**
+ * This function is used by the checkNetworkStopped feature to check if the
+ * network is down by checking if all Archivers are down. If so, it causes
+ * the node to apoptosize itself.
+ */
+async function hasNetworkStopped() {
+  // If network check still in progress, return
+  if (networkCheckInProgress) return
+  networkCheckInProgress = true
+
+  // Get a randomized list of all Archivers
+  const shuffledArchivers = shuffleMapIterator(archivers)
+
+  // Loop through them and check their /nodelist endpoint for a response
+  for (const archiver of shuffledArchivers) {
+    try {
+      const response = await http.get(`http://${archiver.ip}:${archiver.port}/nodelist`)
+
+      // If any one of them responds, return
+      if (response.data) return false
+    } catch (error) {
+      warn(`hasNetworkStopped: Archiver ${archiver.ip}:${archiver.port} is down`)
+    }
+  }
+
+  // If all of them do not respond, initiate apoptosis
+  return true
 }
 
 export interface InitialAccountsData {
