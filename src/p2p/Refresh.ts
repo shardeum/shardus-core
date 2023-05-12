@@ -18,6 +18,7 @@ import { logger } from './Context'
 import { cycles, newest } from './CycleChain'
 import * as NodeList from './NodeList'
 import { totalNodeCount } from './Sync'
+import * as Context from './Context'
 
 /** STATE */
 
@@ -207,7 +208,7 @@ export function cyclesToKeep() {
   info('cycles to keep is ' + count)
   //  showNodeCount(newest)
   // Keep a few more than that, just to be safe
-  return count + 3
+  return count + Context.config.p2p.extraCyclesToKeep
 }
 
 function info(...msg) {

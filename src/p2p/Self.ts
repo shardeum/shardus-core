@@ -109,6 +109,7 @@ export async function startup(): Promise<boolean> {
   if (logFlags.p2pNonFatal) info('Emitting `joined` event.')
   emitter.emit('joined', id, publicKey)
 
+  nestedCountersInstance.countEvent('p2p', 'joined')
   // Sync cycle chain from network
   await syncCycleChain()
 
@@ -120,6 +121,9 @@ export async function startup(): Promise<boolean> {
 
   p2pSyncEnd = Date.now()
   p2pJoinTime = (p2pSyncEnd - p2pSyncStart) / 1000
+
+  nestedCountersInstance.countEvent('p2p', `sync time ${p2pJoinTime} seconds`)
+
   if (logFlags.p2pNonFatal) info('Emitting `initialized` event.' + p2pJoinTime)
   emitter.emit('initialized')
 

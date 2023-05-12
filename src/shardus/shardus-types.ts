@@ -664,6 +664,8 @@ export interface ServerConfiguration {
     useSignaturesForAuth?: boolean
     /** should the shardus core version be checked */
     checkVersion: boolean
+    /** how many extra cycles should we keep beyond the cycles needed to cover known node counts */
+    extraCyclesToKeep: number
   }
   /** Server IP configuration */
   ip?: {

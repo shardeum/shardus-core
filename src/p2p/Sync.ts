@@ -12,6 +12,8 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
 import { profilerInstance } from '../utils/profiler'
+import { nestedCountersInstance } from '../utils/nestedCounters'
+import { byJoinOrder } from './NodeList'
 
 /** STATE */
 
@@ -80,6 +82,8 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
   CycleChain.reset()
   NodeList.reset()
 
+  nestedCountersInstance.countEvent('p2p', `sync-start`)
+
   // Get the networks newest cycle as the anchor point for sync
   info('Getting newest cycle...')
   const cycleToSyncTo = await getNewestCycle(activeNodes)
@@ -93,17 +97,51 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
   CycleChain.prepend(cycleToSyncTo)
   squasher.addChange(parse(CycleChain.oldest))
 
+  nestedCountersInstance.countEvent('p2p', `sync-to-cycle ${cycleToSyncTo.counter}`)
+
   do {
     // Get prevCycles from the network
     const end = CycleChain.oldest.counter - 1
     const start = end - cyclesToGet
     info(`Getting cycles ${start} - ${end}...`)
+    nestedCountersInstance.countEvent('p2p', `sync-getting-cycles ${start} - ${end}`)
     const prevCycles = await getCycles(activeNodes, start, end)
     info(`Got cycles ${JSON.stringify(prevCycles.map((cycle) => cycle.counter))}`)
     info(`  ${JSON.stringify(prevCycles)}`)
 
     // If prevCycles is empty, start over
-    if (prevCycles.length < 1) throw new Error('Got empty previous cycles')
+    if (prevCycles.length < 1) {
+      nestedCountersInstance.countEvent('p2p', `sync-getting-cycles failed to get ${start} - ${end}`)
+
+      //add some code to detect which nodes we are actually missing
+      let missing = []
+      for (let node of byJoinOrder) {
+        if (squasher.addedIds.has(node.id) === false) {
+          missing.push(node)
+        }
+      }
+      let totalNodes = totalNodeCount(cycleToSyncTo)
+      let squasherTotal = squasher.final.added.length
+      let expectedMissing = totalNodes - squasherTotal
+      let missingListCount = missing.length
+      //if there are more than five nodes in the missingn list truncate it to just five
+      if (missing.length > 5) {
+        missing = missing.slice(0, 5)
+      }
+      let missingList = missing.map((node) => {
+        return { id: node.id, externalIp: node.externalIp, externalPort: node.externalPort }
+      })
+
+      let missingStr = 'none detected'
+      if (missingListCount > 0) {
+        missingStr = JSON.stringify(missingList[0])
+      }
+
+      /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `sync-getting-cycles failed to get ${start} - ${end}  expectedMissing:${expectedMissing} missingListCount:${missingListCount} missing:${missingStr}` )
+      /* prettier-ignore */ error( `sync-getting-cycles failed to get ${start} - ${end}  expectedMissing:${expectedMissing} missingListCount:${missingListCount}` + JSON.stringify(missingList) )
+
+      throw new Error('Got empty previous cycles')
+    }
 
     // Add prevCycles to our cycle chain
     let prepended = 0
@@ -181,6 +219,13 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
   info(`Sync complete; ${NodeList.activeByIdOrder.length} active nodes; ${CycleChain.cycles.length} cycles`)
   info(`NodeList after sync: ${JSON.stringify([...NodeList.nodes.entries()])}`)
   info(`CycleChain after sync: ${JSON.stringify(CycleChain.cycles)}`)
+
+  const p2pSyncReport = {
+    cycle: cycleToSyncTo.counter,
+    activeNodes: NodeList.activeByIdOrder.length,
+    cyclesSynced: CycleChain.cycles.length,
+  }
+  nestedCountersInstance.countEvent('p2p', `Sync cyclechain complete; ${JSON.stringify(p2pSyncReport)}`)
 
   return true
 }
