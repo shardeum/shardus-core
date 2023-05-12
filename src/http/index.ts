@@ -34,6 +34,7 @@ async function get(url: string, getResponseObj = false) {
   let normalized = _normalizeUrl(url)
   let host = parseUrl(normalized, true)
 
+  getIndex++
   if (_logger) {
     _logger.playbackLog('self', host.hostname + ':' + host.port, 'HttpRequest', host.pathname, getIndex, '')
   }
@@ -51,7 +52,6 @@ async function get(url: string, getResponseObj = false) {
     )
   }
 
-  getIndex++
   return res
 }
 
@@ -73,6 +73,8 @@ async function _post(host, payload, getResponseObj = false, timeout = 1000) {
 async function post(givenHost, body, getResponseObj = false, timeout = 1000) {
   let normalized = _normalizeUrl(givenHost)
   let host = parseUrl(normalized, true)
+
+  postIndex--
   if (_logger) {
     _logger.playbackLog(
       'self',
@@ -97,7 +99,6 @@ async function post(givenHost, body, getResponseObj = false, timeout = 1000) {
     )
   }
 
-  postIndex--
   return res
 }
 
