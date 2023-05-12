@@ -290,17 +290,6 @@ export async function apoptosizeSelf(message: string) {
   }
   // If we don't have any active nodes; means we are still joining
   if (activeNodes.length > 0) {
-    
-    // If the networks active node count is < 2/3 (or config.p2p.minNodesToApoptosize) of minNodes, don't apoptosize and log a counter instead
-    const minNodesToApoptosize = config.p2p.minNodes * config.p2p.minNodesFractionToApoptosize
-    if (activeNodes.length < minNodesToApoptosize) {
-      // Log a counter to say node is not going to apoptosize
-      const msg = `Not enough active nodes to apoptosize. Active nodes: ${activeNodes.length}, minNodesToApoptosize: ${minNodesToApoptosize}, minNodes: ${config.p2p.minNodes}, minNodesFractionToApoptosize: ${config.p2p.minNodesFractionToApoptosize}`
-      warn(msg)
-      nestedCountersInstance.countEvent('apoptosis', msg)
-      return
-    }
-
     info(`In apoptosizeSelf calling robustQuery proposal`)
     let redunancy = 1
     if (activeNodes.length > 5) {

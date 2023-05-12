@@ -37,6 +37,8 @@ import MemoryReporting from '../utils/memoryReporting'
 import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
 import { startSaving } from './saveConsoleOutput'
+import { config } from '../p2p/Context'
+import { activeByIdOrder } from '../p2p/NodeList'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -1978,6 +1980,19 @@ class Shardus extends EventEmitter {
         'unhandledRejection: ' + err.stack
       )
       // this.exitHandler.exitCleanly()
+
+      // If the networks active node count is < some percentage of minNodes, don't exit on exceptions and log a counter instead
+      if (config.p2p.continueOnException === true) {
+        const activeNodes = activeByIdOrder
+        const minNodesToExit = config.p2p.minNodes * config.p2p.minNodesPerctToAllowExitOnException
+        if (activeNodes.length < minNodesToExit) {
+          // Log a counter to say node is not going to apoptosize
+          const msg = `Not enough active nodes to exit on exception. Active nodes: ${activeNodes.length}, minNodesToExit: ${minNodesToExit}, minNodes: ${config.p2p.minNodes}, minNodesPerctToAllowExitOnException: ${config.p2p.minNodesPerctToAllowExitOnException}`
+          this.mainLogger.warn(msg)
+          nestedCountersInstance.countEvent('continueOnException', msg)
+          return
+        }
+      }
 
       this.mainLogger.info(`exitUncleanly: logFatalAndExit`)
       this.exitHandler.exitUncleanly('Unhandled Exception', err.message)
