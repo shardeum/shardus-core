@@ -609,6 +609,10 @@ export interface ServerConfiguration {
     maxSeedNodes?: number
     /** The minNodesToAllowTxs parameter is an Integer specifying the minimum number of active nodes needed in the network to process txs. */
     minNodesToAllowTxs?: number
+    /** The minNodesFractionToApoptosize parameter is an Integer used to calculate the minimum number of active nodes needed in the network to allow a node to apoptosize itself.
+     *  If the number of active nodes in the network is less than (minNodesFractionToApoptosize) * (minNodes), then the node will not apoptosize itself. 
+     */
+    minNodesFractionToApoptosize?: number
     /** The minNodes parameter is an Integer specifying the minimum number of nodes that need to be active in the network in order to process transactions. */
     minNodes?: number
     /** The maxNodes parameter is an Integer specifying the maximum number of nodes that can be active in the network at once. */

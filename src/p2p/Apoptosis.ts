@@ -23,7 +23,7 @@ import * as Sequelize from 'sequelize'
 import { P2P } from '@shardus/types'
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
-import { crypto, logger, network } from './Context'
+import { config, crypto, logger, network } from './Context'
 import { currentCycle, currentQuarter } from './CycleCreator'
 import { activeByIdOrder, byIdOrder, byPubKey, nodes } from './NodeList'
 import * as Self from './Self'
@@ -31,6 +31,7 @@ import { robustQuery } from './Utils'
 import { isDebugMode } from '../debug'
 import { profilerInstance } from '../utils/profiler'
 import getCallstack from '../utils/getCallstack'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /** STATE */
 
@@ -289,6 +290,17 @@ export async function apoptosizeSelf(message: string) {
   }
   // If we don't have any active nodes; means we are still joining
   if (activeNodes.length > 0) {
+    
+    // If the networks active node count is < 2/3 (or config.p2p.minNodesToApoptosize) of minNodes, don't apoptosize and log a counter instead
+    const minNodesToApoptosize = config.p2p.minNodes * config.p2p.minNodesFractionToApoptosize
+    if (activeNodes.length < minNodesToApoptosize) {
+      // Log a counter to say node is not going to apoptosize
+      const msg = `Not enough active nodes to apoptosize. Active nodes: ${activeNodes.length}, minNodesToApoptosize: ${minNodesToApoptosize}, minNodes: ${config.p2p.minNodes}, minNodesFractionToApoptosize: ${config.p2p.minNodesFractionToApoptosize}`
+      warn(msg)
+      nestedCountersInstance.countEvent('apoptosis', msg)
+      return
+    }
+
     info(`In apoptosizeSelf calling robustQuery proposal`)
     let redunancy = 1
     if (activeNodes.length > 5) {

@@ -41,6 +41,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     gossipTimeout: 180,
     maxSeedNodes: 10,
     minNodesToAllowTxs: 1,
+    minNodesFractionToApoptosize: 0.66,
     minNodes: 15,
     maxNodes: 30,
     seedNodeOffset: 4,
