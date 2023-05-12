@@ -19,6 +19,7 @@ import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
 import Timeout = NodeJS.Timeout
 import { apoptosizeSelf } from './Apoptosis'
+import { randomInt } from 'crypto'
 
 /** STATE */
 
@@ -69,15 +70,17 @@ export function init() {
   }
 
   if (config.p2p.checkNetworkStopped) {
-    networkCheckInterval = setInterval(() => {
-      hasNetworkStopped().then((stopped) => {
-        if (stopped) {
-          const msg = 'checkNetworkStopped: Network has stopped. Initiating apoptosis'
-          info(msg)
-          apoptosizeSelf(msg)
-        }
-      })
-    }, 1000 * 60 * 5)
+    setTimeout(() => {
+      networkCheckInterval = setInterval(() => {
+        hasNetworkStopped().then((stopped) => {
+          if (stopped) {
+            const msg = 'checkNetworkStopped: Network has stopped. Initiating apoptosis'
+            info(msg)
+            apoptosizeSelf(msg)
+          }
+        })
+      }, 1000 * 60 * 5) // Check every 5 min
+    }, randomInt(1000 * 60, 1000 * 60 * 5)) // Stagger initial checks between 1-5 min
   }
 }
 
