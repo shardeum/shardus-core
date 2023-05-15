@@ -11,6 +11,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import { sync } from './Sync'
+import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 
 let syncTimes = []
 let lastCheckedCycleForSyncTimes = 0
@@ -303,7 +304,10 @@ function addActiveTx(request: P2P.ActiveTypes.SignedActiveRequest) {
 }
 
 function validateActiveRequest(request: P2P.ActiveTypes.SignedActiveRequest) {
-  // [TODO] Validate active request
+  // Do not accept active request if node is already active
+  const existing = NodeList.nodes.get(request.nodeId)
+  if (existing && existing.status === NodeStatus.ACTIVE) return false
+  // [TODO] Discuss and implement more active request validation
   return true
 }
 
