@@ -304,10 +304,12 @@ function addActiveTx(request: P2P.ActiveTypes.SignedActiveRequest) {
 }
 
 function validateActiveRequest(request: P2P.ActiveTypes.SignedActiveRequest) {
-  // Do not accept active request if node is already active
-  const existing = NodeList.nodes.get(request.nodeId)
-  if (existing && existing.status === NodeStatus.ACTIVE) return false
-  // [TODO] Discuss and implement more active request validation
+  if (config.p2p.validateActiveRequests === true) {
+    // Do not accept active request if node is already active
+    const existing = NodeList.nodes.get(request.nodeId)
+    if (existing && existing.status === NodeStatus.ACTIVE) return false
+    // [TODO] Discuss and implement more active request validation
+  }
   return true
 }
 

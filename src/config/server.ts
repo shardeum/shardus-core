@@ -72,6 +72,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     extraCyclesToKeep: 33,
     extraCyclesToKeepMultiplier: 1,
     checkNetworkStopped: false,
+    validateActiveRequests: false,
   },
   ip: {
     externalIp: '0.0.0.0',

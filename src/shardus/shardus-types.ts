@@ -678,6 +678,8 @@ export interface ServerConfiguration {
     extraCyclesToKeepMultiplier: number
     /** Should the node remove itself from the network (apoptosize) if the network has stopped */
     checkNetworkStopped: boolean
+    /** Toggles Active Request validation on or off */
+    validateActiveRequests: boolean
   }
   /** Server IP configuration */
   ip?: {
