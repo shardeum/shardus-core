@@ -68,6 +68,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     useSignaturesForAuth: false,
     checkVersion: false,
     extraCyclesToKeep: 33,
+    extraCyclesToKeepMultiplier: 1,
   },
   ip: {
     externalIp: '0.0.0.0',

@@ -208,6 +208,7 @@ export function cyclesToKeep() {
   info('cycles to keep is ' + count)
   //  showNodeCount(newest)
   // Keep a few more than that, just to be safe
+  count = count * Context.config.p2p.extraCyclesToKeepMultiplier
   return count + Context.config.p2p.extraCyclesToKeep
 }
 

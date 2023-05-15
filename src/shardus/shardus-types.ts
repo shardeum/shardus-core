@@ -666,6 +666,8 @@ export interface ServerConfiguration {
     checkVersion: boolean
     /** how many extra cycles should we keep beyond the cycles needed to cover known node counts */
     extraCyclesToKeep: number
+    /** multiplier applied to cycle to keep before extraCyclesToKeep is added */
+    extraCyclesToKeepMultiplier: number
   }
   /** Server IP configuration */
   ip?: {
