@@ -1,22 +1,22 @@
 import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
-const stringify = require('fast-stable-stringify')
+import stringify from 'fast-stable-stringify'
 
 import Profiler from '../utils/profiler'
-import { P2PModuleContext as P2P } from '../p2p/Context'
-import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
-import ShardFunctions from './shardFunctions'
 import AccountCache from './AccountCache'
 import StateManager from '.'
 import { AccountHashCache, QueueEntry, CycleShardData } from './state-manager-types'
 import { StateManager as StateManagerTypes } from '@shardus/types'
 import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
-import { requestNetworkDownsize } from '../p2p/CycleAutoScale'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
-import { constants } from 'fs'
+import Log4js from 'log4js'
+import { Response } from 'express-serve-static-core'
+
+type RawAccountData = { data: { data: { balance: string } } | { balance: string } } | { balance: string }
+type Line = { raw: string, file: { owner: string }}
 
 /**
  * PartitionStats is a system that allows the dapp to build custom anonymous tallies of accounts and committed TXs.
@@ -64,10 +64,10 @@ class PartitionStats {
 
   stateManager: StateManager
 
-  mainLogger: any
-  fatalLogger: any
-  shardLogger: any
-  statsLogger: any
+  mainLogger: Log4js.Logger
+  fatalLogger: Log4js.Logger
+  shardLogger: Log4js.Logger
+  statsLogger: Log4js.Logger
 
   summaryBlobByPartition: Map<number, StateManagerTypes.StateManagerTypes.SummaryBlob>
   summaryPartitionCount: number
@@ -84,7 +84,7 @@ class PartitionStats {
   statemanager_fatal: (key: string, log: string) => void
 
   /** buildStatsReport uses the work queue to build stats reports at the correct times.  do not add items to work queue if stats are disabled */
-  workQueue: { cycle: number; fn: any; args: any[] }[]
+  workQueue: { cycle: number; fn: (...args: unknown[]) => unknown; args: unknown[] }[]
 
   constructor(
     stateManager: StateManager,
@@ -158,7 +158,7 @@ class PartitionStats {
         cycleShardValues = this.stateManager.shardValuesByCycle.get(cycle)
       }
 
-      let blob = this.dumpLogsForCycle(cycle, false, cycleShardValues)
+      const blob = this.dumpLogsForCycle(cycle, false, cycleShardValues)
 
       res.write(stringify(blob) + '\n')
       res.end()
@@ -171,16 +171,16 @@ class PartitionStats {
      */
     Context.network.registerExternalGet('get-stats-report-all', isDebugModeMiddleware, async (req, res) => {
       try {
-        let raw = req.query.raw
+        const raw = req.query.raw
 
-        let cycleNumber = this.stateManager.currentCycleShardData.cycleNumber - 2
+        const cycleNumber = this.stateManager.currentCycleShardData.cycleNumber - 2
         //wow, why does Context.p2p not work..
         res.write(`building shard report c:${cycleNumber} \n`)
-        let activeNodes = Wrapper.p2p.state.getNodes()
-        let lines = []
+        const activeNodes = Wrapper.p2p.state.getNodes()
+        const lines = []
         if (activeNodes) {
-          for (let node of activeNodes.values()) {
-            let getResp = await this.logger._internalHackGetWithResp(
+          for (const node of activeNodes.values()) {
+            const getResp = await this.logger._internalHackGetWithResp(
               `${node.externalIp}:${node.externalPort}/get-stats-dump?cycle=${cycleNumber}`
             )
             if (getResp.body != null && getResp.body != '') {
@@ -192,7 +192,7 @@ class PartitionStats {
             res.write(JSON.stringify(lines))
           } else {
             {
-              let {
+              const {
                 allPassed,
                 allPassedMetric2,
                 singleVotePartitions,
@@ -201,12 +201,17 @@ class PartitionStats {
                 totalTx,
               } = this.processTxStatsDump(res, this.txStatsTallyFunction, lines)
               res.write(
-                `TX statsReport${cycleNumber}  : ${allPassed} pass2: ${allPassedMetric2}  single:${singleVotePartitions} multi:${multiVotePartitions} badPartitions:${badPartitions}\n`
+                `TX statsReport${cycleNumber}  : ${allPassed} pass2: ${allPassedMetric2}  single:${singleVotePartitions} multi:${multiVotePartitions} badPartitions:${badPartitions} totalTx:${totalTx}\n`
               )
             }
             {
-              let { allPassed, allPassedMetric2, singleVotePartitions, multiVotePartitions, badPartitions } =
-                this.processDataStatsDump(res, this.dataStatsTallyFunction, lines)
+              const {
+                allPassed,
+                allPassedMetric2,
+                singleVotePartitions,
+                multiVotePartitions,
+                badPartitions,
+              } = this.processDataStatsDump(res, this.dataStatsTallyFunction, lines)
               res.write(
                 `DATA statsReport${cycleNumber}  : ${allPassed} pass2: ${allPassedMetric2}  single:${singleVotePartitions} multi:${multiVotePartitions} badPartitions:${badPartitions}\n`
               )
@@ -256,7 +261,7 @@ class PartitionStats {
    * @param cycleNumber
    */
   initTXSummaryBlobsForCycle(cycleNumber: number): StateManagerTypes.StateManagerTypes.SummaryBlobCollection {
-    let summaryBlobCollection = { cycle: cycleNumber, blobsByPartition: new Map() }
+    const summaryBlobCollection = { cycle: cycleNumber, blobsByPartition: new Map() }
     for (let i = 0; i < this.summaryPartitionCount; i++) {
       summaryBlobCollection.blobsByPartition.set(i, this.getNewSummaryBlob(i))
     }
@@ -282,7 +287,9 @@ class PartitionStats {
       return null
     }
     for (let i = this.txSummaryBlobCollections.length - 1; i >= 0; i--) {
-      let summaryBlobCollection = this.txSummaryBlobCollections[i]
+      // index is a number and never out of bounds
+      // eslint-disable-next-line security/detect-object-injection
+      const summaryBlobCollection = this.txSummaryBlobCollections[i]
       if (summaryBlobCollection.cycle === cycle) {
         summaryBlobCollectionToUse = summaryBlobCollection
         break
@@ -290,43 +297,14 @@ class PartitionStats {
     }
     if (summaryBlobCollectionToUse === null) {
       summaryBlobCollectionToUse = this.initTXSummaryBlobsForCycle(cycle)
-      // this.txSummaryBlobCollections.push(summaryBlobCollectionToUse)
     }
     return summaryBlobCollectionToUse
   }
 
-  /**
-   * Get the correct summary blob partition that matches this address.
-   * Address must be in the account space. (i.e. AccountIDs)
-   * Never pass a TX id into this (we use the first sorted writable account key for a TX)
-   * @param address
-   */
-  // getSummaryBlobPartition(address: string): number {
-  //   let addressNum = parseInt(address.slice(0, 8), 16)
-  //   // 2^32  4294967296 or 0xFFFFFFFF + 1
-  //   let size = Math.round((0xffffffff + 1) / this.summaryPartitionCount)
-  //   //let preRound = addressNum / size
-  //   let summaryPartition = Math.floor(addressNum / size)
-
-  //   if (this.extensiveRangeChecking) {
-  //     if (summaryPartition < 0) {
-  //       /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`getSummaryBlobPartition summaryPartition < 0 ${summaryPartition}`)
-  //     }
-  //     if (summaryPartition > this.summaryPartitionCount) {
-  //       /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`getSummaryBlobPartition summaryPartition > this.summaryPartitionCount ${summaryPartition}`)
-  //     }
-  //   }
-
-  //   if (summaryPartition === this.summaryPartitionCount) {
-  //     summaryPartition = summaryPartition - 1
-  //   }
-  //   return summaryPartition
-  // }
-
-  //requires exactly 4096 partitions.
+  // requires exactly 4096 partitions.
   getSummaryBlobPartition(address: string): number {
-    let threebyteHex = address.slice(0, 3)
-    let summaryPartition = Number.parseInt(threebyteHex, 16)
+    const threebyteHex = address.slice(0, 3)
+    const summaryPartition = Number.parseInt(threebyteHex, 16)
 
     return summaryPartition
   }
@@ -338,19 +316,19 @@ class PartitionStats {
    * @param address
    */
   getSummaryBlob(address: string): StateManagerTypes.StateManagerTypes.SummaryBlob {
-    let partition = this.getSummaryBlobPartition(address)
+    const partition = this.getSummaryBlobPartition(address)
 
     //lazy create summary blob.  TODO way to clean long unused/uncoveraged blobs? (could help with memory in a minor way)
     if (this.summaryBlobByPartition.has(partition) === false) {
       this.summaryBlobByPartition.set(partition, this.getNewSummaryBlob(partition))
     }
 
-    let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.summaryBlobByPartition.get(partition)
+    const blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.summaryBlobByPartition.get(partition)
     return blob
   }
 
   //todo , I think this is redundant and removable now.
-  hasAccountBeenSeenByStats(accountId) {
+  hasAccountBeenSeenByStats(accountId: string) {
     return this.accountCache.hasAccount(accountId)
   }
 
@@ -392,12 +370,12 @@ class PartitionStats {
     map: Map<number, boolean>
   } {
     //figure out which summary partitions are fully covered by
-    let result = { list: [], map: new Map() }
+    const result = { list: [], map: new Map() }
 
-    let consensusStartPartition = cycleShardData.nodeShardData.consensusStartPartition
-    let consensusEndPartition = cycleShardData.nodeShardData.consensusEndPartition
+    const consensusStartPartition = cycleShardData.nodeShardData.consensusStartPartition
+    const consensusEndPartition = cycleShardData.nodeShardData.consensusEndPartition
 
-    let outOfRange = this.stateManager.accountPatcher.getNonParitionRanges(
+    const outOfRange = this.stateManager.accountPatcher.getNonParitionRanges(
       cycleShardData,
       consensusStartPartition,
       consensusEndPartition,
@@ -407,7 +385,7 @@ class PartitionStats {
     if (outOfRange.length === 0) {
       return result
     }
-    let lowN, highN, lowN2, highN2
+    let lowN: number, highN: number, lowN2: number, highN2: number
     let twoRanges = false
 
     //note we dialate the ranges by 1. the partitions are already dialated by one but that is not enough.
@@ -459,8 +437,8 @@ class PartitionStats {
    * @param accountDataRaw
    * @param debugMsg
    */
-  statsDataSummaryInit(cycle: number, accountId: string, accountDataRaw: any, debugMsg: string) {
-    let opCounter = this.statsProcessCounter++
+  statsDataSummaryInit(cycle: number, accountId: string, accountDataRaw: unknown, debugMsg: string) {
+    const opCounter = this.statsProcessCounter++
     if (this.invasiveDebugInfo)
       this.mainLogger.debug(
         `statData enter:statsDataSummaryInit op:${opCounter} c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(
@@ -468,13 +446,13 @@ class PartitionStats {
         )}  inputs:${JSON.stringify({ accountDataRaw })}`
       )
 
-    let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountId)
+    const blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountId)
     blob.counter++
 
     if (this.accountCache.hasAccount(accountId)) {
       return
     }
-    let accountInfo = this.app.getTimestampAndHashFromAccount(accountDataRaw)
+    const accountInfo = this.app.getTimestampAndHashFromAccount(accountDataRaw)
     this.accountCache.updateAccountHash(accountId, accountInfo.hash, accountInfo.timestamp, cycle)
 
     if (accountDataRaw == null) {
@@ -506,7 +484,7 @@ class PartitionStats {
   private internalDoInit(
     cycle: number,
     blob: StateManagerTypes.StateManagerTypes.SummaryBlob,
-    accountDataRaw: any,
+    accountDataRaw: RawAccountData,
     accountId: string,
     opCounter: number
   ) {
@@ -551,11 +529,11 @@ class PartitionStats {
    */
   statsDataSummaryUpdate(
     cycle: number,
-    accountDataBefore: any,
+    accountDataBefore: unknown,
     accountDataAfter: Shardus.WrappedData,
     debugMsg: string
   ) {
-    let opCounter = this.statsProcessCounter++
+    const opCounter = this.statsProcessCounter++
     if (this.invasiveDebugInfo)
       this.mainLogger.debug(
         `statData enter:statsDataSummaryUpdate op:${opCounter} c:${cycle} ${debugMsg}  accForBin:${utils.makeShortHash(
@@ -566,7 +544,7 @@ class PartitionStats {
         })}`
       )
 
-    let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(
+    const blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(
       accountDataAfter.accountId
     )
     blob.counter++
@@ -581,12 +559,12 @@ class PartitionStats {
       return
     }
 
-    let accountId = accountDataAfter.accountId
-    let timestamp = accountDataAfter.timestamp //  this.app.getAccountTimestamp(accountId)
-    let hash = accountDataAfter.stateId //this.app.getStateId(accountId)
+    const accountId = accountDataAfter.accountId
+    const timestamp = accountDataAfter.timestamp //  this.app.getAccountTimestamp(accountId)
+    const hash = accountDataAfter.stateId //this.app.getStateId(accountId)
 
     if (this.accountCache.hasAccount(accountId)) {
-      let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
+      const accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
       if (accountMemData.t > timestamp) {
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}  ${debugMsg}  ${accountMemData.t} > ${timestamp}  afterHash:${utils.makeShortHash(accountDataAfter.stateId)}`)
         return
@@ -618,7 +596,7 @@ class PartitionStats {
   private internalDoUpdate(
     cycle: number,
     blob: StateManagerTypes.StateManagerTypes.SummaryBlob,
-    accountDataBefore: any,
+    accountDataBefore: unknown,
     accountDataAfter: Shardus.WrappedData,
     opCounter: number
   ) {
@@ -630,7 +608,9 @@ class PartitionStats {
       this.mainLogger.debug(
         `statData:statsDataSummaryUpdate op:${opCounter} c:${cycle} accForBin:${utils.makeShortHash(
           accountDataAfter.accountId
-        )}   ${this.debugAccountData(accountDataAfter.data)} - ${this.debugAccountData(accountDataBefore)}`
+        )}   ${this.debugAccountData(accountDataAfter.data as RawAccountData)} - ${this.debugAccountData(
+          accountDataBefore as RawAccountData
+        )}`
       )
     if (this.invasiveDebugInfo) this.addDebugToBlob(blob, accountDataAfter.accountId)
   }
@@ -655,7 +635,7 @@ class PartitionStats {
   statsTxSummaryUpdate(cycle: number, queueEntry: QueueEntry) {
     let accountToUseForTXStatBinning = null
     //this list of uniqueWritableKeys is not sorted and deterministic
-    for (let key of queueEntry.uniqueWritableKeys) {
+    for (const key of queueEntry.uniqueWritableKeys) {
       accountToUseForTXStatBinning = key
       break // just use the first for now.. could do something fance
     }
@@ -667,11 +647,11 @@ class PartitionStats {
       return
     }
 
-    let partition = this.getSummaryBlobPartition(accountToUseForTXStatBinning) //very important to not use: queueEntry.acceptedTx.ids
-    let summaryBlobCollection = this.getOrCreateTXSummaryBlobCollectionByCycle(queueEntry.cycleToRecordOn)
+    const partition = this.getSummaryBlobPartition(accountToUseForTXStatBinning) //very important to not use: queueEntry.acceptedTx.ids
+    const summaryBlobCollection = this.getOrCreateTXSummaryBlobCollectionByCycle(queueEntry.cycleToRecordOn)
 
     if (summaryBlobCollection != null) {
-      let blob: StateManagerTypes.StateManagerTypes.SummaryBlob =
+      const blob: StateManagerTypes.StateManagerTypes.SummaryBlob =
         summaryBlobCollection.blobsByPartition.get(partition)
       if (cycle > blob.latestCycle) {
         blob.latestCycle = cycle //todo condider if we can remove this.  getOrCreateTXSummaryBlobCollectionByCycle should give us the correct blob
@@ -722,13 +702,13 @@ class PartitionStats {
    */
   buildStatsReport(
     cycleShardData: CycleShardData,
-    excludeEmpty: boolean = true
+    excludeEmpty = true
   ): StateManagerTypes.StateManagerTypes.StatsClump {
-    let cycle = cycleShardData.cycleNumber
-    let nextQueue = []
+    const cycle = cycleShardData.cycleNumber
+    const nextQueue = []
 
     //Execute our work queue for any items that are for this cycle or older
-    for (let item of this.workQueue) {
+    for (const item of this.workQueue) {
       if (item.cycle <= cycle) {
         item.fn.apply(this, item.args)
       } else {
@@ -739,7 +719,7 @@ class PartitionStats {
     this.workQueue = nextQueue
 
     //start building the statsDump
-    let statsDump: StateManagerTypes.StateManagerTypes.StatsClump = {
+    const statsDump: StateManagerTypes.StateManagerTypes.StatsClump = {
       error: false,
       cycle,
       dataStats: [],
@@ -763,8 +743,8 @@ class PartitionStats {
     statsDump.covered = covered.list
 
     //get out a sparse collection data blobs
-    for (let key of this.summaryBlobByPartition.keys()) {
-      let summaryBlob = this.summaryBlobByPartition.get(key)
+    for (const key of this.summaryBlobByPartition.keys()) {
+      const summaryBlob = this.summaryBlobByPartition.get(key)
 
       if (covered.map.has(key) === false) {
         skippedParitionCount++
@@ -778,10 +758,10 @@ class PartitionStats {
       continue
     }
 
-    let summaryBlobCollection = this.getOrCreateTXSummaryBlobCollectionByCycle(cycle)
+    const summaryBlobCollection = this.getOrCreateTXSummaryBlobCollectionByCycle(cycle)
     if (summaryBlobCollection != null) {
-      for (let key of summaryBlobCollection.blobsByPartition.keys()) {
-        let summaryBlob = summaryBlobCollection.blobsByPartition.get(key)
+      for (const key of summaryBlobCollection.blobsByPartition.keys()) {
+        const summaryBlob = summaryBlobCollection.blobsByPartition.get(key)
 
         if (covered.map.has(key) === false) {
           continue
@@ -812,8 +792,8 @@ class PartitionStats {
    * @param writeTofile
    * @param cycleShardData
    */
-  dumpLogsForCycle(cycle: number, writeTofile: boolean = true, cycleShardData: CycleShardData = null) {
-    let statsDump = { cycle, dataStats: [], txStats: [], covered: [], cycleDebugNotes: {} }
+  dumpLogsForCycle(cycle: number, writeTofile = true, cycleShardData: CycleShardData = null) {
+    const statsDump = { cycle, dataStats: [], txStats: [], covered: [], cycleDebugNotes: {} }
 
     statsDump.cycleDebugNotes = this.stateManager.cycleDebugNotes
 
@@ -824,17 +804,17 @@ class PartitionStats {
     }
 
     //get out a sparse collection data blobs
-    for (let key of this.summaryBlobByPartition.keys()) {
-      let summaryBlob = this.summaryBlobByPartition.get(key)
+    for (const key of this.summaryBlobByPartition.keys()) {
+      const summaryBlob = this.summaryBlobByPartition.get(key)
       if (summaryBlob.counter > 0) {
         statsDump.dataStats.push(summaryBlob)
       }
     }
 
-    let summaryBlobCollection = this.getOrCreateTXSummaryBlobCollectionByCycle(cycle)
+    const summaryBlobCollection = this.getOrCreateTXSummaryBlobCollectionByCycle(cycle)
     if (summaryBlobCollection != null) {
-      for (let key of summaryBlobCollection.blobsByPartition.keys()) {
-        let summaryBlob = summaryBlobCollection.blobsByPartition.get(key)
+      for (const key of summaryBlobCollection.blobsByPartition.keys()) {
+        const summaryBlob = summaryBlobCollection.blobsByPartition.get(key)
         if (summaryBlob.counter > 0) {
           statsDump.txStats.push(summaryBlob)
         }
@@ -859,20 +839,21 @@ class PartitionStats {
    *    ##        ##    ##  ##     ## ##    ## ##       ##    ## ##    ## ##     ## ##     ##    ##    ##     ## ##    ##    ##    ##     ##    ##    ##    ## ##     ## ##     ## ##     ## ##
    *    ##        ##     ##  #######   ######  ########  ######   ######  ########  ##     ##    ##    ##     ##  ######     ##    ##     ##    ##     ######  ########   #######  ##     ## ##
    */
-  processDataStatsDump(stream, tallyFunction, lines) {
-    // let stream = fs.createWriteStream(path, {
-    //   flags: 'w'
-    // })
-    let dataByParition = new Map()
+  processDataStatsDump(
+    stream: Response<unknown, Record<string, unknown>, number>,
+    tallyFunction: { (opaqueBlob: unknown): unknown; (arg0: unknown): unknown },
+    lines: Line[]
+  ) {
+    const dataByParition = new Map()
 
     let newestCycle = -1
-    let statsBlobs = []
-    for (let line of lines) {
-      let index = line.raw.indexOf('{"covered')
+    const statsBlobs = []
+    for (const line of lines) {
+      const index = line.raw.indexOf('{"covered')
       if (index >= 0) {
-        let statsStr = line.raw.slice(index)
+        const statsStr = line.raw.slice(index)
         //this.generalLog(string)
-        let statsObj
+        let statsObj: { cycle: number; owner: string }
         try {
           statsObj = JSON.parse(statsStr)
         } catch (err) {
@@ -896,19 +877,27 @@ class PartitionStats {
       }
     }
 
-    for (let statsObj of statsBlobs) {
-      let coveredMap = new Map()
-      for (let partition of statsObj.covered) {
+    for (const statsObj of statsBlobs) {
+      const coveredMap = new Map()
+      for (const partition of statsObj.covered) {
         coveredMap.set(partition, true)
       }
 
       if (statsObj.cycle === newestCycle) {
-        for (let dataStatsObj of statsObj.dataStats) {
-          let partition = dataStatsObj.partition
+        for (const dataStatsObj of statsObj.dataStats) {
+          const partition = dataStatsObj.partition
           if (coveredMap.has(partition) === false) {
             continue
           }
-          let dataTally
+          let dataTally: {
+            data: object[]
+            dataStrings: Record<string, number>
+            differentVotes: number
+            voters: number
+            bestVote: unknown
+            tallyList: unknown[]
+            partition?: unknown
+          }
           if (dataByParition.has(partition) === false) {
             dataTally = {
               partition,
@@ -922,26 +911,27 @@ class PartitionStats {
             dataByParition.set(partition, dataTally)
           }
 
-          let dataString = stringify(dataStatsObj.opaqueBlob)
+          const dataString = stringify(dataStatsObj.opaqueBlob)
           dataTally = dataByParition.get(partition)
 
           dataTally.data.push(dataStatsObj)
+          // `dataString` is only ever used to index a map of numbers, so this
+          // is probably safe
+          /* eslint-disable security/detect-object-injection */
           if (dataTally.dataStrings[dataString] == null) {
             dataTally.dataStrings[dataString] = 0
             dataTally.differentVotes++
           }
           dataTally.voters++
           dataTally.dataStrings[dataString]++
-          let votes = dataTally.dataStrings[dataString]
+          const votes = dataTally.dataStrings[dataString]
           if (votes > dataTally.bestVote) {
             dataTally.bestVote = votes
-          } else {
-            let debug = 1
           }
           if (tallyFunction != null) {
             dataTally.tallyList.push(tallyFunction(dataStatsObj.opaqueBlob))
-            // console.log(' dataTally',  dataTally)
           }
+          /* eslint-enable security/detect-object-injection */
         }
       }
     }
@@ -949,8 +939,8 @@ class PartitionStats {
     let allPassedMetric2 = true
     let singleVotePartitions = 0
     let multiVotePartitions = 0
-    let badPartitions = []
-    for (let dataTally of dataByParition.values()) {
+    const badPartitions = []
+    for (const dataTally of dataByParition.values()) {
       if (dataTally.differentVotes === 1) {
         singleVotePartitions++
       }
@@ -959,8 +949,7 @@ class PartitionStats {
         allPassed = false
         badPartitions.push(dataTally.partition)
 
-        if (dataTally.bestVote >= Math.ceil(dataTally.voters / 3)) {
-        } else {
+        if (dataTally.bestVote < Math.ceil(dataTally.voters / 3)) {
           allPassedMetric2 = false
         }
       }
@@ -987,20 +976,31 @@ class PartitionStats {
    *    ##        ##    ##  ##     ## ##    ## ##       ##    ## ##    ##    ##     ##   ##  ##    ##    ##    ##     ##    ##    ##    ## ##     ## ##     ## ##     ## ##
    *    ##        ##     ##  #######   ######  ########  ######   ######     ##    ##     ##  ######     ##    ##     ##    ##     ######  ########   #######  ##     ## ##
    */
-  processTxStatsDump(stream, tallyFunction, lines) {
+  processTxStatsDump(
+    stream: Response<unknown, Record<string, unknown>, number>,
+    tallyFunction: { (opaqueBlob: { totalTx?: number }): number; (arg0: unknown): unknown },
+    lines: Line[]
+  ): {
+    allPassed: boolean
+    allPassedMetric2: boolean
+    singleVotePartitions: number
+    multiVotePartitions: number
+    badPartitions: unknown[]
+    totalTx: number
+  } {
     // let stream = fs.createWriteStream(path, {
     //   flags: 'w'
     // })
-    let dataByParition = new Map()
+    const dataByParition = new Map()
 
     let newestCycle = -1
-    let statsBlobs = []
-    for (let line of lines) {
-      let index = line.raw.indexOf('{"covered')
+    const statsBlobs = []
+    for (const line of lines) {
+      const index = line.raw.indexOf('{"covered')
       if (index >= 0) {
-        let statsStr = line.raw.slice(index)
+        const statsStr = line.raw.slice(index)
         //this.generalLog(string)
-        let statsObj
+        let statsObj: { cycle: number; owner: string }
         try {
           statsObj = JSON.parse(statsStr)
         } catch (err) {
@@ -1022,22 +1022,31 @@ class PartitionStats {
         statsObj.owner = line.file.owner // line.raw.slice(0, index)
       }
     }
-    let txCountMap = new Map()
-    for (let statsObj of statsBlobs) {
+    const txCountMap = new Map()
+    for (const statsObj of statsBlobs) {
       if (!txCountMap.has(statsObj.owner)) {
         txCountMap.set(statsObj.owner, [])
       }
-      let coveredMap = new Map()
-      for (let partition of statsObj.covered) {
+      const coveredMap = new Map()
+      for (const partition of statsObj.covered) {
         coveredMap.set(partition, true)
       }
-      let dataTallyListForThisOwner = []
-      for (let txStatsObj of statsObj.txStats) {
-        let partition = txStatsObj.partition
+      const dataTallyListForThisOwner = []
+      for (const txStatsObj of statsObj.txStats) {
+        const partition = txStatsObj.partition
         if (coveredMap.has(partition) === false) {
           continue
         }
-        let dataTally
+        let dataTally: {
+          data: unknown[]
+          dataStrings: Record<string, number>
+          differentVotes: number
+          voters: number
+          bestVote: number
+          bestVoteValue: number
+          tallyList: unknown[]
+          partition?: number
+        }
         if (dataByParition.has(partition) === false) {
           dataTally = {
             partition,
@@ -1052,23 +1061,25 @@ class PartitionStats {
           dataByParition.set(partition, dataTally)
         }
 
-        let dataString = stringify(txStatsObj.opaqueBlob)
+        const dataString = stringify(txStatsObj.opaqueBlob)
         dataTally = dataByParition.get(partition)
 
         dataTally.data.push(txStatsObj)
+        // `dataString` is only ever used to index a map of numbers, so this
+        // is probably safe
+        /* eslint-disable security/detect-object-injection */
         if (dataTally.dataStrings[dataString] == null) {
           dataTally.dataStrings[dataString] = 0
           dataTally.differentVotes++
         }
         dataTally.voters++
         dataTally.dataStrings[dataString]++
-        let votes = dataTally.dataStrings[dataString]
+        const votes = dataTally.dataStrings[dataString]
         if (votes > dataTally.bestVote) {
           dataTally.bestVote = votes
           dataTally.bestVoteValue = txStatsObj.opaqueBlob
-        } else {
-          let debug = 1
         }
+        /* eslint-enable security/detect-object-injection */
         if (tallyFunction != null) {
           dataTally.tallyList.push(tallyFunction(txStatsObj.opaqueBlob))
           if (dataTally.differentVotes > 1) {
@@ -1081,7 +1092,7 @@ class PartitionStats {
         }
       }
       let totalTx = 0
-      for (let dataTally of dataTallyListForThisOwner) {
+      for (const dataTally of dataTallyListForThisOwner) {
         if (dataTally.bestVoteValue) {
           totalTx += dataTally.bestVoteValue.totalTx
         }
@@ -1094,10 +1105,9 @@ class PartitionStats {
     let allPassedMetric2 = true
     let singleVotePartitions = 0
     let multiVotePartitions = 0
-    let badPartitions = []
+    const badPartitions = []
     let sum = 0
-    for (let dataTally of dataByParition.values()) {
-      // console.log('dataByPartition', dataByParition)
+    for (const dataTally of dataByParition.values()) {
       sum += dataTally.bestVoteValue.totalTx || 0
       if (dataTally.differentVotes === 1) {
         singleVotePartitions++
@@ -1106,20 +1116,18 @@ class PartitionStats {
         multiVotePartitions++
         allPassed = false
         badPartitions.push(dataTally.partition)
-        //stream.write(`dataTally string partititon ${dataTally.partition}\n`, dataTally.dataStrings)
 
-        if (dataTally.bestVote >= Math.ceil(dataTally.voters / 3)) {
-        } else {
+        if (dataTally.bestVote < Math.ceil(dataTally.voters / 3)) {
           allPassedMetric2 = false
         }
       }
     }
 
     //print non zero issues
-    for (let statsObj of statsBlobs) {
+    for (const statsObj of statsBlobs) {
       if (statsObj.cycleDebugNotes != null) {
-        for (const [key, value] of Object.entries(statsObj.cycleDebugNotes)) {
-          let valueNum = value as number
+        for (const [, value] of Object.entries(statsObj.cycleDebugNotes)) {
+          const valueNum = value as number
           if (valueNum >= 1) {
             stream.write(`${statsObj.owner} : ${JSON.stringify(statsObj.cycleDebugNotes)}`)
             break
@@ -1139,13 +1147,13 @@ class PartitionStats {
     }
   }
 
-  dataStatsTallyFunction(opaqueBlob) {
+  dataStatsTallyFunction(opaqueBlob: { totalBalance?: number }): number {
     if (opaqueBlob.totalBalance == null) {
       return 0
     }
     return opaqueBlob.totalBalance
   }
-  txStatsTallyFunction(opaqueBlob) {
+  txStatsTallyFunction(opaqueBlob: { totalTx?: number }): number {
     if (opaqueBlob.totalTx == null) {
       return 0
     }
@@ -1154,33 +1162,43 @@ class PartitionStats {
 
   //NOTE THIS IS NOT GENERAL PURPOSE... only works in some cases. only for debug
   //this code should not know about balance.
-  debugAccountData(accountData) {
-    if (accountData.data && accountData.data.data && accountData.data.data.balance) {
+  debugAccountData(accountData: RawAccountData): string {
+    if (
+      'data' in accountData &&
+      'data' in accountData.data &&
+      'balance' in accountData.data.data &&
+      accountData?.data?.data?.balance
+    ) {
       return accountData.data.data.balance
     }
-    if (accountData.data && accountData.data.balance) {
+    if ('data' in accountData && 'balance' in accountData.data && accountData.data.balance) {
       return accountData.data.balance
     }
-    if (accountData == null) {
-      return 'X'
+    if (typeof accountData === 'object' && 'balance' in accountData) {
+      return accountData.balance
     }
 
-    //if(accountData.balance){
-    return accountData.balance
-    //}
-
-    //return '_'
+    return 'X'
   }
 
   //debug helper for invasiveDebugInfo
-  addDebugToBlob(blob, accountID) {
+  addDebugToBlob(
+    blob: {
+      latestCycle?: number
+      counter?: number
+      errorNull?: number
+      partition?: number
+      opaqueBlob: { dbgData?: unknown[] }
+    },
+    accountID: string
+  ): void {
     //todo be sure to turn off this setting when not debugging.
     if (this.invasiveDebugInfo) {
       if (blob.opaqueBlob.dbgData == null) {
         blob.opaqueBlob.dbgData = []
       }
       //add unique.. this would be faster with a set, but dont want to have to post process sort the set later!
-      let shortID = utils.makeShortHash(accountID)
+      const shortID = utils.makeShortHash(accountID)
       if (blob.opaqueBlob.dbgData.indexOf(shortID) === -1) {
         blob.opaqueBlob.dbgData.push(shortID)
         blob.opaqueBlob.dbgData.sort()

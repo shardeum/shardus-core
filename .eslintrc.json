@@ -17,7 +17,6 @@
   "ignorePatterns": [
     "betterSqlite3storage.ts",
     "state-manager-types.ts",
-    "PartitionStats.ts",
     "AccountPatcher.ts",
     "partition-gossip.ts",
     "shardus-types.ts",
