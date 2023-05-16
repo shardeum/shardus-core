@@ -225,7 +225,7 @@ export function addLeaveRequest(request, tracker?, gossip = true) {
   let err = validateTypes(request, { nodeInfo: 'o', sign: 'o' })
   if (err) {
     warn('addLeaveRequest: bad leaveRequest ' + err)
-    return false
+    return { success: false, reason: 'bad leaveRequest ' + err }
   }
   err = validateTypes(request.nodeInfo, {
     curvePk: 's',
@@ -235,24 +235,35 @@ export function addLeaveRequest(request, tracker?, gossip = true) {
   })
   if (err) {
     warn('addLeaveRequest: bad leaveRequest.nodeInfo ' + err)
-    return false
+    return { success: false, reason: 'bad leaveRequest.nodeInfo ' + err }
   }
   err = validateTypes(request.sign, { owner: 's', sig: 's' })
   if (err) {
     warn('addLeaveRequest: bad leaveRequest.sign ' + err)
-    return false
+    return { success: false, reason: 'bad leaveRequest.sign ' + err }
   }
   if (!crypto.verify(request)) {
     warn('addLeaveRequest: bad signature')
-    return false
+    return { success: false, reason: 'bad signature' }
   }
 
+  if (!archivers.get(request.nodeInfo.publicKey)) {
+    warn('addLeaveRequest: Not a valid archiver to be sending leave request, archiver was not found in active archiver list')
+    return { success: false, reason: 'Not a valid archiver to be sending leave request, archiver was not found in active archiver list' }
+  }
+  const existingLeaveRequest = leaveRequests.find(
+    (j) => j.nodeInfo.publicKey === request.nodeInfo.publicKey
+  )
+  if (existingLeaveRequest) {
+    warn('addLeaveRequest: Leave request already exists')
+    return { success: false, reason: 'Leave request already exists' }
+  }
   leaveRequests.push(request)
   if (logFlags.console) console.log('adding leave requests', leaveRequests)
   if (gossip === true) {
     Comms.sendGossip('leavingarchiver', request, tracker, null, NodeList.byIdOrder, true)
   }
-  return true
+  return { success: true }
 }
 
 export function getArchiverUpdates() {
@@ -264,6 +275,7 @@ export function updateArchivers(record) {
   for (const nodeInfo of record.leavingArchivers) {
     archivers.delete(nodeInfo.publicKey)
     removeDataRecipient(nodeInfo.publicKey)
+    removeArchiverConnection(nodeInfo.publicKey)
     leaveRequests = leaveRequests.filter((request) => request.nodeInfo.publicKey !== nodeInfo.publicKey)
   }
   for (const nodeInfo of record.joinedArchivers) {
@@ -631,15 +643,11 @@ export function registerRoutes() {
     const leaveRequest = req.body
     if (logFlags.p2pNonFatal) info(`Archiver leave request received: ${JSON.stringify(leaveRequest)}`)
 
-    if(!archivers.get(leaveRequest.nodeInfo.publicKey)){
-      return res.json({success: false, error: 'Not a valid archiver to be sending leave request, archiver was not found in active archiver list'})
-    }
-
     const accepted = await addLeaveRequest(leaveRequest)
-    if (!accepted){
+    if (!accepted.success) {
       warn('Archiver leave request not accepted.')
-      return res.json({ success: false, error: 'Archiver leave request rejected' })
-    } 
+      return res.json({ success: false, error: `Archiver leave request rejected! ${accepted.reason}` })
+    }
     if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')
     return res.json({ success: true })
   })
@@ -677,17 +685,10 @@ export function registerRoutes() {
         return warn('Archiver leave gossip came from invalid consensor');
       }
       if (logFlags.console) console.log('Leave request gossip received:', payload)
-      const existingLeaveRequest = leaveRequests.find(
-        (j) => j.nodeInfo.publicKey === payload.nodeInfo.publicKey
-      )
-      if (!existingLeaveRequest) {
-        const accepted = await addLeaveRequest(payload, tracker, false)
-        if (!accepted) return warn('Archiver leave request not accepted.')
-        if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')
-        Comms.sendGossip('leavingarchiver', payload, tracker, sender, NodeList.byIdOrder, false)
-      } else {
-        if (logFlags.console) console.log('Already received archiver leave gossip for this node')
-      }
+      const accepted = await addLeaveRequest(payload, tracker, false)
+      if (!accepted.success) return warn('Archiver leave request not accepted.')
+      if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')
+      Comms.sendGossip('leavingarchiver', payload, tracker, sender, NodeList.byIdOrder, false)
     } finally {
       profilerInstance.scopedProfileSectionEnd('leavingarchiver')
     }
