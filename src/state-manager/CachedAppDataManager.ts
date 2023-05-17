@@ -150,7 +150,6 @@ class CachedAppDataManager {
         }
       }
       cacheTopic.cachedAppDataArray = prunedCachedAppDataArray.reverse()
-      console.log('cacheTopic.cachedAppDataArray', cacheTopic.cachedAppDataArray)
       if (logFlags.verbose) {
         this.mainLogger.debug(
           `Updated cached array size: ${cacheTopic.cachedAppDataArray.length}, cacheMapSize: ${cacheTopic.cacheAppDataMap.size}`
