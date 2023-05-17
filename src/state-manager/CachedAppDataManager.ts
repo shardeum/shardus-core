@@ -3,7 +3,7 @@ import { Logger as Log4jsLogger } from 'log4js'
 import StateManager from '.'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
-import { P2PModuleContext as P2P } from '../p2p/Context'
+import { P2PModuleContext as P2P, config } from '../p2p/Context'
 import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
 import { reversed } from '../utils'
@@ -66,6 +66,7 @@ class CachedAppDataManager {
     this.stateManager = stateManager
 
     this.cacheTopicMap = new Map()
+    setInterval(this.pruneCachedItems.bind(this), 1000 * config.p2p.cycleDuration) // prune every cycle
   }
 
   setupHandlers() {
@@ -127,6 +128,37 @@ class CachedAppDataManager {
     return cachedAppData
   }
 
+  // Check and prune cache items for each topic
+  pruneCachedItems() {
+    for (const [, cacheTopic] of this.cacheTopicMap.entries()) {
+      let count = 0
+      const { maxCycleAge, maxCacheElements } = cacheTopic
+      const prunedCachedAppDataArray = []
+      for (const cachedAppData of reversed(cacheTopic.cachedAppDataArray)) {
+        count += 1
+        const cycleAge = this.stateManager.currentCycleShardData.cycleNumber - cachedAppData.cycle
+
+        if (cycleAge > maxCycleAge || count > maxCacheElements) {
+          if (logFlags.verbose) {
+            this.mainLogger.debug(
+              `Deleting dataId ${cachedAppData.dataID} from cache map. cycleAge: ${cycleAge}, count: ${count}`
+            )
+          }
+          cacheTopic.cacheAppDataMap.delete(cachedAppData.dataID)
+        } else {
+          prunedCachedAppDataArray.push(cachedAppData)
+        }
+      }
+      cacheTopic.cachedAppDataArray = prunedCachedAppDataArray.reverse()
+      console.log('cacheTopic.cachedAppDataArray', cacheTopic.cachedAppDataArray)
+      if (logFlags.verbose) {
+        this.mainLogger.debug(
+          `Updated cached array size: ${cacheTopic.cachedAppDataArray.length}, cacheMapSize: ${cacheTopic.cacheAppDataMap.size}`
+        )
+      }
+    }
+  }
+
   insertCachedItem(topic: string, dataID: string, appData: unknown, cycle: number) {
     const cachedAppData: CachedAppData = {
       dataID,
@@ -141,31 +173,10 @@ class CachedAppDataManager {
       )
       return
     }
-    const { maxCycleAge, maxCacheElements } = cacheTopic
-    cacheTopic.cachedAppDataArray.push(cachedAppData)
-    cacheTopic.cacheAppDataMap.set(dataID, cachedAppData)
-
-    // check and prune cache items for this topic
-    let count = 0
-    const filteredCachedAppDataArray: CachedAppData[] = []
-    for (const cachedAppData of reversed(cacheTopic.cachedAppDataArray)) {
-      count += 1
-      const cycleAge = this.stateManager.currentCycleShardData.cycleNumber - cachedAppData.cycle
-      if (cycleAge > maxCycleAge || count > maxCacheElements) {
-        if (logFlags.verbose)
-          this.mainLogger.debug(
-            `Deleting dataId ${cachedAppData.dataID} from cache map. cycleAge: ${cycleAge}, count: ${count}`
-          )
-        cacheTopic.cacheAppDataMap.delete(cachedAppData.dataID)
-      } else {
-        filteredCachedAppDataArray.unshift(cachedAppData)
-      }
+    if (!cacheTopic.cacheAppDataMap.has(dataID)) {
+      cacheTopic.cacheAppDataMap.set(dataID, cachedAppData)
+      cacheTopic.cachedAppDataArray.push(cachedAppData)
     }
-    cacheTopic.cachedAppDataArray = [...filteredCachedAppDataArray]
-    if (logFlags.verbose)
-      this.mainLogger.debug(
-        `Updated cached array size: ${cacheTopic.cachedAppDataArray.length}, cacheMapSize: ${cacheTopic.cacheAppDataMap.size}`
-      )
   }
 
   async sendCorrespondingCachedAppData(
