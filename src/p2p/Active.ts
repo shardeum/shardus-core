@@ -238,6 +238,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   if (record.activated.includes(Self.id)) {
     Self.setActive()
     Self.emitter.emit('active', Self.id)
+    Self.updateNodeState(P2P.P2PTypes.NodeStatus.ACTIVE)
   }
 
   // For all nodes described by activated, make an update to change their status to active

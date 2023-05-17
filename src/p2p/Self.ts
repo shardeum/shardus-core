@@ -1,3 +1,4 @@
+import { SignedObject } from '@shardus/crypto-utils'
 import { P2P } from '@shardus/types'
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 import * as events from 'events'
@@ -19,7 +20,6 @@ import * as GlobalAccounts from './GlobalAccounts'
 import * as Join from './Join'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
-import { SignedObject } from '@shardus/crypto-utils'
 
 /** STATE */
 
@@ -39,6 +39,14 @@ export let p2pSyncStart = 0
 export let p2pSyncEnd = 0
 
 export let p2pIgnoreJoinRequests = true
+
+/*
+  Records the state of the node (INITIALIZING -> STANDBY -> SYNCING -> ACTIVE)
+  INITIALIZING -> STANDBY = Node is trying to get its join request accepted
+  STANDBY -> SYNCING = Node has accepted its join request and is syncing
+  SYNCING -> ACTIVE = Node has synced and is now active
+*/
+export let state = P2P.P2PTypes.NodeStatus.INITIALIZING
 
 /** ROUTES */
 
@@ -90,6 +98,8 @@ export async function startup(): Promise<boolean> {
         //not in witness mode
       }
 
+      updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
+
       // Otherwise, try to join the network
       ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
     } catch (err) {
@@ -109,6 +119,7 @@ export async function startup(): Promise<boolean> {
 
   if (logFlags.p2pNonFatal) info('Emitting `joined` event.')
   emitter.emit('joined', id, publicKey)
+  updateNodeState(P2P.P2PTypes.NodeStatus.SYNCING)
 
   nestedCountersInstance.countEvent('p2p', 'joined')
   // Sync cycle chain from network
@@ -148,6 +159,10 @@ async function witnessConditionsMet(activeNodes: P2P.P2PTypes.Node[]) {
     warn(e)
   }
   return false
+}
+
+export function updateNodeState(updatedState: NodeStatus) {
+  state = updatedState
 }
 
 async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean) {
@@ -415,18 +430,18 @@ export type NodeInfo = {
     status: P2P.P2PTypes.NodeStatus
   }
 
-export function getPublicNodeInfo(reportStandby = false): NodeInfo {
+export function getPublicNodeInfo(reportIntermediateStatus = false): NodeInfo {
   const publicKey = Context.crypto.getPublicKey()
   const curvePublicKey = Context.crypto.convertPublicKeyToCurve(publicKey)
-  const status = { status: getNodeStatus(publicKey, reportStandby) }
+  const status = { status: getNodeStatus(publicKey, reportIntermediateStatus) }
   const nodeInfo = Object.assign({ id, publicKey, curvePublicKey }, network.ipInfo, status)
   return nodeInfo
 }
 
-function getNodeStatus(pubKey: string, reportStandby = false) {
+function getNodeStatus(pubKey: string, reportIntermediateStatus = false) {
   const current = NodeList.byPubKey
   if (current.get(pubKey)) return current.get(pubKey).status
-  return reportStandby ? NodeStatus.STANDBY : null
+  return reportIntermediateStatus ? state : null
 }
 
 export function getThisNodeInfo() {

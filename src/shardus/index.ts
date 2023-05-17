@@ -1913,8 +1913,8 @@ class Shardus extends EventEmitter {
       res.json({ config: netConfig })
     })
     this.network.registerExternalGet('nodeInfo', async (req, res) => {
-      let reportStandby = req.query.reportStandby === 'true'
-      const nodeInfo = Self.getPublicNodeInfo(reportStandby)
+      let reportIntermediateStatus = req.query.reportIntermediateStatus === 'true'
+      const nodeInfo = Self.getPublicNodeInfo(reportIntermediateStatus)
       const appData = this.app.getNodeInfoAppData()
       res.json({ nodeInfo: { ...nodeInfo, appData } })
     })
