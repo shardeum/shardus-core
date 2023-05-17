@@ -194,9 +194,11 @@ class LoadDetection extends EventEmitter {
     //We could potentially make this better by taking some kind of self average
     //rather than just the random luck of load see when a new cycle has turned over.
     //however, these load metrics already have some inherent averaging
-    let cycle = Context.p2p.state.getLastCycle().counter
-    if (this.lastEmitCycle != cycle) {
-      this.lastEmitCycle = cycle
+    let lastCycle = Context.p2p.state.getLastCycle();
+    if (lastCycle == null) {
+      return
+    } else if (this.lastEmitCycle != lastCycle.counter) {
+      this.lastEmitCycle = lastCycle.counter
       //If our max load is higher than the threshold send highLoad event that will create scale up gossip
       if (load > this.highThreshold) {
         this.emit('highLoad')

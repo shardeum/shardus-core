@@ -1827,7 +1827,7 @@ class ShardFunctions {
       }
       // eslint-disable-next-line security/detect-object-injection
       let node = allNodes[rightScanIndex]
-      if (node.id !== excludeID) {
+      if (node != null && node.id !== excludeID) {
         if (node.status === 'active') {
           results.push(node)
           if (results.length === count) {
@@ -1842,7 +1842,7 @@ class ShardFunctions {
 
       // eslint-disable-next-line security/detect-object-injection
       node = allNodes[leftScanIndex]
-      if (node.id !== excludeID) {
+      if (node != null && node.id !== excludeID) {
         if (node.status === 'active') {
           results.push(node)
           if (results.length === count) {

@@ -229,6 +229,10 @@ class Reporter {
         ? await this.stateManager.transactionQueue.getAccountsStateHash()
         : allZeroes64
     */
+    if (CycleChain.newest == null) {
+      this.restartReportInterval()
+      return
+    }
     let appState = allZeroes64 // monititor server will set color based on partition report
     const cycleMarker = CycleChain.newest.previous || '' // [TODO] Replace with cycle creator
     const cycleCounter = CycleChain.newest.counter
@@ -355,7 +359,13 @@ class Reporter {
     }
 
     this.resetStatisticsReport()
+    this.restartReportInterval()
+  }
 
+  private restartReportInterval() {
+    if (this.reportTimer) {
+      clearTimeout(this.reportTimer)
+    }
     this.reportTimer = setTimeout(() => {
       this.report()
     }, this.getReportInterval())
@@ -374,9 +384,7 @@ class Reporter {
       this.mainLogger.info(memoryReportingInstance.getMemoryStringBasic())
     }, 1000)
     // Creates and sends a report every `interval` seconds
-    this.reportTimer = setTimeout(() => {
-      this.report()
-    }, this.getReportInterval())
+    this.restartReportInterval()
   }
 
   consoleReport() {

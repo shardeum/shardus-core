@@ -220,17 +220,21 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
 //Protocl security node:
 //note we will need the ablity to check if other nodes also meet this requirement
 //so that we can reject input from nodes that are not permitted to send a vote
-//to do that well we need to make it easy to get the index of a node by ID
+//to do that well we need to make it easy to get the index of a node by ID.
+//If the currentCycleShardData is null then we can't do this check and return false
 function _canThisNodeSendScaleRequests(_nodeId: string) {
   let scaleVoteLimits = config.p2p.scaleGroupLimit > 0
   if (scaleVoteLimits === false) {
     return true
   }
+  if (stateManager.currentCycleShardData == null) {
+    return false
+  }
 
   let numActiveNodes = NodeList.activeByIdOrder.length
 
   if (numActiveNodes < config.p2p.scaleGroupLimit) {
-    true
+    return true
   }
   let canSendGossip = false
   let offset = CycleChain.newest.counter //todo something more random
