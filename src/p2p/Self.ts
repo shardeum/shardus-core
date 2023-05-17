@@ -98,11 +98,10 @@ export async function startup(): Promise<boolean> {
         //not in witness mode
       }
 
-      updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
-
       // Otherwise, try to join the network
       ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
     } catch (err) {
+      updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
       if (err.message.startsWith('Fatal:')) {
         throw err
       }
