@@ -86,6 +86,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     recipient: 'http://127.0.0.1:3000/api',
     interval: 2,
     console: false,
+    logSocketReports: true,
   },
   debug: {
     ignoreScaleGossipSelfCheck: false,

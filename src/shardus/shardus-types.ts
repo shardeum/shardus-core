@@ -614,7 +614,7 @@ export interface ServerConfiguration {
      */
     continueOnException?: boolean
     /** The minNodesPerctToAllowExitOnException parameter is an Integer used to calculate the minimum number of active nodes needed in the network to allow a node to exit on exception.
-     *  If the number of active nodes in the network is less than (minNodesPerctToAllowExitOnException) * (minNodes), then the node will not exit on exception. 
+     *  If the number of active nodes in the network is less than (minNodesPerctToAllowExitOnException) * (minNodes), then the node will not exit on exception.
      */
     minNodesPerctToAllowExitOnException?: number
     /** The minNodes parameter is an Integer specifying the minimum number of nodes that need to be active in the network in order to process transactions. */
@@ -707,6 +707,8 @@ export interface ServerConfiguration {
     interval?: number
     /** The console parameter is an Boolean specifying whether or not to report data updates to the console. */
     console?: boolean
+    /** periodically log report on how many sockets are opened on this system */
+    logSocketReports: boolean
   }
   /** Server's current mode or environment to be run in. Can be 'release' or 'debug' with 'release' being the default. */
   mode?: ServerMode

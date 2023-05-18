@@ -39,6 +39,7 @@ import Profiler, { profilerInstance } from '../utils/profiler'
 import { startSaving } from './saveConsoleOutput'
 import { config } from '../p2p/Context'
 import { activeByIdOrder } from '../p2p/NodeList'
+import { getSocketReport } from '../utils/debugUtils'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -1921,6 +1922,9 @@ class Shardus extends EventEmitter {
       const nodeInfo = Self.getPublicNodeInfo(reportIntermediateStatus)
       const appData = this.app.getNodeInfoAppData()
       res.json({ nodeInfo: { ...nodeInfo, appData } })
+    })
+    this.network.registerExternalGet('socketReport', isDebugModeMiddleware, async (req, res) => {
+      res.json(await getSocketReport())
     })
 
     this.p2p.registerInternal(

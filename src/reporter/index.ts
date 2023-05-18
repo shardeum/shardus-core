@@ -18,6 +18,7 @@ import { isDebugModeAnd } from '../debug'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { memoryReportingInstance } from '../utils/memoryReporting'
 import { getLinearGossipBurstList } from '../utils'
+import { getSocketReport } from '../utils/debugUtils'
 
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
@@ -47,6 +48,7 @@ interface Reporter {
   logger: Logger
   reportTimer: NodeJS.Timeout
   reportingInterval: NodeJS.Timeout
+  socketReportInterval: NodeJS.Timeout
   lastTime: number
   doConsoleReport: boolean
   hasRecipient: boolean
@@ -63,6 +65,8 @@ class Reporter {
     this.logger = logger
 
     this.reportTimer = null
+    this.reportingInterval = null
+    this.socketReportInterval = null
 
     this.lastTime = Date.now()
 
@@ -385,6 +389,20 @@ class Reporter {
       //temp mem debugging:
       this.mainLogger.info(memoryReportingInstance.getMemoryStringBasic())
     }, 1000)
+
+    //log a socket report every 5 minutes
+    this.socketReportInterval = setInterval(async () => {
+      if (this.config.logSocketReports) {
+        const report = await getSocketReport()
+        this.mainLogger.info(JSON.stringify(report))
+        const networkReport = memoryReportingInstance.getShardusNetReport()
+        this.mainLogger.info(JSON.stringify(networkReport))
+        if (report.error === true) {
+          clearInterval(self.socketReportInterval)
+        }
+      }
+    }, 300000)
+
     // Creates and sends a report every `interval` seconds
     this.restartReportInterval()
   }
@@ -415,7 +433,8 @@ class Reporter {
   stopReporting() {
     this.mainLogger.info('Stopping statistics reporting...')
     clearTimeout(this.reportTimer)
-    clearTimeout(this.reportingInterval)
+    clearInterval(this.reportingInterval)
+    clearInterval(this.socketReportInterval)
     this.reportingInterval = null
   }
 }
