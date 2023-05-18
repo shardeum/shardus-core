@@ -236,7 +236,7 @@ class Reporter {
     let appState = allZeroes64 // monititor server will set color based on partition report
     const cycleMarker = CycleChain.newest.previous || '' // [TODO] Replace with cycle creator
     const cycleCounter = CycleChain.newest.counter
-
+    const networkId = CycleChain.newest.networkId
     let nodelistIDs = NodeList.activeByIdOrder.map((node) => node.id)
     const nodelistHash = crypto.hash(nodelistIDs)
     //const nodelistHash = crypto.hash(NodeList.byJoinOrder) //todo figure out what fields are off.
@@ -322,12 +322,14 @@ class Reporter {
         desiredNodes,
         lastScalingTypeWinner, // "up" "down" or null.  last scaling action decided by this node
         lastScalingTypeRequested, // "up" "down" or null.  last scaling action decided by this node
+        timestamp: Date.now() / 1000,
         txInjected,
         txApplied,
         txRejected,
         txExpired,
         txProcessed,
         reportInterval,
+        networkId,
         nodeIpInfo,
         partitionReport,
         globalSync,
