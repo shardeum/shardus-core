@@ -650,11 +650,13 @@ class Shardus extends EventEmitter {
       }
       this.exitHandler.exitCleanly(`removed`, `removed from network in normal conditions`) // exits with status 0 so that PM2 can restart the process
     })
-    Self.emitter.on('apoptosized', async (callstack: string, message: string, restart: boolean) => {
-      // Omar - Why are we trying to call the functions in modules directly before exiting.
-      //        The modules have already registered shutdown functions with the exitHandler.
-      //        We should let exitHandler handle the shutdown process.
-      /*
+    Self.emitter.on(
+      'invoke-exit',
+      async (tag: string, callstack: string, message: string, restart: boolean) => {
+        // Omar - Why are we trying to call the functions in modules directly before exiting.
+        //        The modules have already registered shutdown functions with the exitHandler.
+        //        We should let exitHandler handle the shutdown process.
+        /*
       this.fatalLogger.fatal('Shardus: caught apoptosized event; cleaning up')
       if (this.statistics) {
         this.statistics.stopSnapshots()
@@ -674,22 +676,24 @@ class Shardus extends EventEmitter {
         'Shardus: caught apoptosized event; finished clean up'
       )
 */
-      nestedCountersInstance.countRareEvent('fatal', 'exitCleanly: apoptosized (not technically fatal)')
-      this.mainLogger.error('exitCleanly: apoptosized')
-      this.mainLogger.error(message)
-      this.mainLogger.error(callstack)
-      if (this.reporter) {
-        this.reporter.stopReporting()
-        await this.reporter.reportRemoved(Self.id)
+        const exitType = restart ? 'exitCleanly' : 'exitUncleanly'
+        nestedCountersInstance.countRareEvent('fatal', `invoke-exit: ${tag} ${exitType}`)
+        this.mainLogger.error(`invoke-exit: ${tag} ${exitType}`)
+        this.mainLogger.error(message)
+        this.mainLogger.error(callstack)
+        if (this.reporter) {
+          this.reporter.stopReporting()
+          await this.reporter.reportRemoved(Self.id)
+        }
+        if (restart)
+          this.exitHandler.exitCleanly(
+            `invoke-exit: ${tag}`,
+            `invoke-exit: ${tag}. but exiting cleanly for a restart`
+          )
+        // exits with status 0 so that PM2 can restart the process
+        else this.exitHandler.exitUncleanly(`invoke-exit: ${tag}`, `invoke-exit: ${tag} ${exitType}`) // exits with status 1 so that PM2 CANNOT restart the process
       }
-      if (restart)
-        this.exitHandler.exitCleanly(
-          `Apoptosized`,
-          `apoptosized by network but exiting cleanly for a restart`
-        )
-      // exits with status 0 so that PM2 can restart the process
-      else this.exitHandler.exitUncleanly(`Apoptosized`, `apoptosized by network`) // exits with status 1 so that PM2 CANNOT restart the process
-    })
+    )
     Self.emitter.on('node-activated', ({ ...params }) =>
       this.app.eventNotify?.({ type: 'node-activated', ...params })
     )

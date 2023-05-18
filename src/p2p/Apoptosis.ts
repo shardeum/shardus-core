@@ -240,9 +240,9 @@ export function parseRecord(record: P2P.ApoptosisTypes.Record): P2P.CycleParserT
     // This could happen if our Internet connection was bad.
     error(`We got marked for apoptosis even though we didn't ask for it. Being nice and leaving.`)
     Self.emitter.emit(
-      'apoptosized',
+      'invoke-exit',
       getCallstack(),
-      'Apoptosis being called at parseRecord() => src/p2p/Apoptosis.ts'
+      'invoke-exit being called at parseRecord() => src/p2p/Apoptosis.ts'
     )
   }
   return {
@@ -267,7 +267,7 @@ export function sendRequests() {
 // [TODO] - We don't need the caller to pass us the list of nodes
 //          remove this after changing references
 export async function apoptosizeSelf(message: string) {
-  warn(`In apoptosizeSelf`)
+  warn(`In apoptosizeSelf. ${message}`)
   // [TODO] - maybe we should shuffle this array
   const activeNodes = activeByIdOrder
   const proposal = createProposal()
@@ -290,7 +290,7 @@ export async function apoptosizeSelf(message: string) {
   }
   // If we don't have any active nodes; means we are still joining
   if (activeNodes.length > 0) {
-    info(`In apoptosizeSelf calling robustQuery proposal`)
+    warn(`In apoptosizeSelf calling robustQuery proposal. ${message}`)
     let redunancy = 1
     if (activeNodes.length > 5) {
       redunancy = 2
@@ -298,15 +298,15 @@ export async function apoptosizeSelf(message: string) {
     if (activeNodes.length > 10) {
       redunancy = 3
     }
-    info(`Redunancy is ${redunancy}`)
+    warn(`Redunancy is ${redunancy}   ${message}`)
     await robustQuery(activeNodes, qF, eF, redunancy, true)
-    info(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}`)
+    warn(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}   ${message}`)
   }
   // Omar - added the following line. Maybe we should emit an event when we apoptosize so other modules and app can clean up
-  Self.emitter.emit('apoptosized', getCallstack(), message) // we can pass true as a parameter if we want to be restarted
+  Self.emitter.emit('invoke-exit', getCallstack(), message) // we can pass true as a parameter if we want to be restarted
   // Omar - we should not add any proposal since we are exiting; we already sent our proposal to some nodes
   //  addProposal(proposal)
-  error('We have been apoptosized. Exiting with status 1. Will not be restarted.')
+  error(`We have been apoptosized. Exiting with status 1. Will not be restarted. ${message}`)
 }
 
 function createProposal(): P2P.ApoptosisTypes.SignedApoptosisProposal {

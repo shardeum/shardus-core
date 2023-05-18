@@ -282,11 +282,12 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
   if (record.lostSyncing.includes(Self.id)) {
     // This could happen if we take longer than maxSyncTime to sync
-    error(`We got marked for apoptosis even though we didn't ask for it. Being nice and leaving.`)
+    error(`We got marked as lostSyncing. Being nice and leaving.`)
     Self.emitter.emit(
-      'apoptosized',
+      'invoke-exit',
+      'lostSyncing',
       getCallstack(),
-      'Apoptosis being called at parseRecord() => src/p2p/Apoptosis.ts'
+      'invoke-exit being called at parseRecord() => src/p2p/Lost.ts'
     )
   }
 
@@ -334,7 +335,7 @@ export function sendRequests() {
 
 async function killSelf(message: string) {
   if (logFlags.p2pNonFatal) error(`In killSelf`)
-  Self.emitter.emit('apoptosized', getCallstack(), message)
+  Self.emitter.emit('invoke-exit', 'killSelf', getCallstack(), message)
   if (logFlags.p2pNonFatal) error(`I have been killed, will not restart.`)
 }
 
