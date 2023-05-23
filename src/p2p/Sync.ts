@@ -140,6 +140,12 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
       /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `sync-getting-cycles failed to get ${start} - ${end}  expectedMissing:${expectedMissing} missingListCount:${missingListCount} missing:${missingStr}` )
       /* prettier-ignore */ error( `sync-getting-cycles failed to get ${start} - ${end}  expectedMissing:${expectedMissing} missingListCount:${missingListCount}` + JSON.stringify(missingList) )
 
+      if (missingListCount === 0) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `hack-fix: go active missing count is 0`)
+        /* prettier-ignore */ error( `hack-fix: go active missing count is 0`)
+        return true
+      }
+
       throw new Error('Got empty previous cycles')
     }
 
