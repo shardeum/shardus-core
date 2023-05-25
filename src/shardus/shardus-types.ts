@@ -682,6 +682,8 @@ export interface ServerConfiguration {
     validateActiveRequests: boolean
     /** for the cycle syncing to complete if it is stuck */
     hackForceCycleSyncComplete: boolean
+    /** Unique Ids between Apop and Removed Nodes */
+    uniqueRemovedIds: boolean
   }
   /** Server IP configuration */
   ip?: {

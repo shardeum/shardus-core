@@ -74,6 +74,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     checkNetworkStopped: false,
     validateActiveRequests: false,
     hackForceCycleSyncComplete: false,
+    uniqueRemovedIds: false,
   },
   ip: {
     externalIp: '0.0.0.0',

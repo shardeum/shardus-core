@@ -70,7 +70,7 @@ export function dropInvalidTxs(txs: P2P.RotationTypes.Txs): P2P.RotationTypes.Tx
 Given the txs and prev cycle record mutate the referenced record
 */
 export function updateRecord(
-  txs: P2P.RotationTypes.Txs,
+  txs: P2P.RotationTypes.Txs & P2P.ApoptosisTypes.Txs,
   record: P2P.CycleCreatorTypes.CycleRecord,
   prev: P2P.CycleCreatorTypes.CycleRecord
 ) {
@@ -81,7 +81,7 @@ export function updateRecord(
   }
 
   // Allow the autoscale module to set this value
-  const { expired, removed } = getExpiredRemoved(prev.start, prev.desired)
+  const { expired, removed } = getExpiredRemoved(prev.start, prev.desired, txs)
 
   record.expired = expired
   record.removed = removed // already sorted
@@ -108,7 +108,8 @@ export function sendRequests() {}
 
 export function getExpiredRemoved(
   start: P2P.CycleCreatorTypes.CycleRecord['start'],
-  desired: P2P.CycleCreatorTypes.CycleRecord['desired']
+  desired: P2P.CycleCreatorTypes.CycleRecord['desired'],
+  txs: P2P.RotationTypes.Txs & P2P.ApoptosisTypes.Txs
 ) {
   let expired = 0
   const removed = []
@@ -187,6 +188,14 @@ export function getExpiredRemoved(
     }
   }
 
+  const apoptosizedNodesList = []
+  for (const request of txs.apoptosis) {
+    const node = NodeList.nodes.get(request.id)
+    if (node) {
+      apoptosizedNodesList.push(node.id)
+    }
+  }
+
   // Oldest node has index 0
   for (const node of NodeList.byJoinOrder) {
     // Don't count syncing nodes in your expired count
@@ -196,9 +205,19 @@ export function getExpiredRemoved(
     // Count the expired node
     expired++
     // Add it to removed if it isn't full
-    if (removed.length < maxRemove) {
-      NodeList.potentiallyRemoved.add(node.id)
-      insertSorted(removed, node.id)
+    if (config.p2p.uniqueRemovedIds) {
+      // Limit the number of nodes that can be removed by removed + apoptosized
+      if (removed.length + apoptosizedNodesList.length < maxRemove) {
+        NodeList.potentiallyRemoved.add(node.id)
+        if (!apoptosizedNodesList.includes(node.id)) {
+          insertSorted(removed, node.id)
+        }
+      } else break
+    } else {
+      if (removed.length < maxRemove) {
+        NodeList.potentiallyRemoved.add(node.id)
+        insertSorted(removed, node.id)
+      }
     }
   }
 

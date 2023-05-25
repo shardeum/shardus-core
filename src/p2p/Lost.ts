@@ -243,7 +243,7 @@ export function updateRecord(
         }
         info('adding node to lost syncing list', syncingNode.id, `${syncTime} > ${record.maxSyncTime}`)
         //todo remove this later after we feel good about the system.. it wont really be that rare, so we dont want to swamp rare counters
-        /* prettier-ignore */ nestedCountersInstance.countRareEvent('lost','sync timeout ' + `${utils.stringifyReduce(syncingNode.id)} ${syncTime} > ${record.maxSyncTime}`)
+        /* prettier-ignore */ nestedCountersInstance.countRareEvent('lost', 'sync timeout ' + `${utils.stringifyReduce(syncingNode.id)} ${syncTime} > ${record.maxSyncTime}`)
         lostSyncingNodeIds.push(syncingNode.id)
       }
     }
@@ -261,6 +261,12 @@ export function updateRecord(
     }
     // remove nodes that are no longer in the network
     apop = apop.filter((id) => !refutedNodeIds.includes(id)) // remove nodes that refuted
+
+    // filter adding nodes that are already in the apop record
+    if (config.p2p.uniqueRemovedIds) {
+      apop = apop.filter((id) => !record.apoptosized.includes(id))
+      apopSyncing = apopSyncing.filter((id) => !record.apoptosized.includes(id))
+    }
     record.apoptosized = [...apop, ...apopSyncing, ...record.apoptosized].sort()
   }
 }
@@ -367,7 +373,7 @@ export function reportLost(target, reason) {
   }
   // [TODO] - remove the following line after testing killother
   if (allowKillRoute && reason === 'killother') msg.killother = true
-  /* prettier-ignore */ if(logFlags.p2pNonFatal) info(`Sending investigate request: reporter:${Self.port} checker:${checker.externalPort} target:${target.externalPort} `+JSON.stringify(msg))
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Sending investigate request: reporter:${Self.port} checker:${checker.externalPort} target:${target.externalPort} ` + JSON.stringify(msg))
   msg = crypto.sign(msg)
   lost.set(key, obj)
   Comms.tell([checker], 'lost-report', msg)
@@ -393,7 +399,7 @@ function getCheckerNode(id, cycle) {
 async function lostReportHandler(payload, response, sender) {
   profilerInstance.scopedProfileSectionStart('lost-report')
   try {
-    /* prettier-ignore */ if(logFlags.p2pNonFatal) info(`Got investigate request: ${JSON.stringify(payload)} from ${JSON.stringify(sender)}`)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got investigate request: ${JSON.stringify(payload)} from ${JSON.stringify(sender)}`)
     let err = ''
     err = validateTypes(payload, { target: 's', reporter: 's', checker: 's', cycle: 'n', sign: 'o' })
     if (err) {
@@ -668,7 +674,7 @@ function upGossipHandler(payload, sender, tracker) {
   const key = `${payload.target}-${payload.cycle}`
   const rec = lost.get(key)
   if (rec && rec.status === 'up') return // we have already gossiped this node for this cycle
-  ;[valid, reason] = checkUpMsg(payload, currentCycle)
+    ;[valid, reason] = checkUpMsg(payload, currentCycle)
   if (!valid) {
     warn(`Bad upGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
     return
