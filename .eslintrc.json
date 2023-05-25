@@ -15,7 +15,6 @@
     "prettier"
   ],
   "ignorePatterns": [
-    "arrays.ts",
     "betterSqlite3storage.ts",
     "state-manager-types.ts",
     "PartitionStats.ts",

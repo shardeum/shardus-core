@@ -6,7 +6,7 @@ type Comparator<T, E = T> = (a: E, b: T) => number
 export function shuffleArray<T>(array: T[]) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    ;[array[i], array[j]] = [array[j], array[i]]
+    ;[array[i], array[j]] = [array[j], array[i]] // eslint-disable-line security/detect-object-injection
   }
 }
 
@@ -26,8 +26,8 @@ export function getRandom<T>(arr: T[], n: number): T[] {
   const result = new Array(n)
   while (n--) {
     const x = Math.floor(Math.random() * len)
-    result[n] = arr[x in taken ? taken[x] : x]
-    taken[x] = --len in taken ? taken[len] : len
+    result[n] = arr[x in taken ? taken[x] : x] // eslint-disable-line security/detect-object-injection
+    taken[x] = --len in taken ? taken[len] : len // eslint-disable-line security/detect-object-injection
   }
   return result
 }
@@ -76,12 +76,12 @@ export function binaryLowest<T>(ar: T[], comparator?: Comparator<T>) {
   if (ar.length < 2) return 0
   let m = 0
   let n = ar.length - 1
-  if (comparator(ar[m], ar[n]) < 0) return m
+  if (comparator(ar[m], ar[n]) < 0) return m // eslint-disable-line security/detect-object-injection
   while (m <= n) {
     const k = (n + m) >> 1
-    const cmp = comparator(ar[m], ar[k])
+    const cmp = comparator(ar[m], ar[k]) // eslint-disable-line security/detect-object-injection
     if (logFlags.console) console.log(ar)
-    if (logFlags.console) console.log(m, k, ar[m], ar[k], cmp)
+    if (logFlags.console) console.log(m, k, ar[m], ar[k], cmp) // eslint-disable-line security/detect-object-injection
     if (cmp > 0) {
       n = k
     } else if (cmp < 0) {
@@ -124,7 +124,7 @@ export function binarySearch<T, E = Partial<T>>(arr: T[], el: E, comparator?: Co
   let n = arr.length - 1
   while (m <= n) {
     const k = (n + m) >> 1
-    const cmp = comparator(el, arr[k])
+    const cmp = comparator(el, arr[k]) // eslint-disable-line security/detect-object-injection
     if (cmp > 0) {
       m = k + 1
     } else if (cmp < 0) {
@@ -151,7 +151,7 @@ export const computeMedian = (arr = [], sort = true) => {
     default: {
       const mid = len / 2
       if (len % 2 === 0) {
-        return arr[mid]
+        return arr[mid] // eslint-disable-line security/detect-object-injection
       } else {
         return (arr[Math.floor(mid)] + arr[Math.ceil(mid)]) / 2
       }
