@@ -1,6 +1,7 @@
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 import { EventEmitter } from 'events'
 import { Handler } from 'express'
+import {inspect} from 'util'
 import Log4js from 'log4js'
 import path from 'path'
 import SHARDUS_CONFIG from '../config'
@@ -1099,7 +1100,7 @@ class Shardus extends EventEmitter {
       this.fatalLogger.fatal('Put: ' + err.name + ': ' + err.message + ' at ' + err.stack)
       return {
         success: false,
-        reason: `Failed to process transaction: ${utils.stringifyReduce(tx)} ${err}`,
+        reason: `Failed to process transaction: ${utils.stringifyReduce(tx)} ${inspect(err)}`,
         status: 500, // 500 status code means transaction is generally failed
       }
     } finally {
