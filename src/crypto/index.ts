@@ -178,10 +178,15 @@ class Crypto {
   }
 
   verify(obj: crypto.SignedObject, expectedPk?: string) {
-    if (expectedPk) {
-      if (obj.sign.owner !== expectedPk) return false
+    try {
+      if (expectedPk) {
+        if (obj.sign.owner !== expectedPk) return false
+      }
+      return crypto.verifyObj(obj)
+    } catch (e) {
+      this.mainLogger.error(`Error in verifying object ${JSON.stringify(obj)}, error: ${e}`)
+      return false
     }
-    return crypto.verifyObj(obj)
   }
 
   hash(obj: HashableObject | unknown) {
