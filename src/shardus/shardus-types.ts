@@ -680,6 +680,8 @@ export interface ServerConfiguration {
     checkNetworkStopped: boolean
     /** Toggles Active Request validation on or off */
     validateActiveRequests: boolean
+    /** for the cycle syncing to complete if it is stuck */
+    hackForceCycleSyncComplete: boolean
   }
   /** Server IP configuration */
   ip?: {

@@ -4,7 +4,7 @@ import util from 'util'
 import * as http from '../http'
 import { P2P } from '@shardus/types'
 import { reversed, validateTypes } from '../utils'
-import { logger, network } from './Context'
+import { config, logger, network } from './Context'
 import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import { ChangeSquasher, parse } from './CycleParser'
@@ -140,7 +140,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
       /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `sync-getting-cycles failed to get ${start} - ${end}  expectedMissing:${expectedMissing} missingListCount:${missingListCount} missing:${missingStr}` )
       /* prettier-ignore */ error( `sync-getting-cycles failed to get ${start} - ${end}  expectedMissing:${expectedMissing} missingListCount:${missingListCount}` + JSON.stringify(missingList) )
 
-      if (missingListCount === 0) {
+      if (config.p2p.hackForceCycleSyncComplete === true && missingListCount === 0) {
         /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `hack-fix: go active missing count is 0`)
         /* prettier-ignore */ error( `hack-fix: go active missing count is 0`)
         return true

@@ -1926,6 +1926,11 @@ class Shardus extends EventEmitter {
     this.network.registerExternalGet('socketReport', isDebugModeMiddleware, async (req, res) => {
       res.json(await getSocketReport())
     })
+    this.network.registerExternalGet('forceCycleSync', isDebugModeMiddleware, async (req, res) => {
+      let enable = req.query.enable === 'true' || false
+      config.p2p.hackForceCycleSyncComplete = enable
+      res.json(await getSocketReport())
+    })
 
     this.p2p.registerInternal(
       'sign-app-data',
