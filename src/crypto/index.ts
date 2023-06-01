@@ -184,7 +184,7 @@ class Crypto {
       }
       return crypto.verifyObj(obj)
     } catch (e) {
-      this.mainLogger.error(`Error in verifying object ${JSON.stringify(obj)}, error: ${e}`)
+      this.mainLogger.error(`Error in verifying object ${JSON.stringify(obj)}`, e)
       return false
     }
   }
