@@ -75,6 +75,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     validateActiveRequests: false,
     hackForceCycleSyncComplete: false,
     uniqueRemovedIds: false,
+    useLruCacheForSocketMgmt: false,
+    lruCacheSizeForSocketMgmt: 1000,
   },
   ip: {
     externalIp: '0.0.0.0',

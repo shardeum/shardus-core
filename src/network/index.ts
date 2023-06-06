@@ -1,21 +1,21 @@
 import Sntp from '@hapi/sntp'
+import { Sn } from '@shardus/net'
 import bodyParser from 'body-parser'
 import cors from 'cors'
 import { EventEmitter } from 'events'
 import express, { Application, Handler } from 'express'
 import Log4js from 'log4js'
 import * as net from 'net'
-import { Sn } from '@shardus/net'
 import { promisify } from 'util'
+import { isDebugMode } from '../debug'
 import * as httpModule from '../http'
 import Logger, { logFlags } from '../logger'
 import { config, defaultConfigs, logger } from '../p2p/Context'
+import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
-import * as Shardus from '../shardus/shardus-types'
-import { nestedCountersInstance } from '../utils/nestedCounters'
-import { isDebugMode } from '../debug'
 
 /** TYPES */
 export interface IPInfo {
@@ -55,6 +55,8 @@ export class NetworkClass extends EventEmitter {
   debugNetworkDelay: number
   statisticsInstance: any
   customStringifier?: (val: any) => string
+  useLruCacheForSocketMgmt: boolean
+  lruCacheSizeForSocketMgmt: number
 
   constructor(
     config: Shardus.StrictServerConfiguration,
@@ -84,6 +86,8 @@ export class NetworkClass extends EventEmitter {
 
     nestedCountersInstance.countEvent('network', 'init')
     this.customStringifier = customStringifier
+    this.useLruCacheForSocketMgmt = config.p2p.useLruCacheForSocketMgmt
+    this.lruCacheSizeForSocketMgmt = config.p2p.lruCacheSizeForSocketMgmt
   }
 
   setStatisticsInstance(statistics) {
@@ -99,11 +103,11 @@ export class NetworkClass extends EventEmitter {
           if (self.verboseLogsNet) {
             self.netLogger.debug(
               'External\t' +
-                JSON.stringify({
-                  url: req.url,
-                  method: req.method,
-                  body: req.body,
-                })
+              JSON.stringify({
+                url: req.url,
+                method: req.method,
+                body: req.body,
+              })
             )
           }
         }
@@ -129,6 +133,10 @@ export class NetworkClass extends EventEmitter {
   async _setupInternal() {
     this.sn = Sn({
       port: this.ipInfo.internalPort,
+      senderOpts: {
+        useLruCache: this.useLruCacheForSocketMgmt,
+        lruSize: this.lruCacheSizeForSocketMgmt,
+      },
       customStringifier: this.customStringifier,
     })
     this.intServer = await this.sn.listen(async (data, remote, respond) => {
@@ -167,10 +175,10 @@ export class NetworkClass extends EventEmitter {
         if (logFlags.net_trace) {
           this.netLogger.debug(
             'Internal\t' +
-              JSON.stringify({
-                url: route,
-                body: payload,
-              })
+            JSON.stringify({
+              url: route,
+              body: payload,
+            })
           )
         }
       } catch (err) {
@@ -558,7 +566,7 @@ class ConnectTest extends EventEmitter {
   start() {
     return new Promise<true>((resolve, reject) => {
       // Open a port on 0.0.0.0 (any IP)
-      const server = net.createServer(() => {})
+      const server = net.createServer(() => { })
       server.unref()
       server.on('error', reject)
       const listenPort = this.port > -1 ? this.port : 0

@@ -684,6 +684,10 @@ export interface ServerConfiguration {
     hackForceCycleSyncComplete: boolean
     /** Unique Ids between Apop and Removed Nodes */
     uniqueRemovedIds: boolean
+    /** Use LRU cache for socket connection mgmt in shardus/net. Default: false */
+    useLruCacheForSocketMgmt: boolean
+    /** LRU cache size for socket connection mgmt in shardus/net. Is used only if `useLruCacheForSocketMgmt` is set to `true`. Default: 1000 */
+    lruCacheSizeForSocketMgmt: number
   }
   /** Server IP configuration */
   ip?: {
@@ -1098,7 +1102,7 @@ type ObjectAlias = object
  * OpaqueTransaction is the way shardus should see transactions internally. it should not be able to mess with parameters individually
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface OpaqueTransaction extends ObjectAlias {}
+export interface OpaqueTransaction extends ObjectAlias { }
 
 export type DeepRequired<T> = Required<{
   [P in keyof T]: T[P] extends object | undefined ? DeepRequired<Required<T[P]>> : T[P]
