@@ -63,6 +63,8 @@ export class Collector extends EventEmitter {
 
     // Loop through messages and add to hash tally
     for (let messageIndex = 0; messageIndex < messages.length; messageIndex++) {
+      // only iterating through messages, so probably safe
+      // eslint-disable-next-line security/detect-object-injection
       const message = messages[messageIndex]
       const partitionHashData = message.data.partitionHash
       const receiptHashData = message.data.receiptMapHash
@@ -91,6 +93,8 @@ export class Collector extends EventEmitter {
       }
 
       for (let i = 0; i < Object.keys(partitionHashData).length; i++) {
+        // only accessing keys of an object, so probably safe
+        // eslint-disable-next-line security/detect-object-injection
         const partitionId = parseInt(Object.keys(partitionHashData)[i])
         const partitionShardData = parititionShardDataMap.get(partitionId)
         if (!partitionShardData) {
@@ -99,6 +103,7 @@ export class Collector extends EventEmitter {
         const coveredBy = partitionShardData.coveredBy
         const isSenderCoverThePartition = coveredBy[message.sender]
         if (!isSenderCoverThePartition) {
+          // eslint-disable-next-line security/detect-object-injection
           delete partitionHashData[partitionId]
           continue
         }
