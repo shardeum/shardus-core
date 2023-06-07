@@ -22,9 +22,9 @@ type Collectors = Map<Message['cycle'], Collector>
 export type Message = {
   cycle: number
   data: {
-    partitionHash: any
-    receiptMapHash: any
-    summaryHash: any
+    partitionHash: object
+    receiptMapHash: object
+    summaryHash: object
   }
   sender: string
 }
@@ -33,9 +33,9 @@ export type hashMap = Map<number, string>
 const queue: Queue = new Map()
 const collectors: Collectors = new Map()
 const gossipCounterByCycle = new Map()
-let gossipCounterByPartition
-let readyPartitions
-let parititionShardDataMap
+let gossipCounterByPartition: Map<PartitionId, number>
+let readyPartitions: Map<PartitionId, boolean>
+let parititionShardDataMap: Map<number, ShardInfo>
 export let forwardedGossips = new Map()
 
 // A class responsible for collecting and processing partition gossip for a given Cycle
@@ -59,7 +59,8 @@ export class Collector extends EventEmitter {
     this.summaryHashCounter = new Map()
   }
   process(messages: Message[]) {
-    let cycle
+    let cycle: number
+
     // Loop through messages and add to hash tally
     for (let messageIndex = 0; messageIndex < messages.length; messageIndex++) {
       let message = messages[messageIndex]
@@ -163,7 +164,7 @@ export class Collector extends EventEmitter {
 
       // decide winner partition hashes based on hash tally
       for (const [partitionId, counterMap] of this.dataHashCounter) {
-        let selectedHash
+        let selectedHash: string
         let maxCount = 0
         let possibleHashes = []
         for (const [, count] of counterMap) {
@@ -184,7 +185,7 @@ export class Collector extends EventEmitter {
 
       // decide winner receipt hashes based on hash tally
       for (const [partitionId, counterMap] of this.receiptHashCounter) {
-        let selectedHash
+        let selectedHash: string
         let maxCount = 0
         let possibleHashes = []
         for (const [, count] of counterMap) {
@@ -205,7 +206,7 @@ export class Collector extends EventEmitter {
 
       // decide winner summary hashes based on hash tally
       for (const [partitionId, counterMap] of this.summaryHashCounter) {
-        let selectedHash
+        let selectedHash: string
         let maxCount = 0
         let possibleHashes = []
         for (const [, count] of counterMap) {
@@ -237,7 +238,7 @@ export class Collector extends EventEmitter {
 // Registers partition gossip handler
 export function initGossip() {
   if (logFlags.console) console.log('registering gossip handler...')
-  registerGossipHandler('snapshot_gossip', (message) => {
+  registerGossipHandler('snapshot_gossip', (message: Message) => {
     profilerInstance.scopedProfileSectionStart('snapshot_gossip')
     try {
       let { cycle } = message
@@ -283,7 +284,7 @@ export function processMessagesInGossipQueue(shard: CycleShardData, collector: C
   queue.delete(shard.cycleNumber)
 }
 
-function convertObjectToHashMap(obj): hashMap {
+function convertObjectToHashMap(obj: object): hashMap {
   let convertedMap = new Map() as hashMap
   for (let key in obj) {
     convertedMap.set(parseInt(key), obj[key])
