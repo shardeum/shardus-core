@@ -18,7 +18,6 @@
     "betterSqlite3storage.ts",
     "state-manager-types.ts",
     "AccountPatcher.ts",
-    "partition-gossip.ts",
     "shardus-types.ts",
     "Wrapper.ts",
     "Utils.ts",
