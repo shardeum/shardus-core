@@ -63,10 +63,10 @@ export class Collector extends EventEmitter {
 
     // Loop through messages and add to hash tally
     for (let messageIndex = 0; messageIndex < messages.length; messageIndex++) {
-      let message = messages[messageIndex]
-      let partitionHashData = message.data.partitionHash
-      let receiptHashData = message.data.receiptMapHash
-      let summaryHashData = message.data.summaryHash
+      const message = messages[messageIndex]
+      const partitionHashData = message.data.partitionHash
+      const receiptHashData = message.data.receiptMapHash
+      const summaryHashData = message.data.summaryHash
       if (!cycle) cycle = message.cycle
 
       // forward snapshot gossip if gossip cycle is same as current cycle
@@ -91,21 +91,21 @@ export class Collector extends EventEmitter {
       }
 
       for (let i = 0; i < Object.keys(partitionHashData).length; i++) {
-        let partitionId = parseInt(Object.keys(partitionHashData)[i])
-        let partitionShardData = parititionShardDataMap.get(partitionId)
+        const partitionId = parseInt(Object.keys(partitionHashData)[i])
+        const partitionShardData = parititionShardDataMap.get(partitionId)
         if (!partitionShardData) {
           continue
         }
-        let coveredBy = partitionShardData.coveredBy
-        let isSenderCoverThePartition = coveredBy[message.sender]
+        const coveredBy = partitionShardData.coveredBy
+        const isSenderCoverThePartition = coveredBy[message.sender]
         if (!isSenderCoverThePartition) {
           delete partitionHashData[partitionId]
           continue
         }
-        let currentCount = gossipCounterByPartition.get(partitionId)
-        let requiredCount = Math.ceil(Object.keys(coveredBy).length / 2)
+        const currentCount = gossipCounterByPartition.get(partitionId)
+        const requiredCount = Math.ceil(Object.keys(coveredBy).length / 2)
         if (currentCount) {
-          let newCount = currentCount + 1
+          const newCount = currentCount + 1
           gossipCounterByPartition.set(partitionId, newCount)
           if (newCount >= requiredCount) {
             readyPartitions.set(partitionId, true)
@@ -241,13 +241,13 @@ export function initGossip() {
   registerGossipHandler('snapshot_gossip', (message: Message) => {
     profilerInstance.scopedProfileSectionStart('snapshot_gossip')
     try {
-      let { cycle } = message
-      let collector = collectors.get(cycle)
+      const { cycle } = message
+      const collector = collectors.get(cycle)
       if (collector) {
         collector.process([message])
       } else {
         if (queue.has(cycle)) {
-          let messageList = queue.get(cycle)
+          const messageList = queue.get(cycle)
           messageList.push(message)
         } else {
           queue.set(cycle, [message])
@@ -285,8 +285,8 @@ export function processMessagesInGossipQueue(shard: CycleShardData, collector: C
 }
 
 function convertObjectToHashMap(obj: object): hashMap {
-  let convertedMap = new Map() as hashMap
-  for (let key in obj) {
+  const convertedMap = new Map() as hashMap
+  for (const key in obj) {
     convertedMap.set(parseInt(key), obj[key])
   }
   return convertedMap
