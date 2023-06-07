@@ -5,6 +5,7 @@ import * as NodeList from '../p2p/NodeList'
 import { logFlags } from '../logger'
 import { CycleShardData } from '../state-manager/state-manager-types'
 import { profilerInstance } from '../utils/profiler'
+import { ShardInfo } from '@shardus/types/build/src/state-manager/shardFunctionTypes'
 
 /** TYPES */
 
