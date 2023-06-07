@@ -1,7 +1,7 @@
 import { profilerInstance } from './profiler'
 import * as Context from '../p2p/Context'
 import * as utils from '../utils'
-import Crypto, { HashableObject } from '../crypto'
+import Crypto from '../crypto'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 type CounterMap = Map<string, CounterNode>
