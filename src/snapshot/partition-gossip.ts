@@ -291,8 +291,8 @@ export function processMessagesInGossipQueue(shard: CycleShardData, collector: C
 
 function convertObjectToHashMap(obj: object): hashMap {
   const convertedMap = new Map() as hashMap
-  for (const key in obj) {
-    convertedMap.set(parseInt(key), obj[key])
+  for (const [key, value] of Object.entries(obj)) {
+    convertedMap.set(parseInt(key), value)
   }
   return convertedMap
 }
