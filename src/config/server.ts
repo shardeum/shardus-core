@@ -75,6 +75,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     validateActiveRequests: false,
     hackForceCycleSyncComplete: false,
     uniqueRemovedIds: false,
+    uniqueRemovedIdsUpdate: false,
     useLruCacheForSocketMgmt: false,
     lruCacheSizeForSocketMgmt: 1000,
   },
