@@ -5,10 +5,12 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     utils.url = "github:numtide/flake-utils";
     shardus-cli.url = "git+https://gitlab.com/shardus/tools/shardus-cli?ref=nix-flake";
+    naersk.url = "github:nix-community/naersk";
   };
 
   outputs = {
     self,
+    naersk,
     nixpkgs,
     shardus-cli,
     utils,
@@ -29,6 +31,10 @@
 
         nativeBuildInputs = with pkgs; [
           custom-nodejs
+
+          # rust dependencies for rust dependencies
+          rustc
+          cargo
         ];
         buildInputs = with pkgs; [];
       in {
