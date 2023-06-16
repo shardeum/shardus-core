@@ -494,7 +494,7 @@ async function getExternalIp() {
     mainLogger.warn('Failed to get external IP from gateway:', err.message ? err.message : err)
 
     try {
-      const ip = await discoverExternalIp(config.p2p.ipServer)
+      const ip = await discoverExternalIp(config.p2p.ipServers)
       return ip
     } catch (err) {
       mainLogger.warn('Failed to get external IP from IP server:', err.message ? err.message : err)
@@ -617,20 +617,21 @@ export async function checkTimeSynced(timeServers) {
   throw Error('Unable to check local time against time servers.')
 }
 
-async function discoverExternalIp(server: string) {
+async function discoverExternalIp(servers: string[]) {
   // Figure out if we're behind a NAT
 
   // Attempt NAT traversal with UPnP
 
   //
-
-  try {
-    const { ip }: { ip: string } = await httpModule.get(server)
-    return ip
-  } catch (err) {
-    throw Error(
-      `p2p/Self:discoverExternalIp: Could not discover IP from external IP server ${server}: ` + err.message
-    )
+  for (const server of servers) {
+    try {
+      const {ip} : {ip:string} = await httpModule.get(server)
+      return ip
+    } catch (err) {
+      mainLogger.warn(
+        `p2p/Self:discoverExternalIp: Could not discover IP from external IP server ${server}: ` + err.message
+      )
+    }
   }
 }
 

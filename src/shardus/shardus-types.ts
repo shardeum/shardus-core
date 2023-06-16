@@ -563,8 +563,8 @@ export interface ServerConfiguration {
   }
   /** P2P module configuration */
   p2p?: {
-    /** The ipServer parameter is a String that specifies a the url for the ipServer. */
-    ipServer?: string
+    /** The ipServer parameter is an array of Strings that specifies a urls for the ipServer. */
+    ipServers?: string[]
     /** The timeServers parameter is an Array of String that specifies where to get time critical data. */
     timeServers?: string[]
     /**  */
