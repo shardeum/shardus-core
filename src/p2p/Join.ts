@@ -16,13 +16,13 @@ import { robustQuery } from './Utils'
 import { isBogonIP, isInvalidIP, isIPv6 } from '../utils/functions/checkIP'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 import { isPortReachable } from '../utils/isPortReachable'
+import { Logger } from 'log4js'
 
 /** STATE */
 
-let p2pLogger
-let mainLogger 
+let p2pLogger: Logger
+let mainLogger: Logger
 
 let requests: P2P.JoinTypes.JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
@@ -80,7 +80,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
     }
 
     //  Validate of joinReq is done in addJoinRequest
-    const validJoinRequest = await addJoinRequest(joinRequest)
+    const validJoinRequest = addJoinRequest(joinRequest)
 
     if (validJoinRequest.success) {
       Comms.sendGossip('gossip-join', joinRequest, '', null, NodeList.byIdOrder, true)
@@ -140,7 +140,7 @@ const routes = {
 
 /** CycleCreator Functions */
 
-export function init() {
+export function init(): void {
   p2pLogger = logger.getLogger('p2p')
   mainLogger = logger.getLogger('main')
   // Init state
@@ -155,14 +155,14 @@ export function init() {
   }
 }
 
-export function reset() {
+export function reset(): void {
   requests = []
   seen = new Set()
 }
 
 export function getNodeRequestingJoin(): P2P.P2PTypes.P2PNode[] {
-  let nodes: P2P.P2PTypes.P2PNode[] = []
-  for (let request of requests) {
+  const nodes: P2P.P2PTypes.P2PNode[] = []
+  for (const request of requests) {
     if (request && request.nodeInfo) {
       nodes.push(request.nodeInfo)
     }
@@ -170,7 +170,8 @@ export function getNodeRequestingJoin(): P2P.P2PTypes.P2PNode[] {
   return nodes
 }
 
-function calculateToAccept() {
+/** calculateToAccept - calculates the number of nodes to accept into the network */
+function calculateToAccept(): number {
   const desired = CycleChain.newest.desired
   const active = CycleChain.newest.active
   let maxJoin = config.p2p.maxJoinedPerCycle // [TODO] allow autoscaling to change this
@@ -186,9 +187,9 @@ function calculateToAccept() {
           config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor * CycleCreator.scaleFactorSyncBoost
         )
 
-  //The first batch of nodes to join the network after the seed node server can join at a higher rate if firstCycleJoin is set
-  //This first batch will sync the full data range from the seed node, which should be very little data
-  //This get the network rolling faster, but also allows us to use a slightly higher base join rate because
+  //The first batch of nodes to join the network after the seed node server can join at a higher rate if firstCycleJoin is set.
+  //This first batch will sync the full data range from the seed node, which should be very little data.
+  //This gets the network rolling faster, but also allows us to use a slightly higher base join rate because
   //we are not worrying on how it performs with small networks. < 25 nodes.
   if (active === 0 && config.p2p.firstCycleJoin) {
     maxJoin = Math.max(config.p2p.firstCycleJoin, maxJoin)
@@ -200,7 +201,7 @@ function calculateToAccept() {
   }
 
   if (active > 0) {
-    let syncMaxLimit = 150 //todo make config
+    const syncMaxLimit = 150 //todo make config
     if (syncMax > syncMaxLimit) {
       /* prettier-ignore */ nestedCountersInstance.countEvent('networkSize', `limit syncmax ${syncMax}=>${syncMaxLimit} cyc:${CycleCreator.currentCycle}`)
       syncMax = syncMaxLimit
@@ -221,7 +222,7 @@ function calculateToAccept() {
   // If rotation is on, add expired to needed
   if (config.p2p.maxRotatedPerCycle > 0) {
     //only can accept as many as could actually rotate out in one cycle
-    let maxToLeave = Math.min(expired, config.p2p.maxRotatedPerCycle)
+    const maxToLeave = Math.min(expired, config.p2p.maxRotatedPerCycle)
     needed += maxToLeave
   }
 
@@ -236,7 +237,7 @@ function calculateToAccept() {
     needed = 0
   }
 
-  let cycle = CycleChain.newest.counter
+  const cycle = CycleChain.newest.counter
   if (cycle > lastLoggedCycle) {
     lastLoggedCycle = cycle
     info(
@@ -292,15 +293,11 @@ export function validateRecordTypes(rec: P2P.JoinTypes.Record): string {
 }
 
 export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
-  const join = txs.join.filter((request) => validateJoinRequest(request))
+  const join = txs.join.filter(() => validateJoinRequest())
   return { join }
 }
 
-export function updateRecord(
-  txs: P2P.JoinTypes.Txs,
-  record: P2P.CycleCreatorTypes.CycleRecord,
-  _prev: P2P.CycleCreatorTypes.CycleRecord
-) {
+export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
   const joinedConsensors = txs.join.map((joinRequest) => {
     const { nodeInfo, cycleMarker: cycleJoined } = joinRequest
     const id = computeNodeId(nodeInfo.publicKey, cycleJoined)
@@ -322,15 +319,19 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 }
 
 /** Not used by Join */
-export function sendRequests() {}
+export function sendRequests(): void {
+  return
+}
 
 /** Not used by Join */
-export function queueRequest(request) {}
+export function queueRequest(): void {
+  return
+}
 
 /** Module Functions */
 
 export async function createJoinRequest(
-  cycleMarker
+  cycleMarker: string
 ): Promise<P2P.JoinTypes.JoinRequest & P2P.P2PTypes.SignedObject> {
   // Build and return a join request
   const nodeInfo = Self.getThisNodeInfo()
@@ -338,10 +339,16 @@ export async function createJoinRequest(
   const proofOfWork = {
     compute: await crypto.getComputeProofOfWork(cycleMarker, config.p2p.difficulty),
   }
-  let joinReq = { nodeInfo, cycleMarker, proofOfWork, version }
+  const joinReq = {
+    nodeInfo,
+    cycleMarker,
+    proofOfWork: JSON.stringify(proofOfWork),
+    version,
+    selectionNum: undefined,
+  }
   if (typeof shardus.app.getJoinData === 'function') {
     try {
-      let appJoinData = shardus.app.getJoinData()
+      const appJoinData = shardus.app.getJoinData()
       if (appJoinData) {
         joinReq['appJoinData'] = appJoinData
       }
@@ -471,11 +478,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
     nestedCountersInstance.countEvent('p2p', `join-reject-bogon-ex:${er}`)
   }
 
-  let selectionKey
+  let selectionKey: unknown
 
   if (typeof shardus.app.validateJoinRequest === 'function') {
     try {
-      let validationResponse = shardus.app.validateJoinRequest(joinRequest)
+      const validationResponse = shardus.app.validateJoinRequest(joinRequest)
       if (validationResponse.success !== true) {
         error(`Validation of join request data is failed due to ${validationResponse.reason || 'unknown reason'}`)
         nestedCountersInstance.countEvent('p2p', `join-reject-dapp`)
@@ -606,7 +613,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
   }
 }
 
-export async function firstJoin() {
+export async function firstJoin(): Promise<string> {
   // Create join request from 000... cycle marker
   const zeroMarker = '0'.repeat(64)
   const request = await createJoinRequest(zeroMarker)
@@ -619,7 +626,7 @@ export async function firstJoin() {
 export async function submitJoin(
   nodes: P2P.P2PTypes.Node[],
   joinRequest: P2P.JoinTypes.JoinRequest & P2P.P2PTypes.SignedObject
-) {
+): Promise<void> {
   // Send the join request to a handful of the active node all at once:w
   const selectedNodes = utils.getRandom(nodes, Math.min(nodes.length, 5))
   const promises = []
@@ -669,14 +676,14 @@ export async function submitJoin(
   })
 }
 
-export async function fetchJoined(activeNodes) {
-  const queryFn = async (node) => {
+export async function fetchJoined(activeNodes: unknown[]): Promise<string> {
+  const queryFn = async (node: { ip: string; port: number }): Promise<unknown> => {
     const publicKey = crypto.keypair.publicKey
     const res = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
     return res
   }
   try {
-    const { topResult: response, winningNodes: _responders } = await robustQuery(activeNodes, queryFn)
+    const { topResult: response } = await robustQuery(activeNodes, queryFn)
     if (!response) return
     if (!response.node) return
     let err = utils.validateTypes(response, { node: 'o' })
@@ -696,12 +703,12 @@ export async function fetchJoined(activeNodes) {
   }
 }
 
-function validateJoinRequest(request: P2P.JoinTypes.JoinRequest) {
+function validateJoinRequest(): boolean {
   // [TODO] Implement this
   return true
 }
 
-export function computeNodeId(publicKey, cycleMarker) {
+export function computeNodeId(publicKey: string, cycleMarker: string): string {
   const obj = { publicKey, cycleMarker }
   const nodeId = crypto.hash(obj)
   if (logFlags.p2pNonFatal) {
@@ -711,17 +718,17 @@ export function computeNodeId(publicKey, cycleMarker) {
   return nodeId
 }
 
-function info(...msg) {
+function info(...msg: string[]): void {
   const entry = `Join: ${msg.join(' ')}`
   p2pLogger.info(entry)
 }
 
-function warn(...msg) {
+function warn(...msg: string[]): void {
   const entry = `Join: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }
 
-function error(...msg) {
+function error(...msg: string[]): void {
   const entry = `Join: ${msg.join(' ')}`
   p2pLogger.error(entry)
 }
