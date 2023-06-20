@@ -702,6 +702,9 @@ class Shardus extends EventEmitter {
     Self.emitter.on('node-deactivated', ({ ...params }) =>
       this.app.eventNotify?.({ type: 'node-deactivated', ...params })
     )
+    Self.emitter.on('node-left-early', ({ ...params }) =>
+      this.app.eventNotify?.({ type: 'node-left-early', ...params })
+    )
 
     Context.setShardusContext(this)
 

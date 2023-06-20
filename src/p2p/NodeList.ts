@@ -158,14 +158,27 @@ export function removeNode(id, raiseEvents: boolean, cycle: P2P.CycleCreatorType
   nodes.delete(id)
 
   if (raiseEvents) {
-    const emitParams: Omit<ShardusEvent, 'type'> = {
-      nodeId: node.id,
-      reason: 'Node deactivated',
-      time: cycle.start,
-      publicKey: node.publicKey,
-      cycleNumber: cycle.counter,
+    // check if this node is marked as "lost" prev cycle
+
+    if (isNodeLeftNetworkEarly(node)) {
+      const emitParams: Omit<ShardusEvent, 'type'> = {
+        nodeId: node.id,
+        reason: 'Node left early',
+        time: cycle.start,
+        publicKey: node.publicKey,
+        cycleNumber: cycle.counter,
+      }
+      emitter.emit('node-left-early', emitParams )
+    } else {
+      const emitParams: Omit<ShardusEvent, 'type'> = {
+        nodeId: node.id,
+        reason: 'Node deactivated',
+        time: cycle.start,
+        publicKey: node.publicKey,
+        cycleNumber: cycle.counter,
+      }
+      emitter.emit('node-deactivated', emitParams)
     }
-    emitter.emit('node-deactivated', emitParams)
   }
 }
 export function removeNodes(
@@ -223,6 +236,9 @@ export function updateNodes(
   for (const update of updates) updateNode(update, raiseEvents, cycle)
 }
 
+export function isNodeLeftNetworkEarly(node: P2P.NodeListTypes.Node) {
+  return CycleChain.newest && CycleChain.newest.lost.includes(node.id)
+}
 export function createNode(joined: P2P.JoinTypes.JoinedConsensor) {
   const node: P2P.NodeListTypes.Node = {
     ...joined,

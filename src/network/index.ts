@@ -90,6 +90,10 @@ export class NetworkClass extends EventEmitter {
     this.lruCacheSizeForSocketMgmt = config.p2p.lruCacheSizeForSocketMgmt
   }
 
+  setDebugNetworkDelay(delay: number) {
+    this.debugNetworkDelay = delay
+  }
+
   setStatisticsInstance(statistics) {
     this.statisticsInstance = statistics
   }

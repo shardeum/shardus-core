@@ -65,6 +65,15 @@ class Debug {
       res.set('content-type', 'application/gzip')
       archive.pipe(gzip).pipe(res)
     })
+    this.network.registerExternalGet('debug-network-delay', isDebugModeMiddleware, (req, res) => {
+      try {
+        const delay = req.query.delay && typeof req.query.delay === "string" ? parseInt(req.query.delay) * 1000 : 120 * 1000
+        this.network.setDebugNetworkDelay(delay)
+      } catch (e) {
+        return res.send({ success: false, error: e.message })
+      }
+      return res.send({ success: true })
+    })
   }
 }
 
