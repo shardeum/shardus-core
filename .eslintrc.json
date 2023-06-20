@@ -21,7 +21,6 @@
     "Template.ts",
     "Sync.ts",
     "SafetyMode.ts",
-    "Rotation.ts",
     "Refresh.ts",
     "NodeList.ts",
     "Lost.ts",

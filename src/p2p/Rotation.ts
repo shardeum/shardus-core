@@ -19,7 +19,9 @@ let lastLoggedCycle: number
 /** ROUTES */
 
 // [TODO] - since we don't have any routes, no need to create and register this emply function
-const gossipRoute: P2P.P2PTypes.GossipHandler = (payload) => {}
+const gossipRoute: P2P.P2PTypes.GossipHandler = () => {
+  return
+}
 
 const routes = {
   internal: {},
@@ -32,7 +34,7 @@ const routes = {
 
 /** CycleCreator Functions */
 
-export function init() {
+export function init(): void {
   // Init logger
   p2pLogger = logger.getLogger('p2p')
 
@@ -49,14 +51,16 @@ export function init() {
   }
 }
 
-export function reset() {}
+export function reset(): void {
+  return
+}
 
 export function getTxs(): P2P.RotationTypes.Txs {
   return {}
 }
 
 export function validateRecordTypes(rec: P2P.RotationTypes.Record): string {
-  let err = validateTypes(rec, { expired: 'n', removed: 'a' })
+  const err = validateTypes(rec, { expired: 'n', removed: 'a' })
   if (err) return err
   for (const item of rec.removed) {
     if (typeof item !== 'string') return 'items of removed array must be strings'
@@ -68,14 +72,12 @@ export function dropInvalidTxs(txs: P2P.RotationTypes.Txs): P2P.RotationTypes.Tx
   return txs
 }
 
-/*
-Given the txs and prev cycle record mutate the referenced record
-*/
+/** Given the `txs` and `prev` cycle record, mutate the referenced `record` */
 export function updateRecord(
   txs: P2P.RotationTypes.Txs & P2P.ApoptosisTypes.Txs,
   record: P2P.CycleCreatorTypes.CycleRecord,
   prev: P2P.CycleCreatorTypes.CycleRecord
-) {
+): void {
   if (!prev) {
     record.expired = 0
     record.removed = []
@@ -103,17 +105,22 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   }
 }
 
-export function queueRequest(request) {}
+export function queueRequest(): void {
+  return
+}
 
-export function sendRequests() {}
+export function sendRequests(): void {
+  return
+}
 
 /** Module Functions */
 
+/** Returns the number of expired nodes and the list of removed nodes */
 export function getExpiredRemoved(
   start: P2P.CycleCreatorTypes.CycleRecord['start'],
   desired: P2P.CycleCreatorTypes.CycleRecord['desired'],
   txs: P2P.RotationTypes.Txs & P2P.ApoptosisTypes.Txs
-) {
+): { expired: number; removed: string[] } {
   let expired = 0
   const removed = []
   NodeList.potentiallyRemoved.clear()
@@ -122,24 +129,19 @@ export function getExpiredRemoved(
   if (config.p2p.nodeExpiryAge < 0) return { expired, removed }
 
   const active = NodeList.activeByIdOrder.length
-  // const desired = getDesiredCount()
 
   let expireTimestamp = (start - config.p2p.nodeExpiryAge) * 1000
   if (expireTimestamp < 0) expireTimestamp = 0
 
+  // initialize the max amount to remove to our config value
   let maxRemove = config.p2p.maxRotatedPerCycle
 
-  let scaleDownRemove = 0
-  if (active - desired > 0) scaleDownRemove = active - desired
+  // initialize `scaleDownRemove` to at most any "excess" nodes more than
+  // desired. it can't be less than zero.
+  let scaleDownRemove = Math.max(active - desired, 0)
 
   //only let the scale factor impart a partial influence based on scaleInfluenceForShrink
-  let scaledAmountToShrink: number
-  {
-    const scaleInfluence = config.p2p.scaleInfluenceForShrink
-    const nonScaledAmount = config.p2p.amountToShrink
-    const scaledAmount = config.p2p.amountToShrink * CycleCreator.scaleFactor
-    scaledAmountToShrink = Math.floor(lerp(nonScaledAmount, scaledAmount, scaleInfluence))
-  }
+  const scaledAmountToShrink = getScaledAmountToShrink()
 
   //limit the scale down by scaledAmountToShrink
   if (scaleDownRemove > scaledAmountToShrink) {
@@ -151,7 +153,7 @@ export function getExpiredRemoved(
   //make sure the value is at least 1
   const maxActiveNodesToRemove = Math.max(Math.floor(config.p2p.maxShrinkMultiplier * active), 1)
 
-  let cycle = CycleChain.newest.counter
+  const cycle = CycleChain.newest.counter
   if (cycle > lastLoggedCycle && scaleDownRemove > 0) {
     lastLoggedCycle = cycle
     info(
@@ -182,15 +184,14 @@ export function getExpiredRemoved(
   if (maxRemove > active - desired) maxRemove = active - desired
 
   // final clamp of max remove, but only if it is more than amountToShrink
-  // to avoid messing up the calculation above this next part can only make maxRemove smaller
-  if (maxRemove > config.p2p.amountToShrink) {
-    //maxActiveNodesToRemove is a percent of the active nodes that is set as a 0-1 value in maxShrinkMultiplier
-    if (maxRemove > maxActiveNodesToRemove) {
-      //yes, this max could be baked in earlier, but I like it here for clarity
-      maxRemove = Math.max(config.p2p.amountToShrink, maxActiveNodesToRemove)
-    }
+  // to avoid messing up the calculation above this next part can only make maxRemove smaller.
+  // maxActiveNodesToRemove is a percent of the active nodes that is set as a 0-1 value in maxShrinkMultiplier
+  if (maxRemove > config.p2p.amountToShrink && maxRemove > maxActiveNodesToRemove) {
+    // yes, this max could be baked in earlier, but I like it here for clarity
+    maxRemove = Math.max(config.p2p.amountToShrink, maxActiveNodesToRemove)
   }
 
+  // get list of nodes that have been requested to be removed
   const apoptosizedNodesList = []
   for (const request of txs.apoptosis) {
     const node = NodeList.nodes.get(request.id)
@@ -201,12 +202,15 @@ export function getExpiredRemoved(
 
   // Oldest node has index 0
   for (const node of NodeList.byJoinOrder) {
-    // Don't count syncing nodes in your expired count
+    // don't count syncing nodes in our expired count
     if (node.status === 'syncing') continue
-    // Once you hit the first node that's not expired, stop
+
+    // once we've hit the first node that's not expired, stop counting
     if (node.joinRequestTimestamp > expireTimestamp) break
-    // Count the expired node
+
+    // otherwise, count this node as expired
     expired++
+
     // Add it to removed if it isn't full
     if (config.p2p.uniqueRemovedIds) {
       // Limit the number of nodes that can be removed by removed + apoptosized
@@ -227,17 +231,27 @@ export function getExpiredRemoved(
   return { expired, removed }
 }
 
-function info(...msg) {
+function info(...msg: string[]): void {
   const entry = `Rotation: ${msg.join(' ')}`
   p2pLogger.info(entry)
 }
 
-function warn(...msg) {
+function warn(...msg: string[]): void {
   const entry = `Rotation: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }
 
-function error(...msg) {
+function error(...msg: string[]): void {
   const entry = `Rotation: ${msg.join(' ')}`
   p2pLogger.error(entry)
+}
+
+/** Returns a linearly interpolated value between `amountToShrink` and the same
+* multiplied by a `scaleFactor`. The result depends on the
+* `scaleInfluenceForShrink` */
+function getScaledAmountToShrink(): number {
+  const nonScaledAmount = config.p2p.amountToShrink
+  const scaledAmount = config.p2p.amountToShrink * CycleCreator.scaleFactor
+  const scaleInfluence = config.p2p.scaleInfluenceForShrink
+  return Math.floor(lerp(nonScaledAmount, scaledAmount, scaleInfluence))
 }
