@@ -48,7 +48,7 @@
   "dependencies": {
     "@hapi/sntp": "^3.1.1",
     "@shardus/crypto-utils": "^4.0.4",
-    "@shardus/net": "1.1.1",
+    "@shardus/net": "1.1.2",
     "@shardus/types": "^1.0.13",
     "@types/better-sqlite3": "^7.6.3",
     "body-parser": "^1.18.3",
