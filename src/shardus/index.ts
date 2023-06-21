@@ -696,15 +696,27 @@ class Shardus extends EventEmitter {
         else this.exitHandler.exitUncleanly(`invoke-exit: ${tag}`, `invoke-exit: ${tag} ${exitType}`) // exits with status 1 so that PM2 CANNOT restart the process
       }
     )
-    Self.emitter.on('node-activated', ({ ...params }) =>
-      this.app.eventNotify?.({ type: 'node-activated', ...params })
-    )
-    Self.emitter.on('node-deactivated', ({ ...params }) =>
-      this.app.eventNotify?.({ type: 'node-deactivated', ...params })
-    )
-    Self.emitter.on('node-left-early', ({ ...params }) =>
-      this.app.eventNotify?.({ type: 'node-left-early', ...params })
-    )
+    Self.emitter.on('node-activated', ({ ...params }) => {
+      try {
+        this.app.eventNotify?.({ type: 'node-activated', ...params })
+      } catch (e) {
+        this.mainLogger.error(`Error: while processing node-activated event stack: ${e.stack}`)
+      }
+    })
+    Self.emitter.on('node-deactivated', ({ ...params }) => {
+      try {
+        this.app.eventNotify?.({ type: 'node-deactivated', ...params })
+      } catch (e) {
+        this.mainLogger.error(`Error: while processing node-deactivated event stack: ${e.stack}`)
+      }
+    })
+    Self.emitter.on('node-left-early', ({ ...params }) => {
+      try {
+        this.app.eventNotify?.({ type: 'node-left-early', ...params })
+      } catch (e) {
+        this.mainLogger.error(`Error: while processing node-left-early event stack: ${e.stack}`)
+      }
+    })
 
     Context.setShardusContext(this)
 
