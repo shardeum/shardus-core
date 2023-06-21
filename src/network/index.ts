@@ -285,6 +285,7 @@ export class NetworkClass extends EventEmitter {
       } catch (err) {
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Error evicting socket for node ${node.id}: ${err}, (ip: ${node.internalIp}, port: ${node.internalPort})`)
       } finally {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Evicted socket for node ${node.id}, (ip: ${node.internalIp}, port: ${node.internalPort})`)
         profilerInstance.profileSectionEnd('net-evictCachedSockets')
       }
     }
