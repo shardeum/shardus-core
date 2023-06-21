@@ -279,7 +279,7 @@ export class NetworkClass extends EventEmitter {
     if (!this.sn) return
     for (const node of nodes) {
       try {
-        profilerInstance.profileSectionStart('p2p-evictCachedSockets')
+        profilerInstance.profileSectionStart('net-evictCachedSockets')
         /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Evicting socket for node ${node.id}, (ip: ${node.internalIp}, port: ${node.internalPort})`)
         this.sn.evictSocket(node.internalPort, node.internalIp)
       } catch (err) {
