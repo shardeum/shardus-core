@@ -781,8 +781,8 @@ export type DebugDumpNodesCovered = {
   id: string
   fracID: number
   hP: number
-  consensus: []
-  stored: []
+  consensus: { idx: number, hp: number }[]
+  stored: { idx: number, hp: number }[]
   extra: []
   numP: number
 }

@@ -35,9 +35,14 @@ import {
 } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { errorToStringFull } from '../utils'
-//import { all } from 'deepmerge'
-//import { Node } from '../p2p/Types'
+import { Response } from 'express-serve-static-core'
 
+type Line = {
+  raw: string
+  file: {
+    owner: string
+  }
+}
 type AccountHashStats = {
   matched: number
   visisted: number
@@ -177,7 +182,7 @@ class AccountPatcher {
     //could replace with a different cheaper hash!!
     return this.crypto.hash(value)
   }
-  sortByAccountID(a, b) {
+  sortByAccountID(a: TrieAccount, b: TrieAccount) {
     if (a.accountID < b.accountID) {
       return -1
     }
@@ -186,7 +191,7 @@ class AccountPatcher {
     }
     return 0
   }
-  sortByRadix(a, b) {
+  sortByRadix(a: RadixAndHash, b: RadixAndHash) {
     if (a.radix < b.radix) {
       return -1
     }
@@ -211,9 +216,9 @@ class AccountPatcher {
       'get_trie_hashes',
       async (
         payload: HashTrieReq,
-        respond: (arg0: HashTrieResp) => number,
-        sender,
-        tracker: string,
+        respond: (arg0: HashTrieResp) => Promise<number>,
+        _sender: unknown,
+        _tracker: string,
         msgSize: number
       ) => {
         profilerInstance.scopedProfileSectionStart('get_trie_hashes', false, msgSize)
@@ -249,7 +254,13 @@ class AccountPatcher {
 
     this.p2p.registerInternal(
       'sync_trie_hashes',
-      async (payload: HashTrieSyncTell, respondWrapped, sender: string, tracker: string, msgSize: number) => {
+      async (
+        payload: HashTrieSyncTell,
+        _respondWrapped: unknown,
+        sender: string,
+        _tracker: string,
+        msgSize: number
+      ) => {
         profilerInstance.scopedProfileSectionStart('sync_trie_hashes', false, msgSize)
         try {
           //TODO use our own definition of current cycle.
@@ -319,9 +330,9 @@ class AccountPatcher {
       'get_trie_accountHashes',
       async (
         payload: HashTrieReq,
-        respond: (arg0: HashTrieAccountsResp) => number,
-        sender: string,
-        tracker: string,
+        respond: (arg0: HashTrieAccountsResp) => Promise<number>,
+        _sender: string,
+        _tracker: string,
         msgSize: number
       ) => {
         profilerInstance.scopedProfileSectionStart('get_trie_accountHashes', false, msgSize)
@@ -373,9 +384,9 @@ class AccountPatcher {
       'get_account_data_by_hashes',
       async (
         payload: HashTrieAccountDataRequest,
-        respond: (arg0: HashTrieAccountDataResponse) => number,
-        sender: string,
-        tracker: string,
+        respond: (arg0: HashTrieAccountDataResponse) => Promise<number>,
+        _sender: string,
+        _tracker: string,
         msgSize: number
       ) => {
         profilerInstance.scopedProfileSectionStart('get_account_data_by_hashes', false, msgSize)
@@ -505,7 +516,7 @@ class AccountPatcher {
     Context.network.registerExternalGet(
       'debug-patcher-ignore-hash-updates',
       isDebugModeMiddleware,
-      (req, res) => {
+      (_req, res) => {
         try {
           this.debug_ignoreUpdates = !this.debug_ignoreUpdates
           res.write(`this.debug_ignoreUpdates: ${this.debug_ignoreUpdates}\n`)
@@ -515,7 +526,7 @@ class AccountPatcher {
         res.end()
       }
     )
-    Context.network.registerExternalGet('debug-patcher-fail-tx', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('debug-patcher-fail-tx', isDebugModeMiddleware, (_req, res) => {
       try {
         //toggle chance to fail TXs in a way that they do not get fixed by the first tier of repair.
 
@@ -531,7 +542,7 @@ class AccountPatcher {
       }
       res.end()
     })
-    Context.network.registerExternalGet('debug-patcher-voteflip', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('debug-patcher-voteflip', isDebugModeMiddleware, (_req, res) => {
       try {
         if (this.stateManager.voteFlipChance === 0) {
           this.stateManager.voteFlipChance = 1
@@ -545,7 +556,7 @@ class AccountPatcher {
       }
       res.end()
     })
-    Context.network.registerExternalGet('debug-patcher-toggle-skip', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('debug-patcher-toggle-skip', isDebugModeMiddleware, (_req, res) => {
       try {
         if (this.stateManager.debugSkipPatcherRepair === false) {
           this.stateManager.debugSkipPatcherRepair = true
@@ -559,7 +570,7 @@ class AccountPatcher {
       }
       res.end()
     })
-    Context.network.registerExternalGet('debug-patcher-dumpTree', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('debug-patcher-dumpTree', isDebugModeMiddleware, (_req, res) => {
       try {
         // this.statemanager_fatal('debug shardTrie',`temp shardTrie ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}`)
         // res.write(`${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}\n`)
@@ -615,7 +626,7 @@ class AccountPatcher {
       }
     )
 
-    Context.network.registerExternalGet('debug-patcher-fail-hashes', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('debug-patcher-fail-hashes', isDebugModeMiddleware, (_req, res) => {
       try {
         const lastCycle = this.p2p.state.getLastCycle()
         const cycle = lastCycle.counter
@@ -668,7 +679,7 @@ class AccountPatcher {
       res.end()
     })
 
-    Context.network.registerExternalGet('get-tree-last-insync', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('get-tree-last-insync', isDebugModeMiddleware, (_req, res) => {
       res.write(`${this.failedLastTrieSync === false}\n`)
 
       res.end()
@@ -723,19 +734,19 @@ class AccountPatcher {
       }
     )
 
-    Context.network.registerExternalGet('trie-repair-dump', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('trie-repair-dump', isDebugModeMiddleware, (_req, res) => {
       res.write(`${utils.stringifyReduce(this.lastRepairInfo)}\n`)
       res.end()
     })
 
     //
-    Context.network.registerExternalGet('get-shard-dump', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('get-shard-dump', isDebugModeMiddleware, (_req, res) => {
       res.write(`${this.stateManager.lastShardReport}\n`)
       res.end()
     })
 
     //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('get-shard-dump-all', isDebugModeMiddleware, async (req, res) => {
+    Context.network.registerExternalGet('get-shard-dump-all', isDebugModeMiddleware, async (_req, res) => {
       try {
         //wow, why does Context.p2p not work..
         res.write(`last shard reports \n`)
@@ -757,7 +768,7 @@ class AccountPatcher {
       res.end()
     })
 
-    Context.network.registerExternalGet('get-shard-report-all', isDebugModeMiddleware, async (req, res) => {
+    Context.network.registerExternalGet('get-shard-report-all', isDebugModeMiddleware, async (_req, res) => {
       try {
         //wow, why does Context.p2p not work..
         res.write(`building shard report \n`)
@@ -794,11 +805,11 @@ class AccountPatcher {
         if (id.length === 10) {
           //short form..
           let found = false
-          const prefix = id.substr(0, 4)
+          const prefix = id.substring(0, 4)
           const low = prefix + '0'.repeat(60)
           const high = prefix + 'f'.repeat(60)
 
-          const suffix = id.substr(5, 5)
+          const suffix = id.substring(5, 10)
           const possibleAccounts = await this.app.getAccountDataByRange(low, high, 0, Date.now(), 100, 0, '')
 
           res.write(`searching ${possibleAccounts.length} accounts \n`)
@@ -855,11 +866,11 @@ class AccountPatcher {
       try {
         if (id.length === 10) {
           //short form..
-          const prefix = id.substr(0, 4)
+          const prefix = id.substring(0, 4)
           const low = prefix + '0'.repeat(60)
           const high = prefix + 'f'.repeat(60)
 
-          const suffix = id.substr(5, 5)
+          const suffix = id.substring(5, 10)
           const possibleAccounts = await this.app.getAccountDataByRange(low, high, 0, Date.now(), 100, 0, '')
 
           for (const account of possibleAccounts) {
@@ -884,8 +895,8 @@ class AccountPatcher {
             const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(accountId)
             const storedNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(accountId)
 
+            // eslint-disable-next-line security/detect-object-injection
             resObj[accountId] = {
-              // eslint-disable-line security/detect-object-injection
               consensusNodes: consensusNodes.map((node) => {
                 return {
                   id: node.id,
@@ -924,14 +935,14 @@ class AccountPatcher {
       res.end()
     })
 
-    Context.network.registerExternalGet('hack-version', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('hack-version', isDebugModeMiddleware, (_req, res) => {
       res.write(`1.0.1\n`)
       res.end()
     })
   }
 
   getAccountTreeInfo(accountID: string): TrieAccount {
-    const radix = accountID.substr(0, this.treeMaxDepth)
+    const radix = accountID.substring(0, this.treeMaxDepth)
 
     const treeNode = this.shardTrie.layerMaps[this.treeMaxDepth].get(radix)
     if (treeNode == null || treeNode.accountTempMap == null) {
@@ -1130,6 +1141,7 @@ class AccountPatcher {
         }
 
         //if we have not set this child yet then count it
+        // eslint-disable-next-line security/detect-object-injection
         if (parentTreeNode.children[index] == null) {
           // eslint-disable-line security/detect-object-injection
           parentTreeNode.nonSparseChildCount++
@@ -1232,8 +1244,8 @@ class AccountPatcher {
     for (const syncTracker of this.stateManager.accountSync.syncTrackers) {
       if (syncTracker.syncFinished === false && syncTracker.isGlobalSyncTracker === false) {
         incompleteRanges.push({
-          low: syncTracker.range.low.substr(0, this.treeSyncDepth),
-          high: syncTracker.range.high.substr(0, this.treeSyncDepth),
+          low: syncTracker.range.low.substring(0, this.treeSyncDepth),
+          high: syncTracker.range.high.substring(0, this.treeSyncDepth),
         })
       }
     }
@@ -1282,8 +1294,8 @@ class AccountPatcher {
       const partition2 = shardValues.parititionShardDataMap.get(incompletePartition2)
 
       const incompleteRange = {
-        low: partition1.homeRange.low.substr(0, depth),
-        high: partition2.homeRange.high.substr(0, depth),
+        low: partition1.homeRange.low.substring(0, depth),
+        high: partition2.homeRange.high.substring(0, depth),
       }
       incompleteRanges.push(incompleteRange)
       return incompleteRanges
@@ -1306,8 +1318,8 @@ class AccountPatcher {
         const partition2 = shardValues.parititionShardDataMap.get(incompletePartition1)
 
         const incompleteRange = {
-          low: partition1.homeRange.low.substr(0, depth),
-          high: partition2.homeRange.high.substr(0, depth),
+          low: partition1.homeRange.low.substring(0, depth),
+          high: partition2.homeRange.high.substring(0, depth),
         }
         incompleteRanges.push(incompleteRange)
         return incompleteRanges
@@ -1322,8 +1334,8 @@ class AccountPatcher {
         const partition2 = shardValues.parititionShardDataMap.get(incompletePartition1)
 
         const incompleteRange = {
-          low: partition1.homeRange.low.substr(0, depth),
-          high: partition2.homeRange.high.substr(0, depth),
+          low: partition1.homeRange.low.substring(0, depth),
+          high: partition2.homeRange.high.substring(0, depth),
         }
         incompleteRanges.push(incompleteRange)
         return incompleteRanges
@@ -1334,15 +1346,15 @@ class AccountPatcher {
       const partition1 = shardValues.parititionShardDataMap.get(0)
       const partition2 = shardValues.parititionShardDataMap.get(incompletePartition1)
       const incompleteRange = {
-        low: partition1.homeRange.low.substr(0, depth),
-        high: partition2.homeRange.high.substr(0, depth),
+        low: partition1.homeRange.low.substring(0, depth),
+        high: partition2.homeRange.high.substring(0, depth),
       }
 
       const partition1b = shardValues.parititionShardDataMap.get(incompletePartition2)
       const partition2b = shardValues.parititionShardDataMap.get(numPartitions - 1)
       const incompleteRangeB = {
-        low: partition1b.homeRange.low.substr(0, depth),
-        high: partition2b.homeRange.high.substr(0, depth),
+        low: partition1b.homeRange.low.substring(0, depth),
+        high: partition2b.homeRange.high.substring(0, depth),
       }
 
       incompleteRanges.push(incompleteRange)
@@ -1351,7 +1363,7 @@ class AccountPatcher {
     }
   }
 
-  initStoredRadixValues(cycle) {
+  initStoredRadixValues(cycle: number) {
     // //mark these here , call this where we first create the vote structure for the cycle (could be two locations)
     // nonStoredRanges: {low:string,high:string}[]
     // radixIsStored: Map<string, boolean>
@@ -1360,7 +1372,7 @@ class AccountPatcher {
     this.radixIsStored.clear()
   }
 
-  isRadixStored(cycle: number, radix: string) {
+  isRadixStored(_cycle: number, radix: string) {
     if (this.radixIsStored.has(radix)) {
       return this.radixIsStored.get(radix)
     }
@@ -1534,7 +1546,7 @@ class AccountPatcher {
    */
   getNodeForQuery(radix: string, cycle: number, nextNode = false) {
     const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
-    const parentRadix = radix.substr(0, this.treeSyncDepth)
+    const parentRadix = radix.substring(0, this.treeSyncDepth)
 
     const coverageEntry = hashTrieSyncConsensus.coverageMap.get(parentRadix)
 
@@ -1761,7 +1773,7 @@ class AccountPatcher {
    *
    * @param cycle
    */
-  isInSync(cycle) {
+  isInSync(cycle: number) {
     const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
     if (hashTrieSyncConsensus == null) {
@@ -2142,7 +2154,7 @@ class AccountPatcher {
    *
    * @param cycle
    */
-  async broadcastSyncHashes(cycle) {
+  async broadcastSyncHashes(cycle: number) {
     const syncLayer = this.shardTrie.layerMaps[this.treeSyncDepth]
 
     const shardGlobals = this.stateManager.currentCycleShardData.shardGlobals
@@ -2286,7 +2298,7 @@ class AccountPatcher {
    *
    * @param cycle
    */
-  async updateTrieAndBroadCast(cycle) {
+  async updateTrieAndBroadCast(cycle: number) {
     //calculate sync levels!!
     const shardValues = this.stateManager.shardValuesByCycle.get(cycle)
     const shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
@@ -2386,7 +2398,7 @@ class AccountPatcher {
    *
    * @param cycle
    */
-  async testAndPatchAccounts(cycle) {
+  async testAndPatchAccounts(cycle: number) {
     // let updateStats = this.upateShardTrie(cycle)
     // nestedCountersInstance.countEvent(`accountPatcher`, `totalAccountsHashed`, updateStats.totalAccountsHashed)
 
@@ -2420,7 +2432,7 @@ class AccountPatcher {
         this.failedLastTrieSync = true
         return
       }
-      let failHistoryObject
+      let failHistoryObject: { repaired: number; s: number; e: number; cycles: number }
       if (lastFail === false) {
         this.failStartCycle = cycle
         this.failEndCycle = -1
@@ -2708,7 +2720,7 @@ class AccountPatcher {
    * @param cycle
    * @param badAccounts
    */
-  simulateRepairs(cycle: number, badAccounts: AccountIDAndHash[]): AccountPreTest[] {
+  simulateRepairs(_cycle: number, badAccounts: AccountIDAndHash[]): AccountPreTest[] {
     const results = []
 
     for (const badAccount of badAccounts) {
@@ -2755,7 +2767,7 @@ class AccountPatcher {
     //pick which nodes to ask! /    //build up requests
     const nodesBySyncRadix: Map<
       string,
-      { node: Shardus.Node; request: { cycle; accounts: AccountIDAndHash[] } }
+      { node: Shardus.Node; request: { cycle: number; accounts: AccountIDAndHash[] } }
     > = new Map()
     const accountHashMap = new Map()
 
@@ -2771,7 +2783,7 @@ class AccountPatcher {
 
     try {
       for (const accountEntry of badAccounts) {
-        const syncRadix = accountEntry.accountID.substr(0, this.treeSyncDepth)
+        const syncRadix = accountEntry.accountID.substring(0, this.treeSyncDepth)
         let requestEntry = nodesBySyncRadix.get(syncRadix)
 
         // let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(accountEntry.accountID)
@@ -2896,7 +2908,7 @@ class AccountPatcher {
    * @param stream
    * @param lines
    */
-  processShardDump(stream, lines) {
+  processShardDump(stream: Response<unknown, Record<string, unknown>, number>, lines: Line[]) {
     const dataByParition = new Map()
 
     const rangesCovered = []
@@ -2907,11 +2919,11 @@ class AccountPatcher {
     for (const line of lines) {
       const index = line.raw.indexOf('{"allNodeIds')
       if (index >= 0) {
-        let partitionStr = line.raw.slice(index)
+        const partitionStr = line.raw.slice(index)
         //this.generalLog(string)
-        let partitionObj
+        let partitionObj: { cycle: number; owner: string }
         try {
-          const partitionObj = JSON.parse(partitionStr)
+          partitionObj = JSON.parse(partitionStr)
         } catch (error) {
           this.mainLogger.error('error parsing partitionObj', error, partitionStr)
           continue
@@ -2969,7 +2981,7 @@ class AccountPatcher {
           // new settings allow for not using accounts from sql
           continue
         }
-        entry.accounts.sort(function (a, b) {
+        entry.accounts.sort(function (a: { id: number }, b: { id: number }) {
           return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
         })
         const string = utils.stringifyReduce(entry.accounts)
@@ -3058,7 +3070,7 @@ class AccountPatcher {
       return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
     })
 
-    const isStored = function (i, rangeCovered) {
+    const isStored = function (i: number, rangeCovered: { stMin: number; stMax: number }) {
       const key = i
       const minP = rangeCovered.stMin
       const maxP = rangeCovered.stMax
@@ -3079,7 +3091,7 @@ class AccountPatcher {
       }
       return true
     }
-    const isConsensus = function (i, rangeCovered) {
+    const isConsensus = function (i: number, rangeCovered: { cMin: number; cMax: number }) {
       const key = i
       const minP = rangeCovered.cMin
       const maxP = rangeCovered.cMax

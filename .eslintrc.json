@@ -39,7 +39,6 @@
     "computePowGenerator.ts",
     "**/storage/index.ts",
     "**/statistics/index.ts",
-    "**/state-manager/index.ts",
     "**/snapshot/index.ts",
     "**/shardus/index.ts",
     "**/reporter/index.ts",

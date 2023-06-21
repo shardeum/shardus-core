@@ -3,8 +3,6 @@ export type Node = P2P.NodeListTypes.Node
 export type Cycle = P2P.CycleCreatorTypes.CycleRecord
 //import { RequestHandler } from "express"; //express was causing problems.
 
-type RequestHandler = any
-
 // Type definitions for Shardus
 // Project: Shardus Enterprise Server
 // Definitions by: Erik Xavier

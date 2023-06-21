@@ -3,7 +3,7 @@ import { Logger as Log4jsLogger } from 'log4js'
 import StateManager from '.'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
-import { P2PModuleContext as P2P, config } from '../p2p/Context'
+import { P2PModuleContext as P2P } from '../p2p/Context'
 import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
 import { reversed } from '../utils'
@@ -88,7 +88,7 @@ class CachedAppDataManager {
       }
     })
 
-    this.p2p.registerInternal('get_cached_app_data', async (payload: CacheAppDataRequest, respond) => {
+    this.p2p.registerInternal('get_cached_app_data', async (payload: CacheAppDataRequest, respond: (arg0: CachedAppData) => Promise<void>) => {
       profilerInstance.scopedProfileSectionStart('get_cached_app_data')
       try {
         const { topic, dataId } = payload
@@ -183,7 +183,7 @@ class CachedAppDataManager {
     dataID: string,
     appData: unknown,
     cycle: number,
-    formId: string,
+    _formId: string,
     txId: string
   ) {
     if (this.stateManager.currentCycleShardData == null) {
