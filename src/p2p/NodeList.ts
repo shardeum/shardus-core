@@ -1,13 +1,14 @@
-import { Logger } from 'log4js'
 import { stringify } from '@shardus/crypto-utils'
 import { P2P } from '@shardus/types'
+import { Logger } from 'log4js'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { ShardusEvent } from '../shardus/shardus-types'
 import { binarySearch, insertSorted, propComparator, propComparator2 } from '../utils'
+import * as Comms from './Comms'
 import { crypto, logger, network } from './Context'
 import * as CycleChain from './CycleChain'
 import * as Join from './Join'
-import { id, emitter } from './Self'
-import { ShardusEvent } from '../shardus/shardus-types'
-import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { emitter, id } from './Self'
 
 /** STATE */
 
@@ -157,6 +158,8 @@ export function removeNode(id, raiseEvents: boolean, cycle: P2P.CycleCreatorType
   byPubKey.delete(node.publicKey)
   nodes.delete(id)
 
+  Comms.evictCachedSockets([node])
+
   if (raiseEvents) {
     // check if this node is marked as "lost" prev cycle
 
@@ -168,7 +171,7 @@ export function removeNode(id, raiseEvents: boolean, cycle: P2P.CycleCreatorType
         publicKey: node.publicKey,
         cycleNumber: cycle.counter,
       }
-      emitter.emit('node-left-early', emitParams )
+      emitter.emit('node-left-early', emitParams)
     } else {
       const emitParams: Omit<ShardusEvent, 'type'> = {
         nodeId: node.id,

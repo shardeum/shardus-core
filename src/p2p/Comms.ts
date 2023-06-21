@@ -302,6 +302,10 @@ export async function ask(
   }
 }
 
+export function evictCachedSockets(nodes: ShardusTypes.Node[]) {
+  network.evictCachedSockets(nodes)
+}
+
 export function registerInternal(route, handler) {
   // Create function that wraps handler function
   const wrappedHandler = async (wrappedPayload, respond) => {

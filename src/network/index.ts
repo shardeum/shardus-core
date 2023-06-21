@@ -107,11 +107,11 @@ export class NetworkClass extends EventEmitter {
           if (self.verboseLogsNet) {
             self.netLogger.debug(
               'External\t' +
-              JSON.stringify({
-                url: req.url,
-                method: req.method,
-                body: req.body,
-              })
+                JSON.stringify({
+                  url: req.url,
+                  method: req.method,
+                  body: req.body,
+                })
             )
           }
         }
@@ -179,10 +179,10 @@ export class NetworkClass extends EventEmitter {
         if (logFlags.net_trace) {
           this.netLogger.debug(
             'Internal\t' +
-            JSON.stringify({
-              url: route,
-              body: payload,
-            })
+              JSON.stringify({
+                url: route,
+                body: payload,
+              })
           )
         }
       } catch (err) {
@@ -273,6 +273,18 @@ export class NetworkClass extends EventEmitter {
         profilerInstance.profileSectionEnd(`net-ask-${route}`)
       }
     })
+  }
+
+  evictCachedSockets(nodes: Shardus.Node[]) {
+    if (!this.sn) return
+    for (const node of nodes) {
+      try {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Evicting socket for node ${node.id}, (ip: ${node.internalIp}, port: ${node.internalPort})`)
+        this.sn.evictSocket(node.internalPort, node.internalIp)
+      } catch (err) {
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Error evicting socket for node ${node.id}: ${err}, (ip: ${node.internalIp}, port: ${node.internalPort})`)
+      }
+    }
   }
 
   async setup(ipInfo: IPInfo) {
@@ -570,7 +582,7 @@ class ConnectTest extends EventEmitter {
   start() {
     return new Promise<true>((resolve, reject) => {
       // Open a port on 0.0.0.0 (any IP)
-      const server = net.createServer(() => { })
+      const server = net.createServer(() => {})
       server.unref()
       server.on('error', reject)
       const listenPort = this.port > -1 ? this.port : 0
@@ -629,7 +641,7 @@ async function discoverExternalIp(servers: string[]) {
   //
   for (const server of servers) {
     try {
-      const {ip} : {ip:string} = await httpModule.get(server)
+      const { ip }: { ip: string } = await httpModule.get(server)
       return ip
     } catch (err) {
       mainLogger.warn(
