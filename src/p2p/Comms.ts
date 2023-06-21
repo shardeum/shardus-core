@@ -303,7 +303,9 @@ export async function ask(
 }
 
 export function evictCachedSockets(nodes: ShardusTypes.Node[]) {
+  profilerInstance.scopedProfileSectionStart('p2p-evictCachedSockets')
   network.evictCachedSockets(nodes)
+  profilerInstance.scopedProfileSectionEnd('p2p-evictCachedSockets')
 }
 
 export function registerInternal(route, handler) {
