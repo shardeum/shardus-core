@@ -365,6 +365,10 @@ export function registerInternal(route, handler) {
       warn('Payload unable to be extracted, possible missing signature...')
       return
     }
+    if (!NodeList.nodes.has(sender)) {
+      warn('Internal routes can only be used by nodes in the network...')
+      return
+    }
     if (route !== 'gossip') {
       logger.playbackLog(sender, 'self', 'InternalRecv', route, tracker, payload)
     }
