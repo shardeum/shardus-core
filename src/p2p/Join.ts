@@ -543,6 +543,42 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
     }
   }
 
+  //TODO - figure out why joinRequest is send with previous cycle marker instead of current cycle marker
+  /*
+   CONTEXT: when node create join request the cycleMarker is (current - 1).
+   The reason join request didn't use current cycleMarker is most likely the the current cycle is potential not agreed upon yet.
+   but the joinRequestTimestamp is Date.now
+   so checking if the timestamp is within its cycleMarker is gurantee to fail
+   let request cycle marker be X, then X+1 is current cycle, then we check if the timestamp is in the current cycleMarker
+  */
+  const joinRequestTimestamp = joinRequest.nodeInfo.joinRequestTimestamp
+  const cycleThisJoinRequestBelong = CycleChain.cyclesByMarker[joinRequest.cycleMarker]
+  const cycleStartedAt = cycleThisJoinRequestBelong.start
+  const cycleDuration = cycleThisJoinRequestBelong.duration 
+  const cycleWillEndsAt = cycleStartedAt + cycleDuration
+  const requestValidUpperBound = cycleWillEndsAt + (cycleDuration * 2)
+  const requestValidLowerBound = cycleWillEndsAt
+  
+  if(joinRequestTimestamp < requestValidLowerBound){
+    if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-not-meet-lowerbound`)
+    if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, timestamp is earlier than allowed cycle range')
+    return {
+      success: false,
+      reason: 'Cannot add join request, timestamp is earlier than allowed cycle range',
+      fatal: false,
+    }
+  }
+
+  if(joinRequestTimestamp > requestValidUpperBound){
+    if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-beyond-upperbound`)
+    if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, its timestamp exceeds allowed cycle range')
+    return {
+      success: false,
+      reason: 'Cannot add join request, timestamp exceeds allowed cycle range',
+      fatal: false,
+    }
+  }
+
   // Compute how many join request to accept
   const toAccept = calculateToAccept()
 

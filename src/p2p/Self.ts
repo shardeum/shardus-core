@@ -324,7 +324,7 @@ async function contactArchiver() {
     | P2P.ArchiversTypes.Request
     | undefined
   if (joinRequest) {
-    const accepted = Archivers.addJoinRequest(joinRequest)
+    const accepted = Archivers.addArchiverJoinRequest(joinRequest)
     if (accepted.success === false) {
       throw Error('Fatal: _getSeedNodes archivers join request not accepted by us!')
     }

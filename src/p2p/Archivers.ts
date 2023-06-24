@@ -182,7 +182,7 @@ export function resetLeaveRequests() {
   leaveRequests = []
 }
 
-export function addJoinRequest(joinRequest: P2P.ArchiversTypes.Request, tracker?, gossip = true) {
+export function addArchiverJoinRequest(joinRequest: P2P.ArchiversTypes.Request, tracker?, gossip = true) {
   // validate input
   let err = validateTypes(joinRequest, { nodeInfo: 'o', requestType: 's', sign: 'o' })
   if (err) {
@@ -652,7 +652,7 @@ export function registerRoutes() {
     const joinRequest = req.body
     if (logFlags.p2pNonFatal) info(`Archiver join request received: ${JSON.stringify(joinRequest)}`)
 
-    const accepted = await addJoinRequest(joinRequest)
+    const accepted = await addArchiverJoinRequest(joinRequest)
     if (!accepted.success) {
       warn('Archiver join request not accepted.')
       return res.json({ success: false, error: `Archiver join request rejected! ${accepted.reason}` })
@@ -683,7 +683,7 @@ export function registerRoutes() {
     profilerInstance.scopedProfileSectionStart('joinarchiver')
     try {
       if (logFlags.console) console.log('Join request gossip received:', payload)
-      const accepted = await addJoinRequest(payload, tracker, false)
+      const accepted = await addArchiverJoinRequest(payload, tracker, false)
       if (logFlags.console) {
         console.log('This join request is new. Should forward the join request')
         console.log('join request gossip accepted', accepted)
