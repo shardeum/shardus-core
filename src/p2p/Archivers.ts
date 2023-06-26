@@ -167,10 +167,10 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 }
 
 /** Not used by Archivers */
-export function sendRequests() { }
+export function sendRequests() {}
 
 /** Not used by Archivers */
-export function queueRequest() { }
+export function queueRequest() {}
 
 /** Original Functions */
 
@@ -201,16 +201,16 @@ export function addJoinRequest(joinRequest: P2P.ArchiversTypes.Request, tracker?
   }
   if (joinRequest.requestType !== P2P.ArchiversTypes.RequestTypes.JOIN) {
     warn('addJoinRequest: invalid joinRequest.requestType')
-    return { success: false, reason: 'invalid joinRequest.requestType'}
+    return { success: false, reason: 'invalid joinRequest.requestType' }
   }
   err = validateTypes(joinRequest.sign, { owner: 's', sig: 's' })
   if (err) {
     warn('addJoinRequest: bad joinRequest.sign ' + err)
     return { success: false, reason: 'bad joinRequest.sign ' + err }
   }
-  if (!crypto.verify(joinRequest)) {
+  if (!crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)) {
     warn('addJoinRequest: bad signature')
-    return { success: false, reason: 'bad signature '}
+    return { success: false, reason: 'bad signature ' }
   }
   if (archivers.get(joinRequest.nodeInfo.publicKey)) {
     warn('addJoinRequest: This archiver is already in the active archiver list')
@@ -254,21 +254,27 @@ export function addLeaveRequest(leaveRequest: P2P.ArchiversTypes.Request, tracke
   }
   if (leaveRequest.requestType !== P2P.ArchiversTypes.RequestTypes.LEAVE) {
     warn('addLeaveRequest: invalid leaveRequest.requestType')
-    return { success: false, reason: 'invalid leaveRequest.requestType'}
+    return { success: false, reason: 'invalid leaveRequest.requestType' }
   }
   err = validateTypes(leaveRequest.sign, { owner: 's', sig: 's' })
   if (err) {
     warn('addLeaveRequest: bad leaveRequest.sign ' + err)
     return { success: false, reason: 'bad leaveRequest.sign ' + err }
   }
-  if (!crypto.verify(leaveRequest)) {
+  if (!crypto.verify(leaveRequest, leaveRequest.nodeInfo.publicKey)) {
     warn('addLeaveRequest: bad signature')
     return { success: false, reason: 'bad signature' }
   }
 
   if (!archivers.get(leaveRequest.nodeInfo.publicKey)) {
-    warn('addLeaveRequest: Not a valid archiver to be sending leave request, archiver was not found in active archiver list')
-    return { success: false, reason: 'Not a valid archiver to be sending leave request, archiver was not found in active archiver list' }
+    warn(
+      'addLeaveRequest: Not a valid archiver to be sending leave request, archiver was not found in active archiver list'
+    )
+    return {
+      success: false,
+      reason:
+        'Not a valid archiver to be sending leave request, archiver was not found in active archiver list',
+    }
   }
   const existingLeaveRequest = leaveRequests.find(
     (j) => j.nodeInfo.publicKey === leaveRequest.nodeInfo.publicKey
@@ -696,8 +702,8 @@ export function registerRoutes() {
     if (tracker === undefined || tracker === null) return warn('Archiver leave tracker empty.')
     profilerInstance.scopedProfileSectionStart('leavingarchiver')
     try {
-      if (NodeList.nodes.get(sender)==null){
-        return warn('Archiver leave gossip came from invalid consensor');
+      if (NodeList.nodes.get(sender) == null) {
+        return warn('Archiver leave gossip came from invalid consensor')
       }
       if (logFlags.console) console.log('Leave request gossip received:', payload)
       const accepted = await addLeaveRequest(payload, tracker, false)

@@ -305,6 +305,15 @@ function addActiveTx(request: P2P.ActiveTypes.SignedActiveRequest) {
 }
 
 function validateActiveRequest(request: P2P.ActiveTypes.SignedActiveRequest) {
+  const node = NodeList.nodes.get(request.nodeId)
+  if (!node) {
+    warn(`validateActiveRequest: node not found, nodeId: ${request.nodeId}`)
+    return false
+  }
+  if (!crypto.verify(request, node.publicKey)) {
+    warn(`validateActiveRequest: bad signature, request: ${JSON.stringify(request)}`)
+    return false
+  }
   if (config.p2p.validateActiveRequests === true) {
     // Do not accept active request if node is already active
     const existing = NodeList.nodes.get(request.nodeId)
