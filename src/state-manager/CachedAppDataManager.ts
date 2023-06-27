@@ -80,7 +80,7 @@ class CachedAppDataManager {
           return
         }
         // insert cachedAppData
-        this.insertCachedItem(payload.topic, cachedAppData.dataID, cachedAppData, cachedAppData.cycle)
+        this.insertCachedItem(payload.topic, cachedAppData.dataID, cachedAppData.appData, cachedAppData.cycle)
       } catch (e) {
         this.mainLogger.error(`Error while processing send_cacheAppData`, e)
       } finally {
@@ -385,7 +385,7 @@ class CachedAppDataManager {
     }
   }
 
-  async getLocalOrRemoteCachedAppData(topic: string, dataId: string): Promise<unknown> {
+  async getLocalOrRemoteCachedAppData(topic: string, dataId: string): Promise<CachedAppData | null> {
     let cachedAppData: CachedAppData | null = null
 
     if (this.stateManager.currentCycleShardData == null) {
@@ -445,8 +445,8 @@ class CachedAppDataManager {
       }
 
       const result = r as CachedAppData
-      if (result != null) {
-        return result.appData
+      if (result != null && result.appData != null) {
+        return result
       } else {
         if (logFlags.verbose)
           this.stateManager.getAccountFailDump(address, 'remote request missing data: result == null')
@@ -455,7 +455,8 @@ class CachedAppDataManager {
       // we are local!
       cachedAppData = this.getCachedItem(topic, dataId)
       if (cachedAppData != null) {
-        return cachedAppData.appData
+
+        return cachedAppData
       }
     }
     return null

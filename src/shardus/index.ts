@@ -28,7 +28,7 @@ import * as ShardusTypes from '../shardus/shardus-types'
 import { WrappedData } from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
-import { QueueCountsResult } from '../state-manager/state-manager-types'
+import { QueueCountsResult, CachedAppData } from '../state-manager/state-manager-types'
 import { DebugComplete } from '../state-manager/TransactionQueue'
 import Statistics from '../statistics'
 import Storage from '../storage'
@@ -1394,7 +1394,7 @@ class Shardus extends EventEmitter {
     }
   }
 
-  async getLocalOrRemoteCachedAppData(topic, dataId) {
+  async getLocalOrRemoteCachedAppData(topic, dataId) : Promise <CachedAppData | null> {
     if (this.p2p.allowTransactions()) {
       return this.stateManager.cachedAppDataManager.getLocalOrRemoteCachedAppData(topic, dataId)
     } else {
