@@ -83,6 +83,13 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<
     try {
       info(`Got Apoptosis proposal: ${JSON.stringify(payload)}`)
       let err = ''
+
+      //special control case used to get an 'ack' from the isDownCheck function on a potentially lost node
+      //this must be before the validation of the payload as it is not a valid payload
+      if (payload?.id === 'isDownCheck') {
+        response({ s: 'node is not down', r: 1 })
+      }
+
       err = validateTypes(payload, { when: 'n', id: 's', sign: 'o' })
       if (err) {
         warn('bad input ' + err)

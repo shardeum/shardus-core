@@ -563,12 +563,17 @@ async function isDownCheck(node) {
   // Check the internal route
   // The timeout for this is controled by the network.timeout paramater in server.json
   if (logFlags.p2pNonFatal) info(`Checking internal connection for ${node.id}`)
-  const res = await Comms.ask(node, 'apoptosize', { id: 'bad' })
+
+  //using the 'apoptosize' route to check if the node is up.
+  const res = await Comms.ask(node, 'apoptosize', { id: 'isDownCheck' })
   try {
     if (typeof res.s !== 'string') return 'down'
   } catch {
     return 'down'
   }
+
+  //Note 20230630:  the code below here has not likely had any coverage for a few years due to an upstream issue
+
   if (node.externalIp === node.interalIp) return 'up'
   if (logFlags.p2pNonFatal) info(`Checking external connection for ${node.id}`)
   // Check the external route if ip is different than internal
@@ -679,7 +684,7 @@ function upGossipHandler(payload, sender, tracker) {
   const key = `${payload.target}-${payload.cycle}`
   const rec = lost.get(key)
   if (rec && rec.status === 'up') return // we have already gossiped this node for this cycle
-    ;[valid, reason] = checkUpMsg(payload, currentCycle)
+  ;[valid, reason] = checkUpMsg(payload, currentCycle)
   if (!valid) {
     warn(`Bad upGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
     return
