@@ -38,23 +38,22 @@ import { errorToStringFull } from '../utils'
 //import { all } from 'deepmerge'
 //import { Node } from '../p2p/Types'
 
-
 type AccountHashStats = {
-  matched: number;
-  visisted: number;
-  empty: number;
-  nullResults: number;
-  numRequests: number;
-  responses: number;
-  exceptions: number;
-  radixToReq: number;
-  actualRadixRequests: number;
-};
+  matched: number
+  visisted: number
+  empty: number
+  nullResults: number
+  numRequests: number
+  responses: number
+  exceptions: number
+  radixToReq: number
+  actualRadixRequests: number
+}
 
 type AccountStats = {
-  skipping: number,
-  multiRequests: number,
-  requested: number,
+  skipping: number
+  multiRequests: number
+  requested: number
 }
 
 class AccountPatcher {
@@ -105,7 +104,7 @@ class AccountPatcher {
   nonStoredRanges: { low: string; high: string }[]
   radixIsStored: Map<string, boolean>
 
-  lastRepairInfo: string
+  lastRepairInfo: unknown
 
   constructor(
     stateManager: StateManager,
@@ -725,7 +724,7 @@ class AccountPatcher {
     )
 
     Context.network.registerExternalGet('trie-repair-dump', isDebugModeMiddleware, (req, res) => {
-      res.write(`${this.lastRepairInfo}\n`)
+      res.write(`${utils.stringifyReduce(this.lastRepairInfo)}\n`)
       res.end()
     })
 
@@ -885,7 +884,8 @@ class AccountPatcher {
             const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(accountId)
             const storedNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(accountId)
 
-            resObj[accountId] = { // eslint-disable-line security/detect-object-injection
+            resObj[accountId] = {
+              // eslint-disable-line security/detect-object-injection
               consensusNodes: consensusNodes.map((node) => {
                 return {
                   id: node.id,
@@ -1130,7 +1130,8 @@ class AccountPatcher {
         }
 
         //if we have not set this child yet then count it
-        if (parentTreeNode.children[index] == null) { // eslint-disable-line security/detect-object-injection
+        if (parentTreeNode.children[index] == null) {
+          // eslint-disable-line security/detect-object-injection
           parentTreeNode.nonSparseChildCount++
         }
 
@@ -1980,7 +1981,7 @@ class AccountPatcher {
       badHashesPerLevel[level] = toFix.length // eslint-disable-line security/detect-object-injection
       checkedKeysPerLevel[level] = toFix.map((x) => x.radix) // eslint-disable-line security/detect-object-injection
       requestedKeysPerLevel[level] = childrenToDiff.length // eslint-disable-line security/detect-object-injection
-      hashesPerLevel[level] = childrenToDiff.length// eslint-disable-line security/detect-object-injection
+      hashesPerLevel[level] = childrenToDiff.length // eslint-disable-line security/detect-object-injection
       // badLayerMap.size ...badLayerMap could be null!
     }
 
@@ -2228,7 +2229,7 @@ class AccountPatcher {
           sendToMap = shardInfo.storedBy
         }
 
-        for (const  value of Object.values(sendToMap)) {
+        for (const value of Object.values(sendToMap)) {
           let messagePair = messageToNodeMap.get(value.id)
           if (messagePair == null) {
             messagePair = { node: value, message: { cycle, nodeHashes: [] } }
@@ -2303,7 +2304,7 @@ class AccountPatcher {
     //We have to partition the leaf node data into leafs of the correct level and rebuild the tree
     if (this.treeSyncDepth != newSyncDepth) {
       //todo add this in to prevent size flipflop..(better: some deadspace)  && newSyncDepth > this.treeSyncDepth){
-        const resizeStats = {
+      const resizeStats = {
         nodesWithAccounts: 0,
         nodesWithoutAccounts: 0,
       }
@@ -2673,7 +2674,7 @@ class AccountPatcher {
       // }
       //check again if we are in sync
 
-      this.lastRepairInfo = utils.stringifyReduce(this.lastRepairInfo)
+      this.lastRepairInfo = trieRepairDump
 
       //update the repair count
       failHistoryObject.repaired += appliedFixes
@@ -2809,7 +2810,11 @@ class AccountPatcher {
             Math.min(offset + accountPerRequest, allAccounts.length) < maxAskCount
           ) {
             requestEntry.request.accounts = allAccounts.slice(offset, offset + accountPerRequest)
-            const promise = this.p2p.ask(requestEntry.node, 'get_account_data_by_hashes', requestEntry.request)
+            const promise = this.p2p.ask(
+              requestEntry.node,
+              'get_account_data_by_hashes',
+              requestEntry.request
+            )
             promises.push(promise)
             offset = offset + accountPerRequest
             getAccountStats.multiRequests++
@@ -2906,7 +2911,7 @@ class AccountPatcher {
         //this.generalLog(string)
         let partitionObj
         try {
-        const partitionObj = JSON.parse(partitionStr)
+          const partitionObj = JSON.parse(partitionStr)
         } catch (error) {
           this.mainLogger.error('error parsing partitionObj', error, partitionStr)
           continue
