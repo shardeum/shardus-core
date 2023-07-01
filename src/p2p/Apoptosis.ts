@@ -87,7 +87,14 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<
       //special control case used to get an 'ack' from the isDownCheck function on a potentially lost node
       //this must be before the validation of the payload as it is not a valid payload
       if (payload?.id === 'isDownCheck') {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-isDownCheck c:${currentCycle}`, 1)
         response({ s: 'node is not down', r: 1 })
+      }
+
+      //expand compatiblity with old nodes, can remove this later probably after 1.5.1
+      if (payload?.id === 'bad') {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-isDownCheck-bad c:${currentCycle}`, 1)
+        response({ s: 'node is not down', r: 2 })
       }
 
       err = validateTypes(payload, { when: 'n', id: 's', sign: 'o' })

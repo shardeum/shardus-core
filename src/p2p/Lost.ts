@@ -316,7 +316,10 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   // If we see our node in the lost field set flag to send an 'up' message at start of next cycle
   for (const id of record.lost) {
     stopReporting[id] = record.counter
-    if (id === Self.id) sendRefute = record.counter + 1
+    if (id === Self.id) {
+      sendRefute = record.counter + 1
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-schedule refute c:${currentCycle}`, 1)
+    }
   }
 
   if (record.lostSyncing.includes(Self.id)) {
@@ -352,6 +355,9 @@ export function sendRequests() {
       obj.message = msg
       obj.gossiped = true
       if (logFlags.p2pNonFatal) info(`Gossiping node down message: ${JSON.stringify(msg)}`)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'send-lost-down', 1)
+      //this next line is probably too spammy to leave in forever (but ok to comment out and keep)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `send-lost-down c:${currentCycle}`, 1)
       Comms.sendGossip('lost-down', msg, '', null, byIdOrder, true)
     }
   }
@@ -366,6 +372,9 @@ export function sendRequests() {
     let msg = { target: Self.id, status: 'up', cycle: currentCycle }
     msg = crypto.sign(msg)
     if (logFlags.p2pNonFatal) info(`Gossiping node up message: ${JSON.stringify(msg)}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'self-refute', 1)
+    //this next line is probably too spammy to leave in forever (but ok to comment out and keep)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-refute c:${currentCycle}`, 1)
     Comms.sendGossip('lost-up', msg, '', null, byIdOrder, true)
   }
 }
@@ -595,8 +604,12 @@ async function isDownCheck(node) {
   //using the 'apoptosize' route to check if the node is up.
   const res = await Comms.ask(node, 'apoptosize', { id: 'isDownCheck' })
   try {
-    if (typeof res.s !== 'string') return 'down'
+    if (typeof res.s !== 'string') {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-1', 1)
+      return 'down'
+    }
   } catch {
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-2', 1)
     return 'down'
   }
 
@@ -618,8 +631,10 @@ async function isDownCheck(node) {
   try {
     if (typeof resp.newestCycle.counter !== 'number') return 'down'
   } catch {
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-3', 1)
     return 'down'
   }
+  /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-up-1', 1)
   return 'up'
 }
 

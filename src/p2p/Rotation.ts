@@ -7,6 +7,8 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as CycleCreator from './CycleCreator'
 import * as CycleChain from './CycleChain'
+import { nestedCountersInstance } from '../utils/nestedCounters'
+import { currentCycle } from './CycleCreator'
 
 /** STATE */
 
@@ -90,6 +92,7 @@ export function updateRecord(
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   // Look at the removed id's and make Self emit 'removed' if your own id is there
   if (record.removed.includes(Self.id)) {
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-removed c:${currentCycle}`, 1)
     Self.emitter.emit('removed', Self.id)
   }
 
