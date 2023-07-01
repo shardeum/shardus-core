@@ -23,6 +23,7 @@ import * as NodeList from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as utils from '../utils'
 import { isApopMarkedNode } from './Apoptosis'
+import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 
 /** STATE */
 
@@ -39,6 +40,12 @@ let stopReporting = {}
 let sendRefute = -1
 
 const CACHE_CYCLES = 10
+
+interface PingMessage {
+  m: string
+}
+
+export declare type SignedPingMessage = PingMessage & SignedObject
 
 /** ROUTES */
 
@@ -71,6 +78,27 @@ const lostReportRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<P2P.LostT
   handler: lostReportHandler,
 }
 
+/**
+note: we are not using the SignedObject part yet
+FUTURE-SLASHING
+we would not want to blindly check signatures, and may later need
+a way to mark a node as bad if it spams the ping endpoint too much
+ */
+const pingNodeRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<SignedPingMessage>> = {
+  name: 'ping-node',
+  handler: (payload, response, sender) => {
+    profilerInstance.scopedProfileSectionStart('ping-node')
+    try {
+      //used by isNodeDown to test if a node can be reached on the internal protocol
+      if (payload?.m === 'ping') {
+        response({ s: 'ack', r: 1 })
+      }
+    } finally {
+      profilerInstance.scopedProfileSectionEnd('ping-node')
+    }
+  },
+}
+
 const lostDownRoute: P2P.P2PTypes.GossipHandler = (
   payload: P2P.LostTypes.SignedDownGossipMessage,
   sender,
@@ -99,7 +127,7 @@ const lostUpRoute: P2P.P2PTypes.GossipHandler = (
 
 const routes = {
   external: [killExternalRoute, killOtherExternalRoute],
-  internal: [lostReportRoute],
+  internal: [lostReportRoute, pingNodeRoute],
   gossip: {
     'lost-down': lostDownRoute,
     'lost-up': lostUpRoute,
