@@ -551,13 +551,13 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
    so checking if the timestamp is within its cycleMarker is gurantee to fail
    let request cycle marker be X, then X+1 is current cycle, then we check if the timestamp is in the current cycleMarker
   */
+  // const cycleThisJoinRequestBelong = CycleChain.cyclesByMarker[joinRequest.cycleMarker]
+  // const cycleStartedAt = cycleThisJoinRequestBelong.start
+  // const cycleWillEndsAt = cycleStartedAt + cycleDuration
   const joinRequestTimestamp = joinRequest.nodeInfo.joinRequestTimestamp
-  const cycleThisJoinRequestBelong = CycleChain.cyclesByMarker[joinRequest.cycleMarker]
-  const cycleStartedAt = cycleThisJoinRequestBelong.start
-  const cycleDuration = cycleThisJoinRequestBelong.duration 
-  const cycleWillEndsAt = cycleStartedAt + cycleDuration
-  const requestValidUpperBound = cycleWillEndsAt + (cycleDuration * 2)
-  const requestValidLowerBound = cycleWillEndsAt
+  const cycleDuration = CycleChain.newest.duration
+  const requestValidUpperBound = (Date.now()/1000) + cycleDuration
+  const requestValidLowerBound = (Date.now()/1000) - cycleDuration
   
   if(joinRequestTimestamp < requestValidLowerBound){
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-not-meet-lowerbound`)
