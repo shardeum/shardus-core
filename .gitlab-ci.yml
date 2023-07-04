@@ -17,6 +17,8 @@ stages:
 prepare-job:
   stage: prepare
   script:
+    - apt-get update    #added here as best post merge guess
+    - apt-get install -y python-is-python3  #added here as best post merge guess
     - npm ci # Install Node.js dependencies
 
 # Common configuration for jobs
@@ -60,11 +62,12 @@ build-job:
 
 # Check stage: Perform code checks and tests
 check:
-  <<: *common-job-template
+  image: node:16.11.1
   stage: check
   needs: ['build-job']
   variables:
     NODE_ENV: test
+
   script:
     - npm run depcheck # Check dependencies
     - npm run test
