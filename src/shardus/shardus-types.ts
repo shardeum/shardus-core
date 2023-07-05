@@ -548,6 +548,8 @@ export interface ServerConfiguration {
   baseDir?: string
   /** The transactionExpireTime parameter is an Integer that defines the amount of time (in seconds) allowed to pass before a transaction will expire and be rejected by the network. */
   transactionExpireTime?: number
+  /** The changeListGlobalAccount sets the global network account value for the validator and thereby the whole network */
+  globalAccount: string
   /** Crypto module configuration */
   crypto?: {
     /** The hashkey parameter is a String that is used to initialize the crypto module, which is used for the cryptographic functions within shardus */

@@ -4,6 +4,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
   heartbeatInterval: 5,
   baseDir: '.',
   transactionExpireTime: 5,
+  globalAccount: '0'.repeat(64),
   crypto: {
     hashKey: '69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc',
     keyPairConfig: {

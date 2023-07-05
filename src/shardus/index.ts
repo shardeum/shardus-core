@@ -1,7 +1,7 @@
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 import { EventEmitter } from 'events'
 import { Handler } from 'express'
-import {inspect} from 'util'
+import { inspect } from 'util'
 import Log4js from 'log4js'
 import path from 'path'
 import SHARDUS_CONFIG from '../config'
@@ -53,7 +53,7 @@ Context.setDefaultConfigs(defaultConfigs)
 type RouteHandlerRegister = (route: string, authHandler: Handler, responseHandler?: Handler) => void
 
 //todo make this a config parameter set by the dapp
-const changeListGlobalAccount = '0'.repeat(64)
+const changeListGlobalAccount = defaultConfigs.server.globalAccount
 
 interface Shardus {
   io: SocketIO.Server
@@ -2060,6 +2060,7 @@ class Shardus extends EventEmitter {
 
   async updateConfigChangeQueue(lastCycle: ShardusTypes.Cycle) {
     if (lastCycle == null) return
+    const changeListGlobalAccount = this.config.globalAccount
     let accounts = await this.app.getAccountDataByList([changeListGlobalAccount])
     if (accounts != null && accounts.length === 1) {
       let account = accounts[0]
