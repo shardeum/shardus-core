@@ -556,8 +556,9 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
   // const cycleWillEndsAt = cycleStartedAt + cycleDuration
   const joinRequestTimestamp = joinRequest.nodeInfo.joinRequestTimestamp
   const cycleDuration = CycleChain.newest.duration
-  const requestValidUpperBound = (Date.now()/1000) + cycleDuration
-  const requestValidLowerBound = (Date.now()/1000) - cycleDuration
+  const cycleStarts = CycleChain.newest.start
+  const requestValidUpperBound = cycleStarts + cycleDuration
+  const requestValidLowerBound = cycleStarts - cycleDuration
   
   if(joinRequestTimestamp < requestValidLowerBound){
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-not-meet-lowerbound`)
