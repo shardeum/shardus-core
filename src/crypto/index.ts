@@ -1,5 +1,5 @@
 import * as crypto from '@shardus/crypto-utils'
-import { ChildProcess, fork } from 'child_process'
+import { ChildProcess, fork, Serializable } from 'child_process'
 import fs from 'fs'
 import Log4js from 'log4js'
 import path from 'path'
@@ -7,7 +7,7 @@ import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 
-export type HashableObject = object & { sign?: Shardus.Sign }
+export type HashableObject = (object | string) & { sign?: Shardus.Sign }
 
 interface Keypair {
   publicKey?: crypto.publicKey
@@ -40,7 +40,7 @@ class Crypto {
     this.sharedKeys = {}
   }
 
-  async init() {
+  async init(): Promise<void> {
     crypto.init(this.config.crypto.hashKey)
 
     const keypair = await this.storage.getProperty('keypair')
@@ -73,7 +73,7 @@ class Crypto {
     }
   }
 
-  setCurveKeyPair(keypair: Keypair) {
+  setCurveKeyPair(keypair: Keypair): void {
     if (keypair) {
       this.curveKeypair = {
         secretKey: crypto.convertSkToCurve(this.keypair.secretKey),
@@ -86,13 +86,13 @@ class Crypto {
     return path.join(this.baseDir, this.config.crypto.keyPairConfig.keyPairJsonFile)
   }
 
-  writeKeypairToFile(keypair: Keypair) {
+  writeKeypairToFile(keypair: Keypair): void {
     // probably safe; accesses keypair defined by config
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     fs.writeFileSync(this.getKeyPairFile(), JSON.stringify(keypair))
   }
 
-  readKeypairFromFile() {
+  readKeypairFromFile(): crypto.Keypair {
     // probably safe; accesses keypair defined by config
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     if (fs.existsSync(this.getKeyPairFile())) {
@@ -103,25 +103,25 @@ class Crypto {
     return null
   }
 
-  _generateKeypair() {
+  _generateKeypair(): crypto.Keypair {
     const keypair = crypto.generateKeypair()
     this.mainLogger.info('New keypair generated.')
     return keypair
   }
 
-  convertPublicKeyToCurve(pk: crypto.publicKey) {
+  convertPublicKeyToCurve(pk: crypto.publicKey): string {
     return crypto.convertPkToCurve(pk)
   }
 
-  getPublicKey() {
+  getPublicKey(): string {
     return this.keypair.publicKey
   }
 
-  getCurvePublicKey() {
+  getCurvePublicKey(): string {
     return this.curveKeypair.publicKey
   }
 
-  getSharedKey(curvePk: crypto.curvePublicKey) {
+  getSharedKey(curvePk: crypto.curvePublicKey): Buffer {
     // eslint-disable-next-line security/detect-object-injection
     let sharedKey = this.sharedKeys[curvePk]
     if (!sharedKey) {
@@ -132,7 +132,7 @@ class Crypto {
     return sharedKey
   }
 
-  tag(obj: unknown, recipientCurvePk: crypto.curvePublicKey) {
+  tag<T>(obj: T, recipientCurvePk: crypto.curvePublicKey): T & crypto.TaggedObject {
     const objCopy = JSON.parse(crypto.stringify(obj))
     const sharedKey = this.getSharedKey(recipientCurvePk)
     crypto.tagObj(objCopy, sharedKey)
@@ -149,7 +149,7 @@ class Crypto {
    * @param recipientCurvePk
    * @returns
    */
-  tagWithSize(obj: unknown, recipientCurvePk: crypto.curvePublicKey) {
+  tagWithSize<T>(obj: T, recipientCurvePk: crypto.curvePublicKey): T & { msgSize: number } & crypto.TaggedObject {
     const strEncoded = crypto.stringify(obj)
     const msgSize = strEncoded.length //get the message size
     const objCopy = JSON.parse(strEncoded)
@@ -159,25 +159,28 @@ class Crypto {
     return objCopy
   }
 
-  signWithSize(obj: { msgSize: number, [key: string]: unknown }) {
+  signWithSize<T>(obj: T): T & crypto.SignedObject {
     const wrappedMsgStr = crypto.stringify(obj)
-    const msgLength = wrappedMsgStr.length
-    obj.msgSize = msgLength
-    return this.sign(obj)
+    const msgLength = wrappedMsgStr.length;
+    const newObj = {
+      ...obj,
+      msgSize: msgLength
+    };
+    return this.sign(newObj)
   }
 
-  authenticate(obj: crypto.TaggedObject, senderCurvePk: crypto.curvePublicKey) {
+  authenticate(obj: crypto.TaggedObject, senderCurvePk: crypto.curvePublicKey): boolean {
     const sharedKey = this.getSharedKey(senderCurvePk)
     return crypto.authenticateObj(obj, sharedKey)
   }
 
-  sign(obj: unknown) {
+  sign<T>(obj: T): T & crypto.SignedObject {
     const objCopy = JSON.parse(crypto.stringify(obj))
     crypto.signObj(objCopy, this.keypair.secretKey, this.keypair.publicKey)
     return objCopy
   }
 
-  verify(obj: crypto.SignedObject, expectedPk?: string) {
+  verify(obj: crypto.SignedObject, expectedPk?: string): boolean {
     try {
       if (expectedPk) {
         if (obj.sign.owner !== expectedPk) return false
@@ -189,23 +192,22 @@ class Crypto {
     }
   }
 
-  hash(obj: HashableObject | unknown) {
-    if (!(obj as HashableObject).sign) {
+  hash(obj: HashableObject): string {
+    if (!obj.sign) {
       return crypto.hashObj(obj)
     }
     return crypto.hashObj(obj, true)
   }
 
-  isGreaterHash(hash1: string | number, hash2: string | number) {
+  isGreaterHash(hash1: string | number, hash2: string | number): boolean {
     return hash1 > hash2
   }
 
-  getComputeProofOfWork(seed: unknown, difficulty: number) {
+  getComputeProofOfWork(seed: unknown, difficulty: number): Promise<Serializable> {
     return this._runProofOfWorkGenerator('./computePowGenerator.js', seed, difficulty)
   }
 
-  stopAllGenerators() {
-    // tslint:disable-next-line: forin
+  stopAllGenerators(): void {
     for (const generator in this.powGenerators) {
       // eslint-disable-next-line security/detect-object-injection
       this.powGenerators[generator].kill()
@@ -214,13 +216,13 @@ class Crypto {
   }
 
   /* eslint-disable security/detect-object-injection */
-  _runProofOfWorkGenerator(generator: string, seed: unknown, difficulty: number) {
+  _runProofOfWorkGenerator(generator: string, seed: unknown, difficulty: number): Promise<Serializable> {
     // Fork a child process to compute the PoW, if it doesn't exist
     if (!this.powGenerators[generator]) {
       this.powGenerators[generator] = fork(generator, undefined, { cwd: __dirname })
     }
-    const promise = new Promise((resolve) => {
-      this.powGenerators[generator].on('message', (powObj) => {
+    const promise = new Promise<Serializable>((resolve) => {
+      this.powGenerators[generator].on('message', (powObj: Serializable) => {
         this._stopProofOfWorkGenerator(generator)
         resolve(powObj)
       })
@@ -235,9 +237,9 @@ class Crypto {
   /* eslint-enable security/detect-object-injection */
 
   /* eslint-disable security/detect-object-injection */
-  _stopProofOfWorkGenerator(generator: string) {
+  _stopProofOfWorkGenerator(generator: string): Promise<number | string> {
     if (!this.powGenerators[generator]) return Promise.resolve('not running')
-    const promise = new Promise((resolve) => {
+    const promise = new Promise<number | string>((resolve) => {
       this.powGenerators[generator].on('close', (signal) => {
         delete this.powGenerators[generator]
         resolve(signal)

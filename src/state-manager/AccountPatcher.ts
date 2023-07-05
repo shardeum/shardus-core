@@ -3,7 +3,7 @@ import { StateManager as StateManagerTypes } from '@shardus/types'
 import * as utils from '../utils'
 import Profiler, { profilerInstance } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
-import Crypto from '../crypto'
+import Crypto, { HashableObject } from '../crypto'
 import Logger, { logFlags } from '../logger'
 import log4js from 'log4js'
 import ShardFunctions from './shardFunctions'
@@ -34,7 +34,7 @@ import {
   CycleShardData,
 } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
-import { errorToStringFull } from '../utils'
+import { errorToStringFull, Ordering } from '../utils'
 import { Response } from 'express-serve-static-core'
 
 type Line = {
@@ -178,11 +178,11 @@ class AccountPatcher {
     this.syncFailHistory = []
   }
 
-  hashObj(value: unknown) {
+  hashObj(value: HashableObject): string {
     //could replace with a different cheaper hash!!
     return this.crypto.hash(value)
   }
-  sortByAccountID(a: TrieAccount, b: TrieAccount) {
+  sortByAccountID(a: TrieAccount, b: TrieAccount): Ordering {
     if (a.accountID < b.accountID) {
       return -1
     }
@@ -191,7 +191,7 @@ class AccountPatcher {
     }
     return 0
   }
-  sortByRadix(a: RadixAndHash, b: RadixAndHash) {
+  sortByRadix(a: RadixAndHash, b: RadixAndHash): Ordering {
     if (a.radix < b.radix) {
       return -1
     }
@@ -211,7 +211,7 @@ class AccountPatcher {
    *    ######## ##    ## ########  ##         #######  #### ##    ##    ##     ######
    */
 
-  setupHandlers() {
+  setupHandlers(): void {
     this.p2p.registerInternal(
       'get_trie_hashes',
       async (
@@ -1363,7 +1363,7 @@ class AccountPatcher {
     }
   }
 
-  initStoredRadixValues(cycle: number) {
+  initStoredRadixValues(cycle: number): void {
     // //mark these here , call this where we first create the vote structure for the cycle (could be two locations)
     // nonStoredRanges: {low:string,high:string}[]
     // radixIsStored: Map<string, boolean>
@@ -1372,7 +1372,7 @@ class AccountPatcher {
     this.radixIsStored.clear()
   }
 
-  isRadixStored(_cycle: number, radix: string) {
+  isRadixStored(_cycle: number, radix: string): boolean {
     if (this.radixIsStored.has(radix)) {
       return this.radixIsStored.get(radix)
     }
@@ -1498,7 +1498,7 @@ class AccountPatcher {
    *
    * @param cycle
    */
-  computeCoverage(cycle: number) {
+  computeCoverage(cycle: number): void {
     const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
     const coverageMap: Map<string, HashTrieRadixCoverage> = new Map() //map of sync radix to n
@@ -1544,7 +1544,7 @@ class AccountPatcher {
    * @param cycle
    * @param nextNode pass true to start asking the next node in the list for data.
    */
-  getNodeForQuery(radix: string, cycle: number, nextNode = false) {
+  getNodeForQuery(radix: string, cycle: number, nextNode = false): Shardus.Node | null {
     const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
     const parentRadix = radix.substring(0, this.treeSyncDepth)
 
@@ -1773,7 +1773,7 @@ class AccountPatcher {
    *
    * @param cycle
    */
-  isInSync(cycle: number) {
+  isInSync(cycle: number): boolean {
     const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
     if (hashTrieSyncConsensus == null) {
@@ -1870,12 +1870,12 @@ class AccountPatcher {
    *
    * @param cycle
    */
-  async findBadAccounts(cycle: number) {
+  async findBadAccounts(cycle: number): Promise<BadAccountsInfo> {
     let badAccounts: AccountIDAndHash[] = []
-    const hashesPerLevel = Array(this.treeMaxDepth + 1).fill(0)
+    const hashesPerLevel: number[] = Array(this.treeMaxDepth + 1).fill(0)
     const checkedKeysPerLevel = Array(this.treeMaxDepth)
-    const badHashesPerLevel = Array(this.treeMaxDepth + 1).fill(0)
-    const requestedKeysPerLevel = Array(this.treeMaxDepth + 1).fill(0)
+    const badHashesPerLevel: number[] = Array(this.treeMaxDepth + 1).fill(0)
+    const requestedKeysPerLevel: number[] = Array(this.treeMaxDepth + 1).fill(0)
 
     let level = this.treeSyncDepth
     let badLayerMap = this.shardTrie.layerMaps[level] // eslint-disable-line security/detect-object-injection
@@ -2105,7 +2105,7 @@ class AccountPatcher {
    * @param hash
    *
    */
-  updateAccountHash(accountID: string, hash: string) {
+  updateAccountHash(accountID: string, hash: string): void {
     //todo do we need to look at cycle or timestamp and have a future vs. next queue?
     if (this.debug_ignoreUpdates) {
       this.statemanager_fatal(`patcher ignored: tx`, `patcher ignored: ${accountID} hash:${hash}`)
@@ -2116,7 +2116,7 @@ class AccountPatcher {
     this.accountUpdateQueue.push(accountData)
   }
 
-  removeAccountHash(accountID: string) {
+  removeAccountHash(accountID: string): void {
     this.accountRemovalQueue.push(accountID)
   }
   // applyRepair(accountsToFix:AccountIDAndHash[]){
@@ -2154,7 +2154,7 @@ class AccountPatcher {
    *
    * @param cycle
    */
-  async broadcastSyncHashes(cycle: number) {
+  async broadcastSyncHashes(cycle: number): Promise<void> {
     const syncLayer = this.shardTrie.layerMaps[this.treeSyncDepth]
 
     const shardGlobals = this.stateManager.currentCycleShardData.shardGlobals
@@ -2298,7 +2298,7 @@ class AccountPatcher {
    *
    * @param cycle
    */
-  async updateTrieAndBroadCast(cycle: number) {
+  async updateTrieAndBroadCast(cycle: number): Promise<void> {
     //calculate sync levels!!
     const shardValues = this.stateManager.shardValuesByCycle.get(cycle)
     const shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
@@ -2398,7 +2398,7 @@ class AccountPatcher {
    *
    * @param cycle
    */
-  async testAndPatchAccounts(cycle: number) {
+  async testAndPatchAccounts(cycle: number): Promise<void> {
     // let updateStats = this.upateShardTrie(cycle)
     // nestedCountersInstance.countEvent(`accountPatcher`, `totalAccountsHashed`, updateStats.totalAccountsHashed)
 
@@ -2908,7 +2908,10 @@ class AccountPatcher {
    * @param stream
    * @param lines
    */
-  processShardDump(stream: Response<unknown, Record<string, unknown>, number>, lines: Line[]) {
+  processShardDump(
+    stream: Response<unknown, Record<string, unknown>, number>,
+    lines: Line[]
+  ): { allPassed: boolean; allPassed2: boolean } {
     const dataByParition = new Map()
 
     const rangesCovered = []
@@ -3070,7 +3073,7 @@ class AccountPatcher {
       return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
     })
 
-    const isStored = function (i: number, rangeCovered: { stMin: number; stMax: number }) {
+    const isStored = function (i: number, rangeCovered: { stMin: number; stMax: number }): boolean {
       const key = i
       const minP = rangeCovered.stMin
       const maxP = rangeCovered.stMax
@@ -3091,7 +3094,7 @@ class AccountPatcher {
       }
       return true
     }
-    const isConsensus = function (i: number, rangeCovered: { cMin: number; cMax: number }) {
+    const isConsensus = function (i: number, rangeCovered: { cMin: number; cMax: number }): boolean {
       const key = i
       const minP = rangeCovered.cMin
       const maxP = rangeCovered.cMax
@@ -3183,7 +3186,7 @@ class AccountPatcher {
     return { allPassed, allPassed2 }
   }
 
-  calculateMinVotes() {
+  calculateMinVotes(): number {
     let minVotes = Math.ceil(
       this.stateManager.currentCycleShardData.shardGlobals.nodesPerConsenusGroup * 0.51
     )
@@ -3192,6 +3195,34 @@ class AccountPatcher {
     minVotes = Math.max(1, minVotes)
     return minVotes
   }
+}
+
+type BadAccountStats = {
+  testedSyncRadix: number
+  skippedSyncRadix: number
+  badSyncRadix: number
+  ok_noTrieAcc: number
+  ok_trieHashBad: number
+  fix_butHashMatch: number
+  fixLastSeen: number
+  needsVotes: number
+  subHashesTested: number
+  trailColdLevel: number
+  checkedLevel: number
+  leafsChecked: number
+  leafResponses: number
+  getAccountHashStats: Record<string, never>
+}
+
+type BadAccountsInfo = {
+  badAccounts: AccountIDAndHash[]
+  hashesPerLevel: number[]
+  checkedKeysPerLevel: number[]
+  requestedKeysPerLevel: number[]
+  badHashesPerLevel: number[]
+  accountHashesChecked: number
+  stats: BadAccountStats
+  extraBadKeys: string[]
 }
 
 export default AccountPatcher

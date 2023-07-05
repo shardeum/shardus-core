@@ -1,10 +1,10 @@
-export const sleep = (ms) => {
+export const sleep = (ms): Promise<void> => {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
 }
 
-export const getTime = (format = 'ms') => {
+export const getTime = (format = 'ms'): number => {
   let time
   switch (format) {
     case 'ms':
@@ -19,7 +19,7 @@ export const getTime = (format = 'ms') => {
   return time
 }
 
-export const setAlarm = (callback, timestamp) => {
+export const setAlarm = (callback, timestamp): void => {
   const now = Date.now()
   if (timestamp <= now) {
     callback()

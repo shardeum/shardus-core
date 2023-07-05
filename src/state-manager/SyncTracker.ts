@@ -48,7 +48,7 @@ export default class SyncTracker {
 
   restartCount: number
 
-  reset() {
+  reset(): void {
     this.addressRange = null
 
     this.mapAccountData = {}
@@ -70,7 +70,7 @@ export default class SyncTracker {
     range: StateManagerTypes.shardFunctionTypes.BasicAddressRange,
     cycle: number,
     initalSync = false
-  ) {
+  ): void {
     // let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false,
     //isGlobalSyncTracker: false, globalAddressMap: {}, isPartOfInitialSync:initalSync, keys:{}  } as SyncTracker // partition,
     this.reset()
@@ -88,7 +88,7 @@ export default class SyncTracker {
     this.dataSourceHelper = new DataSourceHelper(this.accountSync.stateManager)
   }
 
-  initGlobal(accountSync: AccountSync, p2p: P2P, index: number, cycle: number, initalSync = false) {
+  initGlobal(accountSync: AccountSync, p2p: P2P, index: number, cycle: number, initalSync = false): void {
     // let syncTracker = { range: {}, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false,
     //isGlobalSyncTracker: true, globalAddressMap: {}, isPartOfInitialSync:initalSync, keys:{} } as SyncTracker // partition,
     this.reset()
@@ -116,7 +116,7 @@ export default class SyncTracker {
    *     ######     ##    ##    ##  ######   ######     ##    ##     ##    ##    ######## ########  ##     ##    ##    ##     ## ##        #######  ##     ## ##     ## ##     ## ##    ##  ######   ########
    */
 
-  async syncStateDataForRange2() {
+  async syncStateDataForRange2(): Promise<void> {
     let retry = true
     while (retry) {
       retry = false
@@ -182,7 +182,7 @@ export default class SyncTracker {
    * syncStateDataGlobals
    * @param syncTracker
    */
-  async syncStateDataGlobals() {
+  async syncStateDataGlobals(): Promise<void> {
     let retry = true
     /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `syncStateDataGlobals-start`)
     while (retry) {

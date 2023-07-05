@@ -218,7 +218,7 @@ class TransactionQueue {
    *    ######## ##    ## ########  ##         #######  #### ##    ##    ##     ######
    */
 
-  setupHandlers() {
+  setupHandlers(): void {
     this.p2p.registerInternal(
       'broadcast_state',
       async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
@@ -489,7 +489,7 @@ class TransactionQueue {
     accountEnd = 'f'.repeat(64),
     tsStart = 0,
     tsEnd = Date.now()
-  ) {
+  ): Promise<string> {
     const accountStates = await this.storage.queryAccountStateTable(
       accountStart,
       accountEnd,
@@ -709,7 +709,7 @@ class TransactionQueue {
     }
   }
 
-  resetTxCoverageMap() {
+  resetTxCoverageMap(): void {
     this.txCoverageMap = {}
   }
 
@@ -1046,7 +1046,7 @@ class TransactionQueue {
     return { success: true }
   }
 
-  updateHomeInformation(txQueueEntry: QueueEntry) {
+  updateHomeInformation(txQueueEntry: QueueEntry): void {
     if (this.stateManager.currentCycleShardData != null && txQueueEntry.hasShardInfo === false) {
       const txId = txQueueEntry.acceptedTx.txId
       // Init home nodes!
@@ -1641,7 +1641,7 @@ class TransactionQueue {
    * @param queueEntry
    * @param data
    */
-  queueEntryAddData(queueEntry: QueueEntry, data: Shardus.WrappedResponse) {
+  queueEntryAddData(queueEntry: QueueEntry, data: Shardus.WrappedResponse): void {
     if (queueEntry.collectedData[data.accountId] != null) {
       return // already have the data
     }
@@ -1728,7 +1728,7 @@ class TransactionQueue {
    * This is only for the case that a TX has waited too long and not received the data it needs.
    * @param queueEntry
    */
-  async queueEntryRequestMissingData(queueEntry: QueueEntry) {
+  async queueEntryRequestMissingData(queueEntry: QueueEntry): Promise<void> {
     if (this.stateManager.currentCycleShardData == null) {
       return
     }
@@ -1924,7 +1924,7 @@ class TransactionQueue {
    * Ask other nodes for a receipt to go with this TX
    * @param queueEntry
    */
-  async queueEntryRequestMissingReceipt(queueEntry: QueueEntry) {
+  async queueEntryRequestMissingReceipt(queueEntry: QueueEntry): Promise<void> {
     if (this.stateManager.currentCycleShardData == null) {
       return
     }
@@ -2051,7 +2051,7 @@ class TransactionQueue {
     }
   }
 
-  async queueEntryRequestMissingReceipt_old(queueEntry: QueueEntry) {
+  async queueEntryRequestMissingReceipt_old(queueEntry: QueueEntry): Promise<void> {
     if (this.stateManager.currentCycleShardData == null) {
       return
     }
@@ -2440,7 +2440,7 @@ class TransactionQueue {
    * -sends account data to the correct involved nodees
    * -loads locally available data into the queue entry
    */
-  async tellCorrespondingNodesOld(queueEntry: QueueEntry) {
+  async tellCorrespondingNodesOld(queueEntry: QueueEntry): Promise<unknown> {
     if (this.stateManager.currentCycleShardData == null) {
       throw new Error('tellCorrespondingNodes: currentCycleShardData == null')
     }
@@ -2706,7 +2706,7 @@ class TransactionQueue {
    * -sends account data to the correct involved nodees
    * -loads locally available data into the queue entry
    */
-  async tellCorrespondingNodes(queueEntry: QueueEntry) {
+  async tellCorrespondingNodes(queueEntry: QueueEntry): Promise<unknown> {
     if (this.stateManager.currentCycleShardData == null) {
       throw new Error('tellCorrespondingNodes: currentCycleShardData == null')
     }
@@ -2966,7 +2966,7 @@ class TransactionQueue {
    * @param queueEntry
    * @returns
    */
-  async tellCorrespondingNodesFinalData(queueEntry: QueueEntry) {
+  async tellCorrespondingNodesFinalData(queueEntry: QueueEntry): Promise<void> {
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData - start: ${queueEntry.logID}`)
 
     if (this.stateManager.currentCycleShardData == null) {
@@ -3164,7 +3164,7 @@ class TransactionQueue {
     this.txDebugStatList = []
   }
 
-  printTxDebug() {
+  printTxDebug(): string {
     const collector = {}
     const totalTxCount = this.txDebugStatList.length
 
@@ -3219,7 +3219,7 @@ class TransactionQueue {
    * @param {QueueEntry} queueEntry
    * @param {number} currentIndex
    */
-  removeFromQueue(queueEntry: QueueEntry, currentIndex: number) {
+  removeFromQueue(queueEntry: QueueEntry, currentIndex: number): void {
     queueEntry.txDebug.dequeueHrTime = process.hrtime(queueEntry.txDebug.enqueueHrTime)
     queueEntry.txDebug.duration['queue_sit_time'] = queueEntry.txDebug.dequeueHrTime[1] / 1000000
     this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx.txId)
@@ -3282,7 +3282,7 @@ class TransactionQueue {
    * @param firstTime
    * @returns
    */
-  async processTransactions(firstTime = false) {
+  async processTransactions(firstTime = false): Promise<void> {
     const seenAccounts: SeenAccounts = {}
     let pushedProfilerTag = null
     const startTime = Date.now()
@@ -4773,7 +4773,7 @@ class TransactionQueue {
     }
   }
 
-  private setTXExpired(queueEntry: QueueEntry, currentIndex: number, message: string) {
+  private setTXExpired(queueEntry: QueueEntry, currentIndex: number, message: string): void {
     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`setTXExpired ${message} tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} debug:${utils.stringifyReduce(queueEntry.debug)}`)
     queueEntry.state = 'expired'
     this.removeFromQueue(queueEntry, currentIndex)
@@ -4794,7 +4794,7 @@ class TransactionQueue {
     }
   }
 
-  addReceiptToForward(queueEntry: QueueEntry) {
+  addReceiptToForward(queueEntry: QueueEntry): void {
     const netId = '123abc'
     // const receipt = this.stateManager.getReceipt(queueEntry)
     // const status = receipt.result === true ? 'applied' : 'rejected'
@@ -4811,7 +4811,7 @@ class TransactionQueue {
         originalTxData: queueEntry.acceptedTx.data['tx'] || queueEntry.acceptedTx.data,
         txId: txHash,
         timestamp: queueEntry.acceptedTx.timestamp,
-      },
+      } as unknown as AcceptedTx,
       cycle: queueEntry.cycleToRecordOn,
       result: { txIdShort, txResult },
       accounts: [],
@@ -4859,7 +4859,7 @@ class TransactionQueue {
     this.receiptsToForward.push(signedTxReceiptToPass)
   }
 
-  getReceiptsToForward() {
+  getReceiptsToForward(): Receipt[] {
     const freshReceipts = []
     for (const receipt of this.receiptsToForward) {
       if (!this.forwardedReceipts.has(receipt.tx.txId)) {
@@ -4869,7 +4869,7 @@ class TransactionQueue {
     return freshReceipts
   }
 
-  resetReceiptsToForward() {
+  resetReceiptsToForward(): void {
     if (Date.now() - this.lastReceiptForwardResetTimestamp >= 30000) {
       const lastReceiptsToForward = [...this.receiptsToForward]
       this.receiptsToForward = []
@@ -4942,7 +4942,7 @@ class TransactionQueue {
    * @param seenAccounts
    * @param queueEntry
    */
-  processQueue_markAccountsSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry) {
+  processQueue_markAccountsSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry): void {
     if (this.config.debug.useShardusMemoryPatterns && queueEntry.shardusMemoryPatternSets != null) {
       this.processQueue_markAccountsSeen2(seenAccounts, queueEntry)
       return
@@ -5034,7 +5034,7 @@ class TransactionQueue {
     return false
   }
 
-  processQueue_markAccountsSeen2(seenAccounts: SeenAccounts, queueEntry: QueueEntry) {
+  processQueue_markAccountsSeen2(seenAccounts: SeenAccounts, queueEntry: QueueEntry): void {
     if (queueEntry.uniqueWritableKeys == null) {
       //TSConversion double check if this needs extra logging
       return
@@ -5076,7 +5076,7 @@ class TransactionQueue {
    * @param seenAccounts
    * @param queueEntry
    */
-  processQueue_clearAccountsSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry) {
+  processQueue_clearAccountsSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry): void {
     if (queueEntry.uniqueKeys == null) {
       //TSConversion double check if this needs extra logging
       return
@@ -5204,7 +5204,7 @@ class TransactionQueue {
    * low.  There may even be a chance that this would still help nodes sync up a bit.
    * @param queueEntry
    */
-  computeTxSieveTime(queueEntry: QueueEntry) {
+  computeTxSieveTime(queueEntry: QueueEntry): void {
     //TODO need to make this non-exploitable.  Need to include factors
     //that could not be set by the transaction creator, but are deterministic in the network.
 
@@ -5245,7 +5245,7 @@ class TransactionQueue {
     statsObj: { [statName: string]: SimpleNumberStats },
     statName: string,
     duration: number
-  ) {
+  ): void {
     // eslint-disable-next-line security/detect-object-injection
     let statsEntry = statsObj[statName]
     if (statsEntry == null) {
@@ -5265,7 +5265,7 @@ class TransactionQueue {
     statsEntry.total += duration
   }
 
-  finalizeSimpleStatsObject(statsObj: { [statName: string]: SimpleNumberStats }) {
+  finalizeSimpleStatsObject(statsObj: { [statName: string]: SimpleNumberStats }): void {
     for (const [, value] of Object.entries(statsObj)) {
       if (value.count) {
         value.average = value.total / value.count
@@ -5395,7 +5395,7 @@ class TransactionQueue {
   /**
    * This is called when we detect that the processing queue is stuck
    */
-  onProcesssingQueueStuck() {
+  onProcesssingQueueStuck(): void {
     if (this.stuckProcessingCount === 0) {
       //first time!
       nestedCountersInstance.countRareEvent('processing', `onProcesssingQueueStuck`)
@@ -5444,7 +5444,7 @@ class TransactionQueue {
     }
   }
 
-  clearStuckProcessingDebugVars() {
+  clearStuckProcessingDebugVars(): void {
     this.isStuckProcessing = false
     this.debugLastAwaitedCall = ''
     this.debugLastAwaitedCallInner = ''
@@ -5464,7 +5464,7 @@ class TransactionQueue {
    * Used to unblock and restart the processing queue if it gets stuck
    * @param clearPendingTransactions if true, will clear the pending transaction queue. if false, will leave it alone
    */
-  fixStuckProcessing(clearPendingTransactions: boolean) {
+  fixStuckProcessing(clearPendingTransactions: boolean): void {
     nestedCountersInstance.countRareEvent('processing', `unstickProcessing`)
     this.clearStuckProcessingDebugVars()
 
@@ -5480,13 +5480,13 @@ class TransactionQueue {
     this.stateManager.tryStartTransactionProcessingQueue()
   }
 
-  setDebugLastAwaitedCall(label: string, complete = DebugComplete.Incomplete) {
+  setDebugLastAwaitedCall(label: string, complete = DebugComplete.Incomplete): void {
     this.debugLastAwaitedCall = label + (complete === DebugComplete.Completed ? ' complete' : '')
     this.debugLastAwaitedCallInner = ''
     this.debugLastAwaitedAppCall = ''
   }
 
-  setDebugLastAwaitedCallInner(label: string, complete = DebugComplete.Incomplete) {
+  setDebugLastAwaitedCallInner(label: string, complete = DebugComplete.Incomplete): void {
     this.debugLastAwaitedCallInner = label + (complete === DebugComplete.Completed ? ' complete' : '')
     this.debugLastAwaitedAppCall = ''
 
@@ -5514,7 +5514,7 @@ class TransactionQueue {
       }
     }
   }
-  setDebugSetLastAppAwait(label: string, complete = DebugComplete.Incomplete) {
+  setDebugSetLastAppAwait(label: string, complete = DebugComplete.Incomplete): void {
     this.debugLastAwaitedAppCall = label + (complete === DebugComplete.Completed ? ' complete' : '')
 
     if (complete === DebugComplete.Incomplete) {
@@ -5541,7 +5541,7 @@ class TransactionQueue {
       }
     }
   }
-  clearDebugAwaitStrings() {
+  clearDebugAwaitStrings(): void {
     this.debugLastAwaitedCall = ''
     this.debugLastAwaitedCallInner = ''
     this.debugLastAwaitedAppCall = ''

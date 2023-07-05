@@ -58,7 +58,7 @@ class Sqlite3Storage {
     }
   }
 
-  sqlite3Define(modelName: string, modelAttributes: ModelAttributes) {
+  sqlite3Define(modelName: string, modelAttributes: ModelAttributes): void {
     const tableName = modelName
 
     const modelData: ModelData = {
@@ -116,7 +116,7 @@ class Sqlite3Storage {
     // todo base this off of models
   }
 
-  async deleteFolder(path: string) {
+  async deleteFolder(path: string): Promise<void> {
     //recursive delete of db folder
     try {
       // probably safe; only deletes what is supposed to be the old db folder
@@ -133,13 +133,13 @@ class Sqlite3Storage {
     }
   }
 
-  async deleteOldDBPath() {
+  async deleteOldDBPath(): Promise<void> {
     if (this.storageConfig.options.saveOldDBFiles != true) {
       await this.deleteFolder(this.oldDBPath)
     }
   }
 
-  async init() {
+  async init(): Promise<void> {
     const dbDir = path.parse(this.storageConfig.options.storage).dir
 
     // Rename dbDir if it exists
@@ -231,17 +231,17 @@ class Sqlite3Storage {
       throw new Error('storage init error ' + e.name + ': ' + e.message + ' at ' + e.stack)
     }
   }
-  async close() {
+  async close(): Promise<void> {
     // this.mainLogger.info('Closing Database connections.')
     await this.db.close()
     if (this.oldDb) await this.oldDb.close()
   }
 
-  async runCreate(createStatement: string) {
+  async runCreate(createStatement: string): Promise<void> {
     await this.run(createStatement)
   }
 
-  _create(table: ModelData, object: unknown, opts: OperationOptions) {
+  _create(table: ModelData, object: unknown, opts: OperationOptions): Promise<unknown> {
     try {
       this.profiler.profileSectionStart('db')
       // if (logFlags.console) console.log('_create2: ' + stringify(object))
@@ -281,7 +281,7 @@ class Sqlite3Storage {
     }
   }
 
-  async _read(table: ModelData, params: GenericObject, opts: OperationOptions) {
+  async _read(table: ModelData, params: GenericObject, opts: OperationOptions): Promise<unknown> {
     try {
       this.profiler.profileSectionStart('db')
       // return table.findAll({ where, ...opts })
@@ -314,7 +314,7 @@ class Sqlite3Storage {
       this.profiler.profileSectionEnd('db')
     }
   }
-  async _readOld(table: ModelData, params: GenericObject, opts: OperationOptions) {
+  async _readOld(table: ModelData, params: GenericObject, opts: OperationOptions): Promise<unknown> {
     try {
       this.profiler.profileSectionStart('db')
       // return table.findAll({ where, ...opts })
@@ -348,7 +348,12 @@ class Sqlite3Storage {
     }
   }
 
-  _update(table: ModelData, values: GenericObject, where: GenericObject, opts: OperationOptions) {
+  _update(
+    table: ModelData,
+    values: GenericObject,
+    where: GenericObject,
+    opts: OperationOptions
+  ): Promise<unknown> {
     try {
       this.profiler.profileSectionStart('db')
       // return table.update(values, { where, ...opts })
@@ -375,7 +380,7 @@ class Sqlite3Storage {
     }
   }
 
-  _delete(table: ModelData, where: GenericObject, opts: OperationOptions) {
+  _delete(table: ModelData, where: GenericObject, opts: OperationOptions): Promise<unknown> {
     try {
       this.profiler.profileSectionStart('db')
       // if (!where) {
@@ -398,7 +403,7 @@ class Sqlite3Storage {
     }
   }
 
-  _rawQuery(queryString: string, valueArray: unknown[]) {
+  _rawQuery(queryString: string, valueArray: unknown[]): Promise<unknown> {
     // return this.sequelize.query(query, { model: table })
     try {
       this.profiler.profileSectionStart('db')
@@ -408,7 +413,7 @@ class Sqlite3Storage {
     }
   }
 
-  _rawQueryOld(queryString: string, valueArray: unknown[]) {
+  _rawQueryOld(queryString: string, valueArray: unknown[]): Promise<unknown> {
     // return this.sequelize.query(query, { model: table })
     try {
       this.profiler.profileSectionStart('db')
@@ -418,7 +423,7 @@ class Sqlite3Storage {
     }
   }
 
-  params2Array(paramsObj: GenericObject, table: ModelData) {
+  params2Array(paramsObj: GenericObject, table: ModelData): ParamEntry[] {
     if (paramsObj === null || paramsObj === undefined) {
       return []
     }
@@ -489,7 +494,10 @@ class Sqlite3Storage {
     return paramsArray
   }
 
-  paramsToWhereStringAndValues(paramsArray: { sql: string; vals: string[] }[]) {
+  paramsToWhereStringAndValues(paramsArray: ParamEntry[]): {
+    whereString: string
+    whereValueArray: unknown[]
+  } {
     let whereValueArray = []
     let whereString = ''
     for (let i = 0; i < paramsArray.length; i++) {
@@ -507,7 +515,10 @@ class Sqlite3Storage {
     return { whereString, whereValueArray }
   }
 
-  paramsToAssignmentStringAndValues(paramsArray: { sql: string; vals: string[] }[]) {
+  paramsToAssignmentStringAndValues(paramsArray: ParamEntry[]): {
+    resultString: string
+    valueArray: unknown[]
+  } {
     let valueArray = []
     let resultString = ''
     for (let i = 0; i < paramsArray.length; i++) {
@@ -522,7 +533,7 @@ class Sqlite3Storage {
     return { resultString, valueArray }
   }
 
-  options2string(optionsObj: OperationOptions) {
+  options2string(optionsObj: OperationOptions): string {
     if (optionsObj === null || optionsObj === undefined) {
       return ''
     }
@@ -546,7 +557,7 @@ class Sqlite3Storage {
   }
 
   // run/get/all promise wraps from this tutorial: https://stackabuse.com/a-sqlite-tutorial-with-node-js/
-  run(sql: string, params = []) {
+  run(sql: string, params = []): Promise<unknown> {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function (err: Error) {
         if (err) {
@@ -560,7 +571,7 @@ class Sqlite3Storage {
     })
   }
 
-  get(sql: string, params = []) {
+  get(sql: string, params = []): Promise<unknown> {
     return new Promise((resolve, reject) => {
       this.db.get(sql, params, (err: Error, result: unknown) => {
         if (err) {
@@ -574,7 +585,7 @@ class Sqlite3Storage {
     })
   }
 
-  all(sql: string, params = []) {
+  all(sql: string, params = []): Promise<unknown> {
     return new Promise((resolve, reject) => {
       this.db.all(sql, params, (err: Error, rows: unknown[]) => {
         if (err) {
@@ -588,7 +599,7 @@ class Sqlite3Storage {
     })
   }
 
-  allOld(sql: string, params = []) {
+  allOld(sql: string, params = []): Promise<unknown> {
     return new Promise((resolve, reject) => {
       this.oldDb.all(sql, params, (err: Error, rows: unknown[]) => {
         if (err) {
@@ -604,7 +615,7 @@ class Sqlite3Storage {
 }
 
 // From: https://stackoverflow.com/a/21196961
-async function _ensureExists(dir: string) {
+async function _ensureExists(dir: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     // likely safe; only creates an empty directory and is only used here with a
     // database directory determined by config

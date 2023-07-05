@@ -56,7 +56,7 @@ class TransactionRepair {
     this.statemanager_fatal = stateManager.statemanager_fatal
   }
 
-  async repairToMatchReceipt(queueEntry: QueueEntry) {
+  async repairToMatchReceipt(queueEntry: QueueEntry): Promise<void> {
     if (this.stateManager.currentCycleShardData == null) {
       return
     }

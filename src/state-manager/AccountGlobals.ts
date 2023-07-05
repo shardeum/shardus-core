@@ -67,7 +67,7 @@ class AccountGlobals {
     this.hasknownGlobals = false
   }
 
-  setupHandlers() {
+  setupHandlers(): void {
     this.p2p.registerInternal(
       'get_globalaccountreport',
       async (
@@ -169,7 +169,7 @@ class AccountGlobals {
     return this.globalAccountSet.has(accountID)
   }
 
-  setGlobalAccount(accountID: string) {
+  setGlobalAccount(accountID: string): void {
     this.globalAccountSet.add(accountID)
   }
 
@@ -178,7 +178,7 @@ class AccountGlobals {
    * sync requires having knowlege of what accounts are global very early in the process.
    * This will get an early global report (note does not have account data, just id,hash,timestamp)
    */
-  async getGlobalListEarly() {
+  async getGlobalListEarly(): Promise<void> {
     let retriesLeft = 10
 
     //This will try up to 10 times to get the global list

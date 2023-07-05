@@ -3,7 +3,7 @@ import { logFlags } from '../../logger'
 type Comparator<T, E = T> = (a: E, b: T) => number
 
 // From: https://stackoverflow.com/a/12646864
-export function shuffleArray<T>(array: T[]) {
+export function shuffleArray<T>(array: T[]): void {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
     ;[array[i], array[j]] = [array[j], array[i]] // eslint-disable-line security/detect-object-injection
@@ -32,7 +32,7 @@ export function getRandom<T>(arr: T[], n: number): T[] {
   return result
 }
 
-export function insertSorted<T>(arr: T[], item: T, comparator?: Comparator<T>) {
+export function insertSorted<T>(arr: T[], item: T, comparator?: Comparator<T>): void {
   let i = binarySearch(arr, item, comparator)
   if (i < 0) {
     i = -1 - i
@@ -65,7 +65,7 @@ export function insertSorted<T>(arr: T[], item: T, comparator?: Comparator<T>) {
  * The array may contain duplicate elements. If there are more than one lowest elements in the array,
  * the returned value will be the index of the left most lowest element
  */
-export function binaryLowest<T>(ar: T[], comparator?: Comparator<T>) {
+export function binaryLowest<T>(ar: T[], comparator?: Comparator<T>): number {
   if (ar.length < 1) return -1
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
@@ -113,7 +113,11 @@ export function binaryLowest<T>(ar: T[], comparator?: Comparator<T>) {
  * @param el
  * @param comparator
  */
-export function binarySearch<T, E = Partial<T>>(arr: T[], el: E, comparator?: Comparator<T, typeof el>) {
+export function binarySearch<T, E = Partial<T>>(
+  arr: T[],
+  el: E,
+  comparator?: Comparator<T, typeof el>
+): number {
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
     comparator = (a, b) => {
@@ -136,7 +140,7 @@ export function binarySearch<T, E = Partial<T>>(arr: T[], el: E, comparator?: Co
   return -m - 1
 }
 
-export const computeMedian = (arr = [], sort = true) => {
+export const computeMedian = (arr: number[] = [], sort = true): number => {
   if (sort) {
     arr.sort((a, b) => a - b)
   }

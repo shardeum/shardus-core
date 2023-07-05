@@ -18,7 +18,7 @@ config.server.baseDir = baseDirPath
 
 const shardus = new Shardus(config)
 
-async function init() {
+async function init(): Promise<void> {
   shardus.setup(null)
   await shardus.start()
   shardus.registerExceptionHandler()

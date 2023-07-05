@@ -22,13 +22,13 @@ export default class DataSourceHelper {
     this.stateManager = stateManager
   }
 
-  initWithList(listOfNdoes: Shardus.Node[]) {
+  initWithList(listOfNdoes: Shardus.Node[]): void {
     this.dataSourceNodeIndex = 0
     this.dataSourceNode = listOfNdoes[this.dataSourceNodeIndex] // Todo random index
     this.dataSourceNodeList = [...listOfNdoes]
   }
 
-  initByRange(lowAddress: string, highAddress: string) {
+  initByRange(lowAddress: string, highAddress: string): void {
     this.dataSourceNodeIndex = 0
     this.dataSourceNodeList = []
 
@@ -138,11 +138,11 @@ export default class DataSourceHelper {
     return false
   }
 
-  getNumNodes() {
+  getNumNodes(): number {
     return this.dataSourceNodeList.length
   }
 
-  removePotentiallyRemovedNodes(node: Shardus.Node) {
+  removePotentiallyRemovedNodes(node: Shardus.Node): boolean {
     return potentiallyRemoved.has(node.id) != true
   }
 }

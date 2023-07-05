@@ -69,7 +69,7 @@ class CachedAppDataManager {
     setInterval(this.pruneCachedItems.bind(this), 1000 * config.p2p.cycleDuration) // prune every cycle
   }
 
-  setupHandlers() {
+  setupHandlers(): void {
     this.p2p.registerInternal('send_cachedAppData', async (payload: CacheAppDataResponse) => {
       profilerInstance.scopedProfileSectionStart('send_cachedAppData')
       try {
@@ -107,7 +107,7 @@ class CachedAppDataManager {
     })
   }
 
-  registerTopic(topic: string, maxCycleAge: number, maxCacheElements: number) {
+  registerTopic(topic: string, maxCycleAge: number, maxCacheElements: number): boolean {
     const cacheTopic: CacheTopic = {
       topic,
       maxCycleAge,
@@ -121,7 +121,7 @@ class CachedAppDataManager {
     return true
   }
 
-  getCachedItem(topic: string, dataID: string) {
+  getCachedItem(topic: string, dataID: string): CachedAppData {
     const cacheTopic = this.cacheTopicMap.get(topic)
     if (!cacheTopic) return
     const cachedAppData = cacheTopic.cacheAppDataMap.get(dataID)
@@ -129,7 +129,7 @@ class CachedAppDataManager {
   }
 
   // Check and prune cache items for each topic
-  pruneCachedItems() {
+  pruneCachedItems(): void {
     for (const [, cacheTopic] of this.cacheTopicMap.entries()) {
       let count = 0
       const { maxCycleAge, maxCacheElements } = cacheTopic
@@ -158,7 +158,7 @@ class CachedAppDataManager {
     }
   }
 
-  insertCachedItem(topic: string, dataID: string, appData: unknown, cycle: number) {
+  insertCachedItem(topic: string, dataID: string, appData: unknown, cycle: number): void {
     const cachedAppData: CachedAppData = {
       dataID,
       appData,
@@ -185,7 +185,7 @@ class CachedAppDataManager {
     cycle: number,
     _formId: string,
     txId: string
-  ) {
+  ): Promise<unknown> {
     if (this.stateManager.currentCycleShardData == null) {
       throw new Error('sendCorrespondingCachedAppData: currentCycleShardData == null')
     }

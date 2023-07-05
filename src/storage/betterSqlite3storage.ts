@@ -49,7 +49,7 @@ class BetterSqlite3Storage {
     }
   }
 
-  sqlite3Define(modelName: string, modelAttributes: ModelAttributes) {
+  sqlite3Define(modelName: string, modelAttributes: ModelAttributes): void {
     const tableName = modelName
 
     const modelData: ModelData = {
@@ -102,7 +102,7 @@ class BetterSqlite3Storage {
     // todo base this off of models
   }
 
-  async init() {
+  async init(): Promise<void> {
     // Create dbDir if it doesn't exist
     const dbDir = path.parse(this.storageConfig.options.storage).dir
     await _ensureExists(dbDir)
@@ -119,18 +119,18 @@ class BetterSqlite3Storage {
     this.initialized = true
     this.mainLogger.info('Database initialized.')
   }
-  async close() {
+  async close(): Promise<void> {
     this.db.close()
   }
-  async runCreate(createStatement: string) {
+  async runCreate(createStatement: string): Promise<void> {
     await this.run(createStatement)
   }
 
-  _checkInit() {
+  _checkInit(): void {
     if (!this.initialized) throw new Error('Storage not initialized.')
   }
 
-  _create(table: ModelData, object: GenericObject, opts: OperationOptions) {
+  _create(table: ModelData, object: GenericObject, opts: OperationOptions): Promise<unknown> {
     if (Array.isArray(object)) {
       // TODO transaciton or something else
 
@@ -159,7 +159,7 @@ class BetterSqlite3Storage {
     return this.run(queryString, inputs)
   }
 
-  async _read(table: ModelData, params: GenericObject, opts: OperationOptions) {
+  async _read<T>(table: ModelData, params: GenericObject, opts: OperationOptions): Promise<T[]> {
     let queryString = table.selectString
 
     const paramsArray = this.params2Array(params, table)
@@ -170,10 +170,10 @@ class BetterSqlite3Storage {
     queryString += whereString
     queryString += this.options2string(opts)
 
-    return await this.all(queryString, valueArray)
+    return await this.all<T>(queryString, valueArray)
   }
 
-  _update(table: ModelData, values: GenericObject, where: GenericObject, opts: OperationOptions) {
+  _update(table: ModelData, values: GenericObject, where: GenericObject, opts: OperationOptions): Promise<unknown> {
     let queryString = table.updateString
 
     const valueParams = this.params2Array(values, table)
@@ -191,7 +191,7 @@ class BetterSqlite3Storage {
 
     return this.run(queryString, newValueArray)
   }
-  _delete(table: ModelData, where: GenericObject, opts: OperationOptions) {
+  _delete(table: ModelData, where: GenericObject, opts: OperationOptions): Promise<unknown> {
     let queryString = table.deleteString
 
     const whereParams = this.params2Array(where, table)
@@ -203,11 +203,11 @@ class BetterSqlite3Storage {
     return this.run(queryString, valueArray)
   }
 
-  _rawQuery(queryString: string, valueArray: unknown[]) {
+  _rawQuery<T>(queryString: string, valueArray: unknown[]): Promise<T[]> {
     return this.all(queryString, valueArray)
   }
 
-  params2Array(paramsObj: GenericObject, table: ModelData) {
+  params2Array(paramsObj: GenericObject, table: ModelData): ParamEntry[] {
     if (paramsObj == null) {
       return []
     }
@@ -275,7 +275,7 @@ class BetterSqlite3Storage {
     return paramsArray
   }
 
-  paramsToWhereStringAndValues(paramsArray: ParamEntry[]) {
+  paramsToWhereStringAndValues(paramsArray: ParamEntry[]): { whereString: string; whereValueArray: unknown[] } {
     let whereValueArray = []
     let whereString = ''
     for (let i = 0; i < paramsArray.length; i++) {
@@ -293,7 +293,7 @@ class BetterSqlite3Storage {
     return { whereString, whereValueArray }
   }
 
-  paramsToAssignmentStringAndValues(paramsArray: ParamEntry[]) {
+  paramsToAssignmentStringAndValues(paramsArray: ParamEntry[]): { resultString: string; valueArray: unknown[] } {
     let valueArray = []
     let resultString = ''
     for (let i = 0; i < paramsArray.length; i++) {
@@ -308,7 +308,7 @@ class BetterSqlite3Storage {
     return { resultString, valueArray }
   }
 
-  options2string(optionsObj: OperationOptions) {
+  options2string(optionsObj: OperationOptions): string {
     if (optionsObj == null) {
       return ''
     }
@@ -332,7 +332,7 @@ class BetterSqlite3Storage {
   }
 
   // run/get/all promise wraps from this tutorial: https://stackabuse.com/a-sqlite-tutorial-with-node-js/
-  run(sql: string, params = []) {
+  run(sql: string, params = []): Promise<{ id: number | bigint }> {
     return new Promise((resolve, reject) => {
       try {
         const { lastInsertRowid } = this.db.prepare(sql).run(params)
@@ -344,7 +344,7 @@ class BetterSqlite3Storage {
       }
     })
   }
-  get(sql: string, params = []) {
+  get<T>(sql: string, params = []): Promise<T> {
     return new Promise((resolve, reject) => {
       try {
         const result = this.db.prepare(sql).get(params)
@@ -357,7 +357,7 @@ class BetterSqlite3Storage {
     })
   }
 
-  all(sql: string, params = []) {
+  all<T>(sql: string, params = []): Promise<T[]> {
     return new Promise((resolve, reject) => {
       try {
         const rows = this.db.prepare(sql).all(params)
@@ -372,7 +372,7 @@ class BetterSqlite3Storage {
 }
 
 // From: https://stackoverflow.com/a/21196961
-async function _ensureExists(dir: string) {
+async function _ensureExists(dir: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     // only creates an empty directory and does nothing if it already exists
     // eslint-disable-next-line security/detect-non-literal-fs-filename

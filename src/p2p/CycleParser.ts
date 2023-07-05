@@ -25,7 +25,7 @@ export class ChangeSquasher {
     this.seenUpdates = new Map()
   }
 
-  addChange(change: P2P.CycleParserTypes.Change) {
+  addChange(change: P2P.CycleParserTypes.Change): void {
     for (const id of change.removed) {
       // Ignore if id is already removed
       if (this.removedIds.has(id)) continue

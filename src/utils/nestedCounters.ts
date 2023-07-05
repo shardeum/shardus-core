@@ -29,7 +29,7 @@ class NestedCounters {
     this.infLoopDebug = false
   }
 
-  registerEndpoints() {
+  registerEndpoints(): void {
     Context.network.registerExternalGet('counts', isDebugModeMiddleware, (req, res) => {
       profilerInstance.scopedProfileSectionStart('counts')
 
@@ -82,7 +82,7 @@ class NestedCounters {
    * @param category2 Sub counter category
    * @param count Amount to increment primary and sub counter by. Defaults to 1
    */
-  countEvent(category1: string, category2: string, count = 1) {
+  countEvent(category1: string, category2: string, count = 1): void {
     let counterMap: CounterMap = this.eventCounters
 
     let nextNode: CounterNode = null
@@ -113,7 +113,7 @@ class NestedCounters {
    * @param category2 Sub counter category
    * @param count Amount to increment primary and sub counter by. Defaults to 1
    */
-  countRareEvent(category1: string, category2: string, count = 1) {
+  countRareEvent(category1: string, category2: string, count = 1): void {
     // trigger normal event counter
     this.countEvent(category1, category2, count)
 
@@ -173,7 +173,7 @@ class NestedCounters {
    * @param stream
    * @param indent
    */
-  printArrayReport(arrayReport: CounterArray, stream, indent = 0) {
+  printArrayReport(arrayReport: CounterArray, stream, indent = 0): void {
     const indentText = '___'.repeat(indent)
     for (const item of arrayReport) {
       const { key, count, subArray } = item
@@ -186,11 +186,11 @@ class NestedCounters {
     }
   }
 
-  resetCounters() {
+  resetCounters(): void {
     this.eventCounters = new Map()
   }
 
-  resetRareCounters() {
+  resetRareCounters(): void {
     this.rareEventCounters = new Map()
   }
 }

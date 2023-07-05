@@ -52,7 +52,7 @@ export let state = P2P.P2PTypes.NodeStatus.INITIALIZING
 
 /** FUNCTIONS */
 
-export function init() {
+export function init(): void {
   // Setup our IP and port so modules like Sync can use it
   ip = network.ipInfo.externalIp
   port = network.ipInfo.externalPort
@@ -141,7 +141,7 @@ export async function startup(): Promise<boolean> {
   return true
 }
 
-async function witnessConditionsMet(activeNodes: P2P.P2PTypes.Node[]) {
+async function witnessConditionsMet(activeNodes: P2P.P2PTypes.Node[]): Promise<boolean> {
   try {
     // 1. node has old data
     if (snapshot.oldDataPath) {
@@ -160,11 +160,14 @@ async function witnessConditionsMet(activeNodes: P2P.P2PTypes.Node[]) {
   return false
 }
 
-export function updateNodeState(updatedState: NodeStatus) {
+export function updateNodeState(updatedState: NodeStatus): void {
   state = updatedState
 }
 
-async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean) {
+async function joinNetwork(
+  activeNodes: P2P.P2PTypes.Node[],
+  firstTime: boolean
+): Promise<{ isFirst: boolean; id: string }> {
   // Check if you're the first node
   const isFirst = discoverNetwork(activeNodes)
   if (isFirst) {
@@ -247,7 +250,7 @@ async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean)
   }
 }
 
-async function syncCycleChain() {
+async function syncCycleChain(): Promise<void> {
   // You're already synced if you're first
   if (isFirst) return
 
@@ -277,7 +280,7 @@ async function syncCycleChain() {
   }
 }
 
-async function contactArchiver() {
+async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
   const availableArchivers = Context.config.p2p.existingArchivers
   const maxRetries = 3
   let retry = maxRetries
@@ -354,7 +357,7 @@ async function contactArchiver() {
   return activeNodesSigned.nodeList
 }
 
-function discoverNetwork(seedNodes: P2P.P2PTypes.Node[]) {
+function discoverNetwork(seedNodes: P2P.P2PTypes.Node[]): boolean {
   // Check if we are first seed node
   const isFirstSeed = checkIfFirstSeedNode(seedNodes)
   if (!isFirstSeed) {
@@ -365,7 +368,7 @@ function discoverNetwork(seedNodes: P2P.P2PTypes.Node[]) {
   return true
 }
 
-function checkIfFirstSeedNode(seedNodes: P2P.P2PTypes.Node[]) {
+function checkIfFirstSeedNode(seedNodes: P2P.P2PTypes.Node[]): boolean {
   if (!seedNodes.length) throw new Error('Fatal: No seed nodes in seed list!')
   if (seedNodes.length > 1) return false
   const seed = seedNodes[0]
@@ -438,13 +441,22 @@ export function getPublicNodeInfo(reportIntermediateStatus = false): NodeInfo {
   return nodeInfo
 }
 
-function getNodeStatus(pubKey: string, reportIntermediateStatus = false) {
+function getNodeStatus(pubKey: string, reportIntermediateStatus = false): P2P.P2PTypes.NodeStatus {
   const current = NodeList.byPubKey
   if (current.get(pubKey)) return current.get(pubKey).status
   return reportIntermediateStatus ? state : null
 }
 
-export function getThisNodeInfo() {
+export function getThisNodeInfo(): {
+  publicKey: string
+  externalIp: string
+  externalPort: number
+  internalIp: string
+  internalPort: number
+  address: string
+  joinRequestTimestamp: number
+  activeTimestamp: number
+} {
   const { externalIp, externalPort, internalIp, internalPort } = network.ipInfo
   const publicKey = Context.crypto.getPublicKey()
   // TODO: Change this to actual selectable address
@@ -465,29 +477,29 @@ export function getThisNodeInfo() {
   return nodeInfo
 }
 
-export function setActive() {
+export function setActive(): void {
   isActive = true
 }
 
-export function setp2pIgnoreJoinRequests(value: boolean) {
+export function setp2pIgnoreJoinRequests(value: boolean): void {
   p2pIgnoreJoinRequests = value
 }
 
-function info(...msg: string[]) {
+function info(...msg: string[]): void {
   const entry = `Self: ${msg.join(' ')}`
   p2pLogger.info(entry)
 }
 
-function warn(...msg: string[]) {
+function warn(...msg: string[]): void {
   const entry = `Self: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }
 
 // debug functions
-export function setIsFirst(val: boolean) {
+export function setIsFirst(val: boolean): void {
   isFirst = val
 }
 
-export function getIsFirst() {
+export function getIsFirst(): boolean {
   return isFirst
 }

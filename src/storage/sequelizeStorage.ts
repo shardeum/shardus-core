@@ -37,13 +37,13 @@ class SequelizeStorage {
     this.mainLogger = logger.getLogger('default')
   }
 
-  async init() {
+  async init(): Promise<void> {
     // Create dbDir if it doesn't exist
     const dbDir = path.parse(this.storageConfig.options.storage).dir
     await _ensureExists(dbDir)
     this.mainLogger.info('Created Database directory.')
     // Start Sequelize and load models
-    this.sequelize = new Sequelize(...Object.values(this.storageConfig) as unknown[])
+    this.sequelize = new Sequelize(...(Object.values(this.storageConfig) as unknown[]))
     for (const [modelName, modelAttributes] of this.models) this.sequelize.define(modelName, modelAttributes)
     this.storageModels = this.sequelize.models
     this.initialized = false
@@ -56,43 +56,63 @@ class SequelizeStorage {
     this.initialized = true
     this.mainLogger.info('Database initialized.')
   }
-  async close() {
+  async close(): Promise<void> {
     // this.mainLogger.info('Closing Database connections.')
     await this.sequelize.close()
   }
 
-  async dropAndCreateModel(model: ModelCtor<Model<unknown, unknown>>) {
+  async dropAndCreateModel(model: ModelCtor<Model<unknown, unknown>>): Promise<void> {
     await model.sync({ force: true })
   }
 
-  _checkInit() {
+  _checkInit(): void {
     if (!this.initialized) throw new Error('Storage not initialized.')
   }
-  _create(table: ModelCtor<Model<unknown, unknown>>, values: unknown[], opts: { [key: string]: unknown }) {
+  _create(
+    table: ModelCtor<Model<unknown, unknown>>,
+    values: unknown[],
+    opts: { [key: string]: unknown }
+  ): Promise<Model<unknown, unknown>[]> | Promise<Model<unknown, unknown>> {
     if (Array.isArray(values)) {
       return table.bulkCreate(values, opts)
     }
     return table.create(values, opts)
   }
-  _read(table: ModelCtor<Model<unknown, unknown>>, where: Where, opts: { [key: string]: unknown }) {
+  _read(
+    table: ModelCtor<Model<unknown, unknown>>,
+    where: Where,
+    opts: { [key: string]: unknown }
+  ): Promise<Model<unknown, unknown>[]> {
     return table.findAll({ where, ...opts })
   }
-  _update(table: ModelCtor<Model<unknown, unknown>>, values: unknown, where: Where, opts: { [key: string]: unknown }) {
+  _update(
+    table: ModelCtor<Model<unknown, unknown>>,
+    values: unknown,
+    where: Where,
+    opts: { [key: string]: unknown }
+  ): Promise<[affectedCount: number]> {
     return table.update(values, { where, ...opts })
   }
-  _delete(table: ModelCtor<Model<unknown, unknown>>, where: Where, opts: { [key: string]: unknown }) {
+  _delete(
+    table: ModelCtor<Model<unknown, unknown>>,
+    where: Where,
+    opts: { [key: string]: unknown }
+  ): Promise<number> {
     if (!where) {
       return table.destroy({ ...opts })
     }
     return table.destroy({ where, ...opts })
   }
-  _rawQuery(table: ModelCtor<Model<unknown, unknown>>, query: string | { query: string; values: unknown[] }) {
+  _rawQuery(
+    table: ModelCtor<Model<unknown, unknown>>,
+    query: string | { query: string; values: unknown[] }
+  ): Promise<Model<unknown, unknown>[]> {
     return this.sequelize.query(query, { model: table })
   }
 }
 
 // From: https://stackoverflow.com/a/21196961
-async function _ensureExists(dir: fs.PathLike) {
+async function _ensureExists(dir: fs.PathLike): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     // probably safe; creates an empty folder
     // eslint-disable-next-line security/detect-non-literal-fs-filename

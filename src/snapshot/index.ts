@@ -539,7 +539,7 @@ export async function startWitnessMode() {
   const witnessInterval = setInterval(async () => {
     try {
       const fullNodesSigned = await Self.getFullNodesFromArchiver()
-      if (!Context.crypto.verify(fullNodesSigned, archiver.publicKey)) {
+      if (!Context.crypto.verify(fullNodesSigned as unknown as SignedObject, archiver.publicKey)) {
         throw Error('Fatal: Full Node list was not signed by archiver!')
       }
       const nodeList = fullNodesSigned.nodeList

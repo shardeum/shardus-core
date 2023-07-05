@@ -3,7 +3,7 @@ import { PassThrough } from 'stream'
 import { join } from 'path'
 import { RollingFileStream } from 'streamroller'
 
-export function startSaving(baseDir: string) {
+export function startSaving(baseDir: string): void {
   // Create a file to save combined stdout and stderr output
   const outFileName = `out.log`
   const stream = new RollingFileStream(join(baseDir, outFileName), 10000000, 10)

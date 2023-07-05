@@ -1,11 +1,13 @@
-export const deepCopy = (obj) => {
+import { Ordering } from ".."
+
+export const deepCopy = <T>(obj: T): T => {
   if (typeof obj !== 'object') {
     throw Error('Given element is not of type object.')
   }
   return JSON.parse(JSON.stringify(obj))
 }
 
-export const mod = (n, m) => {
+export const mod = (n, m): number => {
   return ((n % m) + m) % m
 }
 
@@ -16,19 +18,19 @@ export const mod = (n, m) => {
  * @param a the amount to lerp by (0-1) 0 being v0 and 1 being v1. 0.5 being halfway between v0 and v1
  * @returns
  */
-export const lerp = (v0: number, v1: number, a: number) => {
+export const lerp = (v0: number, v1: number, a: number): number => {
   return v0 * (1 - a) + v1 * a
 }
 
-export function propComparator<T>(prop: keyof T) {
+export function propComparator<T>(prop: keyof T): (a: T, b: T) => Ordering {
   // eslint-disable-next-line security/detect-object-injection
-  const comparator = (a: T, b: T) => (a[prop] > b[prop] ? 1 : a[prop] < b[prop] ? -1 : 0)
+  const comparator = (a: T, b: T): Ordering => (a[prop] > b[prop] ? 1 : a[prop] < b[prop] ? -1 : 0)
   return comparator
 }
 
-export function propComparator2<T>(prop: keyof T, prop2: keyof T) {
+export function propComparator2<T>(prop: keyof T, prop2: keyof T): (a: T, b: T) => Ordering {
   /* eslint-disable security/detect-object-injection */
-  const comparator = (a: T, b: T) =>
+  const comparator = (a: T, b: T): Ordering =>
     a[prop] === b[prop]
       ? a[prop2] === b[prop2]
         ? 0
@@ -42,7 +44,7 @@ export function propComparator2<T>(prop: keyof T, prop2: keyof T) {
   return comparator
 }
 
-export const XOR = (hexString1, hexString2) => {
+export const XOR = (hexString1, hexString2): number => {
   // tslint:disable-next-line: ban
   const num1 = parseInt(hexString1.substring(0, 8), 16)
   // tslint:disable-next-line: ban
@@ -50,7 +52,7 @@ export const XOR = (hexString1, hexString2) => {
   return (num1 ^ num2) >>> 0
 }
 
-export const getClosestHash = (targetHash, hashes) => {
+export const getClosestHash = (targetHash, hashes): string => {
   let closest = null
   let closestDist = 0
   for (const hash of hashes) {
@@ -91,14 +93,14 @@ export const makeShortHash = (x, n = 4): string => {
  * @param x
  * @param n
  */
-export const short = (x: string, n = 4) => {
+export const short = (x: string, n = 4): string => {
   if (!x) {
     return x
   }
   return x.slice(0, n * 2)
 }
 
-export const debugExpand = (value: string) => {
+export const debugExpand = (value: string): string => {
   const res = value.slice(0, 4) + '0'.repeat(55) + value.slice(5, 5 + 5)
   return res
 }
@@ -117,7 +119,7 @@ Example of def:
 Returns a string with the first error encountered or and empty string ''.
 Errors are: "[name] is required" or "[name] must be, [type]"
  */
-export function validateTypes(inp, def) {
+export function validateTypes(inp, def): string {
   if (inp === undefined) return 'input is undefined'
   if (inp === null) return 'input is null'
   if (typeof inp !== 'object') return 'input must be object, not ' + typeof inp
@@ -163,11 +165,11 @@ export function validateTypes(inp, def) {
   return ''
 }
 
-export function errorToStringFull(error) {
+export function errorToStringFull(error): string {
   return `${error.name}: ${error.message} at ${error.stack}`
 }
 
-export function sumObject(sumObject, toAddObject) {
+export function sumObject(sumObject, toAddObject): void {
   for (const [key, val] of Object.entries(sumObject)) {
     // eslint-disable-next-line security/detect-object-injection
     const otherVal = toAddObject[key]
@@ -188,7 +190,7 @@ export function sumObject(sumObject, toAddObject) {
 // @param {LiteralObject} `obj` object to be genrate schema for
 // @return {LiteralObject} will return schema object
 // This function generate a schema (object) of the object it has been fed
-export function generateObjectSchema(obj, options = { arrTypeDiversity: false }) {
+export function generateObjectSchema(obj, options = { arrTypeDiversity: false }): object {
   const schema = {}
 
   if (Array.isArray(obj)) {
@@ -259,7 +261,10 @@ export function generateArraySchema(arr: unknown[], options = { diversity: false
 // This first parameter idol object will be idolized
 // and the function will determine if the second parameter (admirer) object fit the idolized object schema
 // Note idol object does not accept type diversive array like this { arr: ['doe', 1, false] } will throw errors.
-export function compareObjectShape(idol, admirer) {
+export function compareObjectShape(
+  idol,
+  admirer
+): { isValid: true; error?: { defectoChain: string[]; defectiveProp: { [x: string]: object } } } {
   let isValid
   let error = undefined
   const defectoChain = []
@@ -279,7 +284,7 @@ export function compareObjectShape(idol, admirer) {
 
   // this function compare prop types
   // this function is not meant to be call outside of this block
-  const smartComparator = (idol_type, admirer_type) => {
+  const smartComparator = (idol_type, admirer_type): boolean => {
     if (typeof idol_type === 'object' && idol_type.constructor === Object) {
       return JSON.stringify(idol_type) === JSON.stringify(admirer_type)
     } else {
@@ -290,7 +295,7 @@ export function compareObjectShape(idol, admirer) {
   // this function is not meant to be call outside of this block
   // worshipped represent idolized schema
   // worshipper represent admirer's schema
-  const defectoHunter = (worshipped, worshipper) => {
+  const defectoHunter = (worshipped, worshipper): { [x: string]: object } => {
     const l1 = Object.keys(worshipped).length
     const l2 = Object.keys(worshipper).length
 
@@ -323,7 +328,7 @@ export function compareObjectShape(idol, admirer) {
 }
 
 // version checker
-export function isEqualOrNewerVersion(oldVer: string, newVer: string) {
+export function isEqualOrNewerVersion(oldVer: string, newVer: string): boolean {
   if (oldVer === newVer) {
     return true
   }

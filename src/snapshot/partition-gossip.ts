@@ -58,7 +58,7 @@ export class Collector extends EventEmitter {
     this.receiptHashCounter = new Map()
     this.summaryHashCounter = new Map()
   }
-  process(messages: Message[]) {
+  process(messages: Message[]): void {
     let cycle: number
 
     // Loop through messages and add to hash tally
@@ -241,7 +241,7 @@ export class Collector extends EventEmitter {
 
 /** FUNCTIONS */
 // Registers partition gossip handler
-export function initGossip() {
+export function initGossip(): void {
   if (logFlags.console) console.log('registering gossip handler...')
   registerGossipHandler('snapshot_gossip', (message: Message) => {
     profilerInstance.scopedProfileSectionStart('snapshot_gossip')
@@ -280,7 +280,7 @@ export function newCollector(shard: CycleShardData): Collector {
   return collector
 }
 
-export function processMessagesInGossipQueue(shard: CycleShardData, collector: Collector) {
+export function processMessagesInGossipQueue(shard: CycleShardData, collector: Collector): void {
   // Pass any messages in the queue for the given cycle to this collector
   const messages = queue.get(shard.cycleNumber)
   if (messages) {
@@ -298,13 +298,13 @@ function convertObjectToHashMap(obj: object): hashMap {
 }
 
 // Cleans the collector and any remaining gossip in the queue for the given cycle
-export function clean(cycle: number) {
+export function clean(cycle: number): void {
   collectors.delete(cycle)
   queue.delete(cycle)
 }
 
 // Cleans partition gossip for cycles older than current - age
-export function cleanOld(current: number, age: number) {
+export function cleanOld(current: number, age: number): void {
   if (age > current) return
   for (const [cycle] of collectors) {
     if (cycle <= current - age) collectors.delete(cycle)

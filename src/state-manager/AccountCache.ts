@@ -80,7 +80,7 @@ class AccountCache {
      */
   ///////////////
 
-  updateAccountHash(accountId: string, accountHash: string, timestamp: number, cycle: number) {
+  updateAccountHash(accountId: string, accountHash: string, timestamp: number, cycle: number): void {
     if (accountHash == null) {
       const stack = new Error().stack
       this.statemanager_fatal('updateAccountHash hash=null', 'updateAccountHash hash=null' + stack)
@@ -249,7 +249,7 @@ class AccountCache {
   // at the end of buildPartitionHashesForNode gets set to the working/current cycle.
   // if TXs come in that are newer they get put in the future list and are not part of the parition hash report yet
 
-  hasAccount(accountId: string) {
+  hasAccount(accountId: string): boolean {
     return this.accountsHashCache3.accountHashMap.has(accountId)
   }
 
@@ -349,7 +349,7 @@ class AccountCache {
     this.accountsHashCache3.currentCalculationCycle = nextCycleToProcess
   }
 
-  getAccountDebugObject(id: string) {
+  getAccountDebugObject(id: string): AccountHashCacheHistory {
     const accountHashFull = this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(id)
     return accountHashFull
   }

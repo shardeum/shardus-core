@@ -3,6 +3,7 @@ import * as Shardus from '../shardus/shardus-types'
 import { StateManager, P2P } from '@shardus/types'
 import stringify from 'fast-stable-stringify'
 import log4js from 'log4js'
+import { Ordering } from '../utils'
 
 type ShardGlobals = StateManager.shardFunctionTypes.ShardGlobals
 type ShardInfo = StateManager.shardFunctionTypes.ShardInfo
@@ -160,7 +161,7 @@ class ShardFunctions {
     shardGlobals: ShardGlobals,
     wrappablePartitionRange: WrappablePartitionRange,
     partitionRadius: number
-  ) {
+  ): void {
     wrappablePartitionRange.partitionRangeVector = {
       start: wrappablePartitionRange.partitionStart,
       dist: 1 + 2 * shardGlobals.nodesPerConsenusGroup,
@@ -360,7 +361,7 @@ class ShardFunctions {
     partitionShardDataMap: PartitionShardDataMap,
     partitionStart: number,
     partitionsToScan: number
-  ) {
+  ): void {
     let partitionIndex = partitionStart
 
     const numPartitions = shardGlobals.numPartitions
@@ -393,7 +394,7 @@ class ShardFunctions {
     activeNodes: Shardus.Node[],
     extendedData: boolean,
     isActiveNodeList = true
-  ) {
+  ): void {
     let index = 0
     for (const node of nodesToGenerate) {
       let nodeShardData = nodeShardDataMap.get(node.id)
@@ -536,7 +537,7 @@ class ShardFunctions {
     partitionShardDataMap: PartitionShardDataMap,
     nodeShardData: NodeShardData,
     activeNodes: Shardus.Node[]
-  ) {
+  ): void {
     if (nodeShardData.extendedData) {
       return
     }
@@ -812,7 +813,7 @@ class ShardFunctions {
     }
   }
 
-  static nodeSortAsc(a: Shardus.Node, b: Shardus.Node) {
+  static nodeSortAsc(a: Shardus.Node, b: Shardus.Node): Ordering {
     return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
   }
 
@@ -1171,7 +1172,7 @@ class ShardFunctions {
     return result
   }
 
-  static getNodeRelation(nodeShardData: NodeShardData, nodeId: string) {
+  static getNodeRelation(nodeShardData: NodeShardData, nodeId: string): string {
     if (nodeShardData.extendedData === false) {
       return 'failed, no extended data'
     }
@@ -1200,7 +1201,7 @@ class ShardFunctions {
     return result
   }
 
-  static getPartitionRangeFromRadix(shardGlobals: ShardGlobals, radix: string) {
+  static getPartitionRangeFromRadix(shardGlobals: ShardGlobals, radix: string): { low: number; high: number } {
     const filledAddress = radix + '0'.repeat(64 - radix.length)
     const partition = ShardFunctions.addressToPartition(shardGlobals, filledAddress)
 
@@ -1893,7 +1894,7 @@ class ShardFunctions {
    * WARNING this only works input ends in all Fs after first byte.
    *
    */
-  static getNextAdjacentAddresses(address: string) {
+  static getNextAdjacentAddresses(address: string): { address1: string; address2: string } {
     const addressNum = parseInt(address.slice(0, 8), 16)
 
     const addressPrefixHex = ShardFunctions.leadZeros8(addressNum.toString(16))
@@ -2002,7 +2003,7 @@ class ShardFunctions {
     return true
   }
 
-  private static modulo(number: number, base: number) {
+  private static modulo(number: number, base: number): number {
     return ((number % base) + base) % base
   }
 }

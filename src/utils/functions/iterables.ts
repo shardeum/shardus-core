@@ -1,4 +1,4 @@
-export function reversed<T>(thing: Iterable<T>) {
+export function reversed<T>(thing: Iterable<T>): Iterable<T> {
   const arr = Array.isArray(thing) ? thing : Array.from(thing)
   let i = arr.length - 1
   const reverseIterator = {
@@ -21,7 +21,7 @@ export function reversed<T>(thing: Iterable<T>) {
  *
  * @param thing
  */
-export function randomShifted<T>(thing: Iterable<T>) {
+export function randomShifted<T>(thing: Iterable<T>): Iterable<T> {
   const arr = Array.isArray(thing) ? thing : Array.from(thing)
   let i = arr.length - 1
   const reverseIterator = {
@@ -66,7 +66,7 @@ export function randomShifted<T>(thing: Iterable<T>) {
  */
 export function* shuffleMapIterator<K, V>(map: Map<K, V>): IterableIterator<V> {
   // Create an array of keys from the map
-  let keys = Array.from(map.keys());
+  const keys = Array.from(map.keys());
 
   // Shuffle the keys array
   for (let i = keys.length - 1; i > 0; i--) {
@@ -75,7 +75,7 @@ export function* shuffleMapIterator<K, V>(map: Map<K, V>): IterableIterator<V> {
   }
 
   // Yield values from the map in the order of the shuffled keys
-  for (let key of keys) {
-      yield map.get(key)!;
+  for (const key of keys) {
+      yield map.get(key);
   }
 }

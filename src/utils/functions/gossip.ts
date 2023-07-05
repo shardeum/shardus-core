@@ -1,6 +1,13 @@
 import { mod } from '../'
 
-export function getLinearSeededGossip(nodeIdxs, myIdx, gossipFactor, startingSeed, seedFalloff, hop = 0) {
+export function getLinearSeededGossip(
+  nodeIdxs,
+  myIdx,
+  gossipFactor,
+  startingSeed,
+  seedFalloff,
+  hop = 0
+): number[] {
   const nodeCount = nodeIdxs.length
   const unique = []
   const gossipToList = []
@@ -35,7 +42,7 @@ export function getLinearSeededGossip(nodeIdxs, myIdx, gossipFactor, startingSee
   return unique
 }
 
-function gossip_factor(n, f, i) {
+function gossip_factor(n, f, i): number {
   let fb
   fb = Math.floor(3 * Math.log2(n))
   if (fb + f > n) {
@@ -55,7 +62,7 @@ function gossip_factor(n, f, i) {
   return fb
 }
 
-function gossip_offset(n, f, i) {
+function gossip_offset(n, f, i): number {
   let fb, r
   if (n < 2) {
     return i
@@ -76,7 +83,7 @@ function gossip_offset(n, f, i) {
   return r
 }
 
-export function getLinearGossipBurstList(numberOfNodes, gossipFactor, myIdx, originIdx) {
+export function getLinearGossipBurstList(numberOfNodes, gossipFactor, myIdx, originIdx): number[] {
   const list = []
   let offset, nodeIdx
 
@@ -101,7 +108,7 @@ export function getLinearGossipBurstList(numberOfNodes, gossipFactor, myIdx, ori
   return list
 }
 
-export function getLinearGossipList(numberOfNodes, gossipFactor, myIdx, isOrigin) {
+export function getLinearGossipList(numberOfNodes, gossipFactor, myIdx, isOrigin): number[] {
   const list = []
   let nodeIdx
   if (gossipFactor >= numberOfNodes) {
@@ -137,7 +144,7 @@ export function getLinearGossipList(numberOfNodes, gossipFactor, myIdx, isOrigin
   return list
 }
 
-export function getRandomGossipIn(nodeIdxs, fanOut, myIdx) {
+export function getRandomGossipIn(nodeIdxs, fanOut, myIdx): number[] {
   const nn = nodeIdxs.length
   if (fanOut >= nn) {
     fanOut = nn - 1

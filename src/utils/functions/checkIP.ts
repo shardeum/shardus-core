@@ -1,4 +1,4 @@
-export function isIPv6(ip: string) {
+export function isIPv6(ip: string): boolean {
   const slicedArr = ip.split(':')
   if (slicedArr.length !== 8) return false
 
@@ -19,7 +19,7 @@ export function isIPv6(ip: string) {
  * @param ip
  * @returns
  */
-export function isBogonIP(ip) {
+export function isBogonIP(ip): boolean {
   let ipArr
   try {
     ipArr = getIpArr(ip)
@@ -36,7 +36,7 @@ export function isBogonIP(ip) {
  * @param ip
  * @returns
  */
-export function isInvalidIP(ip) {
+export function isInvalidIP(ip): boolean {
   let ipArr
   try {
     ipArr = getIpArr(ip)
@@ -47,7 +47,7 @@ export function isInvalidIP(ip) {
   return isReservedIP(ipArr)
 }
 
-function getIpArr(ip: string) {
+function getIpArr(ip: string): number[] {
   const slicedArr = ip.split('.')
   if (slicedArr.length !== 4) {
     throw new Error('Invalid IP address provided')
@@ -67,7 +67,7 @@ function getIpArr(ip: string) {
   return numArray
 }
 
-function isPrivateIP(ip) {
+function isPrivateIP(ip): boolean {
   return (
     // 10.0.0.0/8  Private-use networks
     ip[0] === 10 ||
@@ -84,7 +84,7 @@ function isPrivateIP(ip) {
   )
 }
 
-function isReservedIP(ip) {
+function isReservedIP(ip): boolean {
   return (
     // 0.0.0.0/8 "This" network
     ip[0] === 0 ||

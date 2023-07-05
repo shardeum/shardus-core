@@ -210,7 +210,7 @@ class AccountSync {
   // ////////////////////////////////////////////////////////////////////
 
   // this clears state data related to the current partion we are syncinge
-  clearSyncData() {
+  clearSyncData(): void {
     //older comments indicate it may be odd to clear fifo locks.
     //this could even be a potential cause of the lock up since just setting fifoLocks to {} does not unstick waiting loops.
 
@@ -225,7 +225,7 @@ class AccountSync {
     }
   }
 
-  clearSyncTrackers() {
+  clearSyncTrackers(): void {
     //this seems out of place need to review it.
     this.syncTrackers = []
   }
@@ -240,7 +240,7 @@ class AccountSync {
    *    ##     ## ##     ## ##    ## ########  ######## ######## ##     ##  ######
    */
 
-  setupHandlers() {
+  setupHandlers(): void {
     // /get_account_state_hash (Acc_start, Acc_end, Ts_start, Ts_end)
     // Acc_start - get data for accounts starting with this account id; inclusive
     // Acc_end - get data for accounts up to this account id; inclusive
@@ -490,7 +490,7 @@ class AccountSync {
    *   later on syncing will be from runtime syncTracker ranges
    * @param requiredNodeCount
    */
-  async initialSyncMain(requiredNodeCount: number) {
+  async initialSyncMain(requiredNodeCount: number): Promise<void> {
     const safetyMode = safetyModeVals.safetyMode
 
     /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-start time: ${Date.now()}`)
@@ -732,7 +732,7 @@ class AccountSync {
     /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: initialSyncMain end c${cycle}`)
   }
 
-  private async waitForValidShardData(hasValidShardData: boolean) {
+  private async waitForValidShardData(hasValidShardData: boolean): Promise<true> {
     while (hasValidShardData === false) {
       this.stateManager.getCurrentCycleShardData()
       await utils.sleep(1000)
@@ -902,7 +902,7 @@ class AccountSync {
   async getRobustGlobalReport(tag = ''): Promise<GlobalAccountReportResp> {
     this.lastWinningGlobalReportNodes = []
 
-    const equalFn = (a: GlobalAccountReportResp, b: GlobalAccountReportResp) => {
+    const equalFn = (a: GlobalAccountReportResp, b: GlobalAccountReportResp): boolean => {
       // these fail cases should not count towards forming an hash consenus
       if (a == null || b == null) {
         return false
@@ -915,7 +915,7 @@ class AccountSync {
       }
       return a.combinedHash === b.combinedHash
     }
-    const queryFn = async (node: Shardus.Node) => {
+    const queryFn = async (node: Shardus.Node): Promise<unknown> => {
       // Node Precheck!
       if (
         this.stateManager.isNodeValidForInternalMessage(node.id, 'getRobustGlobalReport', true, true) ===
@@ -1034,7 +1034,7 @@ class AccountSync {
    * failandRestart
    *     this is going away
    */
-  async failandRestart_depricated() {
+  async failandRestart_depricated(): Promise<void> {
     this.mainLogger.info(`DATASYNC: failandRestart`)
     this.logger.playbackLogState('datasyncFail', '', '')
     this.clearSyncData()
@@ -1071,7 +1071,7 @@ class AccountSync {
   /**
    * failAndDontRestartSync
    */
-  failAndDontRestartSync() {
+  failAndDontRestartSync(): void {
     this.mainLogger.info(`DATASYNC: failAndDontRestartSync`)
     // need to clear more?
     this.clearSyncData()
@@ -1093,7 +1093,7 @@ class AccountSync {
    *
    * called in update shard values to handle sync trackers that have finished and need to restar TXs
    */
-  updateRuntimeSyncTrackers() {
+  updateRuntimeSyncTrackers(): void {
     let initalSyncRemaining = 0
     if (this.syncTrackers != null) {
       for (let i = this.syncTrackers.length - 1; i >= 0; i--) {
@@ -1349,7 +1349,7 @@ class AccountSync {
    * syncStatmentIsComplete
    *
    */
-  syncStatmentIsComplete() {
+  syncStatmentIsComplete(): void {
     this.syncStatement.totalSyncTime = (Date.now() - Self.p2pSyncStart) / 1000
 
     this.readyforTXs = true
@@ -1364,7 +1364,7 @@ class AccountSync {
    * Skips app data sync and sets flags to enable external tx processing.
    * Called by snapshot module after data recovery is complete.
    */
-  skipSync() {
+  skipSync(): void {
     this.dataSyncMainPhaseComplete = true
     this.syncStatement.syncComplete = true
 
@@ -1374,7 +1374,7 @@ class AccountSync {
     return
   }
 
-  setGlobalSyncFinished() {
+  setGlobalSyncFinished(): void {
     this.globalAccountsSynced = true
   }
 }

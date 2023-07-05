@@ -14,11 +14,11 @@ export const isPortReachable = async ({
   host: string
   port: number
   timeout?: number
-}) => {
+}): Promise<boolean> => {
   const promise = new Promise<void>((resolve, reject) => {
     const socket = new net.Socket()
 
-    const onError = () => {
+    const onError = (): void => {
       socket.destroy()
       reject()
     }

@@ -81,7 +81,7 @@ export default class FastRandomIterator {
   }
 
   //to help with profiling use
-  debugForceSparse() {
+  debugForceSparse(): void {
     this.sparseSet = new Set()
   }
 

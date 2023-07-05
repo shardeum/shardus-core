@@ -12,6 +12,7 @@ import * as Shardus from '../shardus/shardus-types'
 import { TimestampReceipt } from '../shardus/shardus-types'
 import Storage from '../storage'
 import * as utils from '../utils'
+import { Ordering } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions'
@@ -80,7 +81,7 @@ class TransactionConsenus {
    *    ######## ##    ## ########  ##         #######  #### ##    ##    ##     ######
    */
 
-  setupHandlers() {
+  setupHandlers(): void {
     this.p2p.registerInternal(
       'get_tx_timestamp',
       async (
@@ -387,7 +388,7 @@ class TransactionConsenus {
    * gossip the appliedReceipt to the transaction group
    * @param queueEntry
    */
-  async shareAppliedReceipt(queueEntry: QueueEntry) {
+  async shareAppliedReceipt(queueEntry: QueueEntry): Promise<void> {
     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
 
     if (queueEntry.appliedReceipt2 == null) {
@@ -713,7 +714,7 @@ class TransactionConsenus {
     return null
   }
 
-  sortByAccountId(first: Shardus.WrappedResponse, second: Shardus.WrappedResponse) {
+  sortByAccountId(first: Shardus.WrappedResponse, second: Shardus.WrappedResponse): Ordering {
     return utils.sortAscProp(first, second, 'accountId')
   }
 
@@ -723,7 +724,7 @@ class TransactionConsenus {
    * gossip the AppliedVote
    * @param queueEntry
    */
-  async createAndShareVote(queueEntry: QueueEntry) {
+  async createAndShareVote(queueEntry: QueueEntry): Promise<unknown> {
     this.profiler.profileSectionStart('createAndShareVote')
     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
 

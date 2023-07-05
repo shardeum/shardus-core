@@ -16,7 +16,7 @@ import Log4js from 'log4js'
 import { Response } from 'express-serve-static-core'
 
 type RawAccountData = { data: { data: { balance: string } } | { balance: string } } | { balance: string }
-type Line = { raw: string, file: { owner: string }}
+type Line = { raw: string; file: { owner: string } }
 
 /**
  * PartitionStats is a system that allows the dapp to build custom anonymous tallies of accounts and committed TXs.
@@ -140,7 +140,7 @@ class PartitionStats {
    *    ######## ##    ## ########  ##         #######  #### ##    ##    ##     ######
    */
 
-  setupHandlers() {
+  setupHandlers(): void {
     /**
      *
      *
@@ -249,7 +249,7 @@ class PartitionStats {
   /**
    * init the data stats blobs
    */
-  initSummaryBlobs() {
+  initSummaryBlobs(): void {
     // sparse blobs!
     // for (let i = 0; i < this.summaryPartitionCount; i++) {
     //   this.summaryBlobByPartition.set(i, this.getNewSummaryBlob(i))
@@ -328,7 +328,7 @@ class PartitionStats {
   }
 
   //todo , I think this is redundant and removable now.
-  hasAccountBeenSeenByStats(accountId: string) {
+  hasAccountBeenSeenByStats(accountId: string): boolean {
     return this.accountCache.hasAccount(accountId)
   }
 
@@ -437,7 +437,7 @@ class PartitionStats {
    * @param accountDataRaw
    * @param debugMsg
    */
-  statsDataSummaryInit(cycle: number, accountId: string, accountDataRaw: unknown, debugMsg: string) {
+  statsDataSummaryInit(cycle: number, accountId: string, accountDataRaw: unknown, debugMsg: string): void {
     const opCounter = this.statsProcessCounter++
     if (this.invasiveDebugInfo)
       this.mainLogger.debug(
@@ -468,7 +468,6 @@ class PartitionStats {
         args: [cycle, blob, accountDataRaw, accountId, opCounter],
       })
     }
-    //this.internalDoInit(cycle, blob, accountDataRaw, accountId, opCounter)
   }
 
   /**
@@ -487,7 +486,7 @@ class PartitionStats {
     accountDataRaw: RawAccountData,
     accountId: string,
     opCounter: number
-  ) {
+  ): void {
     if (cycle > blob.latestCycle) {
       blob.latestCycle = cycle
     }
@@ -532,7 +531,7 @@ class PartitionStats {
     accountDataBefore: unknown,
     accountDataAfter: Shardus.WrappedData,
     debugMsg: string
-  ) {
+  ): void {
     const opCounter = this.statsProcessCounter++
     if (this.invasiveDebugInfo)
       this.mainLogger.debug(
@@ -599,7 +598,7 @@ class PartitionStats {
     accountDataBefore: unknown,
     accountDataAfter: Shardus.WrappedData,
     opCounter: number
-  ) {
+  ): void {
     if (cycle > blob.latestCycle) {
       blob.latestCycle = cycle
     }
@@ -632,7 +631,7 @@ class PartitionStats {
    * @param cycle
    * @param queueEntry
    */
-  statsTxSummaryUpdate(cycle: number, queueEntry: QueueEntry) {
+  statsTxSummaryUpdate(cycle: number, queueEntry: QueueEntry): void {
     let accountToUseForTXStatBinning = null
     //this list of uniqueWritableKeys is not sorted and deterministic
     for (const key of queueEntry.uniqueWritableKeys) {
@@ -792,7 +791,17 @@ class PartitionStats {
    * @param writeTofile
    * @param cycleShardData
    */
-  dumpLogsForCycle(cycle: number, writeTofile = true, cycleShardData: CycleShardData = null) {
+  dumpLogsForCycle(
+    cycle: number,
+    writeTofile = true,
+    cycleShardData: CycleShardData = null
+  ): {
+    cycle: number
+    dataStats: any[]
+    txStats: any[]
+    covered: any[]
+    cycleDebugNotes: Record<string, never>
+  } {
     const statsDump = { cycle, dataStats: [], txStats: [], covered: [], cycleDebugNotes: {} }
 
     statsDump.cycleDebugNotes = this.stateManager.cycleDebugNotes
@@ -843,7 +852,14 @@ class PartitionStats {
     stream: Response<unknown, Record<string, unknown>, number>,
     tallyFunction: { (opaqueBlob: unknown): unknown; (arg0: unknown): unknown },
     lines: Line[]
-  ) {
+  ): {
+    allPassed: boolean
+    allPassedMetric2: boolean
+    singleVotePartitions: number
+    multiVotePartitions: number
+    badPartitions: any[]
+    dataByParition: Map<any, any>
+  } {
     const dataByParition = new Map()
 
     let newestCycle = -1
@@ -1182,16 +1198,7 @@ class PartitionStats {
   }
 
   //debug helper for invasiveDebugInfo
-  addDebugToBlob(
-    blob: {
-      latestCycle?: number
-      counter?: number
-      errorNull?: number
-      partition?: number
-      opaqueBlob: { dbgData?: unknown[] }
-    },
-    accountID: string
-  ): void {
+  addDebugToBlob(blob: StateManagerTypes.StateManagerTypes.SummaryBlob, accountID: string): void {
     //todo be sure to turn off this setting when not debugging.
     if (this.invasiveDebugInfo) {
       if (blob.opaqueBlob.dbgData == null) {

@@ -41,7 +41,7 @@ class MemoryReporting {
     this.lastCPUTimes = this.getCPUTimes()
   }
 
-  registerEndpoints() {
+  registerEndpoints(): void {
     Context.network.registerExternalGet('memory', isDebugModeMiddleware, (req, res) => {
       const toMB = 1 / 1000000
       const report = process.memoryUsage()
@@ -153,7 +153,7 @@ class MemoryReporting {
     })
   }
 
-  private addNodesToReport() {
+  private addNodesToReport(): void {
     if (NodeList.activeByIdOrder) {
       const allNodeIds = []
       for (const node of NodeList.activeByIdOrder) {
@@ -179,12 +179,12 @@ class MemoryReporting {
     return outStr
   }
 
-  addToReport(category: string, subcat: string, itemKey: string, count: number) {
+  addToReport(category: string, subcat: string, itemKey: string, count: number): void {
     const obj = { category, subcat, itemKey, count }
     this.report.push(obj)
   }
 
-  reportToStream(report: MemItem[], stream) {
+  reportToStream(report: MemItem[], stream): void {
     for (const item of report) {
       const { category, subcat, itemKey, count } = item
       const countStr = `${count}`
@@ -192,14 +192,14 @@ class MemoryReporting {
     }
   }
 
-  gatherReport() {
+  gatherReport(): void {
     this.report = []
     this.gatherStateManagerReport()
     this.systemProcessReport()
     this.addNetStatsToReport()
   }
 
-  gatherStateManagerReport() {
+  gatherStateManagerReport(): void {
     if (this.shardus && this.shardus.stateManager) {
       if (NodeList.activeByIdOrder) {
         const numActiveNodes = NodeList.activeByIdOrder.length
@@ -244,7 +244,7 @@ class MemoryReporting {
     }
   }
 
-  getCPUTimes() {
+  getCPUTimes(): object[] {
     const cpus = os.cpus()
     const times = []
 
@@ -264,7 +264,7 @@ class MemoryReporting {
     return times
   }
 
-  cpuPercent() {
+  cpuPercent(): number {
     const currentTimes = this.getCPUTimes()
 
     const deltaTimes = []
@@ -298,11 +298,11 @@ class MemoryReporting {
     return percentUsed
   }
 
-  roundTo3decimals(num: number) {
+  roundTo3decimals(num: number): number {
     return Math.round((num + Number.EPSILON) * 1000) / 1000
   }
 
-  systemProcessReport() {
+  systemProcessReport(): void {
     this.addToReport('Process', 'CPU', 'cpuPercent', this.roundTo3decimals(this.cpuPercent() * 100))
 
     const avgCPU = this.shardus.statistics.getAverage('cpuPercent')
@@ -325,7 +325,7 @@ class MemoryReporting {
     }
   }
 
-  getShardusNetReport() {
+  getShardusNetReport(): object {
     if (this.shardus == null || this.shardus.network == null || this.shardus.network.sn == null) {
       return null
     }
@@ -336,7 +336,7 @@ class MemoryReporting {
     return null
   }
 
-  addNetStatsToReport() {
+  addNetStatsToReport(): void {
     const stats = this.getShardusNetReport()
     if (stats != null) {
       this.addToReport('NetStats', 'stats', 'stats', (JSON.stringify(stats, null, 4), 1))

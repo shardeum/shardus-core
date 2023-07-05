@@ -83,13 +83,13 @@ class Deprecated {
   }
 
   //NOT used but seem possibly usefull...
-  purgeTransactionData() {
+  purgeTransactionData(): void {
     const tsStart = 0
     const tsEnd = 0
     this.storage.clearAcceptedTX(tsStart, tsEnd)
   }
 
-  purgeStateTableData() {
+  purgeStateTableData(): void {
     // do this by timestamp maybe..
     // this happnes on a slower scale.
     const tsEnd = 0 // todo get newest time to keep
@@ -106,7 +106,7 @@ class Deprecated {
    *    ##     ## ##     ## ##    ## ########  ######## ######## ##     ##  ######
    */
 
-  setupHandlers() {
+  setupHandlers(): void {
     // // /get_account_data (Acc_start, Acc_end)
     // // Acc_start - get data for accounts starting with this account id; inclusive
     // // Acc_end - get data for accounts up to this account id; inclusive
