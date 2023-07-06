@@ -262,7 +262,7 @@ export interface App {
 
   calculateAccountHash: (account: unknown) => string
 
-  setAccountData: (accountRecords: unknown[]) => void
+  setAccountData: (accountRecords: unknown[]) => Promise<void>
 
   resetAccountData: (accountRecords: unknown[]) => void
 
@@ -270,7 +270,7 @@ export interface App {
 
   getAccountDataByList: (addressList: string[]) => Promise<WrappedData[]>
 
-  deleteLocalAccountData: () => void
+  deleteLocalAccountData: () => Promise<void>
 
   getAccountDebugValue: (wrappedAccount: WrappedData) => string
 

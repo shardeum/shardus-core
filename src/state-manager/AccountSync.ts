@@ -497,7 +497,7 @@ class AccountSync {
 
     //not great, but this currently triggers the storage init in the dapp
     //todo: replace with a specific   initDappStorage() function
-    this.app.deleteLocalAccountData()
+    await this.app.deleteLocalAccountData()
 
     // Dont sync if first node
     if (this.p2p.isFirstSeed || safetyMode) {
@@ -545,7 +545,7 @@ class AccountSync {
     /* prettier-ignore */ console.log(`DATASYNC: initialSyncMain start time: ${Date.now()}`)
     // delete and re-create some tables before we sync:
     await this.storage.clearAppRelatedState()
-    this.app.deleteLocalAccountData()
+    await this.app.deleteLocalAccountData()
 
     /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: starting initialSyncMain`)
 
