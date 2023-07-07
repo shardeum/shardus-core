@@ -149,7 +149,10 @@ class Crypto {
    * @param recipientCurvePk
    * @returns
    */
-  tagWithSize<T>(obj: T, recipientCurvePk: crypto.curvePublicKey): T & { msgSize: number } & crypto.TaggedObject {
+  tagWithSize<T>(
+    obj: T,
+    recipientCurvePk: crypto.curvePublicKey
+  ): T & { msgSize: number } & crypto.TaggedObject {
     const strEncoded = crypto.stringify(obj)
     const msgSize = strEncoded.length //get the message size
     const objCopy = JSON.parse(strEncoded)
@@ -161,12 +164,21 @@ class Crypto {
 
   signWithSize<T>(obj: T): T & crypto.SignedObject {
     const wrappedMsgStr = crypto.stringify(obj)
-    const msgLength = wrappedMsgStr.length;
-    const newObj = {
-      ...obj,
-      msgSize: msgLength
-    };
-    return this.sign(newObj)
+    const msgLength = wrappedMsgStr.length
+    // What the linter wants:
+    // const newObj = {
+    //   ...obj,
+    //   msgSize: msgLength
+    // };
+    // return this.sign(newObj)
+
+    // Need to force this through TS compiler.
+    // This code gets called a lot and we should not saturate the garbage collector to make
+    // the compiler happy.
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    //@ts-ignore
+    obj.msgSize = msgLength
+    return this.sign(obj)
   }
 
   authenticate(obj: crypto.TaggedObject, senderCurvePk: crypto.curvePublicKey): boolean {
