@@ -1,23 +1,70 @@
+# Define cache settings
 cache:
+  key: ${CI_COMMIT_REF_SLUG}
   paths:
-  - node_modules/
+    - node_modules/
 
+# Define default image for all jobs
+image: registry.gitlab.com/shardus/dev-container
+
+# Define stages for the pipeline
 stages:
+  - prepare
+  - build
   - check
 
+# Prepare job: Install Node.js dependencies
+prepare-job:
+  stage: prepare
+  script:
+    - npm ci # Install Node.js dependencies
+
+# Common configuration for jobs
+.common-job-template: &common-job-template
+  before_script:
+    - node -v
+    - rustc --version
+
+# Lint job: Run ESLint for code linting
+lint-job:
+  <<: *common-job-template
+  stage: build
+  needs: ['prepare-job']
+  script:
+    - echo "Running ESLint..."
+    - npm run lint
+    - echo "Running ESLint complete."
+
+# Format Checker Job: Runs a code formatter (commented out for now)
+# format-checker-job:
+#   <<: *common-job-template
+#   stage: build
+#   needs: ['prepare-job']
+#   script:
+#     - echo "Running code formatter..."
+#     - npm run format-check
+#     - echo "Code formatting complete."
+
+# Build job: Build the code
+build-job:
+  <<: *common-job-template
+  stage: build
+  needs: ['lint-job']
+  script:
+    - echo "Compiling the code..."
+    - npm run prepare
+    - echo "Compile complete."
+  artifacts:
+    paths:
+      - build/
+
+# Check stage: Perform code checks and tests
 check:
-  image: node:16.11.1
+  <<: *common-job-template
   stage: check
+  needs: ['build-job']
   variables:
     NODE_ENV: test
-  before_script:
-    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_install.sh
-    - chmod 777 rustup_install.sh
-    - ./rustup_install.sh -y
-    - source $HOME/.cargo/env
-    - npm ci
   script:
-    - npm run depcheck
-    - npm run compile
+    - npm run depcheck # Check dependencies
     - npm run test
-

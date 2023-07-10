@@ -28,6 +28,7 @@
     "prep": "npm run create:folders",
     "np": "np --any-branch --no-cleanup --no-tests --no-yarn --message=\"Bump version to %s\"",
     "compile": "npm-run-all compile:*",
+    "prepare": "npm run compile",
     "release:move": "npm-run-all release:move:*",
     "build:dev": "npm-run-all clean compile:ts dev:move",
     "build:release": "npm-run-all clean prep compile release:move",
@@ -36,7 +37,8 @@
     "fix": "gts fix",
     "test": "jest",
     "test-watch": "jest --watch",
-    "depcheck": "depcheck --skip-missing --ignores webpack,webpack-cli,prettier,typescript-eslint,typescript-estree"
+    "depcheck": "depcheck --skip-missing --ignores webpack,webpack-cli,prettier,typescript-eslint,typescript-estree",
+    "format-check": "prettier --check './src/**/*.ts'"
   },
   "repository": {
     "type": "git",
@@ -99,6 +101,7 @@
     "typescript-estree": "^18.1.0",
     "webpack": "^5.68.0",
     "webpack-cli": "^4.9.2",
-    "webpack-node-externals": "^1.7.2"
+    "webpack-node-externals": "^1.7.2",
+    "gts": "^3.1.1"
   }
 }
