@@ -6,7 +6,7 @@ import { Model, ModelCtor, Sequelize } from 'sequelize'
 import Profiler from '../utils/profiler'
 import Logger from '../logger'
 import { ModelAttributes } from '.'
-import { Where } from 'sequelize/types/utils'
+import { Where } from 'sequelize/types/lib/utils'
 
 interface SequelizeStorage {
   baseDir: string
@@ -91,7 +91,7 @@ class SequelizeStorage {
     where: Where,
     opts: { [key: string]: unknown }
   ): Promise<[affectedCount: number]> {
-    return table.update(values, { where, ...opts })
+    return table.update(values, { where, ...opts })[0]
   }
   _delete(
     table: ModelCtor<Model<unknown, unknown>>,
