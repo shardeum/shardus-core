@@ -44,6 +44,7 @@ The existing join code is in the repository "shardus-global-server", aka "Shardu
     - if otherNode validates
       - reachability with `isPortReachable()`
       - and joiningNode is not already in `pendingJoinRequestList`, `standByNodes` or active nodes
+      - and joiningNode is validated (by Shardeum) to ensure that the node has staked properly
     - then
       - otherNode gossips the join request
       - otherNode adds newNode to a new `pendingJoinRequestList` in the cycle record
@@ -52,26 +53,18 @@ The existing join code is in the repository "shardus-global-server", aka "Shardu
       - otherNode returns error
       - joiningNode fails
 
+## Gossiping the join
+
 - Nodes receiving the gossip for a node to join, add the node to `pendingJoinRequestList`
-
-- to-do: should the following happen as the node moves from standby to active?
-- The join request is validated (by Shardeum) to ensure that the node has staked properly.
-
 - In subsequent cycles, nodes in `pendingJoinRequestList` are moved over to a new `NodeList.standbyNodeByPublicKey`
-
 - Active nodes check to make sure the standby node is reachable, then gossip the join request to all nodes in the network.
   - There is already such a check in `Lost.ts`, invoking `isPortReachable` for both external and external ip:port.
-
-- All nodes that submitted a valid join request are added as “standby” nodes in the next cycle record.
-  - If a node is not already in `standbyNodeByPublicKey`, gossip it to the entire network.
-- On redundant join request (node is already standby or active), ignore the request
 - On each cycle the active nodes decide how many nodes to add (already implemented).
 - On each cycle the needed number of nodes N are selected from the standby node list based on a deterministic-but-unpredictable score that is a function of the node public key and the current cycle marker.
 - The N nodes with the best score are added as joining nodes to the next cycle record.
 - When a node is selected to join, some active nodes in the network send the cycle number to the selected node; letting it know that it has been selected.
-  - to-do: need more info about this. which ones send? luckyNode, check if you are in that, if so, then you are lucky and you send the cycle number to the joining node
 - The selected standby node queries one of the active nodes for this cycle record and verifies that it is included as a joining node in the cycle record.
-  - robustQuery to ask if this node is in the `joined`
+  - robustQuery to ask if this node is in the `pendingJoinRequestList`
 
 ## Unjoining
 
@@ -91,7 +84,7 @@ The following is not part of the join protocol, but included to be informative:
 - If the node does not join and sync in sufficient time then it can be removed from the network.
 - The application will be notified of nodes which are lost or do not sync in time and can choose to slash them. This will be implemented separately as another protocol.
 - `NodeList.byJoinOrder` has both syncing and active nodes.
-- Active nodes in the network score each join request based on the public key in the join request and the current cycle marker; this makes the score deterministic but unpredictable (to-do: already implemented correct?)
+- Active nodes in the network score each join request based on the public key in the join request and the current cycle marker; this makes the score deterministic but unpredictable.
 
 The state of a node goes through these states:
 
@@ -102,8 +95,6 @@ The state of a node goes through these states:
 - Stand-by in the next cycle record
 - Syncing
 - Active - these nodes participate including validation, providing the node list, etc.
-
-to-do: validate the above states
 
 ## Implementation Phases
 
