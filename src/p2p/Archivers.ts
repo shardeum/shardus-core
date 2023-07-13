@@ -44,7 +44,6 @@ let networkCheckInterval: Timeout | null = null
 let networkCheckInProgress = false
 export let connectedSockets = {}
 let lastSentCycle = -1
-let maxArchiversSupport = 2 // Make this as part of the network config
 
 export enum DataRequestTypes {
   SUBSCRIBE = 'SUBSCRIBE',
@@ -763,7 +762,7 @@ export function registerRoutes() {
           removeArchiverConnection(dataRequest.nodeInfo.publicKey)
           recipients.delete(dataRequest.nodeInfo.publicKey)
         }
-        if (recipients.size >= maxArchiversSupport) {
+        if (recipients.size >= config.p2p.maxArchiversSubscriptionPerNode) {
           const maxArchiversSupportErr = 'Max archivers support reached'
           warn(maxArchiversSupportErr)
           return res.json({ success: false, error: maxArchiversSupportErr })

@@ -390,7 +390,6 @@ class Shardus extends EventEmitter {
     try {
       this.io = (await this.network.setup(Network.ipInfo)) as SocketIO.Server
       Context.setIOContext(this.io)
-      let maxArchiversSupport = 2 // Make this as part of the network config
       this.io.on('connection', (socket: any) => {
         if (!Self || !Self.isActive) {
           if (!Self.allowConnectionToFirstNode) {
@@ -440,8 +439,9 @@ class Shardus extends EventEmitter {
                 Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
               }
             }
-            if (Object.keys(Archivers.connectedSockets).length >= maxArchiversSupport) {
-              console.log(`There are already ${maxArchiversSupport} archivers connected for data transfer!`)
+
+            if (Object.keys(Archivers.connectedSockets).length >= config.p2p.maxArchiversSubscriptionPerNode) {
+              console.log(`There are already ${config.p2p.maxArchiversSubscriptionPerNode} archivers connected for data transfer!`)
               socket.disconnect()
               return
             }

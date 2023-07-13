@@ -690,6 +690,8 @@ export interface ServerConfiguration {
     useLruCacheForSocketMgmt: boolean
     /** LRU cache size for socket connection mgmt in shardus/net. Is used only if `useLruCacheForSocketMgmt` is set to `true`. Default: 1000 */
     lruCacheSizeForSocketMgmt: number
+    /** A node can serve only X max archivers for data transfer and can refuse other archivers requests if it’s serving the max number */
+    maxArchiversSubscriptionPerNode: number
   }
   /** Server IP configuration */
   ip?: {
