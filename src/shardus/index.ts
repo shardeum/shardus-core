@@ -1906,6 +1906,9 @@ class Shardus extends EventEmitter {
       if (typeof application.signAppData === 'function') {
         applicationInterfaceImpl.signAppData = application.signAppData
       }
+      if (typeof application.beforeStateAccountFilter === 'function') {
+        applicationInterfaceImpl.beforeStateAccountFilter = application.beforeStateAccountFilter
+      }
     } catch (ex) {
       this.shardus_fatal(
         `getAppInterface_ex`,

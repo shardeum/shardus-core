@@ -4819,21 +4819,28 @@ class TransactionQueue {
       } as unknown as AcceptedTx,
       cycle: queueEntry.cycleToRecordOn,
       result: { txIdShort, txResult },
+      beforeStateAccounts: [],
       accounts: [],
       receipt: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
     }
 
-    let accountsToAdd: WrappedResponses = {}
+    const accountsToAdd: WrappedResponses = {}
+    const beforeAccountsToAdd: WrappedResponses = {}
 
-    if (!this.stateManager.useAccountWritesOnly) {
+    if (this.config.stateManager.includeBeforeStatesInReceipts) {
       for (const account of Object.values(queueEntry.collectedData)) {
-        const accountCopy = {
-          accountId: account.accountId,
-          data: account.data,
-          timestamp: account.timestamp,
-          stateId: account.stateId,
-        } as Shardus.WrappedResponse
-        accountsToAdd[account.accountId] = accountCopy
+        if (
+          typeof this.app.beforeStateAccountFilter !== 'function' ||
+          this.app.beforeStateAccountFilter(account)
+        ) {
+          const accountCopy = {
+            accountId: account.accountId,
+            data: account.data,
+            timestamp: account.timestamp,
+            stateId: account.stateId,
+          } as Shardus.WrappedResponse
+          beforeAccountsToAdd[account.accountId] = accountCopy
+        }
       }
     }
 
@@ -4842,7 +4849,6 @@ class TransactionQueue {
       queueEntry.preApplyTXResult.applyResponse.accountWrites != null &&
       queueEntry.preApplyTXResult.applyResponse.accountWrites.length > 0
     ) {
-      accountsToAdd = {}
       for (const account of queueEntry.preApplyTXResult.applyResponse.accountWrites) {
         accountsToAdd[account.accountId] = {
           accountId: account.accountId,
@@ -4854,6 +4860,7 @@ class TransactionQueue {
     }
 
     txReceiptToPass.accounts = [...Object.values(accountsToAdd)]
+    txReceiptToPass.beforeStateAccounts = [...Object.values(beforeAccountsToAdd)]
     // console.log('acceptedTx', queueEntry.acceptedTx)
     // console.log('txReceiptToPass', txReceiptToPass.tx.txId, txReceiptToPass)
 

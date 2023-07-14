@@ -167,6 +167,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     apopFromStuckProcessing: false,
     discardVeryOldPendingTX: false,
     transactionApplyTimeout: -1, //ms for timeout. something like 7000 is a starting point. todo set to -1 before release
+    includeBeforeStatesInReceipts: false,
     fifoUnlockFix: true, //enabled for testing
     fifoUnlockFix2: false,
     fifoUnlockFix3: false,

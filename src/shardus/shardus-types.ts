@@ -300,6 +300,7 @@ export interface App {
   getNodeInfoAppData?: () => any
   signAppData?: (type: string, hash: string, nodesToSign: number, appData: any) => Promise<SignAppDataResult>
   updateNetworkChangeQueue?: (account: WrappedData, appData: any) => Promise<WrappedData[]>
+  beforeStateAccountFilter?: (account: WrappedData) => boolean
 }
 
 export interface TransactionKeys {
@@ -879,6 +880,8 @@ export interface ServerConfiguration {
     discardVeryOldPendingTX: boolean
     //** if the apply function is stuck for two long we can bypass it, this is a bandaid fix. */
     transactionApplyTimeout: number
+    //** Includes before states in the TX receipts for contract storage accounts */
+    includeBeforeStatesInReceipts: boolean
     //** fixes for where we unlock fifolocks. the sync code was doing brute force clear of fifolocks that could be the cause of lockups!   */
     fifoUnlockFix: boolean
     //** alternate fix for fifo fifolocks. related to the above fix.  but this one focus on avoiding calling clearSyncData in a potential problem spot   */
