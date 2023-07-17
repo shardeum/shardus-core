@@ -368,6 +368,18 @@ export function fastIsPicked(ourIndex: number, groupSize: number, numToPick: num
   return isPicked
 }
 
+//Write a function that uses fastIsPicked to return an arrray of all the indexes that are picked
+export function getIndexesPicked(groupSize: number, numToPick: number, offset = 0): number[] {
+  const indexesPicked = []
+  for (let i = 0; i < groupSize; i++) {
+    if (fastIsPicked(i, groupSize, numToPick, offset)) {
+      indexesPicked.push(i)
+    }
+  }
+  return indexesPicked
+}
+
+
 /**
  * Try to print a variety of possible erros for debug purposes
  * @param err

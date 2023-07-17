@@ -2372,11 +2372,12 @@ class AccountPatcher {
 
     /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, ` syncDepth:${this.treeSyncDepth} maxDepth :${this.treeMaxDepth}`)
 
+    // Update the trie with new account data updates since the last cycle
     const updateStats = this.upateShardTrie(cycle)
 
     /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `totalAccountsHashed`, updateStats.totalAccountsHashed)
 
-    //broadcast sync
+    //broadcast sync data to nodes that cover similar portions of the tree
     await this.broadcastSyncHashes(cycle)
   }
 
