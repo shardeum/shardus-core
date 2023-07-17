@@ -79,6 +79,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     uniqueRemovedIdsUpdate: false,
     useLruCacheForSocketMgmt: false,
     lruCacheSizeForSocketMgmt: 1000,
+    instantForwardReceipts: false,
     maxArchiversSubscriptionPerNode: 2,
   },
   ip: {

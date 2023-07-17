@@ -3,6 +3,7 @@ import StateManager from '.'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import { P2PModuleContext as P2P } from '../p2p/Context'
+import * as Archivers from '../p2p/Archivers'
 import * as Apoptosis from '../p2p/Apoptosis'
 import * as CycleChain from '../p2p/CycleChain'
 import { potentiallyRemoved } from '../p2p/NodeList'
@@ -78,6 +79,8 @@ class TransactionQueue {
   receiptsToForward: Receipt[]
   forwardedReceipts: Map<string, boolean>
   oldNotForwardedReceipts: Map<string, boolean>
+  receiptsBundleByInterval: Map<number, Receipt[]>
+  receiptsForwardedTimestamp: number
   lastReceiptForwardResetTimestamp: number
 
   queueStopped: boolean
@@ -165,6 +168,8 @@ class TransactionQueue {
     this.forwardedReceipts = new Map()
     this.oldNotForwardedReceipts = new Map()
     this.lastReceiptForwardResetTimestamp = Date.now()
+    this.receiptsBundleByInterval = new Map()
+    this.receiptsForwardedTimestamp = Date.now()
 
     this._transactionQueueByID = new Map()
     this.pendingTransactionQueueByID = new Map()
@@ -4855,7 +4860,12 @@ class TransactionQueue {
     // console.log('App Receipt', queueEntry.preApplyTXResult.applyResponse.appReceiptData)
     // console.log('App Receipt Data Hash', queueEntry.preApplyTXResult.applyResponse.appReceiptDataHash)
 
-    const signedTxReceiptToPass = this.crypto.sign(txReceiptToPass)
+    const signedTxReceiptToPass: any = this.crypto.sign(txReceiptToPass)
+
+    if (this.config.p2p.instantForwardReceipts) {
+      Archivers.instantForwardReceipts([signedTxReceiptToPass])
+      this.receiptsForwardedTimestamp = Date.now()
+    }
     this.receiptsToForward.push(signedTxReceiptToPass)
   }
 
@@ -4870,7 +4880,11 @@ class TransactionQueue {
   }
 
   resetReceiptsToForward(): void {
-    if (Date.now() - this.lastReceiptForwardResetTimestamp >= 30000) {
+    const RECEIPT_CLEANUP_INTERVAL_MS = 30000 // 30 seconds
+    if (
+      !this.config.p2p.instantForwardReceipts &&
+      Date.now() - this.lastReceiptForwardResetTimestamp >= RECEIPT_CLEANUP_INTERVAL_MS
+    ) {
       const lastReceiptsToForward = [...this.receiptsToForward]
       this.receiptsToForward = []
       for (const receipt of lastReceiptsToForward) {
@@ -4887,6 +4901,24 @@ class TransactionQueue {
       for (const receipt of this.receiptsToForward) {
         this.oldNotForwardedReceipts.set(receipt.tx.txId, true)
       }
+      this.lastReceiptForwardResetTimestamp = Date.now()
+    } else if (this.config.p2p.instantForwardReceipts) {
+      const lastReceiptsToForward = [...this.receiptsToForward]
+      this.receiptsToForward = []
+      // Save the receipts by the last 10 seconds, 20 seconds, and 30 seconds.
+      this.receiptsBundleByInterval.set(
+        Archivers.ReceiptsBundleByInterval['30SECS_DATA'],
+        this.receiptsBundleByInterval.get(Archivers.ReceiptsBundleByInterval['20SECS_DATA'])
+      )
+      this.receiptsBundleByInterval.set(
+        Archivers.ReceiptsBundleByInterval['20SECS_DATA'],
+        this.receiptsBundleByInterval.get(Archivers.ReceiptsBundleByInterval['10SECS_DATA'])
+      )
+      this.receiptsBundleByInterval.set(
+        Archivers.ReceiptsBundleByInterval['10SECS_DATA'],
+        lastReceiptsToForward
+      )
+      if (logFlags.console) console.log('receiptsBundleByInterval', this.receiptsBundleByInterval)
       this.lastReceiptForwardResetTimestamp = Date.now()
     }
   }

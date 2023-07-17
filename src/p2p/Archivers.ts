@@ -9,7 +9,7 @@ import {
   getSummaryBlob,
   getSummaryHashes,
 } from '../snapshot'
-import { shuffleMapIterator, validateTypes } from '../utils'
+import { shuffleMapIterator, sleep, validateTypes } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import * as Comms from './Comms'
@@ -44,10 +44,18 @@ let networkCheckInterval: Timeout | null = null
 let networkCheckInProgress = false
 export let connectedSockets = {}
 let lastSentCycle = -1
+let lastTimeForwardedArchivers = []
+export const RECEIPT_FORWARD_INTERVAL_MS = 10000
 
 export enum DataRequestTypes {
   SUBSCRIBE = 'SUBSCRIBE',
   UNSUBSCRIBE = 'UNSUBSCRIBE',
+}
+
+export enum ReceiptsBundleByInterval {
+  '30SECS_DATA',
+  '20SECS_DATA',
+  '10SECS_DATA',
 }
 
 // This is to check if the new archiver data subscriptions feature is activated in shardeum v1.1.3
@@ -70,7 +78,7 @@ export function init() {
   registerRoutes()
 
   if (config.p2p.experimentalSnapshot && !receiptForwardInterval) {
-    receiptForwardInterval = setInterval(forwardReceipts, 10000)
+    receiptForwardInterval = setInterval(forwardReceipts, RECEIPT_FORWARD_INTERVAL_MS)
   }
 
   if (config.p2p.checkNetworkStopped) {
@@ -363,9 +371,21 @@ async function forwardReceipts() {
 
   profilerInstance.scopedProfileSectionStart('forwardReceipts')
 
+  let pingNeeded = true
+  // Ping the archivers if the last ping/forward receipts was more than 5 seconds ago
+  const LEAST_LAST_PING_TIME_MS = 5000
+  if (
+    config.p2p.instantForwardReceipts &&
+    Date.now() - stateManager.transactionQueue.receiptsForwardedTimestamp < LEAST_LAST_PING_TIME_MS
+  ) {
+    pingNeeded = false
+  }
+
   // TODO: add a new type for receipt
   const responses: any = {}
-  responses.RECEIPT = stateManager.transactionQueue.getReceiptsToForward()
+  if (config.p2p.instantForwardReceipts)
+    responses.RECEIPT = [] // It's just to ping the archivers with empty receipts
+  else responses.RECEIPT = stateManager.transactionQueue.getReceiptsToForward()
   if (recipients.size > 0) {
     for (const receipt of responses.RECEIPT) {
       // console.log('forwarded receipt', receipt.tx.txId)
@@ -374,32 +394,105 @@ async function forwardReceipts() {
       }
     }
   }
+  const newArchiversToForward = []
+  const stillConnectedArchivers = []
   for (const [publicKey, recipient] of recipients) {
-    const dataResponse: P2P.ArchiversTypes.DataResponse = {
-      publicKey: crypto.getPublicKey(),
-      responses,
-      recipient: publicKey,
-    }
+    if (config.p2p.instantForwardReceipts)
+      if (!lastTimeForwardedArchivers.includes(publicKey)) {
+        newArchiversToForward.push(publicKey)
+      } else stillConnectedArchivers.push(publicKey)
+    if (pingNeeded) stateManager.transactionQueue.receiptsForwardedTimestamp = Date.now()
+    else continue
+    if (logFlags.console)
+      console.log('pingNeeded', pingNeeded, stateManager.transactionQueue.receiptsForwardedTimestamp)
+    forwardReceiptsData(responses, publicKey, recipient)
+  }
 
-    nestedCountersInstance.countEvent('Archiver', 'forwardReceipts', responses.RECEIPT.length)
-
-    // Tag dataResponse
-    const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
-    if (logFlags.console) console.log('Sending receipts to archivers', taggedDataResponse)
-    try {
-      if (io.sockets.sockets[connectedSockets[publicKey]]) {
-        if (logFlags.console)
-          console.log('forwarded Archiver', recipient.nodeInfo.ip + ':' + recipient.nodeInfo.port)
-        io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
-      } else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
-    } catch (e) {
-      error('Run into issue in forwarding receipts data', e)
+  if (config.p2p.instantForwardReceipts) {
+    if (newArchiversToForward.length > 0) {
+      if (logFlags.console) console.log('newArchiversToForward', newArchiversToForward)
+      // Send last 30s, 20s, 10s and fresh receipts to new subscribed archivers
+      const _30SECS__DATA = stateManager.transactionQueue.receiptsBundleByInterval.get(
+        ReceiptsBundleByInterval['30SECS_DATA']
+      ) // of last 30 seconds
+      const _20SECS__DATA = stateManager.transactionQueue.receiptsBundleByInterval.get(
+        ReceiptsBundleByInterval['20SECS_DATA']
+      ) // of last 20 seconds
+      const _10SECS__DATA = stateManager.transactionQueue.receiptsBundleByInterval.get(
+        ReceiptsBundleByInterval['10SECS_DATA']
+      ) // of last 10 seconds
+      const freshReceipts = [...stateManager.transactionQueue.receiptsToForward] // of new receipts
+      for (let publicKey of newArchiversToForward) {
+        if (logFlags.console) console.log('Sending last 30s receipts to new subscribed archivers', publicKey)
+        const recipient = recipients.get(publicKey)
+        if (!recipient) continue
+        const DELAY_BETWEEN_FORWARD_MS = 1000
+        if (_30SECS__DATA && _30SECS__DATA.length > 0) {
+          responses.RECEIPT = [..._30SECS__DATA]
+          forwardReceiptsData(responses, publicKey, recipient)
+        }
+        await sleep(DELAY_BETWEEN_FORWARD_MS)
+        if (_20SECS__DATA && _20SECS__DATA.length > 0) {
+          responses.RECEIPT = [..._20SECS__DATA]
+          forwardReceiptsData(responses, publicKey, recipient)
+        }
+        await sleep(DELAY_BETWEEN_FORWARD_MS)
+        if (_10SECS__DATA && _10SECS__DATA.length > 0) {
+          responses.RECEIPT = [..._10SECS__DATA]
+          forwardReceiptsData(responses, publicKey, recipient)
+        }
+        await sleep(DELAY_BETWEEN_FORWARD_MS)
+        if (freshReceipts && freshReceipts.length > 0) {
+          responses.RECEIPT = [...freshReceipts]
+          forwardReceiptsData(responses, publicKey, recipient)
+        }
+      }
     }
+    lastTimeForwardedArchivers = [...newArchiversToForward, ...stillConnectedArchivers]
+    if (logFlags.console) console.log('lastTimeForwardedArchivers', lastTimeForwardedArchivers)
   }
 
   stateManager.transactionQueue.resetReceiptsToForward()
 
   profilerInstance.scopedProfileSectionEnd('forwardReceipts')
+}
+
+async function forwardReceiptsData(responses, publicKey, recipient) {
+  if (logFlags.console) console.log('forwardReceiptsData', responses.RECEIPT.length)
+  const dataResponse: P2P.ArchiversTypes.DataResponse = {
+    publicKey: crypto.getPublicKey(),
+    responses,
+    recipient: publicKey,
+  }
+
+  nestedCountersInstance.countEvent('Archiver', 'forwardReceiptsData', responses.RECEIPT.length)
+
+  // Tag dataResponse
+  const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
+  if (logFlags.console) console.log('Sending receipts to archivers', taggedDataResponse)
+  try {
+    if (io.sockets.sockets[connectedSockets[publicKey]]) {
+      if (logFlags.console)
+        console.log('Forwarded Archiver', recipient.nodeInfo.ip + ':' + recipient.nodeInfo.port)
+      io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
+    } else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
+  } catch (e) {
+    error('Run into issue in forwarding receipts data', e)
+  }
+}
+
+export async function instantForwardReceipts(receipts) {
+  if (!config.p2p.experimentalSnapshot) return
+
+  profilerInstance.scopedProfileSectionStart('instantForwardReceipts')
+
+  // TODO: add a new type for receipt
+  const responses: any = {}
+  responses.RECEIPT = [...receipts]
+  for (const [publicKey, recipient] of recipients) {
+    forwardReceiptsData(responses, publicKey, recipient)
+  }
+  profilerInstance.scopedProfileSectionEnd('instantForwardReceipts')
 }
 
 /**
