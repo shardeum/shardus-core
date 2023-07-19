@@ -37,14 +37,15 @@ export function shardusFactory(configs = {}, opts?: { customStringifier?: (val: 
   if (error) {
     const fRed = '\x1b[31m' //fg red
     const bYellow = '\x1b[43m' //bg yellow
-    const defectiveObjectPath = `${fRed}${bYellow}${error.defectoChain.join('.')}\x1b[0m`
+    const defectiveObjectPath = error.defectiveChain.join('.')
+    const defectiveObjectPathColored = `${fRed}${bYellow}${defectiveObjectPath}\x1b[0m`
     const msg = `Unacceptable config object shape, defective settings detected: ${defectiveObjectPath}`
 
     console.log(
       '\x1b[1m', //bold, bright
       '\x1b[31m', //fg red
       'INVALID CONFIG OBJECT PROPERTY OR TYPE MISMATCH OCCURS:',
-      `${defectiveObjectPath}`
+      `${defectiveObjectPathColored}`
     )
     console.log(
       '\x1b[36m', //cyan

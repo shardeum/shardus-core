@@ -264,7 +264,7 @@ export function generateArraySchema(arr: unknown[], options = { diversity: false
 export function compareObjectShape(
   idol,
   admirer
-): { isValid: true; error?: { defectoChain: string[]; defectiveProp: { [x: string]: object } } } {
+): { isValid: true; error?: { defectoChain: string[]; defectiveChain: Array<string> } } {
   let isValid
   let error = undefined
   const defectoChain = []
