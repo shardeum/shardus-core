@@ -1892,9 +1892,6 @@ class Shardus extends EventEmitter {
           account: ShardusTypes.WrappedData,
           appData: any
         ) => application.updateNetworkChangeQueue(account, appData)
-      } else {
-        // If the app doesn't provide isReadyToJoin, assume it is always ready to join
-        applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes) => true
       }
       if (typeof application.signAppData === 'function') {
         applicationInterfaceImpl.signAppData = application.signAppData
