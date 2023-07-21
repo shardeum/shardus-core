@@ -1,4 +1,4 @@
-import { Ordering } from ".."
+import { Ordering } from '..'
 
 export const deepCopy = <T>(obj: T): T => {
   if (typeof obj !== 'object') {
@@ -414,4 +414,16 @@ export function formatErrorMessage(err: unknown): string {
   }
 
   return errMsg
+}
+
+/**
+ * checks if a hex-string is a valid shardus address by
+ * checking if it's 64 chars long & 32-bytes in size
+ */
+export function isValidShardusAddress(hexStrings: string[]): boolean {
+  for (let i = 0; i < hexStrings.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection
+    if (!(hexStrings[i].length === 64) || !(Buffer.from(hexStrings[i], 'hex').length === 32)) return false
+  }
+  return true
 }

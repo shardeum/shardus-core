@@ -130,6 +130,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     sanitizeInput: false,
     checkTxGroupChanges: true,
     ignoreTimeCheck: false,
+    checkAddressFormat: false
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {

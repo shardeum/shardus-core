@@ -33,7 +33,7 @@ import { DebugComplete } from '../state-manager/TransactionQueue'
 import Statistics from '../statistics'
 import Storage from '../storage'
 import * as utils from '../utils'
-import { groupResolvePromises, inRangeOfCurrentTime } from '../utils'
+import { groupResolvePromises, inRangeOfCurrentTime, isValidShardusAddress } from '../utils'
 import MemoryReporting from '../utils/memoryReporting'
 import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
@@ -1059,6 +1059,16 @@ class Shardus extends EventEmitter {
       const { timestamp, id, keys, shardusMemoryPatterns } = this.app.crack(timestampedTx, appData)
       // console.log('app.crack results', timestamp, id, keys)
 
+      // Validate the transaction's sourceKeys & targetKeys
+      if (this.config.debug.checkAddressFormat && !isValidShardusAddress(keys.allKeys)) {
+        this.shardus_fatal(
+          `put_invalidAddress`,
+          `Invalid Shardus Address found: allKeys:${keys.allKeys} ${utils.stringifyReduce(tx)}`
+        )
+        this.statistics.incrementCounter('txRejected')
+        nestedCountersInstance.countEvent('rejected', '_hasInvalidShardusAddresses')
+        return { success: false, reason: 'Invalid Shardus Addresses', status: 400 }
+      }
       // Validate the transaction timestamp
       let txExpireTimeMs = this.config.transactionExpireTime * 1000
 

@@ -796,6 +796,8 @@ export interface ServerConfiguration {
     checkTxGroupChanges: boolean
     /** Flag to toggle startup check that makes sure system time is within acceptable range of time from NTP Server */
     ignoreTimeCheck: boolean
+    /** Flag to toggle Shardus address format verification, checks if an address is 32-bytes in size & 64 chars long */
+    checkAddressFormat: boolean
   }
   /** Options for the statistics module */
   statistics?: {
