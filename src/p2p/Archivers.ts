@@ -13,6 +13,8 @@ import { shuffleMapIterator, validateTypes } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import * as Comms from './Comms'
+import * as Context from './Context'
+import { isInvalidIP, isBogonIP } from '../utils/functions/checkIP'
 import { config, crypto, io, logger, network, stateManager } from './Context'
 import { computeCycleMarker, getCycleChain } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
@@ -223,6 +225,12 @@ export function addArchiverJoinRequest(joinRequest: P2P.ArchiversTypes.Request, 
     warn('addJoinRequest: This archiver join request already exists')
     return { success: false, reason: 'This archiver join request already exists' }
   }
+  if (Context.config.p2p.forceBogonFilteringOn) {
+    if (isBogonIP(joinRequest.nodeInfo.ip)) {
+      warn('addJoinRequest: This archiver join request uses a bogon IP')
+      return { success: false, reason: 'This archiver join request is a bogon IP' } 
+    } 
+  } 
   joinRequests.push(joinRequest)
   if (logFlags.console)
     console.log(

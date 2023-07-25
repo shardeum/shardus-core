@@ -37,7 +37,7 @@
     "fix": "gts fix",
     "test": "jest",
     "test-watch": "jest --watch",
-    "depcheck": "depcheck --skip-missing --ignores webpack,webpack-cli,prettier,typescript-eslint,typescript-estree",
+    "depcheck": "depcheck --skip-missing --ignores webpack,webpack-cli,prettier,typescript-eslint,typescript-estree,@mapbox/node-pre-gyp,@types/estree",
     "format-check": "prettier --check './src/**/*.ts'"
   },
   "repository": {

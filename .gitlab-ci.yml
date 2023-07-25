@@ -5,53 +5,41 @@ cache:
     - node_modules/
 
 # Define default image for all jobs
-image: registry.gitlab.com/shardus/dev-container
+image: 'registry.gitlab.com/shardus/dev-container:latest_node18'
 
 # Define stages for the pipeline
 stages:
   - prepare
-  - build
-  - check
+  - build_and_lint_and_check
 
 # Prepare job: Install Node.js dependencies
 prepare-job:
   stage: prepare
   script:
-    - apt-get update    #added here as best post merge guess
-    - apt-get install -y python-is-python3  #added here as best post merge guess
-    - npm ci # Install Node.js dependencies
+    - node -v
+    - apt-get update
+    - npm ci  #install Node.js dependencies
 
 # Common configuration for jobs
 .common-job-template: &common-job-template
   before_script:
     - node -v
-    - rustc --version
 
 # Lint job: Run ESLint for code linting
 lint-job:
   <<: *common-job-template
-  stage: build
+  stage: build_and_lint_and_check
   needs: ['prepare-job']
   script:
     - echo "Running ESLint..."
     - npm run lint
     - echo "Running ESLint complete."
 
-# Format Checker Job: Runs a code formatter (commented out for now)
-# format-checker-job:
-#   <<: *common-job-template
-#   stage: build
-#   needs: ['prepare-job']
-#   script:
-#     - echo "Running code formatter..."
-#     - npm run format-check
-#     - echo "Code formatting complete."
-
 # Build job: Build the code
 build-job:
   <<: *common-job-template
-  stage: build
-  needs: ['lint-job']
+  stage: build_and_lint_and_check
+  needs: ['prepare-job']  
   script:
     - echo "Compiling the code..."
     - npm run prepare
@@ -61,13 +49,12 @@ build-job:
       - build/
 
 # Check stage: Perform code checks and tests
-check:
-  image: node:16.11.1
-  stage: check
-  needs: ['build-job']
+depcheck-job:
+  stage: build_and_lint_and_check
+  needs: ['prepare-job']
   variables:
     NODE_ENV: test
 
   script:
-    - npm run depcheck # Check dependencies
+    - npm run depcheck # analyze dependencies and identify unused or outdated packages.
     - npm run test
