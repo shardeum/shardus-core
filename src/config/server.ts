@@ -13,7 +13,12 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     },
   },
   p2p: {
-    ipServers: ['https://ipapi.co/json', 'https://ifconfig.co/json', 'https://ipinfo.io/json', 'api.ipify.org/?format=json'],
+    ipServers: [
+      'https://ipapi.co/json',
+      'https://ifconfig.co/json',
+      'https://ipinfo.io/json',
+      'api.ipify.org/?format=json',
+    ],
     timeServers: ['0.pool.ntp.org', '1.pool.ntp.org', '2.pool.ntp.org', '3.pool.ntp.org'],
     existingArchivers: [
       {
@@ -130,7 +135,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     sanitizeInput: false,
     checkTxGroupChanges: true,
     ignoreTimeCheck: false,
-    checkAddressFormat: false
+    checkAddressFormat: false,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {
@@ -171,6 +176,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     fifoUnlockFix: true, //enabled for testing
     fifoUnlockFix2: false,
     fifoUnlockFix3: false,
+    enableAccountFetchForQueueCounts: false,
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

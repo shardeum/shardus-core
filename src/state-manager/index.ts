@@ -1378,7 +1378,6 @@ class StateManager {
 
           if (wrappedStates != null) {
             for (const [key, accountData] of Object.entries(wrappedStates)) {
-
               if (payload.key !== accountData.accountId) {
                 continue //not this account.
               }
@@ -1494,7 +1493,13 @@ class StateManager {
     //this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
     this.p2p.registerInternal(
       'spread_appliedVote',
-      async (payload: AppliedVote, _respond: unknown, _sender: unknown, _tracker: string, msgSize: number) => {
+      async (
+        payload: AppliedVote,
+        _respond: unknown,
+        _sender: unknown,
+        _tracker: string,
+        msgSize: number
+      ) => {
         profilerInstance.scopedProfileSectionStart('spread_appliedVote', false, msgSize)
         try {
           const queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
@@ -1516,7 +1521,13 @@ class StateManager {
 
     this.p2p.registerInternal(
       'spread_appliedVoteHash',
-      async (payload: AppliedVoteHash, _respond: unknown, _sender: unknown, _tracker: string, msgSize: number) => {
+      async (
+        payload: AppliedVoteHash,
+        _respond: unknown,
+        _sender: unknown,
+        _tracker: string,
+        msgSize: number
+      ) => {
         profilerInstance.scopedProfileSectionStart('spread_appliedVoteHash', false, msgSize)
         try {
           const queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
@@ -1599,9 +1610,11 @@ class StateManager {
             const { count, committingAppData } = this.transactionQueue.getAccountQueueCount(address, true)
             result.counts.push(count)
             result.committingAppData.push(committingAppData)
-            const currentAccountData = await this.getLocalOrRemoteAccount(address)
-            if (currentAccountData && currentAccountData.data) {
-              result.accounts.push(currentAccountData.data)
+            if (this.config.stateManager.enableAccountFetchForQueueCounts) {
+              const currentAccountData = await this.getLocalOrRemoteAccount(address)
+              if (currentAccountData && currentAccountData.data) {
+                result.accounts.push(currentAccountData.data)
+              }
             }
           }
 
@@ -2049,7 +2062,9 @@ class StateManager {
         if (result != null && result.counts != null && result.counts.length > 0) {
           count = result.counts[0]
           committingAppData = result.committingAppData[0]
-          account =  result.accounts[0]
+          if (this.config.stateManager.enableAccountFetchForQueueCounts) {
+            account = result.accounts[0]
+          }
           success = true
           /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts response: ${count} address:${utils.stringifyReduce(address)}`)
         } else {
@@ -2068,9 +2083,11 @@ class StateManager {
       const queueCountResult = this.transactionQueue.getAccountQueueCount(address)
       count = queueCountResult.count
       committingAppData = queueCountResult.committingAppData
-      const currentAccountData = await this.getLocalOrRemoteAccount(address)
-      if (currentAccountData)  {
-        account = currentAccountData.data
+      if (this.config.stateManager.enableAccountFetchForQueueCounts) {
+        const currentAccountData = await this.getLocalOrRemoteAccount(address)
+        if (currentAccountData) {
+          account = currentAccountData.data
+        }
       }
       /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts local: ${count} address:${utils.stringifyReduce(address)}`)
     }
@@ -2386,10 +2403,7 @@ class StateManager {
     // This ordering can be vitally important for things like a contract account that requires contract storage to be saved first
     // note that the wrapped data passed in alread had accountWrites merged in
     const appOrderedKeys = []
-    if (
-      applyResponse?.accountWrites?.length != null &&
-      applyResponse.accountWrites.length > 0
-    ) {
+    if (applyResponse?.accountWrites?.length != null && applyResponse.accountWrites.length > 0) {
       for (const wrappedAccount of applyResponse.accountWrites) {
         appOrderedKeys.push(wrappedAccount.accountId)
       }

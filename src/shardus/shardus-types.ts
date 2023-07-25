@@ -888,6 +888,8 @@ export interface ServerConfiguration {
     fifoUnlockFix2: boolean
     //** alternate fix for fifo fifolocks. disable all fifo lock logic.  the atomic option */
     fifoUnlockFix3: boolean
+    //** enable account fetch for queue counts.  the extra fetching could cause too much latency so we want the option to control it for testing first */
+    enableAccountFetchForQueueCounts: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
