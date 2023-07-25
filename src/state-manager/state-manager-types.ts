@@ -728,8 +728,9 @@ export type RequestAccountQueueCounts = { accountIds: string[] }
 export type QueueCountsResponse = {
   counts: number[]
   committingAppData: QueueEntry['acceptedTx']['appData'][]
+  accounts: any[]
 }
-export type QueueCountsResult = { count: number; committingAppData: Shardus.AcceptedTx['appData'] }
+export type QueueCountsResult = { count: number; committingAppData: Shardus.AcceptedTx['appData'], account?: any }
 
 export type GlobalAccountReportResp = {
   ready: boolean

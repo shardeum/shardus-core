@@ -1591,13 +1591,18 @@ class StateManager {
         msgSize: number
       ) => {
         profilerInstance.scopedProfileSectionStart('get_account_queue_count', false, msgSize)
+
         let responseSize = cUninitializedSize
         try {
-          const result: QueueCountsResponse = { counts: [], committingAppData: [] }
+          const result: QueueCountsResponse = { counts: [], committingAppData: [], accounts: [] }
           for (const address of payload.accountIds) {
             const { count, committingAppData } = this.transactionQueue.getAccountQueueCount(address, true)
             result.counts.push(count)
             result.committingAppData.push(committingAppData)
+            const currentAccountData = await this.getLocalOrRemoteAccount(address)
+            if (currentAccountData && currentAccountData.data) {
+              result.accounts.push(currentAccountData.data)
+            }
           }
 
           responseSize = await respond(result)
@@ -1978,6 +1983,7 @@ class StateManager {
   async getLocalOrRemoteAccountQueueCount(address: string): Promise<QueueCountsResult> {
     let count: number
     let committingAppData: unknown
+    let account: unknown
     if (this.currentCycleShardData == null) {
       await this.waitForShardData()
     }
@@ -2043,6 +2049,7 @@ class StateManager {
         if (result != null && result.counts != null && result.counts.length > 0) {
           count = result.counts[0]
           committingAppData = result.committingAppData[0]
+          account =  result.accounts[0]
           success = true
           /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts response: ${count} address:${utils.stringifyReduce(address)}`)
         } else {
@@ -2061,10 +2068,14 @@ class StateManager {
       const queueCountResult = this.transactionQueue.getAccountQueueCount(address)
       count = queueCountResult.count
       committingAppData = queueCountResult.committingAppData
+      const currentAccountData = await this.getLocalOrRemoteAccount(address)
+      if (currentAccountData)  {
+        account = currentAccountData.data
+      }
       /* prettier-ignore */ if (logFlags.verbose) console.log(`queue counts local: ${count} address:${utils.stringifyReduce(address)}`)
     }
 
-    return { count, committingAppData }
+    return { count, committingAppData, account }
   }
 
   // todo support metadata so we can serve up only a portion of the account
