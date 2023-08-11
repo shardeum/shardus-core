@@ -239,9 +239,26 @@ export function addArchiverJoinRequest(joinRequest: P2P.ArchiversTypes.Request, 
   if (Context.config.p2p.forceBogonFilteringOn) {
     if (isBogonIP(joinRequest.nodeInfo.ip)) {
       warn('addJoinRequest: This archiver join request uses a bogon IP')
-      return { success: false, reason: 'This archiver join request is a bogon IP' } 
-    } 
-  } 
+      return { success: false, reason: 'This archiver join request is a bogon IP' }
+    }
+  }
+
+  if (archivers.size > 0) {
+    // Get the consensus radius of the network
+    try {
+      const {
+        shardGlobals: { consensusRadius },
+      } = Context.stateManager.getCurrentCycleShardData()
+      if (archivers.size >= consensusRadius * config.p2p.maxArchiversSubscriptionPerNode) {
+        warn('addJoinRequest: This archiver cannot join as max archivers limit has been reached')
+        return { success: false, reason: 'Max number of archivers limit reached' }
+      }
+    } catch (e) {
+      warn('addJoinRequest: Failed to get consensus radius', e)
+      return { success: false, reason: 'This node is not ready to accept this request!' }
+    }
+  }
+
   joinRequests.push(joinRequest)
   if (logFlags.console)
     console.log(
