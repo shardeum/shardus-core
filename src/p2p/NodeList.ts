@@ -1,4 +1,4 @@
-import { stringify } from '@shardus/crypto-utils'
+import { hexstring, stringify } from '@shardus/crypto-utils'
 import { P2P } from '@shardus/types'
 import { Logger } from 'log4js'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
@@ -9,6 +9,9 @@ import { crypto, logger, network } from './Context'
 import * as CycleChain from './CycleChain'
 import * as Join from './Join'
 import { emitter, id } from './Self'
+import rfdc from 'rfdc'
+
+const clone = rfdc()
 
 /** STATE */
 
@@ -296,6 +299,35 @@ export function getAgeIndex(): { idx: number; total: number } {
     }
   }
   return { idx: -1, total: totalNodes }
+}
+
+/** Returns the validator list hash. It is a hash of the NodeList sorted by join order. This will also update the recorded `lastHashedList` of nodes, which can be retrieved via `getLastHashedNodeList`. */
+export function computeNewNodeListHash(): hexstring {
+  // set the lastHashedList to the current list by join order, then hash.
+  // deep cloning is necessary as validator information may be mutated by
+  // reference.
+  lastHashedList = clone(byJoinOrder)
+  info('hashing validator list:', JSON.stringify(lastHashedList))
+  let hash = crypto.hash(lastHashedList)
+  info('the new validator list hash is', hash)
+  return hash
+}
+
+/**
+ * Returns the validator list hash from the last complete cycle, if available. If you
+ * want to compute a new hash instead, use `computeNewNodeListHash`.
+ */
+export function getNodeListHash(): hexstring | undefined {
+  info('returning validator list hash:', CycleChain.newest?.nodeListHash)
+  return CycleChain.newest?.nodeListHash
+}
+
+let lastHashedList: P2P.NodeListTypes.Node[] = []
+
+/** Returns the last list of nodes that had its hash computed. */
+export function getLastHashedNodeList(): P2P.NodeListTypes.Node[] {
+    info('returning last hashed validator list:', JSON.stringify(lastHashedList))
+    return lastHashedList
 }
 
 /** ROUTES */

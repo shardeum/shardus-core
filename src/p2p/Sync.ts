@@ -5,6 +5,7 @@ import * as http from '../http'
 import { P2P } from '@shardus/types'
 import { reversed, validateTypes } from '../utils'
 import { config, logger, network } from './Context'
+import * as Archivers from './Archivers'
 import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import { ChangeSquasher, parse } from './CycleParser'
@@ -26,7 +27,7 @@ const newestCycleRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'sync-newest-cycle',
   handler: (_req, res) => {
     profilerInstance.scopedProfileSectionStart('sync-newest-cycle')
-    const newestCycle = CycleChain.newest ? CycleChain.newest : undefined
+    const newestCycle = CycleChain.newest || null
     res.json({ newestCycle })
     profilerInstance.scopedProfileSectionEnd('sync-newest-cycle')
   },
@@ -288,6 +289,10 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
 }
 
 export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
+  // get the node list hashes *before* applying node changes
+  cycle.nodeListHash = NodeList.computeNewNodeListHash()
+  cycle.archiverListHash = Archivers.computeNewArchiverListHash()
+
   const marker = CycleCreator.makeCycleMarker(cycle)
   if (CycleChain.cyclesByMarker[marker]) {
     warn(`Tried to digest cycle record twice: ${JSON.stringify(cycle)}\n` + `${new Error().stack}`)
@@ -296,6 +301,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
 
   const changes = parse(cycle)
   applyNodeListChange(changes, true, cycle)
+
   CycleChain.append(cycle)
 
   let nodeLimit = 2 //todo set this to a higher number, but for now I want to make sure it works in a small test
@@ -360,8 +366,8 @@ export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.Cycle
   console.log(`response is: ${JSON.stringify(response)}`)
 
   // [TODO] Validate response
-  if (!response) throw new Error('Bad response')
-  if (!response.newestCycle) throw new Error('Bad response')
+  if (!response) throw new Error('Bad response: no response')
+  if (!response.newestCycle) throw new Error('Bad response: no newestCycle')
 
   const newestCycle = response.newestCycle as P2P.CycleCreatorTypes.CycleRecord
   return newestCycle
@@ -597,17 +603,17 @@ function validateCycles(cycles: P2P.CycleCreatorTypes.CycleRecord[]) {
   return true
 }
 
-function info(...msg) {
+function info(...msg: unknown[]) {
   const entry = `Sync: ${msg.join(' ')}`
   p2pLogger.info(entry)
 }
 
-function warn(...msg) {
+function warn(...msg: unknown[]) {
   const entry = `Sync: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }
 
-function error(...msg) {
+function error(...msg: unknown[]) {
   const entry = `Sync: ${msg.join(' ')}`
   p2pLogger.error(entry)
 }

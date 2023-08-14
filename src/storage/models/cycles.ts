@@ -42,6 +42,8 @@ const cycles = [
     lost: { type: Sequelize.JSON, allowNull: false },
     lostSyncing: { type: Sequelize.JSON, allowNull: false },
     refuted: { type: Sequelize.JSON, allowNull: false },
+    nodeListHash: { type: Sequelize.TEXT, allowNull: false },
+    archiverListHash: { type: Sequelize.TEXT, allowNull: false },
     ...P2PApoptosis.sequelizeCycleFieldModel,
   },
 ]

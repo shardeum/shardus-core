@@ -86,6 +86,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     lruCacheSizeForSocketMgmt: 1000,
     instantForwardReceipts: false,
     maxArchiversSubscriptionPerNode: 2,
+    useSyncProtocolV2: process.env.NODE_ENV === 'test',
   },
   ip: {
     externalIp: '0.0.0.0',

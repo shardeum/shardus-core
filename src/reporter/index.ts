@@ -4,6 +4,7 @@ import Logger, { logFlags } from '../logger'
 import { ipInfo } from '../network'
 import { config, crypto } from '../p2p/Context'
 import * as Shardus from '../shardus/shardus-types'
+import * as Archivers from '../p2p/Archivers'
 import * as Context from '../p2p/Context'
 import { getDesiredCount, lastScalingType, requestedScalingType } from '../p2p/CycleAutoScale'
 import * as CycleChain from '../p2p/CycleChain'
@@ -201,7 +202,7 @@ class Reporter {
     }
   }
 
-  getAppData(): string {
+  getAppData(): unknown {
     if (typeof Context.shardus.app.getNodeInfoAppData === 'function') {
       const appData = Context.shardus.app.getNodeInfoAppData()
       return appData
@@ -241,9 +242,6 @@ class Reporter {
     const cycleMarker = CycleChain.newest.previous || '' // [TODO] Replace with cycle creator
     const cycleCounter = CycleChain.newest.counter
     const networkId = CycleChain.newest.networkId
-    let nodelistIDs = NodeList.activeByIdOrder.map((node) => node.id)
-    const nodelistHash = crypto.hash(nodelistIDs)
-    //const nodelistHash = crypto.hash(NodeList.byJoinOrder) //todo figure out what fields are off.
     const desiredNodes = getDesiredCount()
     const lastScalingTypeRequested = requestedScalingType
     const lastScalingTypeWinner = lastScalingType
@@ -314,6 +312,11 @@ class Reporter {
       }
     }
 
+    // try to re-use the hashes from the newest cycle. if they don't
+    // exist, compute them just-in-time
+    const nodelistHash = NodeList.getNodeListHash()
+    const archiverListHash = Archivers.getArchiverListHash()
+
     try {
       await this._sendReport({
         repairsStarted,
@@ -353,6 +356,7 @@ class Reporter {
         isRefuted: isNodeRefuted,
         shardusVersion: packageJson.version,
         appData,
+        archiverListHash,
       })
       if (this.stateManager != null && config.mode === 'debug' && !config.debug.disableTxCoverageReport) {
         this.stateManager.transactionQueue.resetTxCoverageMap()

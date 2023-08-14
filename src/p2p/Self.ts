@@ -1,6 +1,5 @@
-import { SignedObject } from '@shardus/crypto-utils'
 import { P2P } from '@shardus/types'
-import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
+import { NodeStatus, SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import * as events from 'events'
 import * as log4js from 'log4js'
 import * as http from '../http'
@@ -20,6 +19,8 @@ import * as GlobalAccounts from './GlobalAccounts'
 import * as Join from './Join'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
+import { getNewestCycle } from './Sync'
+import * as SyncV2 from './SyncV2/'
 
 /** STATE */
 
@@ -60,10 +61,15 @@ export function init(): void {
   // Init submodules
   Comms.init()
   Archivers.init()
-  Sync.init()
   CycleCreator.init()
   GlobalAccounts.init()
   NodeList.init()
+  Sync.init()
+
+  // initialize SyncV2 if enabled
+  if (Context.config.p2p.useSyncProtocolV2) {
+    SyncV2.init()
+  }
 
   // Create a logger for yourself
   p2pLogger = Context.logger.getLogger('p2p')
@@ -145,7 +151,7 @@ async function witnessConditionsMet(activeNodes: P2P.P2PTypes.Node[]): Promise<b
   try {
     // 1. node has old data
     if (snapshot.oldDataPath) {
-      const latestCycle = await Sync.getNewestCycle(activeNodes)
+      const latestCycle = await getNewestCycle(activeNodes)
       // 2. network is in safety mode
       if (latestCycle.safetyMode === true) {
         // 3. active nodes >= max nodes
@@ -270,7 +276,18 @@ async function syncCycleChain(): Promise<void> {
       }
 
       if (logFlags.p2pNonFatal) info('Attempting to sync to network...')
-      synced = await Sync.sync(activeNodes)
+      if (Context.config.p2p.useSyncProtocolV2) {
+        // attempt syncing with the v2 protocol and handle the result. the first
+        // callback will run if the result is `Ok`, the second if it is `Err`
+        await SyncV2.syncV2(activeNodes).match(
+          () => (synced = true),
+          (err) => {
+            throw err
+          }
+        )
+      } else {
+        synced = await Sync.sync(activeNodes)
+      }
     } catch (err) {
       synced = false
       warn(err)
@@ -285,7 +302,7 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
   const maxRetries = 3
   let retry = maxRetries
   const failArchivers: string[] = []
-  let archiver: P2P.P2PTypes.Node
+  let archiver: P2P.SyncTypes.ActiveNode
   let activeNodesSigned: SignedActiveNodesFromArchiver
 
   while (retry > 0) {
@@ -383,7 +400,7 @@ type SignedActiveNodesFromArchiver = P2P.P2PTypes.SignedObject & {
 }
 
 async function getActiveNodesFromArchiver(
-  archiver: P2P.P2PTypes.Node
+  archiver: P2P.SyncTypes.ActiveNode
 ): Promise<SignedActiveNodesFromArchiver> {
   const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
   const nodeInfo = getPublicNodeInfo()
@@ -411,10 +428,11 @@ async function getActiveNodesFromArchiver(
   return seedListSigned
 }
 
-export async function getFullNodesFromArchiver(): Promise<SignedObject> {
-  const archiver = Context.config.p2p.existingArchivers[0]
+export async function getFullNodesFromArchiver(
+  archiver: P2P.SyncTypes.ActiveNode = Context.config.p2p.existingArchivers[0]
+): Promise<SignedObject<{ nodeList: P2P.NodeListTypes.Node[] }>> {
   const nodeListUrl = `http://${archiver.ip}:${archiver.port}/full-nodelist`
-  let fullNodeList: SignedObject
+  let fullNodeList: SignedObject<{ nodeList: P2P.NodeListTypes.Node[] }>
   try {
     fullNodeList = await http.get(nodeListUrl)
   } catch (e) {

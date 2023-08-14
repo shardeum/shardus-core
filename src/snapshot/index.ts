@@ -8,7 +8,6 @@ import * as Context from '../p2p/Context'
 import * as CycleChain from '../p2p/CycleChain'
 import * as NodeList from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
-import * as Sync from '../p2p/Sync'
 import * as ShardusTypes from '../shardus/shardus-types'
 import ShardFunctions from '../state-manager/shardFunctions'
 import { Cycle, CycleShardData, MainHashResults } from '../state-manager/state-manager-types'
@@ -17,7 +16,7 @@ import * as utils from '../utils'
 import { profilerInstance } from '../utils/profiler'
 import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
-import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
+import { getNewestCycle } from '../p2p/Sync'
 
 console.log('StateManager', StateManager)
 console.log('StateManager type', StateManager.StateManagerTypes)
@@ -539,11 +538,11 @@ export async function startWitnessMode() {
   const witnessInterval = setInterval(async () => {
     try {
       const fullNodesSigned = await Self.getFullNodesFromArchiver()
-      if (!Context.crypto.verify(fullNodesSigned as unknown as SignedObject, archiver.publicKey)) {
+      if (!Context.crypto.verify(fullNodesSigned, archiver.publicKey)) {
         throw Error('Fatal: Full Node list was not signed by archiver!')
       }
       const nodeList = fullNodesSigned.nodeList
-      const newestCycle = await Sync.getNewestCycle(nodeList)
+      const newestCycle = await getNewestCycle(nodeList)
       const oldNetworkHash = await SnapshotFunctions.readOldNetworkHash()
 
       if (newestCycle.safetyMode === false || notNeededRepliedNodes.size >= nodeList.length) {
@@ -575,9 +574,11 @@ export async function startWitnessMode() {
         // send offer to each syncing + active nodes unless data is already offered
         for (let i = 0; i < nodeList.length; i++) {
           const node = nodeList[i]
+          const ip = 'ip' in node && node.ip || node.externalIp
+          const port = 'port' in node && node.port || node.externalIp
           if (!alreadyOfferedNodes.has(node.id)) {
             try {
-              log(`Sending witness offer to new node ${node.ip}:${node.port}`)
+              log(`Sending witness offer to new node ${ip}:${port}`)
               sendOfferToNode(node, offer)
               alreadyOfferedNodes.set(node.id, true)
             } catch (e) {

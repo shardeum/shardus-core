@@ -524,21 +524,22 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
 
   // Return if we already know about this node
   if (NodeList.byPubKey.has(joinRequest.nodeInfo.publicKey)) {
-    if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, already a known node.')
+    const message = 'Cannot add join request for this node, already a known node (by public key).'
+    if (logFlags.p2pNonFatal) warn(message)
     return {
       success: false,
-      reason: 'Cannot add join request for this node, already a known node.',
+      reason: message,
       fatal: false,
     }
   }
   const ipPort = NodeList.ipPort(node.internalIp, node.internalPort)
   if (NodeList.byIpPort.has(ipPort)) {
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Cannot add join request for this node, already a known node.', JSON.stringify(NodeList.byIpPort.get(ipPort)))
-    // const node = NodeList.byIpPort.get(ipPort)
+    const message = 'Cannot add join request for this node, already a known node (by IP address).'
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(message, JSON.stringify(NodeList.byIpPort.get(ipPort)))
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-already-known`)
     return {
       success: false,
-      reason: 'Cannot add join request for this node, already a known node.',
+      reason: message,
       fatal: true,
     }
   }
@@ -713,14 +714,14 @@ export async function submitJoin(
   })
 }
 
-export async function fetchJoined(activeNodes: unknown[]): Promise<string> {
-  const queryFn = async (node: { ip: string; port: number }): Promise<unknown> => {
+export async function fetchJoined(activeNodes: P2P.P2PTypes.Node[]): Promise<string> {
+  const queryFn = async (node: P2P.P2PTypes.Node): Promise<{ node: P2P.NodeListTypes.Node }> => {
     const publicKey = crypto.keypair.publicKey
-    const res = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
+    const res: { node: P2P.NodeListTypes.Node } = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
     return res
   }
   try {
-    const { topResult: response } = await robustQuery(activeNodes, queryFn)
+    const { topResult: response } = await robustQuery<P2P.P2PTypes.Node, { node: P2P.NodeListTypes.Node }>(activeNodes, queryFn)
     if (!response) return
     if (!response.node) return
     let err = utils.validateTypes(response, { node: 'o' })
@@ -733,8 +734,7 @@ export async function fetchJoined(activeNodes: unknown[]): Promise<string> {
       warn('fetchJoined invalid response response.node.id' + err)
       return
     }
-    const node = response.node as P2P.NodeListTypes.Node
-    return node.id
+    return response.node.id
   } catch (err) {
     warn('Self: fetchNodeId: robustQuery failed: ', err)
   }

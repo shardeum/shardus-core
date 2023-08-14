@@ -19,19 +19,18 @@ import * as Refresh from './Refresh'
 import * as Rotation from './Rotation'
 import * as SafetyMode from './SafetyMode'
 import * as Self from './Self'
-import * as Sync from './Sync'
 import { compareQuery, Comparison } from './Utils'
 import { errorToStringFull } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { reportLost } from './Lost'
 import { randomBytes } from '@shardus/crypto-utils'
+import { digestCycle, syncNewCycles } from './Sync'
 
 /** CONSTANTS */
 
 const SECOND = 1000
 const BEST_CERTS_WANTED = 3
 const DESIRED_CERT_MATCHES = 3
-const DESIRED_MARKER_MATCHES = 2
+const MAX_CYCLES_TO_KEEP = 2
 
 /** STATE */
 
@@ -269,20 +268,23 @@ async function cycleCreator() {
 
   // Apply the previous records changes to the NodeList
   //if (madeCycle) {
-  if (!CycleChain.newest || CycleChain.newest.counter < prevRecord.counter) Sync.digestCycle(prevRecord)
+  if (!CycleChain.newest || CycleChain.newest.counter < prevRecord.counter) digestCycle(prevRecord)
   //}
 
   // Save the previous record to the DB
   const marker = makeCycleMarker(prevRecord)
   const certificate = makeCycleCert(marker)
-  const data: P2P.CycleCreatorTypes.CycleData = { ...prevRecord, marker, certificate }
+  const data: P2P.CycleCreatorTypes.CycleData = {
+    ...prevRecord,
+    marker,
+    certificate,
+  }
   if (lastSavedData) {
     await storage.updateCycle({ networkId: lastSavedData.networkId }, data)
-    lastSavedData = data
   } else {
-    await storage.addCycles({ ...prevRecord, marker, certificate })
-    lastSavedData = data
+    await storage.addCycles(data)
   }
+  lastSavedData = data
 
   Self.emitter.emit('new_cycle_data', data)
 
@@ -614,7 +616,7 @@ function dropInvalidTxs(txs: Partial<P2P.CycleCreatorTypes.CycleTxs>) {
 async function fetchLatestRecord(): Promise<P2P.CycleCreatorTypes.CycleRecord> {
   try {
     const oldCounter = CycleChain.newest.counter
-    await Sync.syncNewCycles(NodeList.activeOthersByIdOrder)
+    await syncNewCycles(NodeList.activeOthersByIdOrder)
     if (CycleChain.newest.counter <= oldCounter) {
       // We didn't actually sync
       warn('CycleCreator: fetchLatestRecord: synced record not newer')
@@ -1087,10 +1089,14 @@ async function gossipCycleCert(sender: P2P.NodeListTypes.Node['id'], tracker?: s
 }
 
 function pruneCycleChain() {
-  // Determine number of cycle records to keep
-  const keep = Refresh.cyclesToKeep()
-  // Throws away extra cycles
-  CycleChain.prune(keep)
+  if (config.p2p.useSyncProtocolV2) {
+    CycleChain.prune(MAX_CYCLES_TO_KEEP);
+  } else {
+    // Determine number of cycle records to keep
+    const keep = Refresh.cyclesToKeep()
+    // Throws away extra cycles
+    CycleChain.prune(keep)
+  }
 }
 
 function info(...msg) {

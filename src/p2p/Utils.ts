@@ -3,10 +3,11 @@ import * as utils from '../utils'
 import FastRandomIterator from '../utils/FastRandomIterator'
 import { logFlags } from '../logger'
 import { config } from './Context'
-import { stringifyReduce } from '../utils'
+import { sleep, stringifyReduce } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { Logger } from 'log4js'
 
-export type QueryFunction<Node, Response> = (node: Node) => Promise<Response>
+export type QueryFunction<Node, Response> = (node: Node) => PromiseLike<Response>
 
 export type VerifyFunction<Result> = (result: Result) => boolean
 
@@ -136,16 +137,86 @@ export async function sequentialQuery<Node = unknown, Response = unknown>(
   }
 }
 
-type TallyItem = {
-  value: any // Response type is from a template
+type TallyItem<N, T> = {
+  value: T // Response type is from a template
   count: number
-  nodes: any[] // Shardus.Node[] Not using this because robustQuery uses a generic Node, maybe it should be non generic?
+  nodes: N[] // Shardus.Node[] Not using this because robustQuery uses a generic Node, maybe it should be non generic?
 }
 
-type RobustQueryResult = {
-  topResult: any
-  winningNodes: any[]
+export type RobustQueryResult<N, R> = {
+  topResult: R
+  winningNodes: N[]
   isRobustResult: boolean
+}
+
+class Tally<Node, Response> {
+  winCount: number
+  equalFn: EqualityFunction<Response>
+  items: TallyItem<Node, Response>[]
+  extraDebugging: boolean
+
+  constructor(winCount: number, equalFn: EqualityFunction<Response>, extraDebugging = false) {
+    this.winCount = winCount
+    this.equalFn = equalFn
+    this.items = []
+    this.extraDebugging = extraDebugging
+  }
+
+  add(response: Response, node: Node): TallyItem<Node, Response> | null {
+    if (response === null) {
+      if (this.extraDebugging) nestedCountersInstance.countEvent('robustQuery', `response is null`)
+      return null
+    }
+    // We search to see if we've already seen this item before
+    for (const item of this.items) {
+      // If the value of the new item is not equal to the current item, we continue searching
+      if (!this.equalFn(response, item.value)) continue
+      // If the new item is equal to the current item in the list,
+      // we increment the current item's counter and add the current node to the list
+      item.count++
+      item.nodes.push(node)
+      // Here we check our win condition if the current item's counter was incremented
+      // If we meet the win requirement, we return an array with the value of the item,
+      // and the list of nodes who voted for that item
+      if (item.count >= this.winCount) {
+        return item
+      }
+      // Otherwise, if the win condition hasn't been met,
+      // We return null to indicate no winner yet
+      return null
+    }
+    // If we made it through the entire items list without finding a match,
+    // We create a new item and set the count to 1
+    const newItem = { value: response, count: 1, nodes: [node] }
+    this.items.push(newItem)
+    // Finally, we check to see if the winCount is 1,
+    // and return the item we just created if that is the case
+    if (this.winCount === 1) return newItem //return [newItem, [node]]
+  }
+  getHighestCount() {
+    if (!this.items.length) return 0
+    let highestCount = 0
+    for (const item of this.items) {
+      if (item.count > highestCount) {
+        highestCount = item.count
+      }
+    }
+    return highestCount
+  }
+  getHighestCountItem(): TallyItem<Node, Response> | null {
+    if (!this.items.length) return null
+    let highestCount = 0
+    let highestIndex = 0
+    let i = 0
+    for (const item of this.items) {
+      if (item.count > highestCount) {
+        highestCount = item.count
+        highestIndex = i
+      }
+      i += 1
+    }
+    return this.items[highestIndex]
+  }
 }
 
 /**
@@ -174,7 +245,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   shuffleNodes = true,
   strictRedundancy = false,
   extraDebugging = false
-): Promise<RobustQueryResult> {
+): Promise<RobustQueryResult<Node, Response>> {
   if (nodes.length === 0) throw new Error('No nodes given.')
   if (typeof queryFn !== 'function') {
     throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
@@ -193,73 +264,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     redundancy = nodes.length
   }
 
-  class Tally {
-    winCount: number
-    equalFn: EqualityFunction<Response>
-    items: TallyItem[]
-    constructor(winCount: number, equalFn: EqualityFunction<Response>) {
-      this.winCount = winCount
-      this.equalFn = equalFn
-      this.items = []
-    }
-
-    add(response: Response, node: Node): TallyItem | null {
-      if (response === null) {
-        if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `response is null`)
-        return null
-      }
-      // We search to see if we've already seen this item before
-      for (const item of this.items) {
-        // If the value of the new item is not equal to the current item, we continue searching
-        if (!this.equalFn(response, item.value)) continue
-        // If the new item is equal to the current item in the list,
-        // we increment the current item's counter and add the current node to the list
-        item.count++
-        item.nodes.push(node)
-        // Here we check our win condition if the current item's counter was incremented
-        // If we meet the win requirement, we return an array with the value of the item,
-        // and the list of nodes who voted for that item
-        if (item.count >= this.winCount) {
-          return item
-        }
-        // Otherwise, if the win condition hasn't been met,
-        // We return null to indicate no winner yet
-        return null
-      }
-      // If we made it through the entire items list without finding a match,
-      // We create a new item and set the count to 1
-      const newItem = { value: response, count: 1, nodes: [node] }
-      this.items.push(newItem)
-      // Finally, we check to see if the winCount is 1,
-      // and return the item we just created if that is the case
-      if (this.winCount === 1) return newItem //return [newItem, [node]]
-    }
-    getHighestCount() {
-      if (!this.items.length) return 0
-      let highestCount = 0
-      for (const item of this.items) {
-        if (item.count > highestCount) {
-          highestCount = item.count
-        }
-      }
-      return highestCount
-    }
-    getHighestCountItem(): TallyItem | null {
-      if (!this.items.length) return null
-      let highestCount = 0
-      let highestIndex = 0
-      let i = 0
-      for (const item of this.items) {
-        if (item.count > highestCount) {
-          highestCount = item.count
-          highestIndex = i
-        }
-        i += 1
-      }
-      return this.items[highestIndex]
-    }
-  }
-  const responses = new Tally(redundancy, equalityFn)
+  const responses = new Tally<Node, Response>(redundancy, equalityFn)
   let errors = 0
 
   // old shuffle.  replaced by FastRandomIterator has much better performance as the pools size grows.
@@ -278,9 +283,9 @@ export async function robustQuery<Node = unknown, Response = unknown>(
 
   const nodeCount = nodes.length
 
-  const queryNodes = async (nodes: Node[]): Promise<TallyItem | null> => {
+  const queryNodes = async (nodes: Node[]): Promise<TallyItem<Node, Response> | null> => {
     // Wrap the query so that we know which node it's coming from
-    const wrappedQuery = async (node) => {
+    const wrappedQuery = async (node: Node) => {
       const response = await queryFn(node)
       return { response, node }
     }
@@ -291,14 +296,14 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       const node = nodes[i]
       queries.push(wrappedQuery(node))
     }
-    const [results, errs] = await utils.robustPromiseAll<{ response: Response, node: Node }>(queries)
+    const [results, errs] = await utils.robustPromiseAll<{ response: Response; node: Node }>(queries)
 
     if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) {
       console.log('robustQuery results', results)
       console.log('robustQuery errs', errs)
     }
 
-    let finalResult: TallyItem
+    let finalResult: TallyItem<Node, Response>
     for (const result of results) {
       const { response, node } = result
       if (response === null) {
@@ -329,7 +334,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     return finalResult
   }
 
-  let finalResult: TallyItem = null
+  let finalResult: TallyItem<Node, Response> = null
   let tries = 0
   while (!finalResult) {
     tries += 1
@@ -408,4 +413,64 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   // throwing errors was causing problems in past testing.
   // it is OK to throw errors for stuff that is an unexected code mistake in cases where the code would
   //   fail right away.
+}
+
+/**
+ * Attempts to execute a given asynchronous function up to a certain number of retries upon failure.
+ *
+ * @template T The type of the resolved value of the input function.
+ * @param {() => Promise<T>} fn - The asynchronous function to execute. This function should return a Promise that resolves to a value of type `T`.
+ * @param {AttemptOptions} options - Optional. Options passed to change the behavior of this function. See the `AttemptOptions` interface in this same file for details.
+ * @returns {Promise<T>} A Promise that resolves to the return value of the input function, if successful.
+ * @throws Will throw an error if the function fails all attempts. The error will be the last error thrown by the input function.
+ */
+export async function attempt<T>(fn: () => Promise<T>, options?: AttemptOptions): Promise<T> {
+  // fallback to option defaults if needed
+  const maxRetries = options?.maxRetries || 3
+  const delay = options?.delay || 2000
+  const logPrefix = options?.logPrefix || 'attempt'
+  const logger = options?.logger
+
+  // initialize our lastError variable
+  let lastError = new Error('out of retries')
+
+  // loop until we're successful
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      // run the function and return the result. if the funciton fails,
+      // we'll catch it below
+      return await fn()
+    } catch (e) {
+      // log the error
+      if (logger && logFlags.error) logger.error(`${logPrefix}: attempt failure #${i + 1}: ${e.message}`)
+
+      // save the error in case we need to throw it later
+      lastError = e
+
+      // sleep before trying again
+      await sleep(delay)
+      continue
+    }
+  }
+
+  // log that we've run out of attempts
+  if (logger && logFlags.error) logger.error(`${logPrefix}: giving up`)
+
+  // think fast!
+  throw lastError
+}
+
+/** A little interface to represent the options you can pass to the `attempt` function. */
+export interface AttemptOptions {
+  /** The maximum number of attempts to execute the function. */
+  maxRetries?: number
+
+  /** The delay between attempts, in milliseconds. */
+  delay?: number
+
+  /** A log prefix to prepend to error logs on each failure. */
+  logPrefix?: string
+
+  /** The logger to write to on failures. */
+  logger?: Logger
 }

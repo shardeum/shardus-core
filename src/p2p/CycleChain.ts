@@ -1,6 +1,6 @@
 import { Logger } from 'log4js'
 import { crypto, logger, stateManager } from './Context'
-import { P2P } from '@shardus/types'
+import { hexstring, P2P } from '@shardus/types'
 import { nodes } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { logFlags } from '../logger'
@@ -14,6 +14,8 @@ export let cyclesByMarker: { [marker: string]: P2P.CycleCreatorTypes.CycleRecord
 
 export let oldest: P2P.CycleCreatorTypes.CycleRecord
 export let newest: P2P.CycleCreatorTypes.CycleRecord
+
+let currentCycleMarker: hexstring
 
 reset()
 
@@ -40,6 +42,7 @@ export function append(cycle: P2P.CycleCreatorTypes.CycleRecord) {
     cycles.push(cycle)
     cyclesByMarker[marker] = cycle
     newest = cycle
+    currentCycleMarker = marker
     if (!oldest) oldest = cycle
   }
 }
@@ -251,4 +254,9 @@ export function getDebug() {
   ${chain.join('\n')}`
 
   return output
+}
+
+/** Returns the last appended cycle's marker. */
+export function getCurrentCycleMarker(): hexstring {
+    return currentCycleMarker
 }

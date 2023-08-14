@@ -10,7 +10,6 @@ import * as CycleChain from './CycleChain'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
-import { sync } from './Sync'
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 
 let syncTimes = []

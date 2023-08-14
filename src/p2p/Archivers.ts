@@ -1,4 +1,4 @@
-import { P2P, StateManager } from '@shardus/types'
+import { hexstring, P2P, StateManager } from '@shardus/types'
 import deepmerge from 'deepmerge'
 import * as http from '../http'
 import { logFlags } from '../logger'
@@ -25,6 +25,10 @@ import { randomInt } from 'crypto'
 import { CycleRecord } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
 import { StateMetaData } from '@shardus/types/build/src/p2p/SnapshotTypes'
 import { DataRequest } from '@shardus/types/build/src/p2p/ArchiversTypes'
+import * as CycleChain from './CycleChain'
+import rfdc from 'rfdc'
+
+const clone = rfdc()
 
 /** STATE */
 
@@ -511,7 +515,7 @@ async function hasNetworkStopped() {
   // Loop through them and check their /nodelist endpoint for a response
   for (const archiver of shuffledArchivers) {
     try {
-      const response = await http.get(`http://${archiver.ip}:${archiver.port}/nodelist`)
+      const response: { data: unknown } = await http.get(`http://${archiver.ip}:${archiver.port}/nodelist`)
 
       // If any one of them responds, return
       if (response.data) return false
@@ -937,6 +941,48 @@ export function registerRoutes() {
   network.registerExternalGet('datarecipients', (req, res) => {
     res.json({ dataRecipients: [...recipients.values()] })
   })
+}
+
+export function sortedByPubKey(): P2P.ArchiversTypes.JoinedArchiver[] {
+  return [...archivers.values()].sort((a, b) => {
+    // using mathematical comparison in case localeCompare is inconsisten
+    if (a.publicKey > b.publicKey) {
+      return 1
+    } else if (a.publicKey < b.publicKey) {
+      return -1
+    } else {
+      return 0
+    }
+  })
+}
+
+/** Calculates and returns a hash based on the list of archivers, sorted by public key. This will also update the recorded `lastHashedList` of nodes, which can be retrieved via `getLastHashedArchiverList`. */
+export function computeNewArchiverListHash(): hexstring {
+  // set the lastHashedList to the current list by pubkey, then hash.
+  // deep cloning is necessary as archiver information may be mutated by
+  // reference.
+  lastHashedList = clone(sortedByPubKey())
+  info('hashing archiver list:', JSON.stringify(lastHashedList))
+  const hash = crypto.hash(lastHashedList)
+  info('the new archiver list hash is', hash)
+  return hash
+}
+
+/**
+ * Returns the archiver list hash from the last complete cycle, if available. If you
+ * want to compute a new hash instead, use `computeNewArchiverListHash`.
+ */
+export function getArchiverListHash(): hexstring | undefined {
+  info('returning archiver hash:', CycleChain.newest?.archiverListHash)
+  return CycleChain.newest?.archiverListHash
+}
+
+let lastHashedList: P2P.ArchiversTypes.JoinedArchiver[] = []
+
+/** Returns the last list of archivers that had its hash computed. */
+export function getLastHashedArchiverList(): P2P.ArchiversTypes.JoinedArchiver[] {
+  info('returning last hashed archiver list:', JSON.stringify(lastHashedList))
+  return lastHashedList
 }
 
 function info(...msg) {

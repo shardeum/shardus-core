@@ -30,7 +30,7 @@ async function _get(url, getResponseObj = false) {
   Queries the given host for a JSON payload
   Returns a promise, resolves parsed JSON response
 */
-async function get(url: string, getResponseObj = false) {
+async function get<T>(url: string, getResponseObj = false): Promise<T> {
   let normalized = _normalizeUrl(url)
   let host = parseUrl(normalized, true)
 

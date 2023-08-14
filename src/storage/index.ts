@@ -19,10 +19,10 @@ import P2PApoptosis = require('../p2p/Apoptosis')
 import { config } from '../p2p/Context'
 
 /** A type alias to avoid both `any` and having to spell this type out any time
-* we want to use it. */
+ * we want to use it. */
 export type GenericObject = { [key: symbol]: unknown }
 
-export type ModelAttributes = { [column: string]: ColumnDescription };
+export type ModelAttributes = { [column: string]: ColumnDescription }
 
 export interface ModelData {
   tableName: string
@@ -40,10 +40,10 @@ export interface ModelData {
 }
 
 export type OperationOptions = {
-    createOrReplace?: boolean;
-    raw?: boolean;
-    order?: { length: number; };
-    limit?: number;
+  createOrReplace?: boolean
+  raw?: boolean
+  order?: { length: number }
+  limit?: number
 }
 
 export interface ParamEntry {
@@ -88,7 +88,13 @@ class Storage {
     // this.storage = new SequelizeStorage(models, config, logger, baseDir, this.profiler)
 
     // this.storage = new BetterSqlite3Storage(models, config, logger, baseDir, this.profiler)
-    this.storage = new Sqlite3Storage(models as [string, ModelAttributes][], config, logger, baseDir, this.profiler)
+    this.storage = new Sqlite3Storage(
+      models as [string, ModelAttributes][],
+      config,
+      logger,
+      baseDir,
+      this.profiler
+    )
     this.serverConfig = serverConfig
     this.stateManager = null
   }
@@ -114,7 +120,7 @@ class Storage {
         ' `joinedArchivers` JSON NOT NULL,`leavingArchivers` JSON NOT NULL, `joinedConsensors` JSON NOT' +
         ' NULL,`refreshedArchivers` JSON NOT NULL, `refreshedConsensors` JSON NOT NULL, `activated` JSON NOT NULL,' +
         ' `activatedPublicKeys` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT' +
-        ' NULL, `lostSyncing` JSON NOT NULL , `refuted` JSON NOT NULL)'
+        ' NULL, `lostSyncing` JSON NOT NULL , `refuted` JSON NOT NULL, `nodeListHash` TEXT NOT NULL, `archiverListHash` TEXT NOT NULL)'
     )
     await this.storage.runCreate(
       'CREATE TABLE if not exists `nodes` (`id` TEXT NOT NULL PRIMARY KEY, `publicKey` TEXT NOT NULL, `curvePublicKey` TEXT NOT NULL, `cycleJoined` TEXT NOT NULL, `internalIp` VARCHAR(255) NOT NULL, `externalIp` VARCHAR(255) NOT NULL, `internalPort` SMALLINT NOT NULL, `externalPort` SMALLINT NOT NULL, `joinRequestTimestamp` BIGINT NOT NULL, `activeTimestamp` BIGINT NOT NULL, `address` VARCHAR(255) NOT NULL, `status` VARCHAR(255) NOT NULL)'

@@ -29,6 +29,8 @@ import { errorToStringFull } from '../utils'
 import SyncTracker from './SyncTracker'
 import { Logger as L4jsLogger } from 'log4js'
 
+const REDUNDANCY = 3
+
 type SyncStatment = {
   p2pJoinTime: number
   timeBeforeDataSync: number
@@ -902,7 +904,7 @@ class AccountSync {
   async getRobustGlobalReport(tag = ''): Promise<GlobalAccountReportResp> {
     this.lastWinningGlobalReportNodes = []
 
-    const equalFn = (a: GlobalAccountReportResp, b: GlobalAccountReportResp): boolean => {
+    const equalFn = (a: Partial<GlobalAccountReportResp>, b: Partial<GlobalAccountReportResp>): boolean => {
       // these fail cases should not count towards forming an hash consenus
       if (a == null || b == null) {
         return false
@@ -915,7 +917,10 @@ class AccountSync {
       }
       return a.combinedHash === b.combinedHash
     }
-    const queryFn = async (node: Shardus.Node): Promise<unknown> => {
+
+    const queryFn = async (
+      node: Shardus.Node
+    ): Promise<Partial<GlobalAccountReportResp> & { msg: string }> => {
       // Node Precheck!
       if (
         this.stateManager.isNodeValidForInternalMessage(node.id, 'getRobustGlobalReport', true, true) ===
@@ -969,15 +974,15 @@ class AccountSync {
       return // nothing to do
     }
     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery getRobustGlobalReport ${utils.stringifyReduce(nodes.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
-    let result: {
-      ready: unknown
-      combinedHash?: string
-      accounts?: { id: string; hash: string; timestamp: number }[]
-    }
+
+    let result: Partial<GlobalAccountReportResp> & { msg: string }
     let winners: string | unknown[]
     try {
       //Must make sure shuffle is on!  This is critical to avoid DDOSing the first node in the list
-      const robustQueryResult = await robustQuery(nodes, queryFn, equalFn, 3, true, false, true)
+      const robustQueryResult = await robustQuery<
+        Shardus.Node,
+        Partial<GlobalAccountReportResp> & { msg: string }
+      >(nodes, queryFn, equalFn, REDUNDANCY, true, false, true)
 
       // if we did not get a result at all wait, log and retry
       if (robustQueryResult === null) {

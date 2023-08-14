@@ -24,6 +24,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as utils from '../utils'
 import { isApopMarkedNode } from './Apoptosis'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
+import { CycleData } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
 
 /** STATE */
 
@@ -624,7 +625,7 @@ async function isDownCheck(node) {
     // the queryFunction must return null if the given node is our own
     // while syncing nodeList we dont have node.id, so use ip and port
     if (ip === Self.ip && port === Self.port) return null
-    const resp = await http.get(`${ip}:${port}/sync-newest-cycle`)
+    const resp: { newestCycle: CycleData } = await http.get(`${ip}:${port}/sync-newest-cycle`)
     return resp
   }
   const resp = await queryExt(node) // if the node is down, reportLost() will set status to 'down'
