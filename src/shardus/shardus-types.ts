@@ -270,6 +270,8 @@ export interface App {
 
   getAccountDataByList: (addressList: string[]) => Promise<WrappedData[]>
 
+  getNetworkAccount: () => Promise<WrappedData>
+
   deleteLocalAccountData: () => Promise<void>
 
   getAccountDebugValue: (wrappedAccount: WrappedData) => string
@@ -1150,3 +1152,4 @@ export interface ValidatorNodeDetails {
   port: number
   publicKey: string
 }
+
