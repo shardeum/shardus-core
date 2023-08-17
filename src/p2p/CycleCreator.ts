@@ -20,7 +20,7 @@ import * as Rotation from './Rotation'
 import * as SafetyMode from './SafetyMode'
 import * as Self from './Self'
 import { compareQuery, Comparison } from './Utils'
-import { errorToStringFull } from '../utils'
+import { errorToStringFull, formatErrorMessage } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { randomBytes } from '@shardus/crypto-utils'
 import { digestCycle, syncNewCycles } from './Sync'
@@ -59,6 +59,8 @@ export let scaleFactor: number = 1
 export let scaleFactorSyncBoost: number = 1
 
 export let netConfig: any = {}
+
+let createCycleTag = 0
 
 let madeCycle = false // True if we successfully created the last cycle record, otherwise false
 // not used anymore
@@ -205,6 +207,8 @@ function reset() {
   txs = collectCycleTxs()
   ;({ record, marker, cert } = makeCycleData(txs, CycleChain.newest || undefined))
 
+  //todo some logging here.
+
   bestRecord = undefined
   bestMarker = undefined
   bestCycleCert = new Map()
@@ -245,36 +249,46 @@ async function cycleCreator() {
   // Set current quater to 0 while we are setting up the previous record
   //   Routes should use this to not process and just single-forward gossip
   currentQuarter = 0
-  if (logFlags.p2pNonFatal) {
-    info(`C${currentCycle} Q${currentQuarter}`)
-    info(`madeCycle: ${madeCycle} bestMarker: ${bestMarker}`)
-  }
-  // Get the previous record
-  //let prevRecord = madeCycle ? bestRecord : await fetchLatestRecord()
-  let prevRecord = bestRecord
-  if (!prevRecord) {
-    prevRecord = await fetchLatestRecord()
-  }
-  while (!prevRecord) {
-    // [TODO] - when there are few nodes in the network, we may not
-    //          be able to get a previous record since the number of
-    //          matches for robust query may not be met. Maybe we should
-    //          count the number of tries and lower the number of matches
-    //          needed if the number of tries increases.
-    warn('CycleCreator: cycleCreator: Could not get prevRecord. Trying again in 1 sec...')
-    await utils.sleep(1 * SECOND)
-    prevRecord = await fetchLatestRecord()
-  }
 
-  // Apply the previous records changes to the NodeList
-  //if (madeCycle) {
-  if (!CycleChain.newest || CycleChain.newest.counter < prevRecord.counter) digestCycle(prevRecord)
-  //}
+  createCycleTag++
+  let callTag = `cct${createCycleTag}`
+  /* prettier-ignore */ info( `cc: start C${currentCycle} Q${currentQuarter} madeCycle: ${madeCycle} bestMarker: ${bestMarker} ${callTag}` )
 
-  // Save the previous record to the DB
-  const marker = makeCycleMarker(prevRecord)
-  const certificate = makeCycleCert(marker)
-  const data: P2P.CycleCreatorTypes.CycleData = {
+  try {
+    // Get the previous record
+    //let prevRecord = madeCycle ? bestRecord : await fetchLatestRecord()
+    let prevRecord = bestRecord
+    if (!prevRecord) {
+      warn(`cc: !prevRecord. Fetech now. ${callTag}`)
+      prevRecord = await fetchLatestRecord()
+    }
+    while (!prevRecord) {
+      // [TODO] - when there are few nodes in the network, we may not
+      //          be able to get a previous record since the number of
+      //          matches for robust query may not be met. Maybe we should
+      //          count the number of tries and lower the number of matches
+      //          needed if the number of tries increases.
+      warn(`cc: cycleCreator: Could not get fetch prevRecord. Trying again in 1 sec...  ${callTag}`)
+      await utils.sleep(1 * SECOND)
+      prevRecord = await fetchLatestRecord()
+    }
+
+    info(`cc: prevRecord.counter: ${prevRecord.counter} ${callTag}`)
+    //WE complete Sync.digestCycle each cycle even thought we are failing later to get to cycleLogger.info
+
+    // Apply the previous records changes to the NodeList
+    //if (madeCycle) {
+    if (!CycleChain.newest || CycleChain.newest.counter < prevRecord.counter) {
+      warn(`cc: digest cycle ${prevRecord.counter} ${callTag}`)
+      digestCycle(prevRecord, 'cycleCreator')
+    }
+    //}
+    let data: P2P.CycleCreatorTypes.CycleData = undefined
+    try {
+      // Save the previous record to the DB
+      const marker = makeCycleMarker(prevRecord)
+      const certificate = makeCycleCert(marker)
+  const data: P2P.CycleCreatorTypes.CycleData = { ...prevRecord, marker, certificate }
     ...prevRecord,
     marker,
     certificate,
@@ -288,33 +302,66 @@ async function cycleCreator() {
     await storage.addCycles(data)
   }
   lastSavedData = data
+    } catch (er) {
+      /* prettier-ignore */ warn(`cc: Could not save prevRecord to DB. C${currentCycle} ${formatErrorMessage(er)}`)
+    }
 
-  Self.emitter.emit('new_cycle_data', data)
+    info(`cc: cycle data created and stored. data.counter:${data.counter} ${callTag}`)
 
-  // Print combined cycle log entry
-  cycleLogger.info(CycleChain.getDebug() + NodeList.getDebug())
+    // this event is currently only handled by non active snapshot system
+    Self.emitter.emit('new_cycle_data', data)
 
-  // Prune the cycle chain
-  pruneCycleChain()
+    // We are not always making it to this point. every 60s:
+    // Print combined cycle log entry
+    cycleLogger.info(CycleChain.getDebug() + NodeList.getDebug())
 
-  // Send last cycle record, state hashes and receipt hashes to any subscribed archivers
-  Archivers.sendData()
-  ;({ cycle: currentCycle, quarter: currentQuarter } = currentCycleQuarterByTime(prevRecord))
+    info(`cc: recorded to cycle.log ${callTag}`)
 
-  const { quarterDuration, startQ1, startQ2, startQ3, startQ4, end } = calcIncomingTimes(prevRecord)
+    // Prune the cycle chain
+    pruneCycleChain()
 
-  nextQ1Start = end
+    info(`cc: pruned ${callTag}`)
 
-  // Reset cycle marker and cycle certificate creation state
-  reset()
-  // Omar moved this to before scheduling the quarters; should not make a difference
-  madeCycle = false
+    // Send last cycle record, state hashes and receipt hashes to any subscribed archivers
+    Archivers.sendData()
+    info(`cc: acrhiver data sent ${callTag}`) //todo list time delta
 
-  schedule(runQ1, startQ1, { runEvenIfLateBy: quarterDuration - 1 * SECOND }) // if there's at least one sec before Q2 starts, we can start Q1 now
-  schedule(runQ2, startQ2)
-  schedule(runQ3, startQ3)
-  schedule(runQ4, startQ4)
-  schedule(cycleCreator, end, { runEvenIfLateBy: Infinity })
+    let expectedCycle = currentCycle + 1
+    // this is where we update the current cycle
+    ;({ cycle: currentCycle, quarter: currentQuarter } = currentCycleQuarterByTime(prevRecord))
+
+    if (expectedCycle !== currentCycle) {
+      warn(`cc: expectedCycle: ${expectedCycle} currentCycle: ${currentCycle} ${callTag}`)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `cycleCreator:expectedCycle !== currentCycle ex${expectedCycle}!=${currentCycle}} tag:${callTag}`)
+    }
+
+    info(`cc: current cycle and quarter updated C${currentCycle} Q${currentQuarter} ${callTag}`)
+
+    const { quarterDuration, startQ1, startQ2, startQ3, startQ4, end } = calcIncomingTimes(prevRecord)
+
+    nextQ1Start = end
+
+    // make some more logging .. posibly even to cycle log with a timestamp also.
+    /* prettier-ignore */ info(`cc: inc times ${JSON.stringify({ quarterDuration, startQ1, startQ2, startQ3, startQ4, end })}  ${callTag}`)
+
+    // Reset cycle marker and cycle certificate creation state
+    reset()
+
+    info(`cc: cycle data was reset record.counter: ${record.counter}  ${callTag}`)
+
+    // Omar moved this to before scheduling the quarters; should not make a difference
+    madeCycle = false
+
+    info(`cc: scheduling currentCycle:${currentCycle} ${callTag}`)
+
+    schedule(runQ1, startQ1, { runEvenIfLateBy: quarterDuration - 1 * SECOND }) // if there's at least one sec before Q2 starts, we can start Q1 now
+    schedule(runQ2, startQ2)
+    schedule(runQ3, startQ3)
+    schedule(runQ4, startQ4)
+    schedule(cycleCreator, end, { runEvenIfLateBy: Infinity })
+  } finally {
+    /* prettier-ignore */ info( `cc: end C${currentCycle} Q${currentQuarter} madeCycle: ${madeCycle} bestMarker: ${bestMarker} ${callTag}` )
+  }
 }
 
 /**
@@ -443,6 +490,8 @@ async function runQ4() {
   currentQuarter = 4
   if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 
+  /* prettier-ignore */ info(`Q4: start: C${currentCycle} Q${currentQuarter}`)
+
   // Don't do cert comparison if you didn't make the cycle
   // [TODO] - maybe we should still compare if we have bestCert since we may have got it from gossip
   if (madeCycle === false) {
@@ -454,32 +503,41 @@ async function runQ4() {
   // Compare your cert for this cycle with the network
   const myC = currentCycle
   const myQ = currentQuarter
-
-  let matched
-  do {
-    matched = await compareCycleCert(myC, myQ, DESIRED_CERT_MATCHES)
-    if (!matched) {
-      if (cycleQuarterChanged(myC, myQ)) {
-        warn(
-          `In Q4 ran out of time waiting for compareCycleCert with DESIRED_CERT_MATCHES of ${DESIRED_CERT_MATCHES}`
-        )
-        profilerInstance.profileSectionEnd('CycleCreator-runQ4')
-        return
+  const enterTime = Date.now()
+  const cycleDuration = config.p2p.cycleDuration * SECOND
+  try {
+    let matched
+    do {
+      matched = await compareCycleCert(myC, myQ, DESIRED_CERT_MATCHES)
+      if (!matched) {
+        if (cycleQuarterChanged(myC, myQ)) {
+          /* prettier-ignore */ warn( `In Q4 ran out of time waiting for compareCycleCert with DESIRED_CERT_MATCHES of ${DESIRED_CERT_MATCHES}` )
+          profilerInstance.profileSectionEnd('CycleCreator-runQ4')
+          return
+        }
+        await utils.sleep(100)
+        if (enterTime + cycleDuration < Date.now()) {
+          /* prettier-ignore */ warn( `In Q4 waited ${config.p2p.cycleDuration} seconds for compareCycleCert with DESIRED_CERT_MATCHES of ${DESIRED_CERT_MATCHES}` )
+          //profilerInstance.profileSectionEnd('CycleCreator-runQ4')
+          //return
+          // we should return, but want to catch this get stuck to confirm it is not happening
+          await utils.sleep(1000)
+        }
       }
-      await utils.sleep(100)
-    }
-  } while (!matched)
+    } while (!matched)
 
-  if (logFlags.p2pNonFatal)
-    info(`
+    if (logFlags.p2pNonFatal)
+      info(`
     Certified cycle record: ${JSON.stringify(record)}
     Certified cycle marker: ${JSON.stringify(marker)}
     Certified cycle cert: ${JSON.stringify(cert)}
   `)
-
-  // Dont need this any more since we are not doing anything after this
-  // if (cycleQuarterChanged(myC, myQ)) return
-  profilerInstance.profileSectionEnd('CycleCreator-runQ4')
+  } finally {
+    /* prettier-ignore */ info( `Q4: END: myC:${myC}  C${currentCycle} Q${currentQuarter} Certified cycle record: ${JSON.stringify(record.counter)}` )
+    // Dont need this any more since we are not doing anything after this
+    // if (cycleQuarterChanged(myC, myQ)) return
+    profilerInstance.profileSectionEnd('CycleCreator-runQ4')
+  }
 }
 
 /** HELPER FUNCTIONS */
@@ -622,12 +680,10 @@ async function fetchLatestRecord(): Promise<P2P.CycleCreatorTypes.CycleRecord> {
     await syncNewCycles(NodeList.activeOthersByIdOrder)
     if (CycleChain.newest.counter <= oldCounter) {
       // We didn't actually sync
-      warn('CycleCreator: fetchLatestRecord: synced record not newer')
+      /* prettier-ignore */ warn(`CycleCreator: fetchLatestRecord: synced record not newer CycleChain.newest.counter: ${CycleChain.newest.counter} oldCounter: ${oldCounter}`)
       fetchLatestRecordFails++
       if (fetchLatestRecordFails > maxFetchLatestRecordFails) {
-        error(
-          'CycleCreator: fetchLatestRecord_A: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf '
-        )
+        /* prettier-ignore */ error( 'CycleCreator: fetchLatestRecord_A: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf ' )
         Apoptosis.apoptosizeSelf('Apoptosized within fetchLatestRecord() => src/p2p/CycleCreator.ts')
       }
 
@@ -637,9 +693,7 @@ async function fetchLatestRecord(): Promise<P2P.CycleCreatorTypes.CycleRecord> {
     warn('CycleCreator: fetchLatestRecord: syncNewCycles failed:', errorToStringFull(err))
     fetchLatestRecordFails++
     if (fetchLatestRecordFails > maxFetchLatestRecordFails) {
-      error(
-        'CycleCreator: fetchLatestRecord_B: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf '
-      )
+      /* prettier-ignore */ error( 'CycleCreator: fetchLatestRecord_B: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf ' )
       Apoptosis.apoptosizeSelf('Apoptosized within fetchLatestRecord() => src/p2p/CycleCreator.ts')
     }
     return null
@@ -771,37 +825,25 @@ function validateCertSign(certs: P2P.CycleCreatorTypes.CycleCert[], sender: P2P.
   return true
 }
 
-function validateCerts(certs: P2P.CycleCreatorTypes.CycleCert[], record, sender) {
+function validateCerts(certs: P2P.CycleCreatorTypes.CycleCert[], record, sender, callerTag) {
   if (!certs || !Array.isArray(certs) || certs.length <= 0) {
-    warn('validateCerts: bad certificate format')
-    warn(
-      `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify(sender)}`
-    )
+    /* prettier-ignore */ warn(`validateCerts: bad certificate format;  ${callerTag}`)
+    /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify(sender)}` )
     return false
   }
   if (!record || record === null || typeof record !== 'object') return false
   //  make sure the cycle counter is what we expect
   if (record.counter !== CycleChain.newest.counter + 1) {
-    warn(
-      `validateCerts: bad cycle record counter; expected ${CycleChain.newest.counter + 1} but got ${
-        record.counter
-      }`
-    )
-    warn(
-      `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify(sender)}`
-    )
+    /* prettier-ignore */ warn( `validateCerts: bad cycle record counter; ${callerTag} expected ${CycleChain.newest.counter + 1} but got ${ record.counter } ` )
+    /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify(sender)}` )
     return false
   }
   // make sure all the certs are for the same cycle marker
   const inpMarker = crypto.hash(record)
   for (let i = 1; i < certs.length; i++) {
     if (inpMarker !== certs[i].marker) {
-      warn('validateCerts: certificates marker does not match hash of record')
-      warn(
-        `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify(
-          sender
-        )}`
-      )
+      /* prettier-ignore */ warn(`validateCerts: certificates marker does not match hash of record;  ${callerTag}`)
+      /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify( sender )}` )
       return false
     }
   }
@@ -809,22 +851,16 @@ function validateCerts(certs: P2P.CycleCreatorTypes.CycleCert[], record, sender)
   const seen = {}
   for (let i = 0; i < certs.length; i++) {
     if (seen[certs[i].sign.owner]) {
-      warn(`validateCerts: multiple certificate from same owner ${JSON.stringify(certs)}`)
-      warn(
-        `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify(
-          sender
-        )}`
-      )
+      /* prettier-ignore */ warn(`validateCerts: multiple certificate from same owner; ${callerTag} certs: ${JSON.stringify(certs)}`)
+      /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify( sender )}` )
       return false
     }
     seen[certs[i].sign.owner] = true
   }
   //  checks signatures; more expensive
   if (!validateCertSign(certs, sender)) {
-    warn(`validateCerts: certificate has bad sign; certs:${JSON.stringify(certs)}`)
-    warn(
-      `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify(sender)}`
-    )
+    /* prettier-ignore */ warn(`validateCerts: certificate has bad sign;  ${callerTag} certs:${JSON.stringify(certs)}`)
+    /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify(sender)}` )
     return false
   }
   return true
@@ -966,7 +1002,7 @@ function compareCycleCertEndpoint(inp: CompareCertReq, sender) {
     return { certs: bestCycleCert.get(bestMarker), record: bestRecord }
   }
   const { certs: inpCerts, record: inpRecord } = inp
-  if (!validateCerts(inpCerts, inpRecord, sender)) {
+  if (!validateCerts(inpCerts, inpRecord, sender, 'compareCycleCertEndpoint')) {
     return { certs: bestCycleCert.get(bestMarker), record: bestRecord }
   }
   const inpMarker = inpCerts[0].marker
@@ -1003,7 +1039,7 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
     if (resp.certs[0].marker === bestMarker) {
       // Our markers match
       return Comparison.EQUAL
-    } else if (!validateCerts(resp.certs, resp.record, node.id)) {
+    } else if (!validateCerts(resp.certs, resp.record, node.id, 'compareCycleCert')) {
       return Comparison.WORSE
     } else if (improveBestCert(resp.certs, resp.record)) {
       // Their marker is better, change to it and their record
@@ -1070,7 +1106,7 @@ function gossipHandlerCycleCert(inp: CompareCertReq, sender: P2P.NodeListTypes.N
   if (!validateCertsRecordTypes(inp, 'gossipHandlerCycleCert')) return
   // [TODO] - submodules need to validate their part of the record
   const { certs: inpCerts, record: inpRecord } = inp
-  if (!validateCerts(inpCerts, inpRecord, sender)) {
+  if (!validateCerts(inpCerts, inpRecord, sender, 'gossipHandlerCycleCert')) {
     return
   }
   if (improveBestCert(inpCerts, inpRecord)) {

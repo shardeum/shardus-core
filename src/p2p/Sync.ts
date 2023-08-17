@@ -243,7 +243,7 @@ type SyncNode = Partial<
 
 export async function syncNewCycles(activeNodes: SyncNode[]) {
   let newestCycle = await getNewestCycle(activeNodes)
-  warn(`myNewest=${CycleChain.newest.counter} netNewest=${newestCycle.counter}`)
+  info(`syncNewCycles: myNewest=${CycleChain.newest.counter} netNewest=${newestCycle.counter}`)
 
   const progressHistory = 5
   const maxAttempts = 10
@@ -259,16 +259,20 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
     const oldCounter = CycleChain.newest.counter
     for (const nextCycle of nextCycles) {
       //      CycleChain.validate(CycleChain.newest, newestCycle)
-      if (CycleChain.validate(CycleChain.newest, nextCycle)) await digestCycle(nextCycle)
-      else
-        error(
-          `syncNewCycles next record does not fit with prev record.\nnext: ${JSON.stringify(
-            CycleChain.newest
-          )}\nprev: ${JSON.stringify(newestCycle)}`
-        )
-      // [TODO] If we ever hit this, we should return from here after setting
-      //        a timeout to run syncNewCycles function again. Maybe also through away
-      //        the most recent record we have in case it was bad.
+      if (CycleChain.validate(CycleChain.newest, nextCycle)) {
+        await digestCycle(nextCycle, 'syncNewCycles')
+        info(`syncNewCycles: digested nextCycle=${nextCycle.counter}`)
+      } else {
+        /* prettier-ignore */ error( `syncNewCycles: next record does not fit with prev record.\nnext: ${JSON.stringify( CycleChain.newest )}\nprev: ${JSON.stringify(newestCycle)}` )
+
+        //20230730: comment below is from 3 years ago, is it something that needs to be handled.
+        //          was not getting to this spot even when our node failed to stay up to date with cycles
+        //          so this may not be a current point of failure
+
+        // [TODO] If we ever hit this, we should return from here after setting
+        //        a timeout to run syncNewCycles function again. Maybe also through away
+        //        the most recent record we have in case it was bad.
+      }
     }
     const newCounter = CycleChain.newest.counter
 
@@ -288,7 +292,7 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
   }
 }
 
-export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
+export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: string) {
   // get the node list hashes *before* applying node changes
   if (config.p2p.useSyncProtocolV2 || config.p2p.writeSyncProtocolV2) {
     cycle.nodeListHash = NodeList.computeNewNodeListHash()
@@ -301,10 +305,20 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
     return
   }
 
+  info(
+    `digestCycle ${JSON.stringify(cycle)} from ${source}... note: CycleChain.newest.counter: ${JSON.stringify(
+      CycleChain.newest
+    )} CycleCreator.currentCycle: ${CycleCreator.currentCycle}`
+  )
+
   const changes = parse(cycle)
   applyNodeListChange(changes, true, cycle)
 
   CycleChain.append(cycle)
+
+  // TODO: This seems like a possible location to inetvene if our node
+  // is getting far behind on what it thinks the current cycle is
+  // first would like to know how it is getting behind.
 
   let nodeLimit = 2 //todo set this to a higher number, but for now I want to make sure it works in a small test
   if (NodeList.activeByIdOrder.length <= nodeLimit) {

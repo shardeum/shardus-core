@@ -691,6 +691,10 @@ export interface ServerConfiguration {
     useLruCacheForSocketMgmt: boolean
     /** LRU cache size for socket connection mgmt in shardus/net. Is used only if `useLruCacheForSocketMgmt` is set to `true`. Default: 1000 */
     lruCacheSizeForSocketMgmt: number
+    /** Number of cycles we want to delay the lost report by */
+    delayLostReportByNumOfCycles: number
+    /** If disabled, the lost reports are sent to the checker immediately */
+    aggregateLostReportsTillQ1: boolean
     /** To forward the receipt data to the archivers as soon as a receipt is formed */
     instantForwardReceipts: boolean
     /** A node can serve only X max archivers for data transfer and can refuse other archivers requests if it’s serving the max number */

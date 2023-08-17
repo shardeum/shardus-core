@@ -256,7 +256,7 @@ export function parseRecord(record: P2P.ApoptosisTypes.Record): P2P.CycleParserT
     Self.emitter.emit(
       'invoke-exit',
       getCallstack(),
-      'invoke-exit being called at parseRecord() => src/p2p/Apoptosis.ts'
+      `invoke-exit being called at parseRecord() => src/p2p/Apoptosis.ts: found our id in the apoptosis list`
     )
   }
   return {

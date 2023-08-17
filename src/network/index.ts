@@ -11,6 +11,7 @@ import { isDebugMode } from '../debug'
 import * as httpModule from '../http'
 import Logger, { logFlags } from '../logger'
 import { config, defaultConfigs, logger } from '../p2p/Context'
+import { generateUUID } from '../p2p/Utils'
 import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -232,6 +233,11 @@ export class NetworkClass extends EventEmitter {
         id = message.tracker
       }
 
+      const requestId = generateUUID()
+      mainLogger.info(`Initiating ask request with requestId: ${requestId}`)
+      mainLogger.info(`requestId: ${requestId}, node: ${JSON.stringify(node)}`)
+      mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
+
       try {
         if (this.debugNetworkDelay > 0) {
           await utils.sleep(this.debugNetworkDelay)
@@ -251,7 +257,7 @@ export class NetworkClass extends EventEmitter {
           nestedCountersInstance.countRareEvent('network', 'timeout ' + route)
           if (logFlags.error) this.mainLogger.error('Network: ' + err)
           if (logFlags.error) this.mainLogger.error(err.stack)
-          this.emit('timeout', node)
+          this.emit('timeout', node, requestId)
           reject(err)
         }
         if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, id, message)

@@ -1,9 +1,9 @@
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 import { EventEmitter } from 'events'
 import { Handler } from 'express'
-import { inspect } from 'util'
 import Log4js from 'log4js'
 import path from 'path'
+import { inspect } from 'util'
 import SHARDUS_CONFIG from '../config'
 import Crypto from '../crypto'
 import Debug, { getDevPublicKey } from '../debug'
@@ -15,12 +15,15 @@ import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { apoptosizeSelf, isApopMarkedNode } from '../p2p/Apoptosis'
 import * as Archivers from '../p2p/Archivers'
 import * as Context from '../p2p/Context'
+import { config } from '../p2p/Context'
 import * as AutoScaling from '../p2p/CycleAutoScale'
 import * as CycleChain from '../p2p/CycleChain'
 import { netConfig } from '../p2p/CycleCreator'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
-import { reportLost } from '../p2p/Lost'
+import { scheduleLostReport } from '../p2p/Lost'
+import { activeByIdOrder } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
+import { generateUUID } from '../p2p/Utils'
 import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
@@ -28,19 +31,17 @@ import * as ShardusTypes from '../shardus/shardus-types'
 import { WrappedData } from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
-import { QueueCountsResult, CachedAppData } from '../state-manager/state-manager-types'
+import { CachedAppData, QueueCountsResult } from '../state-manager/state-manager-types'
 import { DebugComplete } from '../state-manager/TransactionQueue'
 import Statistics from '../statistics'
 import Storage from '../storage'
 import * as utils from '../utils'
 import { groupResolvePromises, inRangeOfCurrentTime, isValidShardusAddress } from '../utils'
+import { getSocketReport } from '../utils/debugUtils'
 import MemoryReporting from '../utils/memoryReporting'
 import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
 import { startSaving } from './saveConsoleOutput'
-import { config } from '../p2p/Context'
-import { activeByIdOrder } from '../p2p/NodeList'
-import { getSocketReport } from '../utils/debugUtils'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -456,13 +457,13 @@ class Shardus extends EventEmitter {
     } catch (e) {
       this.mainLogger.error('Socket connection break', e)
     }
-    this.network.on('timeout', (node) => {
-      console.log('in Shardus got network timeout from', node)
+    this.network.on('timeout', (node, requestId: string) => {
+      console.log(`In Shardus got network timeout for ${requestId} from node: ${node}`)
       const result = isApopMarkedNode(node.id)
       if (result) {
         return
       }
-      reportLost(node, 'timeout')
+      scheduleLostReport(node, 'timeout', requestId)
       /** [TODO] Report lost */
       nestedCountersInstance.countEvent('lostNodes', 'timeout')
 
@@ -470,8 +471,9 @@ class Shardus extends EventEmitter {
       if (this.network.statisticsInstance) this.network.statisticsInstance.incrementCounter('lostNodeTimeout')
     })
     this.network.on('error', (node) => {
-      console.log('in Shardus got network error from', node)
-      reportLost(node, 'error')
+      const requestId = generateUUID()
+      console.log(`In Shardus got network error for ${requestId} from node: ${node}`)
+      scheduleLostReport(node, 'error', requestId)
       /** [TODO] Report lost */
       nestedCountersInstance.countEvent('lostNodes', 'error')
     })
@@ -1406,7 +1408,7 @@ class Shardus extends EventEmitter {
     }
   }
 
-  async getLocalOrRemoteCachedAppData(topic, dataId) : Promise <CachedAppData | null> {
+  async getLocalOrRemoteCachedAppData(topic, dataId): Promise<CachedAppData | null> {
     if (this.p2p.allowTransactions()) {
       return this.stateManager.cachedAppDataManager.getLocalOrRemoteCachedAppData(topic, dataId)
     } else {

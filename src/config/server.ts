@@ -84,6 +84,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     uniqueRemovedIdsUpdate: false,
     useLruCacheForSocketMgmt: false,
     lruCacheSizeForSocketMgmt: 1000,
+    delayLostReportByNumOfCycles: 1,
+    aggregateLostReportsTillQ1: true,
     instantForwardReceipts: false,
     maxArchiversSubscriptionPerNode: 2,
     writeSyncProtocolV2: false,

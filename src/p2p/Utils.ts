@@ -1,10 +1,11 @@
+import * as crypto from 'crypto'
 import util from 'util'
-import * as utils from '../utils'
-import FastRandomIterator from '../utils/FastRandomIterator'
 import { logFlags } from '../logger'
-import { config } from './Context'
+import * as utils from '../utils'
 import { sleep, stringifyReduce } from '../utils'
+import FastRandomIterator from '../utils/FastRandomIterator'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { config } from './Context'
 import { Logger } from 'log4js'
 
 export type QueryFunction<Node, Response> = (node: Node) => PromiseLike<Response>
@@ -149,6 +150,8 @@ export type RobustQueryResult<N, R> = {
   isRobustResult: boolean
 }
 
+      if (extraDebugging)
+      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `not enough nodes to meet strictRedundancy`)
 class Tally<Node, Response> {
   winCount: number
   equalFn: EqualityFunction<Response>
@@ -322,7 +325,8 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     }
 
     for (const err of errs) {
-      if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) console.log('robustQuery: err:', err)
+      if (logFlags.console || config.debug.robustQueryDebug || extraDebugging)
+        console.log('robustQuery: err:', err)
       errors += 1
       if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `error: ${err.message}`)
     }
@@ -341,7 +345,8 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     const toQuery = redundancy - responses.getHighestCount()
     if (nodes.length < toQuery) {
       /* prettier-ignore */ if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) console.log('robustQuery: stopping since we ran out of nodes to query.')
-      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `stopping since we ran out of nodes to query.`)
+      if (extraDebugging)
+        nestedCountersInstance.countEvent('robustQuery', `stopping since we ran out of nodes to query.`)
       break
     }
     let nodesToQuery: Node[]
@@ -366,7 +371,11 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     const isRobustResult = finalResult.count >= redundancy
     if (config.debug.robustQueryDebug || extraDebugging)
       console.log(`robustQuery: stopping since we got a finalResult:${stringifyReduce(finalResult)}`)
-    if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `stopping since we got finalResult:${stringifyReduce(finalResult)}`)
+    if (extraDebugging)
+      nestedCountersInstance.countEvent(
+        'robustQuery',
+        `stopping since we got finalResult:${stringifyReduce(finalResult)}`
+      )
     return {
       topResult: finalResult.value,
       winningNodes: finalResult.nodes,
@@ -390,7 +399,8 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       }
       //if there was no highestCountItem then we had no responses at all
       /* prettier-ignore */ if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) console.log('robustQuery: isRobustResult=false. no responses at all')
-      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `isRobustResult=false. no responses at all`)
+      if (extraDebugging)
+        nestedCountersInstance.countEvent('robustQuery', `isRobustResult=false. no responses at all`)
       return { topResult: null, winningNodes: [], isRobustResult: false }
     }
     //this isRobustResult should always be false if we get to this code.
@@ -400,7 +410,11 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     if (config.debug.robustQueryDebug || extraDebugging) {
       console.log(`isRobustResult=false. robust tally dump: ${stringifyReduce(responses)}`)
     }
-    if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `isRobustResult=false. returning highest count response. ${stringifyReduce(responses)}`)
+    if (extraDebugging)
+      nestedCountersInstance.countEvent(
+        'robustQuery',
+        `isRobustResult=false. returning highest count response. ${stringifyReduce(responses)}`
+      )
     return {
       topResult: highestCountItem.value,
       winningNodes: highestCountItem.nodes,
@@ -473,4 +487,16 @@ export interface AttemptOptions {
 
   /** The logger to write to on failures. */
   logger?: Logger
+}
+
+export function generateUUID(): string {
+  const buffer = crypto.randomBytes(16)
+  buffer[6] = (buffer[6] & 0x0f) | 0x40 // Version 4
+  buffer[8] = (buffer[8] & 0x3f) | 0x80 // Variant
+
+  const uuid = buffer.toString('hex')
+  return `${uuid.substring(0, 8)}-${uuid.substring(8, 4)}-${uuid.substring(12, 4)}-${uuid.substring(
+    16,
+    4
+  )}-${uuid.substring(20)}`
 }
