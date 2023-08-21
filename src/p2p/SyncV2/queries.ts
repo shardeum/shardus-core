@@ -134,7 +134,7 @@ export function robustQueryForArchiverListHash(
 }
 
 /** Retrives the cycle by marker from the node. */
-export function getCurrentCycleDataFromNode(node: ActiveNode, expectedMarker: hexstring): ResultAsync<CycleRecord, Error> {
+export function getCycleDataFromNode(node: ActiveNode, expectedMarker: hexstring): ResultAsync<CycleRecord, Error> {
   return attemptSimpleFetch(node, 'cycle-by-marker', {
     marker: expectedMarker
   })
