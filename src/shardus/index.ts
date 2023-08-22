@@ -1964,6 +1964,12 @@ class Shardus extends EventEmitter {
           appData: any
         ) => application.pruneNetworkChangeQueue(account, appData)
       }
+      if (typeof application.pruneNetworkChangeQueue === 'function') {
+        applicationInterfaceImpl.pruneNetworkChangeQueue = async (
+          account: ShardusTypes.WrappedData,
+          appData: any
+        ) => application.pruneNetworkChangeQueue(account, appData)
+      }
       if (typeof application.signAppData === 'function') {
         applicationInterfaceImpl.signAppData = async (
           type,
