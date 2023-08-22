@@ -303,6 +303,7 @@ export interface App {
   getNodeInfoAppData?: () => any
   signAppData?: (type: string, hash: string, nodesToSign: number, appData: any) => Promise<SignAppDataResult>
   updateNetworkChangeQueue?: (account: WrappedData, appData: any) => Promise<WrappedData[]>
+  pruneNetworkChangeQueue?: (account: WrappedData, appData: any) => Promise<WrappedData[]>
   beforeStateAccountFilter?: (account: WrappedData) => boolean
 }
 
@@ -893,6 +894,10 @@ export interface ServerConfiguration {
     fifoUnlockFix3: boolean
     //** enable account fetch for queue counts.  the extra fetching could cause too much latency so we want the option to control it for testing first */
     enableAccountFetchForQueueCounts: boolean
+    //** the number of cycles within which we want to keep \changes to a config*/
+    configChangeMaxCyclesToKeep: number
+    //** the number of config changes to keep*/
+    configChangeMaxChangesToKeep: number
   }
   /** Options for sharding calculations */
   sharding?: {

@@ -1916,6 +1916,12 @@ class Shardus extends EventEmitter {
           appData: any
         ) => application.updateNetworkChangeQueue(account, appData)
       }
+      if (typeof application.pruneNetworkChangeQueue === 'function') {
+        applicationInterfaceImpl.pruneNetworkChangeQueue = async (
+          account: ShardusTypes.WrappedData,
+          appData: any
+        ) => application.pruneNetworkChangeQueue(account, appData)
+      }
       if (typeof application.signAppData === 'function') {
         applicationInterfaceImpl.signAppData = application.signAppData
       }
@@ -2099,29 +2105,32 @@ class Shardus extends EventEmitter {
       return
     }
     for (let change of changes) {
-     //skip future changes
-     if (change.cycle > lastCycle.counter) {
-      continue
-    }
-    const changeHash = this.crypto.hash(change)
-    //skip handled changes
-    if (this.appliedConfigChanges.has(changeHash)) {
-      continue
-    }
-    //apply this change
-    this.appliedConfigChanges.add(changeHash)
-    let changeObj = change.change
-    let appData = change.appData
+      //skip future changes
+      if (change.cycle > lastCycle.counter) {
+        continue
+      }
+      const changeHash = this.crypto.hash(change)
+      //skip handled changes
+      if (this.appliedConfigChanges.has(changeHash)) {
+        continue
+      }
+      //apply this change
+      this.appliedConfigChanges.add(changeHash)
+      let changeObj = change.change
+      let appData = change.appData
 
-    this.patchObject(this.config, changeObj, appData)
+      this.patchObject(this.config, changeObj, appData)
 
-    if (appData) {
-      const data: WrappedData[] = await this.app.updateNetworkChangeQueue(account, appData)
-      await this.stateManager.checkAndSetAccountData(data, 'global network account update', true)
-    }
+      const prunedData: WrappedData[] = await this.app.pruneNetworkChangeQueue(account, lastCycle.counter)
+      await this.stateManager.checkAndSetAccountData(prunedData, 'global network account update', true)
 
-    this.p2p.configUpdated()
-    this.loadDetection.configUpdated()
+      if (appData) {
+        const data: WrappedData[] = await this.app.updateNetworkChangeQueue(account, appData)
+        await this.stateManager.checkAndSetAccountData(data, 'global network account update', true)
+      }
+
+      this.p2p.configUpdated()
+      this.loadDetection.configUpdated()
     }
   }
 
