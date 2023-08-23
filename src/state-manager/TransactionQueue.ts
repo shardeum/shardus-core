@@ -341,6 +341,24 @@ class TransactionQueue {
               transactionGroup,
               false
             )
+            console.log(
+              'queueEntry.isInExecutionHome',
+              queueEntry.acceptedTx.txId,
+              queueEntry.isInExecutionHome
+            )
+            // If our node is in the execution group, forward this raw tx to the subscribed archivers
+            if (queueEntry.isInExecutionHome === true) {
+              console.log('originalTxData', queueEntry.acceptedTx.txId)
+              const { acceptedTx } = queueEntry
+              const originalTxData = {
+                txId: acceptedTx.txId,
+                originalTxData: acceptedTx.data,
+                cycle: queueEntry.cycleToRecordOn,
+                timestamp: acceptedTx.timestamp,
+              }
+              const signedOriginalTxData: any = this.crypto.sign(originalTxData)
+              Archivers.instantForwardOriginalTxData(signedOriginalTxData)
+            }
           }
         } finally {
           profilerInstance.scopedProfileSectionEnd('spread_tx_to_group', respondSize)
@@ -959,6 +977,7 @@ class TransactionQueue {
       this.profiler.profileSectionStart('commit-3-transactionReceiptPass')
       // endpoint to allow dapp to execute something that depends on a transaction being approved.
       this.app.transactionReceiptPass(acceptedTX.data, wrappedStates, applyResponse)
+      console.log('transactionReceiptPass', acceptedTX.txId, queueEntry)
 
       this.profiler.profileSectionEnd('commit-3-transactionReceiptPass')
     } catch (ex) {
@@ -1476,6 +1495,13 @@ class TransactionQueue {
                 // should consider only forwarding in some cases?
                 this.stateManager.debugNodeGroup(txId, timestamp, `share to neighbors`, transactionGroup)
                 this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, transactionGroup, true)
+                console.log(
+                  'spread_tx_to_group',
+                  txId,
+                  txQueueEntry.executionGroup.length,
+                  txQueueEntry.conensusGroup.length,
+                  txQueueEntry.transactionGroup.length
+                )
               }
               // /* prettier-ignore */ if (logFlags.playback ) this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
             } catch (ex) {
@@ -4380,6 +4406,8 @@ class TransactionQueue {
               // most remove from queue at the end because it compacts the queue entry
               this.removeFromQueue(queueEntry, currentIndex)
 
+              console.log('Await Repair Finished', queueEntry.acceptedTx.txId, queueEntry)
+
               nestedCountersInstance.countEvent('stateManager', 'repairFinished')
               continue
             }
@@ -4551,6 +4579,8 @@ class TransactionQueue {
               // commit  queueEntry.preApplyTXResult.applyResponse.... hmm
               // aslo is queueEntry.preApplyTXResult.applyResponse use above in tex data tell?
 
+              console.log('Commiting TX', queueEntry.acceptedTx.txId, queueEntry)
+
               try {
                 let canCommitTX = true
                 let hasReceiptFail = false
@@ -4612,6 +4642,8 @@ class TransactionQueue {
                   this.profiler.profileSectionEnd('commit')
                   //}
                 }
+
+                console.log('Can Commit TX', queueEntry.acceptedTx.txId, queueEntry)
 
                 if (this.config.p2p.experimentalSnapshot) this.addReceiptToForward(queueEntry)
                 // console.log('commit commit', queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)

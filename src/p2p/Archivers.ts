@@ -426,7 +426,7 @@ async function forwardReceipts() {
     else continue
     if (logFlags.console)
       console.log('pingNeeded', pingNeeded, stateManager.transactionQueue.receiptsForwardedTimestamp)
-    forwardReceiptsData(responses, publicKey, recipient)
+    forwardDataToSubscribedArchivers(responses, publicKey, recipient)
   }
 
   if (config.p2p.instantForwardReceipts) {
@@ -450,22 +450,22 @@ async function forwardReceipts() {
         const DELAY_BETWEEN_FORWARD_MS = 1000
         if (_30SECS__DATA && _30SECS__DATA.length > 0) {
           responses.RECEIPT = [..._30SECS__DATA]
-          forwardReceiptsData(responses, publicKey, recipient)
+          forwardDataToSubscribedArchivers(responses, publicKey, recipient)
         }
         await sleep(DELAY_BETWEEN_FORWARD_MS)
         if (_20SECS__DATA && _20SECS__DATA.length > 0) {
           responses.RECEIPT = [..._20SECS__DATA]
-          forwardReceiptsData(responses, publicKey, recipient)
+          forwardDataToSubscribedArchivers(responses, publicKey, recipient)
         }
         await sleep(DELAY_BETWEEN_FORWARD_MS)
         if (_10SECS__DATA && _10SECS__DATA.length > 0) {
           responses.RECEIPT = [..._10SECS__DATA]
-          forwardReceiptsData(responses, publicKey, recipient)
+          forwardDataToSubscribedArchivers(responses, publicKey, recipient)
         }
         await sleep(DELAY_BETWEEN_FORWARD_MS)
         if (freshReceipts && freshReceipts.length > 0) {
           responses.RECEIPT = [...freshReceipts]
-          forwardReceiptsData(responses, publicKey, recipient)
+          forwardDataToSubscribedArchivers(responses, publicKey, recipient)
         }
       }
     }
@@ -478,19 +478,15 @@ async function forwardReceipts() {
   profilerInstance.scopedProfileSectionEnd('forwardReceipts')
 }
 
-async function forwardReceiptsData(responses, publicKey, recipient) {
-  if (logFlags.console) console.log('forwardReceiptsData', responses.RECEIPT.length)
+async function forwardDataToSubscribedArchivers(responses, publicKey, recipient) {
   const dataResponse: P2P.ArchiversTypes.DataResponse = {
     publicKey: crypto.getPublicKey(),
     responses,
     recipient: publicKey,
   }
-
-  nestedCountersInstance.countEvent('Archiver', 'forwardReceiptsData', responses.RECEIPT.length)
-
   // Tag dataResponse
   const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
-  if (logFlags.console) console.log('Sending receipts to archivers', taggedDataResponse)
+  if (logFlags.console) console.log('Sending data to subscribed archivers', taggedDataResponse)
   try {
     if (io.sockets.sockets[connectedSockets[publicKey]]) {
       if (logFlags.console)
@@ -498,7 +494,7 @@ async function forwardReceiptsData(responses, publicKey, recipient) {
       io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
     } else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
   } catch (e) {
-    error('Run into issue in forwarding receipts data', e)
+    error('Run into issue in forwarding data', e)
   }
 }
 
@@ -511,11 +507,26 @@ export async function instantForwardReceipts(receipts) {
   const responses: any = {}
   responses.RECEIPT = [...receipts]
   for (const [publicKey, recipient] of recipients) {
-    forwardReceiptsData(responses, publicKey, recipient)
+    forwardDataToSubscribedArchivers(responses, publicKey, recipient)
   }
+  nestedCountersInstance.countEvent('Archiver', 'instantForwardReceipts')
   profilerInstance.scopedProfileSectionEnd('instantForwardReceipts')
 }
 
+export async function instantForwardOriginalTxData(originalTxData) {
+  if (!config.p2p.experimentalSnapshot) return
+
+  profilerInstance.scopedProfileSectionStart('instantForwardOriginalTxData')
+
+  // TODO: add a new type for receipt
+  const responses: any = {}
+  responses.ORIGINAL_TX_DATA = [originalTxData]
+  for (const [publicKey, recipient] of recipients) {
+    forwardDataToSubscribedArchivers(responses, publicKey, recipient)
+  }
+  nestedCountersInstance.countEvent('Archiver', 'instantForwardOriginalTxData')
+  profilerInstance.scopedProfileSectionEnd('instantForwardOriginalTxData')
+}
 /**
  * This function is used by the checkNetworkStopped feature to check if the
  * network is down by checking if all Archivers are down. If so, it causes
