@@ -1669,8 +1669,11 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.txPreCrackData === 'function') {
-        applicationInterfaceImpl.txPreCrackData = async (tx, appData) =>
-          application.txPreCrackData(tx, appData)
+        applicationInterfaceImpl.txPreCrackData = async (tx, appData) => {
+          this.profiler.scopedProfileSectionStart("process-dapp.txPreCrackData", false);
+          await application.txPreCrackData(tx, appData)
+          this.profiler.scopedProfileSectionEnd("process-dapp.txPreCrackData");
+        }
       } else {
         applicationInterfaceImpl.txPreCrackData = async function () {}
       }
@@ -1704,8 +1707,11 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.updateAccountFull === 'function') {
-        applicationInterfaceImpl.updateAccountFull = async (wrappedStates, localCache, applyResponse) =>
-          application.updateAccountFull(wrappedStates, localCache, applyResponse)
+        applicationInterfaceImpl.updateAccountFull = async (wrappedStates, localCache, applyResponse) =>{
+          this.profiler.scopedProfileSectionStart("process-dapp.updateAccountFull", false);
+          await application.updateAccountFull(wrappedStates, localCache, applyResponse)
+          this.profiler.scopedProfileSectionEnd("process-dapp.updateAccountFull");
+        }
       } else {
         throw new Error('Missing required interface function. updateAccountFull()')
       }
@@ -1741,8 +1747,12 @@ class Shardus extends EventEmitter {
       // Provides the functionality defined for /get_accounts API
       // Max_records - limits the number of records returned
       if (typeof application.getAccountData === 'function') {
-        applicationInterfaceImpl.getAccountData = async (accountStart, accountEnd, maxRecords) =>
-          application.getAccountData(accountStart, accountEnd, maxRecords)
+        applicationInterfaceImpl.getAccountData = async (accountStart, accountEnd, maxRecords) =>{
+          this.profiler.scopedProfileSectionStart("process-dapp.getAccountData", false);
+          const res = await  application.getAccountData(accountStart, accountEnd, maxRecords)
+          this.profiler.scopedProfileSectionEnd("process-dapp.getAccountData");
+          return res;
+        }
       } else {
         throw new Error('Missing required interface function. getAccountData()')
       }
@@ -1756,16 +1766,20 @@ class Shardus extends EventEmitter {
           maxRecords,
           offset,
           accountOffset
-        ) =>
-          application.getAccountDataByRange(
-            accountStart,
-            accountEnd,
-            tsStart,
-            tsEnd,
-            maxRecords,
-            offset,
-            accountOffset
-          )
+        ) =>{
+          this.profiler.scopedProfileSectionStart("process-dapp.getAccountDataByRange", false);
+          const res = await application.getAccountDataByRange(
+                              accountStart,
+                              accountEnd,
+                              tsStart,
+                              tsEnd,
+                              maxRecords,
+                              offset,
+                              accountOffset
+                            )
+          this.profiler.scopedProfileSectionEnd("process-dapp.getAccountDataByRange");
+          return res;
+        }
       } else {
         throw new Error('Missing required interface function. getAccountDataByRange()')
       }
@@ -1781,8 +1795,11 @@ class Shardus extends EventEmitter {
       // Stores the records into the Accounts table if the hash of the Acc_data matches State_id
       // Returns a list of failed Acc_id
       if (typeof application.setAccountData === 'function') {
-        applicationInterfaceImpl.setAccountData = async (accountRecords) =>
+        applicationInterfaceImpl.setAccountData = async (accountRecords) => {
+          this.profiler.scopedProfileSectionStart('process-dapp.setAccountData', false); 
           application.setAccountData(accountRecords)
+          this.profiler.scopedProfileSectionEnd('process-dapp.setAccountData'); 
+        }
       } else {
         throw new Error('Missing required interface function. setAccountData()')
       }
@@ -1796,8 +1813,13 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.getAccountDataByList === 'function') {
-        applicationInterfaceImpl.getAccountDataByList = async (addressList) =>
-          application.getAccountDataByList(addressList)
+        applicationInterfaceImpl.getAccountDataByList = async (addressList) =>{
+          this.profiler.scopedProfileSectionStart('process-dapp.getAccountDataByList', false); 
+          console.log("process-dapp.getAccountDataByList");
+          const accData =  await application.getAccountDataByList(addressList)
+          this.profiler.scopedProfileSectionEnd('process-dapp.getAccountDataByList'); 
+          return accData;
+        }
       } else {
         throw new Error('Missing required interface function. getAccountDataByList()')
       }
@@ -1809,7 +1831,11 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.deleteLocalAccountData === 'function') {
-        applicationInterfaceImpl.deleteLocalAccountData = async () => application.deleteLocalAccountData()
+        applicationInterfaceImpl.deleteLocalAccountData = async () => {
+          this.profiler.scopedProfileSectionStart('process-dapp.deleteLocalAccountData', false); 
+          await application.deleteLocalAccountData()
+          this.profiler.scopedProfileSectionEnd('process-dapp.deleteLocalAccountData'); 
+        }
       } else {
         throw new Error('Missing required interface function. deleteLocalAccountData()')
       }
@@ -1835,7 +1861,12 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.sync === 'function') {
-        applicationInterfaceImpl.sync = async () => application.sync()
+        applicationInterfaceImpl.sync = async () => {
+          this.profiler.scopedProfileSectionStart('process-dapp.sync', false); 
+          const res = await application.sync()
+          this.profiler.scopedProfileSectionEnd('process-dapp.sync'); 
+          return res
+        }
       } else {
         const thisPtr = this
         applicationInterfaceImpl.sync = async function () {
@@ -1917,6 +1948,9 @@ class Shardus extends EventEmitter {
           account: ShardusTypes.WrappedData,
           appData: any
         ) => application.updateNetworkChangeQueue(account, appData)
+      } else {
+        // If the app doesn't provide updateNetworkChangeQueue, just return empty arr 
+        applicationInterfaceImpl.updateNetworkChangeQueue = async (account, appData) => [] 
       }
       if (typeof application.pruneNetworkChangeQueue === 'function') {
         applicationInterfaceImpl.pruneNetworkChangeQueue = async (
@@ -1925,7 +1959,11 @@ class Shardus extends EventEmitter {
         ) => application.pruneNetworkChangeQueue(account, appData)
       }
       if (typeof application.signAppData === 'function') {
-        applicationInterfaceImpl.signAppData = application.signAppData
+        applicationInterfaceImpl.signAppData = async (type,hash, nodesToSign, appData): Promise<ShardusTypes.SignAppDataResult> => { 
+          this.profiler.scopedProfileSectionStart("process-dapp.signAppData", false);
+          const res = await  application.signAppData(type, hash, nodesToSign, appData)
+          this.profiler.scopedProfileSectionEnd("process-dapp.signAppData");
+          return res
       }
       if (typeof application.beforeStateAccountFilter === 'function') {
         applicationInterfaceImpl.beforeStateAccountFilter = application.beforeStateAccountFilter

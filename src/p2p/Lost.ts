@@ -52,7 +52,7 @@ interface ScheduledLostReport {
   requestId: string
 }
 
-const CACHE_CYCLES = 10
+//const CACHE_CYCLES = 10 replaced by multiple configs
 
 interface PingMessage {
   m: string
@@ -174,15 +174,18 @@ export function init() {
 
 // This gets called before start of Q1
 export function reset() {
+  const lostCacheCycles = config.p2p.lostMapPruneCycles
   for (const [key, obj] of lost) {
-    if (obj.cycle < currentCycle - CACHE_CYCLES) {
+    // delete old lost reports
+    if (obj.cycle < currentCycle - lostCacheCycles) {
       lost.delete(key)
       continue
-    } // delete old lost reports
+    }
+    // delete once the target is removed from the node list
     if (!nodes.get(obj.target)) {
       lost.delete(key)
       continue
-    } // delete once the target is removed from the node list
+    }
   }
   pruneIsDown() // prune isUp and isDown status cache
   pruneStopReporting() // prune stopReporting cache
@@ -598,18 +601,26 @@ returns true it means that it was found to be up recently.
 async function isDownCache(node, requestId: string) {
   // First check the isUp isDown caches to see if we already checked this node before
   const id = node.id
-  if (isDown[id]) {
-    info(`node with id ${node.id} found in isDown for requestId: ${requestId}`)
-    return 'down'
-  }
-  if (isUp[id]) {
-    info(`node with id ${node.id} found in isUp for requestId: ${requestId}`)
-    return 'up'
+
+  if (config.p2p.isDownCacheEnabled) {
+    if (isDown[id]) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-skipped-down', 1)
+      info(`node with id ${node.id} found in isDown for requestId: ${requestId}`)
+      return 'down'
+    }
+    if (isUp[id]) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-skipped-up', 1)
+      info(`node with id ${node.id} found in isUp for requestId: ${requestId}`)
+      return 'up'
+    }
   }
   const status = await isDownCheck(node)
   info(`isDownCheck for requestId: ${requestId} on node with id ${node.id} is ${status}`)
-  if (status === 'down') isDown[id] = currentCycle
-  else isUp[id] = currentCycle
+  if (status === 'down') {
+    isDown[id] = currentCycle
+  } else {
+    isUp[id] = currentCycle
+  }
   return status
 }
 
@@ -652,17 +663,21 @@ export function isNodeLost(nodeId: string): boolean {
 
 // This is called once per cycle by reset
 function pruneIsDown() {
+  const cachePruneAge = config.p2p.isDownCachePruneCycles
+
   for (const [key, value] of Object.entries(isDown)) {
-    if (value < currentCycle - CACHE_CYCLES) delete isDown[key]
+    if (value < currentCycle - cachePruneAge) delete isDown[key]
   }
   for (const [key, value] of Object.entries(isUp)) {
-    if (value < currentCycle - CACHE_CYCLES) delete isUp[key]
+    if (value < currentCycle - cachePruneAge) delete isUp[key]
   }
 }
 
 function pruneStopReporting() {
+  const stopReportingPruneCycles = config.p2p.stopReportingLostPruneCycles
+
   for (const [key, value] of Object.entries(stopReporting)) {
-    if (value < currentCycle - CACHE_CYCLES) delete stopReporting[key]
+    if (value < currentCycle - stopReportingPruneCycles) delete stopReporting[key]
   }
 }
 

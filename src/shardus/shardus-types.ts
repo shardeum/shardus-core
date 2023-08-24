@@ -695,6 +695,15 @@ export interface ServerConfiguration {
     delayLostReportByNumOfCycles: number
     /** If disabled, the lost reports are sent to the checker immediately */
     aggregateLostReportsTillQ1: boolean
+
+    /** how many cycles old should an is down cache entry be before we clear it */
+    isDownCachePruneCycles: number
+    /** should we use the is down cache */
+    isDownCacheEnabled: boolean
+    /** how many cycles before we prune our info of a node being lost and can report it again */
+    stopReportingLostPruneCycles: number
+    /** how many cycles before we prune our info of our map of lost node information */
+    lostMapPruneCycles: number
     /** To forward the receipt data to the archivers as soon as a receipt is formed */
     instantForwardReceipts: boolean
     /** A node can serve only X max archivers for data transfer and can refuse other archivers requests if it’s serving the max number */
