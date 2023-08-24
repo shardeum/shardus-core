@@ -17,6 +17,7 @@ import * as utils from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
+import { formatErrorMessage } from '../utils'
 
 /** TYPES */
 export interface IPInfo {
@@ -209,12 +210,17 @@ export class NetworkClass extends EventEmitter {
     }
     for (const node of nodes) {
       if (!logged) this.logger.playbackLog('self', node, 'InternalTell', route, id, message)
+      const requestId = generateUUID()
+        mainLogger.info(`Initiating tell request with requestId: ${requestId}`)
+        mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
+        mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
       this.InternalTellCounter++
       const promise = this.sn.send(node.internalPort, node.internalIp, data)
       promise.catch((err) => {
         if (logFlags.error) this.mainLogger.error('Network: ' + err)
-        if (logFlags.error) this.mainLogger.error(err.stack)
-        this.emit('error', node)
+        if (logFlags.error) this.mainLogger.error('Network: ' + formatErrorMessage(err.stack))
+        let errorGroup = ('' + err).slice(0,20)
+        this.emit('error', node, requestId, "tell", errorGroup)
       })
       promises.push(promise)
     }
@@ -235,7 +241,7 @@ export class NetworkClass extends EventEmitter {
 
       const requestId = generateUUID()
       mainLogger.info(`Initiating ask request with requestId: ${requestId}`)
-      mainLogger.info(`requestId: ${requestId}, node: ${JSON.stringify(node)}`)
+      mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
       mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
 
       try {
@@ -256,8 +262,8 @@ export class NetworkClass extends EventEmitter {
           const err = new Error(`Request timed out. ${utils.stringifyReduce(id)}`)
           nestedCountersInstance.countRareEvent('network', 'timeout ' + route)
           if (logFlags.error) this.mainLogger.error('Network: ' + err)
-          if (logFlags.error) this.mainLogger.error(err.stack)
-          this.emit('timeout', node, requestId)
+          if (logFlags.error) this.mainLogger.error('Network: ' + formatErrorMessage(err.stack))
+          this.emit('timeout', node, requestId, "ask")
           reject(err)
         }
         if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, id, message)
@@ -272,7 +278,8 @@ export class NetworkClass extends EventEmitter {
           )
         } catch (err) {
           if (logFlags.error) this.mainLogger.error('Network: ' + err)
-          this.emit('error', node)
+          let errorGroup = ('' + err).slice(0,20)
+          this.emit('error', node, requestId, "ask", errorGroup)
         }
       } finally {
         profilerInstance.profileSectionEnd('net-ask')

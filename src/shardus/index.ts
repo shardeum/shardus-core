@@ -36,7 +36,7 @@ import { DebugComplete } from '../state-manager/TransactionQueue'
 import Statistics from '../statistics'
 import Storage from '../storage'
 import * as utils from '../utils'
-import { groupResolvePromises, inRangeOfCurrentTime, isValidShardusAddress } from '../utils'
+import { groupResolvePromises, inRangeOfCurrentTime, isValidShardusAddress, logNode } from '../utils'
 import { getSocketReport } from '../utils/debugUtils'
 import MemoryReporting from '../utils/memoryReporting'
 import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
@@ -457,25 +457,26 @@ class Shardus extends EventEmitter {
     } catch (e) {
       this.mainLogger.error('Socket connection break', e)
     }
-    this.network.on('timeout', (node, requestId: string) => {
-      console.log(`In Shardus got network timeout for ${requestId} from node: ${node}`)
+    this.network.on('timeout', (node, requestId: string, context: string) => {
+      console.log(`In Shardus got network timeout-${context} for request ID - ${requestId} from node: ${logNode(node)}`)
       const result = isApopMarkedNode(node.id)
       if (result) {
         return
       }
       scheduleLostReport(node, 'timeout', requestId)
       /** [TODO] Report lost */
-      nestedCountersInstance.countEvent('lostNodes', 'timeout')
-
-      nestedCountersInstance.countRareEvent('lostNodes', `timeout  ${node.internalIp}:${node.internalPort}`)
+      nestedCountersInstance.countEvent('lostNodes', `timeout-${context}`)
+      // context has been added to provide info on the type of timeout and where it happened
+      nestedCountersInstance.countRareEvent('lostNodes', `timeout-${context} ${node.internalIp}:${node.internalPort}`)
       if (this.network.statisticsInstance) this.network.statisticsInstance.incrementCounter('lostNodeTimeout')
     })
-    this.network.on('error', (node) => {
-      const requestId = generateUUID()
-      console.log(`In Shardus got network error for ${requestId} from node: ${node}`)
+    this.network.on('error', (node, requestId: string, context: string, errorGroup: string) => {
+      console.log(`In Shardus got network error-${context} for request ID ${requestId} from node: ${logNode(node)}`)
+      console.log(`Error group for request ID - ${requestId}: ${errorGroup}`)
       scheduleLostReport(node, 'error', requestId)
       /** [TODO] Report lost */
-      nestedCountersInstance.countEvent('lostNodes', 'error')
+      nestedCountersInstance.countEvent('lostNodes', `error-${context}`)
+      nestedCountersInstance.countRareEvent('lostNodes', `error-${context}  ${node.internalIp}:${node.internalPort}`)
     })
 
     // Setup storage

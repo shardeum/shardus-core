@@ -1,3 +1,4 @@
+import { P2P } from "@shardus/types"
 import { Ordering } from '..'
 
 export const deepCopy = <T>(obj: T): T => {
@@ -426,4 +427,8 @@ export function isValidShardusAddress(hexStrings: string[]): boolean {
     if (!(hexStrings[i].length === 64) || !(Buffer.from(hexStrings[i], 'hex').length === 32)) return false
   }
   return true
+}
+
+export function logNode( node : P2P.NodeListTypes.Node ): string {
+  return `Node ID : ${node.id} Node Address : ${node.address} externalPort : ${node.externalPort} externalIP : ${node.externalIp}`
 }
