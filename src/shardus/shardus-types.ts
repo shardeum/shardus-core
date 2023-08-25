@@ -289,6 +289,7 @@ export interface App {
   dataSummaryUpdate?: (blob: any, accountDataBefore: any, accountDataAfter: any) => void
   txSummaryUpdate?: (blob: any, tx: any, wrappedStates: any) => void
   validateJoinRequest?: (data: any) => any
+  validateArchiverJoinRequest?: (data: any) => any
   getJoinData?: () => any
   eventNotify?: (event: ShardusEvent) => void
   isReadyToJoin: (

@@ -14,8 +14,8 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import * as Comms from './Comms'
 import * as Context from './Context'
-import { isInvalidIP, isBogonIP } from '../utils/functions/checkIP'
-import { config, crypto, io, logger, network, stateManager } from './Context'
+import { isBogonIP } from '../utils/functions/checkIP'
+import { config, crypto, io, logger, network, stateManager, shardus } from './Context'
 import { computeCycleMarker, getCycleChain } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
@@ -244,8 +244,12 @@ export function addArchiverJoinRequest(joinRequest: P2P.ArchiversTypes.Request, 
   }
 
   if (archivers.size > 0) {
-    // Get the consensus radius of the network
+    // Check the archiver version from dapp
+    const validationResponse = validateArchiverAppData(joinRequest)
+    if (validationResponse && !validationResponse.success) return validationResponse
+
     try {
+      // Get the consensus radius of the network
       const {
         shardGlobals: { consensusRadius },
       } = Context.stateManager.getCurrentCycleShardData()
@@ -269,6 +273,37 @@ export function addArchiverJoinRequest(joinRequest: P2P.ArchiversTypes.Request, 
     Comms.sendGossip('joinarchiver', joinRequest, tracker, null, NodeList.byIdOrder, true)
   }
   return { success: true }
+}
+
+function validateArchiverAppData(joinRequest: P2P.ArchiversTypes.Request): {
+  success: boolean
+  reason?: string
+} {
+  if (typeof shardus.app.validateArchiverJoinRequest === 'function') {
+    try {
+      const validationResponse = shardus.app.validateArchiverJoinRequest(joinRequest)
+      if (validationResponse.success !== true) {
+        error(
+          `Validation of Archiver join request data failed due to ${
+            validationResponse.reason || 'unknown reason'
+          }`
+        )
+        nestedCountersInstance.countEvent('Archiver', `Join-reject-dapp`)
+        return {
+          success: validationResponse.success,
+          reason: validationResponse.reason,
+        }
+      }
+      return { success: true }
+    } catch (e) {
+      warn(`shardus.app.validateArchiverJoinRequest failed due to ${e}`)
+      nestedCountersInstance.countEvent('Archiver', `Join-reject-ex ${e}`)
+      return {
+        success: false,
+        reason: `Could not validate archiver join request due to Error`,
+      }
+    }
+  }
 }
 
 export function addLeaveRequest(leaveRequest: P2P.ArchiversTypes.Request, tracker?, gossip = true) {
