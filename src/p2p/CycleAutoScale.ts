@@ -346,7 +346,12 @@ function setDesireCount(count: number) {
 
 export function configUpdated() {
   if (desiredCount < config.p2p.minNodes) {
+    //requestNetworkUpsize updates desiredCount internally
+    requestNetworkUpsize()
+  }
+  if (desiredCount > config.p2p.minNodes) {
     desiredCount = config.p2p.minNodes
+    requestNetworkDownsize()
   }
 }
 
