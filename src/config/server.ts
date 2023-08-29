@@ -85,7 +85,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     useLruCacheForSocketMgmt: false,
     lruCacheSizeForSocketMgmt: 1000,
     instantForwardReceipts: false,
-    maxArchiversSubscriptionPerNode: 2
+    maxArchiversSubscriptionPerNode: 2,
     writeSyncProtocolV2: false,
     useSyncProtocolV2: false,
   },
@@ -180,7 +180,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     fifoUnlockFix3: false,
     enableAccountFetchForQueueCounts: false,
     configChangeMaxCyclesToKeep: 5,
-    configChangeMaxChangesToKeep: 1000
+    configChangeMaxChangesToKeep: 1000,
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,
