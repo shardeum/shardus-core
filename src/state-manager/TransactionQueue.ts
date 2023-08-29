@@ -4406,7 +4406,7 @@ class TransactionQueue {
               // most remove from queue at the end because it compacts the queue entry
               this.removeFromQueue(queueEntry, currentIndex)
 
-              console.log('Await Repair Finished', queueEntry.acceptedTx.txId, queueEntry)
+              // console.log('Await Repair Finished', queueEntry.acceptedTx.txId, queueEntry)
 
               nestedCountersInstance.countEvent('stateManager', 'repairFinished')
               continue
@@ -4579,7 +4579,7 @@ class TransactionQueue {
               // commit  queueEntry.preApplyTXResult.applyResponse.... hmm
               // aslo is queueEntry.preApplyTXResult.applyResponse use above in tex data tell?
 
-              console.log('Commiting TX', queueEntry.acceptedTx.txId, queueEntry)
+              // console.log('Commiting TX', queueEntry.acceptedTx.txId, queueEntry)
 
               try {
                 let canCommitTX = true
@@ -4643,7 +4643,7 @@ class TransactionQueue {
                   //}
                 }
 
-                console.log('Can Commit TX', queueEntry.acceptedTx.txId, queueEntry)
+                // console.log('Can Commit TX', queueEntry.acceptedTx.txId, queueEntry)
 
                 if (this.config.p2p.experimentalSnapshot) this.addReceiptToForward(queueEntry)
                 // console.log('commit commit', queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)

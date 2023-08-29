@@ -16,7 +16,7 @@ import * as Comms from './Comms'
 import * as Context from './Context'
 import { isBogonIP } from '../utils/functions/checkIP'
 import { config, crypto, io, logger, network, stateManager, shardus } from './Context'
-import { computeCycleMarker, getCycleChain } from './CycleChain'
+import { computeCycleMarker, getCycleChain, newest } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
 import Timeout = NodeJS.Timeout
@@ -197,7 +197,7 @@ export function resetLeaveRequests() {
 
 export function addArchiverJoinRequest(joinRequest: P2P.ArchiversTypes.Request, tracker?, gossip = true) {
   // validate input
-  let err = validateTypes(joinRequest, { nodeInfo: 'o', requestType: 's', sign: 'o' })
+  let err = validateTypes(joinRequest, { nodeInfo: 'o', requestType: 's', requestTimestamp: 'n', sign: 'o' })
   if (err) {
     warn('addJoinRequest: bad joinRequest ' + err)
     return { success: false, reason: 'bad joinRequest ' + err }
@@ -248,8 +248,30 @@ export function addArchiverJoinRequest(joinRequest: P2P.ArchiversTypes.Request, 
     const validationResponse = validateArchiverAppData(joinRequest)
     if (validationResponse && !validationResponse.success) return validationResponse
 
+    // Check if the archiver request timestamp is within the acceptable timestamp range (after current cycle, before next cycle)
+    const requestTimestamp = joinRequest.requestTimestamp
+    const cycleDuration = newest.duration
+    const cycleStart = newest.start
+    const currentCycleStartTime = (cycleStart + cycleDuration) * 1000
+    const nextCycleStartTime = (cycleStart + 2 * cycleDuration) * 1000
+
+    if (requestTimestamp < currentCycleStartTime) {
+      warn('addJoinRequest: This archiver join request timestamp is earlier than acceptable timestamp range')
+      return {
+        success: false,
+        reason: 'This archiver join request timestamp is earlier than acceptable timestamp range',
+      }
+    }
+    if (requestTimestamp > nextCycleStartTime) {
+      warn('addJoinRequest: This archiver join request timestamp exceeds acceptable timestamp range')
+      return {
+        success: false,
+        reason: 'This archiver join request timestamp exceeds acceptable timestamp range',
+      }
+    }
+
+    // Get the consensus radius of the network
     try {
-      // Get the consensus radius of the network
       const {
         shardGlobals: { consensusRadius },
       } = Context.stateManager.getCurrentCycleShardData()
@@ -353,6 +375,28 @@ export function addLeaveRequest(leaveRequest: P2P.ArchiversTypes.Request, tracke
   if (existingLeaveRequest) {
     warn('addLeaveRequest: This archiver leave request already exists')
     return { success: false, reason: 'This archiver leave request already exists' }
+  }
+
+  // Check if the archiver request timestamp is within the acceptable timestamp range (after current cycle, before next cycle)
+  const requestTimestamp = leaveRequest.requestTimestamp
+  const cycleDuration = newest.duration
+  const cycleStart = newest.start
+  const currentCycleStartTime = (cycleStart + cycleDuration) * 1000
+  const nextCycleStartTime = (cycleStart + 2 * cycleDuration) * 1000
+
+  if (requestTimestamp < currentCycleStartTime) {
+    warn('addLeaveRequest: This archiver leave request timestamp is earlier than acceptable timestamp range')
+    return {
+      success: false,
+      reason: 'This archiver leave request timestamp is earlier than acceptable timestamp range',
+    }
+  }
+  if (requestTimestamp > nextCycleStartTime) {
+    warn('addLeaveRequest: This archiver leave request timestamp exceeds acceptable timestamp range')
+    return {
+      success: false,
+      reason: 'This archiver leave request timestamp exceeds acceptable timestamp range',
+    }
   }
   leaveRequests.push(leaveRequest)
   if (logFlags.console) console.log('adding leave requests', leaveRequests)
