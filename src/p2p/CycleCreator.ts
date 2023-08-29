@@ -282,6 +282,9 @@ async function cycleCreator() {
   if (lastSavedData) {
     await storage.updateCycle({ networkId: lastSavedData.networkId }, data)
   } else {
+    // if node list hashes are not set at this point, set them to empty strings
+    data.nodeListHash = data.nodeListHash || ""
+    data.archiverListHash = data.archiverListHash || ""
     await storage.addCycles(data)
   }
   lastSavedData = data
