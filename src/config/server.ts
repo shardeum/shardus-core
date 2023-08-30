@@ -86,6 +86,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     lruCacheSizeForSocketMgmt: 1000,
     instantForwardReceipts: false,
     maxArchiversSubscriptionPerNode: 2,
+    writeSyncProtocolV2: false,
     useSyncProtocolV2: false,
   },
   ip: {

@@ -290,8 +290,10 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
 
 export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   // get the node list hashes *before* applying node changes
-  cycle.nodeListHash = NodeList.computeNewNodeListHash()
-  cycle.archiverListHash = Archivers.computeNewArchiverListHash()
+  if (config.p2p.useSyncProtocolV2 || config.p2p.writeSyncProtocolV2) {
+    cycle.nodeListHash = NodeList.computeNewNodeListHash()
+    cycle.archiverListHash = Archivers.computeNewArchiverListHash()
+  }
 
   const marker = CycleCreator.makeCycleMarker(cycle)
   if (CycleChain.cyclesByMarker[marker]) {
