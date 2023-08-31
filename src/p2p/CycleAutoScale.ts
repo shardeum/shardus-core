@@ -346,13 +346,16 @@ function setDesireCount(count: number) {
 
 export function configUpdated() {
   if (desiredCount < config.p2p.minNodes) {
-    //requestNetworkUpsize updates desiredCount internally
-    requestNetworkUpsize()
-  }
-  if (desiredCount > config.p2p.minNodes) {
     desiredCount = config.p2p.minNodes
-    requestNetworkDownsize()
+    //requestNetworkUpsize updates desiredCount internally
+    //we may still want this, but need some special testing to be sure
+    //requestNetworkUpsize()
   }
+  // if (desiredCount > config.p2p.maxNodes) {
+  //   desiredCount = config.p2p.maxNodes
+  //   //we may still want this, but need some special testing to be sure
+  //   //requestNetworkDownsize()
+  // }
 }
 
 export function queueRequest(request) {}

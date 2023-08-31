@@ -341,14 +341,10 @@ class TransactionQueue {
               transactionGroup,
               false
             )
-            console.log(
-              'queueEntry.isInExecutionHome',
-              queueEntry.acceptedTx.txId,
-              queueEntry.isInExecutionHome
-            )
+            /* prettier-ignore */ if (logFlags.verbose) console.log( 'queueEntry.isInExecutionHome', queueEntry.acceptedTx.txId, queueEntry.isInExecutionHome )
             // If our node is in the execution group, forward this raw tx to the subscribed archivers
             if (queueEntry.isInExecutionHome === true) {
-              console.log('originalTxData', queueEntry.acceptedTx.txId)
+              /* prettier-ignore */ if (logFlags.verbose) console.log('originalTxData', queueEntry.acceptedTx.txId)
               const { acceptedTx } = queueEntry
               const originalTxData = {
                 txId: acceptedTx.txId,
@@ -977,7 +973,7 @@ class TransactionQueue {
       this.profiler.profileSectionStart('commit-3-transactionReceiptPass')
       // endpoint to allow dapp to execute something that depends on a transaction being approved.
       this.app.transactionReceiptPass(acceptedTX.data, wrappedStates, applyResponse)
-      console.log('transactionReceiptPass', acceptedTX.txId, queueEntry)
+      /* prettier-ignore */ if (logFlags.verbose) console.log('transactionReceiptPass', acceptedTX.txId, queueEntry)
 
       this.profiler.profileSectionEnd('commit-3-transactionReceiptPass')
     } catch (ex) {
@@ -1495,13 +1491,7 @@ class TransactionQueue {
                 // should consider only forwarding in some cases?
                 this.stateManager.debugNodeGroup(txId, timestamp, `share to neighbors`, transactionGroup)
                 this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, transactionGroup, true)
-                console.log(
-                  'spread_tx_to_group',
-                  txId,
-                  txQueueEntry.executionGroup.length,
-                  txQueueEntry.conensusGroup.length,
-                  txQueueEntry.transactionGroup.length
-                )
+                /* prettier-ignore */ if (logFlags.verbose) console.log( 'spread_tx_to_group', txId, txQueueEntry.executionGroup.length, txQueueEntry.conensusGroup.length, txQueueEntry.transactionGroup.length )
               }
               // /* prettier-ignore */ if (logFlags.playback ) this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
             } catch (ex) {
