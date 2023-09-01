@@ -299,14 +299,14 @@ async function cycleCreator() {
         await storage.addCycles(data)
       }
       lastSavedData = data
+
+      info(`cc: cycle data created and stored. data.counter:${data.counter} ${callTag}`)
+
+      // this event is currently only handled by non active snapshot system
+      Self.emitter.emit('new_cycle_data', data)
     } catch (er) {
       /* prettier-ignore */ warn(`cc: Could not save prevRecord to DB. C${currentCycle} ${formatErrorMessage(er)}`)
     }
-
-    info(`cc: cycle data created and stored. data.counter:${data.counter} ${callTag}`)
-
-    // this event is currently only handled by non active snapshot system
-    Self.emitter.emit('new_cycle_data', data)
 
     // We are not always making it to this point. every 60s:
     // Print combined cycle log entry
