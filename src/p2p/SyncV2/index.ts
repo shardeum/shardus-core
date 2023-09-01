@@ -44,9 +44,17 @@ export function syncV2(activeNodes: P2P.SyncTypes.ActiveNode[]): ResultAsync<voi
     syncValidArchiverList(activeNodes).andThen(([archiverList, archiverListHash]) =>
       syncLatestCycleRecord(activeNodes).andThen((cycle) => {
         if (cycle.nodeListHash !== validatorListHash) {
-          return errAsync(new Error(`validator list hash from received cycle (${cycle.nodeListHash}) does not match the hash received from robust query (${validatorListHash})`))
+          return errAsync(
+            new Error(
+              `validator list hash from received cycle (${cycle.nodeListHash}) does not match the hash received from robust query (${validatorListHash})`
+            )
+          )
         } else if (cycle.archiverListHash !== archiverListHash) {
-          return errAsync(new Error(`archiver list hash from received cycle (${cycle.archiverListHash}) does not match the hash received from robust query (${archiverListHash})`))
+          return errAsync(
+            new Error(
+              `archiver list hash from received cycle (${cycle.archiverListHash}) does not match the hash received from robust query (${archiverListHash})`
+            )
+          )
         }
 
         NodeList.reset()
@@ -57,7 +65,7 @@ export function syncV2(activeNodes: P2P.SyncTypes.ActiveNode[]): ResultAsync<voi
         }
 
         CycleChain.reset()
-        digestCycle(cycle)
+        digestCycle(cycle, 'syncV2')
 
         return okAsync(void 0)
       })
@@ -88,7 +96,9 @@ function syncValidValidatorList(
     getValidatorListFromNode(winningNodes[0], value.nodeListHash).andThen((nodeList) =>
       // verify a hash of the retrieved node list matches the hash from before.
       // if it does, return the node list
-      verifyValidatorList(nodeList, value.nodeListHash).map(() => [nodeList, value.nodeListHash] as [P2P.NodeListTypes.Node[], hexstring])
+      verifyValidatorList(nodeList, value.nodeListHash).map(
+        () => [nodeList, value.nodeListHash] as [P2P.NodeListTypes.Node[], hexstring]
+      )
     )
   )
 }
@@ -114,7 +124,9 @@ function syncValidArchiverList(
     getArchiverListFromNode(winningNodes[0], value.archiverListHash).andThen((archiverList) =>
       // verify a hash of the retrieved archiver list matches the hash from before.
       // if it does, return the archiver list
-      verifyArchiverList(archiverList, value.archiverListHash).map(() => [archiverList, value.archiverListHash] as [P2P.ArchiversTypes.JoinedArchiver[], hexstring])
+      verifyArchiverList(archiverList, value.archiverListHash).map(
+        () => [archiverList, value.archiverListHash] as [P2P.ArchiversTypes.JoinedArchiver[], hexstring]
+      )
     )
   )
 }

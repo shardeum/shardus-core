@@ -150,8 +150,6 @@ export type RobustQueryResult<N, R> = {
   isRobustResult: boolean
 }
 
-      if (extraDebugging)
-      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `not enough nodes to meet strictRedundancy`)
 class Tally<Node, Response> {
   winCount: number
   equalFn: EqualityFunction<Response>
@@ -259,7 +257,8 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   }
   if (redundancy > nodes.length) {
     if (strictRedundancy) {
-      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `not enough nodes to meet strictRedundancy`)
+      if (extraDebugging)
+        nestedCountersInstance.countEvent('robustQuery', `not enough nodes to meet strictRedundancy`)
       if (logFlags.console || config.debug.robustQueryDebug || extraDebugging)
         console.log('robustQuery: isRobustResult=false. not enough nodes to meet strictRedundancy')
       return { topResult: null, winningNodes: [], isRobustResult: false }

@@ -288,20 +288,17 @@ async function cycleCreator() {
       // Save the previous record to the DB
       const marker = makeCycleMarker(prevRecord)
       const certificate = makeCycleCert(marker)
-  const data: P2P.CycleCreatorTypes.CycleData = { ...prevRecord, marker, certificate }
-    ...prevRecord,
-    marker,
-    certificate,
-  }
-  if (lastSavedData) {
-    await storage.updateCycle({ networkId: lastSavedData.networkId }, data)
-  } else {
-    // if node list hashes are not set at this point, set them to empty strings
-    data.nodeListHash = data.nodeListHash || ""
-    data.archiverListHash = data.archiverListHash || ""
-    await storage.addCycles(data)
-  }
-  lastSavedData = data
+      const data: P2P.CycleCreatorTypes.CycleData = { ...prevRecord, marker, certificate }
+
+      if (lastSavedData) {
+        await storage.updateCycle({ networkId: lastSavedData.networkId }, data)
+      } else {
+        // if node list hashes are not set at this point, set them to empty strings
+        data.nodeListHash = data.nodeListHash || ''
+        data.archiverListHash = data.archiverListHash || ''
+        await storage.addCycles(data)
+      }
+      lastSavedData = data
     } catch (er) {
       /* prettier-ignore */ warn(`cc: Could not save prevRecord to DB. C${currentCycle} ${formatErrorMessage(er)}`)
     }
@@ -1129,7 +1126,7 @@ async function gossipCycleCert(sender: P2P.NodeListTypes.Node['id'], tracker?: s
 
 function pruneCycleChain() {
   if (config.p2p.useSyncProtocolV2) {
-    CycleChain.prune(MAX_CYCLES_TO_KEEP);
+    CycleChain.prune(MAX_CYCLES_TO_KEEP)
   } else {
     // Determine number of cycle records to keep
     const keep = Refresh.cyclesToKeep()
