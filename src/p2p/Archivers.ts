@@ -1053,16 +1053,12 @@ export function registerRoutes() {
 }
 
 export function sortedByPubKey(): P2P.ArchiversTypes.JoinedArchiver[] {
-  return [...archivers.values()].sort((a, b) => {
-    // using mathematical comparison in case localeCompare is inconsisten
-    if (a.publicKey > b.publicKey) {
-      return 1
-    } else if (a.publicKey < b.publicKey) {
-      return -1
-    } else {
-      return 0
-    }
-  })
+  return [...archivers.values()].sort((a, b) =>
+    // using mathematical comparison in case localeCompare is inconsistent.
+    // we will use a simple ternary statement for this that doens't account for
+    // equality. this should be fine as no two public keys should be the same.
+    a.publicKey > b.publicKey ? 1 : -1
+  )
 }
 
 /** Calculates and returns a hash based on the list of archivers, sorted by public key. This will also update the recorded `lastHashedList` of nodes, which can be retrieved via `getLastHashedArchiverList`. */

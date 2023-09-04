@@ -9,6 +9,7 @@ import { attempt, robustQuery } from '../Utils'
 import * as http from '../../http'
 import { logger } from '../Context'
 import { Logger } from 'log4js'
+import { StandbyAdditionInfo } from '@shardus/types/build/src/p2p/JoinTypes'
 
 /** A `ResultAsync` that wraps an `UnwrappedRobustResult`. */
 export type RobustQueryResultAsync<T> = ResultAsync<UnwrappedRobustResult<ActiveNode, T>, Error>
@@ -133,6 +134,13 @@ export function robustQueryForArchiverListHash(
   return makeRobustQueryCall(nodes, 'archiver-list-hash')
 }
 
+/** Executes a robust query to retrieve the standby list hash from the network. */
+export function robustQueryForStandbyNodeListHash(
+  nodes: ActiveNode[]
+): RobustQueryResultAsync<{ standbyNodeListHash: hexstring }> {
+  return makeRobustQueryCall(nodes, 'standby-list-hash')
+}
+
 /** Retrives the cycle by marker from the node. */
 export function getCycleDataFromNode(node: ActiveNode, expectedMarker: hexstring): ResultAsync<CycleRecord, Error> {
   return attemptSimpleFetch(node, 'cycle-by-marker', {
@@ -150,6 +158,13 @@ export function getValidatorListFromNode(node: ActiveNode, expectedHash: hexstri
 /** Gets the full archiver list from the specified archiver. */
 export function getArchiverListFromNode(node: ActiveNode, expectedHash: hexstring): ResultAsync<Archiver[], Error> {
   return attemptSimpleFetch(node, 'archiver-list', {
+    hash: expectedHash,
+  })
+}
+
+/** Gets the full standby list from the specified standby. */
+export function getStandbyNodeListFromNode(node: ActiveNode, expectedHash: hexstring): ResultAsync<StandbyAdditionInfo[], Error> {
+  return attemptSimpleFetch(node, 'standby-list', {
     hash: expectedHash,
   })
 }

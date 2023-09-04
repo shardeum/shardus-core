@@ -10,6 +10,7 @@ import { network } from '../Context'
 import * as NodeList from '../NodeList'
 import * as Archivers from '../Archivers'
 import * as CycleCreator from '../CycleCreator'
+import * as JoinV2 from '../Join/v2'
 
 /** An endpoint that returns the latest node list hash. */
 const validatorListHashRoute: P2P.P2PTypes.Route<Handler> = {
@@ -27,6 +28,15 @@ const archiverListHashRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'archiver-list-hash',
   handler: (_req, res) => {
     res.json({ archiverListHash: Archivers.getArchiverListHash() })
+  },
+}
+
+/** An endpoint that returns the latest standby node list hash. */
+const standbyListHashRoute: P2P.P2PTypes.Route<Handler> = {
+  method: 'GET',
+  name: 'standby-list-hash',
+  handler: (_req, res) => {
+    res.json({ standbyNodeListHash: JoinV2.getStandbyListHash() })
   },
 }
 
@@ -75,6 +85,24 @@ const archiverListRoute: P2P.P2PTypes.Route<Handler> = {
   },
 }
 
+/** An endpoint that returns the last hashed standby list if the expected (requested)
+  * hash matches. */
+const standbyListRoute: P2P.P2PTypes.Route<Handler> = {
+  method: 'GET',
+  name: 'standby-list',
+  handler: (req, res) => {
+    const expectedHash = req.query.hash
+
+    // return the standby list if the hash from the requester matches
+    if (expectedHash && expectedHash === JoinV2.getStandbyListHash()) {
+      res.json(JoinV2.getLastHashedStandbyList())
+    } else {
+      console.error(`rejecting standby list request: expected '${expectedHash}' != '${JoinV2.getStandbyListHash()}'`)
+      res.status(404).send(`standby list with hash '${expectedHash}' not found`)
+    }
+  },
+}
+
 /** An endpoint that returns the cycle corresponding to the requested marker. */
 const cycleByMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
@@ -104,9 +132,11 @@ export function initRoutes(): void {
   const routes = [
     validatorListHashRoute,
     archiverListHashRoute,
+    standbyListHashRoute,
     newestCycleHashRoute,
     validatorListRoute,
     archiverListRoute,
+    standbyListRoute,
     cycleByMarkerRoute,
     newestCycleRecordRoute
   ]

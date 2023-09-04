@@ -141,6 +141,13 @@ export type Cycle = P2P.CycleCreatorTypes.CycleRecord
 //   p2p: any
 // }
 
+interface ValidateJoinRequestResponse {
+  success: boolean
+  reason: string
+  fatal: boolean
+  data?: string
+}
+
 export interface App {
   /**
    * Runs fast validation of the tx checking if all tx fields present, data
@@ -290,7 +297,7 @@ export interface App {
   dataSummaryInit?: (blob: any, accountData: any) => void
   dataSummaryUpdate?: (blob: any, accountDataBefore: any, accountDataAfter: any) => void
   txSummaryUpdate?: (blob: any, tx: any, wrappedStates: any) => void
-  validateJoinRequest?: (data: any, mode: P2P.ModesTypes.Record['mode'] | null, latestCycle: Cycle, minNodes: number) => any
+  validateJoinRequest?: (data: any, mode: P2P.ModesTypes.Record['mode'] | null, latestCycle: Cycle, minNodes: number) => ValidateJoinRequestResponse
   validateArchiverJoinRequest?: (data: any) => any
   getJoinData?: () => any
   eventNotify?: (event: ShardusEvent) => void
@@ -717,6 +724,8 @@ export interface ServerConfiguration {
     validateArchiverAppData: boolean
     /** use the mode system to regulate network growth and transactions*/
     useNetworkModes: boolean
+    /** Use the new join protocol that gossips all valid join requests to validators.  */
+    useJoinProtocolV2: boolean
   }
   /** Server IP configuration */
   ip?: {

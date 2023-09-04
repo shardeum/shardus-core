@@ -17,6 +17,7 @@ import * as CycleCreator from './CycleCreator'
 import { calcIncomingTimes } from './CycleCreator'
 import * as GlobalAccounts from './GlobalAccounts'
 import * as Join from './Join'
+import * as Acceptance from './Join/v2/acceptance'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
 import { getNewestCycle } from './Sync'
@@ -196,7 +197,7 @@ async function joinNetwork(
     // Check if joined by trying to set our node ID
     const id = await Join.fetchJoined(activeNodes)
     if (id) {
-      return { isFirst, id }
+      return { isFirst: false, id }
     }
   }
 
@@ -225,29 +226,40 @@ async function joinNetwork(
   const { startQ1, startQ4 } = calcIncomingTimes(latestCycle)
   if (logFlags.p2pNonFatal) info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
 
-  // Wait until a Q1 then send join request to active nodes
-  let untilQ1 = startQ1 - Date.now()
-  while (untilQ1 < 0) {
-    untilQ1 += latestCycle.duration * 1000
+  // only submit join requests if this is our first time or if we are using the old protocol
+  if (firstTime || !Context.config.p2p.useJoinProtocolV2) {
+    // Wait until a Q1 then send join request to active nodes
+    let untilQ1 = startQ1 - Date.now()
+    while (untilQ1 < 0) {
+      untilQ1 += latestCycle.duration * 1000
+    }
+
+    if (logFlags.p2pNonFatal) info(`Waiting ${untilQ1 + 500} ms for Q1 before sending join...`)
+    await utils.sleep(untilQ1 + 500) // Not too early
+
+    await Join.submitJoin(activeNodes, request)
+
+    // Wait approx. one cycle then check again
+    if (logFlags.p2pNonFatal) info('Waiting approx. one cycle then checking again...')
   }
 
-  if (logFlags.p2pNonFatal) info(`Waiting ${untilQ1 + 500} ms for Q1 before sending join...`)
-  await utils.sleep(untilQ1 + 500) // Not too early
-  await Join.submitJoin(activeNodes, request)
+  if (Context.config.p2p.useJoinProtocolV2) {
+    // if using join protocol v2, simply wait for the 'accepted' event to fire
+    await acceptedTrigger();
 
-  // Wait approx. one cycle then check again
-  if (logFlags.p2pNonFatal) info('Waiting approx. one cycle then checking again...')
-
-  // Wait until a Q4 before we loop ..
-  // This is a bit faster than before and should allow nodes to try joining
-  // without skipping a cycle
-  let untilQ4 = startQ4 - Date.now()
-  while (untilQ4 < 0) {
-    untilQ4 += latestCycle.duration * 1000
+    // then, we can fetch the id from the network and return
+    const id = await Join.fetchJoined(activeNodes)
+    return { isFirst, id }
+  } else {
+    // otherwise, wait until a Q4 before we loop ..
+    // This is a bit faster than before and should allow nodes to try joining
+    // without skipping a cycle
+    let untilQ4 = startQ4 - Date.now()
+    while (untilQ4 < 0) {
+      untilQ4 += latestCycle.duration * 1000
+    }
+    await utils.sleep(untilQ4 + 500)
   }
-  await utils.sleep(untilQ4 + 500)
-
-  //await utils.sleep(Context.config.p2p.cycleDuration * 1000 + 500)
 
   return {
     isFirst: undefined,
@@ -518,4 +530,12 @@ export function setIsFirst(val: boolean): void {
 
 export function getIsFirst(): boolean {
   return isFirst
+}
+
+function acceptedTrigger(): Promise<void> {
+  return new Promise((resolve) => {
+    Acceptance.getEventEmitter().once('accepted', () => {
+      resolve()
+    })
+  })
 }

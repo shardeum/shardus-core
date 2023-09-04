@@ -1,24 +1,25 @@
 import deepmerge from 'deepmerge'
-import { Handler } from 'express'
-import { version } from '../../package.json'
-import * as http from '../http'
-import { logFlags } from '../logger'
+import { version } from '../../../package.json'
+import * as http from '../../http'
+import { logFlags } from '../../logger'
 import { P2P } from '@shardus/types'
-import * as utils from '../utils'
-import { validateTypes, isEqualOrNewerVersion } from '../utils'
-import * as Comms from './Comms'
-import { config, crypto, logger, network, shardus } from './Context'
-import * as CycleChain from './CycleChain'
-import * as CycleCreator from './CycleCreator'
-import * as NodeList from './NodeList'
-import * as Self from './Self'
-import { robustQuery } from './Utils'
-import { isBogonIP, isInvalidIP, isIPv6 } from '../utils/functions/checkIP'
-import { profilerInstance } from '../utils/profiler'
-import { nestedCountersInstance } from '../utils/nestedCounters'
-import { isPortReachable } from '../utils/isPortReachable'
+import * as utils from '../../utils'
+import { validateTypes, isEqualOrNewerVersion } from '../../utils'
+import * as Comms from '../Comms'
+import { config, crypto, logger, network, shardus } from '../Context'
+import * as CycleChain from '../CycleChain'
+import * as CycleCreator from '../CycleCreator'
+import * as NodeList from '../NodeList'
+import * as Self from '../Self'
+import { robustQuery } from '../Utils'
+import { isBogonIP, isInvalidIP, isIPv6 } from '../../utils/functions/checkIP'
+import { nestedCountersInstance } from '../../utils/nestedCounters'
 import { Logger } from 'log4js'
-import { calculateToAcceptV2 } from './ModeSystemFuncs'
+import { calculateToAcceptV2 } from '../ModeSystemFuncs'
+import { routes } from './routes'
+import { drainNewJoinRequests, getAllJoinRequestsMap, getStandbyNodesInfoMap, saveJoinRequest } from './v2'
+import { err, ok, Result } from 'neverthrow'
+import { drainSelectedPublicKeys } from './v2/select'
 
 /** STATE */
 
@@ -30,114 +31,16 @@ let seen: Set<P2P.P2PTypes.Node['publicKey']>
 
 let lastLoggedCycle = 0
 
-export let allowBogon = false
+let allowBogon = false
+
+export function setAllowBogon(value: boolean): void {
+  allowBogon = value
+}
+export function getAllowBogon(): boolean {
+  return allowBogon
+}
 
 let mode = null
-
-/** ROUTES */
-
-const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
-  method: 'GET',
-  name: 'cyclemarker',
-  handler: (_req, res) => {
-    const marker = CycleChain.newest ? CycleChain.newest.previous : '0'.repeat(64)
-    res.json(marker)
-  },
-}
-
-const joinRoute: P2P.P2PTypes.Route<Handler> = {
-  method: 'POST',
-  name: 'join',
-  handler: async (req, res) => {
-    const joinRequest = req.body
-    if (CycleCreator.currentQuarter < 1) {
-      // if currentQuarter <= 0 then we are not ready
-      res.end()
-      return
-    }
-
-    if (
-      NodeList.activeByIdOrder.length === 1 &&
-      Self.isFirst &&
-      isBogonIP(joinRequest.nodeInfo.externalIp) &&
-      config.p2p.forceBogonFilteringOn === false
-    ) {
-      allowBogon = true
-    }
-    nestedCountersInstance.countEvent('p2p', `join-allow-bogon-firstnode:${allowBogon}`)
-
-    const externalIp = joinRequest.nodeInfo.externalIp
-    const externalPort = joinRequest.nodeInfo.externalPort
-    const internalIp = joinRequest.nodeInfo.internalIp
-    const internalPort = joinRequest.nodeInfo.internalPort
-
-    const externalPortReachable = await isPortReachable({ host: externalIp, port: externalPort })
-    const internalPortReachable = await isPortReachable({ host: internalIp, port: internalPort })
-
-    if (!externalPortReachable || !internalPortReachable) {
-      return res.json({
-        success: false,
-        fatal: true,
-        reason: `IP or Port is not reachable. ext:${externalIp}:${externalPort} int:${internalIp}:${internalPort}}`,
-      })
-    }
-
-    //  Validate of joinReq is done in addJoinRequest
-    const validJoinRequest = addJoinRequest(joinRequest)
-
-    if (validJoinRequest.success) {
-      Comms.sendGossip('gossip-join', joinRequest, '', null, NodeList.byIdOrder, true)
-      nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
-    }
-    return res.json(validJoinRequest)
-  },
-}
-
-const joinedRoute: P2P.P2PTypes.Route<Handler> = {
-  method: 'GET',
-  name: 'joined/:publicKey',
-  handler: (req, res) => {
-    // Respond with id if node's join request was accepted, otherwise undefined
-    let err = utils.validateTypes(req, { params: 'o' })
-    if (err) {
-      warn('joined/:publicKey bad req ' + err)
-      res.json()
-    }
-    err = utils.validateTypes(req.params, { publicKey: 's' })
-    if (err) {
-      warn('joined/:publicKey bad req.params ' + err)
-      res.json()
-    }
-    const publicKey = req.params.publicKey
-    const node = NodeList.byPubKey.get(publicKey)
-    res.json({ node })
-  },
-}
-
-const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P.NodeListTypes.Node['id']> = (
-  payload,
-  sender,
-  tracker
-) => {
-  profilerInstance.scopedProfileSectionStart('gossip-join')
-  try {
-    // Do not forward gossip after quarter 2
-    if (CycleCreator.currentQuarter >= 3) return
-
-    //  Validate of payload is done in addJoinRequest
-    if (addJoinRequest(payload).success)
-      Comms.sendGossip('gossip-join', payload, tracker, sender, NodeList.byIdOrder, false)
-  } finally {
-    profilerInstance.scopedProfileSectionEnd('gossip-join')
-  }
-}
-
-const routes = {
-  external: [cycleMarkerRoute, joinRoute, joinedRoute],
-  gossip: {
-    'gossip-join': gossipJoinRoute,
-  },
-}
 
 /** FUNCTIONS */
 
@@ -174,7 +77,7 @@ export function getNodeRequestingJoin(): P2P.P2PTypes.P2PNode[] {
 }
 
 /** calculateToAccept - calculates the number of nodes to accept into the network */
-function calculateToAccept(): number {
+export function calculateToAccept(): number {
   const desired = CycleChain.newest.desired
   const active = CycleChain.newest.active
   let maxJoin = config.p2p.maxJoinedPerCycle // [TODO] allow autoscaling to change this
@@ -187,8 +90,8 @@ function calculateToAccept(): number {
     CycleChain.newest.safetyMode === true
       ? CycleChain.newest.safetyNum
       : Math.floor(
-          config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor * CycleCreator.scaleFactorSyncBoost
-        )
+        config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor * CycleCreator.scaleFactorSyncBoost
+      )
 
   //The first batch of nodes to join the network after the seed node server can join at a higher rate if firstCycleJoin is set.
   //This first batch will sync the full data range from the seed node, which should be very little data.
@@ -245,19 +148,19 @@ function calculateToAccept(): number {
     lastLoggedCycle = cycle
     info(
       'scale dump:' +
-        JSON.stringify({
-          cycle,
-          scaleFactor: CycleCreator.scaleFactor,
-          needed,
-          desired,
-          active,
-          syncing,
-          canSync,
-          syncMax,
-          maxJoin,
-          expired,
-          scaleFactorSyncBoost: CycleCreator.scaleFactorSyncBoost,
-        })
+      JSON.stringify({
+        cycle,
+        scaleFactor: CycleCreator.scaleFactor,
+        needed,
+        desired,
+        active,
+        syncing,
+        canSync,
+        syncMax,
+        maxJoin,
+        expired,
+        scaleFactorSyncBoost: CycleCreator.scaleFactorSyncBoost,
+      })
     )
   }
   return needed
@@ -301,15 +204,55 @@ export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
 }
 
 export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
-  const joinedConsensors = txs.join.map((joinRequest) => {
-    const { nodeInfo, cycleMarker: cycleJoined } = joinRequest
-    const id = computeNodeId(nodeInfo.publicKey, cycleJoined)
-    const counterRefreshed = record.counter
-    return { ...nodeInfo, cycleJoined, counterRefreshed, id }
-  })
-  /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("new desired count: ", record.desired)
   record.syncing = NodeList.byJoinOrder.length - NodeList.activeByIdOrder.length
-  record.joinedConsensors = joinedConsensors.sort()
+  record.standbyAdd = [];
+
+  if (config.p2p.useJoinProtocolV2) {
+    // for join v2, add new standby nodes to the standbyAdd field ...
+    for (const joinRequest of drainNewJoinRequests()) {
+      record.standbyAdd.push({
+        publicKey: joinRequest.nodeInfo.publicKey,
+        ip: joinRequest.nodeInfo.externalIp,
+        port: joinRequest.nodeInfo.externalPort,
+      })
+    }
+
+    // ... and add any standby nodes that are now allowed to join
+    const selectedPublicKeys = drainSelectedPublicKeys()
+    console.log('selected public keys', selectedPublicKeys)
+    record.joinedConsensors =
+      selectedPublicKeys
+        .map((publicKey) => {
+          const joinRequest = getAllJoinRequestsMap().get(publicKey)
+          console.log('selected join request', joinRequest)
+
+          // TODO: does `cycleJoined` need to be updated? is it supposed
+          // to be the cycle that the node sent its join request, or the
+          // cycle that it became active? currently it is likely the cycle that
+          // the join request was sent
+          const { nodeInfo, cycleMarker: cycleJoined } = joinRequest
+          const id = computeNodeId(nodeInfo.publicKey, cycleJoined)
+          const counterRefreshed = record.counter
+
+          // finally, remove the node from the standby list
+          getStandbyNodesInfoMap().delete(publicKey)
+
+          return { ...nodeInfo, cycleJoined, counterRefreshed, id }
+        })
+        .sort();
+  } else {
+    // old protocol handling
+    record.joinedConsensors =
+      txs.join
+        .map((joinRequest) => {
+          const { nodeInfo, cycleMarker: cycleJoined } = joinRequest
+          const id = computeNodeId(nodeInfo.publicKey, cycleJoined)
+          const counterRefreshed = record.counter
+          return { ...nodeInfo, cycleJoined, counterRefreshed, id }
+        })
+        .sort()
+    /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("new desired count: ", record.desired)
+  }
 }
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
@@ -366,10 +309,29 @@ export async function createJoinRequest(
 }
 
 export interface JoinRequestResponse {
+  /** Whether the join request was accepted. TODO: consider renaming to `accepted`? */
   success: boolean
+
+  /** A message explaining the result of the join request. */
   reason: string
+
+  /** Whether the join request could not be accepted due to some error, usually in validating a join request. TODO: consider renaming to `invalid`? */
   fatal: boolean
 }
+
+/**
+ * Processes a join request by validating the joining node's information,
+ * ensuring compatibility with the network's version, checking cryptographic signatures, and responding
+ * with either an acceptance or rejection based on the provided criteria.
+ *
+ * This function serves as a critical part of the network's security, allowing only valid and authenticated
+ * nodes to participate in the network activities.
+ *
+ * @function
+ * @param {P2P.JoinTypes.JoinRequest} joinRequest - The request object containing information about the joining node.
+ * @returns {JoinRequestResponse} The result of the join request, with details about acceptance or rejection.
+ * @throws {Error} Throws an error if the validation of the join request fails.
+ */
 export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse {
   if (Self.p2pIgnoreJoinRequests === true) {
     if (logFlags.p2pNonFatal) info(`Join request ignored. p2pIgnoreJoinRequests === true`)
@@ -380,50 +342,13 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
     }
   }
 
-  //  Validate joinReq
-  let err = utils.validateTypes(joinRequest, {
-    cycleMarker: 's',
-    nodeInfo: 'o',
-    sign: 'o',
-    version: 's',
-  })
-  if (err) {
-    warn('join bad joinRequest ' + err)
-    return {
-      success: false,
-      reason: `Bad join request object structure`,
-      fatal: true,
-    }
-  }
-  err = utils.validateTypes(joinRequest.nodeInfo, {
-    activeTimestamp: 'n',
-    address: 's',
-    externalIp: 's',
-    externalPort: 'n',
-    internalIp: 's',
-    internalPort: 'n',
-    joinRequestTimestamp: 'n',
-    publicKey: 's',
-  })
-  if (err) {
-    warn('join bad joinRequest.nodeInfo ' + err)
-    return {
-      success: false,
-      reason: 'Bad nodeInfo object structure within join request',
-      fatal: true,
-    }
-  }
-  err = utils.validateTypes(joinRequest.sign, { owner: 's', sig: 's' })
-  if (err) {
-    warn('join bad joinRequest.sign ' + err)
-    return {
-      success: false,
-      reason: 'Bad signature object structure within join request',
-      fatal: true,
-    }
-  }
+  // validate `joinRequest`'s types. if there was an error in validation, `errResult`
+  // will be non-null.
+  const errResult = verifyJoinRequestTypes(joinRequest);
+  if (errResult) return errResult;
+
   if (config.p2p.checkVersion && !isEqualOrNewerVersion(version, joinRequest.version)) {
-    /* prettier-ignore */ warn( `version number is old. Our node version is ${version}. Join request node version is ${joinRequest.version}` )
+    /* prettier-ignore */ warn(`version number is old. Our node version is ${version}. Join request node version is ${joinRequest.version}`)
     nestedCountersInstance.countEvent('p2p', `join-reject-version ${joinRequest.version}`)
     return {
       success: false,
@@ -434,7 +359,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
 
   //If the node that signed the request is not the same as the node that is joining
   if (joinRequest.sign.owner != joinRequest.nodeInfo.publicKey) {
-    /* prettier-ignore */ warn(`join-reject owner != publicKey ${{sign:joinRequest.sign.owner, info:joinRequest.nodeInfo.publicKey}}`)
+    /* prettier-ignore */ warn(`join-reject owner != publicKey ${{ sign: joinRequest.sign.owner, info: joinRequest.nodeInfo.publicKey }}`)
     nestedCountersInstance.countEvent('p2p', `join-reject owner != publicKey`)
     return {
       success: false,
@@ -481,35 +406,6 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
     nestedCountersInstance.countEvent('p2p', `join-reject-bogon-ex:${er}`)
   }
 
-  let selectionKey: unknown
-
-  if (typeof shardus.app.validateJoinRequest === 'function') {
-    try {
-      mode = CycleChain.newest.mode || null
-      const validationResponse = shardus.app.validateJoinRequest(joinRequest, mode, CycleChain.newest, config.p2p.minNodes)
-      
-      if (validationResponse.success !== true) {
-        error(`Validation of join request data is failed due to ${validationResponse.reason || 'unknown reason'}`)
-        nestedCountersInstance.countEvent('p2p', `join-reject-dapp`)
-        return {
-          success: validationResponse.success,
-          reason: validationResponse.reason,
-          fatal: validationResponse.fatal,
-        }
-      }
-      if (typeof validationResponse.data === 'string') {
-        selectionKey = validationResponse.data
-      }
-    } catch (e) {
-      warn(`shardus.app.validateJoinRequest failed due to ${e}`)
-      nestedCountersInstance.countEvent('p2p', `join-reject-ex ${e}`)
-      return {
-        success: false,
-        reason: `Could not validate join request due to Error`,
-        fatal: true,
-      }
-    }
-  }
   const node = joinRequest.nodeInfo
   if (logFlags.p2pNonFatal) info(`Got join request for ${node.externalIp}:${node.externalPort}`)
 
@@ -566,7 +462,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
   const requestValidUpperBound = cycleStarts + cycleDuration
   const requestValidLowerBound = cycleStarts - cycleDuration
 
-  if(joinRequestTimestamp < requestValidLowerBound){
+  if (joinRequestTimestamp < requestValidLowerBound) {
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-not-meet-lowerbound`)
     if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, timestamp is earlier than allowed cycle range')
     return {
@@ -576,7 +472,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
     }
   }
 
-  if(joinRequestTimestamp > requestValidUpperBound){
+  if (joinRequestTimestamp > requestValidUpperBound) {
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-beyond-upperbound`)
     if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, its timestamp exceeds allowed cycle range')
     return {
@@ -592,73 +488,75 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
   /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("results of calculateToAccept: ", toAccept)
   const { add, remove } = calculateToAcceptV2(CycleChain.newest)
   nestedCountersInstance.countEvent('p2p', `results of calculateToAcceptV2: add: ${add}, remove: ${remove}`)
-  /* prettier-ignore */ if (logFlags && logFlags.verbose) {console.log(`results of calculateToAcceptV2: add: ${add}, remove: ${remove}`)}
+  /* prettier-ignore */ if (logFlags && logFlags.verbose) { console.log(`results of calculateToAcceptV2: add: ${add}, remove: ${remove}`) }
   toAccept = add
 
-  // Check if we are better than the lowest selectionNum
-  const last = requests.length > 0 ? requests[requests.length - 1] : undefined
-  /*
-    (This is implemented on 22/12/2021 in commit 9bf8b052673d03e7b7ba0e36321bb8d2fee5cc37)
-    To calculate selectionNumber, we now use the hash of selectionKey and cycle number
-    Selection key is provided by the application , and we can hash that with the cycle number.
-    For example the application may want to use the staking address or the POW.
-    It should be something that the node cannot easily change to
-    guess a high selection number. If we generate a network
-    random number we have to be careful that a node inside the network
-    does not have an advantage by having access to this info and
-    is able to create a stronger selectionNum. If no selectionKey is provided,
-    joining node public key and cycle number are hashed to calculate selectionNumber.
-  */
-  const obj = {
-    cycleNumber: CycleChain.newest.counter,
-    selectionKey: selectionKey ? selectionKey : node.publicKey,
-  }
-  const selectionNum = crypto.hash(obj)
-  if (last && requests.length >= toAccept && !crypto.isGreaterHash(selectionNum, last.selectionNum)) {
-    if (logFlags.p2pNonFatal) info('Join request not better than lowest, not added.')
-    if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-hash-not-good-enough`)
+  if (!config.p2p.useJoinProtocolV2) {
+
+    // Check if we are better than the lowest selectionNum
+    const last = requests.length > 0 ? requests[requests.length - 1] : undefined
+    /*
+      (This is implemented on 22/12/2021 in commit 9bf8b052673d03e7b7ba0e36321bb8d2fee5cc37)
+      To calculate selectionNumber, we now use the hash of selectionKey and cycle number
+      Selection key is provided by the application , and we can hash that with the cycle number.
+      For example the application may want to use the staking address or the POW.
+      It should be something that the node cannot easily change to
+      guess a high selection number. If we generate a network
+      random number we have to be careful that a node inside the network
+      does not have an advantage by having access to this info and
+      is able to create a stronger selectionNum. If no selectionKey is provided,
+      joining node public key and cycle number are hashed to calculate selectionNumber.
+    */
+    const selectionNumResult = computeSelectionNum(joinRequest);
+    if (selectionNumResult.isErr()) return selectionNumResult.error;
+    const selectionNum = selectionNumResult.value;
+
+    if (last && requests.length >= toAccept && !crypto.isGreaterHash(selectionNum, last.selectionNum)) {
+      if (logFlags.p2pNonFatal) info('Join request not better than lowest, not added.')
+      if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-hash-not-good-enough`)
+      return {
+        success: false,
+        reason: 'Join request not better than lowest, not added',
+        fatal: false,
+      }
+    }
+
+    // TODO: call into application
+    // ----- application should decide the ranking order of the join requests
+    // ----- if hook doesn't exist, then we go with default order based on selection number
+    // ----- hook signature = (currentList, newJoinRequest, numDesired) returns [newOrder, added]
+    // ----- should create preconfigured hooks for adding POW, allowing join based on netadmin sig, etc.
+
+    // Check the signature as late as possible since it is expensive
+    const validationErr = checkJoinRequestSignature(joinRequest);
+    if (validationErr) return validationErr;
+
+    // Insert sorted into best list if we made it this far
+    utils.insertSorted(requests, { ...joinRequest, selectionNum }, (a, b) =>
+      a.selectionNum < b.selectionNum ? 1 : a.selectionNum > b.selectionNum ? -1 : 0
+    )
+    if (logFlags.p2pNonFatal)
+      info(`Added join request for ${joinRequest.nodeInfo.externalIp}:${joinRequest.nodeInfo.externalPort}`)
+
+    // If we have > maxJoinedPerCycle requests, trim them down
+    if (logFlags.p2pNonFatal) info(`Requests: ${requests.length}, toAccept: ${toAccept}`)
+    if (requests.length > toAccept) {
+      const over = requests.length - toAccept
+      requests.splice(-over)
+      //    info(`Over maxJoinedPerCycle; removed ${over} requests from join requests`)
+    }
+
     return {
-      success: false,
-      reason: 'Join request not better than lowest, not added',
+      success: true,
+      reason: 'Join request accepted',
       fatal: false,
     }
-  }
-
-  // TODO: call into application
-  // ----- application should decide the ranking order of the join requests
-  // ----- if hook doesn't exist, then we go with default order based on selection number
-  // ----- hook signature = (currentList, newJoinRequest, numDesired) returns [newOrder, added]
-  // ----- should create preconfigured hooks for adding POW, allowing join based on netadmin sig, etc.
-
-  // Check the signature as late as possible since it is expensive
-  if (!crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)) {
-    warn('join bad sign ' + JSON.stringify(joinRequest))
-    nestedCountersInstance.countEvent('p2p', `join-reject-bad-sign`)
+  } else {
     return {
       success: false,
-      reason: 'Bad signature',
-      fatal: true,
+      reason: 'Join Protocol v2 is enabled, and selection is not implemented for Join Protocol v2 yet',
+      fatal: false,
     }
-  }
-  // Insert sorted into best list if we made it this far
-  utils.insertSorted(requests, { ...joinRequest, selectionNum }, (a, b) =>
-    a.selectionNum < b.selectionNum ? 1 : a.selectionNum > b.selectionNum ? -1 : 0
-  )
-  if (logFlags.p2pNonFatal)
-    info(`Added join request for ${joinRequest.nodeInfo.externalIp}:${joinRequest.nodeInfo.externalPort}`)
-
-  // If we have > maxJoinedPerCycle requests, trim them down
-  if (logFlags.p2pNonFatal) info(`Requests: ${requests.length}, toAccept: ${toAccept}`)
-  if (requests.length > toAccept) {
-    const over = requests.length - toAccept
-    requests.splice(-over)
-    //    info(`Over maxJoinedPerCycle; removed ${over} requests from join requests`)
-  }
-
-  return {
-    success: true,
-    reason: 'Join request accepted',
-    fatal: false,
   }
 }
 
@@ -668,6 +566,9 @@ export async function firstJoin(): Promise<string> {
   const request = await createJoinRequest(zeroMarker)
   // Add own join request
   utils.insertSorted(requests, request)
+  if (config.p2p.useJoinProtocolV2) {
+    saveJoinRequest(request)
+  }
   // Return node ID
   return computeNodeId(crypto.keypair.publicKey, zeroMarker)
 }
@@ -766,17 +667,146 @@ export function computeNodeId(publicKey: string, cycleMarker: string): string {
   return nodeId
 }
 
+/**
+  * This function is a little weird because it was taken directly from
+  * `addJoinRequest`, but here's how it works:
+  *
+  * It validates the types of the `joinRequest`. If the types are invalid, it
+  * returns a `JoinRequestResponse` object with `success` set to `false` and
+  * `fatal` set to `true`. The `reason` field will contain a message describing
+  * the validation error.
+  *
+  * If the types are valid, it returns `null`.
+  */
+function verifyJoinRequestTypes(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse | null {
+  // Validate joinReq
+  let err = utils.validateTypes(joinRequest, {
+    cycleMarker: 's',
+    nodeInfo: 'o',
+    sign: 'o',
+    version: 's',
+  })
+  if (err) {
+    warn('join bad joinRequest ' + err)
+    return {
+      success: false,
+      reason: `Bad join request object structure`,
+      fatal: true,
+    }
+  }
+  err = utils.validateTypes(joinRequest.nodeInfo, {
+    activeTimestamp: 'n',
+    address: 's',
+    externalIp: 's',
+    externalPort: 'n',
+    internalIp: 's',
+    internalPort: 'n',
+    joinRequestTimestamp: 'n',
+    publicKey: 's',
+  })
+  if (err) {
+    warn('join bad joinRequest.nodeInfo ' + err)
+    return {
+      success: false,
+      reason: 'Bad nodeInfo object structure within join request',
+      fatal: true,
+    }
+  }
+  err = utils.validateTypes(joinRequest.sign, { owner: 's', sig: 's' })
+  if (err) {
+    warn('join bad joinRequest.sign ' + err)
+    return {
+      success: false,
+      reason: 'Bad signature object structure within join request',
+      fatal: true,
+    }
+  }
+
+  return null
+}
+
+/**
+  * Returns the selection key pertaining to the given `joinRequest`. If
+  * `shardus.app.validateJoinRequest` is not a function, then the selection key
+  * is the public key of the node that sent the join request.
+  */
+function getSelectionKey(joinRequest: P2P.JoinTypes.JoinRequest): Result<string, JoinRequestResponse> {
+  if (typeof shardus.app.validateJoinRequest === 'function') {
+    try {
+      mode = CycleChain.newest.mode || null
+      const validationResponse = shardus.app.validateJoinRequest(joinRequest, mode, CycleChain.newest, config.p2p.minNodes)
+
+      if (validationResponse.success !== true) {
+        error(`Validation of join request data is failed due to ${validationResponse.reason || 'unknown reason'}`)
+        nestedCountersInstance.countEvent('p2p', `join-reject-dapp`)
+        return err({
+          success: validationResponse.success,
+          reason: validationResponse.reason,
+          fatal: validationResponse.fatal,
+        })
+      }
+      if (typeof validationResponse.data === 'string') {
+        return ok(validationResponse.data)
+      } else {
+        return ok(joinRequest.nodeInfo.publicKey)
+      }
+    } catch (e) {
+      warn(`shardus.app.validateJoinRequest failed due to ${e}`)
+      nestedCountersInstance.countEvent('p2p', `join-reject-ex ${e}`)
+      return err({
+        success: false,
+        reason: `Could not validate join request due to Error`,
+        fatal: true,
+      })
+    }
+  } else {
+    return ok(joinRequest.nodeInfo.publicKey)
+  }
+}
+
+export function checkJoinRequestSignature(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse | null {
+  if (!crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)) {
+    warn('join bad sign ' + JSON.stringify(joinRequest))
+    nestedCountersInstance.countEvent('p2p', `join-reject-bad-sign`)
+    return {
+      success: false,
+      reason: 'Bad signature',
+      fatal: true,
+    }
+  }
+  return null
+}
+
+/**
+  * Computes a selection number given a join request.
+  */
+export function computeSelectionNum(joinRequest: P2P.JoinTypes.JoinRequest): Result<string, JoinRequestResponse> {
+  // get the selection key
+  const selectionKeyResult = getSelectionKey(joinRequest);
+  if (selectionKeyResult.isErr()) {
+    return err(selectionKeyResult.error);
+  }
+  const selectionKey = selectionKeyResult.value;
+
+  // calculate the selection number based on the selection key
+  const obj = {
+    cycleNumber: CycleChain.newest.counter,
+    selectionKey: selectionKey,
+  }
+  return ok(crypto.hash(obj))
+}
+
 function info(...msg: string[]): void {
   const entry = `Join: ${msg.join(' ')}`
   p2pLogger.info(entry)
 }
 
-function warn(...msg: string[]): void {
+export function warn(...msg: string[]): void {
   const entry = `Join: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }
 
-function error(...msg: string[]): void {
+export function error(...msg: string[]): void {
   const entry = `Join: ${msg.join(' ')}`
   p2pLogger.error(entry)
 }
