@@ -5,7 +5,7 @@ import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { ShardusEvent } from '../shardus/shardus-types'
 import { binarySearch, insertSorted, propComparator, propComparator2 } from '../utils'
 import * as Comms from './Comms'
-import { crypto, logger, network } from './Context'
+import { config, crypto, logger, network } from './Context'
 import * as CycleChain from './CycleChain'
 import * as Join from './Join'
 import { emitter, id } from './Self'
@@ -314,12 +314,20 @@ export function computeNewNodeListHash(): hexstring {
 }
 
 /**
- * Returns the validator list hash from the last complete cycle, if available. If you
+ * For Sync v2, returns the validator list hash from the last complete cycle, if available. If you
  * want to compute a new hash instead, use `computeNewNodeListHash`.
+ *
+ * If Sync v2 is not enabled, it returns the hash of a sorted list of active node IDs.
  */
 export function getNodeListHash(): hexstring | undefined {
-  info('returning validator list hash:', CycleChain.newest?.nodeListHash)
-  return CycleChain.newest?.nodeListHash
+  if (config.p2p.writeSyncProtocolV2 || config.p2p.useSyncProtocolV2) {
+    info('returning validator list hash:', CycleChain.newest?.nodeListHash)
+    return CycleChain.newest?.nodeListHash
+  } else {
+    // this is how the `nodelistHash` is computed before Sync v2
+    const nodelistIDs = activeByIdOrder.map((node) => node.id)
+    return crypto.hash(nodelistIDs)
+  }
 }
 
 let lastHashedList: P2P.NodeListTypes.Node[] = []

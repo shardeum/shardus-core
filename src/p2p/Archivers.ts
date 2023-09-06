@@ -1080,8 +1080,15 @@ export function computeNewArchiverListHash(): hexstring {
  * want to compute a new hash instead, use `computeNewArchiverListHash`.
  */
 export function getArchiverListHash(): hexstring | undefined {
-  info('returning archiver hash:', CycleChain.newest?.archiverListHash)
-  return CycleChain.newest?.archiverListHash
+  if (config.p2p.writeSyncProtocolV2 || config.p2p.useSyncProtocolV2) {
+    info('returning archiver hash:', CycleChain.newest?.archiverListHash)
+    return CycleChain.newest?.archiverListHash
+  } else {
+    // if we're not using sync v2, just compute a simple hash based on the
+    // public keys of the archivers.
+    const archiverListIDs = [...archivers.keys()].sort()
+    return crypto.hash(archiverListIDs)
+  }
 }
 
 let lastHashedList: P2P.ArchiversTypes.JoinedArchiver[] = []
