@@ -94,6 +94,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     maxArchiversSubscriptionPerNode: 2,
     writeSyncProtocolV2: false,
     useSyncProtocolV2: false,
+    validateArchiverAppData: false,
   },
   ip: {
     externalIp: '0.0.0.0',

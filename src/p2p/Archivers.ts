@@ -245,8 +245,10 @@ export function addArchiverJoinRequest(joinRequest: P2P.ArchiversTypes.Request, 
 
   if (archivers.size > 0) {
     // Check the archiver version from dapp
-    const validationResponse = validateArchiverAppData(joinRequest)
-    if (validationResponse && !validationResponse.success) return validationResponse
+    if (Context.config.p2p.validateArchiverAppData) {
+      const validationResponse = validateArchiverAppData(joinRequest)
+      if (validationResponse && !validationResponse.success) return validationResponse
+    }
 
     // Check if the archiver request timestamp is within the acceptable timestamp range (after current cycle, before next cycle)
     const requestTimestamp = joinRequest.requestTimestamp

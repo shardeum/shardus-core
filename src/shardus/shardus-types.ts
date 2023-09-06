@@ -712,6 +712,8 @@ export interface ServerConfiguration {
     writeSyncProtocolV2: boolean
     /** Use the new experimental sync protocol for better synchronizing efficiency. Other nodes must also have this enabled for it to work. */
     useSyncProtocolV2: boolean
+    /** To validate the archiver app data from dapp in the archiver join request */
+    validateArchiverAppData: boolean
   }
   /** Server IP configuration */
   ip?: {
@@ -1170,4 +1172,3 @@ export interface ValidatorNodeDetails {
   port: number
   publicKey: string
 }
-
