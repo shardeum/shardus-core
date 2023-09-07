@@ -64,25 +64,31 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       })
     }
 
-    //  Validate of joinReq is done in addJoinRequest
-    const joinRequestResponse = addJoinRequest(joinRequest)
+    // if the port of the join request was reachable, this join request is free to be
+    // gossiped to all nodes according to Join Protocol v2. TODO: perform
+    // validation as well
+    if (config.p2p.useJoinProtocolV2) {
+      // add the join request to the global list of join requests. this will also
+      // add it to the list of new join requests that will be processed as part of
+      // cycle creation to create a standy node list
+      saveJoinRequest(joinRequest)
 
-    // if the join request was valid (not fatal) and the port was reachable, this join request is free to be
-    // gossiped to all nodes according to Join Protocol v2
-    if (config.p2p.useJoinProtocolV2 && !joinRequestResponse.fatal) {
+      // gossip it to other nodes
       Comms.sendGossip('gossip-valid-join-requests', joinRequest, '', null, NodeList.byIdOrder, true)
-    }
+      return res.status(200).send()
+    } else {
+      //  Validate of joinReq is done in addJoinRequest
+      const joinRequestResponse = addJoinRequest(joinRequest)
 
-    // if the join request was valid and accepted, gossip that this join request
-    // was accepted to other nodes
-    if (joinRequestResponse.success) {
-      // only gossip join requests if we are still using the old join protocol
-      if (!config.p2p.useJoinProtocolV2) {
+      // if the join request was valid and accepted, gossip that this join request
+      // was accepted to other nodes
+      if (joinRequestResponse.success) {
+        // only gossip join requests if we are still using the old join protocol
         Comms.sendGossip('gossip-join', joinRequest, '', null, NodeList.byIdOrder, true)
         nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
-      } else warn('join request received but not being gossiped for join protocol v2')
+      }
+      return res.json(joinRequestResponse)
     }
-    return res.json(joinRequestResponse)
   },
 }
 

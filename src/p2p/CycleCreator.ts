@@ -25,7 +25,7 @@ import { errorToStringFull, formatErrorMessage } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { randomBytes } from '@shardus/crypto-utils'
 import { digestCycle, syncNewCycles } from './Sync'
-import { executeNodeSelection } from './Join/v2/select'
+import { executeNodeSelection, notifyNewestJoinedConsensors } from './Join/v2/select'
 
 /** CONSTANTS */
 
@@ -400,6 +400,12 @@ function runQ1() {
   // Tell submodules to sign and send their requests
   if (logFlags.p2pNonFatal) info('Triggering submodules to send requests...')
   for (const submodule of submodules) submodule.sendRequests()
+
+  if (config.p2p.useJoinProtocolV2) {
+    notifyNewestJoinedConsensors().catch((e) => {
+      console.error('failed to notify selected nodes:', e)
+    })
+  }
 
   profilerInstance.profileSectionEnd('CycleCreator-runQ1')
 }

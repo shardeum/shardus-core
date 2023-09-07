@@ -3,6 +3,10 @@
   * to join the network.
   */
 
+import { crypto } from "../../Context";
+import * as CycleChain from "../../CycleChain";
+import * as http from '../../../http'
+
 import { getAllJoinRequestsMap, getStandbyNodesInfoMap } from ".";
 import { calculateToAccept, computeSelectionNum } from "..";
 
@@ -52,6 +56,25 @@ export function selectNodes(maxAllowed: number): void {
     selectedPublicKeys.add(objs.splice(0, 1)[0].publicKey)
 }
 
+/**
+  * Notifies the nodes that have been selected that they have been selected by
+  * calling their `accepted` endpoints.`
+  */
+export async function notifyNewestJoinedConsensors(): Promise<void> {
+  for (const joinedConsensor of CycleChain.newest.joinedConsensors) {
+    const publicKey = joinedConsensor.publicKey
+
+    // no need to notify ourselves
+    if (publicKey === crypto.keypair.publicKey) continue
+
+    console.log('notifying node', publicKey, 'that it has been selected')
+    try {
+      await http.get(`http://${joinedConsensor.externalIp}:${joinedConsensor.externalPort}/accepted/${CycleChain.getCurrentCycleMarker()}`)
+    } catch (e) {
+      console.error(`failed to notify node ${publicKey} that it has been selected:`, e)
+    }
+  }
+}
 
 /**
   * Returns the list of public keys of the nodes that have been selected and
@@ -61,4 +84,8 @@ export function drainSelectedPublicKeys(): string[] {
   const tmp = [...selectedPublicKeys.values()]
   selectedPublicKeys.clear()
   return tmp
+}
+
+export function forceSelectSelf(): void {
+  selectedPublicKeys.add(crypto.keypair.publicKey)
 }

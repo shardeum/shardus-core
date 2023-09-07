@@ -500,7 +500,7 @@ class Logger {
 
     let p2pLogger = this.getLogger('p2p')
     // @ts-ignore
-    if (p2pLogger && ['FATAL', 'fatal'].includes(netLogger.level.levelStr)) {
+    if (p2pLogger && ['FATAL', 'fatal'].includes(p2pLogger.level.levelStr)) {
       logFlags.p2pNonFatal = false
     } else {
       logFlags.p2pNonFatal = true

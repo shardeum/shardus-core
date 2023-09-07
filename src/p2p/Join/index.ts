@@ -19,7 +19,8 @@ import { calculateToAcceptV2 } from '../ModeSystemFuncs'
 import { routes } from './routes'
 import { drainNewJoinRequests, getAllJoinRequestsMap, getStandbyNodesInfoMap, saveJoinRequest } from './v2'
 import { err, ok, Result } from 'neverthrow'
-import { drainSelectedPublicKeys } from './v2/select'
+import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
+import * as acceptance from './v2/acceptance'
 
 /** STATE */
 
@@ -32,7 +33,6 @@ let seen: Set<P2P.P2PTypes.Node['publicKey']>
 let lastLoggedCycle = 0
 
 let allowBogon = false
-
 export function setAllowBogon(value: boolean): void {
   allowBogon = value
 }
@@ -41,6 +41,11 @@ export function getAllowBogon(): boolean {
 }
 
 let mode = null
+
+let hasSubmittedJoinRequest = false
+export function getHasSubmittedJoinRequest(): boolean {
+  return hasSubmittedJoinRequest
+}
 
 /** FUNCTIONS */
 
@@ -568,6 +573,7 @@ export async function firstJoin(): Promise<string> {
   utils.insertSorted(requests, request)
   if (config.p2p.useJoinProtocolV2) {
     saveJoinRequest(request)
+    forceSelectSelf()
   }
   // Return node ID
   return computeNodeId(crypto.keypair.publicKey, zeroMarker)
@@ -577,8 +583,10 @@ export async function submitJoin(
   nodes: P2P.P2PTypes.Node[],
   joinRequest: P2P.JoinTypes.JoinRequest & P2P.P2PTypes.SignedObject
 ): Promise<void> {
-  // Send the join request to a handful of the active node all at once:w
+  // Send the join request to a handful of the active node all at once
   const selectedNodes = utils.getRandom(nodes, Math.min(nodes.length, 5))
+  acceptance.provideActiveNodes(selectedNodes)
+
   const promises = []
   if (logFlags.p2pNonFatal) info(`Sending join request to ${selectedNodes.map((n) => `${n.ip}:${n.port}`)}`)
 
@@ -616,14 +624,20 @@ export async function submitJoin(
     }
   }
 
-  return Promise.all(promises).then((responses: JoinRequestResponse[]) => {
+  try {
+    const responses = await Promise.all(promises)
+
     for (const res of responses) {
       mainLogger.info(`Join Request Response: ${JSON.stringify(res)}`)
       if (res.fatal) {
         throw new Error(`Fatal: Join request Reason: ${res.reason}`)
       }
     }
-  })
+  } catch (e) {
+    throw new Error(`submitJoin: Error posting join request: ${e}`)
+  }
+
+  hasSubmittedJoinRequest = true
 }
 
 export async function fetchJoined(activeNodes: P2P.P2PTypes.Node[]): Promise<string> {
