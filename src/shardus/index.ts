@@ -18,6 +18,7 @@ import * as Context from '../p2p/Context'
 import { config } from '../p2p/Context'
 import * as AutoScaling from '../p2p/CycleAutoScale'
 import * as CycleChain from '../p2p/CycleChain'
+import * as CycleCreator from '../p2p/CycleCreator'
 import { netConfig } from '../p2p/CycleCreator'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
 import { scheduleLostReport } from '../p2p/Lost'
@@ -42,6 +43,9 @@ import MemoryReporting from '../utils/memoryReporting'
 import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
 import { startSaving } from './saveConsoleOutput'
+import { isDebugMode } from '../debug'
+import * as JoinV2 from '../p2p/Join/v2'
+
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -2020,12 +2024,47 @@ class Shardus extends EventEmitter {
     this.network.registerExternalGet('netconfig', async (req, res) => {
       res.json({ config: netConfig })
     })
+
     this.network.registerExternalGet('nodeInfo', async (req, res) => {
       let reportIntermediateStatus = req.query.reportIntermediateStatus === 'true'
       const nodeInfo = Self.getPublicNodeInfo(reportIntermediateStatus)
       const appData = this.app.getNodeInfoAppData()
-      res.json({ nodeInfo: { ...nodeInfo, appData } })
+      let result = { nodeInfo: { ...nodeInfo, appData } } as any
+      if (isDebugMode() && req.query.debug === 'true') {
+        result.debug = {
+          queriedWhen: new Date().toISOString(),
+          startedWhen: (new Date(Date.now() - process.uptime() * 1000)).toISOString(),
+          uptimeMins: Math.round(100 * process.uptime() / 60) / 100,
+          pid: process.pid,
+          currentQuarter: CycleCreator.currentQuarter,
+          currentCycleMarker: CycleChain.getCurrentCycleMarker() ?? null,
+          newestCycle: CycleChain.getNewest() ?? null,
+        }
+      }
+      res.json(result)
     })
+
+    this.network.registerExternalGet('joinInfo', isDebugModeMiddleware, async (req, res) => {
+      const nodeInfo = Self.getPublicNodeInfo(true)
+      let result = {
+        respondedWhen: new Date().toISOString(),
+        startedWhen: (new Date(Date.now() - process.uptime() * 1000)).toISOString(),
+        uptimeMins: Math.round(100 * process.uptime() / 60) / 100,
+        pid: process.pid,
+        publicKey: nodeInfo.publicKey,
+        id: nodeInfo.id,
+        status: nodeInfo.status,
+        currentQuarter: CycleCreator.currentQuarter,
+        currentCycleMarker: CycleChain.getCurrentCycleMarker() ?? null,
+        previousCycleMarker: CycleChain.getNewest()?.previous,
+        getStandbyListHash: JoinV2.getStandbyListHash(),
+        getLastHashedStandbyList: JoinV2.getLastHashedStandbyList(),
+        getSortedStandbyNodeList: JoinV2.getSortedStandbyNodeList(),
+        getSortedAllJoinRequestsMap: JoinV2.getSortedAllJoinRequestsMap(),
+      }
+      res.json(deepReplace(result, undefined, '__undefined__'))
+    })
+
     this.network.registerExternalGet('socketReport', isDebugModeMiddleware, async (req, res) => {
       res.json(await getSocketReport())
     })
@@ -2327,6 +2366,27 @@ class Shardus extends EventEmitter {
       signatures: signatures,
     }
   }
+}
+
+function deepReplace(obj: object | ArrayLike<any>, find: any, replace: any): any {
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      if (obj[i] === find) {
+        obj[i] = replace
+      } else if (typeof obj[i] === 'object' && obj[i] !== null) {
+        deepReplace(obj[i], find, replace)
+      }
+    }
+  } else if (typeof obj === 'object' && obj !== null) {
+    for (const key in obj) {
+      if (obj[key] === find) {
+        obj[key] = replace
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        deepReplace(obj[key], find, replace)
+      }
+    }
+  }
+  return obj
 }
 
 // tslint:disable-next-line: no-default-export

@@ -107,3 +107,10 @@ export function getAllJoinRequestsMap(): Map<P2P.P2PTypes.Node['publicKey'], P2P
   console.log('getting all join requests map')
   return allJoinRequests
 }
+
+export function getSortedAllJoinRequestsMap(): any {
+  let arr = []
+  for (const [key, value] of allJoinRequests.entries())
+    arr.push({ key, ...value })
+  return arr.sort((a, b) => a.key > b.key ? 1 : -1)
+}
