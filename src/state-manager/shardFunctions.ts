@@ -1,9 +1,8 @@
 import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
 import { StateManager, P2P } from '@shardus/types'
-import stringify from 'fast-stable-stringify'
 import log4js from 'log4js'
-import { Ordering } from '../utils'
+import { Ordering, stringify } from '../utils'
 
 type ShardGlobals = StateManager.shardFunctionTypes.ShardGlobals
 type ShardInfo = StateManager.shardFunctionTypes.ShardInfo

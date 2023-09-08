@@ -1,6 +1,6 @@
 import Log4js from 'log4js'
 import Sqlite3 from 'better-sqlite3'
-import stringify from 'fast-stable-stringify'
+import {stringify} from '../utils'
 import * as Shardus from '../shardus/shardus-types'
 import Profiler from '../utils/profiler'
 import fs from 'fs'

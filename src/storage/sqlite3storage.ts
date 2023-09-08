@@ -1,5 +1,5 @@
 /* eslint-disable no-empty */
-import stringify from 'fast-stable-stringify'
+import {stringify} from '../utils'
 import fs from 'fs'
 import Log4js from 'log4js'
 import path from 'path'

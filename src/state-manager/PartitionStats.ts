@@ -1,6 +1,6 @@
 import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
-import stringify from 'fast-stable-stringify'
+import {stringify} from '../utils'
 
 import Profiler from '../utils/profiler'
 import Crypto from '../crypto'

@@ -9,7 +9,7 @@ import ShardFunctions from './shardFunctions'
 import EventEmitter from 'events'
 import * as utils from '../utils'
 
-import stringify from 'fast-stable-stringify'
+import {stringify} from '../utils'
 
 // not sure about this.
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
@@ -1480,7 +1480,7 @@ class StateManager {
             }
           }
 
-          response.originalData = stringify(queueEntry.originalData)
+          response.originalData = queueEntry.originalData
           response.success = true
           responseSize = await respond(response)
         } finally {

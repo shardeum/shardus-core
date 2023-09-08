@@ -712,7 +712,7 @@ export type RequestTxResp = {
   beforeHashes: { [accountID: string]: string }
   note: string
   success: boolean
-  originalData: { [accountID: string]: string }
+  originalData: WrappedResponses
 }
 
 export type RequestReceiptForTxReq = { txid: string; timestamp: number }

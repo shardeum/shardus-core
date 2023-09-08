@@ -1,11 +1,31 @@
 import { P2P } from "@shardus/types"
 import { Ordering } from '..'
+import {stringify} from './stringify'
+
+const replacer = (key: string, value: any) => {
+  if (typeof value === 'bigint') {
+    return {__BigInt__: value.toString()};
+  }
+  if (value instanceof Uint8Array) {
+    return {__Uint8Array__: Array.from(value)};
+  }
+  return value;
+}
+const reviver = (key: string, value: any) => {
+  if (value && value.__BigInt__) {
+    return BigInt(value.__BigInt__);
+  }
+  if (value && value.__Uint8Array__ instanceof Array) {
+    return new Uint8Array(value.__Uint8Array__);
+  }
+  return value;
+}
 
 export const deepCopy = <T>(obj: T): T => {
   if (typeof obj !== 'object') {
     throw Error('Given element is not of type object.')
   }
-  return JSON.parse(JSON.stringify(obj))
+  return JSON.parse(JSON.stringify(obj, replacer), reviver)
 }
 
 export const mod = (n, m): number => {
