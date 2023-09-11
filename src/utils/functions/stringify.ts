@@ -35,7 +35,7 @@ function stringifier(
   val: any,
   isArrayProp: boolean,
   options: StringifierOptions = defaultStringifierOptions
-): string | null | any {
+): string | null | undefined {
   if (options == null) options = defaultStringifierOptions
   let i, max, str, keys, key, propVal, toStr
   if (val === true) {
@@ -108,14 +108,15 @@ function stringifier(
       return JSON.stringify(val)
     case 'bigint':
       // Add some special identifier for bigint
-      return JSON.stringify({__BigInt__: val.toString()})
+      // return JSON.stringify({__BigInt__: val.toString()})
+      return JSON.stringify(val.toString(16))
     default:
       return isFinite(val) ? val : null
   }
   /* eslint-enable security/detect-object-injection */
 }
 
-export function stringify(val: unknown, options: StringifierOptions = null): string {
+export function stringify(val: unknown, options: StringifierOptions = defaultStringifierOptions): string {
   const returnVal = stringifier(val, false, options)
   if (returnVal !== undefined) {
     return '' + returnVal

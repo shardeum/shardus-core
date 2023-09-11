@@ -8,7 +8,6 @@ import StateManager from '../state-manager'
 import Profiler from '../utils/profiler'
 import * as ShardusTypes from './../shardus/shardus-types'
 import models from './models'
-// const stringify = require('fast-stable-stringify')
 // const utils = require('../utils')
 // const SequelizeStorage = require('./sequelizeStorage')
 import Sqlite3Storage from './sqlite3storage'

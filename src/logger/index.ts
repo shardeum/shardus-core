@@ -6,7 +6,7 @@ import * as http from '../http'
 import * as Shardus from '../shardus/shardus-types'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-const stringify = require('fast-stable-stringify')
+const { stringify } = require('../utils')
 const log4jsExtend = require('log4js-extend')
 import got from 'got'
 import { parse as parseUrl } from 'url'
