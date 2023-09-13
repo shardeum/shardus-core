@@ -75,7 +75,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       return res.json({
         success: false,
         fatal: true,
-        reason: 'IP or Port is not reachable',
+        reason: `IP or Port is not reachable. ext:${externalIp}:${externalPort} int:${internalIp}:${internalPort}}`,
       })
     }
 
