@@ -561,7 +561,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
   const cycleStarts = CycleChain.newest.start
   const requestValidUpperBound = cycleStarts + cycleDuration
   const requestValidLowerBound = cycleStarts - cycleDuration
-  
+
   if(joinRequestTimestamp < requestValidLowerBound){
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-not-meet-lowerbound`)
     if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, timestamp is earlier than allowed cycle range')
@@ -583,12 +583,12 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
   }
 
   // Compute how many join request to accept
-  const toAccept = calculateToAccept()
+  let toAccept = calculateToAccept()
   nestedCountersInstance.countEvent('p2p', `results of calculateToAccept: toAccept: ${toAccept}`)
   console.log("results of calculateToAccept: ", toAccept)
-  const { add, remove } = calculateToAcceptV2()
+  const { add, remove } = calculateToAcceptV2(CycleChain.newest)
   nestedCountersInstance.countEvent('p2p', `results of calculateToAcceptV2: add: ${add}, remove: ${remove}`)
-  console.log(`results of calculateToAcceptV2: add: ${add}, remove: ${remove}`)
+  toAccept = add
 
   // Check if we are better than the lowest selectionNum
   const last = requests.length > 0 ? requests[requests.length - 1] : undefined
