@@ -1390,10 +1390,14 @@ class Shardus extends EventEmitter {
   }
 
   tryInvolveAccount(txId: string, address: string, isRead: boolean): boolean {
-    const result = this.stateManager.transactionQueue.tryInvloveAccount(txId, address, isRead)
-    return result
+    try {
+      const result = this.stateManager.transactionQueue.tryInvloveAccount(txId, address, isRead)
+      return result
+    } catch (err) {
+      this.fatalLogger.fatal('Error while checking tryInvolveAccount ' + err.name + ': ' + err.message + ' at ' + err.stack)
+      return false
+    }
   }
-
   signAsNode(obj) {
     return this.crypto.sign(obj)
   }
