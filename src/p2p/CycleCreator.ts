@@ -18,6 +18,7 @@ import { profilerInstance } from '../utils/profiler'
 import * as Refresh from './Refresh'
 import * as Rotation from './Rotation'
 import * as SafetyMode from './SafetyMode'
+import * as Modes from './Modes'
 import * as Self from './Self'
 import { compareQuery, Comparison } from './Utils'
 import { errorToStringFull, formatErrorMessage } from '../utils'
@@ -32,14 +33,21 @@ const BEST_CERTS_WANTED = 3
 const DESIRED_CERT_MATCHES = 3
 const MAX_CYCLES_TO_KEEP = 2
 
+// add the types of any new modules here
+type submoduleTypes = typeof Archivers | typeof Join | typeof Active | typeof Rotation | typeof Refresh | typeof Apoptosis | typeof Lost | typeof SafetyMode | typeof Modes | typeof CycleAutoScale
+
 /** STATE */
+
+let modeModuleMigrationApplied = false
+export let hasAlreadyEnteredProcessing = false
 
 let p2pLogger: Logger
 let cycleLogger: Logger
 
 // don't forget to add new modules here
 //   need to keep the Lost module after the Apoptosis module
-export const submodules = [
+
+export let submodules: submoduleTypes[] = [
   Archivers,
   Join,
   Active,
@@ -48,7 +56,7 @@ export const submodules = [
   Apoptosis,
   Lost,
   SafetyMode,
-  CycleAutoScale,
+  CycleAutoScale
 ]
 
 export let currentQuarter = -1 // means we have not started creating cycles
@@ -151,7 +159,6 @@ export function init() {
   p2pLogger = logger.getLogger('p2p')
   cycleLogger = logger.getLogger('cycle')
 
-  // Init submodules
   for (const submodule of submodules) {
     if (submodule.init) submodule.init()
   }
@@ -166,6 +173,13 @@ export function init() {
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
   }
+}
+
+function moduleMigration() {
+  // removing SafetyMode from submodules and adding Modes
+  submodules = submodules.filter((submodule) => submodule !== SafetyMode)
+  submodules.push(Modes)
+  submodules[submodules.length - 1].init()
 }
 
 function updateScaleFactor() {
@@ -349,6 +363,16 @@ async function cycleCreator() {
     // Omar moved this to before scheduling the quarters; should not make a difference
     madeCycle = false
 
+    // swapping out SafetyMode module for Modes if feature flag is true and if we haven't done it before
+    if (config.p2p.useNetworkModes === true && modeModuleMigrationApplied === false) {
+      modeModuleMigrationApplied = true
+      moduleMigration()
+    }
+
+    if (prevRecord.active >= config.p2p.minNodes && hasAlreadyEnteredProcessing === false) {
+      hasAlreadyEnteredProcessing = true
+    }
+
     info(`cc: scheduling currentCycle:${currentCycle} ${callTag}`)
 
     schedule(runQ1, startQ1, { runEvenIfLateBy: quarterDuration - 1 * SECOND }) // if there's at least one sec before Q2 starts, we can start Q1 now
@@ -437,6 +461,8 @@ async function runQ3() {
   // Get txs and create this cycle's record, marker, and cert
   txs = collectCycleTxs()
   ;({ record, marker, cert } = makeCycleData(txs, CycleChain.newest))
+
+  console.log("cycle record: ", record)
 
   /*
   info(`

@@ -95,6 +95,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     writeSyncProtocolV2: false,
     useSyncProtocolV2: false,
     validateArchiverAppData: false,
+    useNetworkModes: false
   },
   ip: {
     externalIp: '0.0.0.0',

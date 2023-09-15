@@ -18,6 +18,7 @@ import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { isPortReachable } from '../utils/isPortReachable'
 import { Logger } from 'log4js'
+import { calculateToAcceptV2 } from './ModeSystemFuncs'
 
 /** STATE */
 
@@ -304,7 +305,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     const counterRefreshed = record.counter
     return { ...nodeInfo, cycleJoined, counterRefreshed, id }
   })
-
+  console.log("new desired count: ", record.desired)
   record.syncing = NodeList.byJoinOrder.length - NodeList.activeByIdOrder.length
   record.joinedConsensors = joinedConsensors.sort()
 }
@@ -583,6 +584,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
 
   // Compute how many join request to accept
   const toAccept = calculateToAccept()
+  nestedCountersInstance.countEvent('p2p', `results of calculateToAccept: toAccept: ${toAccept}`)
+  console.log("results of calculateToAccept: ", toAccept)
+  const { add, remove } = calculateToAcceptV2()
+  nestedCountersInstance.countEvent('p2p', `results of calculateToAcceptV2: add: ${add}, remove: ${remove}`)
+  console.log(`results of calculateToAcceptV2: add: ${add}, remove: ${remove}`)
 
   // Check if we are better than the lowest selectionNum
   const last = requests.length > 0 ? requests[requests.length - 1] : undefined

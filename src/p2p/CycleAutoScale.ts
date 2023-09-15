@@ -11,6 +11,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { enterSafety } from './Modes'
 
 /** STATE */
 
@@ -26,6 +27,7 @@ export let scalingRequestsCollector: Map<
   P2P.CycleAutoScaleTypes.SignedScaleRequest
 >
 export let desiredCount: number
+export let targetCount: number
 
 reset()
 
@@ -286,6 +288,9 @@ function _checkScaling() {
   }
 
   // Check up first, but must have more votes than down votes.
+  console.log("CycleAutoScale: scale up length is ", scaleUpRequests.length)
+  console.log("CycleAutoScale: scale down length is ", scaleDownRequests.length)
+  console.log("CycleAutoScale: required votes is ", requiredVotes)
   if (scaleUpRequests.length >= requiredVotes && scaleUpRequests.length >= scaleDownRequests.length) {
     approvedScalingType = P2P.CycleAutoScaleTypes.ScaleType.UP
     changed = true
@@ -299,10 +304,13 @@ function _checkScaling() {
     //   )
     //   return
     // }
+    console.log("CycleAutoScale: scale up not approved")
     if (scaleDownRequests.length >= requiredVotes) {
       approvedScalingType = P2P.CycleAutoScaleTypes.ScaleType.DOWN
       changed = true
     } else {
+      console.log("CycleAutoScale: changed is ", changed)
+      console.log("CycleAutoScale: won't change desired")
       // Return if we don't change anything
       return
     }
@@ -321,14 +329,14 @@ function _checkScaling() {
       let moreThanActiveMax = Math.floor(numActiveNodes * config.p2p.maxDesiredMultiplier)
       if (newDesired > moreThanActiveMax) newDesired = moreThanActiveMax
 
-      setDesireCount(newDesired)
+      setDesiredCount(newDesired)
       break
     case P2P.CycleAutoScaleTypes.ScaleType.DOWN:
       newDesired = CycleChain.newest.desired - config.p2p.amountToGrow
       // If newDesired less than minNodes, set newDesired to minNodes
       if (newDesired < config.p2p.minNodes) newDesired = config.p2p.minNodes
 
-      setDesireCount(newDesired)
+      setDesiredCount(newDesired)
       break
     default:
       error(new Error(`Invalid scaling flag after changing flag. Flag: ${approvedScalingType}`))
@@ -337,11 +345,82 @@ function _checkScaling() {
   console.log('newDesired', newDesired)
 }
 
-function setDesireCount(count: number) {
+function setDesiredCount(count: number) {
   if (count >= config.p2p.minNodes && count <= config.p2p.maxNodes) {
     console.log('Setting desired count to', count)
     desiredCount = count
   }
+}
+
+function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): number {
+  const active = NodeList.activeByIdOrder.length
+
+  if (prevRecord && prevRecord.mode !== undefined) {
+    // For now, we are using the desired value from the previous cycle. In the future, we should look at using the next desired value
+    const desired = prevRecord.desired
+
+    if (prevRecord.mode === 'forming') {
+      console.log("CycleAutoScale: in forming")
+      if (Self.isFirst) {
+        console.log("CycleAutoScale: entered seed node condition")
+      } else if (active != desired) {
+        if (active < desired) {
+          console.log("CycleAutoScale: entered active < desired")
+          let add = ~~(0.5 * active)
+          console.log(`counter is ${prevRecord.counter}`)
+          console.log(`1. add: ${add}`)
+          if (add < 3) { 
+            add = 3
+          }
+          console.log(`2. add: ${add}`)
+          console.log(`1. tar: ${targetCount}`)
+          targetCount = active + add
+          console.log(`2. tar: ${targetCount}`)
+          if (targetCount > desired) { 
+            targetCount = desired 
+          }
+        }
+        if (active > desired) {
+          console.log("CycleAutoScale: entered active > desired")
+          let sub = ~~(0.3 * active)
+          if (sub < 1) { 
+            sub = 1 
+          }
+          targetCount = active - sub
+          if (targetCount < desired) { 
+            targetCount = desired 
+          }
+        }
+      }
+    } else if (prevRecord.mode === 'processing') {
+      console.log("CycleAutoScale: in processing")
+      if (enterSafety(active, prevRecord) === false) {
+        console.log("CycleAutoScale: not in safety")
+        let addRem = (desired - prevRecord.target) * 0.1
+        console.log(`addRem: ${addRem}, desired: ${desired}, prevTarget: ${prevRecord.target}`)
+        if (addRem > active * 0.01) {
+          addRem = active * 0.01
+        } 
+        if (addRem < 0 - active * 0.005) { 
+          addRem = 0 - active * 0.005 
+        }
+        console.log(`CycleAutoScale: prev target is ${prevRecord.target} and addRem is ${addRem}`)
+        targetCount = prevRecord.target + addRem
+        // may want to swap config values to values from cycle record
+        if (targetCount < config.p2p.minNodes) { 
+          targetCount = config.p2p.minNodes 
+        }
+        if (targetCount > config.p2p.maxNodes) { 
+          targetCount = config.p2p.maxNodes 
+        }
+      }
+    }
+  } else if(Self.isFirst) {
+    console.log("CycleAutoScale: in Self.isFirst condition")
+    targetCount = 5
+  }
+  console.log("CycleAutoScale: target count is ", targetCount)
+  return targetCount
 }
 
 export function configUpdated() {
@@ -379,10 +458,14 @@ export function validateRecordTypes(rec: P2P.CycleAutoScaleTypes.Record): string
   return ''
 }
 
-export function updateRecord(txs: P2P.CycleAutoScaleTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord) {
+export function updateRecord(txs: P2P.CycleAutoScaleTypes.Txs,
+  record: P2P.CycleCreatorTypes.CycleRecord,
+  prevRecord: P2P.CycleCreatorTypes.CycleRecord) {
   //just in time scaling vote count.
   _checkScaling()
   record.desired = getDesiredCount()
+  record.target = setAndGetTargetCount(prevRecord)
+
   reset()
 }
 

@@ -99,7 +99,6 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
   squasher.addChange(parse(CycleChain.oldest))
 
   nestedCountersInstance.countEvent('p2p', `sync-to-cycle ${cycleToSyncTo.counter}`)
-
   do {
     // Get prevCycles from the network
     const end = CycleChain.oldest.counter - 1
@@ -585,34 +584,36 @@ function validateCycles(cycles: P2P.CycleCreatorTypes.CycleRecord[]) {
         return false
       }
     }
-    for (const networkHash of cycleRecord.networkDataHash) {
-      err = validateTypes(networkHash, {
-        cycle: 'n',
-        hash: 's',
-      })
-      if (err) {
-        warn('Validation failed for cycleRecord.networkDataHash: ' + err)
-        return false
+    if (!config.p2p.useNetworkModes && cycleRecord.mode === undefined) {
+      for (const networkHash of cycleRecord.networkDataHash) {
+        err = validateTypes(networkHash, {
+          cycle: 'n',
+          hash: 's',
+        })
+        if (err) {
+          warn('Validation failed for cycleRecord.networkDataHash: ' + err)
+          return false
+        }
       }
-    }
-    for (const networkHash of cycleRecord.networkReceiptHash) {
-      err = validateTypes(networkHash, {
-        cycle: 'n',
-        hash: 's',
-      })
-      if (err) {
-        warn('Validation failed for cycleRecord.networkReceiptHash: ' + err)
-        return false
+      for (const networkHash of cycleRecord.networkReceiptHash) {
+        err = validateTypes(networkHash, {
+          cycle: 'n',
+          hash: 's',
+        })
+        if (err) {
+          warn('Validation failed for cycleRecord.networkReceiptHash: ' + err)
+          return false
+        }
       }
-    }
-    for (const networkHash of cycleRecord.networkSummaryHash) {
-      err = validateTypes(networkHash, {
-        cycle: 'n',
-        hash: 's',
-      })
-      if (err) {
-        warn('Validation failed for cycleRecord.networkSummaryHash: ' + err)
-        return false
+      for (const networkHash of cycleRecord.networkSummaryHash) {
+        err = validateTypes(networkHash, {
+          cycle: 'n',
+          hash: 's',
+        })
+        if (err) {
+          warn('Validation failed for cycleRecord.networkSummaryHash: ' + err)
+          return false
+        }
       }
     }
   }

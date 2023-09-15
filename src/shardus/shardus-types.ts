@@ -714,6 +714,8 @@ export interface ServerConfiguration {
     useSyncProtocolV2: boolean
     /** To validate the archiver app data from dapp in the archiver join request */
     validateArchiverAppData: boolean
+    /** use the mode system to regulate network growth and transactions*/
+    useNetworkModes: boolean
   }
   /** Server IP configuration */
   ip?: {
