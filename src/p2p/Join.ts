@@ -32,6 +32,8 @@ let lastLoggedCycle = 0
 
 export let allowBogon = false
 
+let mode = null
+
 /** ROUTES */
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
@@ -483,7 +485,9 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
 
   if (typeof shardus.app.validateJoinRequest === 'function') {
     try {
-      const validationResponse = shardus.app.validateJoinRequest(joinRequest)
+      mode = CycleChain.newest.mode || null
+      const validationResponse = shardus.app.validateJoinRequest(joinRequest, mode)
+      
       if (validationResponse.success !== true) {
         error(`Validation of join request data is failed due to ${validationResponse.reason || 'unknown reason'}`)
         nestedCountersInstance.countEvent('p2p', `join-reject-dapp`)

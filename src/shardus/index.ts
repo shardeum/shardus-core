@@ -1924,7 +1924,7 @@ class Shardus extends EventEmitter {
         }
       }
       if (typeof application.validateJoinRequest === 'function') {
-        applicationInterfaceImpl.validateJoinRequest = (data) => application.validateJoinRequest(data)
+        applicationInterfaceImpl.validateJoinRequest = (data, mode) => application.validateJoinRequest(data, mode)
       }
       if (typeof application.validateArchiverJoinRequest === 'function') {
         applicationInterfaceImpl.validateArchiverJoinRequest = (data) =>
@@ -1937,11 +1937,11 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.eventNotify = application.eventNotify
       }
       if (typeof application.isReadyToJoin === 'function') {
-        applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes) =>
-          application.isReadyToJoin(latestCycle, publicKey, activeNodes)
+        applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes, mode) =>
+          application.isReadyToJoin(latestCycle, publicKey, activeNodes, mode)
       } else {
         // If the app doesn't provide isReadyToJoin, assume it is always ready to join
-        applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes) => true
+        applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes, mode) => true
       }
       if (typeof application.getNodeInfoAppData === 'function') {
         applicationInterfaceImpl.getNodeInfoAppData = () => application.getNodeInfoAppData()

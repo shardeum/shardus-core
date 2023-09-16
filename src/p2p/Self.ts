@@ -41,6 +41,7 @@ export let p2pSyncEnd = 0
 
 export let p2pIgnoreJoinRequests = true
 
+let mode = null
 /*
   Records the state of the node (INITIALIZING -> STANDBY -> SYNCING -> ACTIVE)
   INITIALIZING -> STANDBY = Node is trying to get its join request accepted
@@ -201,9 +202,9 @@ async function joinNetwork(
 
   // Get latest cycle record from active nodes
   const latestCycle = await Sync.getNewestCycle(activeNodes)
-
+  mode = latestCycle.mode || null
   const publicKey = Context.crypto.getPublicKey()
-  const isReadyToJoin = await Context.shardus.app.isReadyToJoin(latestCycle, publicKey, activeNodes)
+  const isReadyToJoin = await Context.shardus.app.isReadyToJoin(latestCycle, publicKey, activeNodes, mode)
   if (!isReadyToJoin) {
     // Wait for Context.config.p2p.cycleDuration and try again
     throw new Error('Node not ready to join')

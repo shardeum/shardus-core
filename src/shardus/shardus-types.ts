@@ -290,14 +290,15 @@ export interface App {
   dataSummaryInit?: (blob: any, accountData: any) => void
   dataSummaryUpdate?: (blob: any, accountDataBefore: any, accountDataAfter: any) => void
   txSummaryUpdate?: (blob: any, tx: any, wrappedStates: any) => void
-  validateJoinRequest?: (data: any) => any
+  validateJoinRequest?: (data: any, mode: P2P.ModesTypes.Record['mode'] | null) => any
   validateArchiverJoinRequest?: (data: any) => any
   getJoinData?: () => any
   eventNotify?: (event: ShardusEvent) => void
   isReadyToJoin: (
     latestCycle: Cycle,
     nodePublicKey: string,
-    activeNodes: P2P.P2PTypes.Node[]
+    activeNodes: P2P.P2PTypes.Node[],
+    mode: P2P.ModesTypes.Record['mode'] | null,
   ) => Promise<boolean>
 
   getNodeInfoAppData?: () => any
