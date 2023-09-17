@@ -26,7 +26,7 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
   if (prevRecord) {
     console.log("ModeSystemFuncs: passed prevRecord check")
     if (prevRecord.mode === 'forming') {
-      if (Self.isFirst) {
+      if (Self.isFirst && active < 1) {
         console.log("ModeSystemFuncs: seed node reaches here")
         add = target
         remove = 0
@@ -54,20 +54,17 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
             remove = Math.ceil(addRem)
             console.log("ModeSystemFuncs: 2 return")
             return { add, remove }
-          } else {
-            console.log("ModeSystemFuncs: 3 return")
-            return { add, remove }
           }
-        } else {
-          console.log("ModeSystemFuncs: 4 return")
-          return { add, remove }
         }
       }
     } else if (prevRecord.mode === 'processing') {
       if (enterSafety(active, prevRecord) === false && enterRecovery(active) === false) {
+        console.log("max rotated per cycle: ", config.p2p.maxRotatedPerCycle)
         if (active !== ~~target) {
           // calculate nodes to add or remove
+          console.log("active not equal target")
           let addRem = target - (active + syncing)
+          console.log("addRem ", addRem)
           if (addRem > 0) {
             if (addRem > active * 0.1) { // limit nodes added to 10% of active; we are here because many were lost
               addRem = ~~(active * 0.1)
@@ -102,14 +99,37 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
               remove = Math.ceil(addRem)
               console.log("ModeSystemFuncs: 6 return")
               return { add, remove }
-            } else {
-              console.log("ModeSystemFuncs: 7 return")
-              return { add, remove }
             }
-          } else {
-            console.log("ModeSystemFuncs: 8 return")
-            return { add, remove }
           }
+        } else if (config.p2p.maxRotatedPerCycle !== 0) {
+          console.log("entered rotation")
+          let rnum = config.p2p.maxRotatedPerCycle // num to rotate per cycle; can be less than 1; like 0.5 for every other cycle; -1 for auto
+          if (rnum < 0) { // rotate all nodes in 1000 cycles
+            rnum = active * 0.001 
+          }  
+          if (rnum < 1) {
+            if (prevRecord.counter % (1/rnum) === 0) { // rotate every few cycles if less than 1000 nodes
+              rnum = 1 
+            }  
+            else { 
+              rnum = 0 
+            }
+          }
+          if (rnum > 0){
+            if (rnum > active * 0.001) { 
+              rnum = ~~(active * 0.001)
+              if (rnum < 1) { 
+                rnum = 1
+              }
+            }
+            console.log("rnum: ", rnum)
+            console.log("setting add to rnum")
+            add = Math.ceil(rnum)
+            remove = 0
+          }
+          console.log(`add: ${add}, remove: ${remove}`)
+          console.log(`ModeSystemFuncs: 8 return`)
+          return { add, remove }
         }
       }
     } else if (prevRecord.mode === 'safety') {
@@ -147,6 +167,7 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
       }
     }
   }
+  console.log("returned from default")
   return { add, remove }
 }
 

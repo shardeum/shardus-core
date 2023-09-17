@@ -11,7 +11,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { enterSafety } from './Modes'
+import { enterRecovery, enterSafety } from './Modes'
 
 /** STATE */
 
@@ -354,23 +354,22 @@ function setDesiredCount(count: number) {
 
 function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): number {
   const active = NodeList.activeByIdOrder.length
-
+  console.log(`prev record is `)
+  console.dir(prevRecord, { depth: null })
   if (prevRecord && prevRecord.mode !== undefined) {
     // For now, we are using the desired value from the previous cycle. In the future, we should look at using the next desired value
     const desired = prevRecord.desired
 
     if (prevRecord.mode === 'forming') {
       console.log("CycleAutoScale: in forming")
-      if (Self.isFirst) {
-        console.log("CycleAutoScale: entered seed node condition")
-      } else if (active != desired) {
+      if (active != desired) {
         if (active < desired) {
           console.log("CycleAutoScale: entered active < desired")
           let add = ~~(0.5 * active)
           console.log(`counter is ${prevRecord.counter}`)
           console.log(`1. add: ${add}`)
-          if (add < 3) { 
-            add = 3
+          if (add < 7) { 
+            add = 7
           }
           console.log(`2. add: ${add}`)
           console.log(`1. tar: ${targetCount}`)
@@ -394,7 +393,7 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
       }
     } else if (prevRecord.mode === 'processing') {
       console.log("CycleAutoScale: in processing")
-      if (enterSafety(active, prevRecord) === false) {
+      if (enterSafety(active, prevRecord) === false && enterRecovery(active) === false) {
         console.log("CycleAutoScale: not in safety")
         let addRem = (desired - prevRecord.target) * 0.1
         console.log(`addRem: ${addRem}, desired: ${desired}, prevTarget: ${prevRecord.target}`)
@@ -402,7 +401,7 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
           addRem = active * 0.01
         } 
         if (addRem < 0 - active * 0.005) { 
-          addRem = 0 - active * 0.005 
+          addRem = 0 - active * 0.005
         }
         console.log(`CycleAutoScale: prev target is ${prevRecord.target} and addRem is ${addRem}`)
         targetCount = prevRecord.target + addRem
@@ -415,9 +414,11 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
         }
       }
     }
-  } else if(Self.isFirst) {
+  } else if(Self.isFirst && active < 1) {
     console.log("CycleAutoScale: in Self.isFirst condition")
-    targetCount = 5
+    targetCount = 7
+  } else {
+    console.log("we should not be here")
   }
   console.log("CycleAutoScale: target count is ", targetCount)
   return targetCount
