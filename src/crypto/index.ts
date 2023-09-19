@@ -6,6 +6,7 @@ import path from 'path'
 import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
+import {cryptoStringify} from '../utils'
 
 export type HashableObject = (object | string) & { sign?: Shardus.Sign }
 
@@ -42,6 +43,7 @@ class Crypto {
 
   async init(): Promise<void> {
     crypto.init(this.config.crypto.hashKey)
+    crypto.setCustomStringifier(cryptoStringify, 'shardus_crypto_stringify')
 
     const keypair = await this.storage.getProperty('keypair')
     if (keypair) {
