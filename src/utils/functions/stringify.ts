@@ -118,62 +118,62 @@ function stringifier(
 
 /* cryptoStringifier is a close version of default fast-stringify-json that works with BigInts */
 function cryptoStringifier(val, isArrayProp): string {
-  var i, max, str, keys, key, propVal, toStr;
+  let i, max, str, keys, key, propVal, toStr
   if (val === true) {
-    return "true";
+    return 'true'
   }
   if (val === false) {
-    return "false";
+    return 'false'
   }
   switch (typeof val) {
-    case "object":
+    case 'object':
       if (val === null) {
-        return null;
-      } else if (val.toJSON && typeof val.toJSON === "function") {
-        return cryptoStringifier(val.toJSON(), isArrayProp);
+        return null
+      } else if (val.toJSON && typeof val.toJSON === 'function') {
+        return cryptoStringifier(val.toJSON(), isArrayProp)
       } else {
-        toStr = objToString.call(val);
-        if (toStr === "[object Array]") {
-          str = '[';
-          max = val.length - 1;
-          for(i = 0; i < max; i++) {
-            str += cryptoStringifier(val[i], true) + ',';
+        toStr = objToString.call(val)
+        if (toStr === '[object Array]') {
+          str = '['
+          max = val.length - 1
+          for (i = 0; i < max; i++) {
+            str += cryptoStringifier(val[i], true) + ','
           }
           if (max > -1) {
-            str += cryptoStringifier(val[i], true);
+            str += cryptoStringifier(val[i], true)
           }
-          return str + ']';
-        } else if (toStr === "[object Object]") {
+          return str + ']'
+        } else if (toStr === '[object Object]') {
           // only object is left
-          keys = objKeys(val).sort();
-          max = keys.length;
-          str = "";
-          i = 0;
+          keys = objKeys(val).sort()
+          max = keys.length
+          str = ''
+          i = 0
           while (i < max) {
-            key = keys[i];
-            propVal = cryptoStringifier(val[key], false);
+            key = keys[i]
+            propVal = cryptoStringifier(val[key], false)
             if (propVal !== undefined) {
               if (str) {
-                str += ',';
+                str += ','
               }
-              str += JSON.stringify(key) + ':' + propVal;
+              str += JSON.stringify(key) + ':' + propVal
             }
-            i++;
+            i++
           }
-          return '{' + str + '}';
+          return '{' + str + '}'
         } else {
-          return JSON.stringify(val);
+          return JSON.stringify(val)
         }
       }
-    case "function":
-    case "undefined":
-      return isArrayProp ? null : undefined;
-    case "string":
-      return JSON.stringify(val);
+    case 'function':
+    case 'undefined':
+      return isArrayProp ? null : undefined
+    case 'string':
+      return JSON.stringify(val)
     case 'bigint':
       return JSON.stringify(val.toString(16))
     default:
-      return isFinite(val) ? val : null;
+      return isFinite(val) ? val : null
   }
 }
 

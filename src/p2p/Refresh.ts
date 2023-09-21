@@ -81,7 +81,7 @@ export function updateRecord(
   txs: P2P.RefreshTypes.Txs,
   record: P2P.CycleCreatorTypes.CycleRecord,
   prev: P2P.CycleCreatorTypes.CycleRecord
-) {
+): void {
   // sync v2 does not require refreshing nodes, but these fields cannot be left
   // null/undefined
   if (Context.config.p2p.useSyncProtocolV2) {

@@ -1,4 +1,3 @@
-
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { enterRecovery, enterSafety, enterProcessing } from './Modes'
@@ -11,14 +10,22 @@ import * as CycleCreator from './CycleCreator'
 import * as CycleChain from './CycleChain'
 import { logFlags } from '../logger'
 
-export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecord) {
+interface ToAcceptResult {
+  add: number
+  remove: number
+}
+
+export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecord): ToAcceptResult {
   const active = NodeList.activeByIdOrder.length
   const syncing = NodeList.byJoinOrder.length - NodeList.activeByIdOrder.length
   // For now, we are using the desired value from the previous cycle. In the future, we should look at using the next desired value
   const desired = prevRecord.desired
   const target = targetCount
 
-  nestedCountersInstance.countEvent('p2p', `desired: ${desired}, target: ${target}, active: ${active}, syncing: ${syncing}`)
+  nestedCountersInstance.countEvent(
+    'p2p',
+    `desired: ${desired}, target: ${target}, active: ${active}, syncing: ${syncing}`
+  )
   /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`prevCounter: ${prevRecord.counter}, desired: ${desired}, target: ${target}, active: ${active}, syncing: ${syncing}`)
 
   let add = 0
@@ -61,7 +68,8 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
           let addRem = target - (active + syncing)
           /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("addRem ", addRem)
           if (addRem > 0) {
-            if (addRem > active * 0.1) { // limit nodes added to 10% of active; we are here because many were lost
+            if (addRem > active * 0.1) {
+              // limit nodes added to 10% of active; we are here because many were lost
               addRem = ~~(active * 0.1)
               if (addRem === 0) {
                 addRem = 1
@@ -73,17 +81,19 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
             return { add, remove }
           }
           if (addRem < 0) {
-            addRem = active - target   // only remove the active nodes more than target
+            addRem = active - target // only remove the active nodes more than target
             /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`addRem in processing: ${addRem}`)
-            if (addRem > active * 0.05) { // limit nodes removed to 5% of active; this should not happen
-              console.log("unexpected addRem > 5% of active", addRem, active, target, desired)
+            if (addRem > active * 0.05) {
+              // limit nodes removed to 5% of active; this should not happen
+              console.log('unexpected addRem > 5% of active', addRem, active, target, desired)
               addRem = ~~(active * 0.05)
               if (addRem === 0) {
                 addRem = 1
               }
             }
             if (addRem > 0) {
-              if (addRem > active * 0.05) { // don't ever remove more than 10% of active per cycle
+              if (addRem > active * 0.05) {
+                // don't ever remove more than 10% of active per cycle
                 addRem = active * 0.05
               }
               if (addRem < 1) {
@@ -97,21 +107,22 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
         } else if (config.p2p.maxRotatedPerCycle !== 0) {
           /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("entered rotation")
           let rnum = config.p2p.maxRotatedPerCycle // num to rotate per cycle; can be less than 1; like 0.5 for every other cycle; -1 for auto
-          if (rnum < 0) { // rotate all nodes in 1000 cycles
-            rnum = active * 0.001 
-          }  
+          if (rnum < 0) {
+            // rotate all nodes in 1000 cycles
+            rnum = active * 0.001
+          }
           if (rnum < 1) {
-            if (prevRecord.counter % (1/rnum) === 0) { // rotate every few cycles if less than 1000 nodes
-              rnum = 1 
-            }  
-            else { 
-              rnum = 0 
+            if (prevRecord.counter % (1 / rnum) === 0) {
+              // rotate every few cycles if less than 1000 nodes
+              rnum = 1
+            } else {
+              rnum = 0
             }
           }
-          if (rnum > 0){
-            if (rnum > active * 0.001) { 
+          if (rnum > 0) {
+            if (rnum > active * 0.001) {
               rnum = ~~(active * 0.001)
-              if (rnum < 1) { 
+              if (rnum < 1) {
                 rnum = 1
               }
             }
@@ -133,7 +144,7 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
             addRem = 1
           }
         }
-        addRem += prevRecord.lost.length  // compensate for nodes that were lost; though this could add more burden on existing nodes
+        addRem += prevRecord.lost.length // compensate for nodes that were lost; though this could add more burden on existing nodes
         if (addRem > 0) {
           add = Math.ceil(addRem)
           remove = 0
@@ -143,7 +154,8 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
     } else if (prevRecord.mode === 'recovery') {
       if (enterSafety(active, prevRecord) === false) {
         let addRem = 0.62 * config.p2p.minNodes - (active + syncing) // we try to overshoot min value by 2%; for slow syncing nodes
-        if (addRem > active * 0.1) { // we really should be looking at how many archivers are available to sync from
+        if (addRem > active * 0.1) {
+          // we really should be looking at how many archivers are available to sync from
           addRem = ~~(active * 0.1)
           if (addRem === 0) {
             addRem = 1
@@ -157,13 +169,11 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
       }
     }
   }
-  console.log("add remove returned from default")
+  console.log('add remove returned from default')
   return { add, remove }
 }
 
-
 // need to think about and maybe ask Omar about using prev record for determining mode, could use next record
-
 
 /** Returns the number of expired nodes and the list of removed nodes using calculateToAcceptV2 */
 export function getExpiredRemovedV2(
@@ -190,10 +200,13 @@ export function getExpiredRemovedV2(
 
   // calculate the target number of nodes
   const { add, remove } = calculateToAcceptV2(prevRecord)
-  nestedCountersInstance.countEvent('p2p', `results of getExpiredRemovedV2.calculateToAcceptV2: add: ${add}, remove: ${remove}`)
+  nestedCountersInstance.countEvent(
+    'p2p',
+    `results of getExpiredRemovedV2.calculateToAcceptV2: add: ${add}, remove: ${remove}`
+  )
   // initialize `scaleDownRemove` to at most any "excess" nodes more than
   // desired. it can't be less than zero.
-  let maxRemove = remove
+  const maxRemove = remove
 
   //only let the scale factor impart a partial influence based on scaleInfluenceForShrink
   // const scaledAmountToShrink = getScaledAmountToShrink() //TODO check if this is needed
@@ -244,13 +257,16 @@ export function getExpiredRemovedV2(
   // to avoid messing up the calculation above this next part can only make maxRemove smaller.
   // maxActiveNodesToRemove is a percent of the active nodes that is set as a 0-1 value in maxShrinkMultiplier
   // if (maxRemove > config.p2p.amountToShrink && maxRemove > maxActiveNodesToRemove) {
-    // yes, this max could be baked in earlier, but I like it here for clarity
-    // maxRemove = Math.max(config.p2p.amountToShrink, maxActiveNodesToRemove)
+  // yes, this max could be baked in earlier, but I like it here for clarity
+  // maxRemove = Math.max(config.p2p.amountToShrink, maxActiveNodesToRemove)
   // }
 
   //TODO end of block
 
-  nestedCountersInstance.countEvent('p2p', `results of getExpiredRemovedV2: scaleDownRemove: maxRemove: ${maxRemove}`)
+  nestedCountersInstance.countEvent(
+    'p2p',
+    `results of getExpiredRemovedV2: scaleDownRemove: maxRemove: ${maxRemove}`
+  )
   // get list of nodes that have been requested to be removed
   const apoptosizedNodesList = []
   for (const request of txs.apoptosis) {
@@ -291,10 +307,9 @@ export function getExpiredRemovedV2(
   return { expired, removed }
 }
 
-
 /** Returns a linearly interpolated value between `amountToShrink` and the same
-* multiplied by a `scaleFactor`. The result depends on the
-* `scaleInfluenceForShrink` */
+ * multiplied by a `scaleFactor`. The result depends on the
+ * `scaleInfluenceForShrink` */
 function getScaledAmountToShrink(): number {
   const nonScaledAmount = config.p2p.amountToShrink
   const scaledAmount = config.p2p.amountToShrink * CycleCreator.scaleFactor

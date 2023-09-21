@@ -1,24 +1,24 @@
-import { P2P } from "@shardus/types"
+import { P2P } from '@shardus/types'
 import { Ordering } from '..'
-import {stringify} from './stringify'
+import { stringify } from './stringify'
 
-const replacer = (key: string, value: any) => {
+const replacer = (key: string, value: any): any => {
   if (typeof value === 'bigint') {
-    return {__BigInt__: value.toString()};
+    return { __BigInt__: value.toString() }
   }
   if (value instanceof Uint8Array) {
-    return {__Uint8Array__: Array.from(value)};
+    return { __Uint8Array__: Array.from(value) }
   }
-  return value;
+  return value
 }
-const reviver = (key: string, value: any) => {
+const reviver = (key: string, value: any): any => {
   if (value && value.__BigInt__) {
-    return BigInt(value.__BigInt__);
+    return BigInt(value.__BigInt__)
   }
   if (value && value.__Uint8Array__ instanceof Array) {
-    return new Uint8Array(value.__Uint8Array__);
+    return new Uint8Array(value.__Uint8Array__)
   }
-  return value;
+  return value
 }
 
 export const deepCopy = <T>(obj: T): T => {
@@ -400,7 +400,6 @@ export function getIndexesPicked(groupSize: number, numToPick: number, offset = 
   return indexesPicked
 }
 
-
 /**
  * Try to print a variety of possible erros for debug purposes
  * @param err
@@ -449,6 +448,6 @@ export function isValidShardusAddress(hexStrings: string[]): boolean {
   return true
 }
 
-export function logNode( node : P2P.NodeListTypes.Node ): string {
+export function logNode(node: P2P.NodeListTypes.Node): string {
   return `Node ID : ${node.id} Node Address : ${node.address} externalPort : ${node.externalPort} externalIP : ${node.externalIp}`
 }

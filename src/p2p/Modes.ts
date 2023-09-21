@@ -7,14 +7,15 @@ import { validateTypes } from '../utils'
 import { hasAlreadyEnteredProcessing } from './CycleCreator'
 import * as NodeList from './NodeList'
 
-
 /** STATE */
 
 let p2pLogger: Logger
 
 /** ROUTES */
 
-const gossipRoute: P2P.P2PTypes.GossipHandler = (payload) => {}
+const gossipRoute: P2P.P2PTypes.GossipHandler = () => {
+  return
+}
 
 const routes = {
   internal: {},
@@ -32,7 +33,7 @@ const routes = {
      These functions are called by CycleCreator
 */
 
-export function init() {
+export function init(): void {
   // Init logger
   p2pLogger = Context.logger.getLogger('p2p')
 
@@ -48,7 +49,9 @@ export function init() {
   }
 }
 
-export function reset() {}
+export function reset(): void {
+  return
+}
 
 export function getTxs(): P2P.ModesTypes.Txs {
   return
@@ -65,7 +68,7 @@ export function updateRecord(
   txs: P2P.ModesTypes.Txs,
   record: P2P.CycleCreatorTypes.CycleRecord,
   prev: P2P.CycleCreatorTypes.CycleRecord
-) {
+): void {
   const active = NodeList.activeByIdOrder.length
 
   // If you're the first node
@@ -77,7 +80,7 @@ export function updateRecord(
   else if (prev) {
     //  if the modules have just been swapped last cycle
     if (prev.mode === undefined && prev.safetyMode !== undefined) {
-      if(hasAlreadyEnteredProcessing === false) {
+      if (hasAlreadyEnteredProcessing === false) {
         record.mode = 'forming'
       } else if (enterProcessing(active)) {
         record.mode = 'processing'
@@ -86,7 +89,7 @@ export function updateRecord(
       } else if (enterRecovery(active)) {
         record.mode = 'recovery'
       }
-    // for all other cases
+      // for all other cases
     } else {
       record.mode = prev.mode
 
@@ -118,7 +121,7 @@ export function updateRecord(
 }
 
 export function validateRecordTypes(rec: P2P.ModesTypes.Record): string {
-  let err = validateTypes(rec, { mode: 's' })
+  const err = validateTypes(rec, { mode: 's' })
   if (err) return err
   return ''
 }
@@ -131,29 +134,32 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   }
 }
 
+export function queueRequest(): void {
+  return
+}
 
-export function queueRequest(request) {}
-
-export function sendRequests() {}
+export function sendRequests(): void {
+  return
+}
 
 /** Helper Functions */
 
 /* These functions make the code neater and easier to understand
-*/
+ */
 
-export function enterRecovery(activeCount: number): Boolean {
-  return activeCount < (0.5 * Context.config.p2p.minNodes)
+export function enterRecovery(activeCount: number): boolean {
+  return activeCount < 0.5 * Context.config.p2p.minNodes
 }
 
-export function enterSafety(activeCount: number, prevRecord: P2P.CycleCreatorTypes.CycleRecord): Boolean {
+export function enterSafety(activeCount: number, prevRecord: P2P.CycleCreatorTypes.CycleRecord): boolean {
   if (prevRecord.mode === 'recovery') {
-    return activeCount >= (0.6 * Context.config.p2p.minNodes) && activeCount < (0.9 * Context.config.p2p.minNodes) 
+    return activeCount >= 0.6 * Context.config.p2p.minNodes && activeCount < 0.9 * Context.config.p2p.minNodes
   } else {
-    return activeCount >= (0.5 * Context.config.p2p.minNodes) && activeCount < (0.9 * Context.config.p2p.minNodes) 
+    return activeCount >= 0.5 * Context.config.p2p.minNodes && activeCount < 0.9 * Context.config.p2p.minNodes
   }
 }
 
-export function enterProcessing(activeCount: number): Boolean {
+export function enterProcessing(activeCount: number): boolean {
   /* 
   In the future the change from recovery to processing will need to be updated in the recovery project.
   per Andrew, we may want a sticky state that doesn't enter processing until something indicates the data is restored,
