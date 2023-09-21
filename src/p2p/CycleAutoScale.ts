@@ -76,11 +76,7 @@ export function init() {
 }
 
 export function reset() {
-  if (logFlags && logFlags.verbose)
-    console.log(
-      'Resetting auto-scale module',
-      `Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`
-    )
+  /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log( 'Resetting auto-scale module', `Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`)
   scalingRequested = false
   scalingRequestsCollector = new Map()
   requestedScalingType = null
@@ -288,9 +284,6 @@ function _checkScaling() {
   }
 
   // Check up first, but must have more votes than down votes.
-  console.log("CycleAutoScale: scale up length is ", scaleUpRequests.length)
-  console.log("CycleAutoScale: scale down length is ", scaleDownRequests.length)
-  console.log("CycleAutoScale: required votes is ", requiredVotes)
   if (scaleUpRequests.length >= requiredVotes && scaleUpRequests.length >= scaleDownRequests.length) {
     approvedScalingType = P2P.CycleAutoScaleTypes.ScaleType.UP
     changed = true
@@ -304,13 +297,13 @@ function _checkScaling() {
     //   )
     //   return
     // }
-    console.log("CycleAutoScale: scale up not approved")
+    /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: scale up not approved")
     if (scaleDownRequests.length >= requiredVotes) {
       approvedScalingType = P2P.CycleAutoScaleTypes.ScaleType.DOWN
       changed = true
     } else {
-      console.log("CycleAutoScale: changed is ", changed)
-      console.log("CycleAutoScale: won't change desired")
+      /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: changed is ", changed)
+      /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: won't change desired")
       // Return if we don't change anything
       return
     }
@@ -354,33 +347,27 @@ function setDesiredCount(count: number) {
 
 function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): number {
   const active = NodeList.activeByIdOrder.length
-  console.log(`prev record is `)
-  console.dir(prevRecord, { depth: null })
+
   if (prevRecord && prevRecord.mode !== undefined) {
     // For now, we are using the desired value from the previous cycle. In the future, we should look at using the next desired value
     const desired = prevRecord.desired
 
     if (prevRecord.mode === 'forming') {
-      console.log("CycleAutoScale: in forming")
+      /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in forming")
       if (active != desired) {
         if (active < desired) {
-          console.log("CycleAutoScale: entered active < desired")
+          /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: entered active < desired")
           let add = ~~(0.5 * active)
-          console.log(`counter is ${prevRecord.counter}`)
-          console.log(`1. add: ${add}`)
           if (add < 7) { 
             add = 7
           }
-          console.log(`2. add: ${add}`)
-          console.log(`1. tar: ${targetCount}`)
           targetCount = active + add
-          console.log(`2. tar: ${targetCount}`)
           if (targetCount > desired) { 
             targetCount = desired 
           }
         }
         if (active > desired) {
-          console.log("CycleAutoScale: entered active > desired")
+          /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: entered active > desired")
           let sub = ~~(0.3 * active)
           if (sub < 1) { 
             sub = 1 
@@ -392,18 +379,18 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
         }
       }
     } else if (prevRecord.mode === 'processing') {
-      console.log("CycleAutoScale: in processing")
+      /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in processing")
       if (enterSafety(active, prevRecord) === false && enterRecovery(active) === false) {
-        console.log("CycleAutoScale: not in safety")
+        /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: not in safety")
         let addRem = (desired - prevRecord.target) * 0.1
-        console.log(`addRem: ${addRem}, desired: ${desired}, prevTarget: ${prevRecord.target}`)
+        /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`addRem: ${addRem}, desired: ${desired}, prevTarget: ${prevRecord.target}`)
         if (addRem > active * 0.01) {
           addRem = active * 0.01
         } 
         if (addRem < 0 - active * 0.005) { 
           addRem = 0 - active * 0.005
         }
-        console.log(`CycleAutoScale: prev target is ${prevRecord.target} and addRem is ${addRem}`)
+        /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`CycleAutoScale: prev target is ${prevRecord.target} and addRem is ${addRem}`)
         targetCount = prevRecord.target + addRem
         // may want to swap config values to values from cycle record
         if (targetCount < config.p2p.minNodes) { 
@@ -415,12 +402,12 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
       }
     }
   } else if(Self.isFirst && active < 1) {
-    console.log("CycleAutoScale: in Self.isFirst condition")
+    /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in Self.isFirst condition")
     targetCount = 7
   } else {
     console.log("we should not be here")
   }
-  console.log("CycleAutoScale: target count is ", targetCount)
+  /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: target count is ", targetCount)
   return targetCount
 }
 

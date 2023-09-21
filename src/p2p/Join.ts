@@ -307,7 +307,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     const counterRefreshed = record.counter
     return { ...nodeInfo, cycleJoined, counterRefreshed, id }
   })
-  console.log("new desired count: ", record.desired)
+  /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("new desired count: ", record.desired)
   record.syncing = NodeList.byJoinOrder.length - NodeList.activeByIdOrder.length
   record.joinedConsensors = joinedConsensors.sort()
 }
@@ -589,10 +589,10 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
   // Compute how many join request to accept
   let toAccept = calculateToAccept()
   nestedCountersInstance.countEvent('p2p', `results of calculateToAccept: toAccept: ${toAccept}`)
-  console.log("results of calculateToAccept: ", toAccept)
+  /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("results of calculateToAccept: ", toAccept)
   const { add, remove } = calculateToAcceptV2(CycleChain.newest)
   nestedCountersInstance.countEvent('p2p', `results of calculateToAcceptV2: add: ${add}, remove: ${remove}`)
-  console.log("results of calculateToAcceptV2: ", add, remove)
+  /* prettier-ignore */ if (logFlags && logFlags.verbose) {console.log(`results of calculateToAcceptV2: add: ${add}, remove: ${remove}`)}
   toAccept = add
 
   // Check if we are better than the lowest selectionNum

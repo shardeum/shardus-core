@@ -462,7 +462,7 @@ async function runQ3() {
   txs = collectCycleTxs()
   ;({ record, marker, cert } = makeCycleData(txs, CycleChain.newest))
 
-  console.log("cycle record: ", record)
+  /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("cycle record: ", record)
 
   /*
   info(`

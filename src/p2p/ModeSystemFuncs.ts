@@ -9,6 +9,7 @@ import { P2P } from '@shardus/types'
 import { insertSorted, lerp } from '../utils'
 import * as CycleCreator from './CycleCreator'
 import * as CycleChain from './CycleChain'
+import { logFlags } from '../logger'
 
 export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecord) {
   const active = NodeList.activeByIdOrder.length
@@ -18,26 +19,22 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
   const target = targetCount
 
   nestedCountersInstance.countEvent('p2p', `desired: ${desired}, target: ${target}, active: ${active}, syncing: ${syncing}`)
-  console.log(`prevCounter: ${prevRecord.counter}, desired: ${desired}, target: ${target}, active: ${active}, syncing: ${syncing}`)
+  /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`prevCounter: ${prevRecord.counter}, desired: ${desired}, target: ${target}, active: ${active}, syncing: ${syncing}`)
 
   let add = 0
   let remove = 0
-  console.log("ModeSystemFuncs: before prevRecord check")
   if (prevRecord) {
-    console.log("ModeSystemFuncs: passed prevRecord check")
     if (prevRecord.mode === 'forming') {
       if (Self.isFirst && active < 1) {
-        console.log("ModeSystemFuncs: seed node reaches here")
         add = target
         remove = 0
         return { add, remove }
       } else if (active != desired) {
         let addRem = target - (active + syncing)
-        console.log(`under forming active != desired; addRem: ${addRem}`)
+        /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`under forming active != desired; addRem: ${addRem}`)
         if (addRem > 0) {
           add = Math.ceil(addRem)
           remove = 0
-          console.log("ModeSystemFuncs: 1 return")
           return { add, remove }
         }
         if (addRem < 0) {
@@ -49,22 +46,20 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
             if (addRem < 1) {
               addRem = 1
             }
-
             add = 0
             remove = Math.ceil(addRem)
-            console.log("ModeSystemFuncs: 2 return")
             return { add, remove }
           }
         }
       }
     } else if (prevRecord.mode === 'processing') {
       if (enterSafety(active, prevRecord) === false && enterRecovery(active) === false) {
-        console.log("max rotated per cycle: ", config.p2p.maxRotatedPerCycle)
+        /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("max rotated per cycle: ", config.p2p.maxRotatedPerCycle)
         if (active !== ~~target) {
           // calculate nodes to add or remove
-          console.log("active not equal target")
+          /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("active not equal target")
           let addRem = target - (active + syncing)
-          console.log("addRem ", addRem)
+          /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("addRem ", addRem)
           if (addRem > 0) {
             if (addRem > active * 0.1) { // limit nodes added to 10% of active; we are here because many were lost
               addRem = ~~(active * 0.1)
@@ -75,12 +70,11 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
 
             add = Math.ceil(addRem)
             remove = 0
-            console.log("ModeSystemFuncs: 5 return")
             return { add, remove }
           }
           if (addRem < 0) {
             addRem = active - target   // only remove the active nodes more than target
-            console.log(`addRem in processing: ${addRem}`)
+            /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`addRem in processing: ${addRem}`)
             if (addRem > active * 0.05) { // limit nodes removed to 5% of active; this should not happen
               console.log("unexpected addRem > 5% of active", addRem, active, target, desired)
               addRem = ~~(active * 0.05)
@@ -97,12 +91,11 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
               }
               add = 0
               remove = Math.ceil(addRem)
-              console.log("ModeSystemFuncs: 6 return")
               return { add, remove }
             }
           }
         } else if (config.p2p.maxRotatedPerCycle !== 0) {
-          console.log("entered rotation")
+          /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("entered rotation")
           let rnum = config.p2p.maxRotatedPerCycle // num to rotate per cycle; can be less than 1; like 0.5 for every other cycle; -1 for auto
           if (rnum < 0) { // rotate all nodes in 1000 cycles
             rnum = active * 0.001 
@@ -122,13 +115,12 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
                 rnum = 1
               }
             }
-            console.log("rnum: ", rnum)
-            console.log("setting add to rnum")
+            /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("rnum: ", rnum)
+            /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("setting add to rnum")
             add = Math.ceil(rnum)
             remove = 0
           }
-          console.log(`add: ${add}, remove: ${remove}`)
-          console.log(`ModeSystemFuncs: 8 return`)
+          /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`add: ${add}, remove: ${remove}`)
           return { add, remove }
         }
       }
@@ -145,7 +137,6 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
         if (addRem > 0) {
           add = Math.ceil(addRem)
           remove = 0
-          console.log("ModeSystemFuncs: 9 return")
           return { add, remove }
         }
       }
@@ -161,13 +152,12 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
         if (addRem > 0) {
           add = Math.ceil(addRem)
           remove = 0
-          console.log("ModeSystemFuncs: 10 return")
           return { add, remove }
         }
       }
     }
   }
-  console.log("returned from default")
+  console.log("add remove returned from default")
   return { add, remove }
 }
 
