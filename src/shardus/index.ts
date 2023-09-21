@@ -1924,7 +1924,7 @@ class Shardus extends EventEmitter {
         }
       }
       if (typeof application.validateJoinRequest === 'function') {
-        applicationInterfaceImpl.validateJoinRequest = (data, mode) => application.validateJoinRequest(data, mode)
+        applicationInterfaceImpl.validateJoinRequest = (data, mode, latestCycle, minNodes) => application.validateJoinRequest(data, mode, latestCycle, minNodes)
       }
       if (typeof application.validateArchiverJoinRequest === 'function') {
         applicationInterfaceImpl.validateArchiverJoinRequest = (data) =>

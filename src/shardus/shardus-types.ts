@@ -290,7 +290,7 @@ export interface App {
   dataSummaryInit?: (blob: any, accountData: any) => void
   dataSummaryUpdate?: (blob: any, accountDataBefore: any, accountDataAfter: any) => void
   txSummaryUpdate?: (blob: any, tx: any, wrappedStates: any) => void
-  validateJoinRequest?: (data: any, mode: P2P.ModesTypes.Record['mode'] | null) => any
+  validateJoinRequest?: (data: any, mode: P2P.ModesTypes.Record['mode'] | null, latestCycle: Cycle, minNodes: number) => any
   validateArchiverJoinRequest?: (data: any) => any
   getJoinData?: () => any
   eventNotify?: (event: ShardusEvent) => void

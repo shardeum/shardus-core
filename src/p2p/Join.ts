@@ -486,7 +486,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
   if (typeof shardus.app.validateJoinRequest === 'function') {
     try {
       mode = CycleChain.newest.mode || null
-      const validationResponse = shardus.app.validateJoinRequest(joinRequest, mode)
+      const validationResponse = shardus.app.validateJoinRequest(joinRequest, mode, CycleChain.newest, config.p2p.minNodes)
       
       if (validationResponse.success !== true) {
         error(`Validation of join request data is failed due to ${validationResponse.reason || 'unknown reason'}`)
