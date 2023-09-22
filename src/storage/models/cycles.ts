@@ -12,6 +12,7 @@ const cycles = [
       primaryKey: true,
       allowNull: false,
     },
+    target: { type: Sequelize.BIGINT, allowNull: true },
     mode: { type: Sequelize.TEXT, allowNull: true },
     safetyMode: { type: Sequelize.TEXT, allowNull: true },
     safetyNum: { type: Sequelize.BIGINT, allowNull: true },
