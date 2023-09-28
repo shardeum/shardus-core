@@ -8,29 +8,26 @@ export class VectorBufferStream {
   }
 
   public static fromBuffer(buffer: Buffer): VectorBufferStream {
-    const stream = new VectorBufferStream(0);
-    stream.buffer = buffer;
-    stream.position = 0;
-    return stream;
+    const stream = new VectorBufferStream(0)
+    stream.buffer = buffer
+    stream.position = 0
+    return stream
   }
 
   public getBufferLength(): number {
-    return this.buffer.length;
+    return this.buffer.length
   }
 
-  //create a string for debugging that contains numbytes worth of hex values from the buffer
-  public getDebugString(numBytes: number, offset:number = 0): string {
-    let str = "";
+  public getDebugString(numBytes: number, offset = 0): string {
+    let str = ''
     for (let i = 0; i < numBytes; i++) {
-      str += this.buffer[i+offset].toString(16) + " ";
+      str += this.buffer[i + offset].toString(16) + ' '
     }
-    return str;
+    return str
   }
-
-
 
   public isAtOrPastEnd(): boolean {
-    return this.position >= this.buffer.length;
+    return this.position >= this.buffer.length
   }
 
   private ensureCapacity(size: number): void {
@@ -202,7 +199,6 @@ export class VectorBufferStream {
     this.position += 8
     return value
   }
-
 
   public readFixedBuffer(length: number): Buffer {
     const value = this.buffer.slice(this.position, this.position + length)

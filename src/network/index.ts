@@ -14,10 +14,10 @@ import { config, defaultConfigs, logger } from '../p2p/Context'
 import { generateUUID } from '../p2p/Utils'
 import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
+import { formatErrorMessage } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
-import { formatErrorMessage } from '../utils'
 
 /** TYPES */
 export interface IPInfo {
@@ -143,6 +143,11 @@ export class NetworkClass extends EventEmitter {
         useLruCache: this.useLruCacheForSocketMgmt,
         lruSize: this.lruCacheSizeForSocketMgmt,
       },
+      headerOpts: {
+        sendWithHeaders: true,
+        sendHeaderVersion: 1,
+        enableDataCompression: true,
+      },
       customStringifier: this.customStringifier,
     })
     this.intServer = await this.sn.listen(async (data, remote, respond) => {
@@ -211,16 +216,16 @@ export class NetworkClass extends EventEmitter {
     for (const node of nodes) {
       if (!logged) this.logger.playbackLog('self', node, 'InternalTell', route, id, message)
       const requestId = generateUUID()
-        mainLogger.info(`Initiating tell request with requestId: ${requestId}`)
-        mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
-        mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
+      mainLogger.info(`Initiating tell request with requestId: ${requestId}`)
+      mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
+      mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
       this.InternalTellCounter++
-      const promise = this.sn.send(node.internalPort, node.internalIp, data)
+      const promise = this.sn.sendWithHeaders(node.internalPort, node.internalIp, data, {})
       promise.catch((err) => {
         if (logFlags.error) this.mainLogger.error('Network: ' + err)
         if (logFlags.error) this.mainLogger.error('Network: ' + formatErrorMessage(err.stack))
-        let errorGroup = ('' + err).slice(0,20)
-        this.emit('error', node, requestId, "tell", errorGroup)
+        let errorGroup = ('' + err).slice(0, 20)
+        this.emit('error', node, requestId, 'tell', errorGroup)
       })
       promises.push(promise)
     }
@@ -263,23 +268,24 @@ export class NetworkClass extends EventEmitter {
           nestedCountersInstance.countRareEvent('network', 'timeout ' + route)
           if (logFlags.error) this.mainLogger.error('Network: ' + err)
           if (logFlags.error) this.mainLogger.error('Network: ' + formatErrorMessage(err.stack))
-          this.emit('timeout', node, requestId, "ask")
+          this.emit('timeout', node, requestId, 'ask')
           reject(err)
         }
         if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, id, message)
         try {
-          await this.sn.send(
+          await this.sn.sendWithHeaders(
             node.internalPort,
             node.internalIp,
             data,
+            {},
             this.timeout + extraTime,
             onRes,
             onTimeout
           )
         } catch (err) {
           if (logFlags.error) this.mainLogger.error('Network: ' + err)
-          let errorGroup = ('' + err).slice(0,20)
-          this.emit('error', node, requestId, "ask", errorGroup)
+          let errorGroup = ('' + err).slice(0, 20)
+          this.emit('error', node, requestId, 'ask', errorGroup)
         }
       } finally {
         profilerInstance.profileSectionEnd('net-ask')
