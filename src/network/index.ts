@@ -1,5 +1,6 @@
 import Sntp from '@hapi/sntp'
 import { Sn } from '@shardus/net'
+import { AppHeader } from '@shardus/net/build/src/types'
 import bodyParser from 'body-parser'
 import cors from 'cors'
 import { EventEmitter } from 'events'
@@ -53,6 +54,7 @@ export class NetworkClass extends EventEmitter {
   InternalTellCounter: number
   InternalAskCounter: number
   ipInfo: any
+  signingSecretKeyHex: string
   externalCatchAll: any
   debugNetworkDelay: number
   statisticsInstance: any
@@ -144,20 +146,19 @@ export class NetworkClass extends EventEmitter {
         lruSize: this.lruCacheSizeForSocketMgmt,
       },
       headerOpts: {
-        sendWithHeaders: true,
         sendHeaderVersion: 1,
-        enableDataCompression: true,
       },
+      signingSecretKeyHex: this.signingSecretKeyHex,
       customStringifier: this.customStringifier,
     })
-    this.intServer = await this.sn.listen(async (data, remote, respond) => {
+    this.intServer = await this.sn.listen(async (data, remote, respond, header, sign) => {
       let routeName
       try {
         if (!data) throw new Error('No data provided in request...')
         const { route, payload } = data
 
         routeName = route
-        if (!route && payload && payload.isResponse) {
+        if (!route && payload) {
           if (logFlags.debug)
             this.mainLogger.debug('Received response data without any specified route', payload)
           return
@@ -179,10 +180,10 @@ export class NetworkClass extends EventEmitter {
 
         const handler = this.internalRoutes[route]
         if (!payload) {
-          await handler(null, respond)
+          await handler(null, respond, header, sign)
           return
         }
-        await handler(payload, respond)
+        await handler(payload, respond, header, sign)
         if (logFlags.net_trace) {
           this.netLogger.debug(
             'Internal\t' +
@@ -220,7 +221,40 @@ export class NetworkClass extends EventEmitter {
       mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
       mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
       this.InternalTellCounter++
-      const promise = this.sn.sendWithHeaders(node.internalPort, node.internalIp, data, {})
+      const promise = this.sn.send(node.internalPort, node.internalIp, data)
+      promise.catch((err) => {
+        if (logFlags.error) this.mainLogger.error('Network: ' + err)
+        if (logFlags.error) this.mainLogger.error('Network: ' + formatErrorMessage(err.stack))
+        let errorGroup = ('' + err).slice(0, 20)
+        this.emit('error', node, requestId, 'tell', errorGroup)
+      })
+      promises.push(promise)
+    }
+    try {
+      await Promise.all(promises)
+    } catch (err) {
+      if (logFlags.error) this.mainLogger.error('Network: ' + err)
+    }
+  }
+
+  async tell2(
+    nodes: Shardus.Node[],
+    route: string,
+    message: Buffer,
+    appHeader: AppHeader,
+    trackerId: string,
+    logged = false
+  ) {
+    const data = { route, payload: message }
+    const promises = []
+    for (const node of nodes) {
+      if (!logged) this.logger.playbackLog('self', node, 'InternalTell', route, trackerId, message)
+      const requestId = generateUUID()
+      mainLogger.info(`Initiating tell request with requestId: ${requestId}`)
+      mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
+      mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
+      this.InternalTellCounter++
+      const promise = this.sn.sendWithHeader(node.internalPort, node.internalIp, data, appHeader)
       promise.catch((err) => {
         if (logFlags.error) this.mainLogger.error('Network: ' + err)
         if (logFlags.error) this.mainLogger.error('Network: ' + formatErrorMessage(err.stack))
@@ -273,11 +307,10 @@ export class NetworkClass extends EventEmitter {
         }
         if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, id, message)
         try {
-          await this.sn.sendWithHeaders(
+          await this.sn.send(
             node.internalPort,
             node.internalIp,
             data,
-            {},
             this.timeout + extraTime,
             onRes,
             onTimeout
@@ -285,6 +318,69 @@ export class NetworkClass extends EventEmitter {
         } catch (err) {
           if (logFlags.error) this.mainLogger.error('Network: ' + err)
           let errorGroup = ('' + err).slice(0, 20)
+          this.emit('error', node, requestId, 'ask', errorGroup)
+        }
+      } finally {
+        profilerInstance.profileSectionEnd('net-ask')
+        profilerInstance.profileSectionEnd(`net-ask-${route}`)
+      }
+    })
+  }
+
+  ask2(
+    node,
+    route: string,
+    message: Buffer,
+    appHeader: AppHeader,
+    trackerId: string,
+    logged = false,
+    extraTime = 0
+  ) {
+    return new Promise(async (resolve, reject) => {
+      this.InternalAskCounter++
+
+      const requestId = generateUUID()
+      this.mainLogger.info(`Initiating ask request with requestId: ${requestId}`)
+      this.mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
+      this.mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
+
+      try {
+        if (this.debugNetworkDelay > 0) {
+          await utils.sleep(this.debugNetworkDelay)
+        }
+        profilerInstance.profileSectionStart('net-ask')
+        profilerInstance.profileSectionStart(`net-ask-${route}`)
+
+        const data = { route, payload: message }
+        const onRes = (res) => {
+          if (!logged) this.logger.playbackLog('self', node, 'InternalAskResp', route, trackerId, res)
+          resolve(res)
+        }
+        const onTimeout = () => {
+          nestedCountersInstance.countEvent('network', 'timeout')
+          if (this.statisticsInstance) this.statisticsInstance.incrementCounter('networkTimeout')
+          const err = new Error(`Request timed out. ${utils.stringifyReduce(trackerId)}`)
+          nestedCountersInstance.countRareEvent('network', 'timeout ' + route)
+          if (logFlags.error) this.mainLogger.error('Network: ' + err)
+          if (logFlags.error) this.mainLogger.error('Network: ' + formatErrorMessage(err.stack))
+          this.emit('timeout', node, requestId, 'ask')
+          reject(err)
+        }
+        if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, trackerId, message)
+        try {
+          await this.sn.sendWithHeader(
+            node.internalPort,
+            node.internalIp,
+            data,
+            appHeader,
+            this.timeout + extraTime,
+            onRes,
+            onTimeout
+          )
+        } catch (err) {
+          if (logFlags.error) this.mainLogger.error('Network: ' + err)
+          let errorGroup = ('' + err).slice(0, 20)
+          console.log('sendWithHeader: error:', err)
           this.emit('error', node, requestId, 'ask', errorGroup)
         }
       } finally {
@@ -310,13 +406,14 @@ export class NetworkClass extends EventEmitter {
     }
   }
 
-  async setup(ipInfo: IPInfo) {
+  async setup(ipInfo: IPInfo, signingSecretKeyHex: string) {
     if (!ipInfo.externalIp) throw new Error('Fatal: network module requires externalIp')
     if (!ipInfo.externalPort) throw new Error('Fatal: network module requires externalPort')
     if (!ipInfo.internalIp) throw new Error('Fatal: network module requires internalIp')
     if (!ipInfo.internalPort) throw new Error('Fatal: network module requires internalPort')
 
     this.ipInfo = ipInfo
+    this.signingSecretKeyHex = signingSecretKeyHex
 
     this.logger.setPlaybackIPInfo(ipInfo)
 
@@ -450,7 +547,7 @@ export class NetworkClass extends EventEmitter {
     this._registerExternal('PATCH', route, authHandler, responseHandler)
   }
 
-  registerInternal(route: string, handler: Handler) {
+  registerInternal(route: string, handler) {
     if (this.internalRoutes[route]) throw Error('Handler already exists for specified internal route.')
     this.internalRoutes[route] = handler
   }

@@ -14,6 +14,10 @@ export class VectorBufferStream {
     return stream
   }
 
+  public getAsHexString(): string {
+    return this.buffer.toString('hex')
+  }
+
   public getBufferLength(): number {
     return this.buffer.length
   }
@@ -41,8 +45,7 @@ export class VectorBufferStream {
   }
 
   public getBuffer(): Buffer {
-    //console.log(`position: ${this.position} `);
-    return this.buffer.slice(0, this.position)
+    return this.buffer.subarray(0, this.position)
   }
 
   public write(value: string | Buffer, encoding?: BufferEncoding): void {

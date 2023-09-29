@@ -24,7 +24,7 @@ import * as GlobalAccounts from '../p2p/GlobalAccounts'
 import { scheduleLostReport } from '../p2p/Lost'
 import { activeByIdOrder } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
-import { attempt, generateUUID } from '../p2p/Utils'
+import { attempt } from '../p2p/Utils'
 import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
@@ -394,8 +394,16 @@ class Shardus extends EventEmitter {
     await Network.init()
     await Network.checkTimeSynced(this.config.p2p.timeServers)
 
+    // Setup storage
+    await this.storage.init()
+
+    // Setup crypto
+    await this.crypto.init()
+
     try {
-      this.io = (await this.network.setup(Network.ipInfo)) as SocketIO.Server
+      const sk: string = this.crypto.keypair.secretKey
+      console.log('[arham] sk', sk)
+      this.io = (await this.network.setup(Network.ipInfo, sk)) as SocketIO.Server
       Context.setIOContext(this.io)
       this.io.on('connection', (socket: any) => {
         if (!Self || !Self.isActive) {
@@ -487,12 +495,6 @@ class Shardus extends EventEmitter {
       /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `error-${context}`)
       /* prettier-ignore */ nestedCountersInstance.countRareEvent( 'lostNodes', `error-${context}  ${node.internalIp}:${node.internalPort}` )
     })
-
-    // Setup storage
-    await this.storage.init()
-
-    // Setup crypto
-    await this.crypto.init()
 
     // Setup other modules
     this.debug = new Debug(this.config.baseDir, this.network)
@@ -1402,7 +1404,9 @@ class Shardus extends EventEmitter {
       const result = this.stateManager.transactionQueue.tryInvloveAccount(txId, address, isRead)
       return result
     } catch (err) {
-      this.fatalLogger.fatal('Error while checking tryInvolveAccount ' + err.name + ': ' + err.message + ' at ' + err.stack)
+      this.fatalLogger.fatal(
+        'Error while checking tryInvolveAccount ' + err.name + ': ' + err.message + ' at ' + err.stack
+      )
       return false
     }
   }
@@ -1932,7 +1936,8 @@ class Shardus extends EventEmitter {
         }
       }
       if (typeof application.validateJoinRequest === 'function') {
-        applicationInterfaceImpl.validateJoinRequest = (data, mode, latestCycle, minNodes) => application.validateJoinRequest(data, mode, latestCycle, minNodes)
+        applicationInterfaceImpl.validateJoinRequest = (data, mode, latestCycle, minNodes) =>
+          application.validateJoinRequest(data, mode, latestCycle, minNodes)
       }
       if (typeof application.validateArchiverJoinRequest === 'function') {
         applicationInterfaceImpl.validateArchiverJoinRequest = (data) =>

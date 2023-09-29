@@ -18,20 +18,28 @@ it is saved and gossiped to other nodes.
 When the apoptosized field of a cycle record contains the node id
 of a particular node, the node is removed from the node list.
 */
+import { P2P } from '@shardus/types'
 import { Handler } from 'express'
 import * as Sequelize from 'sequelize'
-import { P2P } from '@shardus/types'
+import { isDebugMode } from '../debug'
+import {
+  ApoptosisProposalReq,
+  deserializeApoptosisProposalReq,
+  serializeApoptosisProposalReq,
+} from '../types/ApoptosizeProposalReq'
+import { ApoptosisProposalResp, serializeApoptosisProposalResp } from '../types/ApoptosizeProposalResp'
+import { InternalBinaryHandler } from '../types/Handler'
 import { validateTypes } from '../utils'
+import getCallstack from '../utils/getCallstack'
+import { nestedCountersInstance } from '../utils/nestedCounters'
+import { profilerInstance } from '../utils/profiler'
+import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import * as Comms from './Comms'
-import { config, crypto, logger, network } from './Context'
+import { crypto, logger, network } from './Context'
 import { currentCycle, currentQuarter } from './CycleCreator'
 import { activeByIdOrder, byIdOrder, byPubKey, nodes } from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
-import { isDebugMode } from '../debug'
-import { profilerInstance } from '../utils/profiler'
-import getCallstack from '../utils/getCallstack'
-import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /** STATE */
 
@@ -74,69 +82,66 @@ const failExternalRoute: P2P.P2PTypes.Route<Handler> = {
 // This route is expected to return "pass" or "fail" so that
 //   the exiting node can know that some other nodes have
 //   received the message and will send it to other nodes
-const apoptosisInternalRoute: P2P.P2PTypes.Route<
-  P2P.P2PTypes.InternalHandler<P2P.ApoptosisTypes.SignedApoptosisProposal>
-> = {
+const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
   name: internalRouteName,
-  handler: (payload, response, sender) => {
+  handler: (payload, response, header, sign) => {
     profilerInstance.scopedProfileSectionStart('apoptosize')
+    console.log('apoptosisInternalRoute called')
     try {
-      info(`Got Apoptosis proposal: ${JSON.stringify(payload)}`)
+      const requestBuffer = VectorBufferStream.fromBuffer(payload)
+      console.log('request type:', requestBuffer.readUInt16())
+      const req = deserializeApoptosisProposalReq(requestBuffer)
+      console.log('request:', req)
+      const apopProposal: P2P.ApoptosisTypes.SignedApoptosisProposal = {
+        id: req.id,
+        when: req.when,
+        sign: sign,
+      }
+      info(`Got Apoptosis proposal: ${JSON.stringify(apopProposal)}`)
       let err = ''
 
-      //special control case used to get an 'ack' from the isDownCheck function on a potentially lost node
-      //this must be before the validation of the payload as it is not a valid payload
-      if (payload?.id === 'isDownCheck') {
+      if (apopProposal.id === 'isDownCheck') {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-isDownCheck c:${currentCycle}`, 1)
-        response({ s: 'node is not down', r: 1 })
+        let resp: ApoptosisProposalResp = { s: 'node is not down', r: 1 }
+        response(resp, serializeApoptosisProposalResp)
+        return
       }
 
-      //expand compatiblity with old nodes, can remove this later probably after 1.5.1
-      if (payload?.id === 'bad') {
+      //expand compatibility with old nodes, can remove this later probably after 1.5.1
+      if (apopProposal.id === 'bad') {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-isDownCheck-bad c:${currentCycle}`, 1)
-        response({ s: 'node is not down', r: 2 })
+        let resp: ApoptosisProposalResp = { s: 'node is not down', r: 2 }
+        response(resp, serializeApoptosisProposalResp)
+        return
       }
 
-      err = validateTypes(payload, { when: 'n', id: 's', sign: 'o' })
-      if (err) {
-        warn('bad input ' + err)
-        return
-      }
-      err = validateTypes(payload.sign, { owner: 's', sig: 's' })
-      if (err) {
-        warn('bad input sign ' + err)
-        return
-      }
-      // The when must be set to current cycle +-1 because it is being
-      //    received from the originating node
-      if (!(payload as P2P.P2PTypes.LooseObject).when) {
-        response({ s: 'fail', r: 1 })
-        return
-      }
-      const when = payload.when
+      const when = apopProposal.when
       if (when > currentCycle + 1 || when < currentCycle - 1) {
-        response({ s: 'fail', r: 2 })
+        let resp: ApoptosisProposalResp = { s: 'fail', r: 2 }
+        response(resp, serializeApoptosisProposalResp)
         return
       }
       //  check that the node which sent this is the same as the node that signed it, otherwise this is not original message so ignore it
-      if (sender === payload.id) {
+      if (header.sender_id === apopProposal.id) {
         //  if (addProposal(payload)) p2p.sendGossipIn(gossipRouteName, payload)
         //  if (addProposal(payload)) Comms.sendGossip(gossipRouteName, payload)
         //  Omar - we must always accept the original apoptosis message regardless of quarter and save it to gossip next cycle
         //    but if we are in Q1 gossip it, otherwise save for Q1 of next cycle
-        if (addProposal(payload)) {
+        if (addProposal(apopProposal)) {
           if (currentQuarter === 1) {
             // if it is Q1 we can try to gossip the message now instead of waiting for Q1 of next cycle
             Comms.sendGossip(gossipRouteName, payload)
           }
-          response({ s: 'pass' })
+          let resp: ApoptosisProposalResp = { s: 'pass', r: 1 }
+          response(resp, serializeApoptosisProposalResp)
           return
         } else {
           warn(`addProposal failed for payload: ${JSON.stringify(payload)}`)
         }
       } else {
-        warn(`sender is not apop node: sender:${sender} apop:${payload.id}`)
-        response({ s: 'fail', r: 3 })
+        warn(`sender is not apop node: sender:${header.sender_id} apop:${apopProposal.id}`)
+        let resp: ApoptosisProposalResp = { s: 'fail', r: 3 }
+        response(resp, serializeApoptosisProposalResp)
       }
     } finally {
       profilerInstance.scopedProfileSectionEnd('apoptosize')
@@ -175,7 +180,8 @@ const apoptosisGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ApoptosisTypes.Signed
 
 const routes = {
   external: [stopExternalRoute, failExternalRoute],
-  internal: [apoptosisInternalRoute],
+  internal: [],
+  internal2: [apoptosisInternalRoute],
   gossip: {
     //    'gossip-join': gossipJoinRoute,
     [gossipRouteName]: apoptosisGossipRoute,
@@ -198,6 +204,9 @@ export function init() {
   }
   for (const route of routes.internal) {
     Comms.registerInternal(route.name, route.handler)
+  }
+  for (const route of routes.internal2) {
+    Comms.registerInternal2(route.name, route.handler)
   }
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
@@ -285,15 +294,20 @@ export async function apoptosizeSelf(message: string) {
   // [TODO] - maybe we should shuffle this array
   const activeNodes = activeByIdOrder
   const proposal = createProposal()
-  /* Don't use tell, do a robust query instead
-//  await p2p.tell(activeNodes, internalRouteName, proposal)
-  await Comms.tell(activeNodes, internalRouteName, proposal)
-*/
+  const apopProposalReq: ApoptosisProposalReq = {
+    id: proposal.id,
+    when: proposal.when,
+  }
+  const serializedPayload = new VectorBufferStream(0)
+  serializeApoptosisProposalReq(serializedPayload, apopProposalReq, true)
+  await Comms.tell2(activeNodes, internalRouteName, serializedPayload, {})
   const qF = async (node) => {
     //  use ask instead of tell and expect the node to
     //          acknowledge it received the request by sending 'pass'
     if (node.id === Self.id) return null
-    const res = Comms.ask(node, internalRouteName, proposal)
+    const res = Comms.ask2(node, internalRouteName, serializedPayload, {
+      sender_id: Self.id,
+    })
     return res
   }
   const eF = (item1, item2) => {
