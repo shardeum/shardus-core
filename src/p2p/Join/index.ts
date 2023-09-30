@@ -792,7 +792,7 @@ function getSelectionKey(joinRequest: JoinRequest): Result<string, JoinRequestRe
   return ok(joinRequest.nodeInfo.publicKey)
 }
 
-function verifyJoinRequestSignature(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse | null {
+export function verifyJoinRequestSignature(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse | null {
   if (!crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)) {
     warn('join bad sign ' + JSON.stringify(joinRequest))
     nestedCountersInstance.countEvent('p2p', `join-reject-bad-sign`)

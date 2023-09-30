@@ -68,7 +68,16 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
     // if the port of the join request was reachable, this join request is free to be
     // gossiped to all nodes according to Join Protocol v2.
     if (config.p2p.useJoinProtocolV2) {
-      // validate the join request first. if it's invalid for any reason, return
+      // ensure this join request doesn't already exist in standby nodes
+      if (getStandbyNodesInfoMap().has(joinRequest.nodeInfo.publicKey)) {
+        return res.status(400).json({
+          success: false,
+          fatal: true,
+          reason: `Join request for pubkey ${joinRequest.nodeInfo.publicKey} already exists as a standby node`,
+        })
+      }
+
+      // then validate the join request. if it's invalid for any reason, return
       // that reason.
       const validationError = validateJoinRequest(joinRequest)
       if (validationError) {
@@ -79,9 +88,9 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       const selectionNumResult = computeSelectionNum(joinRequest)
       if (selectionNumResult.isErr()) {
         console.error(`failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`, JSON.stringify(selectionNumResult.error))
-      } else {
-        joinRequest.selectionNum = selectionNumResult.value
+        return res.status(500).json(selectionNumResult.error)
       }
+      joinRequest.selectionNum = selectionNumResult.value
 
       // add the join request to the global list of join requests. this will also
       // add it to the list of new join requests that will be processed as part of
@@ -194,6 +203,12 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequ
   sender: P2P.NodeListTypes.Node['id'],
   tracker: string,
 ) => {
+  // ensure this join request doesn't already exist in standby nodes
+  if (getStandbyNodesInfoMap().has(payload.nodeInfo.publicKey)) {
+    console.error(`join request for pubkey ${payload.nodeInfo.publicKey} already exists as a standby node`)
+    return
+  }
+
   // validate the join request first
   const validationError = validateJoinRequest(payload)
   if (validationError) {
