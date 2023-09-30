@@ -148,7 +148,8 @@ class Storage {
         '`nodeListHash` TEXT NOT NULL',
         '`archiverListHash` TEXT NOT NULL',
         '`standbyAdd` JSON NOT NULL',
-        '`standbyNodeListHash` TEXT NOT NULL'].join(', ')
+        '`standbyNodeListHash` TEXT NOT NULL',
+        '`standbyRemove` JSON NOT NULL'].join(', ')
       + ')'
     )
     await this.storage.runCreate(

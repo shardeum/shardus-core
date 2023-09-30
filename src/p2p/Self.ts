@@ -7,7 +7,6 @@ import { logFlags } from '../logger'
 import * as network from '../network'
 import * as snapshot from '../snapshot'
 import * as utils from '../utils'
-import { getRandom } from '../utils'
 import { isInvalidIP } from '../utils/functions/checkIP'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as Archivers from './Archivers'
@@ -17,11 +16,13 @@ import * as CycleCreator from './CycleCreator'
 import { calcIncomingTimes } from './CycleCreator'
 import * as GlobalAccounts from './GlobalAccounts'
 import * as Join from './Join'
+import * as JoinV2 from './Join/v2'
 import * as Acceptance from './Join/v2/acceptance'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
 import { getNewestCycle } from './Sync'
 import * as SyncV2 from './SyncV2/'
+import { getRandomAvailableArchiver, SeedNodesList } from './Utils'
 
 /** STATE */
 
@@ -71,6 +72,11 @@ export function init(): void {
   // initialize SyncV2 if enabled
   if (Context.config.p2p.useSyncProtocolV2) {
     SyncV2.init()
+  }
+
+  // initialize JoinV2 if enabled
+  if (Context.config.p2p.useJoinProtocolV2) {
+    JoinV2.init()
   }
 
   // Create a logger for yourself
@@ -306,16 +312,15 @@ async function syncCycleChain(): Promise<void> {
 }
 
 async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
-  const availableArchivers = Context.config.p2p.existingArchivers
   const maxRetries = 3
   let retry = maxRetries
   const failArchivers: string[] = []
   let archiver: P2P.SyncTypes.ActiveNode
-  let activeNodesSigned: SignedActiveNodesFromArchiver
+  let activeNodesSigned: P2P.P2PTypes.SignedObject<SeedNodesList>
 
   while (retry > 0) {
     try {
-      archiver = getRandom(availableArchivers, 1)[0]
+      archiver = getRandomAvailableArchiver()
       if (!failArchivers.includes(archiver.ip)) failArchivers.push(archiver.ip)
       activeNodesSigned = await getActiveNodesFromArchiver(archiver)
       break // To stop this loop if it gets the response without failing
@@ -403,18 +408,12 @@ function checkIfFirstSeedNode(seedNodes: P2P.P2PTypes.Node[]): boolean {
   return false
 }
 
-type SignedActiveNodesFromArchiver = P2P.P2PTypes.SignedObject & {
-  nodeList: P2P.P2PTypes.Node[]
-}
-
 async function getActiveNodesFromArchiver(
   archiver: P2P.SyncTypes.ActiveNode
-): Promise<SignedActiveNodesFromArchiver> {
+): Promise<P2P.P2PTypes.SignedObject<SeedNodesList>> {
   const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
   const nodeInfo = getPublicNodeInfo()
-  let seedListSigned: P2P.P2PTypes.SignedObject & {
-    nodeList: P2P.P2PTypes.Node[]
-  }
+  let seedListSigned: P2P.P2PTypes.SignedObject<SeedNodesList>
   try {
     seedListSigned = await http.post(
       nodeListUrl,

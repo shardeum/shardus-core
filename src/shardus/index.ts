@@ -24,7 +24,7 @@ import * as GlobalAccounts from '../p2p/GlobalAccounts'
 import { scheduleLostReport } from '../p2p/Lost'
 import { activeByIdOrder } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
-import { generateUUID } from '../p2p/Utils'
+import { attempt, generateUUID } from '../p2p/Utils'
 import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
@@ -45,7 +45,6 @@ import Profiler, { profilerInstance } from '../utils/profiler'
 import { startSaving } from './saveConsoleOutput'
 import { isDebugMode } from '../debug'
 import * as JoinV2 from '../p2p/Join/v2'
-
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -236,6 +235,10 @@ class Shardus extends EventEmitter {
     this.exitHandler.registerAsync('storage', async () => {
       this.mainLogger.info('Closing Database connections...')
       await this.storage.close()
+    })
+    this.exitHandler.registerAsync('unjoin', async () => {
+      this.mainLogger.info('Submitting unjoin request...')
+      await JoinV2.shutdown()
     })
     /* moved stopping the application to earlier
     this.exitHandler.registerAsync('application', async () => {
@@ -2059,8 +2062,7 @@ class Shardus extends EventEmitter {
         previousCycleMarker: CycleChain.getNewest()?.previous,
         getStandbyListHash: JoinV2.getStandbyListHash(),
         getLastHashedStandbyList: JoinV2.getLastHashedStandbyList(),
-        getSortedStandbyNodeList: JoinV2.getSortedStandbyNodeList(),
-        getSortedAllJoinRequestsMap: JoinV2.getSortedAllJoinRequestsMap(),
+        getSortedStandbyNodeList: JoinV2.getSortedStandbyJoinRequests(),
       }
       res.json(deepReplace(result, undefined, '__undefined__'))
     })

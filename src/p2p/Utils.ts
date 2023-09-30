@@ -2,11 +2,18 @@ import * as crypto from 'crypto'
 import util from 'util'
 import { logFlags } from '../logger'
 import * as utils from '../utils'
-import { sleep, stringifyReduce } from '../utils'
+import { getRandom, sleep, stringifyReduce } from '../utils'
 import FastRandomIterator from '../utils/FastRandomIterator'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { config } from './Context'
+import { config, stateManager } from './Context'
+import * as Context from './Context'
+import * as Self from './Self'
 import { Logger } from 'log4js'
+import { P2P } from '@shardus/types'
+import { Result } from 'neverthrow'
+import { getPublicNodeInfo } from './Self'
+import * as http from '../http'
+import { ok, err } from 'neverthrow'
 
 export type QueryFunction<Node, Response> = (node: Node) => PromiseLike<Response>
 
@@ -39,6 +46,13 @@ export interface SequentialQueryError<Node> {
 export interface SequentialQueryResult<Node> {
   result: unknown
   errors: Array<SequentialQueryError<Node>>
+}
+
+export type SeedNodesList = {
+  nodeList: P2P.P2PTypes.Node[]
+  joinRequest: P2P.ArchiversTypes.Request | undefined
+  dataRequestCycle: unknown
+  dataRequestStateMetaData: unknown
 }
 
 export async function compareQuery<Node = unknown, Response = unknown>(
@@ -498,4 +512,43 @@ export function generateUUID(): string {
     16,
     4
   )}-${uuid.substring(20)}`
+}
+
+export function getOurNodeIndex(): number | null {
+  let nodeInfo = stateManager.currentCycleShardData.nodeShardDataMap.get(Self.id)
+
+  // no such node in the list
+  if (!nodeInfo) return null
+
+  return nodeInfo.ourNodeIndex
+}
+
+export function getRandomAvailableArchiver(): P2P.SyncTypes.ActiveNode {
+  const availableArchivers = Context.config.p2p.existingArchivers
+  return getRandom(availableArchivers, 1)[0]
+}
+
+export async function getActiveNodesFromArchiver(
+  archiver: P2P.SyncTypes.ActiveNode
+): Promise<Result<P2P.P2PTypes.SignedObject<SeedNodesList>, Error>> {
+  const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
+  const nodeInfo = getPublicNodeInfo()
+  let seedListSigned: P2P.P2PTypes.SignedObject<SeedNodesList>
+  try {
+    seedListSigned = await http.post(
+      nodeListUrl,
+      Context.crypto.sign({
+        nodeInfo,
+      }),
+      false,
+      10000
+    )
+  } catch (e) {
+    nestedCountersInstance.countRareEvent(
+      'archiver_nodelist',
+      'Could not get seed list from seed node server'
+    )
+    return err(Error(`Could not get seed list from seed node server ${nodeListUrl}: ` + e.message))
+  }
+  return ok(seedListSigned)
 }

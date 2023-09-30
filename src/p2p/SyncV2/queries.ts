@@ -9,7 +9,7 @@ import { attempt, robustQuery } from '../Utils'
 import * as http from '../../http'
 import { logger } from '../Context'
 import { Logger } from 'log4js'
-import { StandbyAdditionInfo } from '@shardus/types/build/src/p2p/JoinTypes'
+import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 
 /** A `ResultAsync` that wraps an `UnwrappedRobustResult`. */
 export type RobustQueryResultAsync<T> = ResultAsync<UnwrappedRobustResult<ActiveNode, T>, Error>
@@ -163,7 +163,7 @@ export function getArchiverListFromNode(node: ActiveNode, expectedHash: hexstrin
 }
 
 /** Gets the full standby list from the specified standby. */
-export function getStandbyNodeListFromNode(node: ActiveNode, expectedHash: hexstring): ResultAsync<StandbyAdditionInfo[], Error> {
+export function getStandbyNodeListFromNode(node: ActiveNode, expectedHash: hexstring): ResultAsync<JoinRequest[], Error> {
   return attemptSimpleFetch(node, 'standby-list', {
     hash: expectedHash,
   })

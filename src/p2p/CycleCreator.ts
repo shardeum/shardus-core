@@ -25,7 +25,6 @@ import { errorToStringFull, formatErrorMessage } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { randomBytes } from '@shardus/crypto-utils'
 import { digestCycle, syncNewCycles } from './Sync'
-import { executeNodeSelection, notifyNewestJoinedConsensors } from './Join/v2/select'
 
 /** CONSTANTS */
 
@@ -275,7 +274,7 @@ async function cycleCreator() {
     let prevRecord = bestRecord
     if (!prevRecord) {
       warn(`cc: !prevRecord. Fetech now. ${callTag}`)
-      prevRecord = await fetchLatestRecord(NodeList.activeOthersByIdOrder)
+      prevRecord = await fetchLatestRecord()
     }
     while (!prevRecord) {
       // [TODO] - when there are few nodes in the network, we may not
@@ -285,7 +284,7 @@ async function cycleCreator() {
       //          needed if the number of tries increases.
       warn(`cc: cycleCreator: Could not get fetch prevRecord. Trying again in 1 sec...  ${callTag}`)
       await utils.sleep(1 * SECOND)
-      prevRecord = await fetchLatestRecord(NodeList.activeOthersByIdOrder)
+      prevRecord = await fetchLatestRecord()
     }
 
     info(`cc: prevRecord.counter: ${prevRecord.counter} ${callTag}`)
@@ -401,12 +400,6 @@ function runQ1() {
   if (logFlags.p2pNonFatal) info('Triggering submodules to send requests...')
   for (const submodule of submodules) submodule.sendRequests()
 
-  if (config.p2p.useJoinProtocolV2) {
-    notifyNewestJoinedConsensors().catch((e) => {
-      console.error('failed to notify selected nodes:', e)
-    })
-  }
-
   profilerInstance.profileSectionEnd('CycleCreator-runQ1')
 }
 
@@ -417,8 +410,6 @@ function runQ2() {
   currentQuarter = 2
   Self.emitter.emit('cycle_q2_start')
   if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
-
-  executeNodeSelection()
 }
 
 /**
@@ -707,10 +698,10 @@ function dropInvalidTxs(txs: Partial<P2P.CycleCreatorTypes.CycleTxs>) {
  * Syncs the CycleChain to the newest cycle record of the network, and returns
  * the newest cycle record.
  */
-async function fetchLatestRecord(activeNodes: P2P.NodeListTypes.Node[]): Promise<P2P.CycleCreatorTypes.CycleRecord> {
+async function fetchLatestRecord(): Promise<P2P.CycleCreatorTypes.CycleRecord> {
   try {
     const oldCounter = CycleChain.newest.counter
-    await syncNewCycles(activeNodes)
+    await syncNewCycles(NodeList.activeOthersByIdOrder)
     if (CycleChain.newest.counter <= oldCounter) {
       // We didn't actually sync
       /* prettier-ignore */ warn(`CycleCreator: fetchLatestRecord: synced record not newer CycleChain.newest.counter: ${CycleChain.newest.counter} oldCounter: ${oldCounter}`)

@@ -12,6 +12,7 @@ import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { enterRecovery, enterSafety } from './Modes'
+import { getOurNodeIndex } from './Utils'
 
 /** STATE */
 
@@ -236,12 +237,10 @@ function _canThisNodeSendScaleRequests(_nodeId: string) {
   }
   let canSendGossip = false
   let offset = CycleChain.newest.counter //todo something more random
-  let nodeInfo = stateManager.currentCycleShardData.nodeShardDataMap.get(_nodeId)
 
-  // no such node in the list
-  if (!nodeInfo) return false
-
-  const ourIndex = nodeInfo.ourNodeIndex
+  const ourIndex = getOurNodeIndex()
+  if (ourIndex == null)
+    return false
 
   canSendGossip = fastIsPicked(ourIndex, numActiveNodes, config.p2p.scaleGroupLimit, offset)
 
