@@ -19,6 +19,7 @@ import { formatErrorMessage } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
+import { crypto } from '../p2p/Context'
 
 /** TYPES */
 export interface IPInfo {
@@ -55,6 +56,7 @@ export class NetworkClass extends EventEmitter {
   InternalAskCounter: number
   ipInfo: any
   signingSecretKeyHex: string
+  shardusCryptoHashKey: string
   externalCatchAll: any
   debugNetworkDelay: number
   statisticsInstance: any
@@ -92,6 +94,8 @@ export class NetworkClass extends EventEmitter {
     this.customStringifier = customStringifier
     this.useLruCacheForSocketMgmt = config.p2p.useLruCacheForSocketMgmt
     this.lruCacheSizeForSocketMgmt = config.p2p.lruCacheSizeForSocketMgmt
+    this.signingSecretKeyHex = crypto.keypair.secretKey
+    this.shardusCryptoHashKey = config.crypto.hashKey
   }
 
   setDebugNetworkDelay(delay: number) {
@@ -148,8 +152,11 @@ export class NetworkClass extends EventEmitter {
       headerOpts: {
         sendHeaderVersion: 1,
       },
-      signingSecretKeyHex: this.signingSecretKeyHex,
       customStringifier: this.customStringifier,
+      crypto:{
+        hashKey: this.shardusCryptoHashKey, 
+        signingSecretKeyHex: this.signingSecretKeyHex,
+      }
     })
     this.intServer = await this.sn.listen(async (data, remote, respond, header, sign) => {
       let routeName
