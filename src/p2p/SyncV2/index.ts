@@ -22,7 +22,7 @@ import * as NodeList from '../NodeList'
 import * as CycleChain from '../CycleChain'
 import { initRoutes } from './routes'
 import { digestCycle } from '../Sync'
-import { JoinRequest, JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
+import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { addStandbyJoinRequests } from '../Join/v2'
 
 /** Initializes logging and endpoints for Sync V2. */

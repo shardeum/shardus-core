@@ -93,10 +93,10 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     instantForwardReceipts: false,
     maxArchiversSubscriptionPerNode: 2,
     writeSyncProtocolV2: false,
-    useSyncProtocolV2: false,
+    useSyncProtocolV2: true,
     validateArchiverAppData: false,
     useNetworkModes: true,
-    useJoinProtocolV2: false,
+    useJoinProtocolV2: true,
   },
   ip: {
     externalIp: '0.0.0.0',
