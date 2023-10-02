@@ -8,7 +8,7 @@ import * as Self from '../Self'
 import * as utils from '../../utils'
 import { Handler } from "express"
 import { P2P } from "@shardus/types"
-import { addJoinRequest, computeSelectionNum, getAllowBogon, setAllowBogon, validateJoinRequest, warn } from "."
+import { addJoinRequest, computeSelectionNum, getAllowBogon, setAllowBogon, validateJoinRequest, verifyJoinRequestSignature, warn } from "."
 import { config } from '../Context'
 import { isBogonIP } from '../../utils/functions/checkIP'
 import { isPortReachable } from '../../utils/isPortReachable'
@@ -83,6 +83,12 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       if (validationError) {
         return res.status(400).json(validationError)
       }
+
+      // then, verify the signature of the join request. this has to be done
+      // before selectionNum is calculated because we will mutate the original
+      // join request.
+      const signatureError = verifyJoinRequestSignature(joinRequest);
+      if (signatureError) return signatureError;
 
       // then, calculate the selection number for this join request.
       const selectionNumResult = computeSelectionNum(joinRequest)
@@ -167,6 +173,9 @@ const acceptedRoute: P2P.P2PTypes.Route<Handler> = {
         } else {
           acceptance.getEventEmitter().emit('accepted')
         }
+      }, {
+        maxRetries: 5,
+        delay: 2000,
       })
     } catch (err) {
       res.status(400).send(err)

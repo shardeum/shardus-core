@@ -8,8 +8,13 @@ import { crypto } from "../../Context";
 import { JoinedConsensor } from "@shardus/types/build/src/p2p/JoinTypes";
 import { SignedObject } from "@shardus/types/build/src/p2p/P2PTypes";
 import { getActiveNodesFromArchiver, getRandomAvailableArchiver } from "../../Utils";
+import * as Self from "../../Self";
 
 let alreadyCheckingAcceptance = false
+
+/** A flag that is set to true once this node has successfully confirmed it was
+* accepted into the network. */
+let hasConfirmedAcceptance = false
 
 /**
   * A simple object that tells a joining node which cycle marker it has been
@@ -26,7 +31,15 @@ export function getEventEmitter(): EventEmitter {
   return eventEmitter
 }
 
+export function reset(): void {
+  hasConfirmedAcceptance = false
+}
+
 export async function confirmAcceptance(offer: SignedObject<AcceptanceOffer>): Promise<Result<boolean, Error>> {
+  if (hasConfirmedAcceptance || Self.isActive) {
+    return err(new Error("no need to check acceptance; we've already confirmed acceptance"))
+  }
+
   // ensure we're not already checking acceptance
   if (alreadyCheckingAcceptance) {
     return err(new Error('already checking acceptance'))
@@ -73,13 +86,16 @@ export async function confirmAcceptance(offer: SignedObject<AcceptanceOffer>): P
   // disable this flag since we're done
   alreadyCheckingAcceptance = false
 
+  // falling back to `hasConfirmedAcceptance` so that it is not wrongly set to
+  // `false` in case of a strange race condition
+  hasConfirmedAcceptance = hasConfirmedAcceptance || included
+
   return ok(included)
 }
 
 async function getCycleFromNode(node: P2P.P2PTypes.Node, cycleMarker: hexstring): Promise<P2P.CycleCreatorTypes.CycleRecord> {
   const url = `http://${node.ip}:${node.port}/cycle-by-marker?marker=${cycleMarker}`
-  const cycle: P2P.CycleCreatorTypes.CycleRecord =
-    await http.get(url)
+  const cycle: P2P.CycleCreatorTypes.CycleRecord = await http.get(url)
 
   return cycle
 }

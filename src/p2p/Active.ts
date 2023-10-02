@@ -11,6 +11,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
+import { err, ok, Result } from 'neverthrow'
 
 let syncTimes = []
 let lastCheckedCycleForSyncTimes = 0
@@ -260,7 +261,8 @@ export function sendRequests() {
     queuedRequest = undefined
 
     if (logFlags.p2pNonFatal) info(`Gossiping active request: ${JSON.stringify(activeTx)}`)
-    addActiveTx(activeTx)
+    const added = addActiveTx(activeTx)
+    console.log("added activetx:", added)
     Comms.sendGossip('gossip-active', activeTx, '', null, NodeList.byIdOrder, true)
 
     // Check if we went active and try again if we didn't in 1 cycle duration
@@ -291,16 +293,17 @@ function createActiveRequest(): P2P.ActiveTypes.ActiveRequest {
     status: 'active',
     timestamp: utils.getTime(),
   }
+  console.log("active request:", request)
   return request
 }
 
-function addActiveTx(request: P2P.ActiveTypes.SignedActiveRequest) {
-  if (!request) return false
-  if (!validateActiveRequest(request)) return false
-  if (activeRequests.has(request.sign.owner)) return false
+function addActiveTx(request: P2P.ActiveTypes.SignedActiveRequest): Result<boolean, Error> {
+  if (!request) return err(new Error('addActiveTx: request is falsy'))
+  if (!validateActiveRequest(request)) return err(new Error('addActiveTx: request is invalid'))
+  if (activeRequests.has(request.sign.owner)) return err(new Error('addActiveTx: request already exists'))
 
   activeRequests.set(request.sign.owner, request)
-  return true
+  return ok(true)
 }
 
 function validateActiveRequest(request: P2P.ActiveTypes.SignedActiveRequest) {

@@ -114,7 +114,7 @@ const cycleByMarkerRoute: P2P.P2PTypes.Route<Handler> = {
     if (cycle) {
       res.json(cycle)
     } else {
-      res.status(404).send(`cycle with marker '${req.query.hash}' not found`)
+      res.status(404).send(`cycle with marker '${req.query.marker}' not found`)
     }
   },
 }

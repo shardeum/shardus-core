@@ -60,15 +60,8 @@ export function selectNodes(maxAllowed: number): void {
 
   // add as many keys as we're allowed to the set
   for (let i = 0; i < objs.length && selectedPublicKeys.size < maxAllowed; i++) {
-    // verify the join request's signature before adding it to the set
     // eslint-disable-next-line security/detect-object-injection
-    const publicKey = objs[i].publicKey
-    const signatureErr = verifyJoinRequestSignature(standbyNodesInfo.get(publicKey))
-    if (signatureErr) {
-      console.error(`failed to verify join request signature for node ${publicKey}:`, signatureErr)
-      continue
-    }
-    selectedPublicKeys.add(publicKey)
+    selectedPublicKeys.add(objs[i].publicKey)
   }
 }
 

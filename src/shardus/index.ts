@@ -879,6 +879,7 @@ class Shardus extends EventEmitter {
     }
     // if (this.stateManager) await this.stateManager.accountSync.syncStateDataFast(3) // fast mode
     if (this.p2p.isFirstSeed) {
+      console.log('syncAppData - isFirstSeed')
       await this.p2p.goActive()
       console.log('syncAppData - goActive')
       await this.stateManager.waitForShardCalcs()

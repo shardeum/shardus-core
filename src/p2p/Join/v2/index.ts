@@ -13,6 +13,7 @@ import { executeNodeSelection, notifyNewestJoinedConsensors } from "./select";
 import { attempt } from "../../Utils";
 import { submitUnjoin } from "./unjoin";
 import { ResultAsync } from "neverthrow";
+import { reset as resetAcceptance } from "./acceptance";
 
 const clone = rfdc()
 
@@ -148,6 +149,9 @@ export async function shutdown(): Promise<void> {
       }),
       (err) => err as Error
     ).andThen((result) => result)
+
+  // reset acceptance state
+  resetAcceptance()
 
   if (unjoinResult.isErr()) {
     console.error('Failed send unjoin request:', unjoinResult.error)
