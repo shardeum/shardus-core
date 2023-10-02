@@ -1,7 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 
-const cApoptosisProposalResp = 2
-const cApoptosisProposalRespVersion = 1
+export const cApoptosisProposalResp = 2
+export const cApoptosisProposalRespVersion = 1
 
 export interface ApoptosisProposalResp {
   s: string

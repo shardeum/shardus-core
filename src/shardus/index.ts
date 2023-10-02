@@ -36,6 +36,7 @@ import { CachedAppData, QueueCountsResult } from '../state-manager/state-manager
 import { DebugComplete } from '../state-manager/TransactionQueue'
 import Statistics from '../statistics'
 import Storage from '../storage'
+import { initAjvSchemas } from '../types/ajv/Helpers'
 import * as utils from '../utils'
 import { groupResolvePromises, inRangeOfCurrentTime, isValidShardusAddress, logNode } from '../utils'
 import { getSocketReport } from '../utils/debugUtils'
@@ -125,6 +126,7 @@ class Shardus extends EventEmitter {
       dynamicLogMode = 'error'
     }
 
+    initAjvSchemas()
     this.logger = new Logger(config.baseDir, logsConfig, dynamicLogMode)
     Context.setLoggerContext(this.logger)
     Snapshot.initLogger()
@@ -402,7 +404,6 @@ class Shardus extends EventEmitter {
 
     try {
       const sk: string = this.crypto.keypair.secretKey
-      console.log('[arham] sk', sk)
       this.io = (await this.network.setup(Network.ipInfo, sk)) as SocketIO.Server
       Context.setIOContext(this.io)
       this.io.on('connection', (socket: any) => {

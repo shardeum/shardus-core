@@ -24,10 +24,15 @@ import * as Sequelize from 'sequelize'
 import { isDebugMode } from '../debug'
 import {
   ApoptosisProposalReq,
+  cApoptosisProposalReq,
   deserializeApoptosisProposalReq,
   serializeApoptosisProposalReq,
-} from '../types/ApoptosizeProposalReq'
-import { ApoptosisProposalResp, serializeApoptosisProposalResp } from '../types/ApoptosizeProposalResp'
+} from '../types/ApoptosisProposalReq'
+import {
+  ApoptosisProposalResp,
+  deserializeApoptosisProposalResp,
+  serializeApoptosisProposalResp,
+} from '../types/ApoptosisProposalResp'
 import { InternalBinaryHandler } from '../types/Handler'
 import { validateTypes } from '../utils'
 import getCallstack from '../utils/getCallstack'
@@ -86,12 +91,16 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> 
   name: internalRouteName,
   handler: (payload, response, header, sign) => {
     profilerInstance.scopedProfileSectionStart('apoptosize')
-    console.log('apoptosisInternalRoute called')
     try {
-      const requestBuffer = VectorBufferStream.fromBuffer(payload)
-      console.log('request type:', requestBuffer.readUInt16())
-      const req = deserializeApoptosisProposalReq(requestBuffer)
-      console.log('request:', req)
+      const requestStream = VectorBufferStream.fromBuffer(payload)
+      const requestType = requestStream.readUInt16()
+      if (requestType !== cApoptosisProposalReq) {
+        info(`apoptosisInternalRoute: bad requestType: ${requestType}`)
+        let resp: ApoptosisProposalResp = { s: 'bad request', r: 1 }
+        response(resp, serializeApoptosisProposalResp)
+        return
+      }
+      const req = deserializeApoptosisProposalReq(requestStream)
       const apopProposal: P2P.ApoptosisTypes.SignedApoptosisProposal = {
         id: req.id,
         when: req.when,
@@ -130,18 +139,22 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> 
         if (addProposal(apopProposal)) {
           if (currentQuarter === 1) {
             // if it is Q1 we can try to gossip the message now instead of waiting for Q1 of next cycle
-            Comms.sendGossip(gossipRouteName, payload)
+            Comms.sendGossip(gossipRouteName, apopProposal)
           }
           let resp: ApoptosisProposalResp = { s: 'pass', r: 1 }
           response(resp, serializeApoptosisProposalResp)
           return
         } else {
-          warn(`addProposal failed for payload: ${JSON.stringify(payload)}`)
+          warn(`addProposal failed for payload: ${JSON.stringify(apopProposal)}`)
+          let resp: ApoptosisProposalResp = { s: 'fail', r: 4 }
+          response(resp, serializeApoptosisProposalResp)
+          return
         }
       } else {
         warn(`sender is not apop node: sender:${header.sender_id} apop:${apopProposal.id}`)
         let resp: ApoptosisProposalResp = { s: 'fail', r: 3 }
         response(resp, serializeApoptosisProposalResp)
+        return
       }
     } finally {
       profilerInstance.scopedProfileSectionEnd('apoptosize')
@@ -298,17 +311,32 @@ export async function apoptosizeSelf(message: string) {
     id: proposal.id,
     when: proposal.when,
   }
-  const serializedPayload = new VectorBufferStream(0)
-  serializeApoptosisProposalReq(serializedPayload, apopProposalReq, true)
-  await Comms.tell2(activeNodes, internalRouteName, serializedPayload, {})
+  await Comms.tell2<ApoptosisProposalReq>(
+    activeNodes,
+    internalRouteName,
+    apopProposalReq,
+    serializeApoptosisProposalReq,
+    {}
+  )
   const qF = async (node) => {
     //  use ask instead of tell and expect the node to
     //          acknowledge it received the request by sending 'pass'
     if (node.id === Self.id) return null
-    const res = Comms.ask2(node, internalRouteName, serializedPayload, {
-      sender_id: Self.id,
-    })
-    return res
+    try {
+      const res = Comms.ask2<ApoptosisProposalReq, ApoptosisProposalResp>(
+        node,
+        internalRouteName,
+        apopProposalReq,
+        serializeApoptosisProposalReq,
+        deserializeApoptosisProposalResp,
+        {}
+      )
+      return res
+    } catch (err) {
+      warn(`qF: In apoptosizeSelf calling robustQuery proposal. ${message}`)
+      warn(`Error: ${err}`)
+      return null
+    }
   }
   const eF = (item1, item2) => {
     if (!item1 || !item2) return false

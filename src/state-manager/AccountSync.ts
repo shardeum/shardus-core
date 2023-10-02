@@ -1,33 +1,34 @@
-import * as Shardus from '../shardus/shardus-types'
 import { StateManager as StateManagerTypes } from '@shardus/types'
+import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
 
-import Profiler, { cUninitializedSize } from '../utils/profiler'
-import { P2PModuleContext as P2P } from '../p2p/Context'
-import Storage from '../storage'
+import { Logger as L4jsLogger } from 'log4js'
+import StateManager from '.'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
-import ShardFunctions from './shardFunctions'
-import StateManager from '.'
-import { robustQuery } from '../p2p/Utils'
-import { nestedCountersInstance } from '../utils/nestedCounters'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import * as Context from '../p2p/Context'
-import * as Wrapper from '../p2p/Wrapper'
+import { P2PModuleContext as P2P } from '../p2p/Context'
 import * as Self from '../p2p/Self'
+import { robustQuery } from '../p2p/Utils'
+import * as Wrapper from '../p2p/Wrapper'
+import { safetyModeVals } from '../snapshot'
+import Storage from '../storage'
+import { verifyPayload } from '../types/ajv/Helpers'
+import { errorToStringFull } from '../utils'
+import { nestedCountersInstance } from '../utils/nestedCounters'
+import Profiler, { cUninitializedSize } from '../utils/profiler'
+import SyncTracker from './SyncTracker'
+import ShardFunctions from './shardFunctions'
 import {
   AccountStateHashReq,
   AccountStateHashResp,
-  GetAccountStateReq,
+  CycleShardData,
   GetAccountData3Req,
   GetAccountDataByRangeSmart,
+  GetAccountStateReq,
   GlobalAccountReportResp,
-  CycleShardData,
 } from './state-manager-types'
-import { safetyModeVals } from '../snapshot'
-import { isDebugModeMiddleware } from '../network/debugMiddleware'
-import { errorToStringFull } from '../utils'
-import SyncTracker from './SyncTracker'
-import { Logger as L4jsLogger } from 'log4js'
 
 const REDUNDANCY = 3
 
@@ -331,13 +332,22 @@ class AccountSync {
       'get_account_data3',
       async (
         payload: GetAccountData3Req,
-        respond: (arg0: { data: GetAccountDataByRangeSmart }) => Promise<number>,
+        respond: (arg0: { data: GetAccountDataByRangeSmart; errors?: string[] }) => Promise<number>,
         _sender: unknown,
         _tracker: string,
         msgSize: number
       ) => {
         this.profiler.scopedProfileSectionStart('get_account_data3', false, msgSize)
-        const result = {} as { data: GetAccountDataByRangeSmart } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
+        const result = {} as { data: GetAccountDataByRangeSmart; errors?: string[] } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
+
+        const errors = verifyPayload('GetAccountData3Req', payload)
+        if (errors && errors.length > 0) {
+          this.mainLogger.error(`get_account_data3: request validation errors: ${errors}`)
+          result.errors = errors
+          await respond(result)
+          return
+        }
+
         let accountData: GetAccountDataByRangeSmart | null = null
         let ourLockID = -1
         try {

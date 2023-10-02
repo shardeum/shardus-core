@@ -19,7 +19,6 @@ import { formatErrorMessage } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
-import { crypto } from '../p2p/Context'
 
 /** TYPES */
 export interface IPInfo {
@@ -94,7 +93,6 @@ export class NetworkClass extends EventEmitter {
     this.customStringifier = customStringifier
     this.useLruCacheForSocketMgmt = config.p2p.useLruCacheForSocketMgmt
     this.lruCacheSizeForSocketMgmt = config.p2p.lruCacheSizeForSocketMgmt
-    this.signingSecretKeyHex = crypto.keypair.secretKey
     this.shardusCryptoHashKey = config.crypto.hashKey
   }
 
@@ -153,10 +151,10 @@ export class NetworkClass extends EventEmitter {
         sendHeaderVersion: 1,
       },
       customStringifier: this.customStringifier,
-      crypto:{
-        hashKey: this.shardusCryptoHashKey, 
+      crypto: {
+        hashKey: this.shardusCryptoHashKey,
         signingSecretKeyHex: this.signingSecretKeyHex,
-      }
+      },
     })
     this.intServer = await this.sn.listen(async (data, remote, respond, header, sign) => {
       let routeName
@@ -255,25 +253,25 @@ export class NetworkClass extends EventEmitter {
     const data = { route, payload: message }
     const promises = []
     for (const node of nodes) {
-      if (!logged) this.logger.playbackLog('self', node, 'InternalTell', route, trackerId, message)
+      if (!logged) this.logger.playbackLog('self', node, 'InternalTell2', route, trackerId, message)
       const requestId = generateUUID()
-      mainLogger.info(`Initiating tell request with requestId: ${requestId}`)
-      mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
-      mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
+      this.mainLogger.info(`tell2: initiating tell request with requestId: ${requestId}`)
+      this.mainLogger.info(`tell2: requestId: ${requestId}, node: ${utils.logNode(node)}`)
+      this.mainLogger.info(`tell2: route: ${route}, message: ${message} requestId: ${requestId}`)
       this.InternalTellCounter++
       const promise = this.sn.sendWithHeader(node.internalPort, node.internalIp, data, appHeader)
       promise.catch((err) => {
-        if (logFlags.error) this.mainLogger.error('Network: ' + err)
-        if (logFlags.error) this.mainLogger.error('Network: ' + formatErrorMessage(err.stack))
+        if (logFlags.error) this.mainLogger.error(`tell2: network: ${err}`)
+        if (logFlags.error) this.mainLogger.error(`tell2: network: ${formatErrorMessage(err.stack)}`)
         let errorGroup = ('' + err).slice(0, 20)
-        this.emit('error', node, requestId, 'tell', errorGroup)
+        this.emit('error', node, requestId, 'tell2', errorGroup)
       })
       promises.push(promise)
     }
     try {
       await Promise.all(promises)
     } catch (err) {
-      if (logFlags.error) this.mainLogger.error('Network: ' + err)
+      if (logFlags.error) this.mainLogger.error(`tell2: network promise resolution error: ${err}`)
     }
   }
 
@@ -343,34 +341,34 @@ export class NetworkClass extends EventEmitter {
     logged = false,
     extraTime = 0
   ) {
-    return new Promise(async (resolve, reject) => {
+    return new Promise<{ res: Buffer; header?: AppHeader; sign?: Shardus.Sign }>(async (resolve, reject) => {
       this.InternalAskCounter++
 
       const requestId = generateUUID()
-      this.mainLogger.info(`Initiating ask request with requestId: ${requestId}`)
-      this.mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
-      this.mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
+      this.mainLogger.info(`ask2: initiating ask request with requestId: ${requestId}`)
+      this.mainLogger.info(`ask2: requestId: ${requestId}, node: ${utils.logNode(node)}`)
+      this.mainLogger.info(`ask2: route: ${route}, message: ${message} requestId: ${requestId}`)
 
       try {
         if (this.debugNetworkDelay > 0) {
           await utils.sleep(this.debugNetworkDelay)
         }
-        profilerInstance.profileSectionStart('net-ask')
-        profilerInstance.profileSectionStart(`net-ask-${route}`)
+        profilerInstance.profileSectionStart('net-ask2')
+        profilerInstance.profileSectionStart(`net-ask2-${route}`)
 
         const data = { route, payload: message }
-        const onRes = (res) => {
+        const onRes = (res, header, sign) => {
           if (!logged) this.logger.playbackLog('self', node, 'InternalAskResp', route, trackerId, res)
-          resolve(res)
+          resolve({ res, header, sign })
         }
         const onTimeout = () => {
           nestedCountersInstance.countEvent('network', 'timeout')
           if (this.statisticsInstance) this.statisticsInstance.incrementCounter('networkTimeout')
-          const err = new Error(`Request timed out. ${utils.stringifyReduce(trackerId)}`)
+          const err = new Error(`ask2: request timed out. ${utils.stringifyReduce(trackerId)}`)
           nestedCountersInstance.countRareEvent('network', 'timeout ' + route)
-          if (logFlags.error) this.mainLogger.error('Network: ' + err)
-          if (logFlags.error) this.mainLogger.error('Network: ' + formatErrorMessage(err.stack))
-          this.emit('timeout', node, requestId, 'ask')
+          if (logFlags.error) this.mainLogger.error('ask2: network: ' + err)
+          if (logFlags.error) this.mainLogger.error('ask2: network: ' + formatErrorMessage(err.stack))
+          this.emit('timeout', node, requestId, 'ask2')
           reject(err)
         }
         if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, trackerId, message)
@@ -387,7 +385,7 @@ export class NetworkClass extends EventEmitter {
         } catch (err) {
           if (logFlags.error) this.mainLogger.error('Network: ' + err)
           let errorGroup = ('' + err).slice(0, 20)
-          console.log('sendWithHeader: error:', err)
+          this.mainLogger.info(`ask2: sendWithHeader: error: ${err}`)
           this.emit('error', node, requestId, 'ask', errorGroup)
         }
       } finally {

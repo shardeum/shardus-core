@@ -1,7 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 
-const cWrappedReq = 3
-const cWrappedReqVersion = 1
+export const cWrappedReq = 3
+export const cWrappedReqVersion = 1
 
 export interface WrappedReq {
   payload: Buffer

@@ -674,7 +674,7 @@ export type GetAccountData3Req = {
   offset: number
   accountOffset: string
 }
-export type GetAccountData3Resp = { data: GetAccountDataByRangeSmart }
+export type GetAccountData3Resp = { data: GetAccountDataByRangeSmart; errors?: string[] }
 
 export type PosPartitionResults = { partitionResults: PartitionResult[]; Cycle_number: number }
 
@@ -730,7 +730,11 @@ export type QueueCountsResponse = {
   committingAppData: QueueEntry['acceptedTx']['appData'][]
   accounts: any[]
 }
-export type QueueCountsResult = { count: number; committingAppData: Shardus.AcceptedTx['appData'], account?: any }
+export type QueueCountsResult = {
+  count: number
+  committingAppData: Shardus.AcceptedTx['appData']
+  account?: any
+}
 
 export type GlobalAccountReportResp = {
   ready: boolean
@@ -782,8 +786,8 @@ export type DebugDumpNodesCovered = {
   id: string
   fracID: number
   hP: number
-  consensus: { idx: number, hp: number }[]
-  stored: { idx: number, hp: number }[]
+  consensus: { idx: number; hp: number }[]
+  stored: { idx: number; hp: number }[]
   extra: []
   numP: number
 }
