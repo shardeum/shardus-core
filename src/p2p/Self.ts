@@ -115,7 +115,9 @@ export async function startup(): Promise<boolean> {
       ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
     } catch (err) {
       console.log("error in Join network: ", err)
-      updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
+      if (!Context.config.p2p.useJoinProtocolV2) {
+        updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
+      }
       if (err.message.startsWith('Fatal:')) {
         throw err
       }

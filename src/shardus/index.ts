@@ -2368,6 +2368,14 @@ class Shardus extends EventEmitter {
       signatures: signatures,
     }
   }
+
+  isOnStandbyList(publicKey: string): boolean {
+    if (JoinV2.standbyNodesInfo.has(publicKey)) {
+      return true
+    } else {
+      return false
+    }
+  }
 }
 
 function deepReplace(obj: object | ArrayLike<any>, find: any, replace: any): any {

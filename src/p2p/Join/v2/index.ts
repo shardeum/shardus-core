@@ -20,7 +20,7 @@ const clone = rfdc()
 type publickey = JoinRequest['nodeInfo']['publicKey']
 
 /** The list of nodes that are currently on standby. */
-const standbyNodesInfo: Map<publickey, JoinRequest> = new Map()
+export const standbyNodesInfo: Map<publickey, JoinRequest> = new Map()
 
 /**
   * New join requests received during the node's current cycle. This list is

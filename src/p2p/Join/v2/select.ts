@@ -10,7 +10,7 @@ import * as NodeList from "../../NodeList";
 import * as http from '../../../http'
 
 import { getStandbyNodesInfoMap } from ".";
-import { calculateToAccept } from "..";
+import { calculateToAccept, verifyJoinRequestSignature } from "..";
 import { fastIsPicked } from "../../../utils";
 import { getOurNodeIndex } from "../../Utils";
 

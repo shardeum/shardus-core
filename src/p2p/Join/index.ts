@@ -22,6 +22,7 @@ import { err, ok, Result } from 'neverthrow'
 import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
 import { drainNewUnjoinRequests } from './v2/unjoin'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
+import { updateNodeState } from '../Self'
 
 /** STATE */
 
@@ -446,6 +447,9 @@ export async function submitJoin(
   }
 
   hasSubmittedJoinRequest = true
+  if (config.p2p.useJoinProtocolV2) {
+    updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
+  }
 }
 
 export async function fetchJoined(activeNodes: P2P.P2PTypes.Node[]): Promise<string> {
