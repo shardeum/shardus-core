@@ -119,14 +119,14 @@ export function addNodes(newNodes: P2P.NodeListTypes.Node[]) {
   for (const node of newNodes) addNode(node)
 }
 
-export function removeSyncingNode(id) {
+export function removeSyncingNode(id: string) {
   const idx = binarySearch(syncingByIdOrder, { id }, propComparator('id'))
   console.log('Removing syncing node', id, idx)
   if (idx >= 0) syncingByIdOrder.splice(idx, 1)
 }
 
-export function removeNode(id, raiseEvents: boolean, cycle: P2P.CycleCreatorTypes.CycleRecord | null) {
-  let idx
+export function removeNode(id: string, raiseEvents: boolean, cycle: P2P.CycleCreatorTypes.CycleRecord | null) {
+  let idx: number
 
   // Omar added this so we don't crash if a node gets remove more than once
   if (!nodes.has(id)) {
@@ -259,7 +259,7 @@ export function ipPort(ip: string, port: number) {
   return ip + ':' + port
 }
 
-function idTrim(id) {
+function idTrim(id: string) {
   return id.substr(0, 4)
 }
 
@@ -340,17 +340,17 @@ export function getLastHashedNodeList(): P2P.NodeListTypes.Node[] {
 
 /** ROUTES */
 
-function info(...msg) {
+function info(...msg: string[]) {
   const entry = `NodeList: ${msg.join(' ')}`
   p2pLogger.info(entry)
 }
 
-function warn(...msg) {
+function warn(...msg: string[]) {
   const entry = `NodeList: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }
 
-function error(...msg) {
+function error(...msg: any[]) {
   const entry = `NodeList: ${msg.join(' ')}`
   p2pLogger.error(entry)
 }
