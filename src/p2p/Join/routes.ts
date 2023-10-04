@@ -88,7 +88,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       // before selectionNum is calculated because we will mutate the original
       // join request.
       const signatureError = verifyJoinRequestSignature(joinRequest);
-      if (signatureError) return signatureError;
+      if (signatureError) return res.status(400).json(signatureError);
 
       // then, calculate the selection number for this join request.
       const selectionNumResult = computeSelectionNum(joinRequest)
