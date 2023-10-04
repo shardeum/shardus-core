@@ -13,11 +13,13 @@ import { getStandbyNodesInfoMap } from ".";
 import { calculateToAccept, verifyJoinRequestSignature } from "..";
 import { fastIsPicked } from "../../../utils";
 import { getOurNodeIndex } from "../../Utils";
+import { nestedCountersInstance } from "../../../utils/nestedCounters";
+import { logFlags } from "../../../logger";
 
 const selectedPublicKeys: Set<string> = new Set();
 
 /** The number of nodes that will try to contact a single joining node about its selection. */
-const NUM_NOTIFYING_NODES = 3
+const NUM_NOTIFYING_NODES = 5
 
 /**
   * Decides how many nodes to accept into the network, then selects nodes that
@@ -70,12 +72,15 @@ export function selectNodes(maxAllowed: number): void {
   * calling their `accepted` endpoints.`
   */
 export async function notifyNewestJoinedConsensors(): Promise<void> {
+  const counter = CycleChain.getNewest().counter
+
   if (!Self.isActive) {
-    console.warn('not notifying nodes because we are not active yet')
+    console.warn(`C${counter} not notifying nodes because we are not active yet`)
     return
   }
 
   // decide if we should be in charge of notifying joining nodes
+  console.log(`C${counter} fastIsPicked params: ${{getOurNodeIndex: getOurNodeIndex(), activeByIdOrderLength: NodeList.activeByIdOrder.length, NUM_NOTIFYING_NODES, CycleChainNewestCounter: CycleChain.newest.counter}}`)
   const shouldNotify = fastIsPicked(
     getOurNodeIndex(),
     NodeList.activeByIdOrder.length,
@@ -85,6 +90,9 @@ export async function notifyNewestJoinedConsensors(): Promise<void> {
 
   // if so, do so
   if (shouldNotify) {
+
+    nestedCountersInstance.countEvent('joinV2', `C${counter}: notifyNewestJoinedConsensors: shouldNotify`)
+
     const marker = CycleChain.getCurrentCycleMarker()
 
     for (const joinedConsensor of CycleChain.newest.joinedConsensors) {
@@ -92,7 +100,7 @@ export async function notifyNewestJoinedConsensors(): Promise<void> {
 
       // no need to notify ourselves
       if (publicKey === crypto.keypair.publicKey) continue
-      console.log('notifying node', publicKey, 'that it has been selected')
+      console.log(`C${counter} notifying node`, publicKey, 'that it has been selected')
 
       // sign an acceptance offer
       const offer = crypto.sign({
@@ -103,7 +111,10 @@ export async function notifyNewestJoinedConsensors(): Promise<void> {
       // make the call, but don't await. it might take a while.
       http
         .post(`http://${joinedConsensor.externalIp}:${joinedConsensor.externalPort}/accepted`, offer)
-        .catch(e => console.error(`failed to notify node ${publicKey} that it has been selected:`, e))
+        .catch(e => {
+          nestedCountersInstance.countEvent('joinV2', `C${counter}: notifyNewestJoinedConsensors: http post failed`)
+          console.error(`C${counter} failed to notify node ${publicKey} that it has been selected:`, e)
+        })
     }
   }
 }

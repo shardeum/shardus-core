@@ -169,21 +169,30 @@ const acceptedRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'accepted',
   handler: async (req, res) => {
+    const counter = CycleChain.getNewest().counter
+    nestedCountersInstance.countEvent('joinV2', `C${counter}: acceptedRoute: start`)
     try {
-      await attempt(async () => {
-        const result = await acceptance.confirmAcceptance(req.body)
-        if (result.isErr()) {
-          throw result.error
-        } else if (!result.value) {
-          throw new Error(`this node was not found in cycle ${req.body.cycleMarker}; assuming not accepted`)
-        } else {
-          acceptance.getEventEmitter().emit('accepted')
+      await attempt(
+        async () => {
+          const result = await acceptance.confirmAcceptance(req.body)
+          if (result.isErr()) {
+            nestedCountersInstance.countEvent('joinV2', `C${counter}: acceptedRoute: confirmAcceptance error`)
+            throw result.error
+          } else if (!result.value) {
+            nestedCountersInstance.countEvent('joinV2', `C${counter}: acceptedRoute: node not in cycle`)
+            throw new Error(`this node was not found in cycle ${req.body.cycleMarker}; assuming not accepted`)
+          } else {
+            nestedCountersInstance.countEvent('joinV2', `C${counter}: acceptedRoute: node accepted`)
+            acceptance.getEventEmitter().emit('accepted')
+          }
+        },
+        {
+          maxRetries: 5,
+          delay: 2000,
         }
-      }, {
-        maxRetries: 5,
-        delay: 2000,
-      })
+      )
     } catch (err) {
+      nestedCountersInstance.countEvent('joinV2', `C${counter}: acceptedRoute: attempt error`)
       res.status(400).send(err)
     }
   },
