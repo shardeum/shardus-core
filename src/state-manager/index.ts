@@ -70,6 +70,7 @@ import {
   RequestAccountQueueCounts,
   QueueCountsResponse,
   QueueCountsResult,
+  ConfirmOrChallengeMessage
 } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
@@ -1573,6 +1574,68 @@ class StateManager {
           }
         } finally {
           profilerInstance.scopedProfileSectionEnd('spread_appliedVoteHash')
+        }
+      }
+    )
+
+    this.p2p.registerInternal(
+      'spread_appliedVote',
+      async (
+        payload: AppliedVote,
+        _respond: unknown,
+        _sender: unknown,
+        _tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('spread_appliedVote', false, msgSize)
+        try {
+          const queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+          if (queueEntry == null) {
+            return
+          }
+          if (queueEntry.acceptVoteMessage === false) {
+            return
+          }
+          const collectedAppliedVote = payload as AppliedVote
+          // TODO STATESHARDING4 ENDPOINTS check payload format
+          // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (correct consenus group and valid signature)
+          const appendSuccessful = this.transactionConsensus.tryAppendVote(queueEntry, collectedAppliedVote)
+
+          if (appendSuccessful) {
+            // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
+          }
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('spread_appliedVote')
+        }
+      }
+    )
+
+    this.p2p.registerInternal(
+      'spread_confirmOrChallenge',
+      async (
+        payload: ConfirmOrChallengeMessage,
+        _respond: unknown,
+        _sender: unknown,
+        _tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('spread_confirmOrChallenge', false, msgSize)
+        try {
+          const queueEntry = this.transactionQueue.getQueueEntrySafe(payload.appliedVote?.txid) // , payload.timestamp)
+          if (queueEntry == null) {
+            return
+          }
+          if (queueEntry.acceptConfirmOrChallenge === false) {
+            return
+          }
+          const collectedConfirmOrChallengeMessage = payload as ConfirmOrChallengeMessage
+          const appendSuccessful = this.transactionConsensus.tryAppendMessage(queueEntry, collectedConfirmOrChallengeMessage)
+
+          if (appendSuccessful) {
+            // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
+          }
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('spread_confirmOrChallenge')
         }
       }
     )

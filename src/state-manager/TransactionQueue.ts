@@ -10,7 +10,7 @@ import { potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import * as utils from '../utils'
-import { errorToStringFull, inRangeOfCurrentTime, withTimeout } from '../utils'
+import { errorToStringFull, inRangeOfCurrentTime, stringify, withTimeout, XOR } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions'
@@ -96,6 +96,7 @@ class TransactionQueue {
   transactionQueueHasRemainingWork: boolean
 
   executeInOneShard: boolean
+  useNewPOQ: boolean
 
   txCoverageMap: { [key: symbol]: unknown }
 
@@ -185,6 +186,7 @@ class TransactionQueue {
     this.transactionQueueHasRemainingWork = false
 
     this.executeInOneShard = false
+    this.useNewPOQ = true
 
     if (this.config.sharding.executeInOneShard === true) {
       this.executeInOneShard = true
@@ -1205,6 +1207,8 @@ class TransactionQueue {
 
       this.queueEntryCounter++
       const txQueueEntry: QueueEntry = {
+        eligibleNodesToConfirm: [],
+        eligibleNodesToVote: [],
         acceptedTx: acceptedTx,
         txKeys: keysResponse,
         executionShardKey: null,
@@ -1261,6 +1265,8 @@ class TransactionQueue {
         newVotes: false,
         fromClient: sendGossip,
         gossipedReceipt: false,
+        gossipedVote: false,
+        gossipedConfirmOrChallenge: false,
         archived: false,
         ourTXGroupIndex: -1,
         ourExGroupIndex: -1,
@@ -1274,7 +1280,11 @@ class TransactionQueue {
         txSieveTime: 0,
         debug: {},
         voteCastAge: 0,
-        accountDataSet: false,
+        lastVoteReceivedTimestamp: 0,
+        lastConfirmOrChallengeTimestamp: 0,
+        acceptVoteMessage: true,
+        acceptConfirmOrChallenge: true,
+        accountDataSet: false
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1367,7 +1377,17 @@ class TransactionQueue {
 
           //set the nodes that are in the executionGroup.
           //This is needed so that consensus will expect less nodes to be voting
-          txQueueEntry.executionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
+          const unRankedExecutionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
+          txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
+
+          const minNodesToVote = 3;
+          const voterPercentage = 0.1;
+          const numberOfVoters = Math.max(minNodesToVote, Math.floor(txQueueEntry.executionGroup.length * voterPercentage));
+          // voters are highest ranked nodes
+          txQueueEntry.eligibleNodesToVote = txQueueEntry.executionGroup.slice(0, numberOfVoters);
+          // confirm nodes are lowest ranked nodes
+          txQueueEntry.eligibleNodesToConfirm = txQueueEntry.executionGroup.slice(txQueueEntry.executionGroup.length - numberOfVoters);
+
           const ourID = this.stateManager.currentCycleShardData.ourNode.id
           for (let idx = 0; idx < txQueueEntry.executionGroup.length; idx++) {
             // eslint-disable-next-line security/detect-object-injection
@@ -2242,6 +2262,25 @@ class TransactionQueue {
     if (gotReceipt === false) {
       queueEntry.requestingReceiptFailed = true
     }
+  }
+
+  // compute the rand of the node where rank = node_id XOR hash(tx_id + tx_ts)
+  computeNodeRank(nodeId: string, txId: string, txTimestamp: number): number {
+    if (nodeId == null || txId == null || txTimestamp == null) return 0
+    const hash = this.crypto.hash([txId, txTimestamp])
+    return XOR(nodeId, hash)
+  }
+
+  // sort the nodeList by rank, in descending order
+  orderNodesByRank(nodeList: Shardus.Node[], queueEntry: QueueEntry): Shardus.NodeWithRank[] {
+    const nodeListWithRankData: Shardus.NodeWithRank[] = nodeList.map((node: Shardus.Node) => {
+      let rank = this.computeNodeRank(node.id, queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
+      let nodeWithRank: Shardus.NodeWithRank = {...node, rank}
+      return nodeWithRank
+    })
+    return nodeListWithRankData.sort((a: Shardus.NodeWithRank, b: Shardus.NodeWithRank) => {
+      return b.rank - a.rank
+    })
   }
 
   /**
@@ -4260,6 +4299,9 @@ class TransactionQueue {
               let didNotMatchReceipt = false
 
               let finishedConsensing = false
+
+              // if we are in execution group, try to "confirm" or "challenge" the highest ranked vote
+              await this.stateManager.transactionConsensus.tryConfirmOrChallenge(queueEntry)
 
               // try to produce a receipt
               /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)

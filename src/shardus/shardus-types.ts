@@ -3,6 +3,9 @@ import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 export type Node = P2P.NodeListTypes.Node
 export type Cycle = P2P.CycleCreatorTypes.CycleRecord
 export type Archiver = P2P.ArchiversTypes.JoinedArchiver
+export interface NodeWithRank extends P2P.NodeListTypes.Node {
+  rank: number
+}
 //import { RequestHandler } from "express"; //express was causing problems.
 
 // Type definitions for Shardus
