@@ -240,10 +240,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
       console.log('selected standby node', standbyInfo)
 
-      // TODO: does `cycleJoined` need to be updated? is it supposed
-      // to be the cycle that the node sent its join request, or the
-      // cycle that it became active? currently it is likely the cycle that
-      // the join request was sent
+      // prepare information for the joinedConsensors list
       const { nodeInfo, cycleMarker: cycleJoined } = standbyInfo
       const id = computeNodeId(nodeInfo.publicKey, standbyInfo.cycleMarker)
       const counterRefreshed = record.counter
