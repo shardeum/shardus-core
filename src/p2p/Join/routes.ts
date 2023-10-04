@@ -18,6 +18,7 @@ import * as acceptance from './v2/acceptance'
 import { attempt } from '../Utils'
 import { getStandbyNodesInfoMap, saveJoinRequest } from './v2'
 import { processNewUnjoinRequest, UnjoinRequest } from './v2/unjoin'
+import { isActive } from '../Self'
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
@@ -33,6 +34,13 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'join',
   handler: async (req, res) => {
     const joinRequest = req.body
+
+    if (!isActive) {
+      // if we are not active yet, we cannot accept join requests
+      res.end()
+      return
+    }
+
     if (CycleCreator.currentQuarter < 1) {
       // if currentQuarter <= 0 then we are not ready
       res.end()
