@@ -80,9 +80,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       // then validate the join request. if it's invalid for any reason, return
       // that reason.
       const validationError = validateJoinRequest(joinRequest)
-      if (validationError) {
-        return res.status(400).json(validationError)
-      }
+      if (validationError) return res.status(400).json(validationError)
 
       // then, verify the signature of the join request. this has to be done
       // before selectionNum is calculated because we will mutate the original
