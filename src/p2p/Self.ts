@@ -115,7 +115,7 @@ export async function startup(): Promise<boolean> {
       ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
       console.log("isFirst:", isFirst, "id:", id)
     } catch (err) {
-      console.log("error in Join network: ", err)
+      console.log("joinNetwork: ", err.message)
       if (!Context.config.p2p.useJoinProtocolV2) {
         updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
       }
