@@ -2274,8 +2274,8 @@ class TransactionQueue {
   // sort the nodeList by rank, in descending order
   orderNodesByRank(nodeList: Shardus.Node[], queueEntry: QueueEntry): Shardus.NodeWithRank[] {
     const nodeListWithRankData: Shardus.NodeWithRank[] = nodeList.map((node: Shardus.Node) => {
-      let rank = this.computeNodeRank(node.id, queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
-      let nodeWithRank: Shardus.NodeWithRank = {...node, rank}
+      const rank = this.computeNodeRank(node.id, queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
+      const nodeWithRank: Shardus.NodeWithRank = {...node, rank}
       return nodeWithRank
     })
     return nodeListWithRankData.sort((a: Shardus.NodeWithRank, b: Shardus.NodeWithRank) => {
@@ -4305,7 +4305,7 @@ class TransactionQueue {
 
               // try to produce a receipt
               /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
-              const result = this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
+              const result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
 
               //todo this is false.. and prevents some important stuff.
               //need to look at appliedReceipt2
@@ -4494,7 +4494,7 @@ class TransactionQueue {
 
               //temp hack ... hopefully this hack can go away
               if (queueEntry.recievedAppliedReceipt == null) {
-                const result = this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
+                const result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
                 if (result != null) {
                   queueEntry.recievedAppliedReceipt = result
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_hackReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${utils.stringifyReduce(result)}`)
