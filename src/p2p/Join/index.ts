@@ -23,6 +23,7 @@ import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
 import { drainNewUnjoinRequests } from './v2/unjoin'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { updateNodeState } from '../Self'
+import { HTTPError } from 'got'
 
 /** STATE */
 
@@ -440,7 +441,11 @@ export async function submitJoin(
       }
     }
   } catch (e) {
-    throw new Error(`submitJoin: Error posting join request: ${e}`)
+    if (e instanceof HTTPError) {
+      throw new Error(`submitJoin: Error posting join request: ${JSON.stringify(e.response)}`)
+    } else {
+      throw new Error(`submitJoin: Error posting join request: ${e}`)
+    }
   }
 
   hasSubmittedJoinRequest = true
