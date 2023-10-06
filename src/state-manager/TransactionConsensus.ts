@@ -145,6 +145,44 @@ class TransactionConsenus {
       }
     )
 
+    Comms.registerGossipHandler(
+      'gossip-applied-vote',
+      async (payload: AppliedVote, sender: string, tracker: string) => {
+        profilerInstance.scopedProfileSectionStart('gossip-applied-vote', true)
+        try {
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+          if (queueEntry == null) {
+            return
+          }
+          const newVote = payload as AppliedVote
+          const appendSuccessful = this.stateManager.transactionConsensus.tryAppendVote(queueEntry, newVote)
+
+          if (appendSuccessful) {
+            const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+            if (gossipGroup.length > 1) {
+              // should consider only forwarding in some cases?
+              this.stateManager.debugNodeGroup(
+                queueEntry.acceptedTx.txId,
+                queueEntry.acceptedTx.timestamp,
+                `share appliedVote to consensus nodes`,
+                gossipGroup
+              )
+              Comms.sendGossip(
+                'gossip-applied-vote',
+                newVote,
+                tracker,
+                null,
+                queueEntry.transactionGroup,
+                false
+              )
+            }
+          }
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('gossip-applied-vote')
+        }
+      }
+    )
+
     this.p2p.registerGossipHandler(
       'spread_appliedReceipt',
       async (
@@ -1149,18 +1187,6 @@ class TransactionConsenus {
       ourVote.transaction_result = !ourVote.transaction_result
     }
 
-    // fill out the lists of account ids and after states
-    // let applyResponse = queueEntry.preApplyTXResult.applyResponse //as ApplyResponse
-    // if(applyResponse != null){
-    //   //we need to sort this list and doing it in place seems ok
-    //   applyResponse.stateTableResults.sort(this.sortByAccountId )
-    //   for(let stateTableObject of applyResponse.stateTableResults ){
-
-    //     ourVote.account_id.push(stateTableObject.accountId)
-    //     ourVote.account_state_hash_after.push(stateTableObject.stateAfter)
-    //   }
-    // }
-
     let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
 
     const applyResponse = queueEntry?.preApplyTXResult?.applyResponse
@@ -1273,11 +1299,18 @@ class TransactionConsenus {
       }
       const filteredConsensusGroup = filteredNodes
 
-      this.profiler.profileSectionStart('createAndShareVote-tell')
-      if (this.stateManager.transactionQueue.useNewPOQ === false)
-        this.p2p.tell(filteredConsensusGroup, 'spread_appliedVoteHash', appliedVoteHash)
-      else this.p2p.tell(filteredConsensusGroup, 'spread_appliedVote', ourVote)
-      this.profiler.profileSectionEnd('createAndShareVote-tell')
+      if (this.stateManager.transactionQueue.useNewPOQ === false) {
+        this.profiler.profileSectionStart('createAndShareVote-tell')
+        if (this.stateManager.transactionQueue.useNewPOQ === false) {
+          this.p2p.tell(filteredConsensusGroup, 'spread_appliedVoteHash', appliedVoteHash)
+        } else {
+          this.p2p.tell(filteredConsensusGroup, 'spread_appliedVote', ourVote)
+        }
+        this.profiler.profileSectionEnd('createAndShareVote-tell')
+      } else {
+        // todo: PodA POQ13 Gossip the vote to the entire consensus group
+        Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4)
+      }
     } else {
       nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote fail, no consensus group')
     }
