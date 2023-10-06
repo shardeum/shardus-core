@@ -35,15 +35,15 @@ export function reset(): void {
   hasConfirmedAcceptance = false
 }
 
-export async function confirmAcceptance(offer: SignedObject<AcceptanceOffer>): Promise<Result<boolean, Error>> {
-  if (hasConfirmedAcceptance || Self.isActive) {
-    return err(new Error("no need to check acceptance; we've already confirmed acceptance"))
-  }
+export function isAlreadyCheckingAcceptance(): boolean {
+  return alreadyCheckingAcceptance
+}
 
-  // ensure we're not already checking acceptance
-  if (alreadyCheckingAcceptance) {
-    return err(new Error('already checking acceptance'))
-  }
+export function getHasConfirmedAcceptance(): boolean {
+  return hasConfirmedAcceptance
+}
+
+export async function confirmAcceptance(offer: SignedObject<AcceptanceOffer>): Promise<Result<boolean, Error>> {
   alreadyCheckingAcceptance = true
 
   // ensure we even have nodes to check from

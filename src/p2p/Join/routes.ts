@@ -171,17 +171,30 @@ const acceptedRoute: P2P.P2PTypes.Route<Handler> = {
   handler: async (req, res) => {
     const counter = CycleChain.getNewest().counter
     nestedCountersInstance.countEvent('joinV2', `C${counter}: acceptedRoute: start`)
+
+    // check if we even need to check acceptance
+    if (acceptance.getHasConfirmedAcceptance() || Self.isActive) {
+      return res.status(400).send('no need to check acceptance; this node has already confirmed acceptance')
+    } else if (acceptance.isAlreadyCheckingAcceptance()) {
+      return res.status(400).send('node is already checking acceptance')
+    }
+
+    // then try to confirm acceptance if needed
     try {
       await attempt(
         async () => {
           const result = await acceptance.confirmAcceptance(req.body)
+
           if (result.isErr()) {
+            // transform Err into a thrown Error if needed
             nestedCountersInstance.countEvent('joinV2', `C${counter}: acceptedRoute: confirmAcceptance error`)
             throw result.error
           } else if (!result.value) {
+            // if the result is false, acceptance is not confirmed
             nestedCountersInstance.countEvent('joinV2', `C${counter}: acceptedRoute: node not in cycle`)
             throw new Error(`this node was not found in cycle ${req.body.cycleMarker}; assuming not accepted`)
           } else {
+            // otherwise, at this point, the node has been confirmed to be accepted
             nestedCountersInstance.countEvent('joinV2', `C${counter}: acceptedRoute: node accepted`)
             acceptance.getEventEmitter().emit('accepted')
           }
