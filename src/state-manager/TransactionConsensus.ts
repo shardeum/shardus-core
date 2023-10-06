@@ -32,6 +32,7 @@ import {
 } from './state-manager-types'
 import { shardusGetTime } from '../network'
 import { robustQuery } from '../p2p/Utils'
+import { SignedObject } from '@shardus/crypto-utils'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -1337,8 +1338,16 @@ class TransactionConsenus {
     /* prettier-ignore */
     if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVotes.length} `);
 
-    // todo: podA: POQ5 check if the message is cast by one of the eligible nodes, check its signature
-    // eligible nodes are stored under queueEntry.eligibleNodesToVote
+    const foundNode = queueEntry.eligibleNodesToVote.find((node) =>
+      confirmOrChallenge.nodeId === node.id
+      && this.crypto.verify(confirmOrChallenge as SignedObject, node.publicKey)
+    )
+
+    if (!foundNode) {
+      console.log('tryAppendMessage: Message signature does not match with any eligible nodes.')
+      return
+    }
+
     const isVoteValid = true
     if (!isVoteValid) return false
 
@@ -1360,8 +1369,26 @@ class TransactionConsenus {
     }
 
     if (confirmOrChallenge.message === 'confirm') {
-      // todo: podA: POQ7 compare with existing message. Skip we already have it or node rank is higher than ours
-      const isBetterThanCurrentConfirmation = true
+      let isBetterThanCurrentConfirmation
+      let receivedConfirmedNode: Shardus.NodeWithRank
+
+      if (!queueEntry.receivedBestConfirmation) isBetterThanCurrentConfirmation = true
+      else if (queueEntry.receivedBestConfirmation.nodeId === confirmOrChallenge.nodeId)
+        isBetterThanCurrentConfirmation = false
+      else {
+        // Compare ranks
+        receivedConfirmedNode = queueEntry.executionGroup.find(
+          (node) => node.id === confirmOrChallenge.nodeId
+        )
+
+        if (receivedConfirmedNode.rank === queueEntry.receivedBestConfirmedNode.rank) {
+          // Compare ids if ranks are equal (rare edge case)
+          isBetterThanCurrentConfirmation = receivedConfirmedNode.id > queueEntry.receivedBestConfirmedNode.id
+        } else {
+          isBetterThanCurrentConfirmation =
+            receivedConfirmedNode.rank > queueEntry.receivedBestConfirmedNode.rank
+        }
+      }
 
       if (!isBetterThanCurrentConfirmation) {
         console.log(
@@ -1374,10 +1401,15 @@ class TransactionConsenus {
 
       queueEntry.receivedBestConfirmation = confirmOrChallenge
       queueEntry.lastConfirmOrChallengeTimestamp = Date.now()
-      for (const node of queueEntry.executionGroup) {
-        if (node.id === confirmOrChallenge.nodeId) {
-          queueEntry.receivedBestConfirmedNode = node
-          return true
+      if (receivedConfirmedNode) {
+        queueEntry.receivedBestConfirmedNode = receivedConfirmedNode
+        return true
+      } else {
+        for (const node of queueEntry.executionGroup) {
+          if (node.id === confirmOrChallenge.nodeId) {
+            queueEntry.receivedBestConfirmedNode = node
+            return true
+          }
         }
       }
     } else if (confirmOrChallenge.message === 'challenge') {
@@ -1463,8 +1495,16 @@ class TransactionConsenus {
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`)
       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVotes.length} `)
 
-      // todo: podA: POQ11 check if the vote is cast by one of the eligible nodes, check its signature
-      // eligible nodes are stored under queueEntry.eligibleNodesToVote
+      const foundNode = queueEntry.eligibleNodesToVote.find((node) =>
+        vote.node_id === node.id
+        && this.crypto.verify(vote as SignedObject, node.publicKey)
+      )
+
+      if (!foundNode) {
+        console.log('tryAppendVote: Message signature does not match with any eligible nodes.')
+        return
+      }
+
       const isVoteValid = true
       if (!isVoteValid) return
 
