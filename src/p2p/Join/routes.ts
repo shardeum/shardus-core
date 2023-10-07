@@ -16,7 +16,7 @@ import { nestedCountersInstance } from '../../utils/nestedCounters'
 import { profilerInstance } from '../../utils/profiler'
 import * as acceptance from './v2/acceptance'
 import { attempt } from '../Utils'
-import { getStandbyNodesInfoMap, saveJoinRequest } from './v2'
+import { getStandbyNodesInfoMap, saveJoinRequest, isOnStandbyList } from './v2'
 import { processNewUnjoinRequest, UnjoinRequest } from './v2/unjoin'
 import { isActive } from '../Self'
 
@@ -161,7 +161,7 @@ const joinedRoute: P2P.P2PTypes.Route<Handler> = {
     }
     const publicKey = req.params.publicKey
     const node = NodeList.byPubKey.get(publicKey)
-    res.json({ node })
+    res.json({ node, isOnStandbyList: isOnStandbyList(publicKey) })
   },
 }
 

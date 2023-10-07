@@ -133,6 +133,14 @@ export function getStandbyNodesInfoMap(): Map<publickey, JoinRequest> {
   return standbyNodesInfo
 }
 
+export function isOnStandbyList(publicKey: string): boolean {
+  if (standbyNodesInfo.has(publicKey)) {
+    return true
+  } else {
+    return false
+  }
+}
+
 /**
   * Handles unjoining from the network.
   */

@@ -454,14 +454,14 @@ export async function submitJoin(
   }
 }
 
-export async function fetchJoined(activeNodes: P2P.P2PTypes.Node[]): Promise<string> {
-  const queryFn = async (node: P2P.P2PTypes.Node): Promise<{ node: P2P.NodeListTypes.Node }> => {
+export async function fetchJoined(activeNodes: P2P.P2PTypes.Node[]): Promise<{id: string, isOnStandbyList: boolean}> {
+  const queryFn = async (node: P2P.P2PTypes.Node): Promise<{ node: P2P.NodeListTypes.Node, isOnStandbyList: boolean }> => {
     const publicKey = crypto.keypair.publicKey
-    const res: { node: P2P.NodeListTypes.Node } = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
+    const res: { node: P2P.NodeListTypes.Node, isOnStandbyList: boolean } = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
     return res
   }
   try {
-    const { topResult: response } = await robustQuery<P2P.P2PTypes.Node, { node: P2P.NodeListTypes.Node }>(activeNodes, queryFn)
+    const { topResult: response } = await robustQuery<P2P.P2PTypes.Node, { node: P2P.NodeListTypes.Node, isOnStandbyList: boolean }>(activeNodes, queryFn)
     if (!response) return
     if (!response.node) return
     let err = utils.validateTypes(response, { node: 'o' })
@@ -474,9 +474,41 @@ export async function fetchJoined(activeNodes: P2P.P2PTypes.Node[]): Promise<str
       warn('fetchJoined invalid response response.node.id' + err)
       return
     }
-    return response.node.id
+    err = validateTypes(response, { isOnStandbyList: 'b' })
+    if (err) {
+      warn('fetchJoined invalid response response.isOnStandbyList' + err)
+      return
+    }
+
+    return { id: response.node.id, isOnStandbyList: response.isOnStandbyList }
   } catch (err) {
     warn('Self: fetchNodeId: robustQuery failed: ', err)
+  }
+}
+
+export async function fetchStandbied(activeNodes: P2P.P2PTypes.Node[]): Promise<string> {
+  const queryFn = async (node: P2P.P2PTypes.Node): Promise<{ node: P2P.NodeListTypes.Node }> => {
+    const publicKey = crypto.keypair.publicKey
+    const res: { node: P2P.NodeListTypes.Node } = await http.get(`${node.ip}:${node.port}/standbied/${publicKey}`)
+    return res
+  }
+  try {
+    const { topResult: response } = await robustQuery<P2P.P2PTypes.Node, { node: P2P.NodeListTypes.Node }>(activeNodes, queryFn)
+    if (!response) return
+    if (!response.node) return
+    let err = utils.validateTypes(response, { node: 'o' })
+    if (err) {
+      warn('fetchStandbied invalid response response.node' + err)
+      return
+    }
+    err = validateTypes(response.node, { id: 's' })
+    if (err) {
+      warn('fetchStandbied invalid response response.node.id' + err)
+      return
+    }
+    return response.node.id
+  } catch (err) {
+    warn('Self: fetchStandbied: robustQuery failed: ', err)
   }
 }
 

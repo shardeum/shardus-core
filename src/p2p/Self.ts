@@ -83,6 +83,88 @@ export function init(): void {
   p2pLogger = Context.logger.getLogger('p2p')
 }
 
+export async function startup2(): Promise<boolean> {
+  const publicKey = Context.crypto.getPublicKey()
+
+  // If startInWitness config is set to true, start witness mode and end
+  if (Context.config.p2p.startInWitnessMode) {
+    if (logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
+    emitter.emit('witnessing', publicKey)
+    return true
+  }
+
+  // Attempt to join the network until you know if you're first or you're in the standby list
+  if (logFlags.p2pNonFatal) info('Emitting `joining` event.')
+  emitter.emit('joining', publicKey)
+
+  let firstTime = true
+  let isOnStandbyList = false
+  do {
+    try {
+      // Get active nodes from Archiver
+      const activeNodes = await contactArchiver()
+
+      // Start in witness mode if conditions are met
+      if (await witnessConditionsMet(activeNodes)) {
+        if (logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
+        emitter.emit('witnessing', publicKey)
+        return true
+      } else {
+        //not in witness mode
+      }
+      // Otherwise, try to join the network
+      ;({ isFirst, id, isOnStandbyList } = await joinNetwork2(activeNodes, firstTime))
+      console.log("isFirst:", isFirst, "id:", id, "isInStandby:", isOnStandbyList)
+    } catch (err) {
+      console.log("error in Join network: ", err)
+      if (err.message.startsWith('Fatal:')) {
+        throw err
+      }
+      warn('Error while joining network:')
+      warn(err)
+      warn(err.stack)
+      if (logFlags.p2pNonFatal) info(`Trying to join again in ${Context.config.p2p.cycleDuration} seconds...`)
+      await utils.sleep(Context.config.p2p.cycleDuration * 1000)
+    }
+    firstTime = false
+  } while (utils.isUndefined(isFirst) || utils.isUndefined(id) || utils.isUndefined(isOnStandbyList))
+
+  updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
+
+  if (utils.isUndefined(id)) {
+    id = await new Promise<string>((resolve) =>
+      Acceptance.getEventEmitter().on('accepted', (id) => resolve(id))
+    )
+  }
+
+  p2pSyncStart = Date.now()
+
+  if (logFlags.p2pNonFatal) info('Emitting `joined` event.')
+
+  // Should fire after being accepted into the network
+  emitter.emit('joined', id, publicKey)
+  updateNodeState(P2P.P2PTypes.NodeStatus.SYNCING)
+
+  nestedCountersInstance.countEvent('p2p', 'joined')
+  // Sync cycle chain from network
+  await syncCycleChain()
+
+  // Enable internal routes
+  Comms.setAcceptInternal(true)
+
+  // Start creating cycle records
+  await CycleCreator.startCycles()
+  p2pSyncEnd = Date.now()
+  p2pJoinTime = (p2pSyncEnd - p2pSyncStart) / 1000
+
+  nestedCountersInstance.countEvent('p2p', `sync time ${p2pJoinTime} seconds`)
+
+  if (logFlags.p2pNonFatal) info('Emitting `initialized` event.' + p2pJoinTime)
+  emitter.emit('initialized')
+
+  return true
+}
+
 export async function startup(): Promise<boolean> {
   const publicKey = Context.crypto.getPublicKey()
 
@@ -115,7 +197,7 @@ export async function startup(): Promise<boolean> {
       ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
       console.log("isFirst:", isFirst, "id:", id)
     } catch (err) {
-      console.log("joinNetwork: ", err.message)
+      console.log("error in Join network: ", err)
       if (!Context.config.p2p.useJoinProtocolV2) {
         updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
       }
@@ -178,6 +260,78 @@ async function witnessConditionsMet(activeNodes: P2P.P2PTypes.Node[]): Promise<b
 
 export function updateNodeState(updatedState: NodeStatus): void {
   state = updatedState
+}
+
+async function joinNetwork2(
+  activeNodes: P2P.P2PTypes.Node[],
+  firstTime: boolean
+): Promise<{ isFirst: boolean; id: string; isOnStandbyList: boolean }> {
+  // Check if you're the first node
+  const isFirst = discoverNetwork(activeNodes)
+  let isOnStandbyList = false
+
+  if (isFirst) {
+    // Join your own network and give yourself an ID
+    const id = await Join.firstJoin()
+    // Return id and isFirst
+    return { isFirst, id, isOnStandbyList }
+  }
+
+  // Remove yourself from activeNodes if you are present in them
+  const ourIdx = activeNodes.findIndex(
+    (node) => node.ip === network.ipInfo.externalIp && node.port === network.ipInfo.externalPort
+  )
+  if (ourIdx > -1) {
+    activeNodes.splice(ourIdx, 1)
+  }
+
+  // Check if we're in the standby list or if we've been joined before trying to join, if not first time
+  if (firstTime === false) {
+    const resp = await Join.fetchJoined(activeNodes)
+    if (resp.id || resp.isOnStandbyList) {
+      return { isFirst: false, id: resp.id, isOnStandbyList: resp.isOnStandbyList }
+    }
+  }
+
+  // Get latest cycle record from active nodes
+  const latestCycle = await Sync.getNewestCycle(activeNodes)
+  mode = latestCycle.mode || null
+  const publicKey = Context.crypto.getPublicKey()
+  const isReadyToJoin = await Context.shardus.app.isReadyToJoin(latestCycle, publicKey, activeNodes, mode)
+  if (!isReadyToJoin) {
+    // Wait for Context.config.p2p.cycleDuration and try again
+    throw new Error('Node not ready to join')
+  }
+
+  // Create join request from latest cycle
+  const request = await Join.createJoinRequest(latestCycle.previous)
+
+  //we can't use allowBogon lag yet because its value is detected later.
+  //it is possible to throw out any invalid IPs at this point
+  if (Context.config.p2p.rejectBogonOutboundJoin || Context.config.p2p.forceBogonFilteringOn) {
+    if (isInvalidIP(request.nodeInfo.externalIp)) {
+      throw new Error(`Fatal: Node cannot join with invalid external IP: ${request.nodeInfo.externalIp}`)
+    }
+  }
+
+  // Figure out when Q1 is from the latestCycle
+  const { startQ1 } = calcIncomingTimes(latestCycle)
+  if (logFlags.p2pNonFatal) info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
+
+  // Wait until a Q1 then send join request to active nodes
+  let untilQ1 = startQ1 - Date.now()
+  while (untilQ1 < 0) {
+    untilQ1 += latestCycle.duration * 1000
+  }
+
+  if (logFlags.p2pNonFatal) info(`Waiting ${untilQ1 + 500} ms for Q1 before sending join...`)
+  await utils.sleep(untilQ1 + 500) // Not too early
+
+  await Join.submitJoin(activeNodes, request)
+
+  return {
+    isFirst, id, isOnStandbyList
+  }
 }
 
 async function joinNetwork(

@@ -2376,13 +2376,10 @@ class Shardus extends EventEmitter {
     }
   }
 
-  isOnStandbyList(publicKey: string): boolean {
-    if (JoinV2.standbyNodesInfo.has(publicKey)) {
-      return true
-    } else {
-      return false
-    }
+  isOnStandbyList (publicKey: string): boolean {
+    return JoinV2.isOnStandbyList(publicKey)
   }
+  
 }
 
 function deepReplace(obj: object | ArrayLike<any>, find: any, replace: any): any {
