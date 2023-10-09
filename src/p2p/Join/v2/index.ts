@@ -95,7 +95,7 @@ export function getSortedStandbyJoinRequests(): JoinRequest[] {
   console.log('getting sorted standby node list')
   return [...standbyNodesInfo.values()].sort((a, b) =>
     // using mathematical comparison in case localeCompare is inconsistent.
-    // we will use a simple ternary statement for this that doens't account for
+    // we will use a simple ternary statement for this that doesn't account for
     // equality. this should be fine as no two public keys should be the same.
     a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1
   )
