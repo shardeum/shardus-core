@@ -389,6 +389,10 @@ async function joinNetwork(
   const { startQ1, startQ4 } = calcIncomingTimes(latestCycle)
   if (logFlags.p2pNonFatal) info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
 
+  // create the Promise that we will `await` to wait for the 'accepted' event,
+  // in case of Join v2. this registers the listener ahead of time
+  const trigger = acceptedTrigger();
+
   // only submit join requests if we are using the old protocol or if we have not yet successfully submitted a join request
   if (!Context.config.p2p.useJoinProtocolV2 || !Join.getHasSubmittedJoinRequest()) {
     // Wait until a Q1 then send join request to active nodes
@@ -405,7 +409,7 @@ async function joinNetwork(
 
   if (Context.config.p2p.useJoinProtocolV2) {
     // if using join protocol v2, simply wait for the 'accepted' event to fire
-    await acceptedTrigger();
+    await trigger;
 
     // then, we can fetch the id from the network and return
     const id = await Join.fetchJoined(activeNodes)
