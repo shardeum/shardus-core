@@ -80,7 +80,13 @@ export async function notifyNewestJoinedConsensors(): Promise<void> {
   }
 
   // decide if we should be in charge of notifying joining nodes
-  console.log(`C${counter} fastIsPicked params: ${{getOurNodeIndex: getOurNodeIndex(), activeByIdOrderLength: NodeList.activeByIdOrder.length, NUM_NOTIFYING_NODES, CycleChainNewestCounter: CycleChain.newest.counter}}`)
+  const params = {
+    getOurNodeIndex: getOurNodeIndex(),
+    activeByIdOrderLength: NodeList.activeByIdOrder.length,
+    NUM_NOTIFYING_NODES,
+    CycleChainNewestCounter: CycleChain.newest.counter
+  }
+  console.log(`C${counter} fastIsPicked params: ${JSON.stringify(params)}`)
   const shouldNotify = fastIsPicked(
     getOurNodeIndex(),
     NodeList.activeByIdOrder.length,
