@@ -186,6 +186,7 @@ export function startupV2(): Promise<boolean> {
         const resp = await Join.fetchJoinedV2(activeNodes)
 
         if (resp?.id) {
+          id = resp.id
           await enterSyncingState()
           attemptJoiningRunning = false
           return
