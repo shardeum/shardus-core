@@ -95,3 +95,6 @@ dist/
 # TS build results
 build/
 .direnv/
+
+# anything you want
+_scrap
