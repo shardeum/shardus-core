@@ -207,9 +207,11 @@ export function startupV2(): Promise<boolean> {
           info(`Trying to join again in ${latestCycle.duration} seconds...`)
       } finally {
         // schedule yourself to run at the start of the next cycle
-        schedulerTimer = setTimeout(() => {
-          scheduler()
-        }, latestCycle.duration * 1000)
+        if (latestCycle) {
+          schedulerTimer = setTimeout(() => {
+            scheduler()
+          }, latestCycle.duration * 1000)
+        }
       }
     }
 
