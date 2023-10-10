@@ -1,19 +1,20 @@
 /**
-  * `v2` houses some new state or functions introduced with Join Protocol v2.
-  * TODO: Rename this module later?
-  */
+ * `v2` houses some new state or functions introduced with Join Protocol v2.
+ * TODO: Rename this module later?
+ */
 
-import { hexstring } from "@shardus/types";
-import { JoinRequest } from "@shardus/types/build/src/p2p/JoinTypes";
+import { hexstring } from '@shardus/types'
+import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { config, crypto } from '../../Context'
 import * as CycleChain from '../../CycleChain'
 import * as Self from '../../Self'
 import rfdc from 'rfdc'
-import { executeNodeSelection, notifyNewestJoinedConsensors } from "./select";
-import { attempt } from "../../Utils";
-import { submitUnjoin } from "./unjoin";
-import { ResultAsync } from "neverthrow";
-import { reset as resetAcceptance } from "./acceptance";
+import { executeNodeSelection, notifyNewestJoinedConsensors } from './select'
+import { attempt } from '../../Utils'
+import { submitUnjoin } from './unjoin'
+import { ResultAsync } from 'neverthrow'
+import { reset as resetAcceptance } from './acceptance'
+import { stringifyReduce } from '../../../utils/functions/stringifyReduce'
 
 const clone = rfdc()
 
@@ -24,10 +25,10 @@ type publickey = JoinRequest['nodeInfo']['publicKey']
 export const standbyNodesInfo: Map<publickey, JoinRequest> = new Map()
 
 /**
-  * New join requests received during the node's current cycle. This list is
-  * "drained" when the cycle is digested. Its entries are added to `standbyNodeList` as part of cycle...
-  * digestion. appetizing!
-  */
+ * New join requests received during the node's current cycle. This list is
+ * "drained" when the cycle is digested. Its entries are added to `standbyNodeList` as part of cycle...
+ * digestion. appetizing!
+ */
 let newJoinRequests: JoinRequest[] = []
 
 export function init(): void {
@@ -40,21 +41,20 @@ export function init(): void {
         console.error('failed to notify selected nodes:', e)
       })
     }
-  });
+  })
   Self.emitter.on('cycle_q2_start', () => {
-    if (config.p2p.useJoinProtocolV2)
-      executeNodeSelection()
-  });
+    if (config.p2p.useJoinProtocolV2) executeNodeSelection()
+  })
 }
 
 /**
-  * Pushes the join request onto the list of new join requests. Its node's info
-  * will be added to the standby node list at the end of the cycle during cycle
-  * digestion.
-  *
-  * @param joinRequest The join request to save.
-  * @param persistImmediately If true, the node will be added to the standby node list immediately. This can be used for the first node in the network.
-  */
+ * Pushes the join request onto the list of new join requests. Its node's info
+ * will be added to the standby node list at the end of the cycle during cycle
+ * digestion.
+ *
+ * @param joinRequest The join request to save.
+ * @param persistImmediately If true, the node will be added to the standby node list immediately. This can be used for the first node in the network.
+ */
 export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = false): void {
   console.log('saving join request:', joinRequest)
 
@@ -67,8 +67,8 @@ export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = f
 }
 
 /**
-  * Returns the list of new standby join requests and empties the list.
-  */
+ * Returns the list of new standby join requests and empties the list.
+ */
 export function drainNewJoinRequests(): JoinRequest[] {
   console.log('draining new standby info:', newJoinRequests)
   const tmp = newJoinRequests
@@ -77,8 +77,8 @@ export function drainNewJoinRequests(): JoinRequest[] {
 }
 
 /**
-  * Adds nodes to the standby node list.
-  */
+ * Adds nodes to the standby node list.
+ */
 export function addStandbyJoinRequests(...nodes: JoinRequest[]): void {
   console.log('adding standby nodes:', nodes)
   for (const node of nodes) {
@@ -89,8 +89,8 @@ export function addStandbyJoinRequests(...nodes: JoinRequest[]): void {
 let lastHashedList: JoinRequest[] = []
 
 /**
-  * Returns the list of standby nodes, sorted by their public keys.
-  */
+ * Returns the list of standby nodes, sorted by their public keys.
+ */
 export function getSortedStandbyJoinRequests(): JoinRequest[] {
   console.log('getting sorted standby node list')
   return [...standbyNodesInfo.values()].sort((a, b) =>
@@ -103,12 +103,17 @@ export function getSortedStandbyJoinRequests(): JoinRequest[] {
 
 /** Calculates and returns a hash based on the list of standby nodes, sorted by public key. This will also update the recorded `lastHashedList` of nodes, which can be retrieved via `getLastHashedStandbyList`. */
 export function computeNewStandbyListHash(): hexstring {
-  console.log('computing new standby list hash')
   // set the lastHashedList to the current list by pubkey, then hash.
   // deep cloning is necessary as standby node information may be mutated by
   // reference.
   lastHashedList = clone(getSortedStandbyJoinRequests())
   const hash = crypto.hash(lastHashedList)
+
+  console.log(`computing new standby list hash: ${hash} number of nodes: ${lastHashedList.length}`)
+  //use map to convert lastHashedList to a list of public keys
+  const publicKeyList = lastHashedList.map((node) => node.nodeInfo.publicKey)
+  console.log(`{standby_public_key_list: ${stringifyReduce(publicKeyList)}}`)
+
   return hash
 }
 
@@ -142,21 +147,19 @@ export function isOnStandbyList(publicKey: string): boolean {
 }
 
 /**
-  * Handles unjoining from the network.
-  */
+ * Handles unjoining from the network.
+ */
 export async function shutdown(): Promise<void> {
   // if not using join protocol v2, unjoining isn't needed
-  if (!config.p2p.useJoinProtocolV2)
-    return
+  if (!config.p2p.useJoinProtocolV2) return
 
-  const unjoinResult =
-    await ResultAsync.fromPromise(
-      attempt(async () => submitUnjoin(), {
-        delay: 1000,
-        maxRetries: 5,
-      }),
-      (err) => err as Error
-    ).andThen((result) => result)
+  const unjoinResult = await ResultAsync.fromPromise(
+    attempt(async () => submitUnjoin(), {
+      delay: 1000,
+      maxRetries: 5,
+    }),
+    (err) => err as Error
+  ).andThen((result) => result)
 
   // reset acceptance state
   resetAcceptance()

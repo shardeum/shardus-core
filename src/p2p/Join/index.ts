@@ -98,8 +98,8 @@ export function calculateToAccept(): number {
     CycleChain.newest.safetyMode === true
       ? CycleChain.newest.safetyNum
       : Math.floor(
-        config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor * CycleCreator.scaleFactorSyncBoost
-      )
+          config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor * CycleCreator.scaleFactorSyncBoost
+        )
 
   //The first batch of nodes to join the network after the seed node server can join at a higher rate if firstCycleJoin is set.
   //This first batch will sync the full data range from the seed node, which should be very little data.
@@ -156,19 +156,19 @@ export function calculateToAccept(): number {
     lastLoggedCycle = cycle
     info(
       'scale dump:' +
-      JSON.stringify({
-        cycle,
-        scaleFactor: CycleCreator.scaleFactor,
-        needed,
-        desired,
-        active,
-        syncing,
-        canSync,
-        syncMax,
-        maxJoin,
-        expired,
-        scaleFactorSyncBoost: CycleCreator.scaleFactorSyncBoost,
-      })
+        JSON.stringify({
+          cycle,
+          scaleFactor: CycleCreator.scaleFactor,
+          needed,
+          desired,
+          active,
+          syncing,
+          canSync,
+          syncMax,
+          maxJoin,
+          expired,
+          scaleFactorSyncBoost: CycleCreator.scaleFactorSyncBoost,
+        })
     )
   }
   return needed
@@ -214,8 +214,8 @@ export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
 
 export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
   record.syncing = NodeList.byJoinOrder.length - NodeList.activeByIdOrder.length
-  record.standbyAdd = [];
-  record.standbyRemove = [];
+  record.standbyAdd = []
+  record.standbyRemove = []
 
   if (config.p2p.useJoinProtocolV2) {
     // for join v2, add new standby nodes to the standbyAdd field ...
@@ -227,6 +227,8 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     for (const publicKey of drainNewUnjoinRequests()) {
       record.standbyRemove.push(publicKey)
     }
+    record.standbyAdd.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
+    record.standbyRemove.sort()
 
     // ... then add any standby nodes that are now allowed to join
     const selectedPublicKeys = drainSelectedPublicKeys()
@@ -237,7 +239,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
       // the standbyInfo *should* exist, but if it doesn't, continue without
       // adding its node
-      if (!standbyInfo) continue;
+      if (!standbyInfo) continue
 
       console.log('selected standby node', standbyInfo)
 
@@ -254,15 +256,14 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     record.joinedConsensors.sort()
   } else {
     // old protocol handling
-    record.joinedConsensors =
-      txs.join
-        .map((joinRequest) => {
-          const { nodeInfo, cycleMarker: cycleJoined } = joinRequest
-          const id = computeNodeId(nodeInfo.publicKey, cycleJoined)
-          const counterRefreshed = record.counter
-          return { ...nodeInfo, cycleJoined, counterRefreshed, id }
-        })
-        .sort()
+    record.joinedConsensors = txs.join
+      .map((joinRequest) => {
+        const { nodeInfo, cycleMarker: cycleJoined } = joinRequest
+        const id = computeNodeId(nodeInfo.publicKey, cycleJoined)
+        const counterRefreshed = record.counter
+        return { ...nodeInfo, cycleJoined, counterRefreshed, id }
+      })
+      .sort()
     /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("new desired count: ", record.desired)
   }
 }
@@ -360,7 +361,8 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
   }
 
   // validation has passed so far
-  if (logFlags.p2pNonFatal) info(`Got join request for ${joinRequest.nodeInfo.externalIp}:${joinRequest.nodeInfo.externalPort}`)
+  if (logFlags.p2pNonFatal)
+    info(`Got join request for ${joinRequest.nodeInfo.externalIp}:${joinRequest.nodeInfo.externalPort}`)
 
   if (!config.p2p.useJoinProtocolV2) {
     return decideNodeSelection(joinRequest)
@@ -516,11 +518,16 @@ export async function submitJoinV2(
 export async function fetchJoined(activeNodes: P2P.P2PTypes.Node[]): Promise<string> {
   const queryFn = async (node: P2P.P2PTypes.Node): Promise<{ node: P2P.NodeListTypes.Node }> => {
     const publicKey = crypto.keypair.publicKey
-    const res: { node: P2P.NodeListTypes.Node } = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
+    const res: { node: P2P.NodeListTypes.Node } = await http.get(
+      `${node.ip}:${node.port}/joined/${publicKey}`
+    )
     return res
   }
   try {
-    const { topResult: response } = await robustQuery<P2P.P2PTypes.Node, { node: P2P.NodeListTypes.Node }>(activeNodes, queryFn)
+    const { topResult: response } = await robustQuery<P2P.P2PTypes.Node, { node: P2P.NodeListTypes.Node }>(
+      activeNodes,
+      queryFn
+    )
     if (!response) return
     if (!response.node) return
     let err = utils.validateTypes(response, { node: 'o' })
@@ -539,14 +546,23 @@ export async function fetchJoined(activeNodes: P2P.P2PTypes.Node[]): Promise<str
   }
 }
 
-export async function fetchJoinedV2(activeNodes: P2P.P2PTypes.Node[]): Promise<{id: string|undefined, isOnStandbyList: boolean}> {
-  const queryFn = async (node: P2P.P2PTypes.Node): Promise<{ id: string|undefined, isOnStandbyList: boolean }> => {
+export async function fetchJoinedV2(
+  activeNodes: P2P.P2PTypes.Node[]
+): Promise<{ id: string | undefined; isOnStandbyList: boolean }> {
+  const queryFn = async (
+    node: P2P.P2PTypes.Node
+  ): Promise<{ id: string | undefined; isOnStandbyList: boolean }> => {
     const publicKey = crypto.keypair.publicKey
-    const res: { id: string|undefined, isOnStandbyList: boolean } = await http.get(`${node.ip}:${node.port}/joinedV2/${publicKey}`)
+    const res: { id: string | undefined; isOnStandbyList: boolean } = await http.get(
+      `${node.ip}:${node.port}/joinedV2/${publicKey}`
+    )
     return res
   }
   try {
-    const { topResult: response } = await robustQuery<P2P.P2PTypes.Node, { id: string|undefined, isOnStandbyList: boolean }>(activeNodes, queryFn)
+    const { topResult: response } = await robustQuery<
+      P2P.P2PTypes.Node,
+      { id: string | undefined; isOnStandbyList: boolean }
+    >(activeNodes, queryFn)
     if (!response) return
     if (!response.id) {
       return { id: undefined, isOnStandbyList: response.isOnStandbyList }
@@ -569,25 +585,27 @@ export async function fetchJoinedV2(activeNodes: P2P.P2PTypes.Node[]): Promise<{
 }
 
 /**
-  * Returns a `JoinRequestResponse` object if the given `joinRequest` is invalid or rejected for any reason.
-  */
+ * Returns a `JoinRequestResponse` object if the given `joinRequest` is invalid or rejected for any reason.
+ */
 export function validateJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse | null {
   // perform validation. if any of these functions return a non-null value,
   // validation fails and the join request is rejected
-  return verifyJoinRequestTypes(joinRequest)
-    || validateVersion(joinRequest.version)
-    || verifyJoinRequestSigner(joinRequest)
-    || verifyNotIPv6(joinRequest)
-    || validateJoinRequestHost(joinRequest)
-    || verifyUnseen(joinRequest.nodeInfo.publicKey)
-    || verifyNodeUnknown(joinRequest.nodeInfo)
-    || validateJoinRequestTimestamp(joinRequest.nodeInfo.joinRequestTimestamp)
+  return (
+    verifyJoinRequestTypes(joinRequest) ||
+    validateVersion(joinRequest.version) ||
+    verifyJoinRequestSigner(joinRequest) ||
+    verifyNotIPv6(joinRequest) ||
+    validateJoinRequestHost(joinRequest) ||
+    verifyUnseen(joinRequest.nodeInfo.publicKey) ||
+    verifyNodeUnknown(joinRequest.nodeInfo) ||
+    validateJoinRequestTimestamp(joinRequest.nodeInfo.joinRequestTimestamp)
+  )
 }
 
 /**
-  * Returns an error response if the given `joinRequest` is invalid or rejected
-  * based on its IP address.
-  */
+ * Returns an error response if the given `joinRequest` is invalid or rejected
+ * based on its IP address.
+ */
 function validateJoinRequestHost(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse | null {
   try {
     //test or bogon IPs and reject the join request if they appear
@@ -631,16 +649,16 @@ export function computeNodeId(publicKey: string, cycleMarker: string): string {
 }
 
 /**
-  * This function is a little weird because it was taken directly from
-  * `addJoinRequest`, but here's how it works:
-  *
-  * It validates the types of the `joinRequest`. If the types are invalid, it
-  * returns a `JoinRequestResponse` object with `success` set to `false` and
-  * `fatal` set to `true`. The `reason` field will contain a message describing
-  * the validation error.
-  *
-  * If the types are valid, it returns `null`.
-  */
+ * This function is a little weird because it was taken directly from
+ * `addJoinRequest`, but here's how it works:
+ *
+ * It validates the types of the `joinRequest`. If the types are invalid, it
+ * returns a `JoinRequestResponse` object with `success` set to `false` and
+ * `fatal` set to `true`. The `reason` field will contain a message describing
+ * the validation error.
+ *
+ * If the types are valid, it returns `null`.
+ */
 function verifyJoinRequestTypes(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse | null {
   // Validate joinReq
   let err = utils.validateTypes(joinRequest, {
@@ -689,13 +707,13 @@ function verifyJoinRequestTypes(joinRequest: P2P.JoinTypes.JoinRequest): JoinReq
 }
 
 /**
-  * Makes sure that the given `nodeInfo` is not already known to the network.
-  * If it is, it returns a `JoinRequestResponse` object with `success` set to
-  * `false` and `fatal` set to `true`. The `reason` field will contain a message
-  * describing the validation error.
-  *
-  * If the `nodeInfo` is not already known to the network, it returns `null`.
-  */
+ * Makes sure that the given `nodeInfo` is not already known to the network.
+ * If it is, it returns a `JoinRequestResponse` object with `success` set to
+ * `false` and `fatal` set to `true`. The `reason` field will contain a message
+ * describing the validation error.
+ *
+ * If the `nodeInfo` is not already known to the network, it returns `null`.
+ */
 function verifyNodeUnknown(nodeInfo: P2P.P2PTypes.P2PNode): JoinRequestResponse | null {
   if (NodeList.byPubKey.has(nodeInfo.publicKey)) {
     const message = 'Cannot add join request for this node, already a known node (by public key).'
@@ -718,17 +736,17 @@ function verifyNodeUnknown(nodeInfo: P2P.P2PTypes.P2PNode): JoinRequestResponse 
     }
   }
 
-  return null;
+  return null
 }
 
 /**
-  * Makes sure that the given `joinRequest` is not from an IPv6 address. If it
-  * is, it returns a `JoinRequestResponse` object with `success` set to `false`
-  * and `fatal` set to `true`. The `reason` field will contain a message
-  * describing the validation error.
-  *
-  * If the `joinRequest` is not from an IPv6 address, it returns `null`.
-  */
+ * Makes sure that the given `joinRequest` is not from an IPv6 address. If it
+ * is, it returns a `JoinRequestResponse` object with `success` set to `false`
+ * and `fatal` set to `true`. The `reason` field will contain a message
+ * describing the validation error.
+ *
+ * If the `joinRequest` is not from an IPv6 address, it returns `null`.
+ */
 function verifyNotIPv6(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse | null {
   if (isIPv6(joinRequest.nodeInfo.externalIp)) {
     warn('Got join request from IPv6')
@@ -743,14 +761,14 @@ function verifyNotIPv6(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestRespo
 }
 
 /**
-  * Makes sure that the given `joinRequestVersion` is not older than the
-  * current version of the node. If it is, it returns a `JoinRequestResponse`
-  * object with `success` set to `false` and `fatal` set to `true`. The `reason`
-  * field will contain a message describing the validation error.
-  *
-  * If the `joinRequestVersion` is not older than the current version of the
-  * node, it returns `null`.
-  */
+ * Makes sure that the given `joinRequestVersion` is not older than the
+ * current version of the node. If it is, it returns a `JoinRequestResponse`
+ * object with `success` set to `false` and `fatal` set to `true`. The `reason`
+ * field will contain a message describing the validation error.
+ *
+ * If the `joinRequestVersion` is not older than the current version of the
+ * node, it returns `null`.
+ */
 function validateVersion(joinRequestVersion: string): JoinRequestResponse | null {
   if (config.p2p.checkVersion && !isEqualOrNewerVersion(version, joinRequestVersion)) {
     /* prettier-ignore */ warn(`version number is old. Our node version is ${version}. Join request node version is ${joinRequestVersion}`)
@@ -764,14 +782,14 @@ function validateVersion(joinRequestVersion: string): JoinRequestResponse | null
 }
 
 /**
-  * Makes sure that the given `joinRequest` is signed by the node that is
-  * attempting to join. If it is not, it returns a `JoinRequestResponse` object
-  * with `success` set to `false` and `fatal` set to `true`. The `reason` field
-  * will contain a message describing the validation error.
-  *
-  * If the `joinRequest` is signed by the node that is attempting to join, it
-  * returns `null`.
-  */
+ * Makes sure that the given `joinRequest` is signed by the node that is
+ * attempting to join. If it is not, it returns a `JoinRequestResponse` object
+ * with `success` set to `false` and `fatal` set to `true`. The `reason` field
+ * will contain a message describing the validation error.
+ *
+ * If the `joinRequest` is signed by the node that is attempting to join, it
+ * returns `null`.
+ */
 function verifyJoinRequestSigner(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse | null {
   //If the node that signed the request is not the same as the node that is joining
   if (joinRequest.sign.owner != joinRequest.nodeInfo.publicKey) {
@@ -786,14 +804,14 @@ function verifyJoinRequestSigner(joinRequest: P2P.JoinTypes.JoinRequest): JoinRe
 }
 
 /**
-  * Makes sure that the given `joinRequest`'s node  has not already been seen this
-  * cycle. If it has, it returns a `JoinRequestResponse` object with `success`
-  * set to `false` and `fatal` set to `false`. The `reason` field will contain a
-  * message describing the validation error.
-  *
-  * If the `joinRequest`'s node has not already been seen this cycle, it returns
-  * `null`.
-  */
+ * Makes sure that the given `joinRequest`'s node  has not already been seen this
+ * cycle. If it has, it returns a `JoinRequestResponse` object with `success`
+ * set to `false` and `fatal` set to `false`. The `reason` field will contain a
+ * message describing the validation error.
+ *
+ * If the `joinRequest`'s node has not already been seen this cycle, it returns
+ * `null`.
+ */
 function verifyUnseen(publicKey: hexstring): JoinRequestResponse | null {
   // Check if this node has already been seen this cycle
   if (seen.has(publicKey)) {
@@ -830,8 +848,10 @@ function validateJoinRequestTimestamp(joinRequestTimestamp: number): JoinRequest
   const requestValidLowerBound = cycleStarts - cycleDuration
 
   if (joinRequestTimestamp < requestValidLowerBound) {
-    if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-not-meet-lowerbound`)
-    if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, timestamp is earlier than allowed cycle range')
+    if (logFlags.p2pNonFatal)
+      nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-not-meet-lowerbound`)
+    if (logFlags.p2pNonFatal)
+      warn('Cannot add join request for this node, timestamp is earlier than allowed cycle range')
     return {
       success: false,
       reason: 'Cannot add join request, timestamp is earlier than allowed cycle range',
@@ -840,8 +860,10 @@ function validateJoinRequestTimestamp(joinRequestTimestamp: number): JoinRequest
   }
 
   if (joinRequestTimestamp > requestValidUpperBound) {
-    if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-beyond-upperbound`)
-    if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, its timestamp exceeds allowed cycle range')
+    if (logFlags.p2pNonFatal)
+      nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-beyond-upperbound`)
+    if (logFlags.p2pNonFatal)
+      warn('Cannot add join request for this node, its timestamp exceeds allowed cycle range')
     return {
       success: false,
       reason: 'Cannot add join request, timestamp exceeds allowed cycle range',
@@ -851,18 +873,25 @@ function validateJoinRequestTimestamp(joinRequestTimestamp: number): JoinRequest
 }
 
 /**
-  * Returns the selection key pertaining to the given `joinRequest`. If
-  * `shardus.app.validateJoinRequest` is not a function, then the selection key
-  * is the public key of the node that sent the join request.
-  */
+ * Returns the selection key pertaining to the given `joinRequest`. If
+ * `shardus.app.validateJoinRequest` is not a function, then the selection key
+ * is the public key of the node that sent the join request.
+ */
 function getSelectionKey(joinRequest: JoinRequest): Result<string, JoinRequestResponse> {
   if (typeof shardus.app.validateJoinRequest === 'function') {
     try {
       mode = CycleChain.newest.mode || null
-      const validationResponse = shardus.app.validateJoinRequest(joinRequest, mode, CycleChain.newest, config.p2p.minNodes)
+      const validationResponse = shardus.app.validateJoinRequest(
+        joinRequest,
+        mode,
+        CycleChain.newest,
+        config.p2p.minNodes
+      )
 
       if (validationResponse.success !== true) {
-        error(`Validation of join request data is failed due to ${validationResponse.reason || 'unknown reason'}`)
+        error(
+          `Validation of join request data is failed due to ${validationResponse.reason || 'unknown reason'}`
+        )
         nestedCountersInstance.countEvent('p2p', `join-reject-dapp`)
         return err({
           success: validationResponse.success,
@@ -886,7 +915,9 @@ function getSelectionKey(joinRequest: JoinRequest): Result<string, JoinRequestRe
   return ok(joinRequest.nodeInfo.publicKey)
 }
 
-export function verifyJoinRequestSignature(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse | null {
+export function verifyJoinRequestSignature(
+  joinRequest: P2P.JoinTypes.JoinRequest
+): JoinRequestResponse | null {
   if (!crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)) {
     warn('join bad sign ' + JSON.stringify(joinRequest))
     nestedCountersInstance.countEvent('p2p', `join-reject-bad-sign`)
@@ -900,15 +931,15 @@ export function verifyJoinRequestSignature(joinRequest: P2P.JoinTypes.JoinReques
 }
 
 /**
-  * Computes a selection number given a join request.
-  */
+ * Computes a selection number given a join request.
+ */
 export function computeSelectionNum(joinRequest: JoinRequest): Result<string, JoinRequestResponse> {
   // get the selection key
-  const selectionKeyResult = getSelectionKey(joinRequest);
+  const selectionKeyResult = getSelectionKey(joinRequest)
   if (selectionKeyResult.isErr()) {
-    return err(selectionKeyResult.error);
+    return err(selectionKeyResult.error)
   }
-  const selectionKey = selectionKeyResult.value;
+  const selectionKey = selectionKeyResult.value
 
   // calculate the selection number based on the selection key
   const obj = {
@@ -921,20 +952,20 @@ export function computeSelectionNum(joinRequest: JoinRequest): Result<string, Jo
 }
 
 /**
-  * Selects the join request's node to join the network, or doesn't.
-  * Returns a `JoinRequestResponse` signifying whether the join request was
-  * accepted or rejected.
-  *
-  * This is the logic used in Join Protocol v1.
-  */
+ * Selects the join request's node to join the network, or doesn't.
+ * Returns a `JoinRequestResponse` signifying whether the join request was
+ * accepted or rejected.
+ *
+ * This is the logic used in Join Protocol v1.
+ */
 function decideNodeSelection(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse {
   // Compute how many join request to accept
   let toAccept = calculateToAccept()
   nestedCountersInstance.countEvent('p2p', `results of calculateToAccept: toAccept: ${toAccept}`)
-    /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("results of calculateToAccept: ", toAccept)
+  /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("results of calculateToAccept: ", toAccept)
   const { add, remove } = calculateToAcceptV2(CycleChain.newest)
   nestedCountersInstance.countEvent('p2p', `results of calculateToAcceptV2: add: ${add}, remove: ${remove}`)
-    /* prettier-ignore */ if (logFlags && logFlags.verbose) { console.log(`results of calculateToAcceptV2: add: ${add}, remove: ${remove}`) }
+  /* prettier-ignore */ if (logFlags && logFlags.verbose) { console.log(`results of calculateToAcceptV2: add: ${add}, remove: ${remove}`) }
   toAccept = add
 
   // Check if we are better than the lowest selectionNum
@@ -951,9 +982,9 @@ function decideNodeSelection(joinRequest: P2P.JoinTypes.JoinRequest): JoinReques
     is able to create a stronger selectionNum. If no selectionKey is provided,
     joining node public key and cycle number are hashed to calculate selectionNumber.
   */
-  const selectionNumResult = computeSelectionNum(joinRequest);
-  if (selectionNumResult.isErr()) return selectionNumResult.error;
-  const selectionNum = selectionNumResult.value;
+  const selectionNumResult = computeSelectionNum(joinRequest)
+  if (selectionNumResult.isErr()) return selectionNumResult.error
+  const selectionNum = selectionNumResult.value
 
   if (last && requests.length >= toAccept && !crypto.isGreaterHash(selectionNum, last.selectionNum)) {
     if (logFlags.p2pNonFatal) info('Join request not better than lowest, not added.')
@@ -972,8 +1003,8 @@ function decideNodeSelection(joinRequest: P2P.JoinTypes.JoinRequest): JoinReques
   // ----- should create preconfigured hooks for adding POW, allowing join based on netadmin sig, etc.
 
   // Check the signature as late as possible since it is expensive
-  const validationErr = verifyJoinRequestSignature(joinRequest);
-  if (validationErr) return validationErr;
+  const validationErr = verifyJoinRequestSignature(joinRequest)
+  if (validationErr) return validationErr
 
   // Insert sorted into best list if we made it this far
   utils.insertSorted(requests, { ...joinRequest, selectionNum }, (a, b) =>

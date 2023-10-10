@@ -6,9 +6,17 @@ import * as CycleCreator from '../CycleCreator'
 import * as NodeList from '../NodeList'
 import * as Self from '../Self'
 import * as utils from '../../utils'
-import { Handler } from "express"
-import { P2P } from "@shardus/types"
-import { addJoinRequest, computeSelectionNum, getAllowBogon, setAllowBogon, validateJoinRequest, verifyJoinRequestSignature, warn } from "."
+import { Handler } from 'express'
+import { P2P } from '@shardus/types'
+import {
+  addJoinRequest,
+  computeSelectionNum,
+  getAllowBogon,
+  setAllowBogon,
+  validateJoinRequest,
+  verifyJoinRequestSignature,
+  warn,
+} from '.'
 import { config } from '../Context'
 import { isBogonIP } from '../../utils/functions/checkIP'
 import { isPortReachable } from '../../utils/isPortReachable'
@@ -93,16 +101,28 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       // then, verify the signature of the join request. this has to be done
       // before selectionNum is calculated because we will mutate the original
       // join request.
-      const signatureError = verifyJoinRequestSignature(joinRequest);
-      if (signatureError) return res.status(400).json(signatureError);
+      const signatureError = verifyJoinRequestSignature(joinRequest)
+      if (signatureError) return res.status(400).json(signatureError)
 
       // then, calculate the selection number for this join request.
       const selectionNumResult = computeSelectionNum(joinRequest)
       if (selectionNumResult.isErr()) {
-        console.error(`failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`, JSON.stringify(selectionNumResult.error))
+        console.error(
+          `failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`,
+          JSON.stringify(selectionNumResult.error)
+        )
         return res.status(500).json(selectionNumResult.error)
       }
       joinRequest.selectionNum = selectionNumResult.value
+
+      if (CycleCreator.currentQuarter > 1) {
+        nestedCountersInstance.countEvent('p2p', `rejected-late-join-request ${CycleCreator.currentQuarter}`)
+        return res.status(400).json({
+          success: false,
+          fatal: false,
+          reason: `Can't join after quarter 1`,
+        })
+      }
 
       // add the join request to the global list of join requests. this will also
       // add it to the list of new join requests that will be processed as part of
@@ -141,7 +161,7 @@ const unjoinRoute: P2P.P2PTypes.Route<Handler> = {
     }
 
     Comms.sendGossip('gossip-unjoin', joinRequest, '', null, NodeList.byIdOrder, true)
-  }
+  },
 }
 
 const joinedV2Route: P2P.P2PTypes.Route<Handler> = {
@@ -190,7 +210,7 @@ const acceptedRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'accepted',
   handler: async (req, res) => {
-    // Turns out the cycle check is unnecessary because the joining node will robust query for its node ID 
+    // Turns out the cycle check is unnecessary because the joining node will robust query for its node ID
     // The joinNetwork fn in startupV2 will handle acceptance
     acceptance.getEventEmitter().emit('accepted')
 
@@ -260,13 +280,18 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
 }
 
 /**
-  * Part of Join Protocol v2. Gossips all valid join requests.
-  */
-const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P.NodeListTypes.Node['id']> = (
-  payload: P2P.JoinTypes.JoinRequest,
-  sender: P2P.NodeListTypes.Node['id'],
-  tracker: string,
-) => {
+ * Part of Join Protocol v2. Gossips all valid join requests.
+ */
+const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
+  P2P.JoinTypes.JoinRequest,
+  P2P.NodeListTypes.Node['id']
+> = (payload: P2P.JoinTypes.JoinRequest, sender: P2P.NodeListTypes.Node['id'], tracker: string) => {
+  // do not forward gossip after quarter 2
+  if (CycleCreator.currentQuarter > 2) {
+    /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `rejected-late-join-gossip-request ${CycleCreator.currentQuarter}` )
+    return
+  }
+
   // ensure this join request doesn't already exist in standby nodes
   if (getStandbyNodesInfoMap().has(payload.nodeInfo.publicKey)) {
     console.error(`join request for pubkey ${payload.nodeInfo.publicKey} already exists as a standby node`)
@@ -283,7 +308,10 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequ
   // then, calculate the selection number for this join request
   const selectionNumResult = computeSelectionNum(payload)
   if (selectionNumResult.isErr()) {
-    console.error(`failed to compute selection number for node ${payload.nodeInfo.publicKey}:`, JSON.stringify(selectionNumResult.error))
+    console.error(
+      `failed to compute selection number for node ${payload.nodeInfo.publicKey}:`,
+      JSON.stringify(selectionNumResult.error)
+    )
     return
   }
   payload.selectionNum = selectionNumResult.value
@@ -293,15 +321,13 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequ
   // cycle creation to create a standy node list.
   saveJoinRequest(payload)
 
-  // do not forward gossip after quarter 2
-  if (CycleCreator.currentQuarter > 2) return
-  else Comms.sendGossip('gossip-valid-join-requests', payload, tracker, sender, NodeList.byIdOrder, false)
+  Comms.sendGossip('gossip-valid-join-requests', payload, tracker, sender, NodeList.byIdOrder, false)
 }
 
 const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeListTypes.Node['id']> = (
   payload: UnjoinRequest,
   sender: P2P.NodeListTypes.Node['id'],
-  tracker: string,
+  tracker: string
 ) => {
   const processResult = processNewUnjoinRequest(payload)
   if (processResult.isErr()) {
@@ -320,4 +346,3 @@ export const routes = {
     'gossip-unjoin': gossipUnjoinRequests,
   },
 }
-
