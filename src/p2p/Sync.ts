@@ -371,6 +371,8 @@ function applyNodeListChange(
 }
 
 export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.CycleCreatorTypes.CycleRecord> {
+  if (activeNodes == null) throw new Error('null activeNodes')
+  if (activeNodes.length < 1) throw new Error('empty activeNodes')
   const queryFn = async (node: SyncNode) => {
     const ip = node.ip ? node.ip : node.externalIp
     const port = node.port ? node.port : node.externalPort
