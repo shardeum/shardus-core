@@ -454,14 +454,73 @@ export async function submitJoin(
   }
 }
 
-export async function fetchJoined(activeNodes: P2P.P2PTypes.Node[]): Promise<{id: string, isOnStandbyList: boolean}> {
-  const queryFn = async (node: P2P.P2PTypes.Node): Promise<{ node: P2P.NodeListTypes.Node, isOnStandbyList: boolean }> => {
+export async function submitJoinV2(
+  nodes: P2P.P2PTypes.Node[],
+  joinRequest: P2P.JoinTypes.JoinRequest & P2P.P2PTypes.SignedObject
+): Promise<void> {
+  // Send the join request to a handful of the active node all at once
+  const selectedNodes = utils.getRandom(nodes, Math.min(nodes.length, 5))
+
+  const promises = []
+  if (logFlags.p2pNonFatal) info(`Sending join request to ${selectedNodes.map((n) => `${n.ip}:${n.port}`)}`)
+
+  // Check if network allows bogon IPs, set our own flag accordingly
+  if (config.p2p.dynamicBogonFiltering && config.p2p.forceBogonFilteringOn === false) {
+    if (nodes.some((node) => isBogonIP(node.ip))) {
+      allowBogon = true
+    }
+  }
+  nestedCountersInstance.countEvent('p2p', `join-allow-bogon-submit:${allowBogon}`)
+
+  //Check for bad IPs before a join request is sent out
+  if (config.p2p.rejectBogonOutboundJoin || config.p2p.forceBogonFilteringOn) {
+    if (allowBogon === false) {
+      if (isBogonIP(joinRequest.nodeInfo.externalIp)) {
+        throw new Error(`Fatal: Node cannot join with bogon external IP: ${joinRequest.nodeInfo.externalIp}`)
+      }
+    } else {
+      //even if not checking bogon still reject other invalid IPs that would be unusable
+      if (isInvalidIP(joinRequest.nodeInfo.externalIp)) {
+        throw new Error(
+          `Fatal: Node cannot join with invalid external IP: ${joinRequest.nodeInfo.externalIp}`
+        )
+      }
+    }
+  }
+
+  for (const node of selectedNodes) {
+    try {
+      promises.push(http.post(`${node.ip}:${node.port}/join`, joinRequest))
+    } catch (err) {
+      throw new Error(
+        `Fatal: submitJoin: Error posting join request to ${node.ip}:${node.port}: Error: ${err}`
+      )
+    }
+  }
+
+  const responses = await Promise.all(promises)
+  const errs = []
+
+  for (const res of responses) {
+    mainLogger.info(`Join Request Response: ${JSON.stringify(res)}`)
+    if (res.fatal) {
+      errs.push(res)
+    }
+  }
+
+  if (errs.length >= responses.length) {
+    throw new Error(`Fatal: submitJoin: All join requests failed: ${errs.map((e) => e.reason).join(', ')}`)
+  }
+}
+
+export async function fetchJoined(activeNodes: P2P.P2PTypes.Node[]): Promise<string> {
+  const queryFn = async (node: P2P.P2PTypes.Node): Promise<{ node: P2P.NodeListTypes.Node }> => {
     const publicKey = crypto.keypair.publicKey
-    const res: { node: P2P.NodeListTypes.Node, isOnStandbyList: boolean } = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
+    const res: { node: P2P.NodeListTypes.Node } = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
     return res
   }
   try {
-    const { topResult: response } = await robustQuery<P2P.P2PTypes.Node, { node: P2P.NodeListTypes.Node, isOnStandbyList: boolean }>(activeNodes, queryFn)
+    const { topResult: response } = await robustQuery<P2P.P2PTypes.Node, { node: P2P.NodeListTypes.Node }>(activeNodes, queryFn)
     if (!response) return
     if (!response.node) return
     let err = utils.validateTypes(response, { node: 'o' })
@@ -474,41 +533,36 @@ export async function fetchJoined(activeNodes: P2P.P2PTypes.Node[]): Promise<{id
       warn('fetchJoined invalid response response.node.id' + err)
       return
     }
+    return response.node.id
+  } catch (err) {
+    warn('Self: fetchNodeId: robustQuery failed: ', err)
+  }
+}
+
+export async function fetchJoinedV2(activeNodes: P2P.P2PTypes.Node[]): Promise<{id: string|undefined, isOnStandbyList: boolean}> {
+  const queryFn = async (node: P2P.P2PTypes.Node): Promise<{ id: string|undefined, isOnStandbyList: boolean }> => {
+    const publicKey = crypto.keypair.publicKey
+    const res: { id: string|undefined, isOnStandbyList: boolean } = await http.get(`${node.ip}:${node.port}/joinedV2/${publicKey}`)
+    return res
+  }
+  try {
+    const { topResult: response } = await robustQuery<P2P.P2PTypes.Node, { id: string|undefined, isOnStandbyList: boolean }>(activeNodes, queryFn)
+    if (!response) return
+    if (!response.id) return
+    let err = utils.validateTypes(response, { id: 's' })
+    if (err) {
+      warn('fetchJoined invalid response response.id' + err)
+      return
+    }
     err = validateTypes(response, { isOnStandbyList: 'b' })
     if (err) {
       warn('fetchJoined invalid response response.isOnStandbyList' + err)
       return
     }
 
-    return { id: response.node.id, isOnStandbyList: response.isOnStandbyList }
+    return { id: response.id, isOnStandbyList: response.isOnStandbyList }
   } catch (err) {
     warn('Self: fetchNodeId: robustQuery failed: ', err)
-  }
-}
-
-export async function fetchStandbied(activeNodes: P2P.P2PTypes.Node[]): Promise<string> {
-  const queryFn = async (node: P2P.P2PTypes.Node): Promise<{ node: P2P.NodeListTypes.Node }> => {
-    const publicKey = crypto.keypair.publicKey
-    const res: { node: P2P.NodeListTypes.Node } = await http.get(`${node.ip}:${node.port}/standbied/${publicKey}`)
-    return res
-  }
-  try {
-    const { topResult: response } = await robustQuery<P2P.P2PTypes.Node, { node: P2P.NodeListTypes.Node }>(activeNodes, queryFn)
-    if (!response) return
-    if (!response.node) return
-    let err = utils.validateTypes(response, { node: 'o' })
-    if (err) {
-      warn('fetchStandbied invalid response response.node' + err)
-      return
-    }
-    err = validateTypes(response.node, { id: 's' })
-    if (err) {
-      warn('fetchStandbied invalid response response.node.id' + err)
-      return
-    }
-    return response.node.id
-  } catch (err) {
-    warn('Self: fetchStandbied: robustQuery failed: ', err)
   }
 }
 

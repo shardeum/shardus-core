@@ -144,6 +144,27 @@ const unjoinRoute: P2P.P2PTypes.Route<Handler> = {
   }
 }
 
+const joinedV2Route: P2P.P2PTypes.Route<Handler> = {
+  method: 'GET',
+  name: 'joinedV2/:publicKey',
+  handler: (req, res) => {
+    // Respond with id if node's join request was accepted, otherwise undefined
+    let err = utils.validateTypes(req, { params: 'o' })
+    if (err) {
+      warn('joined/:publicKey bad req ' + err)
+      res.json()
+    }
+    err = utils.validateTypes(req.params, { publicKey: 's' })
+    if (err) {
+      warn('joined/:publicKey bad req.params ' + err)
+      res.json()
+    }
+    const publicKey = req.params.publicKey
+    const id = NodeList.byPubKey.get(publicKey)?.id
+    res.json({ id, isOnStandbyList: isOnStandbyList(publicKey) })
+  },
+}
+
 const joinedRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'joined/:publicKey',
@@ -161,7 +182,7 @@ const joinedRoute: P2P.P2PTypes.Route<Handler> = {
     }
     const publicKey = req.params.publicKey
     const node = NodeList.byPubKey.get(publicKey)
-    res.json({ node, isOnStandbyList: isOnStandbyList(publicKey) })
+    res.json({ node })
   },
 }
 

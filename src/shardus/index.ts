@@ -738,7 +738,7 @@ class Shardus extends EventEmitter {
     Self.init()
 
     // Start P2P
-    await Self.startup()
+    await Self.startupV2()
 
     // handle config queue changes and debug logic updates
     this._registerListener(this.p2p.state, 'cycle_q1_start', async () => {
