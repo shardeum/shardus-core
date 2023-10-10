@@ -160,7 +160,7 @@ const joinedV2Route: P2P.P2PTypes.Route<Handler> = {
       res.json()
     }
     const publicKey = req.params.publicKey
-    const id = NodeList.byPubKey.get(publicKey)?.id
+    const id = NodeList.byPubKey.get(publicKey)?.id || null
     res.json({ id, isOnStandbyList: isOnStandbyList(publicKey) })
   },
 }
@@ -313,7 +313,7 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeLi
 }
 
 export const routes = {
-  external: [cycleMarkerRoute, joinRoute, joinedRoute, acceptedRoute, unjoinRoute],
+  external: [cycleMarkerRoute, joinRoute, joinedRoute, joinedV2Route, acceptedRoute, unjoinRoute],
   gossip: {
     'gossip-join': gossipJoinRoute,
     'gossip-valid-join-requests': gossipValidJoinRequests,

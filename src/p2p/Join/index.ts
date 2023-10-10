@@ -548,7 +548,9 @@ export async function fetchJoinedV2(activeNodes: P2P.P2PTypes.Node[]): Promise<{
   try {
     const { topResult: response } = await robustQuery<P2P.P2PTypes.Node, { id: string|undefined, isOnStandbyList: boolean }>(activeNodes, queryFn)
     if (!response) return
-    if (!response.id) return
+    if (!response.id) {
+      return { id: undefined, isOnStandbyList: response.isOnStandbyList }
+    }
     let err = utils.validateTypes(response, { id: 's' })
     if (err) {
       warn('fetchJoined invalid response response.id' + err)

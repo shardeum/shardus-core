@@ -214,7 +214,7 @@ export function startupV2(): Promise<boolean> {
         attempts--
 
         // Log joining error
-        console.log(`error in startupV2 > joinNetwork: remaining attempts ${attempts}:`, err)
+        console.log(`error in startupV2 > attemptJoining: remaining attempts ${attempts}:`, err)
         warn(`Error while joining network: remaining attempts ${attempts}:`)
         warn(err)
         warn(err.stack)
