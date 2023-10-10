@@ -13,6 +13,9 @@ export function serializeApoptosisProposalReq(
   obj: ApoptosisProposalReq,
   root = false
 ): void {
+  if (stream == null) throw new Error('null stream')
+  if (obj == null) throw new Error('null obj')
+  if (obj.id == null) throw new Error('null obj.id')
   if (root) {
     stream.writeUInt16(cApoptosisProposalReq)
   }
