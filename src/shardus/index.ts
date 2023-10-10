@@ -2074,6 +2074,11 @@ class Shardus extends EventEmitter {
       res.json(deepReplace(result, undefined, '__undefined__'))
     })
 
+    this.network.registerExternalGet('status-history', isDebugModeMiddleware, async (req, res) => {
+      let result = Self.getStatusHistoryCopy()
+      res.json(deepReplace(result, undefined, '__undefined__'))
+    })
+
     this.network.registerExternalGet('socketReport', isDebugModeMiddleware, async (req, res) => {
       res.json(await getSocketReport())
     })

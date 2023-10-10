@@ -23,8 +23,13 @@ import * as Sync from './Sync'
 import { getNewestCycle } from './Sync'
 import * as SyncV2 from './SyncV2/'
 import { getRandomAvailableArchiver, SeedNodesList } from './Utils'
+import * as CycleChain from './CycleChain'
+import rfdc from 'rfdc'
+const deepCopy = rfdc()
 
 /** STATE */
+
+let startTimestamp = Date.now()
 
 export const emitter = new events.EventEmitter()
 
@@ -50,7 +55,7 @@ let mode = null
   STANDBY -> SYNCING = Node has accepted its join request and is syncing
   SYNCING -> ACTIVE = Node has synced and is now active
 */
-export let state = P2P.P2PTypes.NodeStatus.INITIALIZING
+let state = P2P.P2PTypes.NodeStatus.INITIALIZING
 
 /** ROUTES */
 
@@ -81,6 +86,9 @@ export function init(): void {
 
   // Create a logger for yourself
   p2pLogger = Context.logger.getLogger('p2p')
+
+  // kick-start the status history. debug end-point is /status-history
+  updateNodeState(P2P.P2PTypes.NodeStatus.INITIALIZING) // requires p2pLogger through warn()
 }
 
 export async function startup2(): Promise<boolean> {
@@ -258,8 +266,52 @@ async function witnessConditionsMet(activeNodes: P2P.P2PTypes.Node[]): Promise<b
   return false
 }
 
-export function updateNodeState(updatedState: NodeStatus): void {
+export interface StatusHistoryEntry {
+  /**
+   * The status of the node taken from the module variable `state`.
+   */
+  moduleStatus: P2P.P2PTypes.NodeStatus
+
+  /**
+   * The status of the node taken from the node list, which ends up being the previous status before the update.
+   */
+  nodeListStatus: P2P.P2PTypes.NodeStatus
+
+  timestamp: number
+  isoDateTime: string
+  newestCycleCounter: number
+  quarter: number
+  uptime: string
+
+  /**
+   * The optional argument to updateNodeState() explaining why or from where the state is being changed.
+   */
+  because: string
+}
+
+const statusHistory: StatusHistoryEntry[] = []
+
+export function getStatusHistoryCopy(): StatusHistoryEntry[] {
+  // return a copy so it cannot be mutated
+  return deepCopy(statusHistory)
+}
+
+export function updateNodeState(updatedState: NodeStatus, because: string = ''): void {
   state = updatedState
+  const pubKey = (Context.crypto && Context.crypto.getPublicKey()) || null
+  const entry: StatusHistoryEntry = {
+    moduleStatus: state,
+    nodeListStatus: (pubKey && NodeList.byPubKey && NodeList.byPubKey.get(pubKey) && NodeList.byPubKey.get(pubKey).status) || null,
+    timestamp: Date.now(),
+    isoDateTime: new Date().toISOString(),
+    uptime: utils.readableDuration(startTimestamp),
+    newestCycleCounter: (CycleChain.getNewest() && CycleChain.getNewest().counter) || null,
+    quarter: CycleCreator.currentCycle,
+    because: because,
+  }
+  // changing status is infrequent, so log it always
+  warn(`Node status changed to ${updatedState}:\n${JSON.stringify(entry, null, 2)}`)
+  statusHistory.push(entry)
 }
 
 async function joinNetwork2(
