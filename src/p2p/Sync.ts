@@ -383,7 +383,7 @@ export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.Cycle
     return resp
   }
   const eqFn = (item1, item2) => {
-    console.log(`item is: ${JSON.stringify(item1)}`)
+    console.log(`getNewestCycle: eqFn: item1 is: ${JSON.stringify(item1)}`)
     try {
       if (item1.newestCycle.counter === item2.newestCycle.counter) return true
       return false
@@ -401,10 +401,10 @@ export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.Cycle
     redundancy,
     true
   )
-  console.log(`response is: ${JSON.stringify(response)}`)
+  console.log(`getNewestCycle: robustQuery response is: ${JSON.stringify(response)}`)
 
   // [TODO] Validate response
-  if (!response?.newestCycle) throw new Error('warning: no newestCycle yet')
+  if (!response?.newestCycle) throw new Error('warning: getNewestCycle: no newestCycle yet')
 
   const newestCycle = response.newestCycle as P2P.CycleCreatorTypes.CycleRecord
   return newestCycle
