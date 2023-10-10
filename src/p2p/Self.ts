@@ -149,7 +149,7 @@ export function startupV2(): Promise<boolean> {
     }
 
     const scheduler = async (): Promise<void> => {
-      let latestCycle
+      let cycleDuration = Context.config.p2p.cycleDuration
       try {
         // Clear existing scheduler timer
         if (schedulerTimer) {
@@ -159,10 +159,15 @@ export function startupV2(): Promise<boolean> {
         // Get active nodes from Archiver
         const activeNodes = await contactArchiver()
 
-        isFirst = discoverNetwork(activeNodes)
-        if (isFirst) {
-          // set status SYNCING
-          return await enterSyncingState()
+        // Determine if you're the first node
+        if (utils.isUndefined(isFirst)) {
+          isFirst = discoverNetwork(activeNodes)
+          if (isFirst) {
+            // Join your own network and give yourself an ID
+            id = await Join.firstJoin()
+            // set status SYNCING
+            return await enterSyncingState()
+          }
         }
 
         // Remove yourself from activeNodes if you are present in them
@@ -174,7 +179,8 @@ export function startupV2(): Promise<boolean> {
         }
 
         // Get latest cycle record from active nodes
-        latestCycle = await Sync.getNewestCycle(activeNodes)
+        const latestCycle = await Sync.getNewestCycle(activeNodes)
+        cycleDuration = latestCycle.duration
         mode = latestCycle.mode || null
 
         // Query network for node status
@@ -188,7 +194,7 @@ export function startupV2(): Promise<boolean> {
           // Call scheduler after 5 cycles
           schedulerTimer = setTimeout(() => {
             scheduler()
-          }, 5 * latestCycle.duration * 1000)
+          }, 5 * cycleDuration * 1000)
           return
         }
 
@@ -204,14 +210,12 @@ export function startupV2(): Promise<boolean> {
         warn(err)
         warn(err.stack)
         if (logFlags.p2pNonFatal)
-          info(`Trying to join again in ${latestCycle.duration} seconds...`)
+          info(`Trying to join again in ${cycleDuration} seconds...`)
       } finally {
         // schedule yourself to run at the start of the next cycle
-        if (latestCycle) {
-          schedulerTimer = setTimeout(() => {
-            scheduler()
-          }, latestCycle.duration * 1000)
-        }
+        schedulerTimer = setTimeout(() => {
+          scheduler()
+        }, cycleDuration * 1000)
       }
     }
 
