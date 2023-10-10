@@ -190,6 +190,11 @@ const acceptedRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'accepted',
   handler: async (req, res) => {
+    // Turns out the cycle check is unnecessary because the joining node will robust query for its node ID 
+    // The joinNetwork fn in startupV2 will handle acceptance
+    acceptance.getEventEmitter().emit('accepted')
+
+    /*
     const counter = CycleChain.getNewest().counter
     nestedCountersInstance.countEvent('joinV2', `C${counter}: acceptedRoute: start`)
 
@@ -229,6 +234,7 @@ const acceptedRoute: P2P.P2PTypes.Route<Handler> = {
       nestedCountersInstance.countEvent('joinV2', `C${counter}: acceptedRoute: attempt error`)
       res.status(400).send(err)
     }
+    */
   },
 }
 

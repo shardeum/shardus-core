@@ -93,69 +93,66 @@ export function init(): void {
 
 export function startupV2(): Promise<boolean> {
   const promise = new Promise<boolean>((resolve, reject) => {
+    let attempts = 5 // number of attempts to restart joining process if an error occurs
     const publicKey = Context.crypto.getPublicKey()
-    let schedulerTimer = null
+    let attemptJoiningTimer = null
+    let attemptJoiningRunning = false
+    let cycleDuration = Context.config.p2p.cycleDuration
 
-    // If startInWitness config is set to true, start witness mode and end
-    if (Context.config.p2p.startInWitnessMode) {
-      if (logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
-      emitter.emit('witnessing', publicKey)
-      return resolve(true)
-    }
-
-    // Emit the joining event
-    if (logFlags.p2pNonFatal) info('Emitting `joining` event.')
-    emitter.emit('joining', publicKey)
-
-    // register listener for acceptance
-    Acceptance.getEventEmitter().on('accepted', () => {
-      if (state === P2P.P2PTypes.NodeStatus.SYNCING || state === P2P.P2PTypes.NodeStatus.ACTIVE) {
-        return
-      }
-      scheduler()
-    })
-
-    // function to set node's status to SYNCING, perform sync functions, and finish startup
+    // Function to set node's status to SYNCING, perform sync functions, and finish startup
     const enterSyncingState = async (): Promise<void> => {
-      // set status SYNCING
-      updateNodeState(P2P.P2PTypes.NodeStatus.SYNCING)
+      try {
+        // set status SYNCING
+        updateNodeState(P2P.P2PTypes.NodeStatus.SYNCING)
 
-      p2pSyncStart = Date.now()
+        p2pSyncStart = Date.now()
 
-      if (logFlags.p2pNonFatal) info('Emitting `joined` event.')
+        if (logFlags.p2pNonFatal) info('Emitting `joined` event.')
 
-      // Should fire after being accepted into the network
-      emitter.emit('joined', id, publicKey)
+        // Should fire after being accepted into the network
+        emitter.emit('joined', id, publicKey)
 
-      nestedCountersInstance.countEvent('p2p', 'joined')
-      // Sync cycle chain from network
-      await syncCycleChain()
+        nestedCountersInstance.countEvent('p2p', 'joined')
+        // Sync cycle chain from network
+        await syncCycleChain()
 
-      // Enable internal routes
-      Comms.setAcceptInternal(true)
+        // Enable internal routes
+        Comms.setAcceptInternal(true)
 
-      // Start creating cycle records
-      await CycleCreator.startCycles()
-      p2pSyncEnd = Date.now()
-      p2pJoinTime = (p2pSyncEnd - p2pSyncStart) / 1000
+        // Start creating cycle records
+        await CycleCreator.startCycles()
+        p2pSyncEnd = Date.now()
+        p2pJoinTime = (p2pSyncEnd - p2pSyncStart) / 1000
 
-      nestedCountersInstance.countEvent('p2p', `sync time ${p2pJoinTime} seconds`)
+        nestedCountersInstance.countEvent('p2p', `sync time ${p2pJoinTime} seconds`)
 
-      if (logFlags.p2pNonFatal) info('Emitting `initialized` event.' + p2pJoinTime)
-      emitter.emit('initialized')
+        if (logFlags.p2pNonFatal) info('Emitting `initialized` event.' + p2pJoinTime)
+        emitter.emit('initialized')
 
-      // Break loop
-      return resolve(true)
+        // Break loop
+        return resolve(true)
+      } catch (err) {
+        // Log syncing error and abort startup
+        console.log('error in startupV2 > enterSyncingState: ', err)
+        warn('Error while syncing to network:')
+        warn(err)
+        warn(err.stack)
+        throw new Error('Fatal: Error while syncing to network:' + err.message)
+      }
     }
 
-    const scheduler = async (): Promise<void> => {
-      let cycleDuration = Context.config.p2p.cycleDuration
-      try {
-        // Clear existing scheduler timer
-        if (schedulerTimer) {
-          clearTimeout(schedulerTimer)
-        }
+    // Function to attempt to join the network
+    const attemptJoining = async (): Promise<void> => {
+      // Prevent scheduler from running multiple times
+      if (attemptJoiningRunning) { return }
+      attemptJoiningRunning = true
 
+      // Clear existing scheduler timer
+      if (attemptJoiningTimer) {
+        clearTimeout(attemptJoiningTimer)
+      }
+
+      try {
         // Get active nodes from Archiver
         const activeNodes = await contactArchiver()
 
@@ -166,7 +163,9 @@ export function startupV2(): Promise<boolean> {
             // Join your own network and give yourself an ID
             id = await Join.firstJoin()
             // set status SYNCING
-            return await enterSyncingState()
+            await enterSyncingState()
+            attemptJoiningRunning = false
+            return
           }
         }
 
@@ -187,40 +186,78 @@ export function startupV2(): Promise<boolean> {
         const resp = await Join.fetchJoinedV2(activeNodes)
 
         if (resp?.id) {
-          return await enterSyncingState()
+          await enterSyncingState()
+          attemptJoiningRunning = false
+          return
         }
 
         if (resp?.isOnStandbyList === true) {
           // Call scheduler after 5 cycles
-          schedulerTimer = setTimeout(() => {
-            scheduler()
+          attemptJoiningTimer = setTimeout(() => {
+            attemptJoining()
           }, 5 * cycleDuration * 1000)
+          attemptJoiningRunning = false
           return
         }
 
         if (resp?.isOnStandbyList === false) {
           await joinNetworkV2(activeNodes)
+          // Call scheduler after 2 cycles
+          attemptJoiningTimer = setTimeout(() => {
+            attemptJoining()
+          }, 2 * cycleDuration * 1000)
+          attemptJoiningRunning = false
+          return
         }
       } catch (err) {
-        console.log('error in startup: ', err)
-        if (err.message.startsWith('Fatal:')) {
-          throw err
-        }
-        warn('Error while joining network:')
+        // Use an attempt
+        attempts--
+
+        // Log joining error
+        console.log(`error in startupV2 > joinNetwork: remaining attempts ${attempts}:`, err)
+        warn(`Error while joining network: remaining attempts ${attempts}:`)
         warn(err)
         warn(err.stack)
-        if (logFlags.p2pNonFatal)
+        
+        // Abort startup if error is fatal
+        if (err.message.startsWith('Fatal:') || attempts <= 0) {
+          attemptJoiningRunning = false
+          throw err
+        }
+
+        // Schedule another attempt to join
+        if (logFlags.p2pNonFatal) {
           info(`Trying to join again in ${cycleDuration} seconds...`)
+        }
+        attemptJoiningTimer = setTimeout(() => {
+          attemptJoining()
+        } , cycleDuration * 1000)
       } finally {
-        // schedule yourself to run at the start of the next cycle
-        schedulerTimer = setTimeout(() => {
-          scheduler()
-        }, cycleDuration * 1000)
+        attemptJoiningRunning = false
       }
     }
 
-    // Start scheduler
-    scheduler()
+    // If startInWitness config is set to true, start witness mode and end
+    if (Context.config.p2p.startInWitnessMode) {
+      if (logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
+      emitter.emit('witnessing', publicKey)
+      return resolve(true)
+    }
+
+    // Emit the joining event
+    if (logFlags.p2pNonFatal) info('Emitting `joining` event.')
+    emitter.emit('joining', publicKey)
+
+    // register listener for acceptance
+    Acceptance.getEventEmitter().on('accepted', () => {
+      if (state === P2P.P2PTypes.NodeStatus.SYNCING || state === P2P.P2PTypes.NodeStatus.ACTIVE) {
+        return
+      }
+      attemptJoining()
+    })
+
+    // Start by joining the network
+    attemptJoining()
   })
 
   return promise
@@ -349,7 +386,7 @@ export function getStatusHistoryCopy(): StatusHistoryEntry[] {
   return deepCopy(statusHistory)
 }
 
-export function updateNodeState(updatedState: NodeStatus, because: string = ''): void {
+export function updateNodeState(updatedState: NodeStatus, because = ''): void {
   state = updatedState
   const pubKey = (Context.crypto && Context.crypto.getPublicKey()) || null
   const entry: StatusHistoryEntry = {
