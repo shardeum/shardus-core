@@ -277,7 +277,7 @@ export function updateRecord(
     const syncingNodes = NodeList.syncingByIdOrder
     const now = Math.floor(Date.now() / 1000)
     for (const syncingNode of syncingNodes) {
-      const syncTime = now - syncingNode.joinRequestTimestamp
+      const syncTime = now - syncingNode.syncingTimestamp
       console.log('syncTime vs maxSyncTime', syncTime, record.maxSyncTime)
       if (record.maxSyncTime && syncTime > record.maxSyncTime) {
         info(`Syncing time for node ${syncingNode.id}`, syncTime)
@@ -431,8 +431,8 @@ export function scheduleLostReport(target: P2P.NodeListTypes.Node, reason: strin
 
   if (scheduledForLostReport.has(key)) {
     const previousScheduleValue = scheduledForLostReport.get(key)
-      /* prettier-ignore */ info(`Target node ${target.id} already scheduled for lost report. requestId: ${previousScheduleValue.requestId}.`)
-      /* prettier-ignore */ info(`Previous scheduled lost report details for ${target.id}: ${JSON.stringify(previousScheduleValue)}`)
+    /* prettier-ignore */ info(`Target node ${target.id} already scheduled for lost report. requestId: ${previousScheduleValue.requestId}.`)
+    /* prettier-ignore */ info(`Previous scheduled lost report details for ${target.id}: ${JSON.stringify(previousScheduleValue)}`)
   }
   scheduledForLostReport.set(key, {
     reason: reason,
@@ -465,10 +465,10 @@ function reportLost(target, reason: string, requestId: string) {
   }
   // [TODO] - remove the following line after testing killother
   if (allowKillRoute && reason === 'killother') msg.killother = true
-    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, reporter: ${Self.ip}:${Self.port} id: ${Self.id}`)
-    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, checker: ${checker.internalIp}:${checker.internalPort} node details: ${logNode(checker)}`)
-    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, target: ${target.internalIp}:${target.internalPort} node details: ${logNode(target)}`)
-    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${JSON.stringify(msg)}`)
+  /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, reporter: ${Self.ip}:${Self.port} id: ${Self.id}`)
+  /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, checker: ${checker.internalIp}:${checker.internalPort} node details: ${logNode(checker)}`)
+  /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, target: ${target.internalIp}:${target.internalPort} node details: ${logNode(target)}`)
+  /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${JSON.stringify(msg)}`)
 
   const msgCopy = JSON.parse(shardusCrypto.stringify(msg))
   msgCopy.timestamp = Date.now()
@@ -488,8 +488,8 @@ function getCheckerNode(id, cycle) {
   const oidx = idx
   if (idx < 0) idx = (-1 - idx) % activeByIdOrder.length
   if (activeByIdOrder[idx].id === id) idx = (idx + 1) % activeByIdOrder.length // skip to next node if the selected node is target
-    info(`in getCheckerNode oidx:${oidx} idx:${idx} near:${near}  cycle:${cycle}  id:${id}`)
-    info(`${JSON.stringify(activeByIdOrder.map((n) => n.id))}`)
+  info(`in getCheckerNode oidx:${oidx} idx:${idx} near:${near}  cycle:${cycle}  id:${id}`)
+  info(`${JSON.stringify(activeByIdOrder.map((n) => n.id))}`)
   return activeByIdOrder[idx]
 }
 
