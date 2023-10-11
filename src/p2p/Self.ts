@@ -29,7 +29,7 @@ const deepCopy = rfdc()
 
 /** STATE */
 
-let startTimestamp = Date.now()
+const startTimestamp = Date.now()
 
 export const emitter = new events.EventEmitter()
 
@@ -93,7 +93,6 @@ export function init(): void {
 
 export function startupV2(): Promise<boolean> {
   const promise = new Promise<boolean>((resolve, reject) => {
-    let attempts = 5 // number of attempts to restart joining process if an error occurs
     const publicKey = Context.crypto.getPublicKey()
     let attemptJoiningTimer = null
     let attemptJoiningRunning = false
@@ -213,17 +212,14 @@ export function startupV2(): Promise<boolean> {
           return
         }
       } catch (err) {
-        // Use an attempt
-        attempts--
-
         // Log joining error
-        console.log(`error in startupV2 > attemptJoining: remaining attempts ${attempts}:`, err)
-        warn(`Error while joining network: remaining attempts ${attempts}:`)
+        console.log(`error in startupV2 > attemptJoining:`, err)
+        warn(`Error while joining network:`)
         warn(err)
         warn(err.stack)
 
         // Abort startup if error is fatal
-        if (err.message.startsWith('Fatal:') || attempts <= 0) {
+        if (err.message.startsWith('Fatal:')) {
           attemptJoiningRunning = false
           throw err
         }
