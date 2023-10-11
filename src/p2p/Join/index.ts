@@ -270,6 +270,11 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   const added = record.joinedConsensors
+
+  for (const node of added) {
+    node.syncingTimestamp = record.start
+  }
+
   return {
     added,
     removed: [],

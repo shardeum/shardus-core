@@ -144,7 +144,9 @@ export function startupV2(): Promise<boolean> {
     // Function to attempt to join the network
     const attemptJoining = async (): Promise<void> => {
       // Prevent scheduler from running multiple times
-      if (attemptJoiningRunning) { return }
+      if (attemptJoiningRunning) {
+        return
+      }
       attemptJoiningRunning = true
 
       // Clear existing scheduler timer
@@ -219,7 +221,7 @@ export function startupV2(): Promise<boolean> {
         warn(`Error while joining network: remaining attempts ${attempts}:`)
         warn(err)
         warn(err.stack)
-        
+
         // Abort startup if error is fatal
         if (err.message.startsWith('Fatal:') || attempts <= 0) {
           attemptJoiningRunning = false
@@ -232,7 +234,7 @@ export function startupV2(): Promise<boolean> {
         }
         attemptJoiningTimer = setTimeout(() => {
           attemptJoining()
-        } , cycleDuration * 1000)
+        }, cycleDuration * 1000)
       } finally {
         attemptJoiningRunning = false
       }
@@ -294,9 +296,9 @@ export async function startup(): Promise<boolean> {
       }
       // Otherwise, try to join the network
       ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
-      console.log("isFirst:", isFirst, "id:", id)
+      console.log('isFirst:', isFirst, 'id:', id)
     } catch (err) {
-      console.log("error in Join network: ", err)
+      console.log('error in Join network: ', err)
       if (!Context.config.p2p.useJoinProtocolV2) {
         updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
       }
@@ -392,7 +394,12 @@ export function updateNodeState(updatedState: NodeStatus, because = ''): void {
   const pubKey = (Context.crypto && Context.crypto.getPublicKey()) || null
   const entry: StatusHistoryEntry = {
     moduleStatus: state,
-    nodeListStatus: (pubKey && NodeList.byPubKey && NodeList.byPubKey.get(pubKey) && NodeList.byPubKey.get(pubKey).status) || null,
+    nodeListStatus:
+      (pubKey &&
+        NodeList.byPubKey &&
+        NodeList.byPubKey.get(pubKey) &&
+        NodeList.byPubKey.get(pubKey).status) ||
+      null,
     timestamp: Date.now(),
     isoDateTime: new Date().toISOString(),
     uptime: utils.readableDuration(startTimestamp),
@@ -501,7 +508,7 @@ async function joinNetwork(
 
   // create the Promise that we will `await` to wait for the 'accepted' event,
   // in case of Join v2. this registers the listener ahead of time
-  const trigger = acceptedTrigger();
+  const trigger = acceptedTrigger()
 
   // only submit join requests if we are using the old protocol or if we have not yet successfully submitted a join request
   if (!Context.config.p2p.useJoinProtocolV2 || !Join.getHasSubmittedJoinRequest()) {
@@ -519,7 +526,7 @@ async function joinNetwork(
 
   if (Context.config.p2p.useJoinProtocolV2) {
     // if using join protocol v2, simply wait for the 'accepted' event to fire
-    await trigger;
+    await trigger
 
     // then, we can fetch the id from the network and return
     const id = await Join.fetchJoined(activeNodes)
@@ -752,6 +759,7 @@ export function getThisNodeInfo(): {
   address: string
   joinRequestTimestamp: number
   activeTimestamp: number
+  syncingTimestamp: number
 } {
   const { externalIp, externalPort, internalIp, internalPort } = network.ipInfo
   const publicKey = Context.crypto.getPublicKey()
@@ -759,6 +767,7 @@ export function getThisNodeInfo(): {
   const address = publicKey
   const joinRequestTimestamp = utils.getTime('s')
   const activeTimestamp = 0
+  const syncingTimestamp = 0
   const nodeInfo = {
     publicKey,
     externalIp,
@@ -768,6 +777,7 @@ export function getThisNodeInfo(): {
     address,
     joinRequestTimestamp,
     activeTimestamp,
+    syncingTimestamp,
   }
   if (logFlags.p2pNonFatal) info(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
   return nodeInfo
