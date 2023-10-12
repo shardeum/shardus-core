@@ -893,7 +893,7 @@ class TransactionConsenus {
               result: winningVote.transaction_result,
               appliedVote: winningVote,
               app_data_hash: '',
-              signatures: [winningVote.sign]
+              signatures: [winningVote.sign],
             }
             for (let i = 0; i < winningVote.account_id.length; i++) {
               /* eslint-disable security/detect-object-injection */
@@ -1192,7 +1192,11 @@ class TransactionConsenus {
 
       await utils.sleep(delayBeforeVote)
 
-      // todo: POQ14 check if we have already received better ranked vote for this tx
+      // Compare our rank with received rank
+      if (queueEntry.receivedBestVoter && queueEntry.receivedBestVoter.rank > ourRankIndex) {
+        // we are not eligible to vote
+        return
+      }
     }
 
     // create our applied vote
@@ -1278,7 +1282,8 @@ class TransactionConsenus {
     appliedVoteHash = this.crypto.sign(appliedVoteHash)
     queueEntry.ourVoteHash = voteHash
 
-    if (logFlags.verbose) this.mainLogger.debug(`createAndShareVote ourVote: ${utils.stringifyReduce(ourVote)}`)
+    if (logFlags.verbose)
+      this.mainLogger.debug(`createAndShareVote ourVote: ${utils.stringifyReduce(ourVote)}`)
 
     //append our vote
     this.tryAppendVoteHash(queueEntry, appliedVoteHash)
@@ -1370,9 +1375,10 @@ class TransactionConsenus {
     /* prettier-ignore */
     if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVotes.length} `);
 
-    const foundNode = queueEntry.eligibleNodesToConfirm.find((node) =>
-      confirmOrChallenge.nodeId === node.id
-      && this.crypto.verify(confirmOrChallenge as SignedObject, node.publicKey)
+    const foundNode = queueEntry.eligibleNodesToConfirm.find(
+      (node) =>
+        confirmOrChallenge.nodeId === node.id &&
+        this.crypto.verify(confirmOrChallenge as SignedObject, node.publicKey)
     )
 
     if (!foundNode) {
@@ -1527,9 +1533,8 @@ class TransactionConsenus {
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`)
       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVotes.length} `)
 
-      const foundNode = queueEntry.eligibleNodesToVote.find((node) =>
-        vote.node_id === node.id
-        && this.crypto.verify(vote as SignedObject, node.publicKey)
+      const foundNode = queueEntry.eligibleNodesToVote.find(
+        (node) => vote.node_id === node.id && this.crypto.verify(vote as SignedObject, node.publicKey)
       )
 
       if (!foundNode) {
