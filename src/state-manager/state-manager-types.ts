@@ -63,6 +63,7 @@ export type QueueEntry = {
   uniqueWritableKeys?: string[]
   ourNodeInTransactionGroup: boolean
   ourNodeInConsensusGroup: boolean
+  ourNodeRank?: bigint
   ourTXGroupIndex: number //our index in the transaction group
   ourExGroupIndex: number //our index in the execution group
   conensusGroup?: Shardus.Node[]

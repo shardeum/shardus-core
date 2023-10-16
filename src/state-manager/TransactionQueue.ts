@@ -1379,6 +1379,9 @@ class TransactionQueue {
           //This is needed so that consensus will expect less nodes to be voting
           const unRankedExecutionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
           txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
+          if (txQueueEntry.isInExecutionHome) {
+            txQueueEntry.ourNodeRank = this.computeNodeRank(this.stateManager.currentCycleShardData.ourNode.id, txQueueEntry.acceptedTx.txId, txQueueEntry.acceptedTx.timestamp)
+          }
 
           const minNodesToVote = 3;
           const voterPercentage = 0.1;
@@ -2007,6 +2010,7 @@ class TransactionQueue {
    * @param queueEntry
    */
   async queueEntryRequestMissingReceipt(queueEntry: QueueEntry): Promise<void> {
+    console.log('thant: queueEntryRequestMissingReceipt', queueEntry.acceptedTx.txId, queueEntry.appliedReceipt);
     if (this.stateManager.currentCycleShardData == null) {
       return
     }
@@ -2265,10 +2269,10 @@ class TransactionQueue {
   }
 
   // compute the rand of the node where rank = node_id XOR hash(tx_id + tx_ts)
-  computeNodeRank(nodeId: string, txId: string, txTimestamp: number): number {
-    if (nodeId == null || txId == null || txTimestamp == null) return 0
+  computeNodeRank(nodeId: string, txId: string, txTimestamp: number): bigint {
+    if (nodeId == null || txId == null || txTimestamp == null) return BigInt(0)
     const hash = this.crypto.hash([txId, txTimestamp])
-    return XOR(nodeId, hash)
+    return BigInt(XOR(nodeId, hash))
   }
 
   // sort the nodeList by rank, in descending order
@@ -2279,7 +2283,7 @@ class TransactionQueue {
       return nodeWithRank
     })
     return nodeListWithRankData.sort((a: Shardus.NodeWithRank, b: Shardus.NodeWithRank) => {
-      return b.rank - a.rank
+      return b.rank > a.rank ? 1 : -1
     })
   }
 
@@ -3068,6 +3072,7 @@ class TransactionQueue {
    * @returns
    */
   async tellCorrespondingNodesFinalData(queueEntry: QueueEntry): Promise<void> {
+    console.log('thant: tellCorrespondingNodesFinalData', queueEntry.acceptedTx.txId)
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData - start: ${queueEntry.logID}`)
 
     if (this.stateManager.currentCycleShardData == null) {
@@ -4300,8 +4305,10 @@ class TransactionQueue {
 
               let finishedConsensing = false
 
-              // if we are in execution group, try to "confirm" or "challenge" the highest ranked vote
-              await this.stateManager.transactionConsensus.tryConfirmOrChallenge(queueEntry)
+              if (this.useNewPOQ) {
+                // if we are in execution group, try to "confirm" or "challenge" the highest ranked vote
+                await this.stateManager.transactionConsensus.tryConfirmOrChallenge(queueEntry)
+              }
 
               // try to produce a receipt
               /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
@@ -4315,6 +4322,7 @@ class TransactionQueue {
                 if (
                   this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, result)
                 ) {
+                  console.log('thant: we have a preApply matching receipt');
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
 
                   const shouldSendReceipt = true
@@ -4374,6 +4382,7 @@ class TransactionQueue {
                   }
                   //continue
                 } else {
+                  console.log('thant: we do not have a preApply matching receipt');
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                   didNotMatchReceipt = true
                   queueEntry.appliedReceiptForRepair = result

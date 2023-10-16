@@ -317,8 +317,8 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     const [results, errs] = await utils.robustPromiseAll<{ response: Response; node: Node }>(queries)
 
     if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) {
-      console.log('robustQuery results', results)
-      console.log('robustQuery errs', errs)
+      // console.log('robustQuery results', results)
+      // console.log('robustQuery errs', errs)
     }
 
     let finalResult: TallyItem<Node, Response>
