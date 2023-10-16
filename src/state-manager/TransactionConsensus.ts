@@ -1168,7 +1168,12 @@ class TransactionConsenus {
           )
           return
         }
-        this.confirmVoteAndShare(queueEntry)
+        // BAD NODE SIMULATION
+        if (this.config.debug.produceBadChallenge) {
+          this.challengeVoteAndShare(queueEntry)
+        } else {
+          this.confirmVoteAndShare(queueEntry)
+        }
       }
       queueEntry.gossipedConfirmOrChallenge = true
     }
@@ -1263,6 +1268,11 @@ class TransactionConsenus {
       node_id: ourNodeId,
       cant_apply: queueEntry.preApplyTXResult.applied === false,
       app_data_hash: '',
+    }
+
+    // BAD NODE SIMULATION
+    if (this.config.debug.produceBadVote) {
+      ourVote.transaction_result = !ourVote.transaction_result
     }
 
     ourVote.app_data_hash = queueEntry?.preApplyTXResult?.applyResponse.appReceiptDataHash

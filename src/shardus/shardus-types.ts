@@ -885,6 +885,10 @@ export interface ServerConfiguration {
     ignoreTimeCheck: boolean
     /** Flag to toggle Shardus address format verification, checks if an address is 32-bytes in size & 64 chars long */
     checkAddressFormat: boolean
+    /** Flag to simulate bad vote creation in PoQLS */
+    produceBadVote: boolean
+    /** Flag to simulate a bad challenge response */
+    produceBadChallenge: boolean
     /**   add a random error to our ntp offset time +- */
     debugNTPErrorWindowMs: number
   }
