@@ -32,7 +32,7 @@ export function executeNodeSelection(): void {
     return
   }
 
-  const numToAccept = calculateToAccept()
+  const numToAccept = calculateToAccept() // I think we need to update to use the new calculateToAcceptV2
   /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`selecting ${numToAccept} nodes to accept`)
   selectNodes(numToAccept)
 }

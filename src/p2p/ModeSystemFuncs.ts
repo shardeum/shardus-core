@@ -144,6 +144,8 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
             addRem = 1
           }
         }
+        // Is this needed for lost nodes? lost nodes didn't get removed in next cycle if they refuted
+        // Or is the intention is to use the removed nodes in the previous cycle?
         addRem += prevRecord.lost.length // compensate for nodes that were lost; though this could add more burden on existing nodes
         if (addRem > 0) {
           add = Math.ceil(addRem)

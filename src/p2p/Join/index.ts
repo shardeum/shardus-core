@@ -1053,7 +1053,7 @@ export function computeSelectionNum(joinRequest: JoinRequest): Result<string, Jo
  */
 function decideNodeSelection(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse {
   // Compute how many join request to accept
-  let toAccept = calculateToAccept()
+  let toAccept = calculateToAccept() // I think we can remove this line; as toAccept would be overriden by calculateToAcceptV2 in the next line
   nestedCountersInstance.countEvent('p2p', `results of calculateToAccept: toAccept: ${toAccept}`)
   /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("results of calculateToAccept: ", toAccept)
   const { add, remove } = calculateToAcceptV2(CycleChain.newest)

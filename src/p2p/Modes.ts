@@ -10,6 +10,7 @@ import * as NodeList from './NodeList'
 /** STATE */
 
 let p2pLogger: Logger
+export let networkMode: P2P.ModesTypes.Record['mode'] = 'forming'
 
 /** ROUTES */
 
@@ -73,7 +74,6 @@ export function updateRecord(
 
   // If you're the first node
   if (Self.isFirst) {
-    // Get safety mode field values from snapshot
     Object.assign(record, { mode: 'forming' })
   }
   // If you're not the first node
@@ -127,6 +127,7 @@ export function validateRecordTypes(rec: P2P.ModesTypes.Record): string {
 }
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
+  networkMode = record.mode
   return {
     added: [],
     removed: [],
@@ -167,3 +168,5 @@ export function enterProcessing(activeCount: number): boolean {
   */
   return activeCount >= Context.config.p2p.minNodes
 }
+
+export function updateNetworkMode(mode: P2P.ModesTypes.Record['mode']): void {}

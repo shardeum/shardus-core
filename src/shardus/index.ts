@@ -48,6 +48,7 @@ import { isDebugMode, isServiceMode } from '../debug'
 import * as JoinV2 from '../p2p/Join/v2'
 import { getNetworkTimeOffset, shardusGetTime } from '../network'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
+import { networkMode } from '../p2p/Modes'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -1250,6 +1251,14 @@ class Shardus extends EventEmitter {
     nestedCountersInstance.countEvent('debug', `getNumActiveNodes latestCycle.active: ${latestCycle.active}`)
 
     return latestCycle ? latestCycle.active : 0
+  }
+
+  /**
+   *
+   * @returns {ShardusTypes.Cycle['mode']} returns the current network mode
+   */
+  getNetworkMode(): ShardusTypes.Cycle['mode'] {
+    return networkMode
   }
 
   /**

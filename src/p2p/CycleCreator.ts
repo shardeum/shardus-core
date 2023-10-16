@@ -66,7 +66,8 @@ export let submodules: submoduleTypes[] = [
   Refresh,
   Apoptosis,
   Lost,
-  SafetyMode,
+  // SafetyMode,
+  Modes,
   CycleAutoScale,
 ]
 
@@ -189,8 +190,10 @@ export function init() {
 function moduleMigration() {
   // removing SafetyMode from submodules and adding Modes
   submodules = submodules.filter((submodule) => submodule !== SafetyMode)
-  submodules.push(Modes)
-  submodules[submodules.length - 1].init()
+  if (!submodules.includes(Modes)) {
+    submodules.push(Modes)
+    submodules[submodules.length - 1].init()
+  }
 }
 
 function updateScaleFactor() {
@@ -381,6 +384,9 @@ async function cycleCreator() {
       moduleMigration()
     }
 
+    // I think once the network has reached to processing mode and some nodes drop to 10% and goes into safety mode
+    // At this point, the new node might find that active count from previous record is still less than minNodes and would not flip hasAlreadyEnteredProcessing to true
+    // I think we should flip hasAlreadyEnteredProcessing to true any mode other than forming in the previous record
     if (prevRecord.active >= config.p2p.minNodes && hasAlreadyEnteredProcessing === false) {
       hasAlreadyEnteredProcessing = true
     }
