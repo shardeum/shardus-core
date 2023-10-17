@@ -1284,7 +1284,7 @@ class TransactionQueue {
         lastConfirmOrChallengeTimestamp: 0,
         acceptVoteMessage: true,
         acceptConfirmOrChallenge: true,
-        accountDataSet: false
+        accountDataSet: false,
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1380,16 +1380,25 @@ class TransactionQueue {
           const unRankedExecutionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
           txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
           if (txQueueEntry.isInExecutionHome) {
-            txQueueEntry.ourNodeRank = this.computeNodeRank(this.stateManager.currentCycleShardData.ourNode.id, txQueueEntry.acceptedTx.txId, txQueueEntry.acceptedTx.timestamp)
+            txQueueEntry.ourNodeRank = this.computeNodeRank(
+              this.stateManager.currentCycleShardData.ourNode.id,
+              txQueueEntry.acceptedTx.txId,
+              txQueueEntry.acceptedTx.timestamp
+            )
           }
 
-          const minNodesToVote = 3;
-          const voterPercentage = 0.1;
-          const numberOfVoters = Math.max(minNodesToVote, Math.floor(txQueueEntry.executionGroup.length * voterPercentage));
+          const minNodesToVote = 3
+          const voterPercentage = 0.1
+          const numberOfVoters = Math.max(
+            minNodesToVote,
+            Math.floor(txQueueEntry.executionGroup.length * voterPercentage)
+          )
           // voters are highest ranked nodes
-          txQueueEntry.eligibleNodesToVote = txQueueEntry.executionGroup.slice(0, numberOfVoters);
+          txQueueEntry.eligibleNodesToVote = txQueueEntry.executionGroup.slice(0, numberOfVoters)
           // confirm nodes are lowest ranked nodes
-          txQueueEntry.eligibleNodesToConfirm = txQueueEntry.executionGroup.slice(txQueueEntry.executionGroup.length - numberOfVoters);
+          txQueueEntry.eligibleNodesToConfirm = txQueueEntry.executionGroup.slice(
+            txQueueEntry.executionGroup.length - numberOfVoters
+          )
 
           const ourID = this.stateManager.currentCycleShardData.ourNode.id
           for (let idx = 0; idx < txQueueEntry.executionGroup.length; idx++) {
@@ -2010,7 +2019,6 @@ class TransactionQueue {
    * @param queueEntry
    */
   async queueEntryRequestMissingReceipt(queueEntry: QueueEntry): Promise<void> {
-    console.log('thant: queueEntryRequestMissingReceipt', queueEntry.acceptedTx.txId, queueEntry.appliedReceipt);
     if (this.stateManager.currentCycleShardData == null) {
       return
     }
@@ -2279,7 +2287,7 @@ class TransactionQueue {
   orderNodesByRank(nodeList: Shardus.Node[], queueEntry: QueueEntry): Shardus.NodeWithRank[] {
     const nodeListWithRankData: Shardus.NodeWithRank[] = nodeList.map((node: Shardus.Node) => {
       const rank = this.computeNodeRank(node.id, queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
-      const nodeWithRank: Shardus.NodeWithRank = {...node, rank}
+      const nodeWithRank: Shardus.NodeWithRank = { ...node, rank }
       return nodeWithRank
     })
     return nodeListWithRankData.sort((a: Shardus.NodeWithRank, b: Shardus.NodeWithRank) => {
@@ -3072,7 +3080,6 @@ class TransactionQueue {
    * @returns
    */
   async tellCorrespondingNodesFinalData(queueEntry: QueueEntry): Promise<void> {
-    console.log('thant: tellCorrespondingNodesFinalData', queueEntry.acceptedTx.txId)
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData - start: ${queueEntry.logID}`)
 
     if (this.stateManager.currentCycleShardData == null) {
@@ -4314,6 +4321,8 @@ class TransactionQueue {
               /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
               const result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
 
+              /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt result : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
+
               //todo this is false.. and prevents some important stuff.
               //need to look at appliedReceipt2
               if (result != null || queueEntry.appliedReceipt2 != null) {
@@ -4322,7 +4331,6 @@ class TransactionQueue {
                 if (
                   this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, result)
                 ) {
-                  console.log('thant: we have a preApply matching receipt');
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
 
                   const shouldSendReceipt = true
@@ -4382,7 +4390,6 @@ class TransactionQueue {
                   }
                   //continue
                 } else {
-                  console.log('thant: we do not have a preApply matching receipt');
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                   didNotMatchReceipt = true
                   queueEntry.appliedReceiptForRepair = result
