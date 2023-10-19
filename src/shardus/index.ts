@@ -481,7 +481,7 @@ class Shardus extends EventEmitter {
       if (result) {
         return
       }
-      scheduleLostReport(node, 'timeout', requestId)
+      if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'timeout', requestId)
       /** [TODO] Report lost */
       /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `timeout-${context}`)
       // context has been added to provide info on the type of timeout and where it happened
@@ -491,7 +491,7 @@ class Shardus extends EventEmitter {
     this.network.on('error', (node, requestId: string, context: string, errorGroup: string) => {
       /* prettier-ignore */ console.log( `In Shardus got network error-${context} for request ID ${requestId} from node: ${logNode(node)}` )
       /* prettier-ignore */ console.log(`Error group for request ID - ${requestId}: ${errorGroup}`)
-      scheduleLostReport(node, 'error', requestId)
+      if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'error', requestId)
       /** [TODO] Report lost */
       /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `error-${context}`)
       /* prettier-ignore */ nestedCountersInstance.countRareEvent( 'lostNodes', `error-${context}  ${node.internalIp}:${node.internalPort}` )
@@ -2043,8 +2043,8 @@ class Shardus extends EventEmitter {
       if (isDebugMode() && req.query.debug === 'true') {
         result.debug = {
           queriedWhen: new Date().toISOString(),
-          startedWhen: (new Date(Date.now() - process.uptime() * 1000)).toISOString(),
-          uptimeMins: Math.round(100 * process.uptime() / 60) / 100,
+          startedWhen: new Date(Date.now() - process.uptime() * 1000).toISOString(),
+          uptimeMins: Math.round((100 * process.uptime()) / 60) / 100,
           pid: process.pid,
           currentQuarter: CycleCreator.currentQuarter,
           currentCycleMarker: CycleChain.getCurrentCycleMarker() ?? null,
@@ -2058,8 +2058,8 @@ class Shardus extends EventEmitter {
       const nodeInfo = Self.getPublicNodeInfo(true)
       let result = {
         respondedWhen: new Date().toISOString(),
-        startedWhen: (new Date(Date.now() - process.uptime() * 1000)).toISOString(),
-        uptimeMins: Math.round(100 * process.uptime() / 60) / 100,
+        startedWhen: new Date(Date.now() - process.uptime() * 1000).toISOString(),
+        uptimeMins: Math.round((100 * process.uptime()) / 60) / 100,
         pid: process.pid,
         publicKey: nodeInfo.publicKey,
         id: nodeInfo.id,
@@ -2391,10 +2391,9 @@ class Shardus extends EventEmitter {
     }
   }
 
-  isOnStandbyList (publicKey: string): boolean {
+  isOnStandbyList(publicKey: string): boolean {
     return JoinV2.isOnStandbyList(publicKey)
   }
-  
 }
 
 function deepReplace(obj: object | ArrayLike<any>, find: any, replace: any): any {

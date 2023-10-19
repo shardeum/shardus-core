@@ -122,6 +122,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     fakeNetworkDelay: 0,
     disableSnapshots: true,
     disableTxCoverageReport: true,
+    disableLostNodeReports: false,
     haltOnDataOOS: false,
     countEndpointStart: -1,
     countEndpointStop: -1,

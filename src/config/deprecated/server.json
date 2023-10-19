@@ -7,12 +7,7 @@
   },
   "p2p": {
     "ipServer": "api.ipify.org/?format=json",
-    "timeServers": [
-      "0.pool.ntp.org",
-      "1.pool.ntp.org",
-      "2.pool.ntp.org",
-      "3.pool.ntp.org"
-    ],
+    "timeServers": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
     "existingArchivers": [
       {
         "ip": "127.0.0.1",
@@ -78,6 +73,7 @@
     "fakeNetworkDelay": 0,
     "disableSnapshots": true,
     "disableTxCoverageReport": true,
+    "disableLostNodeReports": false,
     "haltOnDataOOS": false,
     "countEndpointStart": -1,
     "countEndpointStop": -1,
@@ -102,7 +98,7 @@
       "external": 0.4,
       "txTimeInQueue": 0.2,
       "queueLength": 0.2
-     }
+    }
   },
   "stateManager": {
     "stateTableBucketSize": 500,
