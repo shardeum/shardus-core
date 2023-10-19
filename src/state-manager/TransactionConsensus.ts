@@ -1116,102 +1116,111 @@ class TransactionConsenus {
     if (queueEntry.ourVote == null) {
       return
     }
-    if (logFlags.debug)
-      this.mainLogger.debug(
-        `tryConfirmOrChallenge: ${queueEntry.logID}  receivedBestVote: ${JSON.stringify(
-          queueEntry.receivedBestVote
-        )}} `
-      )
-
-    const now = Date.now()
-    //  if we are in lowest 10% of execution group and agrees with the highest ranked vote, send out a confirm msg
-    const eligibleToConfirm = queueEntry.eligibleNodesToConfirm.map((node) => node.id).includes(Self.id)
-    const timeSinceLastVoteMessage =
-      queueEntry.lastVoteReceivedTimestamp > 0 ? now - queueEntry.lastVoteReceivedTimestamp : 0
-    // check if last confirm/challenge received is 1s ago
-    if (timeSinceLastVoteMessage >= this.waitTimeBeforeConfirm) {
-      // stop accepting the vote messages for this tx
-      queueEntry.acceptVoteMessage = false
-
-      // confirm that current vote is the winning highest ranked vote using robustQuery
-      const voteFromRobustQuery = await this.robustQueryBestVote(queueEntry)
-      if (voteFromRobustQuery == null) {
-        // we cannot confirm the best vote from network
-        this.mainLogger.error(`We cannot get voteFromRobustQuery for tx ${queueEntry.acceptedTx.txId}`)
-        return
-      }
-      let bestVoterFromRobustQuery: Shardus.NodeWithRank
-      for (const node of queueEntry.executionGroup) {
-        if (node.id === voteFromRobustQuery.node_id) {
-          bestVoterFromRobustQuery = node
-        }
-      }
-      if (bestVoterFromRobustQuery == null) {
-        // we cannot confirm the best voter from network
-        this.mainLogger.error(`We cannot get bestVoter from robustQuery for tx ${queueEntry.acceptedTx.txId}`)
-        return
-      }
-
-      // todo: podA: POQ2 handle if we can't figure out the best voter from robust query result (low priority)
-
-      // if vote from robust is better than our received vote, use it as final vote
-      const isRobustQueryVoteBetter = bestVoterFromRobustQuery.rank > queueEntry.receivedBestVoter.rank
-      let finalVote = queueEntry.receivedBestVote
-      if (isRobustQueryVoteBetter) {
-        finalVote = voteFromRobustQuery
-      }
-      const finalVoteHash = this.calculateVoteHash(finalVote)
-      const shouldChallenge = queueEntry.ourVoteHash !== finalVoteHash
-
-      // if we are in execution group and disagree with the highest ranked vote, send out a "challenge" message
-      const isInExecutionSet = queueEntry.executionIdSet.has(Self.id)
+    this.profiler.profileSectionStart('tryConfirmOrChallenge')
+    try {
       if (logFlags.debug)
         this.mainLogger.debug(
-          `tryConfirmOrChallenge: ${queueEntry.logID} isInExecutionSet: ${isInExecutionSet}, eligibleToConfirm: ${eligibleToConfirm}, shouldChallenge: ${shouldChallenge}`
+          `tryConfirmOrChallenge: ${queueEntry.logID}  receivedBestVote: ${JSON.stringify(
+            queueEntry.receivedBestVote
+          )}} `
         )
-      if (isInExecutionSet && shouldChallenge) {
-        this.challengeVoteAndShare(queueEntry)
-      }
 
-      if (eligibleToConfirm && queueEntry.ourVoteHash === finalVoteHash) {
-        // queueEntry.eligibleNodesToConfirm is sorted highest to lowest rank
-        const eligibleNodeIds = queueEntry.eligibleNodesToConfirm.map((node) => node.id).reverse()
-        const ourRankIndex = eligibleNodeIds.indexOf(Self.id)
-        const delayBeforeConfirm = ourRankIndex * 100 // 100ms
-        let isReceivedBetterConfirmation = false
+      const now = Date.now()
+      //  if we are in lowest 10% of execution group and agrees with the highest ranked vote, send out a confirm msg
+      const eligibleToConfirm = queueEntry.eligibleNodesToConfirm.map((node) => node.id).includes(Self.id)
+      const timeSinceLastVoteMessage =
+        queueEntry.lastVoteReceivedTimestamp > 0 ? now - queueEntry.lastVoteReceivedTimestamp : 0
+      // check if last confirm/challenge received is 1s ago
+      if (timeSinceLastVoteMessage >= this.waitTimeBeforeConfirm) {
+        // stop accepting the vote messages for this tx
+        queueEntry.acceptVoteMessage = false
 
-        await utils.sleep(delayBeforeConfirm)
-
-        // Compare our rank with received rank
-        if (
-          queueEntry.receivedBestConfirmedNode &&
-          queueEntry.receivedBestConfirmedNode.rank < queueEntry.ourNodeRank
-        ) {
-          isReceivedBetterConfirmation = true
+        // confirm that current vote is the winning highest ranked vote using robustQuery
+        const voteFromRobustQuery = await this.robustQueryBestVote(queueEntry)
+        if (voteFromRobustQuery == null) {
+          // we cannot confirm the best vote from network
+          this.mainLogger.error(`We cannot get voteFromRobustQuery for tx ${queueEntry.acceptedTx.txId}`)
+          return
         }
-        if (isReceivedBetterConfirmation) {
-          if (logFlags.debug)
-            this.mainLogger.debug(
-              `tryConfirmOrChallenge: ${
-                queueEntry.logID
-              } received better confirmation before we share ours, receivedBestConfirmation: ${utils.stringifyReduce(
-                queueEntry.receivedBestConfirmation
-              )}`
-            )
-          nestedCountersInstance.countEvent(
-            'transactionConsensus',
-            'tryConfirmOrChallenge isReceivedBetterConfirmation: true'
+        let bestVoterFromRobustQuery: Shardus.NodeWithRank
+        for (const node of queueEntry.executionGroup) {
+          if (node.id === voteFromRobustQuery.node_id) {
+            bestVoterFromRobustQuery = node
+          }
+        }
+        if (bestVoterFromRobustQuery == null) {
+          // we cannot confirm the best voter from network
+          this.mainLogger.error(
+            `We cannot get bestVoter from robustQuery for tx ${queueEntry.acceptedTx.txId}`
           )
           return
         }
-        // BAD NODE SIMULATION
-        if (this.config.debug.produceBadChallenge) {
-          this.challengeVoteAndShare(queueEntry)
-        } else {
-          this.confirmVoteAndShare(queueEntry)
+
+        // todo: podA: POQ2 handle if we can't figure out the best voter from robust query result (low priority)
+
+        // if vote from robust is better than our received vote, use it as final vote
+        const isRobustQueryVoteBetter = bestVoterFromRobustQuery.rank > queueEntry.receivedBestVoter.rank
+        let finalVote = queueEntry.receivedBestVote
+        if (isRobustQueryVoteBetter) {
+          finalVote = voteFromRobustQuery
         }
+        const finalVoteHash = this.calculateVoteHash(finalVote)
+        const shouldChallenge = queueEntry.ourVoteHash !== finalVoteHash
+
+        // if we are in execution group and disagree with the highest ranked vote, send out a "challenge" message
+        const isInExecutionSet = queueEntry.executionIdSet.has(Self.id)
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `tryConfirmOrChallenge: ${queueEntry.logID} isInExecutionSet: ${isInExecutionSet}, eligibleToConfirm: ${eligibleToConfirm}, shouldChallenge: ${shouldChallenge}`
+          )
+        if (isInExecutionSet && shouldChallenge) {
+          this.challengeVoteAndShare(queueEntry)
+        }
+
+        if (eligibleToConfirm && queueEntry.ourVoteHash === finalVoteHash) {
+          // queueEntry.eligibleNodesToConfirm is sorted highest to lowest rank
+          const eligibleNodeIds = queueEntry.eligibleNodesToConfirm.map((node) => node.id).reverse()
+          const ourRankIndex = eligibleNodeIds.indexOf(Self.id)
+          const delayBeforeConfirm = ourRankIndex * 100 // 100ms
+          let isReceivedBetterConfirmation = false
+
+          await utils.sleep(delayBeforeConfirm)
+
+          // Compare our rank with received rank
+          if (
+            queueEntry.receivedBestConfirmedNode &&
+            queueEntry.receivedBestConfirmedNode.rank < queueEntry.ourNodeRank
+          ) {
+            isReceivedBetterConfirmation = true
+          }
+          if (isReceivedBetterConfirmation) {
+            if (logFlags.debug)
+              this.mainLogger.debug(
+                `tryConfirmOrChallenge: ${
+                  queueEntry.logID
+                } received better confirmation before we share ours, receivedBestConfirmation: ${utils.stringifyReduce(
+                  queueEntry.receivedBestConfirmation
+                )}`
+              )
+            nestedCountersInstance.countEvent(
+              'transactionConsensus',
+              'tryConfirmOrChallenge isReceivedBetterConfirmation: true'
+            )
+            return
+          }
+          // BAD NODE SIMULATION
+          if (this.config.debug.produceBadChallenge) {
+            this.challengeVoteAndShare(queueEntry)
+          } else {
+            this.confirmVoteAndShare(queueEntry)
+          }
+        }
+        queueEntry.gossipedConfirmOrChallenge = true
       }
-      queueEntry.gossipedConfirmOrChallenge = true
+    } catch (e) {
+      this.mainLogger.error(`tryConfirmOrChallenge: ${queueEntry.logID} ${e.message} ${e.stack}`)
+    } finally {
+      this.profiler.profileSectionEnd('tryConfirmOrChallenge')
     }
   }
 
@@ -1269,7 +1278,6 @@ class TransactionConsenus {
    * @param queueEntry
    */
   async createAndShareVote(queueEntry: QueueEntry): Promise<unknown> {
-    this.profiler.profileSectionStart('createAndShareVote')
     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
 
     // TODO STATESHARDING4 CHECK VOTES PER CONSENSUS GROUP
@@ -1278,195 +1286,208 @@ class TransactionConsenus {
       //we are not in the execution home, so we can't create or share a vote
       return
     }
-    const ourNodeId = Self.id
-    const eligibleNodeIds = queueEntry.eligibleNodesToVote.map((node) => node.id)
-    const isEligibleToShareVote = eligibleNodeIds.includes(ourNodeId)
-    let isReceivedBetterVote = false
+    this.profiler.profileSectionStart('createAndShareVote')
 
-    if (this.stateManager.transactionQueue.useNewPOQ) {
-      const ourRankIndex = eligibleNodeIds.indexOf(ourNodeId)
-      const delayBeforeVote = ourRankIndex * 100 // 100ms
+    try {
+      const ourNodeId = Self.id
+      const eligibleNodeIds = queueEntry.eligibleNodesToVote.map((node) => node.id)
+      const isEligibleToShareVote = eligibleNodeIds.includes(ourNodeId)
+      let isReceivedBetterVote = false
 
-      await utils.sleep(delayBeforeVote)
-
-      // Compare our rank with received rank
-      if (queueEntry.receivedBestVoter && queueEntry.receivedBestVoter.rank > queueEntry.ourNodeRank) {
-        isReceivedBetterVote = true
+      // create our vote (for later use) even if we have received a better vote
+      let ourVote: AppliedVote = {
+        txid: queueEntry.acceptedTx.txId,
+        transaction_result: queueEntry.preApplyTXResult.passed,
+        account_id: [],
+        account_state_hash_after: [],
+        node_id: ourNodeId,
+        cant_apply: queueEntry.preApplyTXResult.applied === false,
+        app_data_hash: '',
       }
-    }
 
-    // create our vote (for later use) even if we have received a better vote
-    let ourVote: AppliedVote = {
-      txid: queueEntry.acceptedTx.txId,
-      transaction_result: queueEntry.preApplyTXResult.passed,
-      account_id: [],
-      account_state_hash_after: [],
-      node_id: ourNodeId,
-      cant_apply: queueEntry.preApplyTXResult.applied === false,
-      app_data_hash: '',
-    }
+      // BAD NODE SIMULATION
+      if (this.config.debug.produceBadVote) {
+        ourVote.transaction_result = !ourVote.transaction_result
+      }
 
-    // BAD NODE SIMULATION
-    if (this.config.debug.produceBadVote) {
-      ourVote.transaction_result = !ourVote.transaction_result
-    }
+      ourVote.app_data_hash = queueEntry?.preApplyTXResult?.applyResponse.appReceiptDataHash
 
-    ourVote.app_data_hash = queueEntry?.preApplyTXResult?.applyResponse.appReceiptDataHash
+      if (queueEntry.debugFail_voteFlip === true) {
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
 
-    if (queueEntry.debugFail_voteFlip === true) {
-      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
+        ourVote.transaction_result = !ourVote.transaction_result
+      }
 
-      ourVote.transaction_result = !ourVote.transaction_result
-    }
+      let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
 
-    let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
+      const applyResponse = queueEntry?.preApplyTXResult?.applyResponse
 
-    const applyResponse = queueEntry?.preApplyTXResult?.applyResponse
-
-    const stats = {
-      usedApplyResponse: false,
-      wrappedStateSet: 0,
-      optimized: false,
-    }
-    //if we have values for accountWrites, then build a list wrappedStates from it and use this list instead
-    //of the collected data list
-    if (applyResponse != null) {
-      const writtenAccountsMap: WrappedResponses = {}
-      if (applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
-        for (const writtenAccount of applyResponse.accountWrites) {
-          writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+      const stats = {
+        usedApplyResponse: false,
+        wrappedStateSet: 0,
+        optimized: false,
+      }
+      //if we have values for accountWrites, then build a list wrappedStates from it and use this list instead
+      //of the collected data list
+      if (applyResponse != null) {
+        const writtenAccountsMap: WrappedResponses = {}
+        if (applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+          for (const writtenAccount of applyResponse.accountWrites) {
+            writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+          }
+          //override wrapped states with writtenAccountsMap which should be more complete if it included
+          wrappedStates = writtenAccountsMap
         }
-        //override wrapped states with writtenAccountsMap which should be more complete if it included
-        wrappedStates = writtenAccountsMap
+
+        stats.usedApplyResponse = true
+        stats.wrappedStateSet = Object.keys(wrappedStates).length
+        //Issue that could happen with sharded network:
+        //Need to figure out where to put the logic that knows which nodes need final data forwarded to them
+        //A receipt aline may not be enough, remote shards will need an updated copy of the data.
       }
 
-      stats.usedApplyResponse = true
-      stats.wrappedStateSet = Object.keys(wrappedStates).length
-      //Issue that could happen with sharded network:
-      //Need to figure out where to put the logic that knows which nodes need final data forwarded to them
-      //A receipt aline may not be enough, remote shards will need an updated copy of the data.
-    }
+      if (wrappedStates != null) {
+        //we need to sort this list and doing it in place seems ok
+        //applyResponse.stateTableResults.sort(this.sortByAccountId )
 
-    if (wrappedStates != null) {
-      //we need to sort this list and doing it in place seems ok
-      //applyResponse.stateTableResults.sort(this.sortByAccountId )
+        stats.optimized = true
+        //need to sort our parallel lists so that they are deterministic!!
+        const wrappedStatesList = [...Object.values(wrappedStates)]
 
-      stats.optimized = true
-      //need to sort our parallel lists so that they are deterministic!!
-      const wrappedStatesList = [...Object.values(wrappedStates)]
+        //this sort is critical to a deterministic vote structure.. we need this if taking a hash
+        wrappedStatesList.sort(this.sortByAccountId)
 
-      //this sort is critical to a deterministic vote structure.. we need this if taking a hash
-      wrappedStatesList.sort(this.sortByAccountId)
+        for (const wrappedState of wrappedStatesList) {
+          // note this is going to stomp the hash value for the account
+          // this used to happen in dapp.updateAccountFull  we now have to save off prevStateId on the wrappedResponse
+          //We have to update the hash now! Not sure if this is the greatest place but it needs to be done
+          const updatedHash = this.app.calculateAccountHash(wrappedState.data)
+          wrappedState.stateId = updatedHash
 
-      for (const wrappedState of wrappedStatesList) {
-        // note this is going to stomp the hash value for the account
-        // this used to happen in dapp.updateAccountFull  we now have to save off prevStateId on the wrappedResponse
-        //We have to update the hash now! Not sure if this is the greatest place but it needs to be done
-        const updatedHash = this.app.calculateAccountHash(wrappedState.data)
-        wrappedState.stateId = updatedHash
-
-        ourVote.account_id.push(wrappedState.accountId)
-        ourVote.account_state_hash_after.push(wrappedState.stateId)
+          ourVote.account_id.push(wrappedState.accountId)
+          ourVote.account_state_hash_after.push(wrappedState.stateId)
+        }
       }
-    }
 
-    let appliedVoteHash: AppliedVoteHash
-    //let temp = ourVote.node_id
-    // ourVote.node_id = '' //exclue this from hash
-    ourVote = this.crypto.sign(ourVote)
-    const voteHash = this.calculateVoteHash(ourVote)
-    //ourVote.node_id = temp
-    appliedVoteHash = {
-      txid: ourVote.txid,
-      voteHash,
-    }
-    queueEntry.ourVoteHash = voteHash
+      let appliedVoteHash: AppliedVoteHash
+      //let temp = ourVote.node_id
+      // ourVote.node_id = '' //exclue this from hash
+      ourVote = this.crypto.sign(ourVote)
+      const voteHash = this.calculateVoteHash(ourVote)
+      //ourVote.node_id = temp
+      appliedVoteHash = {
+        txid: ourVote.txid,
+        voteHash,
+      }
+      queueEntry.ourVoteHash = voteHash
 
-    if (logFlags.verbose)
-      this.mainLogger.debug(
-        `createAndShareVote ourVote: ${utils.stringifyReduce(
-          ourVote
-        )}, isEligibleToShareVote: ${isEligibleToShareVote}, isReceivedBetterVote: ${isReceivedBetterVote}`
-      )
-
-    //append our vote
-    appliedVoteHash = this.crypto.sign(appliedVoteHash)
-    this.tryAppendVoteHash(queueEntry, appliedVoteHash)
-
-    // save our vote to our queueEntry
-    queueEntry.ourVote = ourVote
-
-    // share the vote via gossip?
-    if (this.stateManager.transactionQueue.useNewPOQ) {
-      if (isEligibleToShareVote === false) {
-        nestedCountersInstance.countEvent(
-          'transactionConsensus',
-          'createAndShareVote isEligibleToShareVote:' + ' false'
+      if (logFlags.verbose)
+        this.mainLogger.debug(
+          `createAndShareVote ourVote: ${utils.stringifyReduce(
+            ourVote
+          )}, isEligibleToShareVote: ${isEligibleToShareVote}, isReceivedBetterVote: ${isReceivedBetterVote}`
         )
-        return
-      }
-      if (isReceivedBetterVote) {
-        nestedCountersInstance.countEvent(
-          'transactionConsensus',
-          'createAndShareVote isReceivedBetterVote: true'
-        )
-        return
-      }
-      // tryAppend before sharing
-      const appendWorked = this.tryAppendVote(queueEntry, ourVote)
-      if (appendWorked === false) {
-        nestedCountersInstance.countEvent('transactionConsensus', 'createAndShareVote appendFailed')
-      }
-    }
 
-    let consensusGroup = []
-    if (
-      this.stateManager.transactionQueue.executeInOneShard === true &&
-      this.stateManager.transactionQueue.useNewPOQ === false
-    ) {
-      //only share with the exection group
-      consensusGroup = queueEntry.executionGroup
-    } else {
-      //sharing with the entire transaction group actually..
-      consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-    }
+      //append our vote
+      appliedVoteHash = this.crypto.sign(appliedVoteHash)
+      if (this.stateManager.transactionQueue.useNewPOQ === false)
+        this.tryAppendVoteHash(queueEntry, appliedVoteHash)
 
-    if (consensusGroup.length >= 1) {
-      this.stateManager.debugNodeGroup(
-        queueEntry.acceptedTx.txId,
-        queueEntry.acceptedTx.timestamp,
-        `share tx vote to neighbors`,
-        consensusGroup
-      )
-
-      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)}`)
-      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)} `)
-
-      // Filter nodes before we send tell()
-      const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
-        consensusGroup,
-        'createAndShareVote',
-        true,
-        true
-      )
-      if (filteredNodes.length === 0) {
-        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try')
-        return null
-      }
-      const filteredConsensusGroup = filteredNodes
+      // save our vote to our queueEntry
+      queueEntry.ourVote = ourVote
 
       if (this.stateManager.transactionQueue.useNewPOQ) {
-        // Gossip the vote to the entire consensus group
-        Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4)
-      } else {
-        this.profiler.profileSectionStart('createAndShareVote-tell')
-        this.p2p.tell(filteredConsensusGroup, 'spread_appliedVoteHash', appliedVoteHash)
-        this.profiler.profileSectionEnd('createAndShareVote-tell')
+        if (isEligibleToShareVote === false) {
+          nestedCountersInstance.countEvent(
+            'transactionConsensus',
+            'createAndShareVote isEligibleToShareVote:' + ' false'
+          )
+          return
+        }
+        const ourRankIndex = eligibleNodeIds.indexOf(ourNodeId)
+        let delayBeforeVote = ourRankIndex * 100 // 100ms
+
+        if (delayBeforeVote > 1000) {
+          delayBeforeVote = 1000
+        }
+
+        nestedCountersInstance.countEvent(
+          'transactionConsensus',
+          `createAndShareVote delayBeforeSharingVote: ${delayBeforeVote} ms`
+        )
+        await utils.sleep(delayBeforeVote)
+
+        // Compare our rank with received rank
+        if (queueEntry.receivedBestVoter && queueEntry.receivedBestVoter.rank > queueEntry.ourNodeRank) {
+          isReceivedBetterVote = true
+        }
+
+        if (isReceivedBetterVote) {
+          nestedCountersInstance.countEvent(
+            'transactionConsensus',
+            'createAndShareVote isReceivedBetterVote: true'
+          )
+          return
+        }
+        // tryAppend before sharing
+        const appendWorked = this.tryAppendVote(queueEntry, ourVote)
+        if (appendWorked === false) {
+          nestedCountersInstance.countEvent('transactionConsensus', 'createAndShareVote appendFailed')
+        }
       }
-    } else {
-      nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote fail, no consensus group')
+
+      let consensusGroup = []
+      if (
+        this.stateManager.transactionQueue.executeInOneShard === true &&
+        this.stateManager.transactionQueue.useNewPOQ === false
+      ) {
+        //only share with the exection group
+        consensusGroup = queueEntry.executionGroup
+      } else {
+        //sharing with the entire transaction group actually..
+        consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+      }
+
+      if (consensusGroup.length >= 1) {
+        this.stateManager.debugNodeGroup(
+          queueEntry.acceptedTx.txId,
+          queueEntry.acceptedTx.timestamp,
+          `share tx vote to neighbors`,
+          consensusGroup
+        )
+
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)}`)
+        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)} `)
+
+        // Filter nodes before we send tell()
+        const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
+          consensusGroup,
+          'createAndShareVote',
+          true,
+          true
+        )
+        if (filteredNodes.length === 0) {
+          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try')
+          return null
+        }
+        const filteredConsensusGroup = filteredNodes
+
+        if (this.stateManager.transactionQueue.useNewPOQ) {
+          // Gossip the vote to the entire consensus group
+          Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4)
+        } else {
+          this.profiler.profileSectionStart('createAndShareVote-tell')
+          this.p2p.tell(filteredConsensusGroup, 'spread_appliedVoteHash', appliedVoteHash)
+          this.profiler.profileSectionEnd('createAndShareVote-tell')
+        }
+      } else {
+        nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote fail, no consensus group')
+      }
+    } catch (e) {
+      this.mainLogger.error(`createAndShareVote: error ${e.message}`)
+    } finally {
+      this.profiler.profileSectionEnd('createAndShareVote')
     }
-    this.profiler.profileSectionEnd('createAndShareVote')
   }
 
   calculateVoteHash(vote: AppliedVote, removeSign = true): string {
