@@ -97,7 +97,7 @@ function _authenticateByNode(message, node) {
       ? crypto.verify(message, node.publicKey)
       : crypto.authenticate(message, node.curvePublicKey)
   } catch (e) {
-    error(`Invalid or missing authentication/signature tag on message: ${JSON.stringify(message)}`)
+    /* prettier-ignore */ if (logFlags.verbose) error(`Invalid or missing authentication/signature tag on message: ${JSON.stringify(message)}`)
     return false
   }
   return result
@@ -528,13 +528,14 @@ export function registerInternal2(route: string, handler: InternalBinaryHandler)
       responseHeaders.sender_id = Self.id
       responseHeaders.tracker_id = header.tracker_id
       /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternal2: wrapped response to send back: ${wrappedRespStream.getBuffer()} size: ${wrappedRespStream.getBufferLength()}`)
-      if (route !== 'gossip')
-        /* prettier-ignore */ logger.playbackLog(header.sender_id, 'self', 'InternalRecvResp', route, header.tracker_id, response)
+      if (route !== 'gossip') {
+        /* prettier-ignore */ if (logFlags.newFilter) logger.playbackLog(header.sender_id, 'self', 'InternalRecvResp', route, header.tracker_id, response)
+      }
       await respond(wrappedRespStream.getBuffer(), responseHeaders)
       return wrappedRespStream.getBufferLength()
     }
-    console.log('header:', header)
-    /* prettier-ignore */ info(`registerInternal2: request info: route: ${route} header: ${JSON.stringify(header)} sign: ${JSON.stringify(sign)}`)
+    /* prettier-ignore */ if (logFlags.newFilter) console.log('header:', header)
+    /* prettier-ignore */ if (logFlags.newFilter) info(`registerInternal2: request info: route: ${route} header: ${JSON.stringify(header)} sign: ${JSON.stringify(sign)}`)
     if (!NodeList.byPubKey.has(sign.owner) && !NodeList.nodes.has(header.sender_id)) {
       warn('registerInternal2: internal routes can only be used by nodes in the network...')
       return
@@ -645,7 +646,7 @@ export async function sendGossip(
       )
     }
     for (const node of recipients) {
-      logger.playbackLog('self', node.id, 'GossipInSend', type, tracker, gossipPayload)
+      /* prettier-ignore */ if (logFlags.newFilter) logger.playbackLog('self', node.id, 'GossipInSend', type, tracker, gossipPayload)
       gossipSent++
       gossipTypeSent[type] = gossipTypeSent[type] ? gossipTypeSent[type] + 1 : 1
     }

@@ -222,9 +222,9 @@ export class NetworkClass extends EventEmitter {
     for (const node of nodes) {
       if (!logged) this.logger.playbackLog('self', node, 'InternalTell', route, id, message)
       const requestId = generateUUID()
-      mainLogger.info(`Initiating tell request with requestId: ${requestId}`)
-      mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
-      mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.newFilter) mainLogger.info(`Initiating tell request with requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.newFilter) mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
+      /* prettier-ignore */ if (logFlags.newFilter) mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
       this.InternalTellCounter++
       const promise = this.sn.send(node.internalPort, node.internalIp, data)
       promise.catch((err) => {
@@ -255,9 +255,9 @@ export class NetworkClass extends EventEmitter {
     for (const node of nodes) {
       if (!logged) this.logger.playbackLog('self', node, 'InternalTell2', route, trackerId, message)
       const requestId = generateUUID()
-      this.mainLogger.info(`tell2: initiating tell request with requestId: ${requestId}`)
-      this.mainLogger.info(`tell2: requestId: ${requestId}, node: ${utils.logNode(node)}`)
-      this.mainLogger.info(`tell2: route: ${route}, message: ${message} requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.newFilter) this.mainLogger.info(`tell2: initiating tell request with requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.newFilter) this.mainLogger.info(`tell2: requestId: ${requestId}, node: ${utils.logNode(node)}`)
+      /* prettier-ignore */ if (logFlags.newFilter) this.mainLogger.info(`tell2: route: ${route}, message: ${message} requestId: ${requestId}`)
       this.InternalTellCounter++
       const promise = this.sn.sendWithHeader(node.internalPort, node.internalIp, data, appHeader)
       promise.catch((err) => {
@@ -284,9 +284,9 @@ export class NetworkClass extends EventEmitter {
       }
 
       const requestId = generateUUID()
-      mainLogger.info(`Initiating ask request with requestId: ${requestId}`)
-      mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
-      mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.newFilter) mainLogger.info(`Initiating ask request with requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.newFilter) mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
+      /* prettier-ignore */ if (logFlags.newFilter) mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
 
       try {
         if (this.debugNetworkDelay > 0) {
@@ -345,9 +345,9 @@ export class NetworkClass extends EventEmitter {
       this.InternalAskCounter++
 
       const requestId = generateUUID()
-      this.mainLogger.info(`ask2: initiating ask request with requestId: ${requestId}`)
-      this.mainLogger.info(`ask2: requestId: ${requestId}, node: ${utils.logNode(node)}`)
-      this.mainLogger.info(`ask2: route: ${route}, message: ${message} requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.newFilter) this.mainLogger.info(`ask2: initiating ask request with requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.newFilter) this.mainLogger.info(`ask2: requestId: ${requestId}, node: ${utils.logNode(node)}`)
+      /* prettier-ignore */ if (logFlags.newFilter) this.mainLogger.info(`ask2: route: ${route}, message: ${message} requestId: ${requestId}`)
 
       try {
         if (this.debugNetworkDelay > 0) {

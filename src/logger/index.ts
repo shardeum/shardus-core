@@ -83,6 +83,7 @@ export type LogFlags = {
   // //p2p_info:boolean;
 
   // snapshot:boolean;
+  newFilter: boolean
 }
 
 export let logFlags: LogFlags = {
@@ -101,6 +102,7 @@ export let logFlags: LogFlags = {
   // main_error:true,
   // main_debug:true,
   // main_trace:true,
+  newFilter: false,
 
   // playback:true,
   // playback_verbose:true,
