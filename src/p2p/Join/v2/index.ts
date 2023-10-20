@@ -15,6 +15,7 @@ import { submitUnjoin } from './unjoin'
 import { ResultAsync } from 'neverthrow'
 import { reset as resetAcceptance } from './acceptance'
 import { stringifyReduce } from '../../../utils/functions/stringifyReduce'
+import { logFlags } from '../../../logger'
 
 const clone = rfdc()
 
@@ -56,7 +57,7 @@ export function init(): void {
  * @param persistImmediately If true, the node will be added to the standby node list immediately. This can be used for the first node in the network.
  */
 export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = false): void {
-  console.log('saving join request:', joinRequest)
+  if (logFlags.verbose) console.log('saving join request:', joinRequest)
 
   // if first node, add to standby list immediately
   if (persistImmediately) {
@@ -70,7 +71,7 @@ export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = f
  * Returns the list of new standby join requests and empties the list.
  */
 export function drainNewJoinRequests(): JoinRequest[] {
-  console.log('draining new standby info:', newJoinRequests)
+  if (logFlags.verbose) console.log('draining new standby info:', newJoinRequests)
   const tmp = newJoinRequests
   newJoinRequests = []
   return tmp
@@ -80,7 +81,7 @@ export function drainNewJoinRequests(): JoinRequest[] {
  * Adds nodes to the standby node list.
  */
 export function addStandbyJoinRequests(...nodes: JoinRequest[]): void {
-  console.log('adding standby nodes:', nodes)
+  if (logFlags.verbose) console.log('adding standby nodes:', nodes)
   for (const node of nodes) {
     standbyNodesInfo.set(node.nodeInfo.publicKey, node)
   }
@@ -92,7 +93,7 @@ let lastHashedList: JoinRequest[] = []
  * Returns the list of standby nodes, sorted by their public keys.
  */
 export function getSortedStandbyJoinRequests(): JoinRequest[] {
-  console.log('getting sorted standby node list')
+  if (logFlags.verbose) console.log('getting sorted standby node list')
   return [...standbyNodesInfo.values()].sort((a, b) =>
     // using mathematical comparison in case localeCompare is inconsistent.
     // we will use a simple ternary statement for this that doesn't account for
@@ -109,11 +110,12 @@ export function computeNewStandbyListHash(): hexstring {
   lastHashedList = clone(getSortedStandbyJoinRequests())
   const hash = crypto.hash(lastHashedList)
 
-  console.log(`computing new standby list hash: ${hash} number of nodes: ${lastHashedList.length}`)
-  //use map to convert lastHashedList to a list of public keys
-  const publicKeyList = lastHashedList.map((node) => node.nodeInfo.publicKey)
-  console.log(`{standby_public_key_list: ${stringifyReduce(publicKeyList)}}`)
-
+  if (logFlags.verbose) {
+    console.log(`computing new standby list hash: ${hash} number of nodes: ${lastHashedList.length}`)
+    //use map to convert lastHashedList to a list of public keys
+    const publicKeyList = lastHashedList.map((node) => node.nodeInfo.publicKey)
+    console.log(`{standby_public_key_list: ${stringifyReduce(publicKeyList)}}`)
+  }
   return hash
 }
 
@@ -122,19 +124,19 @@ export function computeNewStandbyListHash(): hexstring {
  * want to compute a new hash instead, use `computeNewStandbyListHash`.
  */
 export function getStandbyListHash(): hexstring | undefined {
-  console.log('getting standby list hash')
+  if (logFlags.verbose) console.log('getting standby list hash')
   return CycleChain.newest?.standbyNodeListHash
 }
 
 /** Returns the last list of standby information that had its hash computed. */
 export function getLastHashedStandbyList(): JoinRequest[] {
-  console.log('getting last hashed standby list')
+  if (logFlags.verbose) console.log('getting last hashed standby list')
   return lastHashedList
 }
 
 /** Returns the map of standby information. */
 export function getStandbyNodesInfoMap(): Map<publickey, JoinRequest> {
-  console.log('getting standby nodes info map')
+  if (logFlags.verbose) console.log('getting standby nodes info map')
   return standbyNodesInfo
 }
 
@@ -167,6 +169,6 @@ export async function shutdown(): Promise<void> {
   if (unjoinResult.isErr()) {
     console.error('Failed send unjoin request:', unjoinResult.error)
   } else {
-    console.log('Unjoin request sent')
+    if (logFlags.verbose) console.log('Unjoin request sent')
   }
 }

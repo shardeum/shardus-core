@@ -34,7 +34,17 @@ const DESIRED_CERT_MATCHES = 3
 const MAX_CYCLES_TO_KEEP = 2
 
 // add the types of any new modules here
-type submoduleTypes = typeof Archivers | typeof Join | typeof Active | typeof Rotation | typeof Refresh | typeof Apoptosis | typeof Lost | typeof SafetyMode | typeof Modes | typeof CycleAutoScale
+type submoduleTypes =
+  | typeof Archivers
+  | typeof Join
+  | typeof Active
+  | typeof Rotation
+  | typeof Refresh
+  | typeof Apoptosis
+  | typeof Lost
+  | typeof SafetyMode
+  | typeof Modes
+  | typeof CycleAutoScale
 
 /** STATE */
 
@@ -56,7 +66,7 @@ export let submodules: submoduleTypes[] = [
   Apoptosis,
   Lost,
   SafetyMode,
-  CycleAutoScale
+  CycleAutoScale,
 ]
 
 export let currentQuarter = -1 // means we have not started creating cycles
@@ -266,7 +276,7 @@ async function cycleCreator() {
 
   createCycleTag++
   let callTag = `cct${createCycleTag}`
-  /* prettier-ignore */ info( `cc: start C${currentCycle} Q${currentQuarter} madeCycle: ${madeCycle} bestMarker: ${bestMarker} ${callTag}` )
+  /* prettier-ignore */ if (logFlags.verbose) info( `cc: start C${currentCycle} Q${currentQuarter} madeCycle: ${madeCycle} bestMarker: ${bestMarker} ${callTag}` )
 
   try {
     // Get the previous record
@@ -287,7 +297,7 @@ async function cycleCreator() {
       prevRecord = await fetchLatestRecord()
     }
 
-    info(`cc: prevRecord.counter: ${prevRecord.counter} ${callTag}`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`cc: prevRecord.counter: ${prevRecord.counter} ${callTag}`)
     //WE complete Sync.digestCycle each cycle even thought we are failing later to get to cycleLogger.info
 
     // Apply the previous records changes to the NodeList
@@ -315,7 +325,7 @@ async function cycleCreator() {
       }
       lastSavedData = data
 
-      info(`cc: cycle data created and stored. data.counter:${data.counter} ${callTag}`)
+      /* prettier-ignore */ if (logFlags.verbose) info(`cc: cycle data created and stored. data.counter:${data.counter} ${callTag}`)
 
       // this event is currently only handled by non active snapshot system
       Self.emitter.emit('new_cycle_data', data)
@@ -327,16 +337,16 @@ async function cycleCreator() {
     // Print combined cycle log entry
     cycleLogger.info(CycleChain.getDebug() + NodeList.getDebug())
 
-    info(`cc: recorded to cycle.log ${callTag}`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`cc: recorded to cycle.log ${callTag}`)
 
     // Prune the cycle chain
     pruneCycleChain()
 
-    info(`cc: pruned ${callTag}`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`cc: pruned ${callTag}`)
 
     // Send last cycle record, state hashes and receipt hashes to any subscribed archivers
     Archivers.sendData()
-    info(`cc: acrhiver data sent ${callTag}`) //todo list time delta
+    /* prettier-ignore */ if (logFlags.verbose) info(`cc: acrhiver data sent ${callTag}`) //todo list time delta
 
     let expectedCycle = currentCycle + 1
     // this is where we update the current cycle
@@ -347,19 +357,19 @@ async function cycleCreator() {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `cycleCreator:expectedCycle !== currentCycle ex${expectedCycle}!=${currentCycle}} tag:${callTag}`)
     }
 
-    info(`cc: current cycle and quarter updated C${currentCycle} Q${currentQuarter} ${callTag}`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`cc: current cycle and quarter updated C${currentCycle} Q${currentQuarter} ${callTag}`)
 
     const { quarterDuration, startQ1, startQ2, startQ3, startQ4, end } = calcIncomingTimes(prevRecord)
 
     nextQ1Start = end
 
     // make some more logging .. posibly even to cycle log with a timestamp also.
-    /* prettier-ignore */ info(`cc: inc times ${JSON.stringify({ quarterDuration, startQ1, startQ2, startQ3, startQ4, end })}  ${callTag}`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`cc: inc times ${JSON.stringify({ quarterDuration, startQ1, startQ2, startQ3, startQ4, end })}  ${callTag}`)
 
     // Reset cycle marker and cycle certificate creation state
     reset()
 
-    info(`cc: cycle data was reset record.counter: ${record.counter}  ${callTag}`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`cc: cycle data was reset record.counter: ${record.counter}  ${callTag}`)
 
     // Omar moved this to before scheduling the quarters; should not make a difference
     madeCycle = false
@@ -374,7 +384,7 @@ async function cycleCreator() {
       hasAlreadyEnteredProcessing = true
     }
 
-    info(`cc: scheduling currentCycle:${currentCycle} ${callTag}`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`cc: scheduling currentCycle:${currentCycle} ${callTag}`)
 
     schedule(runQ1, startQ1, { runEvenIfLateBy: quarterDuration - 1 * SECOND }) // if there's at least one sec before Q2 starts, we can start Q1 now
     schedule(runQ2, startQ2)
@@ -382,7 +392,7 @@ async function cycleCreator() {
     schedule(runQ4, startQ4)
     schedule(cycleCreator, end, { runEvenIfLateBy: Infinity })
   } finally {
-    /* prettier-ignore */ info( `cc: end C${currentCycle} Q${currentQuarter} madeCycle: ${madeCycle} bestMarker: ${bestMarker} ${callTag}` )
+    /* prettier-ignore */ if (logFlags.verbose) info( `cc: end C${currentCycle} Q${currentQuarter} madeCycle: ${madeCycle} bestMarker: ${bestMarker} ${callTag}` )
   }
 }
 

@@ -10,6 +10,7 @@ import * as CycleChain from './CycleChain'
 import * as Join from './Join'
 import { emitter, id } from './Self'
 import rfdc from 'rfdc'
+import { logFlags } from '../logger'
 
 const clone = rfdc()
 
@@ -121,11 +122,15 @@ export function addNodes(newNodes: P2P.NodeListTypes.Node[]) {
 
 export function removeSyncingNode(id: string) {
   const idx = binarySearch(syncingByIdOrder, { id }, propComparator('id'))
-  console.log('Removing syncing node', id, idx)
+  /* prettier-ignore */ if (logFlags.verbose) console.log('Removing syncing node', id, idx)
   if (idx >= 0) syncingByIdOrder.splice(idx, 1)
 }
 
-export function removeNode(id: string, raiseEvents: boolean, cycle: P2P.CycleCreatorTypes.CycleRecord | null) {
+export function removeNode(
+  id: string,
+  raiseEvents: boolean,
+  cycle: P2P.CycleCreatorTypes.CycleRecord | null
+) {
   let idx: number
 
   // Omar added this so we don't crash if a node gets remove more than once
@@ -217,7 +222,7 @@ export function updateNode(
           insertSorted(activeOthersByIdOrder, node, propComparator('id'))
         }
         // remove active node from syncing list
-        console.log('updateNode: removing active node from syncing list')
+        /* prettier-ignore */ if (logFlags.verbose) console.log('updateNode: removing active node from syncing list')
         removeSyncingNode(node.id)
 
         if (raiseEvents) {
@@ -307,9 +312,9 @@ export function computeNewNodeListHash(): hexstring {
   // deep cloning is necessary as validator information may be mutated by
   // reference.
   lastHashedList = clone(byJoinOrder)
-  info('hashing validator list:', JSON.stringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.verbose) info('hashing validator list:', JSON.stringify(lastHashedList))
   let hash = crypto.hash(lastHashedList)
-  info('the new validator list hash is', hash)
+  /* prettier-ignore */ if (logFlags.verbose) info('the new validator list hash is', hash)
   return hash
 }
 
@@ -321,7 +326,7 @@ export function computeNewNodeListHash(): hexstring {
  */
 export function getNodeListHash(): hexstring | undefined {
   if (config.p2p.writeSyncProtocolV2 || config.p2p.useSyncProtocolV2) {
-    info('returning validator list hash:', CycleChain.newest?.nodeListHash)
+    /* prettier-ignore */ if (logFlags.verbose) info('returning validator list hash:', CycleChain.newest?.nodeListHash)
     return CycleChain.newest?.nodeListHash
   } else {
     // this is how the `nodelistHash` is computed before Sync v2
@@ -334,8 +339,8 @@ let lastHashedList: P2P.NodeListTypes.Node[] = []
 
 /** Returns the last list of nodes that had its hash computed. */
 export function getLastHashedNodeList(): P2P.NodeListTypes.Node[] {
-    info('returning last hashed validator list:', JSON.stringify(lastHashedList))
-    return lastHashedList
+  /* prettier-ignore */ if (logFlags.verbose) info('returning last hashed validator list:', JSON.stringify(lastHashedList))
+  return lastHashedList
 }
 
 /** ROUTES */

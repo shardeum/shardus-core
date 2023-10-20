@@ -28,7 +28,7 @@
     "prep": "npm run create:folders",
     "np": "np --any-branch --no-cleanup --no-tests --no-yarn --message=\"Bump version to %s\"",
     "compile": "npm-run-all compile:*",
-    "prepare": "npm run build:dev",
+    "prepare": "npm run compile",
     "release:move": "npm-run-all release:move:*",
     "build:dev": "npm-run-all clean compile:ts dev:move",
     "build:release": "npm-run-all clean prep compile release:move",
