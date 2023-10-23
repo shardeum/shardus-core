@@ -99,9 +99,9 @@ class Storage {
   }
 
   async init() {
-    console.log('shardus storage init:')
+    /* prettier-ignore */ if (logFlags.important_as_fatal) console.log('shardus storage init:')
     await this.storage.init()
-    console.log('shardus storage init complete')
+    /* prettier-ignore */ if (logFlags.important_as_fatal) console.log('shardus storage init complete')
 
     await this.storage.runCreate(
       'CREATE TABLE if not exists `acceptedTxs` (`txId` VARCHAR(255) NOT NULL PRIMARY KEY, `timestamp` BIGINT NOT NULL, `data` JSON NOT NULL, `keys` JSON NOT NULL)'
@@ -110,47 +110,49 @@ class Storage {
       'CREATE TABLE if not exists `accountStates` ( `accountId` VARCHAR(255) NOT NULL, `txId` VARCHAR(255) NOT NULL, `txTimestamp` BIGINT NOT NULL, `stateBefore` VARCHAR(255) NOT NULL, `stateAfter` VARCHAR(255) NOT NULL,  PRIMARY KEY (`accountId`, `txTimestamp`))'
     )
     await this.storage.runCreate(
-      'CREATE TABLE if not exists `cycles` (' + [
-        '`networkId` TEXT NOT NULL',
-        '`counter` BIGINT NOT NULL UNIQUE PRIMARY KEY',
-        '`target` BIGINT',
-        '`mode` TEXT',
-        '`safetyMode` BOOLEAN',
-        '`safetyNum` BIGINT',
-        '`maxSyncTime` BIGINT',
-        '`networkStateHash` BIGINT',
-        '`networkDataHash` JSON',
-        '`networkConfigHash` TEXT NOT NULL',
-        '`networkReceiptHash` JSON',
-        '`networkSummaryHash` JSON',
-        '`certificate` JSON NOT NULL',
-        '`previous` TEXT NOT NULL',
-        '`marker` TEXT NOT NULL',
-        '`start` BIGINT NOT NULL',
-        '`duration` BIGINT NOT NULL',
-        '`active` BIGINT NOT NULL',
-        '`syncing` BIGINT NOT NULL',
-        '`desired` BIGINT NOT NULL',
-        '`expired` BIGINT NOT NULL',
-        '`joined` JSON NOT NULL',
-        '`joinedArchivers` JSON NOT NULL',
-        '`leavingArchivers` JSON NOT NULL',
-        '`joinedConsensors` JSON NOT NULL',
-        '`refreshedArchivers` JSON NOT NULL',
-        '`refreshedConsensors` JSON NOT NULL',
-        '`activated` JSON NOT NULL',
-        '`activatedPublicKeys` JSON NOT NULL',
-        '`removed` JSON NOT NULL',
-        '`returned` JSON NOT NULL',
-        '`lost` JSON NOT NULL',
-        '`lostSyncing` JSON NOT NULL',
-        '`refuted` JSON NOT NULL',
-        '`nodeListHash` TEXT NOT NULL',
-        '`archiverListHash` TEXT NOT NULL',
-        '`standbyAdd` JSON NOT NULL',
-        '`standbyNodeListHash` TEXT NOT NULL',
-        '`standbyRemove` JSON NOT NULL'].join(', ')
-      + ')'
+      'CREATE TABLE if not exists `cycles` (' +
+        [
+          '`networkId` TEXT NOT NULL',
+          '`counter` BIGINT NOT NULL UNIQUE PRIMARY KEY',
+          '`target` BIGINT',
+          '`mode` TEXT',
+          '`safetyMode` BOOLEAN',
+          '`safetyNum` BIGINT',
+          '`maxSyncTime` BIGINT',
+          '`networkStateHash` BIGINT',
+          '`networkDataHash` JSON',
+          '`networkConfigHash` TEXT NOT NULL',
+          '`networkReceiptHash` JSON',
+          '`networkSummaryHash` JSON',
+          '`certificate` JSON NOT NULL',
+          '`previous` TEXT NOT NULL',
+          '`marker` TEXT NOT NULL',
+          '`start` BIGINT NOT NULL',
+          '`duration` BIGINT NOT NULL',
+          '`active` BIGINT NOT NULL',
+          '`syncing` BIGINT NOT NULL',
+          '`desired` BIGINT NOT NULL',
+          '`expired` BIGINT NOT NULL',
+          '`joined` JSON NOT NULL',
+          '`joinedArchivers` JSON NOT NULL',
+          '`leavingArchivers` JSON NOT NULL',
+          '`joinedConsensors` JSON NOT NULL',
+          '`refreshedArchivers` JSON NOT NULL',
+          '`refreshedConsensors` JSON NOT NULL',
+          '`activated` JSON NOT NULL',
+          '`activatedPublicKeys` JSON NOT NULL',
+          '`removed` JSON NOT NULL',
+          '`returned` JSON NOT NULL',
+          '`lost` JSON NOT NULL',
+          '`lostSyncing` JSON NOT NULL',
+          '`refuted` JSON NOT NULL',
+          '`nodeListHash` TEXT NOT NULL',
+          '`archiverListHash` TEXT NOT NULL',
+          '`standbyAdd` JSON NOT NULL',
+          '`standbyNodeListHash` TEXT NOT NULL',
+          '`standbyRemove` JSON NOT NULL',
+        ].join(', ') +
+        ')'
     )
     await this.storage.runCreate(
       'CREATE TABLE if not exists `nodes` (`id` TEXT NOT NULL PRIMARY KEY, `publicKey` TEXT NOT NULL, `curvePublicKey` TEXT NOT NULL, `cycleJoined` TEXT NOT NULL, `internalIp` VARCHAR(255) NOT NULL, `externalIp` VARCHAR(255) NOT NULL, `internalPort` SMALLINT NOT NULL, `externalPort` SMALLINT NOT NULL, `joinRequestTimestamp` BIGINT NOT NULL, `activeTimestamp` BIGINT NOT NULL, `address` VARCHAR(255) NOT NULL, `status` VARCHAR(255) NOT NULL)'
@@ -277,7 +279,7 @@ class Storage {
   // }
 
   async addCycles(cycles) {
-    console.log('adding cycles', cycles)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('adding cycles', cycles)
     this._checkInit()
     try {
       await this._create(this.storageModels.cycles, cycles)

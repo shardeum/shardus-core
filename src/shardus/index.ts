@@ -1037,10 +1037,10 @@ class Shardus extends EventEmitter {
       let timestampReceipt: ShardusTypes.TimestampReceipt
       if (!injectedTimestamp || injectedTimestamp === -1) {
         if (injectedTimestamp === -1) {
-          console.log('Dapp request to generate a new timestmap for the tx')
+          /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('Dapp request to generate a new timestmap for the tx')
         }
         timestampReceipt = await this.stateManager.transactionConsensus.askTxnTimestampFromNode(tx, txId)
-        console.log('Network generated a timestamp', timestampReceipt)
+        /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('Network generated a timestamp', timestampReceipt)
       }
       if (!injectedTimestamp && !timestampReceipt) {
         this.shardus_fatal(
@@ -2074,7 +2074,7 @@ class Shardus extends EventEmitter {
       res.json(deepReplace(result, undefined, '__undefined__'))
     })
 
-    this.network.registerExternalGet('standby-list', isDebugModeMiddleware, async (req, res) => {
+    this.network.registerExternalGet('standby-list-debug', isDebugModeMiddleware, async (req, res) => {
       let getSortedStandbyNodeList = JoinV2.getSortedStandbyJoinRequests()
       let result = getSortedStandbyNodeList.map((node) => ({
         pubKey: node.nodeInfo.publicKey,
@@ -2378,7 +2378,7 @@ class Shardus extends EventEmitter {
 
     if (closestNodesIds.includes(Self.id)) {
       const { success, signature } = await this.app.signAppData?.(type, hash, Number(nodesToSign), appData)
-      console.log(success, signature)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(success, signature)
       responses = [...responses, ...[{ success, signature }]]
     }
 

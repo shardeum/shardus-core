@@ -11,6 +11,9 @@ import * as NodeList from '../NodeList'
 import * as Archivers from '../Archivers'
 import * as CycleCreator from '../CycleCreator'
 import * as JoinV2 from '../Join/v2'
+import { profilerInstance } from '../../utils/profiler'
+import { logFlags } from '../../logger'
+import { jsonHttpResWithSize } from '../../utils'
 
 /** An endpoint that returns the latest node list hash. */
 const validatorListHashRoute: P2P.P2PTypes.Route<Handler> = {
@@ -50,55 +53,79 @@ const newestCycleHashRoute: P2P.P2PTypes.Route<Handler> = {
 }
 
 /** An endpoint that returns the last hashed validator list if the expected (requested)
-  * hash matches. */
+ * hash matches. */
 const validatorListRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'validator-list',
   handler: (req, res) => {
-    const expectedHash = req.query.hash
+    let respondSize = 0
+    profilerInstance.scopedProfileSectionStart('validator-list', false)
+    try {
+      const expectedHash = req.query.hash
 
-    // return the validator list if the hash from the requester matches
-    if (expectedHash && expectedHash === NodeList.getNodeListHash()) {
-      res.json(NodeList.getLastHashedNodeList())
-    } else {
-      console.error(`rejecting validator list request: expected '${expectedHash}' != '${NodeList.getNodeListHash()}'`)
-      res.status(404).send(`validator list with hash '${expectedHash}' not found`)
+      // return the validator list if the hash from the requester matches
+      if (expectedHash && expectedHash === NodeList.getNodeListHash()) {
+        //res.json(NodeList.getLastHashedNodeList())
+        const getLastHashedNodeList = NodeList.getLastHashedNodeList()
+        respondSize = jsonHttpResWithSize(res, getLastHashedNodeList)
+      } else {
+        /* prettier-ignore */ if (logFlags.debug) console.error( `rejecting validator list request: expected '${expectedHash}' != '${NodeList.getNodeListHash()}'` )
+        res.status(404).send(`validator list with hash '${expectedHash}' not found`)
+      }
+    } finally {
+      profilerInstance.scopedProfileSectionEnd('validator-list', respondSize)
     }
   },
 }
 
 /** An endpoint that returns the last hashed archiver list if the expected (requested)
-  * hash matches. */
+ * hash matches. */
 const archiverListRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'archiver-list',
   handler: (req, res) => {
+    profilerInstance.scopedProfileSectionStart('newest-cycle-record', false)
     const expectedHash = req.query.hash
 
     // return the archiver list if the hash from the requester matches
     if (expectedHash && expectedHash === Archivers.getArchiverListHash()) {
       res.json(Archivers.getLastHashedArchiverList())
     } else {
-      console.error(`rejecting archiver list request: expected '${expectedHash}' != '${Archivers.getArchiverListHash()}'`)
+      /* prettier-ignore */ if (logFlags.debug) console.error( `rejecting archiver list request: expected '${expectedHash}' != '${Archivers.getArchiverListHash()}'` )
       res.status(404).send(`archiver list with hash '${expectedHash}' not found`)
     }
+    profilerInstance.scopedProfileSectionEnd('newest-cycle-record')
   },
 }
 
 /** An endpoint that returns the last hashed standby list if the expected (requested)
-  * hash matches. */
+ * hash matches. */
 const standbyListRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'standby-list',
   handler: (req, res) => {
-    const expectedHash = req.query.hash
+    let respondSize = 0
+    profilerInstance.scopedProfileSectionStart('standby-list', false)
 
-    // return the standby list if the hash from the requester matches
-    if (expectedHash && expectedHash === JoinV2.getStandbyListHash()) {
-      res.json(JoinV2.getLastHashedStandbyList())
-    } else {
-      console.error(`rejecting standby list request: expected '${expectedHash}' != '${JoinV2.getStandbyListHash()}'`)
-      res.status(404).send(`standby list with hash '${expectedHash}' not found`)
+    try {
+      const expectedHash = req.query.hash
+
+      // return the standby list if the hash from the requester matches
+      if (expectedHash && expectedHash === JoinV2.getStandbyListHash()) {
+        const standbyList = JoinV2.getLastHashedStandbyList()
+        //todo could make a helper that does response but gets size to
+        // const standbyListStr = JSON.stringify(standbyList)
+        // respondSize = standbyListStr.length
+        // res.write(standbyListStr)
+        // res.end()
+        respondSize = jsonHttpResWithSize(res, standbyList)
+        //res.json(standbyList)
+      } else {
+        /* prettier-ignore */ if (logFlags.debug) console.error( `rejecting standby list request: expected '${expectedHash}' != '${JoinV2.getStandbyListHash()}'` )
+        res.status(404).send(`standby list with hash '${expectedHash}' not found`)
+      }
+    } finally {
+      profilerInstance.scopedProfileSectionEnd('standby-list', respondSize)
     }
   },
 }
@@ -108,6 +135,8 @@ const cycleByMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'cycle-by-marker',
   handler: (req, res) => {
+    profilerInstance.scopedProfileSectionStart('cycle-by-marker', false)
+
     // get the cycle corresponding to the marker. return it if it exists, or
     // otherwise return an error.
     const cycle = CycleChain.cyclesByMarker[req.query.marker as string]
@@ -116,15 +145,18 @@ const cycleByMarkerRoute: P2P.P2PTypes.Route<Handler> = {
     } else {
       res.status(404).send(`cycle with marker '${req.query.marker}' not found`)
     }
+    profilerInstance.scopedProfileSectionEnd('cycle-by-marker')
   },
 }
 
 const newestCycleRecordRoute: P2P.P2PTypes.Route<Handler> = {
-    method: 'GET',
-    name: 'newest-cycle-record',
-    handler: (_req, res) => {
-        res.json(CycleChain.newest)
-    }
+  method: 'GET',
+  name: 'newest-cycle-record',
+  handler: (_req, res) => {
+    profilerInstance.scopedProfileSectionStart('newest-cycle-record', false)
+    res.json(CycleChain.newest)
+    profilerInstance.scopedProfileSectionEnd('newest-cycle-record')
+  },
 }
 
 /** Registers all routes as external routes. */
@@ -138,7 +170,7 @@ export function initRoutes(): void {
     archiverListRoute,
     standbyListRoute,
     cycleByMarkerRoute,
-    newestCycleRecordRoute
+    newestCycleRecordRoute,
   ]
 
   for (const route of routes) {

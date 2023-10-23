@@ -32,18 +32,18 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
       sign: 'o',
     })
     if (err) {
-      warn('bad input ' + err)
+      /* prettier-ignore */ if (logFlags.error) warn('gossip-active: bad input ' + err)
       return
     }
     err = validateTypes(payload.sign, { owner: 's', sig: 's' })
     if (err) {
-      warn('bad input sign ' + err)
+      /* prettier-ignore */ if (logFlags.error) warn('gossip-active: bad input sign ' + err)
       return
     }
 
     const signer = NodeList.byPubKey.get(payload.sign.owner)
     if (!signer) {
-      warn('Got active request from unknown node')
+      /* prettier-ignore */ if (logFlags.error) warn('gossip-active: Got active request from unknown node')
     }
     const isOrig = signer.id === sender
 
@@ -197,7 +197,8 @@ export function updateRecord(
           addedCount += 1
         }
       } else {
-        error(`Found no cycle for counter ${cycleCounter}`)
+        //this gets logged a lot leaving it for now so we dont forget to fix it
+        /* prettier-ignore */ if (logFlags.error) error(`Found no cycle for counter ${cycleCounter}`)
       }
       cycleCounter--
       index--
@@ -215,11 +216,11 @@ export function updateRecord(
     const medianIndex = Math.floor(syncDurations.length / 2)
     const medianSyncTime = syncDurations[medianIndex]
 
-    info('Sync time records sorted', syncTimes.length, JSON.stringify(syncTimes))
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Sync time records sorted', syncTimes.length, JSON.stringify(syncTimes))
 
-    if (CycleChain.newest)
-      info(`Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`)
-
+    if (CycleChain.newest) {
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`)
+    }
     let maxSyncTime = medianSyncTime ? medianSyncTime * 2 : 0
     if (maxSyncTime < config.p2p.maxSyncTimeFloor) {
       maxSyncTime = config.p2p.maxSyncTimeFloor
@@ -228,7 +229,7 @@ export function updateRecord(
     // record.maxSyncTime = Math.min(config.p2p.maxSyncTimeFloor, maxSyncTime)
   } catch (e) {
     record.maxSyncTime = config.p2p.maxSyncTimeFloor
-    error(`calculateMaxSyncTime: Unable to calculate max sync time`, e)
+    /* prettier-ignore */ if (logFlags.error) error(`calculateMaxSyncTime: Unable to calculate max sync time`, e)
   }
 }
 

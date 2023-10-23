@@ -360,7 +360,7 @@ class TransactionConsenus {
     )
     const cycleMarker = CycleChain.computeCycleMarker(CycleChain.newest)
     const cycleCounter = CycleChain.newest.counter
-    this.mainLogger.debug('Asking timestamp from node', homeNode.node)
+    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('Asking timestamp from node', homeNode.node)
     if (homeNode.node.id === Self.id) {
       // we generate the tx timestamp by ourselves
       return this.generateTimestampReceipt(txId, cycleMarker, cycleCounter)

@@ -18,6 +18,7 @@ import { byJoinOrder } from './NodeList'
 import { addStandbyJoinRequests } from './Join/v2'
 import * as JoinV2 from './Join/v2'
 import { deleteStandbyNode } from './Join/v2/unjoin'
+import { logFlags } from '../logger'
 
 /** STATE */
 
@@ -312,11 +313,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
     return
   }
 
-  info(
-    `digestCycle ${JSON.stringify(cycle)} from ${source}... note: CycleChain.newest.counter: ${JSON.stringify(
-      CycleChain.newest
-    )} CycleCreator.currentCycle: ${CycleCreator.currentCycle}`
-  )
+  /* prettier-ignore */ if (logFlags.important_as_error) info( `digestCycle ${JSON.stringify(cycle)} from ${source}... note: CycleChain.newest.counter: ${JSON.stringify( CycleChain.newest )} CycleCreator.currentCycle: ${CycleCreator.currentCycle}` )
 
   const changes = parse(cycle)
   applyNodeListChange(changes, true, cycle)
@@ -325,8 +322,8 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
   // and remove any standby nodes that have unjoined.
   if (config.p2p.useJoinProtocolV2) {
     if (cycle.standbyAdd) {
-    addStandbyJoinRequests(...cycle.standbyAdd)
-  }
+      addStandbyJoinRequests(cycle.standbyAdd)
+    }
     if (cycle.standbyRemove) {
       for (const publicKey of cycle.standbyRemove) {
         deleteStandbyNode(publicKey)
@@ -342,6 +339,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
 
   let nodeLimit = 2 //todo set this to a higher number, but for now I want to make sure it works in a small test
   if (NodeList.activeByIdOrder.length <= nodeLimit) {
+    /* prettier-ignore */ if (logFlags.important_as_error) {
     info(`
       Digested C${cycle.counter}
         cycle record: ${JSON.stringify(cycle)}
@@ -349,7 +347,9 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
         node list: ${JSON.stringify([...NodeList.nodes.values()])}
         active nodes: ${JSON.stringify(NodeList.activeByIdOrder)}
     `)
+    }
   } else {
+    /* prettier-ignore */ if (logFlags.important_as_error) {
     info(`
     Digested C${cycle.counter}
       cycle record: ${JSON.stringify(cycle)}
@@ -357,6 +357,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
       node list: too many to list: ${NodeList.nodes.size}
       active nodes: too many to list: ${NodeList.activeByIdOrder.length}
     `)
+    }
   }
 }
 
@@ -383,7 +384,7 @@ export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.Cycle
     return resp
   }
   const eqFn = (item1, item2) => {
-    console.log(`getNewestCycle: eqFn: item1 is: ${JSON.stringify(item1)}`)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`getNewestCycle: eqFn: item1 is: ${JSON.stringify(item1)}`)
     try {
       if (item1.newestCycle.counter === item2.newestCycle.counter) return true
       return false
@@ -401,7 +402,7 @@ export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.Cycle
     redundancy,
     true
   )
-  console.log(`getNewestCycle: robustQuery response is: ${JSON.stringify(response)}`)
+  /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`getNewestCycle: robustQuery response is: ${JSON.stringify(response)}`)
 
   // [TODO] Validate response
   if (!response?.newestCycle) throw new Error('warning: getNewestCycle: no newestCycle yet')
@@ -432,7 +433,7 @@ async function getCycles(
     return resp
   }
 
-  info(`getCycles: ${start} - ${end}...`)
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`getCycles: ${start} - ${end}...`)
 
   // use robust query so we can ask less nodes to get the cycles
   let redundancy = 1
@@ -464,7 +465,7 @@ export function activeNodeCount(cycle: P2P.CycleCreatorTypes.CycleRecord) {
 }
 
 export function showNodeCount(cycle: P2P.CycleCreatorTypes.CycleRecord) {
-  warn(` syncing + joined + active - apop - rem - lost
+  /* prettier-ignore */ if (logFlags.error) warn(` syncing + joined + active - apop - rem - lost
     ${cycle.syncing} +
     ${cycle.joinedConsensors.length} +
     ${cycle.active} +

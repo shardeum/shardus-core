@@ -27,6 +27,7 @@ import { attempt } from '../Utils'
 import { getStandbyNodesInfoMap, saveJoinRequest, isOnStandbyList } from './v2'
 import { processNewUnjoinRequest, UnjoinRequest } from './v2/unjoin'
 import { isActive } from '../Self'
+import { logFlags } from '../../logger'
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
@@ -44,15 +45,25 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
     const joinRequest = req.body
 
     if (!isActive) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: not-active`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: not-active`)
       // if we are not active yet, we cannot accept join requests
-      res.end()
-      return
+      return res.status(400).json({
+        success: false,
+        fatal: false,
+        reason: `this node is not active yet`,
+      })
     }
 
     if (CycleCreator.currentQuarter < 1) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: CycleCreator.currentQuarter < 1 ${CycleCreator.currentQuarter}`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: CycleCreator.currentQuarter < 1 ${CycleCreator.currentQuarter} ${joinRequest.nodeInfo.publicKey}`)
       // if currentQuarter <= 0 then we are not ready
-      res.end()
-      return
+      return res.status(400).json({
+        success: false,
+        fatal: false,
+        reason: `Can't join before quarter 1`,
+      })
     }
 
     if (
@@ -74,6 +85,8 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
     const internalPortReachable = await isPortReachable({ host: internalIp, port: internalPort })
 
     if (!externalPortReachable || !internalPortReachable) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-reject: !externalPortReachable || !internalPortReachable` )
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: !externalPortReachable || !internalPortReachable ${joinRequest.nodeInfo.publicKey} ${JSON.stringify({ host: externalIp, port: externalPort })}`)
       return res.json({
         success: false,
         fatal: true,
@@ -86,9 +99,11 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
     if (config.p2p.useJoinProtocolV2) {
       // ensure this join request doesn't already exist in standby nodes
       if (getStandbyNodesInfoMap().has(joinRequest.nodeInfo.publicKey)) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: already standby`)
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: already standby ${joinRequest.nodeInfo.publicKey}:`)
         return res.status(400).json({
           success: false,
-          fatal: true,
+          fatal: true, //this seems wrong.  Do we want to kill a node that already got in?
           reason: `Join request for pubkey ${joinRequest.nodeInfo.publicKey} already exists as a standby node`,
         })
       }
@@ -107,16 +122,14 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       // then, calculate the selection number for this join request.
       const selectionNumResult = computeSelectionNum(joinRequest)
       if (selectionNumResult.isErr()) {
-        console.error(
-          `failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`,
-          JSON.stringify(selectionNumResult.error)
-        )
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: failed selection number`)
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`, JSON.stringify(selectionNumResult.error) )
         return res.status(500).json(selectionNumResult.error)
       }
       joinRequest.selectionNum = selectionNumResult.value
 
       if (CycleCreator.currentQuarter > 1) {
-        nestedCountersInstance.countEvent('p2p', `rejected-late-join-request ${CycleCreator.currentQuarter}`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `rejected-late-join-request ${CycleCreator.currentQuarter}`)
         return res.status(400).json({
           success: false,
           fatal: false,
@@ -132,8 +145,9 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       // finally, gossip it to other nodes.
       Comms.sendGossip('gossip-valid-join-requests', joinRequest, '', null, NodeList.byIdOrder, true)
 
+      /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join success` )
       // respond with the number of standby nodes for the user's information
-      return res.status(200).send({ numStandbyNodes: getStandbyNodesInfoMap().size })
+      return res.status(200).send({ success: true, numStandbyNodes: getStandbyNodesInfoMap().size })
     } else {
       //  Validate of joinReq is done in addJoinRequest
       const joinRequestResponse = addJoinRequest(joinRequest)
@@ -206,6 +220,10 @@ const joinedRoute: P2P.P2PTypes.Route<Handler> = {
   },
 }
 
+/**
+ * todo deprecate this or, finish it
+ * for now deprecating the accepted path.  does not seem to have any value
+ */
 const acceptedRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'accepted',
@@ -288,30 +306,30 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
 > = (payload: P2P.JoinTypes.JoinRequest, sender: P2P.NodeListTypes.Node['id'], tracker: string) => {
   // do not forward gossip after quarter 2
   if (CycleCreator.currentQuarter > 2) {
-    /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `rejected-late-join-gossip-request ${CycleCreator.currentQuarter}` )
+    /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-gossip-reject: late-request > Q2:  ${CycleCreator.currentQuarter}` )
     return
   }
 
   // ensure this join request doesn't already exist in standby nodes
   if (getStandbyNodesInfoMap().has(payload.nodeInfo.publicKey)) {
-    console.error(`join request for pubkey ${payload.nodeInfo.publicKey} already exists as a standby node`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-gossip-reject: node already standby` )
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error(`join request for pubkey ${payload.nodeInfo.publicKey} already exists as a standby node`)
     return
   }
 
   // validate the join request first
   const validationError = validateJoinRequest(payload)
   if (validationError) {
-    console.error(`failed to validate join request when gossiping: ${validationError}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-gossip-reject: failed to validate join request` )
+    /* prettier-ignore */ if (logFlags.p2pNonFatal)console.error(`failed to validate join request when gossiping: ${validationError}`)
     return
   }
 
   // then, calculate the selection number for this join request
   const selectionNumResult = computeSelectionNum(payload)
   if (selectionNumResult.isErr()) {
-    console.error(
-      `failed to compute selection number for node ${payload.nodeInfo.publicKey}:`,
-      JSON.stringify(selectionNumResult.error)
-    )
+    /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-gossip-reject:  node already standby` )
+    /* prettier-ignore */ if (logFlags.p2pNonFatal)console.error( `failed to compute selection number for node ${payload.nodeInfo.publicKey}:`, JSON.stringify(selectionNumResult.error) )
     return
   }
   payload.selectionNum = selectionNumResult.value
@@ -321,6 +339,7 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
   // cycle creation to create a standy node list.
   saveJoinRequest(payload)
 
+  /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-gossip: request saved and gossiped` )
   Comms.sendGossip('gossip-valid-join-requests', payload, tracker, sender, NodeList.byIdOrder, false)
 }
 

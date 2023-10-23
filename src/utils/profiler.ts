@@ -440,6 +440,7 @@ class Profiler {
         // eslint-disable-next-line security/detect-object-injection
         const section = this.sectionTimes[key]
         section.total = BigInt(0)
+        section.c = 0
       }
     }
   }

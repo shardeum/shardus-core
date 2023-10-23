@@ -384,7 +384,7 @@ async function cycleCreator() {
       hasAlreadyEnteredProcessing = true
     }
 
-    /* prettier-ignore */ if (logFlags.verbose) info(`cc: scheduling currentCycle:${currentCycle} ${callTag}`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`cc: scheduling currentCycle:${currentCycle} ${callTag} ${startQ1}`)
 
     schedule(runQ1, startQ1, { runEvenIfLateBy: quarterDuration - 1 * SECOND }) // if there's at least one sec before Q2 starts, we can start Q1 now
     schedule(runQ2, startQ2)

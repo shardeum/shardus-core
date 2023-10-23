@@ -132,10 +132,10 @@ export function startupV2(): Promise<boolean> {
         return resolve(true)
       } catch (err) {
         // Log syncing error and abort startup
-        console.log('error in startupV2 > enterSyncingState: ', err)
-        warn('Error while syncing to network:')
-        warn(err)
-        warn(err.stack)
+        /* prettier-ignore */ if (logFlags.important_as_fatal) console.log('error in startupV2 > enterSyncingState: ', utils.formatErrorMessage(err))
+        /* prettier-ignore */ if (logFlags.important_as_fatal) warn('Error while syncing to network:')
+        /* prettier-ignore */ if (logFlags.important_as_fatal) warn(utils.formatErrorMessage(err))
+        //warn(err.stack)
         throw new Error('Fatal: Error while syncing to network:' + err.message)
       }
     }
@@ -211,23 +211,29 @@ export function startupV2(): Promise<boolean> {
           attemptJoiningRunning = false
           return
         }
+
+        //this should help us feel safer that attemptJoining will not finish until we are ready for it to do so
+        nestedCountersInstance.countEvent('p2p', 'attemptJoining: error got too far without an action')
+        throw new Error(
+          'Should not reach this point. Throwing non-fatal error which will restart attemptJoining'
+        )
       } catch (err) {
         // Log joining error
-        console.log(`error in startupV2 > attemptJoining:`, err)
-        warn(`Error while joining network:`)
-        warn(err)
-        warn(err.stack)
+        /* prettier-ignore */ if (logFlags.important_as_fatal) console.log(`error in startupV2 > attemptJoining:`, utils.formatErrorMessage(err))
+        /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Error while joining network:`)
+        /* prettier-ignore */ if (logFlags.important_as_fatal) warn(utils.formatErrorMessage(err))
+        //warn(err.stack)
 
         // Abort startup if error is fatal
         if (err.message.startsWith('Fatal:')) {
           attemptJoiningRunning = false
+          /* prettier-ignore */ if (logFlags.fatal) warn(`Fatal error while joining network. re-throw to cause shutdown`)
           throw err
         }
 
         // Schedule another attempt to join
-        if (logFlags.p2pNonFatal) {
-          info(`Trying to join again in ${cycleDuration} seconds...`)
-        }
+        /* prettier-ignore */ if (logFlags.important_as_fatal) info(`Trying to join again in ${cycleDuration} seconds...`)
+
         attemptJoiningTimer = setTimeout(() => {
           attemptJoining()
         }, cycleDuration * 1000)
@@ -248,12 +254,13 @@ export function startupV2(): Promise<boolean> {
     emitter.emit('joining', publicKey)
 
     // register listener for acceptance
-    Acceptance.getEventEmitter().on('accepted', () => {
-      if (state === P2P.P2PTypes.NodeStatus.SYNCING || state === P2P.P2PTypes.NodeStatus.ACTIVE) {
-        return
-      }
-      attemptJoining()
-    })
+    // The accepted flow is deprecated
+    // Acceptance.getEventEmitter().on('accepted', () => {
+    //   if (state === P2P.P2PTypes.NodeStatus.SYNCING || state === P2P.P2PTypes.NodeStatus.ACTIVE) {
+    //     return
+    //   }
+    //   attemptJoining()
+    // })
 
     // Start by joining the network
     attemptJoining()
@@ -262,98 +269,103 @@ export function startupV2(): Promise<boolean> {
   return promise
 }
 
-export async function startup(): Promise<boolean> {
-  const publicKey = Context.crypto.getPublicKey()
+// export async function startup(): Promise<boolean> {
+//   const publicKey = Context.crypto.getPublicKey()
 
-  // If startInWitness config is set to true, start witness mode and end
-  if (Context.config.p2p.startInWitnessMode) {
-    if (logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
-    emitter.emit('witnessing', publicKey)
-    return true
-  }
+//   // If startInWitness config is set to true, start witness mode and end
+//   if (Context.config.p2p.startInWitnessMode) {
+//     if (logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
+//     emitter.emit('witnessing', publicKey)
+//     return true
+//   }
 
-  // Attempt to join the network until you know if you're first and have an id
-  if (logFlags.p2pNonFatal) info('Emitting `joining` event.')
-  emitter.emit('joining', publicKey)
+//   // Attempt to join the network until you know if you're first and have an id
+//   if (logFlags.p2pNonFatal) info('Emitting `joining` event.')
+//   emitter.emit('joining', publicKey)
 
-  let firstTime = true
-  do {
-    try {
-      // Get active nodes from Archiver
-      const activeNodes = await contactArchiver()
+//   let firstTime = true
+//   do {
+//     try {
+//       // Get active nodes from Archiver
+//       const activeNodes = await contactArchiver()
 
-      // Start in witness mode if conditions are met
-      if (await witnessConditionsMet(activeNodes)) {
-        if (logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
-        emitter.emit('witnessing', publicKey)
-        return true
-      } else {
-        //not in witness mode
-      }
-      // Otherwise, try to join the network
-      ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
-      console.log('isFirst:', isFirst, 'id:', id)
-    } catch (err) {
-      console.log('error in Join network: ', err)
-      if (!Context.config.p2p.useJoinProtocolV2) {
-        updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
-      }
-      if (err.message.startsWith('Fatal:')) {
-        throw err
-      }
-      warn('Error while joining network:')
-      warn(err)
-      warn(err.stack)
-      if (logFlags.p2pNonFatal) info(`Trying to join again in ${Context.config.p2p.cycleDuration} seconds...`)
-      await utils.sleep(Context.config.p2p.cycleDuration * 1000)
-    }
-    firstTime = false
-  } while (utils.isUndefined(isFirst) || utils.isUndefined(id))
+//       // Start in witness mode if conditions are met
+//       if (await witnessConditionsMet(activeNodes)) {
+//         if (logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
+//         emitter.emit('witnessing', publicKey)
+//         return true
+//       } else {
+//         //not in witness mode
+//       }
+//       // Otherwise, try to join the network
+//       ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
+//       console.log('isFirst:', isFirst, 'id:', id)
+//     } catch (err) {
+//       console.log('error in Join network: ', err)
+//       if (!Context.config.p2p.useJoinProtocolV2) {
+//         updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
+//       }
+//       if (err.message.startsWith('Fatal:')) {
+//         throw err
+//       }
+//       /* prettier-ignore */ if (logFlags.important_as_fatal) warn('Error while joining network:')
+//       /* prettier-ignore */ if (logFlags.important_as_fatal) warn(utils.formatErrorMessage(err))
+//       //warn(err.stack)
+//       /* prettier-ignore */ if (logFlags.important_as_fatal) info(`Trying to join again in ${Context.config.p2p.cycleDuration} seconds...`)
+//       await utils.sleep(Context.config.p2p.cycleDuration * 1000)
+//     }
+//     firstTime = false
+//   } while (utils.isUndefined(isFirst) || utils.isUndefined(id))
 
-  p2pSyncStart = Date.now()
+//   p2pSyncStart = Date.now()
 
-  if (logFlags.p2pNonFatal) info('Emitting `joined` event.')
-  emitter.emit('joined', id, publicKey)
-  updateNodeState(P2P.P2PTypes.NodeStatus.SYNCING)
+//   /* prettier-ignore */ if (logFlags.important_as_fatal) info('Emitting `joined` event.')
+//   emitter.emit('joined', id, publicKey)
+//   updateNodeState(P2P.P2PTypes.NodeStatus.SYNCING)
 
-  nestedCountersInstance.countEvent('p2p', 'joined')
-  // Sync cycle chain from network
-  await syncCycleChain()
+//   nestedCountersInstance.countEvent('p2p', 'joined')
+//   // Sync cycle chain from network
+//   await syncCycleChain()
 
-  // Enable internal routes
-  Comms.setAcceptInternal(true)
+//   // Enable internal routes
+//   Comms.setAcceptInternal(true)
 
-  // Start creating cycle records
-  await CycleCreator.startCycles()
-  p2pSyncEnd = Date.now()
-  p2pJoinTime = (p2pSyncEnd - p2pSyncStart) / 1000
+//   // Start creating cycle records
+//   await CycleCreator.startCycles()
+//   p2pSyncEnd = Date.now()
+//   p2pJoinTime = (p2pSyncEnd - p2pSyncStart) / 1000
 
-  nestedCountersInstance.countEvent('p2p', `sync time ${p2pJoinTime} seconds`)
+//   nestedCountersInstance.countEvent('p2p', `sync time ${p2pJoinTime} seconds`)
 
-  if (logFlags.p2pNonFatal) info('Emitting `initialized` event.' + p2pJoinTime)
-  emitter.emit('initialized')
+//   /* prettier-ignore */ if (logFlags.important_as_fatal) info('Emitting `initialized` event.' + p2pJoinTime)
+//   emitter.emit('initialized')
 
-  return true
-}
+//   return true
+// }
 
-async function witnessConditionsMet(activeNodes: P2P.P2PTypes.Node[]): Promise<boolean> {
-  try {
-    // 1. node has old data
-    if (snapshot.oldDataPath) {
-      const latestCycle = await getNewestCycle(activeNodes)
-      // 2. network is in safety mode
-      if (latestCycle.safetyMode === true) {
-        // 3. active nodes >= max nodes
-        if (latestCycle.active >= Context.config.p2p.maxNodes) {
-          return true
-        }
-      }
-    }
-  } catch (e) {
-    warn(e)
-  }
-  return false
-}
+/**
+ * should deprecate this!
+ * @param activeNodes
+ * @returns
+ */
+// async function witnessConditionsMet(activeNodes: P2P.P2PTypes.Node[]): Promise<boolean> {
+//   try {
+//     // 1. node has old data
+//     if (snapshot.oldDataPath) {
+//       const latestCycle = await getNewestCycle(activeNodes)
+//       // 2. network is in safety mode
+//       if (latestCycle.safetyMode === true) {
+//         // 3. active nodes >= max nodes
+//         if (latestCycle.active >= Context.config.p2p.maxNodes) {
+//           return true
+//         }
+//       }
+//     }
+//   } catch (e) {
+//     /* prettier-ignore */ if (logFlags.important_as_fatal) warn('witnessConditionsMet', utils.formatErrorMessage(e))
+//   }
+//   return false
+// }
 
 export interface StatusHistoryEntry {
   /**
@@ -404,7 +416,7 @@ export function updateNodeState(updatedState: NodeStatus, because = ''): void {
     because: because,
   }
   // changing status is infrequent, so log it always
-  warn(`Node status changed to ${updatedState}:\n${JSON.stringify(entry, null, 2)}`)
+  /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Node status changed to ${updatedState}:\n${JSON.stringify(entry, null, 2)}`)
   statusHistory.push(entry)
 }
 
@@ -415,6 +427,7 @@ async function joinNetworkV2(activeNodes): Promise<void> {
   const publicKey = Context.crypto.getPublicKey()
   const isReadyToJoin = await Context.shardus.app.isReadyToJoin(latestCycle, publicKey, activeNodes, mode)
   if (!isReadyToJoin) {
+    /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `joinNetworkV2:isReadyToJoin:false` )
     // Wait for Context.config.p2p.cycleDuration and try again
     throw new Error('Node not ready to join')
   }
@@ -432,118 +445,123 @@ async function joinNetworkV2(activeNodes): Promise<void> {
 
   // Figure out when Q1 is from the latestCycle
   const { startQ1 } = calcIncomingTimes(latestCycle)
-  if (logFlags.p2pNonFatal) info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
+  /* prettier-ignore */ if (logFlags.important_as_fatal) info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
 
   // Wait until a Q1 then send join request to active nodes
   let untilQ1 = startQ1 - Date.now()
+  //make untilQ1 in the future if needed
   while (untilQ1 < 0) {
     untilQ1 += latestCycle.duration * 1000
   }
+  let offsetTime = 500
 
-  if (logFlags.p2pNonFatal) info(`Waiting ${untilQ1 + 500} ms for Q1 before sending join...`)
-  await utils.sleep(untilQ1 + 500) // Not too early
+  //random in between 0 and 2000.  trying to debug why we are rejected from dapps
+  offsetTime = Math.floor(Math.random() * 60000) //TODO make config and set default value back to 2000ms or lower
+
+  /* prettier-ignore */ if (logFlags.important_as_fatal) info(`Waiting ${untilQ1} + ${offsetTime} ms for Q1 before sending join...`)
+  await utils.sleep(untilQ1 + offsetTime) // Not too early
 
   // send join request
   await Join.submitJoinV2(activeNodes, request)
 }
 
-async function joinNetwork(
-  activeNodes: P2P.P2PTypes.Node[],
-  firstTime: boolean
-): Promise<{ isFirst: boolean; id: string }> {
-  // Check if you're the first node
-  const isFirst = discoverNetwork(activeNodes)
-  if (isFirst) {
-    // Join your own network and give yourself an ID
-    const id = await Join.firstJoin()
-    // Return id and isFirst
-    return { isFirst, id }
-  }
+// async function joinNetwork(
+//   activeNodes: P2P.P2PTypes.Node[],
+//   firstTime: boolean
+// ): Promise<{ isFirst: boolean; id: string }> {
+//   // Check if you're the first node
+//   const isFirst = discoverNetwork(activeNodes)
+//   if (isFirst) {
+//     // Join your own network and give yourself an ID
+//     const id = await Join.firstJoin()
+//     // Return id and isFirst
+//     return { isFirst, id }
+//   }
 
-  // Remove yourself from activeNodes if you are present in them
-  const ourIdx = activeNodes.findIndex(
-    (node) => node.ip === network.ipInfo.externalIp && node.port === network.ipInfo.externalPort
-  )
-  if (ourIdx > -1) {
-    activeNodes.splice(ourIdx, 1)
-  }
+//   // Remove yourself from activeNodes if you are present in them
+//   const ourIdx = activeNodes.findIndex(
+//     (node) => node.ip === network.ipInfo.externalIp && node.port === network.ipInfo.externalPort
+//   )
+//   if (ourIdx > -1) {
+//     activeNodes.splice(ourIdx, 1)
+//   }
 
-  // Check joined before trying to join, if not first time
-  if (firstTime === false) {
-    // Check if joined by trying to set our node ID
-    const id = await Join.fetchJoined(activeNodes)
-    if (id) {
-      return { isFirst: false, id }
-    }
-  }
+//   // Check joined before trying to join, if not first time
+//   if (firstTime === false) {
+//     // Check if joined by trying to set our node ID
+//     const id = await Join.fetchJoined(activeNodes)
+//     if (id) {
+//       return { isFirst: false, id }
+//     }
+//   }
 
-  // Get latest cycle record from active nodes
-  const latestCycle = await Sync.getNewestCycle(activeNodes)
-  mode = latestCycle.mode || null
-  const publicKey = Context.crypto.getPublicKey()
-  const isReadyToJoin = await Context.shardus.app.isReadyToJoin(latestCycle, publicKey, activeNodes, mode)
-  if (!isReadyToJoin) {
-    // Wait for Context.config.p2p.cycleDuration and try again
-    throw new Error('Node not ready to join')
-  }
+//   // Get latest cycle record from active nodes
+//   const latestCycle = await Sync.getNewestCycle(activeNodes)
+//   mode = latestCycle.mode || null
+//   const publicKey = Context.crypto.getPublicKey()
+//   const isReadyToJoin = await Context.shardus.app.isReadyToJoin(latestCycle, publicKey, activeNodes, mode)
+//   if (!isReadyToJoin) {
+//     // Wait for Context.config.p2p.cycleDuration and try again
+//     throw new Error('Node not ready to join')
+//   }
 
-  // Create join request from latest cycle
-  const request = await Join.createJoinRequest(latestCycle.previous)
+//   // Create join request from latest cycle
+//   const request = await Join.createJoinRequest(latestCycle.previous)
 
-  //we can't use allowBogon lag yet because its value is detected later.
-  //it is possible to throw out any invalid IPs at this point
-  if (Context.config.p2p.rejectBogonOutboundJoin || Context.config.p2p.forceBogonFilteringOn) {
-    if (isInvalidIP(request.nodeInfo.externalIp)) {
-      throw new Error(`Fatal: Node cannot join with invalid external IP: ${request.nodeInfo.externalIp}`)
-    }
-  }
+//   //we can't use allowBogon lag yet because its value is detected later.
+//   //it is possible to throw out any invalid IPs at this point
+//   if (Context.config.p2p.rejectBogonOutboundJoin || Context.config.p2p.forceBogonFilteringOn) {
+//     if (isInvalidIP(request.nodeInfo.externalIp)) {
+//       throw new Error(`Fatal: Node cannot join with invalid external IP: ${request.nodeInfo.externalIp}`)
+//     }
+//   }
 
-  // Figure out when Q1 is from the latestCycle
-  const { startQ1, startQ4 } = calcIncomingTimes(latestCycle)
-  if (logFlags.p2pNonFatal) info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
+//   // Figure out when Q1 is from the latestCycle
+//   const { startQ1, startQ4 } = calcIncomingTimes(latestCycle)
+//   if (logFlags.important_as_fatal) info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
 
-  // create the Promise that we will `await` to wait for the 'accepted' event,
-  // in case of Join v2. this registers the listener ahead of time
-  const trigger = acceptedTrigger()
+//   // create the Promise that we will `await` to wait for the 'accepted' event,
+//   // in case of Join v2. this registers the listener ahead of time
+//   const trigger = acceptedTrigger()
 
-  // only submit join requests if we are using the old protocol or if we have not yet successfully submitted a join request
-  if (!Context.config.p2p.useJoinProtocolV2 || !Join.getHasSubmittedJoinRequest()) {
-    // Wait until a Q1 then send join request to active nodes
-    let untilQ1 = startQ1 - Date.now()
-    while (untilQ1 < 0) {
-      untilQ1 += latestCycle.duration * 1000
-    }
+//   // only submit join requests if we are using the old protocol or if we have not yet successfully submitted a join request
+//   if (!Context.config.p2p.useJoinProtocolV2 || !Join.getHasSubmittedJoinRequest()) {
+//     // Wait until a Q1 then send join request to active nodes
+//     let untilQ1 = startQ1 - Date.now()
+//     while (untilQ1 < 0) {
+//       untilQ1 += latestCycle.duration * 1000
+//     }
 
-    if (logFlags.p2pNonFatal) info(`Waiting ${untilQ1 + 500} ms for Q1 before sending join...`)
-    await utils.sleep(untilQ1 + 500) // Not too early
+//     if (logFlags.important_as_fatal) info(`Waiting ${untilQ1 + 500} ms for Q1 before sending join...`)
+//     await utils.sleep(untilQ1 + 500) // Not too early
 
-    await Join.submitJoin(activeNodes, request)
-  }
+//     await Join.submitJoin(activeNodes, request)
+//   }
 
-  if (Context.config.p2p.useJoinProtocolV2) {
-    // if using join protocol v2, simply wait for the 'accepted' event to fire
-    await trigger
+//   if (Context.config.p2p.useJoinProtocolV2) {
+//     // if using join protocol v2, simply wait for the 'accepted' event to fire
+//     await trigger
 
-    // then, we can fetch the id from the network and return
-    const id = await Join.fetchJoined(activeNodes)
-    return { isFirst, id }
-  } else {
-    // otherwise, wait until a Q4 before we loop ..
-    // This is a bit faster than before and should allow nodes to try joining
-    // without skipping a cycle
-    if (logFlags.p2pNonFatal) info('Waiting approx. one cycle then checking again...')
-    let untilQ4 = startQ4 - Date.now()
-    while (untilQ4 < 0) {
-      untilQ4 += latestCycle.duration * 1000
-    }
-    await utils.sleep(untilQ4 + 500)
-  }
+//     // then, we can fetch the id from the network and return
+//     const id = await Join.fetchJoined(activeNodes)
+//     return { isFirst, id }
+//   } else {
+//     // otherwise, wait until a Q4 before we loop ..
+//     // This is a bit faster than before and should allow nodes to try joining
+//     // without skipping a cycle
+//     if (logFlags.p2pNonFatal) info('Waiting approx. one cycle then checking again...')
+//     let untilQ4 = startQ4 - Date.now()
+//     while (untilQ4 < 0) {
+//       untilQ4 += latestCycle.duration * 1000
+//     }
+//     await utils.sleep(untilQ4 + 500)
+//   }
 
-  return {
-    isFirst: undefined,
-    id: undefined,
-  }
-}
+//   return {
+//     isFirst: undefined,
+//     id: undefined,
+//   }
+// }
 
 async function syncCycleChain(): Promise<void> {
   // You're already synced if you're first
@@ -567,6 +585,8 @@ async function syncCycleChain(): Promise<void> {
       if (Context.config.p2p.useSyncProtocolV2) {
         // attempt syncing with the v2 protocol and handle the result. the first
         // callback will run if the result is `Ok`, the second if it is `Err`
+        // TODO this can be very very expensive.  In a local test it was getting called repeatedly due to
+        // a local error.  we may need some limits on how many times we try to sync
         await SyncV2.syncV2(activeNodes).match(
           () => (synced = true),
           (err) => {
@@ -578,7 +598,8 @@ async function syncCycleChain(): Promise<void> {
       }
     } catch (err) {
       synced = false
-      warn(err)
+      /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `syncCycleChain: ex: ${err.message}` )
+      /* prettier-ignore */ if (logFlags.important_as_fatal) warn('syncCycleChain:', utils.formatErrorMessage(err))
       if (logFlags.p2pNonFatal) info('Trying again in 2 sec...')
       await utils.sleep(2000)
     }
@@ -698,11 +719,8 @@ async function getActiveNodesFromArchiver(
       10000
     )
   } catch (e) {
-    nestedCountersInstance.countRareEvent(
-      'archiver_nodelist',
-      'Could not get seed list from seed node server'
-    )
-    warn(`Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
+    /* prettier-ignore */ nestedCountersInstance.countRareEvent( 'archiver_nodelist', 'Could not get seed list from seed node server' )
+    /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
     throw Error(e.message)
   }
   if (logFlags.p2pNonFatal) info(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)

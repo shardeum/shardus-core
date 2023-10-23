@@ -169,10 +169,7 @@ export class NetworkClass extends EventEmitter {
           return
         }
         if (!route) {
-          if (logFlags.debug)
-            this.mainLogger.debug(
-              'Network: ' + `Unable to read request, payload of received message: ${JSON.stringify(data)}`
-            )
+          /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug( 'Network: ' + `Unable to read request, payload of received message: ${JSON.stringify(data)}` )
           throw new Error('Unable to read request, no route specified.')
         }
         if (!this.internalRoutes[route]) throw new Error('Unable to handle request, invalid route.')
@@ -210,6 +207,9 @@ export class NetworkClass extends EventEmitter {
       }
     })
     console.log(`Internal server running on port ${this.ipInfo.internalPort}...`)
+
+    //pass logflags to shardus network
+    this.sn.setLogFlags(logFlags)
   }
 
   async tell(nodes: Shardus.Node[], route: string, message, logged = false) {

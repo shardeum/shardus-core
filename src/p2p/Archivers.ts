@@ -91,7 +91,7 @@ export function init() {
         hasNetworkStopped().then((stopped) => {
           if (stopped) {
             const msg = 'checkNetworkStopped: Network has stopped. Initiating apoptosis'
-            info(msg)
+            /* prettier-ignore */ if (logFlags.important_as_fatal) info(msg)
             apoptosizeSelf(msg)
           }
         })
@@ -921,7 +921,7 @@ export function registerRoutes() {
       if (logFlags.console) console.log('Leave request gossip received:', payload)
       const accepted = await addLeaveRequest(payload, tracker, false)
       if (!accepted.success) return warn('Archiver leave request not accepted.')
-      if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')
       Comms.sendGossip('leavingarchiver', payload, tracker, sender, NodeList.byIdOrder, false)
     } finally {
       profilerInstance.scopedProfileSectionEnd('leavingarchiver')
@@ -931,14 +931,14 @@ export function registerRoutes() {
   network.registerExternalPost('requestdata', (req, res) => {
     let err = validateTypes(req, { body: 'o' })
     if (err) {
-      warn(`requestdata: bad req ${err}`)
+      /* prettier-ignore */ if (logFlags.error) warn(`requestdata: bad req ${err}`)
       return res.json({ success: false, error: err })
     }
     err = validateTypes(req.body, {
       tag: 's',
     })
     if (err) {
-      warn(`requestdata: bad req.body ${err}`)
+      /* prettier-ignore */ if (logFlags.error) warn(`requestdata: bad req.body ${err}`)
       return res.json({ success: false, error: err })
     }
 
@@ -949,18 +949,18 @@ export function registerRoutes() {
 
     if (!foundArchiver) {
       const archiverNotFoundErr = 'Archiver not found in list'
-      warn(archiverNotFoundErr)
+      /* prettier-ignore */ if (logFlags.error) warn(archiverNotFoundErr)
       return res.json({ success: false, error: archiverNotFoundErr })
     }
 
     const invalidTagErr = 'Tag is invalid'
     const archiverCurvePk = crypto.convertPublicKeyToCurve(foundArchiver.publicKey)
     if (!crypto.authenticate(dataRequest, archiverCurvePk)) {
-      warn(invalidTagErr)
+      /* prettier-ignore */ if (logFlags.error) warn(invalidTagErr)
       return res.json({ success: false, error: invalidTagErr })
     }
 
-    info('Tag in data request is valid')
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Tag in data request is valid')
     if (config.p2p.experimentalSnapshot && config.features.archiverDataSubscriptionsUpdate) {
       if (dataRequest.dataRequestType === DataRequestTypes.SUBSCRIBE) {
         // if the archiver is already in the recipients list, remove it first
@@ -1019,7 +1019,7 @@ export function registerRoutes() {
     // [TODO] Authenticate tag
 
     const queryRequest = req.body
-    if (logFlags.p2pNonFatal) info('queryRequest received', JSON.stringify(queryRequest))
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info('queryRequest received', JSON.stringify(queryRequest))
 
     const foundArchiver = archivers.get(queryRequest.publicKey)
     if (!foundArchiver) {
@@ -1067,9 +1067,9 @@ export function computeNewArchiverListHash(): hexstring {
   // deep cloning is necessary as archiver information may be mutated by
   // reference.
   lastHashedList = clone(sortedByPubKey())
-  info('hashing archiver list:', JSON.stringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) info('hashing archiver list:', JSON.stringify(lastHashedList))
   const hash = crypto.hash(lastHashedList)
-  info('the new archiver list hash is', hash)
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) info('the new archiver list hash is', hash)
   return hash
 }
 
@@ -1079,7 +1079,7 @@ export function computeNewArchiverListHash(): hexstring {
  */
 export function getArchiverListHash(): hexstring | undefined {
   if (config.p2p.writeSyncProtocolV2 || config.p2p.useSyncProtocolV2) {
-    info('returning archiver hash:', CycleChain.newest?.archiverListHash)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info('returning archiver hash:', CycleChain.newest?.archiverListHash)
     return CycleChain.newest?.archiverListHash
   } else {
     // if we're not using sync v2, just compute a simple hash based on the
@@ -1093,7 +1093,7 @@ let lastHashedList: P2P.ArchiversTypes.JoinedArchiver[] = []
 
 /** Returns the last list of archivers that had its hash computed. */
 export function getLastHashedArchiverList(): P2P.ArchiversTypes.JoinedArchiver[] {
-  info('returning last hashed archiver list:', JSON.stringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) info('returning last hashed archiver list:', JSON.stringify(lastHashedList))
   return lastHashedList
 }
 

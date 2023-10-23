@@ -731,6 +731,10 @@ export interface ServerConfiguration {
     useNetworkModes: boolean
     /** Use the new join protocol that gossips all valid join requests to validators.  */
     useJoinProtocolV2: boolean
+    /** Add a random wait before sending the join effect. Should not need this but may be a safet valve if timing in the network gets off
+     * for example the nodes trying to join do not have the same cycle time as the network
+     */
+    randomJoinRequestWait: number
   }
   /** Server IP configuration */
   ip?: {

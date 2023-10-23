@@ -97,6 +97,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     validateArchiverAppData: false,
     useNetworkModes: true,
     useJoinProtocolV2: true,
+    randomJoinRequestWait: 2000, //todo set this to 1000 before release
   },
   ip: {
     externalIp: '0.0.0.0',

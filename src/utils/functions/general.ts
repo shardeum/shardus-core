@@ -1,6 +1,7 @@
 import { P2P } from '@shardus/types'
 import { Ordering } from '..'
 import { stringify } from './stringify'
+import { Response } from 'express-serve-static-core'
 
 const replacer = (key: string, value: any): any => {
   if (typeof value === 'bigint') {
@@ -450,4 +451,22 @@ export function isValidShardusAddress(hexStrings: string[]): boolean {
 
 export function logNode(node: P2P.NodeListTypes.Node): string {
   return `Node ID : ${node.id} Node Address : ${node.address} externalPort : ${node.externalPort} externalIP : ${node.externalIp}`
+}
+
+/**
+ * Equivalent to .json() but gets the size for us
+ * @param res
+ * @param obj
+ * @returns
+ */
+export function jsonHttpResWithSize(
+  res: Response<unknown, Record<string, unknown>, number>,
+  obj: object
+): number {
+  // res.setHeader('Content-Length', str.length)
+  // res.setHeader('Content-Type', 'application/json')
+  const str = JSON.stringify(obj)
+  res.write(str)
+  res.end()
+  return str.length
 }

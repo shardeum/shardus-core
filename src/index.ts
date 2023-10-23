@@ -21,6 +21,8 @@ export const __ShardFunctions = {
   findHomeNode,
 }
 
+export { LogFlags } from './logger'
+
 export { DebugComplete } from './state-manager/TransactionQueue'
 
 const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG

@@ -24,6 +24,7 @@ import { initRoutes } from './routes'
 import { digestCycle } from '../Sync'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { addStandbyJoinRequests } from '../Join/v2'
+import { logFlags } from '../../logger'
 
 /** Initializes logging and endpoints for Sync V2. */
 export function init(): void {
@@ -63,6 +64,11 @@ export function syncV2(activeNodes: P2P.SyncTypes.ActiveNode[]): ResultAsync<voi
           }
 
           NodeList.reset()
+
+          // log the counts of the nodes, archivers, and standby nodes
+          /* prettier-ignore */ if (logFlags.important_as_fatal) console.log( `syncV2: nodes: ${validatorList.length}, archivers: ${archiverList.length}, standby nodes: ${standbyNodeList.length}` )
+
+          // add validators
           NodeList.addNodes(validatorList)
 
           // add archivers
@@ -71,7 +77,7 @@ export function syncV2(activeNodes: P2P.SyncTypes.ActiveNode[]): ResultAsync<voi
           }
 
           // add standby nodes
-          addStandbyJoinRequests(...standbyNodeList)
+          addStandbyJoinRequests(standbyNodeList, true)
 
           // add latest cycle
           CycleChain.reset()
@@ -151,13 +157,11 @@ function syncArchiverList(
  * retrieved. The node receiving the request may or may not have the list whose
  * hash matches the one requested.
  *
- * @returns {ResultAsync<P2P.ArchiversTypes.JoinedArchiver[], Error>} - A ResultAsync object. On success, it will contain 
+ * @returns {ResultAsync<P2P.ArchiversTypes.JoinedArchiver[], Error>} - A ResultAsync object. On success, it will contain
  * an array of JoinRequest objects, and on error, it will contain an Error object. The function is asynchronous
  * and can be awaited.
  */
-function syncStandbyNodeList(
-  activeNodes: P2P.SyncTypes.ActiveNode[]
-): ResultAsync<JoinRequest[], Error> {
+function syncStandbyNodeList(activeNodes: P2P.SyncTypes.ActiveNode[]): ResultAsync<JoinRequest[], Error> {
   // run a robust query for the lastest archiver list hash
   return robustQueryForStandbyNodeListHash(activeNodes).andThen(({ value, winningNodes }) => {
     // get full archiver list from one of the winning nodes

@@ -45,6 +45,7 @@ import { currentCycle, currentQuarter } from './CycleCreator'
 import { activeByIdOrder, byIdOrder, byPubKey, nodes } from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
+import { logFlags } from '../logger'
 
 /** STATE */
 
@@ -76,7 +77,7 @@ const failExternalRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'fail',
   handler: (_req, res) => {
     if (isDebugMode()) {
-      warn('fail route invoked in Apoptosis; used to test unclean exit')
+      /* prettier-ignore */ if (logFlags.important_as_fatal) warn('fail route invoked in Apoptosis; used to test unclean exit')
       //let fail_endpoint_debug = undefined
       //console.log(fail_endpoint_debug.forced)
       throw Error('fail_endpoint_debug')
@@ -95,7 +96,7 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> 
       const requestStream = VectorBufferStream.fromBuffer(payload)
       const requestType = requestStream.readUInt16()
       if (requestType !== cApoptosisProposalReq) {
-        info(`apoptosisInternalRoute: bad requestType: ${requestType}`)
+        /* prettier-ignore */ if (logFlags.error) warn(`apoptosisInternalRoute: bad requestType: ${requestType}`)
         let resp: ApoptosisProposalResp = { s: 'bad request', r: 1 }
         response(resp, serializeApoptosisProposalResp)
         return
@@ -106,7 +107,7 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> 
         when: req.when,
         sign: sign,
       }
-      info(`Got Apoptosis proposal: ${JSON.stringify(apopProposal)}`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got Apoptosis proposal: ${JSON.stringify(apopProposal)}`)
       let err = ''
 
       if (apopProposal.id === 'isDownCheck') {
@@ -145,13 +146,13 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> 
           response(resp, serializeApoptosisProposalResp)
           return
         } else {
-          warn(`addProposal failed for payload: ${JSON.stringify(apopProposal)}`)
+          /* prettier-ignore */ if (logFlags.error) warn(`addProposal failed for payload: ${JSON.stringify(apopProposal)}`)
           let resp: ApoptosisProposalResp = { s: 'fail', r: 4 }
           response(resp, serializeApoptosisProposalResp)
           return
         }
       } else {
-        warn(`sender is not apop node: sender:${header.sender_id} apop:${apopProposal.id}`)
+        /* prettier-ignore */ if (logFlags.error) warn(`sender is not apop node: sender:${header.sender_id} apop:${apopProposal.id}`)
         let resp: ApoptosisProposalResp = { s: 'fail', r: 3 }
         response(resp, serializeApoptosisProposalResp)
         return
@@ -169,7 +170,7 @@ const apoptosisGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ApoptosisTypes.Signed
 ) => {
   profilerInstance.scopedProfileSectionStart('apoptosis')
   try {
-    info(`Got Apoptosis gossip: ${JSON.stringify(payload)}`)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got Apoptosis gossip: ${JSON.stringify(payload)}`)
     let err = ''
     err = validateTypes(payload, { when: 'n', id: 's', sign: 'o' })
     if (err) {
@@ -274,7 +275,7 @@ export function updateRecord(txs: P2P.ApoptosisTypes.Txs, record: P2P.ApoptosisT
 export function parseRecord(record: P2P.ApoptosisTypes.Record): P2P.CycleParserTypes.Change {
   if (record.apoptosized.includes(Self.id)) {
     // This could happen if our Internet connection was bad.
-    error(`We got marked for apoptosis even though we didn't ask for it. Being nice and leaving.`)
+    /* prettier-ignore */ if (logFlags.important_as_fatal) error(`We got marked for apoptosis even though we didn't ask for it. Being nice and leaving.`)
     Self.emitter.emit(
       'invoke-exit',
       getCallstack(),
@@ -303,7 +304,7 @@ export function sendRequests() {
 // [TODO] - We don't need the caller to pass us the list of nodes
 //          remove this after changing references
 export async function apoptosizeSelf(message: string) {
-  warn(`In apoptosizeSelf. ${message}`)
+  /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`In apoptosizeSelf. ${message}`)
   // [TODO] - maybe we should shuffle this array
   const activeNodes = activeByIdOrder
   const proposal = createProposal()
@@ -333,8 +334,8 @@ export async function apoptosizeSelf(message: string) {
       )
       return res
     } catch (err) {
-      warn(`qF: In apoptosizeSelf calling robustQuery proposal. ${message}`)
-      warn(`Error: ${err}`)
+      /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`qF: In apoptosizeSelf calling robustQuery proposal. ${message}`)
+      /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Error: ${err}`)
       return null
     }
   }
@@ -346,7 +347,7 @@ export async function apoptosizeSelf(message: string) {
   }
   // If we don't have any active nodes; means we are still joining
   if (activeNodes.length > 0) {
-    warn(`In apoptosizeSelf calling robustQuery proposal. ${message}`)
+    /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`In apoptosizeSelf calling robustQuery proposal. ${message}`)
     let redunancy = 1
     if (activeNodes.length > 5) {
       redunancy = 2
@@ -354,15 +355,15 @@ export async function apoptosizeSelf(message: string) {
     if (activeNodes.length > 10) {
       redunancy = 3
     }
-    warn(`Redunancy is ${redunancy}   ${message}`)
+    /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Redunancy is ${redunancy}   ${message}`)
     await robustQuery(activeNodes, qF, eF, redunancy, true)
-    warn(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}   ${message}`)
+    /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}   ${message}`)
   }
   // Omar - added the following line. Maybe we should emit an event when we apoptosize so other modules and app can clean up
   Self.emitter.emit('invoke-exit', getCallstack(), message) // we can pass true as a parameter if we want to be restarted
   // Omar - we should not add any proposal since we are exiting; we already sent our proposal to some nodes
   //  addProposal(proposal)
-  error(`We have been apoptosized. Exiting with status 1. Will not be restarted. ${message}`)
+  /* prettier-ignore */ if (logFlags.important_as_fatal) error(`We have been apoptosized. Exiting with status 1. Will not be restarted. ${message}`)
 }
 
 function createProposal(): P2P.ApoptosisTypes.SignedApoptosisProposal {
@@ -413,7 +414,7 @@ export function isApopMarkedNode(id: string): boolean {
     // Check if the node is in the proposal list
     apopNode = true
   }
-  info('check if the node is apop marked node', id, apopNode)
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) info('check if the node is apop marked node', id, apopNode)
   return apopNode
 }
 

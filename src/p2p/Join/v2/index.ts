@@ -16,6 +16,7 @@ import { ResultAsync } from 'neverthrow'
 import { reset as resetAcceptance } from './acceptance'
 import { stringifyReduce } from '../../../utils/functions/stringifyReduce'
 import { logFlags } from '../../../logger'
+import { Json } from 'sequelize/dist/lib/utils'
 
 const clone = rfdc()
 
@@ -38,9 +39,12 @@ export function init(): void {
   // set up event listeners for cycle quarters
   Self.emitter.on('cycle_q1_start', () => {
     if (config.p2p.useJoinProtocolV2) {
-      notifyNewestJoinedConsensors().catch((e) => {
-        console.error('failed to notify selected nodes:', e)
-      })
+      //TODO clean out the accepted route or is it still useful?
+      //accepted endpoint does not return any more
+      // The accepted flow is deprecated
+      // notifyNewestJoinedConsensors().catch((e) => {
+      //   console.error('failed to notify selected nodes:', e)
+      // })
     }
   })
   Self.emitter.on('cycle_q2_start', () => {
@@ -80,9 +84,18 @@ export function drainNewJoinRequests(): JoinRequest[] {
 /**
  * Adds nodes to the standby node list.
  */
-export function addStandbyJoinRequests(...nodes: JoinRequest[]): void {
+export function addStandbyJoinRequests(nodes: JoinRequest[], logErrors = false): void {
   if (logFlags.verbose) console.log('adding standby nodes:', nodes)
+  //TODO proper input validation
   for (const node of nodes) {
+    if (node == null) {
+      /* prettier-ignore */ if (logErrors && logFlags.important_as_fatal) console.error('null node in standby list')
+      continue
+    }
+    if (node.nodeInfo == null) {
+      /* prettier-ignore */ if (logErrors && logFlags.important_as_fatal) console.error('null node.nodeInfo in standby list: ' + JSON.stringify(node))
+      continue
+    }
     standbyNodesInfo.set(node.nodeInfo.publicKey, node)
   }
 }
