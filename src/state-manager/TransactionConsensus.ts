@@ -28,6 +28,8 @@ import {
   RequestReceiptForTxReq,
   RequestReceiptForTxResp,
   WrappedResponses,
+  GetAccountData3Req,
+  GetAccountData3Resp,
 } from './state-manager-types'
 import { shardusGetTime } from '../network'
 import { robustQuery } from '../p2p/Utils'
@@ -104,6 +106,16 @@ class TransactionConsenus {
    */
 
   setupHandlers(): void {
+    Context.network.registerExternalGet('debug-poq-switch', isDebugModeMiddleware, (_req, res) => {
+      try {
+        this.stateManager.transactionQueue.useNewPOQ = !this.stateManager.transactionQueue.useNewPOQ
+        res.write(`this.useNewPOQ: ${this.stateManager.transactionQueue.useNewPOQ}\n`)
+      } catch (e) {
+        res.write(`${e}\n`)
+      }
+      res.end()
+    })
+
     Context.network.registerExternalGet('debug-produceBadVote', isDebugModeMiddleware, (req, res) => {
       this.produceBadVote = !this.produceBadVote
       res.json({ status: 'ok' })
@@ -440,6 +452,11 @@ class TransactionConsenus {
           }
 
           const appendSuccessful = this.tryAppendMessage(queueEntry, payload)
+
+          if (logFlags.debug)
+            this.mainLogger.debug(
+              `spread_confirmOrChallenge ${queueEntry.logID} appendSuccessful:${appendSuccessful}`
+            )
 
           if (appendSuccessful) {
             // Gossip further
@@ -865,25 +882,62 @@ class TransactionConsenus {
         queueEntry.acceptVoteMessage = false
         queueEntry.acceptConfirmOrChallenge = false
 
+        if (logFlags.debug) {
+          this.mainLogger.debug(
+            `tryProduceReceipt: ${
+              queueEntry.logID
+            } ready to decide final receipt. bestReceivedChallenge: ${utils.stringifyReduce(
+              queueEntry.receivedBestChallenge
+            )}, bestReceivedConfirmation: ${utils.stringifyReduce(
+              queueEntry.receivedBestConfirmation
+            )}, bestReceivedChallenger: ${utils.stringifyReduce(queueEntry.receivedBestChallenger)}`
+          )
+        }
+
         // we have received challenge message, produce failed receipt
         if (queueEntry.receivedBestChallenge && queueEntry.receivedBestChallenger) {
           const appliedReceipt: AppliedReceipt = {
             txid: queueEntry.receivedBestChallenge.appliedVote.txid,
             result: false,
-            appliedVotes: [],
+            appliedVotes: [queueEntry.receivedBestChallenge.appliedVote],
             app_data_hash: '',
           }
+          const appliedReceipt2: AppliedReceipt2 = {
+            txid: queueEntry.receivedBestChallenge.appliedVote.txid,
+            result: false,
+            appliedVote: queueEntry.receivedBestChallenge.appliedVote,
+            app_data_hash: '',
+            signatures: [queueEntry.receivedBestChallenge.appliedVote.sign],
+          }
           queueEntry.appliedReceipt = appliedReceipt
+          queueEntry.appliedReceipt2 = appliedReceipt2
           if (logFlags.debug)
             this.mainLogger.debug(
-              `tryProduceReceipt: producing a fail receipt based on received challenge message. appliedReceipt: ${utils.stringifyReduce(
-                appliedReceipt
+              `tryProduceReceipt: ${
+                queueEntry.logID
+              } producing a fail receipt based on received challenge message. appliedReceipt: ${utils.stringifyReduce(
+                appliedReceipt2
               )}`
             )
+
+          // todo: podA reconsider querying the best receipt
           const receiptFromRobustQuery = await this.robustQueryBestReceipt(queueEntry)
+          if (receiptFromRobustQuery == null) {
+            if (logFlags.debug)
+              this.mainLogger.debug(
+                `tryProduceReceipt: ${queueEntry.logID} failed to produce a receipt from robust query`
+              )
+            return appliedReceipt
+          }
 
           // Received a confrim receipt. We have a challenge receipt which is better.
-          if (receiptFromRobustQuery.result !== false) return appliedReceipt
+          if (receiptFromRobustQuery && receiptFromRobustQuery.result !== false) {
+            if (logFlags.debug)
+              this.mainLogger.debug(
+                `tryProduceReceipt: ${queueEntry.logID} received a confirm receipt. We have a challenge receipt which is better`
+              )
+            return appliedReceipt
+          }
 
           // Received another challenge receipt. Compare ranks
           let bestNodeFromRobustQuery: Shardus.NodeWithRank
@@ -899,16 +953,26 @@ class TransactionConsenus {
               this.mainLogger.debug(
                 `tryProduceReceipt: ${
                   queueEntry.logID
-                } receipt from robust query is better than our receipt. receiptFromRobustQuery: ${utils.stringify(
+                } receipt (challenge) from robust query is better than our receipt. receiptFromRobustQuery: ${utils.stringify(
                   receiptFromRobustQuery
                 )}`
               )
-            return {
+            const appliedReceipt: AppliedReceipt = {
               txid: receiptFromRobustQuery.txid,
               result: receiptFromRobustQuery.result,
               appliedVotes: [receiptFromRobustQuery.appliedVote],
               app_data_hash: receiptFromRobustQuery.app_data_hash,
             }
+            const appliedReceipt2: AppliedReceipt2 = {
+              txid: receiptFromRobustQuery.txid,
+              result: receiptFromRobustQuery.result,
+              appliedVote: receiptFromRobustQuery.appliedVote,
+              app_data_hash: receiptFromRobustQuery.app_data_hash,
+              signatures: [receiptFromRobustQuery.appliedVote.sign],
+            }
+            queueEntry.appliedReceipt = appliedReceipt
+            queueEntry.appliedReceipt2 = appliedReceipt2
+            return appliedReceipt
           } else {
             return appliedReceipt
           }
@@ -933,12 +997,14 @@ class TransactionConsenus {
               app_data_hash: '',
               signatures: [winningVote.sign],
             }
-            console.log(
-              `LPOQ: producing a confirm receipt based on received confirmation message`,
-              queueEntry.logID,
-              appliedReceipt,
-              appliedReceipt2
-            )
+            if (logFlags.debug)
+              this.mainLogger.debug(
+                `tryProduceReceipt: ${
+                  queueEntry.logID
+                } producing a confirm receipt based on received confirmation message. ${utils.stringifyReduce(
+                  appliedReceipt
+                )}`
+              )
             for (let i = 0; i < winningVote.account_id.length; i++) {
               /* eslint-disable security/detect-object-injection */
               if (winningVote.account_id[i] === 'app_data_hash') {
@@ -959,14 +1025,24 @@ class TransactionConsenus {
             return
           }
 
-          // Received challenge receipt, we have confirm receipt which is not better
+          // Received challenge receipt, we have confirm receipt which is not as strong as challenge receipt
           if (receiptFromRobustQuery.result === false) {
-            return {
+            const appliedReceipt: AppliedReceipt = {
               txid: receiptFromRobustQuery.txid,
               result: receiptFromRobustQuery.result,
               appliedVotes: [receiptFromRobustQuery.appliedVote],
               app_data_hash: receiptFromRobustQuery.app_data_hash,
             }
+            const appliedReceipt2: AppliedReceipt2 = {
+              txid: receiptFromRobustQuery.txid,
+              result: receiptFromRobustQuery.result,
+              appliedVote: receiptFromRobustQuery.appliedVote,
+              app_data_hash: receiptFromRobustQuery.app_data_hash,
+              signatures: [receiptFromRobustQuery.appliedVote.sign],
+            }
+            queueEntry.appliedReceipt = appliedReceipt
+            queueEntry.appliedReceipt2 = appliedReceipt2
+            return appliedReceipt
           }
 
           // Received another confirm receipt. Compare ranks
@@ -979,11 +1055,14 @@ class TransactionConsenus {
 
           const isRobustQueryNodeBetter = bestNodeFromRobustQuery.rank < queueEntry.receivedBestVoter.rank
           if (isRobustQueryNodeBetter) {
-            console.log(
-              'LPOQ: producing a confirm receipt based on robust query',
-              queueEntry.logID,
-              receiptFromRobustQuery
-            )
+            if (logFlags.debug)
+              this.mainLogger.debug(
+                `tryProduceReceipt: ${
+                  queueEntry.logID
+                } receipt (confirm) from robust query is better than our receipt. receiptFromRobustQuery: ${utils.stringify(
+                  receiptFromRobustQuery
+                )}`
+              )
             const appliedReceipt: AppliedReceipt = {
               txid: receiptFromRobustQuery.txid,
               result: receiptFromRobustQuery.result,
@@ -1085,7 +1164,6 @@ class TransactionConsenus {
       redundancy,
       true
     )
-    console.log(`robustQueryBestReceipt top response is: ${JSON.stringify(response)}`)
     if (response && response.receipt) {
       return response.receipt
     }
@@ -1101,7 +1179,6 @@ class TransactionConsenus {
       return await Comms.ask(node, 'get_applied_vote', queryData)
     }
     const eqFn = (item1: AppliedVoteQueryResponse, item2: AppliedVoteQueryResponse): boolean => {
-      console.log(`robustQueryBestVote eqFn item is: ${JSON.stringify(item1)}`)
       try {
         if (item1.appliedVoteHash === item2.appliedVoteHash) return true
         return false
@@ -1117,9 +1194,47 @@ class TransactionConsenus {
       redundancy,
       true
     )
-    console.log(`robustQueryBestVote top response is: ${JSON.stringify(response)}`)
     if (response && response.appliedVote) {
       return response.appliedVote
+    }
+  }
+
+  async robustQueryAccountData(
+    consensNodes: Shardus.Node[],
+    accountId: string
+  ): Promise<Shardus.WrappedData> {
+    const queryFn = async (node: Shardus.Node): Promise<GetAccountData3Resp> => {
+      const ip = node.externalIp
+      const port = node.externalPort
+      // the queryFunction must return null if the given node is our own
+      if (ip === Self.ip && port === Self.port) return null
+
+      const message: GetAccountData3Req = {
+        accountStart: accountId,
+        accountEnd: accountId,
+        tsStart: 0,
+        maxRecords: this.config.stateManager.accountBucketSize,
+        offset: 0,
+        accountOffset: '',
+      }
+      const result = await Comms.ask(node, 'get_account_data3', message)
+      return result
+    }
+    const eqFn = (item1: GetAccountData3Resp, item2: GetAccountData3Resp): boolean => {
+      try {
+        const account1 = item1.data.wrappedAccounts[0]
+        const account2 = item1.data.wrappedAccounts[0]
+        if (account1.stateId === account2.stateId) return true
+        return false
+      } catch (err) {
+        return false
+      }
+    }
+    const redundancy = 3
+    const { topResult: response } = await robustQuery(consensNodes, queryFn, eqFn, redundancy, false)
+    if (response && response.data) {
+      const accountData = response.data.wrappedAccounts[0]
+      return accountData
     }
   }
 
@@ -1173,28 +1288,17 @@ class TransactionConsenus {
           return
         }
 
-      // if vote from robust is better than our received vote, use it as final vote
-      const isRobustQueryVoteBetter = bestVoterFromRobustQuery.rank > queueEntry.receivedBestVoter.rank
-      let finalVote = queueEntry.receivedBestVote
-      if (isRobustQueryVoteBetter) {
-        finalVote = voteFromRobustQuery
-      }
-      const finalVoteHash = this.calculateVoteHash(finalVote)
-      const shouldChallenge = queueEntry.ourVoteHash !== finalVoteHash
-        // todo: podA: POQ2 handle if we can't figure out the best voter from robust query result (low priority)
-
-      // if we are in execution group and disagree with the highest ranked vote, send out a "challenge" message
-      const isInExecutionSet = queueEntry.executionIdSet.has(Self.id)
-      if (isInExecutionSet && queueEntry.ourVoteHash !== finalVoteHash) {
-        this.challengeVoteAndShare(queueEntry)
-      }
         // if vote from robust is better than our received vote, use it as final vote
         const isRobustQueryVoteBetter = bestVoterFromRobustQuery.rank > queueEntry.receivedBestVoter.rank
         let finalVote = queueEntry.receivedBestVote
+        let finalVoteHash = queueEntry.receivedBestVoteHash
         if (isRobustQueryVoteBetter) {
           finalVote = voteFromRobustQuery
+          finalVoteHash = this.calculateVoteHash(voteFromRobustQuery)
+          queueEntry.receivedBestVote = voteFromRobustQuery
+          queueEntry.receivedBestVoter = bestVoterFromRobustQuery
+          queueEntry.receivedBestVoteHash = finalVoteHash
         }
-        const finalVoteHash = this.calculateVoteHash(finalVote)
         const shouldChallenge = queueEntry.ourVoteHash !== finalVoteHash
 
         // if we are in execution group and disagree with the highest ranked vote, send out a "challenge" message
@@ -1205,14 +1309,9 @@ class TransactionConsenus {
           )
         if (isInExecutionSet && shouldChallenge) {
           this.challengeVoteAndShare(queueEntry)
+          return
         }
 
-      if (eligibleToConfirm && queueEntry.ourVoteHash === finalVoteHash) {
-        // queueEntry.eligibleNodesToConfirm is sorted highest to lowest rank
-        const eligibleNodeIds = queueEntry.eligibleNodesToConfirm.map((node) => node.id).reverse()
-        const ourRankIndex = eligibleNodeIds.indexOf(Self.id)
-        const delayBeforeConfirm = ourRankIndex * 100 // 100ms
-        let isReceivedBetterConfirmation = false
         if (eligibleToConfirm && queueEntry.ourVoteHash === finalVoteHash) {
           // queueEntry.eligibleNodesToConfirm is sorted highest to lowest rank
           const eligibleNodeIds = queueEntry.eligibleNodesToConfirm.map((node) => node.id).reverse()
@@ -1220,23 +1319,9 @@ class TransactionConsenus {
           const delayBeforeConfirm = ourRankIndex * 100 // 100ms
           let isReceivedBetterConfirmation = false
 
-        await utils.sleep(delayBeforeConfirm)
           await utils.sleep(delayBeforeConfirm)
 
-        // Compare our rank with received rank
-        if (
-          queueEntry.receivedBestConfirmedNode &&
-          queueEntry.receivedBestConfirmedNode.rank < queueEntry.ourNodeRank
-        ) {
-          isReceivedBetterConfirmation = true
-        }
-        if (isReceivedBetterConfirmation) {
-          nestedCountersInstance.countEvent(
-            'transactionConsensus',
-            'tryConfirmOrChallenge isReceivedBetterConfirmation: true'
-          )
-          return
-          // Compare our rank with received rank
+          // Compare our rank with received rank before sharing our confirmation
           if (
             queueEntry.receivedBestConfirmedNode &&
             queueEntry.receivedBestConfirmedNode.rank < queueEntry.ourNodeRank
@@ -1265,10 +1350,14 @@ class TransactionConsenus {
             this.confirmVoteAndShare(queueEntry)
           }
         }
-        queueEntry.gossipedConfirmOrChallenge = true
+      } else {
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `tryConfirmOrChallenge: ${queueEntry.logID} not sending confirm or challenge yet because timeSinceLastVoteMessage is ${timeSinceLastVoteMessage} ms`
+          )
       }
     } catch (e) {
-      this.mainLogger.error(`tryConfirmOrChallenge: ${queueEntry.logID} ${e.message} ${e.stack}`)
+      this.mainLogger.error(`tryConfirmOrChallenge: ${queueEntry.logID} ${e.message}, ${e.stack}`)
     } finally {
       this.profiler.profileSectionEnd('tryConfirmOrChallenge')
     }
@@ -1278,7 +1367,7 @@ class TransactionConsenus {
     return utils.sortAscProp(first, second, 'accountId')
   }
 
-  confirmVoteAndShare(queueEntry: QueueEntry): void {
+  async confirmVoteAndShare(queueEntry: QueueEntry): Promise<void> {
     this.profiler.profileSectionStart('confirmOrChallengeVote')
     /* prettier-ignore */
     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote("shrd_confirmOrChallengeVote", `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `);
@@ -1300,26 +1389,81 @@ class TransactionConsenus {
     this.profiler.profileSectionEnd('confirmOrChallengeVote')
   }
 
-  challengeVoteAndShare(queueEntry: QueueEntry): void {
+  async challengeVoteAndShare(queueEntry: QueueEntry): Promise<void> {
     this.profiler.profileSectionStart('confirmOrChallengeVote')
     /* prettier-ignore */
     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote("shrd_confirmOrChallengeVote", `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `);
+
+    // todo: should check account integrity only when before states are different from best vote
+
+    const isAccountIntegrityOk = await this.checkAccountIntegrity(queueEntry)
+    if (!isAccountIntegrityOk) {
+      if (logFlags.verbose)
+        this.mainLogger.debug(`challengeVoteAndShare: ${queueEntry.logID} account integrity is not ok`)
+      return
+    }
 
     //podA: POQ4 create challenge message and share to tx group
     const challengeMessage: ConfirmOrChallengeMessage = {
       message: 'challenge',
       nodeId: queueEntry.ourVote.node_id,
-      appliedVote: queueEntry.ourVote,
+      appliedVote: queueEntry.receivedBestVote,
     }
-    const signedConfirmMessage = this.crypto.sign(challengeMessage)
+    const signedChallengeMessage = this.crypto.sign(challengeMessage)
+    if (logFlags.debug)
+      this.mainLogger.debug(
+        `challengeVoteAndShare: ${queueEntry.logID}  ${JSON.stringify(signedChallengeMessage)}}`
+      )
 
     //Share message to tx group
     const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-    Comms.sendGossip('spread_confirmOrChallenge', signedConfirmMessage, '', null, gossipGroup, true, 10)
+    Comms.sendGossip('spread_confirmOrChallenge', signedChallengeMessage, '', null, gossipGroup, true, 10)
     queueEntry.gossipedConfirmOrChallenge = true
 
     this.profiler.profileSectionEnd('confirmOrChallengeVote')
     return null
+  }
+
+  async checkAccountIntegrity(queueEntry: QueueEntry): Promise<boolean> {
+    this.profiler.profileSectionStart('checkAccountIntegrity')
+    const success = true
+    // check account integrity before sending challenge
+    if (
+      queueEntry.robustAccountDataPromises &&
+      Object.keys(queueEntry.robustAccountDataPromises).length > 0
+    ) {
+      const keys = Object.keys(queueEntry.robustAccountDataPromises)
+      const promises = Object.values(queueEntry.robustAccountDataPromises)
+      const results: Shardus.WrappedData[] = await Promise.all(promises)
+      for (let i = 0; i < results.length; i++) {
+        const key = keys[i]
+        const collectedAccountData = queueEntry.collectedData[key]
+        const robustQueryAccountData = results[i]
+        if (
+          robustQueryAccountData.stateId === collectedAccountData.stateId &&
+          robustQueryAccountData.timestamp === collectedAccountData.timestamp
+        ) {
+          nestedCountersInstance.countEvent('checkAccountIntegrity', 'collected data and robust data match')
+          if (logFlags.debug)
+            this.mainLogger.debug(`checkAccountIntegrity: ${queueEntry.logID} key: ${key} ok`)
+        } else {
+          nestedCountersInstance.countEvent('checkAccountIntegrity', 'collected data and robust data match')
+          if (logFlags.debug) {
+            this.mainLogger.debug(
+              `checkAccountIntegrity: ${
+                queueEntry.logID
+              } key: ${key} failed. collectedAccountData: ${utils.stringify(
+                collectedAccountData
+              )} robustAccountData: ${utils.stringify(robustQueryAccountData)}`
+            )
+          }
+        }
+      }
+    } else {
+      nestedCountersInstance.countEvent('checkAccountIntegrity', 'robustAccountDataPromises empty')
+    }
+    this.profiler.profileSectionEnd('checkAccountIntegrity')
+    return success
   }
   /**
    * createAndShareVote
@@ -1360,12 +1504,12 @@ class TransactionConsenus {
         ourVote.transaction_result = !ourVote.transaction_result
       }
 
-    // BAD NODE SIMULATION
-    if (this.produceBadVote) {
-      ourVote.transaction_result = !ourVote.transaction_result
-    }
+      // BAD NODE SIMULATION
+      if (this.produceBadVote) {
+        ourVote.transaction_result = !ourVote.transaction_result
+      }
 
-    ourVote.app_data_hash = queueEntry?.preApplyTXResult?.applyResponse.appReceiptDataHash
+      ourVote.app_data_hash = queueEntry?.preApplyTXResult?.applyResponse.appReceiptDataHash
 
       if (queueEntry.debugFail_voteFlip === true) {
         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
@@ -1569,21 +1713,27 @@ class TransactionConsenus {
     /* prettier-ignore */
     if (logFlags.playback) this.logger.playbackLogNote("tryAppendMessage", `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`);
     /* prettier-ignore */
-    if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage confirmOrChallenge: ${queueEntry.logID}   ${JSON.stringify(confirmOrChallenge)} `);
+    if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID}   ${JSON.stringify(confirmOrChallenge)} `);
+    // check if the node is in the execution group
+    const isMessageFromExecutionNode = queueEntry.executionIdSet.has(confirmOrChallenge.nodeId)
 
-    console.log(
-      `tryAppendMessage confirmOrChallenge: ${queueEntry.logID}   ${JSON.stringify(confirmOrChallenge)} `
-    )
+    if (!isMessageFromExecutionNode) {
+      this.mainLogger.error(`tryAppendMessage: ${queueEntry.logID} Message is not from an execution node.`)
+    }
 
-    const foundNode = queueEntry.eligibleNodesToConfirm.find(
-      (node) =>
-        confirmOrChallenge.nodeId === node.id &&
-        this.crypto.verify(confirmOrChallenge as SignedObject, node.publicKey)
-    )
+    if (confirmOrChallenge.message === 'confirm') {
+      const foundNode = queueEntry.eligibleNodesToConfirm.find(
+        (node) =>
+          confirmOrChallenge.nodeId === node.id &&
+          this.crypto.verify(confirmOrChallenge as SignedObject, node.publicKey)
+      )
 
-    if (!foundNode) {
-      console.log('tryAppendMessage: Message signature does not match with any eligible nodes.')
-      return
+      if (!foundNode) {
+        this.mainLogger.error(
+          'tryAppendMessage: ${queueEntry.logID} Message signature does not match with any eligible nodes that can confirm.'
+        )
+        return
+      }
     }
 
     const isVoteValid = true
@@ -1591,7 +1741,9 @@ class TransactionConsenus {
 
     // Check if the previous phase is finalized and we have received best vote
     if (queueEntry.acceptVoteMessage === true || !queueEntry.receivedBestVote) {
-      console.log('tryAppendMessage: best vote is not received as previous phase is not finalized')
+      this.mainLogger.error(
+        `tryAppendMessage: ${queueEntry.logID} confirm/challenge is too early. Not finalized best vote yet`
+      )
       return
     }
 
@@ -1600,8 +1752,12 @@ class TransactionConsenus {
       this.calculateVoteHash(confirmOrChallenge.appliedVote) !==
       this.calculateVoteHash(queueEntry.receivedBestVote)
     ) {
-      console.log(
-        'tryAppendMessage: confirmOrChallenge is not for the same vote that was finalized in the previous phase'
+      this.mainLogger.error(
+        `tryAppendMessage: ${
+          queueEntry.logID
+        } confirmOrChallenge is not for the same vote that was finalized in the previous phase, queueEntry.receivedBestVote: ${JSON.stringify(
+          queueEntry.receivedBestVote
+        )}`
       )
       return false
     }
@@ -1629,11 +1785,10 @@ class TransactionConsenus {
       }
 
       if (!isBetterThanCurrentConfirmation) {
-        console.log(
-          'tryAppendMessage: confirmation is not better than current confirmation',
-          confirmOrChallenge,
-          queueEntry.receivedBestConfirmation
-        )
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `tryAppendMessage: ${queueEntry.logID} confirmation is not better than current confirmation`
+          )
         return false
       }
 
@@ -1651,9 +1806,16 @@ class TransactionConsenus {
         }
       }
     } else if (confirmOrChallenge.message === 'challenge') {
-      let isBetterThanCurrentChallenge
+      let isBetterThanCurrentChallenge = false
       let receivedChallenger: Shardus.NodeWithRank
 
+      this.mainLogger.debug(
+        `tryAppendMessage: ${
+          queueEntry.logID
+        } challenge received and processing. queueEntry.receivedBestChallenge: ${JSON.stringify(
+          queueEntry.receivedBestChallenge
+        )}`
+      )
       if (!queueEntry.receivedBestChallenge) isBetterThanCurrentChallenge = true
       else if (queueEntry.receivedBestChallenge.nodeId === confirmOrChallenge.nodeId)
         isBetterThanCurrentChallenge = false
@@ -1669,16 +1831,23 @@ class TransactionConsenus {
       }
 
       if (!isBetterThanCurrentChallenge) {
-        console.log(
-          'tryAppendMessage: challenge is not better than current challenge',
-          confirmOrChallenge,
-          queueEntry.receivedBestChallenge
-        )
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `tryAppendMessage: ${queueEntry.logID} challenge is not better than current challenge`
+          )
         return false
       }
 
       queueEntry.receivedBestChallenge = confirmOrChallenge
       queueEntry.lastConfirmOrChallengeTimestamp = Date.now()
+      if (logFlags.debug)
+        this.mainLogger.debug(
+          `tryAppendMessage: ${
+            queueEntry.logID
+          } challenge received and processed. queueEntry.receivedBestChallenge: ${JSON.stringify(
+            queueEntry.receivedBestChallenge
+          )}`
+        )
       if (receivedChallenger) {
         queueEntry.receivedBestChallenger = receivedChallenger
         return true

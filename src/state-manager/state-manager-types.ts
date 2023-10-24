@@ -96,6 +96,7 @@ export type QueueEntry = {
   lastConfirmOrChallengeTimestamp: number
   acceptVoteMessage: boolean
   acceptConfirmOrChallenge: boolean
+  robustAccountDataPromises?: { [key: string]: Promise<Shardus.WrappedData> }
 
   gossipedReceipt: boolean
   gossipedVote: boolean
@@ -634,7 +635,7 @@ export type AppliedReceipt = {
 
 export type ConfirmOrChallengeMessage = {
   message: string
-  nodeId: string,
+  nodeId: string
   appliedVote: AppliedVote
   sign?: Shardus.Sign
 }

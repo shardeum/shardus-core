@@ -2548,6 +2548,78 @@ class TransactionQueue {
   }
 
   /**
+   * queueEntryGetConsensusGroupForAccount
+   * Gets a merged results of all the consensus nodes for a specific account involved in the transaction
+   * Ignores global accounts if globalModification == false and the account is global
+   * @param {QueueEntry} queueEntry
+   * @returns {Node[]}
+   */
+  queueEntryGetConsensusGroupForAccount(queueEntry: QueueEntry, accountId: string): Shardus.Node[] {
+    if (this.stateManager.currentCycleShardData == null) {
+      throw new Error('queueEntryGetConsensusGroup: currentCycleShardData == null')
+    }
+    if (queueEntry.uniqueKeys == null) {
+      throw new Error('queueEntryGetConsensusGroup: queueEntry.uniqueKeys == null')
+    }
+    if (queueEntry.conensusGroup != null) {
+      return queueEntry.conensusGroup
+    }
+    if (queueEntry.uniqueKeys.includes(accountId) === false) {
+      throw new Error(`queueEntryGetConsensusGroup: account ${accountId} is not in the queueEntry.uniqueKeys`)
+    }
+    const txGroup = []
+    const uniqueNodes: StringNodeObjectMap = {}
+
+    let hasNonGlobalKeys = false
+    const key = accountId
+    // eslint-disable-next-line security/detect-object-injection
+    const homeNode = queueEntry.homeNodes[key]
+    if (homeNode == null) {
+      if (logFlags.verbose) this.mainLogger.debug('queueEntryGetConsensusGroup homenode:null')
+    }
+    if (homeNode.extendedData === false) {
+      ShardFunctions.computeExtendedNodePartitionData(
+        this.stateManager.currentCycleShardData.shardGlobals,
+        this.stateManager.currentCycleShardData.nodeShardDataMap,
+        this.stateManager.currentCycleShardData.parititionShardDataMap,
+        homeNode,
+        this.stateManager.currentCycleShardData.activeNodes
+      )
+    }
+
+    // TODO STATESHARDING4 GLOBALACCOUNTS is this next block of logic needed?
+    // If this is not a global TX then skip tracking of nodes for global accounts used as a reference.
+    if (queueEntry.globalModification === false) {
+      if (this.stateManager.accountGlobals.isGlobalAccount(key) === true) {
+        /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetConsensusGroup skipping: ${utils.makeShortHash(key)} tx: ${queueEntry.logID}`)
+      } else {
+        hasNonGlobalKeys = true
+      }
+    }
+
+    for (const node of homeNode.consensusNodeForOurNodeFull) {
+      uniqueNodes[node.id] = node
+    }
+
+    // make sure the home node is in there in case we hit and edge case
+    uniqueNodes[homeNode.node.id] = homeNode.node
+    queueEntry.ourNodeInConsensusGroup = true
+    if (uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] == null) {
+      queueEntry.ourNodeInConsensusGroup = false
+      /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetConsensusGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${queueEntry.logID}`)
+    }
+
+    // make sure our node is included: needed for gossip! - although we may not care about the data!
+    uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] =
+      this.stateManager.currentCycleShardData.ourNode
+
+    const values = Object.values(uniqueNodes)
+    for (const v of values) {
+      txGroup.push(v)
+    }
+    return txGroup
+  }
+  /**
    * tellCorrespondingNodes
    * @param queueEntry
    * -sends account data to the correct involved nodees
@@ -4185,6 +4257,29 @@ class TransactionQueue {
                     }
                     continue
                   }
+
+                  if (queueEntry.transactionGroup.length > 1) {
+                    queueEntry.robustAccountDataPromises = {}
+                    // confirm the node has good data
+                    for (const key of queueEntry.uniqueKeys) {
+                      const collectedAccountData = queueEntry.collectedData[key]
+                      if (collectedAccountData.accountCreated) {
+                        // we do not need to check this newly created account
+                        // todo: still possible that node has lost data for this account
+                        continue
+                      }
+                      const consensuGroupForAccount = this.queueEntryGetConsensusGroupForAccount(
+                        queueEntry,
+                        key
+                      )
+                      const promise = this.stateManager.transactionConsensus.robustQueryAccountData(
+                        consensuGroupForAccount,
+                        key
+                      )
+                      queueEntry.robustAccountDataPromises[key] = promise
+                    }
+                  }
+
                   queueEntry.executionDebug.log2 = 'call pre apply'
                   const awaitStart = shardusGetTime()
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.preApplyTransaction(queueEntry)')
@@ -4327,6 +4422,14 @@ class TransactionQueue {
               //need to look at appliedReceipt2
               if (result != null || queueEntry.appliedReceipt2 != null) {
                 //TODO share receipt with corresponding index
+
+                if (logFlags.debug) {
+                  this.mainLogger.debug(
+                    `processAcceptedTxQueue2 tryProduceReceipt final result : ${
+                      queueEntry.logID
+                    } ${utils.stringifyReduce(result)}`
+                  )
+                }
 
                 if (
                   this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, result)
