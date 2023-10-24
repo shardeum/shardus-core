@@ -169,7 +169,7 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
       }
     }
   }
-  console.log('add remove returned from default')
+  /* prettier-ignore */ if (logFlags.verbose) console.log('add remove returned from default')
   return { add, remove }
 }
 

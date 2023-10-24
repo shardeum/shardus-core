@@ -476,21 +476,21 @@ class Shardus extends EventEmitter {
       this.mainLogger.error('Socket connection break', e)
     }
     this.network.on('timeout', (node, requestId: string, context: string) => {
-      /* prettier-ignore */ console.log( `In Shardus got network timeout-${context} for request ID - ${requestId} from node: ${logNode(node)}` )
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `In Shardus got network timeout-${context} for request ID - ${requestId} from node: ${logNode(node)}` )
       const result = isApopMarkedNode(node.id)
       if (result) {
         return
       }
       if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'timeout', requestId)
       /** [TODO] Report lost */
-      /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `timeout-${context}`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('lostNodes', `timeout-${context}`)
       // context has been added to provide info on the type of timeout and where it happened
-      /* prettier-ignore */ nestedCountersInstance.countRareEvent( 'lostNodes', `timeout-${context} ${node.internalIp}:${node.internalPort}` )
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) nestedCountersInstance.countRareEvent( 'lostNodes', `timeout-${context} ${node.internalIp}:${node.internalPort}` )
       if (this.network.statisticsInstance) this.network.statisticsInstance.incrementCounter('lostNodeTimeout')
     })
     this.network.on('error', (node, requestId: string, context: string, errorGroup: string) => {
-      /* prettier-ignore */ console.log( `In Shardus got network error-${context} for request ID ${requestId} from node: ${logNode(node)}` )
-      /* prettier-ignore */ console.log(`Error group for request ID - ${requestId}: ${errorGroup}`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `In Shardus got network error-${context} for request ID ${requestId} from node: ${logNode(node)}` )
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`Error group for request ID - ${requestId}: ${errorGroup}`)
       if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'error', requestId)
       /** [TODO] Report lost */
       /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `error-${context}`)
