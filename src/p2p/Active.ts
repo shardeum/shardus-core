@@ -156,7 +156,7 @@ export function updateRecord(
     let index = cycles.length - 1
 
     // loop through cycle chain and collect sync times
-    while (cycles.length > 0 && cycleCounter > lastCheckedCycleForSyncTimes && loopCount < maxLoopCount) {
+    while (index >= 0 && cycleCounter > lastCheckedCycleForSyncTimes && loopCount < maxLoopCount) {
       loopCount++
       const cycle = cycles[index]
       if (cycle) {
@@ -197,7 +197,7 @@ export function updateRecord(
           addedCount += 1
         }
       } else {
-        //this gets logged a lot leaving it for now so we dont forget to fix it
+        //update 2023/10/23 this loop has been fixed. so if we see this error again it is a new problem
         /* prettier-ignore */ if (logFlags.error) error(`Found no cycle for counter ${cycleCounter}`)
       }
       cycleCounter--
