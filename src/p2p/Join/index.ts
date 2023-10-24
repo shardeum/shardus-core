@@ -513,15 +513,27 @@ export async function submitJoinV2(
   const errs = []
 
   let goodCount = 0
+  let unreachable = 0
 
   for (const res of responses) {
     /* prettier-ignore */ if (logFlags.important_as_fatal) info(`Join Request Response: ${JSON.stringify(res)}`)
     if (res && res.fatal) {
       errs.push(res)
+
+      //special case for unreachable because the very nature of it means some timeouts could prevent us from hearing back
+      if (res.reason && res.reason.startsWith('IP or Port is not reachable')) {
+        unreachable++
+      }
     }
     if (res && res.success === true) {
       goodCount++
     }
+  }
+
+  if (unreachable >= 2) {
+    throw new Error(
+      `Fatal: submitJoin: our node was reported to not be reachable by 2 or more nodes ${unreachable}`
+    )
   }
 
   if (errs.length >= responses.length) {

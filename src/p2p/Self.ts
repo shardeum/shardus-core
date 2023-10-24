@@ -456,7 +456,7 @@ async function joinNetworkV2(activeNodes): Promise<void> {
   let offsetTime = 500
 
   //random in between 0 and 2000.  trying to debug why we are rejected from dapps
-  offsetTime = Math.floor(Math.random() * 60000) //TODO make config and set default value back to 2000ms or lower
+  offsetTime = Math.floor(Math.random() * Context.config.p2p.randomJoinRequestWait) //TODO make config and set default value back to 2000ms or lower
 
   /* prettier-ignore */ if (logFlags.important_as_fatal) info(`Waiting ${untilQ1} + ${offsetTime} ms for Q1 before sending join...`)
   await utils.sleep(untilQ1 + offsetTime) // Not too early

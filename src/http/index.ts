@@ -46,14 +46,16 @@ async function get<T>(url: string, getResponseObj = false, timeout = 1000): Prom
   let host = parseUrl(normalized, true)
 
   getIndex++
+
+  const localIndex = getIndex
   if (_logger) {
-    /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog('self', host.hostname + ':' + host.port, 'HttpRequest', host.pathname, getIndex, '')
+    /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog('self', host.hostname + ':' + host.port, 'HttpRequest', host.pathname, localIndex, '')
   }
 
-  let res = await _get(host, getIndex, timeout)
+  let res = await _get(host, localIndex, timeout)
 
   if (_logger) {
-    /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog( host.hostname + ':' + host.port, 'self', 'HttpResponseRecv', host.pathname, getIndex, stringifyReduceLimit(res.body, 1000) + '  res:: ' + stringifyReduceLimit(res, httpResLogLength) )
+    /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog( host.hostname + ':' + host.port, 'self', 'HttpResponseRecv', host.pathname, localIndex, stringifyReduceLimit(res.body, 1000) + '  res:: ' + stringifyReduceLimit(res, httpResLogLength) )
   }
 
   if (getResponseObj) {
@@ -93,14 +95,15 @@ async function post(givenHost, body, getResponseObj = false, timeout = 1000) {
   let host = parseUrl(normalized, true)
 
   postIndex--
+  const localIndex = postIndex
   if (_logger) {
-    /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog( 'self', host.hostname + ':' + host.port, 'HttpRequest', host.pathname, postIndex, body )
+    /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog( 'self', host.hostname + ':' + host.port, 'HttpRequest', host.pathname, localIndex, body )
   }
 
-  let res = await _post(host, body, postIndex, timeout)
+  let res = await _post(host, body, localIndex, timeout)
 
   if (_logger) {
-    /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog( host.hostname + ':' + host.port, 'self', 'HttpResponseRecv', host.pathname, postIndex, stringifyReduceLimit(res.body, 1000) + '  res:: ' + stringifyReduceLimit(res, httpResLogLength) )
+    /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog( host.hostname + ':' + host.port, 'self', 'HttpResponseRecv', host.pathname, localIndex, stringifyReduceLimit(res.body, 1000) + '  res:: ' + stringifyReduceLimit(res, httpResLogLength) )
   }
 
   if (getResponseObj) return res

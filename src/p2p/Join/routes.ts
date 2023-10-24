@@ -90,6 +90,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       return res.json({
         success: false,
         fatal: true,
+        //the following message string is used by submitJoinV2.  if you change the string please update submitJoinV2
         reason: `IP or Port is not reachable. ext:${externalIp}:${externalPort} int:${internalIp}:${internalPort}}`,
       })
     }
@@ -103,7 +104,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
         /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: already standby ${joinRequest.nodeInfo.publicKey}:`)
         return res.status(400).json({
           success: false,
-          fatal: true, //this seems wrong.  Do we want to kill a node that already got in?
+          fatal: false, //this was true before which seems wrong.  Do we want to kill a node that already got in?
           reason: `Join request for pubkey ${joinRequest.nodeInfo.publicKey} already exists as a standby node`,
         })
       }
@@ -111,18 +112,25 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       // then validate the join request. if it's invalid for any reason, return
       // that reason.
       const validationError = validateJoinRequest(joinRequest)
-      if (validationError) return res.status(400).json(validationError)
-
+      if (validationError) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: validateJoinRequest ${validationError.reason}`)
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: validateJoinRequest ${validationError.reason} ${joinRequest.nodeInfo.publicKey}:`)
+        return res.status(400).json(validationError)
+      }
       // then, verify the signature of the join request. this has to be done
       // before selectionNum is calculated because we will mutate the original
       // join request.
       const signatureError = verifyJoinRequestSignature(joinRequest)
-      if (signatureError) return res.status(400).json(signatureError)
+      if (signatureError) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: signature error`)
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: signature error ${joinRequest.nodeInfo.publicKey}:`)
+        return res.status(400).json(signatureError)
+      }
 
       // then, calculate the selection number for this join request.
       const selectionNumResult = computeSelectionNum(joinRequest)
       if (selectionNumResult.isErr()) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: failed selection number`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: failed selection number ${selectionNumResult.error.reason}`)
         /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`, JSON.stringify(selectionNumResult.error) )
         return res.status(500).json(selectionNumResult.error)
       }
