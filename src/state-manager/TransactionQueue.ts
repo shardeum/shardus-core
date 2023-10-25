@@ -33,7 +33,7 @@ import {
   SimpleNumberStats,
   QueueCountsResult,
 } from './state-manager-types'
-
+import { isInternalTxAllowed } from '../p2p/Modes'
 import { stringify } from '../utils'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
 import { Logger as L4jsLogger } from 'log4js'
@@ -412,6 +412,10 @@ class TransactionQueue {
   }
 
   handleSharedTX(tx: Shardus.OpaqueTransaction, appData: unknown, sender: Shardus.Node): QueueEntry {
+    // Block internal txs in case a node maliciously relays them to other nodes
+    if (this.app.isInternalTx(tx) && !isInternalTxAllowed()) {
+      return null
+    }
     // Perform fast validation of the transaction fields
     const validateResult = this.app.validate(tx, appData)
     if (validateResult.success === false) {

@@ -381,7 +381,7 @@ function applyNodeListChange(
 ) {
   NodeList.addNodes(change.added.map((joined) => NodeList.createNode(joined)))
   NodeList.updateNodes(change.updated, raiseEvents, cycle)
-  NodeList.removeNodes(change.removed, raiseEvents, cycle)
+  if (change.removed[0] !== 'all') NodeList.removeNodes(change.removed, raiseEvents, cycle)
 }
 
 export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.CycleCreatorTypes.CycleRecord> {

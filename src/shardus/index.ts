@@ -48,7 +48,7 @@ import { isDebugMode, isServiceMode } from '../debug'
 import * as JoinV2 from '../p2p/Join/v2'
 import { getNetworkTimeOffset, shardusGetTime } from '../network'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
-import { networkMode } from '../p2p/Modes'
+import { networkMode, isInternalTxAllowed } from '../p2p/Modes'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -1051,6 +1051,14 @@ class Shardus extends EventEmitter {
 
       let appData = {}
 
+      if (this.app.isInternalTx(tx) && !isInternalTxAllowed()) {
+        return {
+          success: false,
+          reason: `Internal transactions are not allowed in ${networkMode} Mode.`,
+          status: 500,
+        }
+      }
+
       // Give the dapp an opportunity to do some up front work and generate
       // appData metadata for the applied TX
       await this.app.txPreCrackData(tx, appData)
@@ -1671,6 +1679,9 @@ class Shardus extends EventEmitter {
       if (application == null) {
         // throw new Error('Invalid Application Instance')
         return null
+      }
+      if (typeof application.isInternalTx === 'function') {
+        applicationInterfaceImpl.isInternalTx = (tx) => application.isInternalTx(tx)
       }
 
       if (typeof application.validate === 'function') {
@@ -2437,6 +2448,10 @@ class Shardus extends EventEmitter {
   isOnStandbyList(publicKey: string): boolean {
     return JoinV2.isOnStandbyList(publicKey)
   }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 82da8409 (SHM-2853/54: Implementing internal tx check as per network mode)
 }
 
 function deepReplace(obj: object | ArrayLike<any>, find: any, replace: any): any {

@@ -390,6 +390,11 @@ async function cycleCreator() {
     if (prevRecord.active >= config.p2p.minNodes && hasAlreadyEnteredProcessing === false) {
       hasAlreadyEnteredProcessing = true
     }
+    if (prevRecord.mode === 'shutdown') {
+      console.log(`❌ Shutdown mode activated at Cycle ${prevRecord.counter}. Exiting Network after 60s.`)
+      utils.sleep(60 * SECOND)
+      Self.emitter.emit('invoke-exit', 'Shutdown-Mode') // Terminating the validator process
+    }
 
     /* prettier-ignore */ if (logFlags.verbose) info(`cc: scheduling currentCycle:${currentCycle} ${callTag} ${startQ1}`)
 
@@ -640,6 +645,12 @@ function makeCycleRecord(
   }) as P2P.CycleCreatorTypes.CycleRecord
 
   submodules.map((submodule) => submodule.updateRecord(cycleTxs, cycleRecord, prevRecord))
+  //Updating Cycle Record if network has entered 'Shutdown' Mode
+  if (config.p2p.initShutdown || cycleRecord.mode === 'shutdown') {
+    console.log('Updating Shutdown Mode Cycle Record...')
+    cycleRecord.removed = ['all']
+    cycleRecord.archiversAtShutdown = Array.from(Archivers.archivers.values())
+  }
 
   return cycleRecord
 }

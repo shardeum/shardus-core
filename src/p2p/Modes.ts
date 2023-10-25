@@ -71,6 +71,12 @@ export function updateRecord(
   prev: P2P.CycleCreatorTypes.CycleRecord
 ): void {
   const active = NodeList.activeByIdOrder.length
+  const { initShutdown } = Context.config.p2p
+  // If Shutdown mode in triggered from Admin/DAO tx
+  if (initShutdown) {
+    record.mode = 'shutdown'
+    return
+  }
 
   // If you're the first node
   if (Self.isFirst) {
@@ -100,17 +106,23 @@ export function updateRecord(
       } else if (prev.mode === 'processing') {
         if (enterRecovery(active)) {
           record.mode = 'recovery'
+        } else if (enterShutdown(active)) {
+          record.mode = 'shutdown'
         } else if (enterSafety(active, prev)) {
           record.mode = 'safety'
         }
       } else if (prev.mode === 'safety') {
         if (enterRecovery(active)) {
           record.mode = 'recovery'
+        } else if (enterShutdown(active)) {
+          record.mode = 'shutdown'
         } else if (enterProcessing(active)) {
           record.mode = 'processing'
         }
       } else if (prev.mode === 'recovery') {
-        if (enterSafety(active, prev)) {
+        if (enterShutdown(active)) {
+          record.mode = 'shutdown'
+        } else if (enterSafety(active, prev)) {
           record.mode = 'safety'
         } else if (enterProcessing(active)) {
           record.mode = 'processing'
@@ -152,6 +164,10 @@ export function enterRecovery(activeCount: number): boolean {
   return activeCount < 0.5 * Context.config.p2p.minNodes
 }
 
+export function enterShutdown(activeCount: number): boolean {
+  return activeCount <= 0.3 * Context.config.p2p.minNodes
+}
+
 export function enterSafety(activeCount: number, prevRecord: P2P.CycleCreatorTypes.CycleRecord): boolean {
   if (prevRecord.mode === 'recovery') {
     return activeCount >= 0.6 * Context.config.p2p.minNodes && activeCount < 0.9 * Context.config.p2p.minNodes
@@ -167,6 +183,10 @@ export function enterProcessing(activeCount: number): boolean {
   and we may even want the nodes to get to minnodes count before the archivers start patching data
   */
   return activeCount >= Context.config.p2p.minNodes
+}
+/** An internal tx is allowed to be processed if the network is in one of the modes mentioned in the function */
+export function isInternalTxAllowed(): boolean {
+  return ['processing', 'safety', 'forming'].includes(networkMode)
 }
 
 export function updateNetworkMode(mode: P2P.ModesTypes.Record['mode']): void {}

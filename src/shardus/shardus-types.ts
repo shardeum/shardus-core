@@ -159,6 +159,13 @@ export interface App {
   validate(tx: OpaqueTransaction, appData: any): { success: boolean; reason: string; status: number }
 
   /**
+   * Checks if the incoming transaction is an internal tx or not
+   *
+   * Returns a boolean value indicaing the same
+   */
+  isInternalTx(tx: OpaqueTransaction): boolean
+
+  /**
    * Cracks open the transaction and returns its timestamp, id (hash), and any
    * involved keys.
    *
@@ -762,6 +769,8 @@ export interface ServerConfiguration {
     q1DelayPercent: number
     /* Golden ticket enablement to allow nodes join the network without staking and have priority over other nodes */
     goldenTicketEnabled: boolean
+    /** The initShutdown flag can be switched on by an Admin/DAO via Change-Server-Config Tx to put the network in 'shutdown' mode */
+    initShutdown: boolean
   }
   /** Server IP configuration */
   ip?: {
