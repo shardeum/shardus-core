@@ -1394,9 +1394,21 @@ class TransactionConsenus {
     /* prettier-ignore */
     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote("shrd_confirmOrChallengeVote", `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `);
 
-    // todo: should check account integrity only when before states are different from best vote
+    // Should check account integrity only when before states are different from best vote
+    let doStatesMatch = true
+    const voteBeforeStates = queueEntry.receivedBestVote.account_state_hash_before
+    const ourBeforeStates = Object.values(queueEntry.collectedData)
+    if (voteBeforeStates.length !== ourBeforeStates.length) {
+      doStatesMatch = false
+    }
+    for (let i = 0; i < voteBeforeStates.length; i++) {
+      if (voteBeforeStates[i] !== ourBeforeStates[i].stateId) {
+        doStatesMatch = false
+        break
+      }
+    }
 
-    const isAccountIntegrityOk = await this.checkAccountIntegrity(queueEntry)
+    const isAccountIntegrityOk = doStatesMatch || (await this.checkAccountIntegrity(queueEntry))
     if (!isAccountIntegrityOk) {
       if (logFlags.verbose)
         this.mainLogger.debug(`challengeVoteAndShare: ${queueEntry.logID} account integrity is not ok`)
@@ -1494,9 +1506,16 @@ class TransactionConsenus {
         transaction_result: queueEntry.preApplyTXResult.passed,
         account_id: [],
         account_state_hash_after: [],
+        account_state_hash_before: [],
         node_id: ourNodeId,
         cant_apply: queueEntry.preApplyTXResult.applied === false,
         app_data_hash: '',
+      }
+
+      // iterate over queueEntry.collectedData and create our vote
+      for (const accountID in queueEntry.collectedData) {
+        const wrappedResponse = queueEntry.collectedData[accountID]
+        ourVote.account_state_hash_before.push(wrappedResponse.stateId)
       }
 
       // BAD NODE SIMULATION
