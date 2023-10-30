@@ -488,13 +488,15 @@ export class NetworkClass extends EventEmitter {
       const wrappedHandler = async (req, res, next) => {
         profilerInstance.profileSectionStart('net-externl', false)
         profilerInstance.profileSectionStart(`net-externl-${route}`, false)
+        profilerInstance.scopedProfileSectionStart(`net-externl-${route}`, false)
 
         let result
         try {
           result = await responseHandler(req, res, next)
         } finally {
-          profilerInstance.profileSectionEnd('net-externl', false)
+          profilerInstance.scopedProfileSectionEnd(`net-externl-${route}`)
           profilerInstance.profileSectionEnd(`net-externl-${route}`, false)
+          profilerInstance.profileSectionEnd('net-externl', false)
         }
 
         return result

@@ -92,8 +92,11 @@ export type QueueEntry = {
   receivedBestChallenger?: Shardus.NodeWithRank
   newVotes: boolean
   voteCastAge: number
+  firstVoteReceivedTimestamp: number
+  firstConfirmOrChallengeTimestamp: number
   lastVoteReceivedTimestamp: number
   lastConfirmOrChallengeTimestamp: number
+  completedConfirmedOrChallenge: boolean
   acceptVoteMessage: boolean
   acceptConfirmOrChallenge: boolean
   robustAccountDataPromises?: { [key: string]: Promise<Shardus.WrappedData> }
@@ -669,10 +672,20 @@ export type AppliedVoteQuery = {
   txId: string
 }
 
+export type ConfirmOrChallengeQuery = {
+  txId: string
+}
+
 export type AppliedVoteQueryResponse = {
   txId: string
   appliedVote: AppliedVote
   appliedVoteHash: string
+}
+
+export type ConfirmOrChallengeQueryResponse = {
+  txId: string
+  appliedVoteHash: string
+  result: ConfirmOrChallengeMessage
 }
 
 // export type AppliedReceiptGossip2 = {

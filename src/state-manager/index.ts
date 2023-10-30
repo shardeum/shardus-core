@@ -70,7 +70,7 @@ import {
   RequestAccountQueueCounts,
   QueueCountsResponse,
   QueueCountsResult,
-  ConfirmOrChallengeMessage
+  ConfirmOrChallengeMessage,
 } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
@@ -1574,36 +1574,6 @@ class StateManager {
           }
         } finally {
           profilerInstance.scopedProfileSectionEnd('spread_appliedVoteHash')
-        }
-      }
-    )
-
-    this.p2p.registerInternal(
-      'spread_confirmOrChallenge',
-      async (
-        payload: ConfirmOrChallengeMessage,
-        _respond: unknown,
-        _sender: unknown,
-        _tracker: string,
-        msgSize: number
-      ) => {
-        profilerInstance.scopedProfileSectionStart('spread_confirmOrChallenge', false, msgSize)
-        try {
-          const queueEntry = this.transactionQueue.getQueueEntrySafe(payload.appliedVote?.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            return
-          }
-          if (queueEntry.acceptConfirmOrChallenge === false) {
-            return
-          }
-          const collectedConfirmOrChallengeMessage = payload as ConfirmOrChallengeMessage
-          const appendSuccessful = this.transactionConsensus.tryAppendMessage(queueEntry, collectedConfirmOrChallengeMessage)
-
-          if (appendSuccessful) {
-            // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
-          }
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('spread_confirmOrChallenge')
         }
       }
     )
@@ -3454,7 +3424,7 @@ class StateManager {
           if (receipt.app_data_hash != null && receipt.app_data_hash != '') {
             const applyResponse = queueEntry?.preApplyTXResult?.applyResponse
             // we may not always have appReceiptData... especially in execute in local shard
-            if (applyResponse.appReceiptDataHash === receipt.app_data_hash) {
+            if (applyResponse && applyResponse.appReceiptDataHash === receipt.app_data_hash) {
               mapResult.txsMapEVMReceipt[txIdShort] = applyResponse.appReceiptData
               gotAppReceipt = true
             }

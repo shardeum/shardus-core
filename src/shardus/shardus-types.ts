@@ -986,6 +986,14 @@ export interface ServerConfiguration {
     configChangeMaxCyclesToKeep: number
     //** the number of config changes to keep*/
     configChangeMaxChangesToKeep: number
+    // how long to wait before confirming or challenging a vote
+    waitTimeBeforeConfirm: number
+    // max limit on how long to wait before confirming or challenge since first vote
+    waitLimitAfterFirstVote: number
+    // how long to wait before producing receipt from confirm/challenge
+    waitTimeBeforeReceipt: number
+    // max limit on how long to wait before confirming or challenge since first vote
+    waitLimitAfterFirstMessage: number
   }
   /** Options for sharding calculations */
   sharding?: {
