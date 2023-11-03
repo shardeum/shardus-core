@@ -59,6 +59,16 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
           }
         }
       }
+    } else if (prevRecord.mode === 'restart') {
+      if (syncing < desired) {
+        const addRem = target - syncing
+        /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`under restart active != desired; addRem: ${addRem}`)
+        if (addRem > 0) {
+          add = Math.ceil(addRem)
+          remove = 0
+          return { add, remove }
+        }
+      }
     } else if (prevRecord.mode === 'processing') {
       if (enterSafety(active, prevRecord) === false && enterRecovery(active) === false) {
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("max rotated per cycle: ", config.p2p.maxRotatedPerCycle)

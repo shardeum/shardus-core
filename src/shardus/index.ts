@@ -242,8 +242,10 @@ class Shardus extends EventEmitter {
       await this.storage.close()
     })
     this.exitHandler.registerAsync('unjoin', async () => {
-      this.mainLogger.info('Submitting unjoin request...')
-      await JoinV2.shutdown()
+      if (networkMode !== 'shutdown') {
+        this.mainLogger.info('Submitting unjoin request...')
+        await JoinV2.shutdown()
+      }
     })
     /* moved stopping the application to earlier
     this.exitHandler.registerAsync('application', async () => {

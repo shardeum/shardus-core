@@ -9,7 +9,7 @@ import * as CycleChain from '../../CycleChain'
 import * as NodeList from '../../NodeList'
 import * as http from '../../../http'
 import { getStandbyNodesInfoMap } from ".";
-import { calculateToAccept, verifyJoinRequestSignature } from "..";
+import { calculateToAcceptV2 } from "../../ModeSystemFuncs";
 import { fastIsPicked } from "../../../utils";
 import { getOurNodeIndex, getOurNodeIndexFromSyncingList } from "../../Utils";
 import { nestedCountersInstance } from "../../../utils/nestedCounters";
@@ -31,9 +31,9 @@ export function executeNodeSelection(): void {
     return
   }
 
-  const numToAccept = calculateToAccept() // I think we need to update to use the new calculateToAcceptV2
-  /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`selecting ${numToAccept} nodes to accept`)
-  selectNodes(numToAccept)
+  const { add } = calculateToAcceptV2(CycleChain.newest)
+  /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`selecting ${add} nodes to accept`)
+  selectNodes(add)
 }
 
 /**

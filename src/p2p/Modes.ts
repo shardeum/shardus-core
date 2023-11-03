@@ -119,10 +119,6 @@ export function updateRecord(
       } else if (prev.mode === 'recovery') {
         if (enterShutdown(active)) {
           record.mode = 'shutdown'
-        } else if (enterSafety(active, prev)) {
-          record.mode = 'safety'
-        } else if (enterProcessing(active)) {
-          record.mode = 'processing'
         }
       } else if (prev.mode === 'shutdown' && Self.isFirst) {
         if (Self.isRestartNetwork) Object.assign(record, { mode: 'restart' })

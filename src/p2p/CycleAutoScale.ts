@@ -401,6 +401,7 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
         }
       }
     } else if (prevRecord.mode === 'restart') {
+      // In restart mode, all the nodes remain in 'syncing' mode until the desired number of nodes are reached
       /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in restart")
       if (syncing < desired) {
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: entered syncing < desired")
