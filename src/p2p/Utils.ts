@@ -8,6 +8,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { config, stateManager } from './Context'
 import * as Context from './Context'
 import * as Self from './Self'
+import * as NodeList from './NodeList'
 import { Logger } from 'log4js'
 import { P2P } from '@shardus/types'
 import { Result } from 'neverthrow'
@@ -51,6 +52,7 @@ export interface SequentialQueryResult<Node> {
 export type SeedNodesList = {
   nodeList: P2P.P2PTypes.Node[]
   joinRequest: P2P.ArchiversTypes.Request | undefined
+  restartCycleRecord: P2P.ArchiversTypes.RestartCycleRecord | undefined
   dataRequestCycle: unknown
   dataRequestStateMetaData: unknown
 }
@@ -524,6 +526,13 @@ export function getOurNodeIndex(): number | null {
   if (!nodeInfo) return null
 
   return nodeInfo.ourNodeIndex
+}
+
+export const getOurNodeIndexFromSyncingList = (): number | null => {
+  let nodeIndex = NodeList.syncingByIdOrder.findIndex((node) => node.id === Self.id)
+  console.log('getOurNodeIndexFromSyncingList', nodeIndex)
+  if (nodeIndex === -1) return null
+  return nodeIndex
 }
 
 export function getRandomAvailableArchiver(): P2P.SyncTypes.ActiveNode {

@@ -44,7 +44,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
   handler: async (req, res) => {
     const joinRequest = req.body
 
-    if (!isActive) {
+    if (!isActive && !Self.isRestartNetwork) {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: not-active`)
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: not-active`)
       // if we are not active yet, we cannot accept join requests
@@ -67,7 +67,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
     }
 
     if (
-      NodeList.activeByIdOrder.length === 1 &&
+      (NodeList.activeByIdOrder.length === 1 || Self.isRestartNetwork) &&
       Self.isFirst &&
       isBogonIP(joinRequest.nodeInfo.externalIp) &&
       config.p2p.forceBogonFilteringOn === false

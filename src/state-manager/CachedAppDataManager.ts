@@ -405,7 +405,7 @@ class CachedAppDataManager {
     let accountIsRemote = this.stateManager.transactionQueue.isAccountRemote(address)
 
     if (
-      this.stateManager.currentCycleShardData.activeNodes.length <=
+      this.stateManager.currentCycleShardData.nodes.length <=
       this.stateManager.currentCycleShardData.shardGlobals.consensusRadius
     ) {
       accountIsRemote = false

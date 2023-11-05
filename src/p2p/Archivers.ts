@@ -429,7 +429,8 @@ export function updateArchivers(record) {
 // Add data type of dataRequests used in experimentalSnapshot
 export function addDataRecipient(
   nodeInfo: P2P.ArchiversTypes.JoinedArchiver,
-  dataRequests: { dataRequestCycle?: number } | DataRequest<CycleRecord | StateMetaData>[]
+  dataRequests: { dataRequestCycle?: number } | DataRequest<CycleRecord | StateMetaData>[],
+  overrideLastSentCycle?: number
 ) {
   if (logFlags.console) console.log('Adding data recipient..', arguments)
   if (config.p2p.experimentalSnapshot && config.features.archiverDataSubscriptionsUpdate) {
@@ -450,6 +451,7 @@ export function addDataRecipient(
       dataRequestCycle: dataRequests['dataRequestCycle'],
       curvePk: crypto.convertPublicKeyToCurve(nodeInfo.publicKey),
     }
+    if (overrideLastSentCycle) lastSentCycle = overrideLastSentCycle
     if (lastSentCycle > recipient.dataRequestCycle) {
       // If the dataRequestCycle is behind many cycles, Set it to 10 cycles before the current cycle
       if (lastSentCycle - recipient.dataRequestCycle > 10) lastSentCycle = lastSentCycle - 10

@@ -346,6 +346,7 @@ function setDesiredCount(count: number) {
 
 function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): number {
   const active = NodeList.activeByIdOrder.length
+  const syncing = NodeList.syncingByIdOrder.length
 
   if (prevRecord && prevRecord.mode !== undefined) {
     // For now, we are using the desired value from the previous cycle. In the future, we should look at using the next desired value
@@ -399,8 +400,21 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
           targetCount = config.p2p.maxNodes
         }
       }
-    }
-  } else if (Self.isFirst && active < 1) {
+    } else if (prevRecord.mode === 'restart') {
+      /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in restart")
+      if (syncing < desired) {
+        /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: entered syncing < desired")
+        let add = ~~(0.2 * syncing) // Add 20% more nodes on each cycle
+        if (add < 7) {
+          add = 7
+        }
+        targetCount = syncing + add
+        if (targetCount > desired) {
+          targetCount = desired
+        }
+      }
+    } else if (prevRecord.mode === 'shutdown') targetCount = 7
+  } else if(Self.isFirst && active < 1) {
     /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in Self.isFirst condition")
     targetCount = 7
   }

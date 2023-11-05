@@ -1,6 +1,6 @@
 import * as Shardus from '../shardus/shardus-types'
 
-import { StateManager as StateManagerTypes } from '@shardus/types'
+import { StateManager as StateManagerTypes, P2P as P2PTypes } from '@shardus/types'
 
 import { isNodeDown, isNodeLost, isNodeUpRecent } from '../p2p/Lost'
 
@@ -18,7 +18,7 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import * as Context from '../p2p/Context'
-import { potentiallyRemoved, activeByIdOrder } from '../p2p/NodeList'
+import { potentiallyRemoved, activeByIdOrder, byIdOrder } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as NodeList from '../p2p/NodeList'
 import * as CycleChain from '../p2p/CycleChain'
@@ -74,7 +74,6 @@ import {
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
 import { Logger as Log4jsLogger } from 'log4js'
-import { NodeInfo } from '@shardus/types/build/src/p2p/P2PTypes'
 import { timingSafeEqual } from 'crypto'
 import { shardusGetTime } from '../network'
 import { isServiceMode } from '../debug'
@@ -472,7 +471,7 @@ class StateManager {
    *     ######  ##     ## ##     ## ##     ## ########         ######  ##     ## ########  ######   ######
    */
   // This is called once per cycle to update to calculate the necessary shard values.
-  updateShardValues(cycleNumber: number) {
+  updateShardValues(cycleNumber: number, mode: P2PTypes.ModesTypes.Record['mode']) {
     if (this.currentCycleShardData == null) {
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_firstCycle', `${cycleNumber}`, ` first init `)
     }
@@ -504,8 +503,7 @@ class StateManager {
     // todo get current cycle..  store this by cycle?
     cycleShardData.nodeShardDataMap = new Map()
     cycleShardData.parititionShardDataMap = new Map()
-
-    cycleShardData.activeNodes = activeByIdOrder
+    cycleShardData.nodes = this.getNodesForCycleShard(mode)
     cycleShardData.cycleNumber = cycleNumber
     cycleShardData.partitionsToSkip = new Map()
     cycleShardData.hasCompleteData = false
@@ -528,7 +526,7 @@ class StateManager {
       return
     }
 
-    if (cycleShardData.activeNodes.length === 0) {
+    if (cycleShardData.nodes.length === 0) {
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_noNodeListAvailable', `${cycleNumber}`, `  `)
       return // no active nodes so stop calculating values
     }
@@ -547,7 +545,7 @@ class StateManager {
 
     // save this per cycle?
     cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(
-      cycleShardData.activeNodes.length,
+      cycleShardData.nodes.length,
       this.config.sharding.nodesPerConsensusGroup as number,
       edgeNodes
     )
@@ -567,9 +565,9 @@ class StateManager {
     ShardFunctions.computeNodePartitionDataMap(
       cycleShardData.shardGlobals,
       cycleShardData.nodeShardDataMap,
-      cycleShardData.activeNodes,
+      cycleShardData.nodes,
       cycleShardData.parititionShardDataMap,
-      cycleShardData.activeNodes,
+      cycleShardData.nodes,
       false
     )
     this.profiler.profileSectionEnd('updateShardValues_computePartitionShardDataMap2')
@@ -581,7 +579,7 @@ class StateManager {
       cycleShardData.ourNode,
       cycleShardData.nodeShardDataMap,
       cycleShardData.parititionShardDataMap,
-      cycleShardData.activeNodes,
+      cycleShardData.nodes,
       true
     )
     this.profiler.profileSectionEnd('updateShardValues_computeNodePartitionData')
@@ -591,7 +589,7 @@ class StateManager {
     // TODO perf scalability  need to generate this as needed in very large networks with millions of nodes.
     // generate full data for nodes that store our home partition
     //
-    // ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodeShardData.nodeThatStoreOurParitionFull, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true, false)
+    // ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodeShardData.nodeThatStoreOurParitionFull, cycleShardData.parititionShardDataMap, cycleShardData.nodes, true, false)
     // this.profiler.profileSectionEnd('updateShardValues_computeNodePartitionDataMap1')
 
     // cycleShardData.nodeShardData = cycleShardData.nodeShardDataMap.get(cycleShardData.ourNode.id)
@@ -602,15 +600,15 @@ class StateManager {
     ShardFunctions.computeNodePartitionDataMap(
       cycleShardData.shardGlobals,
       cycleShardData.nodeShardDataMap,
-      cycleShardData.activeNodes,
+      cycleShardData.nodes,
       cycleShardData.parititionShardDataMap,
-      cycleShardData.activeNodes,
+      cycleShardData.nodes,
       fullDataForDebug
     )
     this.profiler.profileSectionEnd('updateShardValues_computeNodePartitionDataMap2')
 
     // TODO if fullDataForDebug gets turned false we will update the guts of this calculation
-    // ShardFunctions.computeNodePartitionDataMapExt(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes)
+    // ShardFunctions.computeNodePartitionDataMapExt(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodes, cycleShardData.parititionShardDataMap, cycleShardData.nodes)
 
     this.currentCycleShardData = cycleShardData
     this.shardValuesByCycle.set(cycleNumber, cycleShardData)
@@ -676,7 +674,7 @@ class StateManager {
     // /* prettier-ignore */ if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
     /* prettier-ignore */ if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${this.currentCycleShardData.cycleNumber} `)
 
-    this.lastActiveNodeCount = cycleShardData.activeNodes.length
+    this.lastActiveNodeCount = cycleShardData.nodes.length
 
     cycleShardData.hasCompleteData = true
   }
@@ -753,7 +751,7 @@ class StateManager {
       if (cycle === null || cycle === undefined) {
         return null
       }
-      this.updateShardValues(cycle.counter)
+      this.updateShardValues(cycle.counter, cycle.mode)
     }
 
     return this.currentCycleShardData
@@ -781,7 +779,7 @@ class StateManager {
    *     #######     ##    #### ########  ######
    */
 
-  debugNodeGroup(key: string, key2: number, msg: string, nodes: NodeInfo[]) {
+  debugNodeGroup(key: string, key2: number, msg: string, nodes: P2PTypes.P2PTypes.NodeInfo[]) {
     if (logFlags.playback)
       this.logger.playbackLogNote(
         'debugNodeGroup',
@@ -1959,7 +1957,7 @@ class StateManager {
       }
 
       //partitionDump.allNodeIds = []
-      for (const node of this.currentCycleShardData.activeNodes) {
+      for (const node of this.currentCycleShardData.nodes) {
         partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
       }
 
@@ -1970,8 +1968,8 @@ class StateManager {
       partitionDump.globalAccountSummary = globalAccountSummary
       partitionDump.globalStateHash = globalStateHash
     } else {
-      if (this.currentCycleShardData != null && this.currentCycleShardData.activeNodes.length > 0) {
-        for (const node of this.currentCycleShardData.activeNodes) {
+      if (this.currentCycleShardData != null && this.currentCycleShardData.nodes.length > 0) {
+        for (const node of this.currentCycleShardData.nodes) {
           partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
         }
       }
@@ -2121,10 +2119,7 @@ class StateManager {
 
     // hack to say we have all the data
     if (!isServiceMode())
-      if (
-        this.currentCycleShardData.activeNodes.length <=
-        this.currentCycleShardData.shardGlobals.consensusRadius
-      ) {
+      if (this.currentCycleShardData.nodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius) {
         accountIsRemote = false
       }
     if (forceLocalGlobalLookup) {
@@ -2273,7 +2268,7 @@ class StateManager {
     }
     const results = ShardFunctions.getNodesByProximity(
       cycleShardData.shardGlobals,
-      cycleShardData.activeNodes,
+      cycleShardData.nodes,
       homeNodeIndex,
       idToExclude,
       count,
@@ -3020,7 +3015,7 @@ class StateManager {
 
           this.profiler.profileSectionStart('stateManager_cycle_q1_start_updateShardValues')
 
-          this.updateShardValues(lastCycle.counter)
+          this.updateShardValues(lastCycle.counter, lastCycle.mode)
 
           this.profiler.profileSectionEnd('stateManager_cycle_q1_start_updateShardValues')
 
@@ -3163,7 +3158,7 @@ class StateManager {
       if (this.superLargeNetworkDebugReduction === true || logFlags.verbose) {
         //log just the node IDS and cycle number even this may be too much eventually
         const partitionDump = { cycle: cycleShardValues.cycleNumber, allNodeIds: [] }
-        for (const node of this.currentCycleShardData.activeNodes) {
+        for (const node of this.currentCycleShardData.nodes) {
           partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
         }
         this.lastShardReport = utils.stringifyReduce(partitionDump)
@@ -3580,6 +3575,17 @@ class StateManager {
       filteredNodes.push(node)
     }
     return filteredNodes
+  }
+
+  /**
+   *
+   * @returns
+   */
+  getNodesForCycleShard(mode: P2PTypes.ModesTypes.Record['mode']): Shardus.Node[] {
+    if (mode === 'forming' || mode === 'processing' || mode === 'safety') return activeByIdOrder
+    if (mode === 'restart' || mode === 'restore' || mode === 'recovery') return byIdOrder
+    // For shutdown mode as well, we may want all nodes (This needs review)
+    if (mode === 'shutdown') return byIdOrder
   }
 
   getTxRepair(): TransactionRepair {

@@ -71,6 +71,8 @@ export function updateRecord(
   prev: P2P.CycleCreatorTypes.CycleRecord
 ): void {
   const active = NodeList.activeByIdOrder.length
+  const syncing = NodeList.syncingByIdOrder.length
+
   const { initShutdown } = Context.config.p2p
   // If Shutdown mode in triggered from Admin/DAO tx
   if (initShutdown) {
@@ -78,12 +80,7 @@ export function updateRecord(
     return
   }
 
-  // If you're the first node
-  if (Self.isFirst) {
-    Object.assign(record, { mode: 'forming' })
-  }
-  // If you're not the first node
-  else if (prev) {
+  if (prev) {
     //  if the modules have just been swapped last cycle
     if (prev.mode === undefined && prev.safetyMode !== undefined) {
       if (hasAlreadyEnteredProcessing === false) {
@@ -127,8 +124,22 @@ export function updateRecord(
         } else if (enterProcessing(active)) {
           record.mode = 'processing'
         }
+      } else if (prev.mode === 'shutdown' && Self.isFirst) {
+        if (Self.isRestartNetwork) Object.assign(record, { mode: 'restart' })
+      } else if (prev.mode === 'restart') {
+        if (enterRestore(syncing)) {
+          record.mode = 'restore'
+        }
+      } else if (prev.mode === 'restore') {
+        // This might need to be changed later when adding the restore feature
+        if (enterProcessing(active)) {
+          record.mode = 'processing'
+        }
       }
     }
+  } else if (Self.isFirst) {
+    // If you're the first node
+    Object.assign(record, { mode: 'forming' })
   }
 }
 
@@ -139,6 +150,10 @@ export function validateRecordTypes(rec: P2P.ModesTypes.Record): string {
 }
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
+  // If the networkMode before updating is 'restart' or 'recovery' and now it's about to change to 'restore', emit 'restore' event
+  if ((networkMode === 'restart' || networkMode === 'recovery') && record.mode === 'restore') {
+    Self.emitter.emit('restore', record.counter)
+  }
   networkMode = record.mode
   return {
     added: [],
@@ -189,4 +204,6 @@ export function isInternalTxAllowed(): boolean {
   return ['processing', 'safety', 'forming'].includes(networkMode)
 }
 
-export function updateNetworkMode(mode: P2P.ModesTypes.Record['mode']): void {}
+export function enterRestore(syncingCount: number): boolean {
+  return syncingCount >= Context.config.p2p.minNodes
+}

@@ -8,11 +8,12 @@ import AccountSync from './AccountSync'
 import { logFlags } from '../logger'
 import { errorToStringFull } from '../utils'
 import { P2PModuleContext as P2P } from '../p2p/Context'
+import { SyncTrackerInterface } from './NodeSyncTracker'
+import ArchiverDataSourceHelper from './ArchiverDataSourceHelper'
+import { archivers } from '../p2p/Archivers'
+import * as http from '../http'
 
-import DataSourceHelper from './DataSourceHelper'
-import { shardusGetTime } from '../network'
-
-export default class SyncTracker {
+export default class ArchiverSyncTracker implements SyncTrackerInterface {
   accountSync: AccountSync //parent sync manager
   p2p: P2P
 
@@ -29,7 +30,7 @@ export default class SyncTracker {
 
   keys: { [address: string]: boolean }
 
-  dataSourceHelper: DataSourceHelper
+  archiverDataSourceHelper: ArchiverDataSourceHelper
 
   //moved from accountSync
   currentRange: SimpleRange
@@ -86,7 +87,7 @@ export default class SyncTracker {
     this.isPartOfInitialSync = initalSync
     this.keys = {}
 
-    this.dataSourceHelper = new DataSourceHelper(this.accountSync.stateManager)
+    this.archiverDataSourceHelper = new ArchiverDataSourceHelper(this.accountSync.stateManager)
   }
 
   initGlobal(accountSync: AccountSync, p2p: P2P, index: number, cycle: number, initalSync = false): void {
@@ -104,7 +105,7 @@ export default class SyncTracker {
     this.isPartOfInitialSync = initalSync
     this.keys = {}
 
-    this.dataSourceHelper = new DataSourceHelper(this.accountSync.stateManager)
+    this.archiverDataSourceHelper = new ArchiverDataSourceHelper(this.accountSync.stateManager)
   }
 
   /***
@@ -124,7 +125,7 @@ export default class SyncTracker {
 
       try {
         if (this.accountSync.debugFail3) {
-          nestedCountersInstance.countEvent('sync', `syncStateDataForRange2: debugFail3`)
+          nestedCountersInstance.countEvent('archiver_sync', `syncStateDataForRange2: debugFail3`)
           await utils.sleep(3000)
           //should cause apop
           throw new Error('debugFail3 syncStateDataForRange2')
@@ -134,34 +135,34 @@ export default class SyncTracker {
         this.currentRange = this.range
         this.addressRange = this.range // this.partitionToAddressRange(partition)
 
-        this.partitionStartTimeStamp = shardusGetTime()
+        this.partitionStartTimeStamp = Date.now()
 
         const lowAddress = this.addressRange.low
         const highAddress = this.addressRange.high
         partition = `${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)}`
 
-        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `sync partition: ${partition} start: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber}`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('archiver_sync', `sync partition: ${partition} start: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber}`)
 
         //this.accountSync.readyforTXs = true //Do not open the floodgates of queuing stuffs.
 
         const accountsSaved = await this.syncAccountData2(lowAddress, highAddress)
-        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: partition: ${partition}, syncAccountData2 done.`)
+        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: partition: ${partition}, syncAccountData2 done.`)
 
-        /* prettier-ignore */ nestedCountersInstance.countEvent( 'sync', `sync partition: ${partition} end: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} failedHashes:${this.failedAccounts.length}` )
+        /* prettier-ignore */ nestedCountersInstance.countEvent( 'archiver_sync', `sync partition: ${partition} end: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} failedHashes:${this.failedAccounts.length}` )
         this.failedAccounts = [] //clear failed hashes.  We dont try to fix them for now.  let the patcher handle it.  could bring back old code if we change mind
       } catch (error) {
         if (error.message.includes('reset-sync-ranges')) {
-          /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataForRange_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error) )
+          /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataForRange_reset-sync-ranges`, 'ARCHIVER_DATASYNC: reset-sync-ranges: ' + errorToStringFull(error) )
           //buble up:
           throw new Error('reset-sync-ranges')
         } else if (error.message.includes('FailAndRestartPartition')) {
-          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
-          /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataForRange_ex_failandrestart`, 'DATASYNC: FailAndRestartPartition: ' + errorToStringFull(error) )
+          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: Error Failed at: ${error.stack}`)
+          /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataForRange_ex_failandrestart`, 'ARCHIVER_DATASYNC: FailAndRestartPartition: ' + errorToStringFull(error) )
 
           retry = await this.tryRetry('syncStateDataForRange 1')
         } else {
           /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataForRange_ex`, 'syncStateDataForPartition failed: ' + errorToStringFull(error) )
-          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
+          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
 
           retry = await this.tryRetry('syncStateDataForRange 2')
         }
@@ -185,7 +186,7 @@ export default class SyncTracker {
    */
   async syncStateDataGlobals(): Promise<void> {
     let retry = true
-    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `syncStateDataGlobals-start`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`archiver_sync`, `syncStateDataGlobals-start`)
     while (retry) {
       retry = false
 
@@ -193,16 +194,16 @@ export default class SyncTracker {
         const partition = 'globals!'
 
         let remainingAccountsToSync = []
-        this.partitionStartTimeStamp = shardusGetTime()
+        this.partitionStartTimeStamp = Date.now()
 
         if (this.accountSync.debugFail3) {
-          nestedCountersInstance.countEvent('sync', `syncStateDataGlobals: debugFail3`)
+          nestedCountersInstance.countEvent('archiver_sync', `syncStateDataGlobals: debugFail3`)
           await utils.sleep(3000)
           //should cause apop
           throw new Error('debugFail3 syncStateDataGlobals')
         }
 
-        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals partition: ${partition} `)
+        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: syncStateDataGlobals partition: ${partition} `)
 
         //this.accountSync.readyforTXs = true //Do not open the floodgates of queuing stuffs.
 
@@ -211,17 +212,17 @@ export default class SyncTracker {
           'syncTrackerGlobal'
         )
 
-        //TODO should convert to a larger list of valid nodes
-        this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
+        // Added all archivers to the list of archivers to ask for data
+        this.archiverDataSourceHelper.initWithList([...Object.values(archivers)])
 
         let hasAllGlobalData = false
 
         if (globalReport.accounts.length === 0) {
-          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC:  syncStateDataGlobals no global accounts `)
+          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC:  syncStateDataGlobals no global accounts `)
           this.accountSync.setGlobalSyncFinished()
           return // no global accounts
         }
-        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC:  syncStateDataGlobals globalReport: ${utils.stringifyReduce(globalReport)} `)
+        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC:  syncStateDataGlobals globalReport: ${utils.stringifyReduce(globalReport)} `)
 
         let accountReportsByID: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
         for (const report of globalReport.accounts) {
@@ -234,12 +235,14 @@ export default class SyncTracker {
         let maxTries = 20
 
         if (this.accountSync.dataSourceTest === true) {
-          if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1') == false) {
+          if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData1') == false) {
             throw new Error('out of account nodes to ask: dataSourceTest')
           }
           while (this.accountSync.debugFail4) {
             await utils.sleep(1000)
-            if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1 debugFail4') == false) {
+            if (
+              this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData1 debugFail4') == false
+            ) {
               throw new Error('out of account nodes to ask: dataSourceTest debugFail4')
             }
           }
@@ -253,21 +256,21 @@ export default class SyncTracker {
         while (hasAllGlobalData === false) {
           maxTries--
           if (maxTries <= 0) {
-            /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: syncStateDataGlobals max tries excceded `)
+            /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`ARCHIVER_DATASYNC: syncStateDataGlobals max tries excceded `)
             return
           }
-          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals hasAllGlobalData === false `)
+          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: syncStateDataGlobals hasAllGlobalData === false `)
 
           // Node Precheck!
           if (
             this.accountSync.stateManager.isNodeValidForInternalMessage(
-              this.dataSourceHelper.dataSourceNode.id,
+              this.archiverDataSourceHelper.dataSourceArchiver.publicKey,
               'syncStateDataGlobals',
               true,
               true
             ) === false
           ) {
-            if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals1') == false) {
+            if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncStateDataGlobals1') == false) {
               throw new Error('out of account nodes to ask: syncStateDataGlobals1')
             }
             continue
@@ -279,22 +282,25 @@ export default class SyncTracker {
 
           //Get accounts.
           const message = { accountIds: remainingAccountsToSync }
-          const result = await this.p2p.ask(
-            this.dataSourceHelper.dataSourceNode,
-            'get_account_data_by_list',
-            message
-          )
+
+          // TODO: added by Jai - Update this to use the new API from the archiver
+          // const result = await this.p2p.ask(
+          //   this.dataSourceHelper.dataSourceNode,
+          //   'get_account_data_by_list',
+          //   message
+          // )
+          let result
 
           if (result == null) {
             /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result == null')
-            if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals2') == false) {
+            if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncStateDataGlobals2') == false) {
               throw new Error('out of account nodes to ask: syncStateDataGlobals2')
             }
             continue
           }
           if (result.accountData == null) {
             /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
-            if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals3') == false) {
+            if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncStateDataGlobals3') == false) {
               throw new Error('out of account nodes to ask: syncStateDataGlobals3')
             }
             continue
@@ -305,11 +311,12 @@ export default class SyncTracker {
           //Get globals list and hash (if changes then update said accounts and repeath)
           //diff the list and update remainingAccountsToSync
           // add any new accounts to globalAccounts
-          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals get_account_data_by_list ${utils.stringifyReduce(result)} `)
+          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: syncStateDataGlobals get_account_data_by_list ${utils.stringifyReduce(result)} `)
 
           globalReport2 = await this.accountSync.getRobustGlobalReport('syncTrackerGlobal2')
 
-          this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
+          // Added all archivers to the list of archivers to ask for data
+          this.archiverDataSourceHelper.initWithList([...Object.values(archivers)])
 
           const accountReportsByID2: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
           for (const report of globalReport2.accounts) {
@@ -324,18 +331,18 @@ export default class SyncTracker {
           }
           //check the full report for any missing data
           for (const report of globalReport2.accounts) {
-            /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts `)
+            /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: syncStateDataGlobals loop globalReport2.accounts `)
             const data = accountDataById[report.id]
             if (data == null) {
               //we dont have the data
               hasAllGlobalData = false
               remainingAccountsToSync.push(report.id)
-              /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data===null ${utils.makeShortHash(report.id)} `)
+              /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: syncStateDataGlobals remainingAccountsToSync data===null ${utils.makeShortHash(report.id)} `)
             } else if (data.stateId !== report.hash) {
               //we have the data but he hash is wrong
               hasAllGlobalData = false
               remainingAccountsToSync.push(report.id)
-              /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data.stateId !== report.hash ${utils.makeShortHash(report.id)} `)
+              /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: syncStateDataGlobals remainingAccountsToSync data.stateId !== report.hash ${utils.makeShortHash(report.id)} `)
             }
           }
           //set this report to the last report and continue.
@@ -348,7 +355,7 @@ export default class SyncTracker {
 
         //Write the data! and set global memory data!.  set accounts copy data too.
         for (const report of globalReport2.accounts) {
-          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts 2`)
+          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: syncStateDataGlobals loop globalReport2.accounts 2`)
           const accountData = accountDataById[report.id]
           if (accountData != null) {
             dataToSet.push(accountData)
@@ -372,32 +379,32 @@ export default class SyncTracker {
           throw new Error('setting global data falied')
         }
 
-        /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `syncStateDataGlobals complete accounts:${dataToSet.length}`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent(`archiver_sync`, `syncStateDataGlobals complete accounts:${dataToSet.length}`)
 
-        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals complete synced ${dataToSet.length} accounts `)
+        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: syncStateDataGlobals complete synced ${dataToSet.length} accounts `)
       } catch (error) {
         if (error.message.includes('FailAndRestartPartition')) {
-          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
-          /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataGlobals_ex_failandrestart`, 'DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + errorToStringFull(error) )
+          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
+          /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataGlobals_ex_failandrestart`, 'ARCHIVER_DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + errorToStringFull(error) )
 
           retry = await this.tryRetry('syncStateDataGlobals 1 ')
         } else {
           /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataGlobals_ex`, 'syncStateDataGlobals failed: ' + errorToStringFull(error) )
-          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
+          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
 
           retry = await this.tryRetry('syncStateDataGlobals 2')
         }
       }
     }
 
-    /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC:  syncStateDataGlobals complete ${this.accountSync.syncStatement.numGlobalAccounts}`)
+    /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC:  syncStateDataGlobals complete ${this.accountSync.syncStatement.numGlobalAccounts}`)
     this.accountSync.setGlobalSyncFinished()
   }
 
   async syncAccountData2(lowAddress: string, highAddress: string): Promise<number> {
     // Sync the Account data
     //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
-    if (logFlags.console) console.log(`syncAccountData3` + '   time:' + shardusGetTime())
+    if (logFlags.console) console.log(`syncAccountData3` + '   time:' + Date.now())
 
     if (this.accountSync.config.stateManager == null) {
       throw new Error('this.config.stateManager == null')
@@ -415,17 +422,16 @@ export default class SyncTracker {
     let startTime = 0
     let lowTimeQuery = startTime
 
-    //this.dataSourceHelper.dataSourceNode = null
-    //this.dataSourceHelper.getDataSourceNode(lowAddress, highAddress)
-    this.dataSourceHelper.initByRange(lowAddress, highAddress)
+    // Added all archivers to the list of archivers to ask for data
+    this.archiverDataSourceHelper.initWithList([...Object.values(archivers)])
 
-    if (this.dataSourceHelper.dataSourceNode == null) {
-      /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`syncAccountData: dataSourceNode == null ${lowAddress} - ${highAddress}`)
+    if (this.archiverDataSourceHelper.dataSourceArchiver == null) {
+      /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`syncAccountData: dataSourceArchiver == null ${lowAddress} - ${highAddress}`)
       //if we see this then getDataSourceNode failed.
       // this is most likely because the ranges selected when we started sync are now invalid and too wide to be filled.
 
       //throwing this specific error text will bubble us up to the main sync loop and cause re-init of all the non global sync ranges/trackers
-      throw new Error('reset-sync-ranges syncAccountData2: dataSourceNode == null')
+      throw new Error('reset-sync-ranges syncAccountData2: dataSourceArchiver == null')
     }
 
     // This flag is kind of tricky.  It tells us that the loop can go one more time after bumping up the min timestamp to check
@@ -439,13 +445,13 @@ export default class SyncTracker {
     let askRetriesLeft = 20
 
     if (this.accountSync.dataSourceTest === true) {
-      if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1') == false) {
+      if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData1') == false) {
         throw new Error('out of account nodes to ask: dataSourceTest')
       }
 
       while (this.accountSync.debugFail4) {
         await utils.sleep(1000)
-        if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1 debugFail4') == false) {
+        if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData1 debugFail4') == false) {
           throw new Error('out of account nodes to ask: dataSourceTest debugFail4')
         }
       }
@@ -461,34 +467,35 @@ export default class SyncTracker {
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
       let moreAskTime = 0
-      // Node Precheck!
-      if (
-        this.accountSync.stateManager.isNodeValidForInternalMessage(
-          this.dataSourceHelper.dataSourceNode.id,
-          'syncAccountData',
-          true,
-          true
-        ) === false
-      ) {
-        if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1') == false) {
-          if (restartListRetriesLeft <= 0) {
-            /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `out of account nodes to ask: syncAccountData1 totalRestartList: ${totalRestartList}`)
-            throw new Error(`out of account nodes to ask: syncAccountData1 + restartList`)
-          }
+      // We might not need this for data syncing from archivers
+      // // Node Precheck!
+      // if (
+      //   this.accountSync.stateManager.isNodeValidForInternalMessage(
+      //     this.archiverDataSourceHelper.dataSourceNode.id,
+      //     'syncAccountData',
+      //     true,
+      //     true
+      //   ) === false
+      // ) {
+      //   if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData1') == false) {
+      //     if (restartListRetriesLeft <= 0) {
+      //       /* prettier-ignore */ nestedCountersInstance.countEvent('archiver_sync', `out of account nodes to ask: syncAccountData1 totalRestartList: ${totalRestartList}`)
+      //       throw new Error(`out of account nodes to ask: syncAccountData1 + restartList`)
+      //     }
 
-          if (this.dataSourceHelper.tryRestartList('syncAccountData1') === true) {
-            //since we are restarting, give the node we are asking a break
-            await utils.sleep(2000)
-            //give even more timeout time.
-            moreAskTime = 5000
-            restartListRetriesLeft--
-            totalRestartList++
-          } else {
-            throw new Error('out of account nodes to ask: syncAccountData1')
-          }
-        }
-        continue
-      }
+      //     if (this.archiverDataSourceHelper.tryRestartList('syncAccountData1') === true) {
+      //       //since we are restarting, give the node we are asking a break
+      //       await utils.sleep(2000)
+      //       //give even more timeout time.
+      //       moreAskTime = 5000
+      //       restartListRetriesLeft--
+      //       totalRestartList++
+      //     } else {
+      //       throw new Error('out of account nodes to ask: syncAccountData1')
+      //     }
+      //   }
+      //   continue
+      // }
 
       // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
       const message = {
@@ -499,17 +506,29 @@ export default class SyncTracker {
         offset,
         accountOffset,
       }
+      const getAccountDataFromArchiver = async (payload) => {
+        // const randomArchiver = archivers.values()[Math.floor(Math.random() * archivers.size)]
+        const dataSourceArchiver = this.archiverDataSourceHelper.dataSourceArchiver
+        const accountDataArchiverUrl = `http://${dataSourceArchiver.ip}:${dataSourceArchiver.port}/get_account_data_archiver`
+        try {
+          const result = await http.post(
+            // `http://${randomArchiver.ip}:${randomArchiver.port}/get_account_data_archiver`,
+            accountDataArchiverUrl,
+            payload,
+            false,
+            5000 + moreAskTime
+          )
+          console.log('getAccountDataFromArchiver result', result)
+          return result
+        } catch (error) {
+          console.error('getAccountDataFromArchiver error', error)
+          return error
+        }
+      }
 
       let r: GetAccountData3Resp | boolean
       try {
-        r = await this.p2p.ask(
-          this.dataSourceHelper.dataSourceNode,
-          'get_account_data3',
-          message,
-          false,
-          '',
-          5000 + moreAskTime
-        ) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+        r = await getAccountDataFromArchiver(message)
       } catch (ex) {
         /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncAccountData2`, `syncAccountData2 retries:${askRetriesLeft} ask: ` + errorToStringFull(ex) )
         //wait 5 sec
@@ -527,8 +546,8 @@ export default class SyncTracker {
       const result: GetAccountData3Resp = r as GetAccountData3Resp
 
       if (result == null) {
-        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceHelper.dataSourceNode.id}`)
-        if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData2') == false) {
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.archiverDataSourceHelper.dataSourceArchiver.publicKey}`)
+        if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData2') == false) {
           throw new Error('out of account nodes to ask: syncAccountData2')
         }
         continue
@@ -537,8 +556,8 @@ export default class SyncTracker {
       restartListRetriesLeft = 5
 
       if (result.data == null) {
-        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceHelper.dataSourceNode.id}`)
-        if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData3') == false) {
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.archiverDataSourceHelper.dataSourceArchiver.publicKey}`)
+        if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData3') == false) {
           throw new Error('out of account nodes to ask: syncAccountData3')
         }
         continue
@@ -674,7 +693,7 @@ export default class SyncTracker {
           }
         }
 
-        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug( `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset} sameAsStartTS:${sameAsStartTS}` )
+        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug( `ARCHIVER_DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset} sameAsStartTS:${sameAsStartTS}` )
         if (accountData.length > 0) {
           this.combinedAccountData = this.combinedAccountData.concat(accountData)
         }
@@ -684,7 +703,7 @@ export default class SyncTracker {
       } else {
         //we got accounts this time so reset this flag to false
         stopIfNextLoopHasNoResults = false
-        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug( `DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset} sameAsStartTS:${sameAsStartTS}` )
+        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug( `ARCHIVER_DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset} sameAsStartTS:${sameAsStartTS}` )
         this.combinedAccountData = this.combinedAccountData.concat(accountData)
         loopCount++
         // await utils.sleep(500)
@@ -695,7 +714,7 @@ export default class SyncTracker {
         const accountToSave = this.combinedAccountData.length
         const accountsSaved = await this.processAccountDataNoStateTable2()
         totalAccountsSaved += accountsSaved
-        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug( `DATASYNC: syncAccountData3 accountToSave: ${accountToSave} accountsSaved: ${accountsSaved}  offset:${offset} sameAsStartTS:${sameAsStartTS}` )
+        /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug( `ARCHIVER_DATASYNC: syncAccountData3 accountToSave: ${accountToSave} accountsSaved: ${accountsSaved}  offset:${offset} sameAsStartTS:${sameAsStartTS}` )
         //clear data
         this.combinedAccountData = []
       }
@@ -734,7 +753,7 @@ export default class SyncTracker {
     const otherMissingCase = 0
     const futureStateTableEntry = 0
 
-    /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: processAccountData unique accounts: ${uniqueAccounts}  initial combined len: ${initialCombinedAccountLength}`)
+    /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: processAccountData unique accounts: ${uniqueAccounts}  initial combined len: ${initialCombinedAccountLength}`)
 
     this.accountsWithStateConflict = []
     const goodAccounts: Shardus.WrappedData[] = []
@@ -747,7 +766,7 @@ export default class SyncTracker {
       goodAccounts.push(account)
     }
 
-    /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug( `DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs} futureStateTableEntry:${futureStateTableEntry} unhandledCase:${unhandledCase} fix1Worked:${fix1Worked}` )
+    /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug( `ARCHIVER_DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs} futureStateTableEntry:${futureStateTableEntry} unhandledCase:${unhandledCase} fix1Worked:${fix1Worked}` )
     // failedHashes is a list of accounts that failed to match the hash reported by the server
     const failedHashes = await this.accountSync.stateManager.checkAndSetAccountData(
       goodAccounts,
@@ -758,13 +777,13 @@ export default class SyncTracker {
     this.accountSync.syncStatement.numAccounts += goodAccounts.length
 
     if (failedHashes.length > 1000) {
-      /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
+      /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`ARCHIVER_DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
       // recordPotentialBadnode is not implemented yet but we have it as a placeholder
       this.accountSync.stateManager.recordPotentialBadnode()
       throw new Error('FailAndRestartPartition_processAccountData_A')
     }
     if (failedHashes.length > 0) {
-      /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
+      /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`ARCHIVER_DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
       // recordPotentialBadnode is not implemented yet but we have it as a placeholder
       this.accountSync.stateManager.recordPotentialBadnode()
       this.failedAccounts = this.failedAccounts.concat(failedHashes)
@@ -775,7 +794,7 @@ export default class SyncTracker {
       failedHashes
     )
 
-    nestedCountersInstance.countEvent('sync', `accounts written`, accountsSaved)
+    nestedCountersInstance.countEvent('archiver_sync', `accounts written`, accountsSaved)
 
     this.combinedAccountData = [] // we can clear this now.
 
@@ -783,14 +802,14 @@ export default class SyncTracker {
   }
 
   async tryRetry(message: string): Promise<boolean> {
-    this.accountSync.mainLogger.info(`DATASYNC: tryRetry`)
+    this.accountSync.mainLogger.info(`ARCHIVER_DATASYNC: tryRetry`)
     this.accountSync.logger.playbackLogState('datasyncFail', '', '')
 
     this.restartCount++
 
     if (this.restartCount > this.accountSync.config.stateManager.maxTrackerRestarts) {
-      /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: tryRetry: max tries excceded  ${this.restartCount} ${message} `)
-      nestedCountersInstance.countEvent('sync', `tryRetry Out of tries ${message}`)
+      /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`ARCHIVER_DATASYNC: tryRetry: max tries excceded  ${this.restartCount} ${message} `)
+      nestedCountersInstance.countEvent('archiver_sync', `tryRetry Out of tries ${message}`)
       //reset-sync-ranges is code that gets special exception handling.
       //todo: replace this with something that does not rely on string operations
       throw new Error('reset-sync-ranges tryRetry out of tries')
@@ -799,7 +818,7 @@ export default class SyncTracker {
     await utils.sleep(1000)
 
     if (this.accountSync.forceSyncComplete) {
-      nestedCountersInstance.countEvent('sync', 'forceSyncComplete')
+      nestedCountersInstance.countEvent('archiver_sync', 'forceSyncComplete')
       this.accountSync.syncStatmentIsComplete()
       this.accountSync.clearSyncData()
       this.accountSync.skipSync()
@@ -808,14 +827,14 @@ export default class SyncTracker {
         syncTracker.syncFinished = true
       }
 
-      /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: tryRetry: forceSyncComplete ${this.restartCount} ${message} `)
+      /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`ARCHIVER_DATASYNC: tryRetry: forceSyncComplete ${this.restartCount} ${message} `)
 
-      /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `tryRetry: forceSyncComplete. ${this.restartCount} ${message}`)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('archiver_sync', `tryRetry: forceSyncComplete. ${this.restartCount} ${message}`)
       return false
     }
 
-    /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: tryRetry: ${this.restartCount} ${message} `)
-    nestedCountersInstance.countEvent('sync', `tryRetry ${this.restartCount} ${message}`)
+    /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`ARCHIVER_DATASYNC: tryRetry: ${this.restartCount} ${message} `)
+    nestedCountersInstance.countEvent('archiver_sync', `tryRetry ${this.restartCount} ${message}`)
     this.accountSync.syncStatement.failAndRestart++
 
     return true

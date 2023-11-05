@@ -50,6 +50,7 @@ export let isFailed = false
 export let allowConnectionToFirstNode = false
 export let ip: string
 export let port: number
+export let isRestartNetwork = false
 
 export let p2pJoinTime = 0
 export let p2pSyncStart = 0
@@ -754,6 +755,27 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
         dataRequestCycle: activeNodesSigned.dataRequestCycle as number,
       }
       Archivers.addDataRecipient(joinRequest.nodeInfo, firstNodeDataRequest)
+      // Using this flag due to isFirst check is not working as expected yet in the first consensor-archiver connection establishment
+      allowConnectionToFirstNode = true
+      return activeNodesSigned.nodeList
+    }
+  }
+  const restartCycleRecord = activeNodesSigned.restartCycleRecord as P2P.ArchiversTypes.RestartCycleRecord
+  if (restartCycleRecord) {
+    // The archiver is sending a cycle record with shutdown mode from previous network
+    // TODO - Make sure the cycle record is valid
+    CycleChain.prepend(restartCycleRecord)
+    isRestartNetwork = true
+    if (Context.config.p2p.experimentalSnapshot && Context.config.features.archiverDataSubscriptionsUpdate) {
+      const firstNodeDataRequest = {
+        dataRequestCycle: activeNodesSigned.dataRequestCycle as number,
+      }
+      // The list of archivers are not added in the shutdown mode cycle record yet. Thus, using the contacted archiver to add the data recipient
+      Archivers.addDataRecipient(
+        archiver as P2P.ArchiversTypes.JoinedArchiver,
+        firstNodeDataRequest,
+        firstNodeDataRequest.dataRequestCycle
+      )
       // Using this flag due to isFirst check is not working as expected yet in the first consensor-archiver connection establishment
       allowConnectionToFirstNode = true
       return activeNodesSigned.nodeList

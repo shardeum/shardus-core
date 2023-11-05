@@ -1568,7 +1568,7 @@ class AccountPatcher {
     const coverageEntry = hashTrieSyncConsensus.coverageMap.get(parentRadix)
 
     if (coverageEntry == null || coverageEntry.firstChoice == null) {
-      const numActiveNodes = this.stateManager.currentCycleShardData.activeNodes.length
+      const numActiveNodes = this.stateManager.currentCycleShardData.nodes.length
       this.statemanager_fatal(
         `getNodeForQuery null ${coverageEntry == null} ${
           coverageEntry?.firstChoice == null
@@ -3208,7 +3208,7 @@ class AccountPatcher {
     let minVotes = Math.ceil(
       this.stateManager.currentCycleShardData.shardGlobals.nodesPerConsenusGroup * 0.51
     )
-    const majorityOfActiveNodes = Math.ceil(this.stateManager.currentCycleShardData.activeNodes.length * 0.51)
+    const majorityOfActiveNodes = Math.ceil(this.stateManager.currentCycleShardData.nodes.length * 0.51)
     minVotes = Math.min(minVotes, majorityOfActiveNodes)
     minVotes = Math.max(1, minVotes)
     return minVotes

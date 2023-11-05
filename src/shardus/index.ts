@@ -630,6 +630,10 @@ class Shardus extends EventEmitter {
       if (newest && newest.safetyMode === true) {
         // Use snapshot to put old app data into state-manager then go active
         await Snapshot.safetySync()
+      } else if (newest && newest.mode === 'restart') {
+        // Stay in syncing mode and let other nodes join
+        Self.setp2pIgnoreJoinRequests(false)
+        console.log('p2pIgnoreJoinRequests = false')
       } else {
         // not doing a safety sync
         // todo hook this up later cant deal with it now.
@@ -637,6 +641,26 @@ class Shardus extends EventEmitter {
 
         await this.syncAppData()
       }
+    })
+    Self.emitter.on('restore', async (cycleNumber: number) => {
+      this.logger.playbackLogState('restore', '', `Restore mode triggered on cycle ${cycleNumber}`)
+      await this.stateManager.waitForShardCalcs()
+      // Start restoring state data
+      try {
+        await this.stateManager.accountSync.initialSyncMain(3)
+        console.log('syncAppData - initialSyncMain finished')
+      } catch (err) {
+        console.log(utils.formatErrorMessage(err))
+        apoptosizeSelf(`initialSyncMain-failed: ${err?.message}`)
+        return
+      }
+      // After restoring state data, set syncing flags to true and go active
+      await this.stateManager.startCatchUpQueue()
+      console.log('syncAppData - startCatchUpQueue')
+      await this.p2p.goActive()
+      console.log('syncAppData - goActive')
+      this.stateManager.appFinishedSyncing = true
+      this.stateManager.startProcessingCycleSummaries()
     })
     Self.emitter.on('active', (nodeId) => {
       // this.io.emit('DATA', `NODE ACTIVE ${nodeId}`)
@@ -2448,10 +2472,6 @@ class Shardus extends EventEmitter {
   isOnStandbyList(publicKey: string): boolean {
     return JoinV2.isOnStandbyList(publicKey)
   }
-<<<<<<< HEAD
-=======
-
->>>>>>> 82da8409 (SHM-2853/54: Implementing internal tx check as per network mode)
 }
 
 function deepReplace(obj: object | ArrayLike<any>, find: any, replace: any): any {

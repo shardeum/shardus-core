@@ -53,7 +53,7 @@ export default class DataSourceHelper {
 
     let nodes: Shardus.Node[] = ShardFunctions.getNodesByProximity(
       this.stateManager.currentCycleShardData.shardGlobals,
-      this.stateManager.currentCycleShardData.activeNodes,
+      this.stateManager.currentCycleShardData.nodes,
       centerNode.ourNodeIndex,
       this.stateManager.p2p.id,
       40

@@ -606,7 +606,7 @@ async function runQ4() {
 
 export function makeRecordZero(): P2P.CycleCreatorTypes.CycleRecord {
   const txs = collectCycleTxs()
-  return makeCycleRecord(txs)
+  return makeCycleRecord(txs, CycleChain.newest)
 }
 
 function makeCycleData(txs: P2P.CycleCreatorTypes.CycleTxs, prevRecord?: P2P.CycleCreatorTypes.CycleRecord) {
@@ -630,7 +630,7 @@ function makeCycleRecord(
     networkId: prevRecord ? prevRecord.networkId : randomBytes(32),
     counter: prevRecord ? prevRecord.counter + 1 : 0,
     previous: prevRecord ? makeCycleMarker(prevRecord) : '0'.repeat(64),
-    start: prevRecord ? prevRecord.start + prevRecord.duration : utils.getTime('s'),
+    start: prevRecord && prevRecord.mode !== 'shutdown' ? prevRecord.start + prevRecord.duration : utils.getTime('s'),
     duration: prevRecord ? prevRecord.duration : config.p2p.cycleDuration,
     networkConfigHash: makeNetworkConfigHash(),
   }

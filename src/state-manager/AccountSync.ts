@@ -18,7 +18,7 @@ import { verifyPayload } from '../types/ajv/Helpers'
 import { errorToStringFull } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { cUninitializedSize } from '../utils/profiler'
-import SyncTracker from './SyncTracker'
+import NodeSyncTracker, { SyncTrackerInterface } from './NodeSyncTracker'
 import ShardFunctions from './shardFunctions'
 import {
   AccountStateHashReq,
@@ -29,7 +29,14 @@ import {
   GetAccountStateReq,
   GlobalAccountReportResp,
 } from './state-manager-types'
+<<<<<<< HEAD
 import { shardusGetTime } from '../network'
+=======
+import { networkMode } from '../p2p/Modes'
+import ArchiverSyncTracker from './ArchiverSyncTracker'
+import { archivers } from '../p2p/Archivers'
+import * as http from '../http'
+>>>>>>> d86961fb (Put the changes required for syncing data in the restore mode)
 
 const REDUNDANCY = 3
 
@@ -90,7 +97,7 @@ class AccountSync {
 
   readyforTXs: boolean
 
-  syncTrackers: SyncTracker[]
+  syncTrackers: SyncTrackerInterface[]
 
   lastWinningGlobalReportNodes: Shardus.Node[]
 
@@ -513,7 +520,7 @@ class AccountSync {
     await this.app.deleteLocalAccountData()
 
     // Dont sync if first node
-    if (this.p2p.isFirstSeed || safetyMode) {
+    if ((this.p2p.isFirstSeed && networkMode !== 'restore') || safetyMode) {
       this.dataSyncMainPhaseComplete = true
       this.syncStatement.syncComplete = true
       this.initalSyncFinished = true
@@ -575,7 +582,7 @@ class AccountSync {
 
     this.syncStatement.cycleStarted = this.stateManager.currentCycleShardData.cycleNumber
     this.syncStatement.syncStartTime = shardusGetTime()
-    this.syncStatement.numNodesOnStart = this.stateManager.currentCycleShardData.activeNodes.length
+    this.syncStatement.numNodesOnStart = this.stateManager.currentCycleShardData.nodes.length
     this.syncStatement.p2pJoinTime = Self.p2pJoinTime
 
     let nodeShardData = this.stateManager.currentCycleShardData.nodeShardData
@@ -599,20 +606,24 @@ class AccountSync {
     rangesToSync = this.initRangesToSync(nodeShardData, homePartition)
     this.syncStatement.syncRanges = rangesToSync.length
 
+    let syncFromArchiver = false
+    // As phase 1 of restore data, all nodewill sync from archiver
+    if (networkMode === 'restore') syncFromArchiver = true
     for (const range of rangesToSync) {
-      this.createSyncTrackerByRange(range, cycle, true)
+      this.createSyncTrackerByRange(range, cycle, true, syncFromArchiver)
     }
 
     const useGlobalAccounts = true // this should stay true now.
 
     if (useGlobalAccounts === true) {
-      this.createSyncTrackerByForGlobals(cycle, true)
+      this.createSyncTrackerByForGlobals(cycle, true, syncFromArchiver)
     }
 
     this.syncStatement.timeBeforeDataSync2 = (shardusGetTime() - Self.p2pSyncEnd) / 1000
     if (useGlobalAccounts === true) {
       // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
-      await this.stateManager.accountGlobals.getGlobalListEarly()
+      await this.stateManager.accountGlobals.getGlobalListEarly(syncFromArchiver)
+      // Might have to keep this.readyforTXs = false while in restart -> restore mode
       this.readyforTXs = true
     } else {
       //hack force this to true
@@ -912,8 +923,10 @@ class AccountSync {
    * @param tag a debug tag so that logs and counters will give more context
    * @returns GlobalAccountReportResp
    */
-  async getRobustGlobalReport(tag = ''): Promise<GlobalAccountReportResp> {
-    this.lastWinningGlobalReportNodes = []
+  async getRobustGlobalReport(tag = '', syncFromArchiver: boolean = false): Promise<GlobalAccountReportResp> {
+    if (!syncFromArchiver) {
+      this.lastWinningGlobalReportNodes = []
+    }
 
     const equalFn = (a: Partial<GlobalAccountReportResp>, b: Partial<GlobalAccountReportResp>): boolean => {
       // these fail cases should not count towards forming an hash consenus
@@ -947,15 +960,55 @@ class AccountSync {
       // Various failure cases will alter the returned result so that it is tallied in a more orderly way.
       // The random numbers were kept to prevent the hash of results from being equal, but now custom equalFn takes care of this concern
       let result = await this.p2p.ask(node, 'get_globalaccountreport', {})
+      return checkResultFn(result, node.id)
+    }
+
+    const queryFnFromArchiver = async (
+      archiver: Shardus.Archiver
+    ): Promise<Partial<GlobalAccountReportResp> & { msg: string }> => {
+      const getGlobalAccountReportFromArchiver = async () => {
+        const globalAccountReportArchiverUrl = `http://${archiver.ip}:${archiver.port}/get_globalaccountreport`
+        const payload = {}
+        this.crypto.sign(payload)
+
+        try {
+          const r = await http.post(
+            // `http://${randomArchiver.ip}:${randomArchiver.port}/get_account_data_archiver`,
+            globalAccountReportArchiverUrl,
+            payload,
+            false,
+            2000
+          )
+          console.log('getGlobalAccountReportFromArchiver result', r)
+          return r
+        } catch (error) {
+          console.error('getGlobalAccountReportFromArchiver error', error)
+          null
+        }
+      }
+
+      let result: Partial<GlobalAccountReportResp> & { msg: string }
+      result = await getGlobalAccountReportFromArchiver()
+      return checkResultFn(result, archiver.publicKey, true)
+    }
+
+    const checkResultFn = (
+      result: (Partial<GlobalAccountReportResp> & { msg: string }) | boolean,
+      nodeId: string,
+      resultFromArchiver: boolean = false
+    ) => {
+      // Various failure cases will alter the returned result so that it is tallied in a more orderly way.
+      // The random numbers were kept to prevent the hash of results from being equal, but now custom equalFn takes care of this concern
       if (result === false) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} result === false`)
-        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === false node:${utils.stringifyReduce(node.id)}`)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === false ${resultFromArchiver ? 'archiver:': 'node:'}${utils.stringifyReduce(nodeId)} `)
         result = { ready: false, msg: `result === false: ${Math.random()}` }
         return result
       }
+      result = result as Partial<GlobalAccountReportResp> & { msg: string }
       if (result === null) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} result === null`)
-        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null node:${utils.stringifyReduce(node.id)}`)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null ${resultFromArchiver ? 'archiver:': 'node:'}${utils.stringifyReduce(nodeId)} `)
         result = { ready: false, msg: `result === null: ${Math.random()}` }
         return result
       }
@@ -976,24 +1029,36 @@ class AccountSync {
 
       return result
     }
-    //can ask any active nodes for global data.
-    const nodes: Shardus.Node[] = this.stateManager.currentCycleShardData.activeNodes
-    // let nodes = this.getActiveNodesInRange(lowAddress, highAddress) // this.p2p.state.getActiveNodes(this.p2p.id)
-    if (nodes.length === 0) {
-      /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} no nodes available`)
-      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`no nodes available`)
-      return // nothing to do
+
+    let nodes: Shardus.Node[] | Shardus.Archiver[]
+    if (syncFromArchiver) {
+      nodes = [...Object.values(archivers)]
+      if (nodes.length === 0) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} no archivers available`)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`no archivers available`)
+        return // nothing to do
+      }
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery getRobustGlobalReport ${utils.stringifyReduce(nodes.map((node) => utils.makeShortHash(node.publicKey) + ':' + node.port))}`)
+    } else {
+      //can ask any active nodes for global data.
+      nodes = this.stateManager.currentCycleShardData.nodes
+      // let nodes = this.getActiveNodesInRange(lowAddress, highAddress) // this.p2p.state.getActiveNodes(this.p2p.id)
+      if (nodes.length === 0) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} no nodes available`)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`no nodes available`)
+        return // nothing to do
+      }
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery getRobustGlobalReport ${utils.stringifyReduce(nodes.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
     }
-    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery getRobustGlobalReport ${utils.stringifyReduce(nodes.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
 
     let result: Partial<GlobalAccountReportResp> & { msg: string }
     let winners: string | unknown[]
     try {
       //Must make sure shuffle is on!  This is critical to avoid DDOSing the first node in the list
       const robustQueryResult = await robustQuery<
-        Shardus.Node,
+        Shardus.Node | Shardus.Archiver,
         Partial<GlobalAccountReportResp> & { msg: string }
-      >(nodes, queryFn, equalFn, REDUNDANCY, true, false, true)
+      >(nodes, syncFromArchiver ? queryFnFromArchiver : queryFn, equalFn, REDUNDANCY, true, false, true)
 
       // if we did not get a result at all wait, log and retry
       if (robustQueryResult === null) {
@@ -1001,7 +1066,7 @@ class AccountSync {
         /* prettier-ignore */ if (logFlags.console) console.log(`DATASYNC: getRobustGlobalReport results === null wait 10 seconds and try again. nodes:${nodes.length}  `)
         /* prettier-ignore */ nestedCountersInstance.countEvent('sync', 'DATASYNC: getRobustGlobalReport results === null')
         await utils.sleep(10 * 1000) //wait 10 seconds and try again.
-        return await this.getRobustGlobalReport(tag + '_rt')
+        return await this.getRobustGlobalReport(tag + '_rt', syncFromArchiver)
       }
 
       result = robustQueryResult.topResult
@@ -1021,7 +1086,7 @@ class AccountSync {
         /* prettier-ignore */ if (logFlags.console) console.log(`DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again `)
         /* prettier-ignore */ nestedCountersInstance.countEvent('sync', 'DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again')
         await utils.sleep(10 * 1000) //wait 10 seconds and try again.
-        return await this.getRobustGlobalReport(tag + '_rt2')
+        return await this.getRobustGlobalReport(tag + '_rt2', syncFromArchiver)
       }
     } catch (ex) {
       // NOTE: no longer expecting an exception from robust query in cases where we do not have enough votes or respones!
@@ -1039,7 +1104,7 @@ class AccountSync {
     }
     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport found a winner.  results: ${utils.stringifyReduce(result)}`)
 
-    this.lastWinningGlobalReportNodes = winners as Shardus.Node[]
+    if (!syncFromArchiver) this.lastWinningGlobalReportNodes = winners as Shardus.Node[]
     /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} winner found`)
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'sync', `DATASYNC: getRobustGlobalReport_${tag} winner result: ${utils.stringifyReduce(result)}` )
 
@@ -1272,11 +1337,17 @@ class AccountSync {
   createSyncTrackerByRange(
     range: StateManagerTypes.shardFunctionTypes.BasicAddressRange,
     cycle: number,
-    initalSync = false
-  ): SyncTracker {
+    initalSync = false,
+    syncFromArchiver: boolean = false
+  ): SyncTrackerInterface {
     const index = this.syncTrackerIndex++
 
-    const syncTracker = new SyncTracker()
+    let syncTracker: SyncTrackerInterface
+    if (syncFromArchiver) {
+      syncTracker = new ArchiverSyncTracker()
+    } else {
+      syncTracker = new NodeSyncTracker()
+    }
     syncTracker.initByRange(this, this.p2p, index, range, cycle, initalSync)
 
     this.syncTrackers.push(syncTracker) // we should maintain this order.
@@ -1288,10 +1359,19 @@ class AccountSync {
     return syncTracker
   }
 
-  createSyncTrackerByForGlobals(cycle: number, initalSync = false): SyncTracker {
+  createSyncTrackerByForGlobals(
+    cycle: number,
+    initalSync = false,
+    syncFromArchiver: boolean = false
+  ): SyncTrackerInterface {
     const index = this.syncTrackerIndex++
 
-    const syncTracker = new SyncTracker()
+    let syncTracker: SyncTrackerInterface
+    if (syncFromArchiver) {
+      syncTracker = new ArchiverSyncTracker()
+    } else {
+      syncTracker = new NodeSyncTracker()
+    }
     syncTracker.initGlobal(this, this.p2p, index, cycle, initalSync)
 
     this.syncTrackers.push(syncTracker) // we should maintain this order.
@@ -1308,7 +1388,7 @@ class AccountSync {
    * @param address
    * @returns
    */
-  getSyncTracker(address: string): SyncTracker | null {
+  getSyncTracker(address: string): SyncTrackerInterface | null {
     // return the sync tracker.
     for (let i = 0; i < this.syncTrackers.length; i++) {
       // eslint-disable-next-line security/detect-object-injection
@@ -1329,7 +1409,10 @@ class AccountSync {
   }
 
   // Check the entire range for a partition to see if any of it is covered by a sync tracker.
-  getSyncTrackerForParition(partitionID: number, cycleShardData: CycleShardData): SyncTracker | null {
+  getSyncTrackerForParition(
+    partitionID: number,
+    cycleShardData: CycleShardData
+  ): SyncTrackerInterface | null {
     if (cycleShardData == null) {
       return null
     }

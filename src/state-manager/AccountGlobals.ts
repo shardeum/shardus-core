@@ -178,7 +178,7 @@ class AccountGlobals {
    * sync requires having knowlege of what accounts are global very early in the process.
    * This will get an early global report (note does not have account data, just id,hash,timestamp)
    */
-  async getGlobalListEarly(): Promise<void> {
+  async getGlobalListEarly(syncFromArchiver: boolean = false): Promise<void> {
     let retriesLeft = 10
 
     //This will try up to 10 times to get the global list
@@ -191,7 +191,7 @@ class AccountGlobals {
       }
       try {
         const globalReport: GlobalAccountReportResp =
-          await this.stateManager.accountSync.getRobustGlobalReport('getGlobalListEarly')
+          await this.stateManager.accountSync.getRobustGlobalReport('getGlobalListEarly', syncFromArchiver)
         const temp = []
         for (const report of globalReport.accounts) {
           temp.push(report.id)

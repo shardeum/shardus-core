@@ -179,7 +179,7 @@ export type CycleShardData = {
   nodeShardData: StateManager.shardFunctionTypes.NodeShardData
   nodeShardDataMap: Map<string, StateManager.shardFunctionTypes.NodeShardData>
   parititionShardDataMap: Map<number, StateManager.shardFunctionTypes.ShardInfo>
-  activeNodes: Shardus.Node[]
+  nodes: Shardus.Node[]
   syncingNeighbors: Shardus.Node[]
   syncingNeighborsTxGroup: Shardus.Node[]
   hasSyncingNeighbors: boolean

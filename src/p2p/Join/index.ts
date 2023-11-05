@@ -445,9 +445,17 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
 }
 
 export async function firstJoin(): Promise<string> {
-  // Create join request from 000... cycle marker
-  const zeroMarker = '0'.repeat(64)
-  const request = await createJoinRequest(zeroMarker)
+  let marker: string
+  if (CycleChain.newest) {
+    // TODO: add extra check if newest.mode === 'shutdown' later after shutdown is implemented
+    // If there is a cycle provided by the archiver, use it
+    marker = CycleChain.newest['marker']
+  } else {
+    // Create join request from 000... cycle marker
+    const zeroMarker = '0'.repeat(64)
+    marker = zeroMarker
+  }
+  const request = await createJoinRequest(marker)
   // Add own join request
   utils.insertSorted(requests, request)
   if (config.p2p.useJoinProtocolV2) {
@@ -455,7 +463,7 @@ export async function firstJoin(): Promise<string> {
     forceSelectSelf()
   }
   // Return node ID
-  return computeNodeId(crypto.keypair.publicKey, zeroMarker)
+  return computeNodeId(crypto.keypair.publicKey, marker)
 }
 
 // export async function submitJoin(

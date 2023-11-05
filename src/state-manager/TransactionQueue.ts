@@ -2241,7 +2241,7 @@ class TransactionQueue {
           this.stateManager.currentCycleShardData.nodeShardDataMap,
           this.stateManager.currentCycleShardData.parititionShardDataMap,
           homeNode,
-          this.stateManager.currentCycleShardData.activeNodes
+          this.stateManager.currentCycleShardData.nodes
         )
       }
 
@@ -2420,7 +2420,7 @@ class TransactionQueue {
           this.stateManager.currentCycleShardData.nodeShardDataMap,
           this.stateManager.currentCycleShardData.parititionShardDataMap,
           homeNode,
-          this.stateManager.currentCycleShardData.activeNodes
+          this.stateManager.currentCycleShardData.nodes
         )
       }
 
@@ -4851,8 +4851,8 @@ class TransactionQueue {
       receipt: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
     }
 
-    const accountsToAdd: WrappedResponses = {}
-    const beforeAccountsToAdd: WrappedResponses = {}
+    const accountsToAdd = {} as Shardus.AccountsCopy
+    const beforeAccountsToAdd = {} as Shardus.AccountsCopy
 
     if (this.config.stateManager.includeBeforeStatesInReceipts) {
       for (const account of Object.values(queueEntry.collectedData)) {
@@ -4860,12 +4860,14 @@ class TransactionQueue {
           typeof this.app.beforeStateAccountFilter !== 'function' ||
           this.app.beforeStateAccountFilter(account)
         ) {
+          const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(account.accountId)
           const accountCopy = {
             accountId: account.accountId,
             data: account.data,
             timestamp: account.timestamp,
             stateId: account.stateId,
-          } as Shardus.WrappedResponse
+            isGlobal,
+          }
           beforeAccountsToAdd[account.accountId] = accountCopy
         }
       }
@@ -4877,12 +4879,14 @@ class TransactionQueue {
       queueEntry.preApplyTXResult.applyResponse.accountWrites.length > 0
     ) {
       for (const account of queueEntry.preApplyTXResult.applyResponse.accountWrites) {
+        const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(account.accountId)
         accountsToAdd[account.accountId] = {
           accountId: account.accountId,
           data: account.data.data,
           timestamp: account.timestamp,
           stateId: account.data.stateId,
-        } as Shardus.WrappedResponse
+          isGlobal,
+        }
       }
     }
 
