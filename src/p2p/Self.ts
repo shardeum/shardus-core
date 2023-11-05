@@ -195,6 +195,9 @@ export function startupV2(): Promise<boolean> {
         }
 
         if (resp?.isOnStandbyList === true) {
+          if(state !== P2P.P2PTypes.NodeStatus.STANDBY) {
+            updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
+          }
           // Call scheduler after 5 cycles
           attemptJoiningTimer = setTimeout(() => {
             attemptJoining()
