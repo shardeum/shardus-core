@@ -24,6 +24,7 @@ import {
   QueueEntry,
   WrappedResponses,
 } from './state-manager-types'
+import { shardusGetTime } from '../network'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -325,7 +326,8 @@ class TransactionConsenus {
       txId,
       cycleMarker,
       cycleCounter,
-      timestamp: Date.now(),
+      // Date.now() was replaced with shardusGetTime() so we can have a more reliable timestamp consensus
+      timestamp: shardusGetTime(),
     }
     const signedTsReceipt = this.crypto.sign(tsReceipt)
     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Timestamp receipt generated for txId ${txId}: ${utils.stringifyReduce(signedTsReceipt)}`)

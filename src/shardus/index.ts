@@ -46,6 +46,7 @@ import Profiler, { profilerInstance } from '../utils/profiler'
 import { startSaving } from './saveConsoleOutput'
 import { isDebugMode } from '../debug'
 import * as JoinV2 from '../p2p/Join/v2'
+import { getNetworkTimeOffset, shardusGetTime } from '../network'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -394,7 +395,14 @@ class Shardus extends EventEmitter {
   async start() {
     // Check network up & time synced
     await Network.init()
-    await Network.checkTimeSynced(this.config.p2p.timeServers)
+
+    const isInTimeLimit = await Network.checkAndUpdateTimeSyncedOffset(this.config.p2p.timeServers)
+
+    if (isInTimeLimit === false) {
+      this.mainLogger.error(`Time is not synced with the network`)
+      //this is TBD
+      // throw new Error(`Time is not synced with the network`)
+    }
 
     // Setup storage
     await this.storage.init()
@@ -1095,15 +1103,10 @@ class Shardus extends EventEmitter {
       }
 
       if (inRangeOfCurrentTime(timestamp, txExpireTimeMs, txExpireTimeMs) === false) {
-        this.shardus_fatal(
-          `put_txExpired`,
-          `Transaction Expired: timestamp:${timestamp} now:${Date.now()} diff(now-ts):${
-            Date.now() - timestamp
-          }  ${utils.stringifyReduce(tx)} `
-        )
+        /* prettier-ignore */ this.shardus_fatal( `tx_outofrange`, `Transaction timestamp out of range: timestamp:${timestamp} now:${shardusGetTime()} diff(now-ts):${ shardusGetTime() - timestamp }  ${utils.stringifyReduce(tx)} our offset: ${getNetworkTimeOffset()} ` )
         this.statistics.incrementCounter('txRejected')
-        nestedCountersInstance.countEvent('rejected', '_isTransactionTimestampExpired')
-        return { success: false, reason: 'Transaction Expired', status: 400 }
+        nestedCountersInstance.countEvent('rejected', 'transaction timestamp out of range')
+        return { success: false, reason: 'Transaction timestamp out of range', status: 400 }
       }
 
       this.profiler.profileSectionStart('put')
@@ -1252,6 +1255,11 @@ class Shardus extends EventEmitter {
 
   getShardusProfiler() {
     return profilerInstance
+  }
+
+  /** Get the time in MS a replacement for Date.Now().  If p2p.useNTPOffsets===true then adds the NPT offset  */
+  shardusGetTime(): number {
+    return shardusGetTime()
   }
 
   setDebugSetLastAppAwait(label: string, complete = DebugComplete.Incomplete) {
@@ -2043,6 +2051,7 @@ class Shardus extends EventEmitter {
       if (isDebugMode() && req.query.debug === 'true') {
         result.debug = {
           queriedWhen: new Date().toISOString(),
+          //Note we can't convert to shardusGetTime because process.uptime() uses Date.now() internally
           startedWhen: new Date(Date.now() - process.uptime() * 1000).toISOString(),
           uptimeMins: Math.round((100 * process.uptime()) / 60) / 100,
           pid: process.pid,
@@ -2058,6 +2067,7 @@ class Shardus extends EventEmitter {
       const nodeInfo = Self.getPublicNodeInfo(true)
       let result = {
         respondedWhen: new Date().toISOString(),
+        //Note we can't convert to shardusGetTime because process.uptime() uses Date.now() internally
         startedWhen: new Date(Date.now() - process.uptime() * 1000).toISOString(),
         uptimeMins: Math.round((100 * process.uptime()) / 60) / 100,
         pid: process.pid,
@@ -2186,27 +2196,28 @@ class Shardus extends EventEmitter {
 
   /**
    * Checks a transaction timestamp for expiration
+   * deprecated
    * @param {number} timestamp
    */
-  _isTransactionTimestampExpired(timestamp) {
-    // this.mainLogger.debug(`Start of _isTransactionTimestampExpired(${timestamp})`)
-    let transactionExpired = false
-    const txnExprationTime = this.config.transactionExpireTime
-    const currNodeTimestamp = Date.now()
+  // _isTransactionTimestampExpired(timestamp) {
+  //   // this.mainLogger.debug(`Start of _isTransactionTimestampExpired(${timestamp})`)
+  //   let transactionExpired = false
+  //   const txnExprationTime = this.config.transactionExpireTime
+  //   const currNodeTimestamp = Date.now()
 
-    const txnAge = currNodeTimestamp - timestamp
-    if (logFlags.debug)
-      this.mainLogger.debug(`Transaction Timestamp: ${timestamp} CurrNodeTimestamp: ${currNodeTimestamp}
-    txnExprationTime: ${txnExprationTime}   TransactionAge: ${txnAge}`)
+  //   const txnAge = currNodeTimestamp - timestamp
+  //   if (logFlags.debug)
+  //     this.mainLogger.debug(`Transaction Timestamp: ${timestamp} CurrNodeTimestamp: ${currNodeTimestamp}
+  //   txnExprationTime: ${txnExprationTime}   TransactionAge: ${txnAge}`)
 
-    // this.mainLogger.debug(`TransactionAge: ${txnAge}`)
-    if (txnAge >= txnExprationTime * 1000) {
-      this.fatalLogger.error('Transaction Expired')
-      transactionExpired = true
-    }
-    // this.mainLogger.debug(`End of _isTransactionTimestampExpired(${timestamp})`)
-    return transactionExpired
-  }
+  //   // this.mainLogger.debug(`TransactionAge: ${txnAge}`)
+  //   if (txnAge >= txnExprationTime * 1000) {
+  //     this.fatalLogger.error('Transaction Expired')
+  //     transactionExpired = true
+  //   }
+  //   // this.mainLogger.debug(`End of _isTransactionTimestampExpired(${timestamp})`)
+  //   return transactionExpired
+  // }
 
   async updateConfigChangeQueue(account: ShardusTypes.WrappedData, lastCycle: ShardusTypes.Cycle) {
     if (account == null || lastCycle == null) return

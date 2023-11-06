@@ -7,6 +7,7 @@ import { humanFileSize } from '.'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { memoryReportingInstance } from '../utils/memoryReporting'
+import { shardusGetTime, getNetworkTimeOffset } from '../network'
 
 const cDefaultMin = 1e12
 const cDefaultMinBig = BigInt(cDefaultMin)
@@ -146,7 +147,7 @@ class Profiler {
       const toMB = 1 / 1000000
       const report = process.memoryUsage()
       res.write(`\n=> MEMORY RESULTS\n`)
-      res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
+      res.write(`System Memory Report.  Timestamp: ${shardusGetTime()} offset: ${getNetworkTimeOffset()} \n`)
       res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
       res.write(`heapTotal: ${(report.heapTotal * toMB).toFixed(2)} MB\n`)
       res.write(`heapUsed: ${(report.heapUsed * toMB).toFixed(2)} MB\n`)
@@ -207,7 +208,7 @@ class Profiler {
       // write "counts" results
       const arrayReport = nestedCountersInstance.arrayitizeAndSort(nestedCountersInstance.eventCounters)
       res.write(`\n=> COUNTS RESULTS\n`)
-      res.write(`${Date.now()}\n`)
+      res.write(`${shardusGetTime()}\n`)
       nestedCountersInstance.printArrayReport(arrayReport, res, 0)
       res.write(`\n===========================\n`)
 

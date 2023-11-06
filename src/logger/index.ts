@@ -12,6 +12,7 @@ import got from 'got'
 import { parse as parseUrl } from 'url'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { isDebugMode } from '../debug'
+import { shardusGetTime } from '../network'
 
 interface Logger {
   baseDir: string
@@ -275,7 +276,7 @@ class Logger {
 
     nestedCountersInstance.countEvent(type, endpoint)
 
-    let ts = Date.now()
+    let ts = shardusGetTime()
 
     from = this.identifyNode(from)
     to = this.identifyNode(to)

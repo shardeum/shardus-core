@@ -9,7 +9,7 @@ import ShardFunctions from './shardFunctions'
 import EventEmitter from 'events'
 import * as utils from '../utils'
 
-import {stringify} from '../utils'
+import { stringify } from '../utils'
 
 // not sure about this.
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
@@ -76,6 +76,7 @@ import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateMa
 import { Logger as Log4jsLogger } from 'log4js'
 import { NodeInfo } from '@shardus/types/build/src/p2p/P2PTypes'
 import { timingSafeEqual } from 'crypto'
+import { shardusGetTime } from '../network'
 
 export type Callback = (...args: unknown[]) => void
 
@@ -478,7 +479,7 @@ class StateManager {
     const cycleShardData = {} as CycleShardData
 
     // lets make sure shard calculation are happening at a consistent interval
-    const calculationTime = Date.now()
+    const calculationTime = shardusGetTime()
     if (this.lastShardCalculationTS > 0) {
       const delay = calculationTime - this.lastShardCalculationTS - this.config.p2p.cycleDuration * 1000
 
@@ -847,7 +848,7 @@ class StateManager {
 
     await this._firstTimeQueueAwait()
 
-    if (logFlags.console) console.log('syncStateData startCatchUpQueue ' + '   time:' + Date.now())
+    if (logFlags.console) console.log('syncStateData startCatchUpQueue ' + '   time:' + shardusGetTime())
 
     // all complete!
     this.mainLogger.info(`DATASYNC: complete`)
@@ -862,7 +863,7 @@ class StateManager {
     this.accountSync.syncStatement.numCycles =
       this.accountSync.syncStatement.cycleEnded - this.accountSync.syncStatement.cycleStarted
 
-    this.accountSync.syncStatement.syncEndTime = Date.now()
+    this.accountSync.syncStatement.syncEndTime = shardusGetTime()
     this.accountSync.syncStatement.syncSeconds =
       (this.accountSync.syncStatement.syncEndTime - this.accountSync.syncStatement.syncStartTime) / 1000
 
@@ -949,7 +950,7 @@ class StateManager {
     offset: number,
     accountOffset: string
   ): Promise<GetAccountDataByRangeSmart> {
-    const tsEnd = Date.now()
+    const tsEnd = shardusGetTime()
 
     // todo convert this to use account backup data, then compare perf vs app as num accounts grows past 10k
 
@@ -993,7 +994,7 @@ class StateManager {
           accountStart,
           accountEnd,
           tsStart2,
-          Date.now(),
+          shardusGetTime(),
           maxRecords,
           0,
           ''
@@ -2613,7 +2614,7 @@ class StateManager {
         lastServed: 0,
         queueLocked: false,
         lockOwner: 1,
-        lastLock: Date.now(),
+        lastLock: shardusGetTime(),
       }
       // eslint-disable-next-line security/detect-object-injection
       this.fifoLocks[fifoName] = thisFifo
@@ -2650,7 +2651,7 @@ class StateManager {
     thisFifo.lockOwner = ourID
     thisFifo.lastServed = ourID
     //this can be used to cleanup old fifo locks
-    thisFifo.lastLock = Date.now()
+    thisFifo.lastLock = shardusGetTime()
     return ourID
   }
 
@@ -2763,7 +2764,7 @@ class StateManager {
       value.queueLocked = false
       value.waitingList = []
       //set this so we don't clean it up too soon.
-      value.lastLock = Date.now()
+      value.lastLock = shardusGetTime()
       //value.queueCounter
       //do we need to fix up counters
       clearCount++
@@ -2777,7 +2778,7 @@ class StateManager {
    */
   clearStaleFifoLocks() {
     try {
-      const time = Date.now() - 1000 * 60 * 10 //10 minutes ago
+      const time = shardusGetTime() - 1000 * 60 * 10 //10 minutes ago
       const keysToDelete = []
       for (const [key, value] of Object.entries(this.fifoLocks)) {
         if (value.lastLock < time && value.queueLocked === false) {

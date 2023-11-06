@@ -29,6 +29,7 @@ import {
   GetAccountStateReq,
   GlobalAccountReportResp,
 } from './state-manager-types'
+import { shardusGetTime } from '../network'
 
 const REDUNDANCY = 3
 
@@ -505,7 +506,7 @@ class AccountSync {
   async initialSyncMain(requiredNodeCount: number): Promise<void> {
     const safetyMode = safetyModeVals.safetyMode
 
-    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-start time: ${Date.now()}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-start time: ${shardusGetTime()}`)
 
     //not great, but this currently triggers the storage init in the dapp
     //todo: replace with a specific   initDappStorage() function
@@ -531,13 +532,13 @@ class AccountSync {
       this.syncStatement.numCycles = 1
 
       this.syncStatement.syncSeconds = 0
-      this.syncStatement.syncStartTime = Date.now()
+      this.syncStatement.syncStartTime = shardusGetTime()
       this.syncStatement.syncEndTime = this.syncStatement.syncStartTime
       this.syncStatement.numNodesOnStart = 0
 
       this.syncStatement.p2pJoinTime = Self.p2pJoinTime
 
-      this.syncStatement.timeBeforeDataSync = (Date.now() - Self.p2pSyncEnd) / 1000
+      this.syncStatement.timeBeforeDataSync = (shardusGetTime() - Self.p2pSyncEnd) / 1000
       this.syncStatement.timeBeforeDataSync2 = this.syncStatement.timeBeforeDataSync
 
       /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `sync comlete numCycles: ${this.syncStatement.numCycles} start:${this.syncStatement.cycleStarted} end:${this.syncStatement.cycleEnded}`)
@@ -551,10 +552,10 @@ class AccountSync {
 
     this.isSyncingAcceptedTxs = true
 
-    this.syncStatement.timeBeforeDataSync = (Date.now() - Self.p2pSyncEnd) / 1000
+    this.syncStatement.timeBeforeDataSync = (shardusGetTime() - Self.p2pSyncEnd) / 1000
 
     await utils.sleep(5000) // Temporary delay to make it easier to attach a debugger
-    /* prettier-ignore */ console.log(`DATASYNC: initialSyncMain start time: ${Date.now()}`)
+    /* prettier-ignore */ console.log(`DATASYNC: initialSyncMain start time: ${shardusGetTime()}`)
     // delete and re-create some tables before we sync:
     await this.storage.clearAppRelatedState()
     await this.app.deleteLocalAccountData()
@@ -573,7 +574,7 @@ class AccountSync {
     hasValidShardData = await this.waitForValidShardData(hasValidShardData)
 
     this.syncStatement.cycleStarted = this.stateManager.currentCycleShardData.cycleNumber
-    this.syncStatement.syncStartTime = Date.now()
+    this.syncStatement.syncStartTime = shardusGetTime()
     this.syncStatement.numNodesOnStart = this.stateManager.currentCycleShardData.activeNodes.length
     this.syncStatement.p2pJoinTime = Self.p2pJoinTime
 
@@ -584,9 +585,9 @@ class AccountSync {
 
     let cycle = this.stateManager.currentCycleShardData.cycleNumber
 
-    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-gotcycle c${cycle} time: ${Date.now()}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-gotcycle c${cycle} time: ${shardusGetTime()}`)
     /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: initialSyncMain-gotcycle c${cycle}`)
-    /* prettier-ignore */ console.log(`DATASYNC: initialSyncMain-gotcycle c${cycle} time: ${Date.now()}`)
+    /* prettier-ignore */ console.log(`DATASYNC: initialSyncMain-gotcycle c${cycle} time: ${shardusGetTime()}`)
 
     let homePartition = nodeShardData.homePartition
     /* prettier-ignore */ if (logFlags.console) console.log(`homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
@@ -608,7 +609,7 @@ class AccountSync {
       this.createSyncTrackerByForGlobals(cycle, true)
     }
 
-    this.syncStatement.timeBeforeDataSync2 = (Date.now() - Self.p2pSyncEnd) / 1000
+    this.syncStatement.timeBeforeDataSync2 = (shardusGetTime() - Self.p2pSyncEnd) / 1000
     if (useGlobalAccounts === true) {
       // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
       await this.stateManager.accountGlobals.getGlobalListEarly()
@@ -646,7 +647,7 @@ class AccountSync {
           }
 
           // let partition = syncTracker.partition
-          /* prettier-ignore */ if (logFlags.console) console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
+          /* prettier-ignore */ if (logFlags.console) console.log(`syncTracker start. time:${shardusGetTime()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
           /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduceLimit(syncTracker.range)} `)
 
           syncTracker.syncStarted = true
@@ -659,7 +660,7 @@ class AccountSync {
               await syncTracker.syncStateDataForRange2() //syncTracker.range)
             }
           } else {
-            /* prettier-ignore */ if (logFlags.console) console.log(`syncTracker syncStateDataGlobals start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
+            /* prettier-ignore */ if (logFlags.console) console.log(`syncTracker syncStateDataGlobals start. time:${shardusGetTime()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
             await syncTracker.syncStateDataGlobals() //syncTracker)
           }
           syncTracker.syncFinished = true
@@ -739,8 +740,8 @@ class AccountSync {
     }
 
     cycle = this.stateManager.currentCycleShardData?.cycleNumber
-    /* prettier-ignore */ console.log( `DATASYNC: initialSyncMain end c${cycle} time: ${Date.now()}` )
-    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-end c${cycle} time: ${Date.now()} `)
+    /* prettier-ignore */ console.log( `DATASYNC: initialSyncMain end c${cycle} time: ${shardusGetTime()}` )
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`sync`, `initialSyncMain-end c${cycle} time: ${shardusGetTime()} `)
     /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: initialSyncMain end c${cycle}`)
   }
 
@@ -1211,7 +1212,7 @@ class AccountSync {
         const arrayCopy = this.syncTrackers.slice(0)
         for (const syncTracker of arrayCopy) {
           if (syncTracker.syncStarted === false) {
-            /* prettier-ignore */ if (logFlags.console) console.log(`rtsyncTracker start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
+            /* prettier-ignore */ if (logFlags.console) console.log(`rtsyncTracker start. time:${shardusGetTime()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
             /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('rt_shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
             syncTracker.syncStarted = true
@@ -1365,7 +1366,7 @@ class AccountSync {
    *
    */
   syncStatmentIsComplete(): void {
-    this.syncStatement.totalSyncTime = (Date.now() - Self.p2pSyncStart) / 1000
+    this.syncStatement.totalSyncTime = (shardusGetTime() - Self.p2pSyncStart) / 1000
 
     this.readyforTXs = true
     this.clearSyncTrackers()

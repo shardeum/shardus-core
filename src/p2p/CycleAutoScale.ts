@@ -13,6 +13,7 @@ import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { enterRecovery, enterSafety } from './Modes'
 import { getOurNodeIndex } from './Utils'
+import { shardusGetTime } from '../network'
 
 /** STATE */
 
@@ -96,7 +97,7 @@ export function getDesiredCount(): number {
 function createScaleRequest(scaleType): P2P.CycleAutoScaleTypes.SignedScaleRequest {
   const request: P2P.CycleAutoScaleTypes.ScaleRequest = {
     nodeId: Self.id,
-    timestamp: Date.now(),
+    timestamp: shardusGetTime(),
     counter: CycleCreator.currentCycle,
     scale: undefined,
   }
@@ -239,8 +240,7 @@ function _canThisNodeSendScaleRequests(_nodeId: string) {
   let offset = CycleChain.newest.counter //todo something more random
 
   const ourIndex = getOurNodeIndex()
-  if (ourIndex == null)
-    return false
+  if (ourIndex == null) return false
 
   canSendGossip = fastIsPicked(ourIndex, numActiveNodes, config.p2p.scaleGroupLimit, offset)
 
@@ -357,23 +357,23 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
         if (active < desired) {
           /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: entered active < desired")
           let add = ~~(0.5 * active)
-          if (add < 7) { 
+          if (add < 7) {
             add = 7
           }
           targetCount = active + add
-          if (targetCount > desired) { 
-            targetCount = desired 
+          if (targetCount > desired) {
+            targetCount = desired
           }
         }
         if (active > desired) {
           /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: entered active > desired")
           let sub = ~~(0.3 * active)
-          if (sub < 1) { 
-            sub = 1 
+          if (sub < 1) {
+            sub = 1
           }
           targetCount = active - sub
-          if (targetCount < desired) { 
-            targetCount = desired 
+          if (targetCount < desired) {
+            targetCount = desired
           }
         }
       }
@@ -385,22 +385,22 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`addRem: ${addRem}, desired: ${desired}, prevTarget: ${prevRecord.target}`)
         if (addRem > active * 0.01) {
           addRem = active * 0.01
-        } 
-        if (addRem < 0 - active * 0.005) { 
+        }
+        if (addRem < 0 - active * 0.005) {
           addRem = 0 - active * 0.005
         }
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`CycleAutoScale: prev target is ${prevRecord.target} and addRem is ${addRem}`)
         targetCount = prevRecord.target + addRem
         // may want to swap config values to values from cycle record
-        if (targetCount < config.p2p.minNodes) { 
-          targetCount = config.p2p.minNodes 
+        if (targetCount < config.p2p.minNodes) {
+          targetCount = config.p2p.minNodes
         }
-        if (targetCount > config.p2p.maxNodes) { 
-          targetCount = config.p2p.maxNodes 
+        if (targetCount > config.p2p.maxNodes) {
+          targetCount = config.p2p.maxNodes
         }
       }
     }
-  } else if(Self.isFirst && active < 1) {
+  } else if (Self.isFirst && active < 1) {
     /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in Self.isFirst condition")
     targetCount = 7
   }
@@ -443,9 +443,11 @@ export function validateRecordTypes(rec: P2P.CycleAutoScaleTypes.Record): string
   return ''
 }
 
-export function updateRecord(txs: P2P.CycleAutoScaleTypes.Txs,
+export function updateRecord(
+  txs: P2P.CycleAutoScaleTypes.Txs,
   record: P2P.CycleCreatorTypes.CycleRecord,
-  prevRecord: P2P.CycleCreatorTypes.CycleRecord) {
+  prevRecord: P2P.CycleCreatorTypes.CycleRecord
+) {
   //just in time scaling vote count.
   _checkScaling()
   record.desired = getDesiredCount()
@@ -539,7 +541,7 @@ function _addScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleR
 
 //TODO: we need to consider using _waitUntilEndOfCycle to schedule voting times
 async function _waitUntilEndOfCycle() {
-  const currentTime = Date.now()
+  const currentTime = shardusGetTime()
   const nextQ1Start = CycleCreator.nextQ1Start
   if (logFlags.p2pNonFatal) info(`Current time is: ${currentTime}`)
   if (logFlags.p2pNonFatal) info(`Next cycle will start at: ${nextQ1Start}`)

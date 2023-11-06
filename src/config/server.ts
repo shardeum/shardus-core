@@ -32,7 +32,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
         publicKey: 'e4b5e3d51e727f897786a1bb176a028ecfe1941bfa5beefd3c6209c3dbc07cf7',
       },
     ],
-    syncLimit: 180,
+    syncLimit: 180, //180 seconds seems way to high to allow.
+    useNTPOffsets: true,
     cycleDuration: 30,
     maxRejoinTime: 20,
     difficulty: 2,

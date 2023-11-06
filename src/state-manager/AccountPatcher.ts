@@ -36,6 +36,7 @@ import {
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { errorToStringFull, Ordering } from '../utils'
 import { Response } from 'express-serve-static-core'
+import { shardusGetTime } from '../network'
 
 type Line = {
   raw: string
@@ -810,7 +811,15 @@ class AccountPatcher {
           const high = prefix + 'f'.repeat(60)
 
           const suffix = id.substring(5, 10)
-          const possibleAccounts = await this.app.getAccountDataByRange(low, high, 0, Date.now(), 100, 0, '')
+          const possibleAccounts = await this.app.getAccountDataByRange(
+            low,
+            high,
+            0,
+            shardusGetTime(),
+            100,
+            0,
+            ''
+          )
 
           res.write(`searching ${possibleAccounts.length} accounts \n`)
 
@@ -871,7 +880,15 @@ class AccountPatcher {
           const high = prefix + 'f'.repeat(60)
 
           const suffix = id.substring(5, 10)
-          const possibleAccounts = await this.app.getAccountDataByRange(low, high, 0, Date.now(), 100, 0, '')
+          const possibleAccounts = await this.app.getAccountDataByRange(
+            low,
+            high,
+            0,
+            shardusGetTime(),
+            100,
+            0,
+            ''
+          )
 
           for (const account of possibleAccounts) {
             if (account.accountId.endsWith(suffix)) {

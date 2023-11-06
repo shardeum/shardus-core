@@ -5,6 +5,7 @@ import { EventEmitter } from 'events'
 import * as utils from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { CountedEvent, CountedEventMap } from './countedEvents'
+import { shardusGetTime } from '../network'
 
 interface Statistics {
   intervalDuration: number
@@ -85,7 +86,7 @@ class Statistics extends EventEmitter {
         stats.txProcessed += this.getPreviousElement('txProcessed') || 0
         return res.json(stats)
       } catch (e) {
-        console.log(`Error getting stats: ${JSON.stringify(e)}`);
+        console.log(`Error getting stats: ${JSON.stringify(e)}`)
       }
     })
   }
@@ -142,7 +143,7 @@ class Statistics extends EventEmitter {
       eventName: name,
       eventCount: count,
       eventMessages: [message],
-      eventTimestamps: [Date.now()],
+      eventTimestamps: [shardusGetTime()],
     }
 
     const categoryExists = this.countedEventMap.has(category)
@@ -161,7 +162,7 @@ class Statistics extends EventEmitter {
     const currentCountedEvent = eventCategory.get(name)
     currentCountedEvent.eventCount += count
     currentCountedEvent.eventMessages.push(message)
-    currentCountedEvent.eventTimestamps.push(Date.now())
+    currentCountedEvent.eventTimestamps.push(shardusGetTime())
   }
 
   /**
@@ -444,7 +445,7 @@ class TimerRing {
   }
   start(id: string) {
     if (!this.ids[id]) {
-      this.ids[id] = Date.now()
+      this.ids[id] = shardusGetTime()
     }
   }
   stop(id: string) {
@@ -459,7 +460,7 @@ class TimerRing {
     for (const id in this.ids) {
       const startTime = this.ids[id]
       // console.log('START_TIME ', startTime, 'ID', id)
-      const duration = Date.now() - startTime
+      const duration = shardusGetTime() - startTime
       utils.insertSorted(durations, duration, (a, b) => a - b)
     }
     const median = utils.computeMedian(durations, false)

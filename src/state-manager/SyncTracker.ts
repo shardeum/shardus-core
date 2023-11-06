@@ -10,6 +10,7 @@ import { errorToStringFull } from '../utils'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 
 import DataSourceHelper from './DataSourceHelper'
+import { shardusGetTime } from '../network'
 
 export default class SyncTracker {
   accountSync: AccountSync //parent sync manager
@@ -133,7 +134,7 @@ export default class SyncTracker {
         this.currentRange = this.range
         this.addressRange = this.range // this.partitionToAddressRange(partition)
 
-        this.partitionStartTimeStamp = Date.now()
+        this.partitionStartTimeStamp = shardusGetTime()
 
         const lowAddress = this.addressRange.low
         const highAddress = this.addressRange.high
@@ -192,7 +193,7 @@ export default class SyncTracker {
         const partition = 'globals!'
 
         let remainingAccountsToSync = []
-        this.partitionStartTimeStamp = Date.now()
+        this.partitionStartTimeStamp = shardusGetTime()
 
         if (this.accountSync.debugFail3) {
           nestedCountersInstance.countEvent('sync', `syncStateDataGlobals: debugFail3`)
@@ -396,7 +397,7 @@ export default class SyncTracker {
   async syncAccountData2(lowAddress: string, highAddress: string): Promise<number> {
     // Sync the Account data
     //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
-    if (logFlags.console) console.log(`syncAccountData3` + '   time:' + Date.now())
+    if (logFlags.console) console.log(`syncAccountData3` + '   time:' + shardusGetTime())
 
     if (this.accountSync.config.stateManager == null) {
       throw new Error('this.config.stateManager == null')

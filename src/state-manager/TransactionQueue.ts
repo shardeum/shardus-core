@@ -34,9 +34,10 @@ import {
   QueueCountsResult,
 } from './state-manager-types'
 
-import {stringify} from '../utils'
+import { stringify } from '../utils'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
 import { Logger as L4jsLogger } from 'log4js'
+import { shardusGetTime } from '../network'
 
 interface Receipt {
   tx: AcceptedTx
@@ -167,9 +168,9 @@ class TransactionQueue {
     this.receiptsToForward = []
     this.forwardedReceipts = new Map()
     this.oldNotForwardedReceipts = new Map()
-    this.lastReceiptForwardResetTimestamp = Date.now()
+    this.lastReceiptForwardResetTimestamp = shardusGetTime()
     this.receiptsBundleByInterval = new Map()
-    this.receiptsForwardedTimestamp = Date.now()
+    this.receiptsForwardedTimestamp = shardusGetTime()
 
     this._transactionQueueByID = new Map()
     this.pendingTransactionQueueByID = new Map()
@@ -430,15 +431,14 @@ class TransactionQueue {
       return null
     }
 
-    // some timer checks.. should these be merged into route and accept?
+    // Need to review these timeouts before main net.  what bad things can happen by setting a timestamp too far in the future or past.
+    // only a subset of transactions can have timestamp set by the sender while others use independent consensus (askTxnTimestampFromNode)
+    // but that is up to the dapp
     const mostOfQueueSitTimeMs = this.stateManager.queueSitTime * 0.9
     const txExpireTimeMs = this.config.transactionExpireTime * 1000
-    const age = Date.now() - timestamp
+    const age = shardusGetTime() - timestamp
     if (inRangeOfCurrentTime(timestamp, mostOfQueueSitTimeMs, txExpireTimeMs) === false) {
-      this.statemanager_fatal(
-        `spread_tx_to_group_OldTx_or_tooFuture`,
-        'spread_tx_to_group cannot accept tx with age: ' + age
-      )
+      /* prettier-ignore */ this.statemanager_fatal( `spread_tx_to_group_OldTx_or_tooFuture`, 'spread_tx_to_group cannot accept tx with age: ' + age )
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOldOrTooFuture', '', 'spread_tx_to_group working on tx with age: ' + age)
       return null
     }
@@ -507,7 +507,7 @@ class TransactionQueue {
     accountStart = '0'.repeat(64),
     accountEnd = 'f'.repeat(64),
     tsStart = 0,
-    tsEnd = Date.now()
+    tsEnd = shardusGetTime()
   ): Promise<string> {
     const accountStates = await this.storage.queryAccountStateTable(
       accountStart,
@@ -1321,7 +1321,8 @@ class TransactionQueue {
       }
 
       try {
-        const age = Date.now() - timestamp
+        // use shardusGetTime() instead of Date.now as many thing depend on it
+        const age = shardusGetTime() - timestamp
 
         const keyHash: StringBoolObjectMap = {} //TODO replace with Set<string>
         for (const key of txQueueEntry.txKeys.allKeys) {
@@ -3306,7 +3307,7 @@ class TransactionQueue {
   async processTransactions(firstTime = false): Promise<void> {
     const seenAccounts: SeenAccounts = {}
     let pushedProfilerTag = null
-    const startTime = Date.now()
+    const startTime = shardusGetTime()
 
     const processStats: ProcessQueueStats = {
       totalTime: 0,
@@ -3345,7 +3346,7 @@ class TransactionQueue {
       }
       this.transactionProcessingQueueRunning = true
       this.isStuckProcessing = false
-      this.debugLastProcessingQueueStartTime = Date.now()
+      this.debugLastProcessingQueueStartTime = shardusGetTime()
 
       // ensure there is some rest between processing loops
       const timeSinceLastRun = startTime - this.processingLastRunTime
@@ -3384,7 +3385,7 @@ class TransactionQueue {
       const timeM2 = timeM * 2
       const timeM2_5 = timeM * 2.5
       const timeM3 = timeM * 3
-      let currentTime = Date.now()
+      let currentTime = shardusGetTime()
 
       const app = this.app
 
@@ -3417,7 +3418,7 @@ class TransactionQueue {
             lastTx = this._transactionQueue[index]
           }
 
-          const age = Date.now() - timestamp
+          const age = shardusGetTime() - timestamp
           if (age > timeM * 0.9) {
             // IT turns out the correct thing to check is didSync flag only report errors if we did not wait on this TX while syncing
             if (txQueueEntry.didSync == false) {
@@ -3479,10 +3480,10 @@ class TransactionQueue {
       let lastLog = 0
       currentIndex++ //increment once so we can handle the decrement at the top of the loop and be safe about continue statements
 
-      let lastRest = Date.now()
+      let lastRest = shardusGetTime()
       while (this._transactionQueue.length > 0) {
         // update current time with each pass through the loop
-        currentTime = Date.now()
+        currentTime = shardusGetTime()
 
         if (currentTime - lastRest > 1000) {
           //add a brief sleep if we have been in this loop for a long time
@@ -3870,7 +3871,7 @@ class TransactionQueue {
           //TODO?2 should we allow a TX to use a repair op shortly after being expired? (it would have to be carefull, and maybe use some locking)
         }
 
-        const txStartTime = Date.now()
+        const txStartTime = shardusGetTime()
 
         // HANDLE TX logic based on state.
         try {
@@ -3912,11 +3913,11 @@ class TransactionQueue {
               // corresponding nodes and then move into awaiting data phase
 
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-              const time = Date.now()
+              const time = shardusGetTime()
               try {
                 // TODO re-evaluate if it is correct for us to share info for a global modifing TX.
                 //if(queueEntry.globalModification === false) {
-                const awaitStart = Date.now()
+                const awaitStart = shardusGetTime()
 
                 if (this.executeInOneShard === true) {
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodes(queueEntry)')
@@ -3932,7 +3933,7 @@ class TransactionQueue {
                 this.updateSimpleStatsObject(
                   processStats.awaitStats,
                   'tellCorrespondingNodes',
-                  Date.now() - awaitStart
+                  shardusGetTime() - awaitStart
                 )
 
                 /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_processing', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${this.processQueue_debugAccountData(queueEntry, app)}`)
@@ -3964,7 +3965,7 @@ class TransactionQueue {
                   queueEntry.state = 'await final data'
                 }
               }
-              queueEntry.executionDebug.processElapsed = Date.now() - time
+              queueEntry.executionDebug.processElapsed = shardusGetTime() - time
             }
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           }
@@ -4094,7 +4095,7 @@ class TransactionQueue {
                     continue
                   }
                   queueEntry.executionDebug.log2 = 'call pre apply'
-                  const awaitStart = Date.now()
+                  const awaitStart = shardusGetTime()
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.preApplyTransaction(queueEntry)')
                   let txResult = undefined
                   if (this.config.stateManager.transactionApplyTimeout > 0) {
@@ -4124,7 +4125,7 @@ class TransactionQueue {
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
                     'preApplyTransaction',
-                    Date.now() - awaitStart
+                    shardusGetTime() - awaitStart
                   )
 
                   queueEntry.executionDebug.log3 = 'called pre apply'
@@ -4168,7 +4169,7 @@ class TransactionQueue {
                     } else {
                       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_preApplyTx_createAndShareVote', `${shortID}`, ``)
                       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 createAndShareVote : ${queueEntry.logID} `)
-                      const awaitStart = Date.now()
+                      const awaitStart = shardusGetTime()
 
                       queueEntry.voteCastAge = txAge
                       /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.createAndShareVote(queueEntry)' )
@@ -4177,7 +4178,7 @@ class TransactionQueue {
                       this.updateSimpleStatsObject(
                         processStats.awaitStats,
                         'createAndShareVote',
-                        Date.now() - awaitStart
+                        shardusGetTime() - awaitStart
                       )
                     }
                   } else {
@@ -4240,7 +4241,7 @@ class TransactionQueue {
                   if (shouldSendReceipt) {
                     if (queueEntry.appliedReceipt2) {
                       // Broadcast the receipt, only if we made one (try produce can early out if we received one)
-                      const awaitStart = Date.now()
+                      const awaitStart = shardusGetTime()
                       /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()' )
                       await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
                       /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()', DebugComplete.Completed )
@@ -4248,7 +4249,7 @@ class TransactionQueue {
                       this.updateSimpleStatsObject(
                         processStats.awaitStats,
                         'shareAppliedReceipt',
-                        Date.now() - awaitStart
+                        shardusGetTime() - awaitStart
                       )
                     }
                   } else {
@@ -4280,13 +4281,13 @@ class TransactionQueue {
                     queueEntry.isInExecutionHome
                   ) {
                     //forward all finished data to corresponding nodes
-                    const awaitStart = Date.now()
+                    const awaitStart = shardusGetTime()
                     // This is an async function but we do not await it
                     this.tellCorrespondingNodesFinalData(queueEntry)
                     this.updateSimpleStatsObject(
                       processStats.awaitStats,
                       'tellCorrespondingNodesFinalData',
-                      Date.now() - awaitStart
+                      shardusGetTime() - awaitStart
                     )
                   }
                   //continue
@@ -4483,7 +4484,7 @@ class TransactionQueue {
                   }
                   /* eslint-enable security/detect-object-injection */
                   //await this.app.setAccountData(rawAccounts)
-                  const awaitStart = Date.now()
+                  const awaitStart = shardusGetTime()
                   /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.checkAndSetAccountData()' )
                   await this.stateManager.checkAndSetAccountData(
                     accountRecords,
@@ -4495,7 +4496,7 @@ class TransactionQueue {
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
                     'checkAndSetAccountData',
-                    Date.now() - awaitStart
+                    shardusGetTime() - awaitStart
                   )
 
                   //log tx processed if needed
@@ -4605,14 +4606,14 @@ class TransactionQueue {
                   //try {
                   this.profiler.profileSectionStart('commit')
 
-                  const awaitStart = Date.now()
+                  const awaitStart = shardusGetTime()
                   /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.commitConsensedTransaction()' )
                   await this.commitConsensedTransaction(queueEntry)
                   /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.commitConsensedTransaction()', DebugComplete.Completed )
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
                     'commitConsensedTransaction',
-                    Date.now() - awaitStart
+                    shardusGetTime() - awaitStart
                   )
 
                   if (queueEntry.repairFinished) {
@@ -4730,7 +4731,7 @@ class TransactionQueue {
           profilerInstance.scopedProfileSectionEnd(`scoped-process-${pushedProfilerTag}`)
 
           //let do some more stats work
-          const txElapsed = Date.now() - txStartTime
+          const txElapsed = shardusGetTime() - txStartTime
           if (queueEntry.state != pushedProfilerTag) {
             processStats.stateChanged++
             this.updateSimpleStatsObject(processStats.stateChangedStats, pushedProfilerTag, txElapsed)
@@ -4750,7 +4751,7 @@ class TransactionQueue {
         pushedProfilerTag = null
       }
 
-      const processTime = Date.now() - startTime
+      const processTime = shardusGetTime() - startTime
 
       processStats.totalTime = processTime
 
@@ -4793,7 +4794,7 @@ class TransactionQueue {
       }
 
       this.transactionProcessingQueueRunning = false
-      this.processingLastRunTime = Date.now()
+      this.processingLastRunTime = shardusGetTime()
       this.stateManager.lastSeenAccountsMap = seenAccounts
 
       this.profiler.profileSectionEnd('processQ')
@@ -4893,7 +4894,7 @@ class TransactionQueue {
 
     if (this.config.p2p.instantForwardReceipts) {
       Archivers.instantForwardReceipts([signedTxReceiptToPass])
-      this.receiptsForwardedTimestamp = Date.now()
+      this.receiptsForwardedTimestamp = shardusGetTime()
     }
     this.receiptsToForward.push(signedTxReceiptToPass)
   }
@@ -4912,7 +4913,7 @@ class TransactionQueue {
     const RECEIPT_CLEANUP_INTERVAL_MS = 30000 // 30 seconds
     if (
       !this.config.p2p.instantForwardReceipts &&
-      Date.now() - this.lastReceiptForwardResetTimestamp >= RECEIPT_CLEANUP_INTERVAL_MS
+      shardusGetTime() - this.lastReceiptForwardResetTimestamp >= RECEIPT_CLEANUP_INTERVAL_MS
     ) {
       const lastReceiptsToForward = [...this.receiptsToForward]
       this.receiptsToForward = []
@@ -4930,7 +4931,7 @@ class TransactionQueue {
       for (const receipt of this.receiptsToForward) {
         this.oldNotForwardedReceipts.set(receipt.tx.txId, true)
       }
-      this.lastReceiptForwardResetTimestamp = Date.now()
+      this.lastReceiptForwardResetTimestamp = shardusGetTime()
     } else if (this.config.p2p.instantForwardReceipts) {
       const lastReceiptsToForward = [...this.receiptsToForward]
       this.receiptsToForward = []
@@ -4948,7 +4949,7 @@ class TransactionQueue {
         lastReceiptsToForward
       )
       if (logFlags.console) console.log('receiptsBundleByInterval', this.receiptsBundleByInterval)
-      this.lastReceiptForwardResetTimestamp = Date.now()
+      this.lastReceiptForwardResetTimestamp = shardusGetTime()
     }
   }
 
@@ -5429,7 +5430,7 @@ class TransactionQueue {
    * autoUnstickProcessing will attempt to fix the stuck processing if set to true
    */
   checkForStuckProcessing(): void {
-    const timeSinceLastProcessLoop = Date.now() - this.processingLastRunTime
+    const timeSinceLastProcessLoop = shardusGetTime() - this.processingLastRunTime
     const limitInMS = this.config.stateManager.stuckProcessingLimit * 1000
 
     if (timeSinceLastProcessLoop > limitInMS) {

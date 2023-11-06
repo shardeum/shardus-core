@@ -25,11 +25,12 @@ import * as SyncV2 from './SyncV2/'
 import { getRandomAvailableArchiver, SeedNodesList } from './Utils'
 import * as CycleChain from './CycleChain'
 import rfdc from 'rfdc'
+import { shardusGetTime } from '../network'
 const deepCopy = rfdc()
 
 /** STATE */
 
-const startTimestamp = Date.now()
+const startTimestamp = shardusGetTime()
 
 export const emitter = new events.EventEmitter()
 
@@ -104,7 +105,7 @@ export function startupV2(): Promise<boolean> {
         // set status SYNCING
         updateNodeState(P2P.P2PTypes.NodeStatus.SYNCING)
 
-        p2pSyncStart = Date.now()
+        p2pSyncStart = shardusGetTime()
 
         if (logFlags.p2pNonFatal) info('Emitting `joined` event.')
 
@@ -120,7 +121,7 @@ export function startupV2(): Promise<boolean> {
 
         // Start creating cycle records
         await CycleCreator.startCycles()
-        p2pSyncEnd = Date.now()
+        p2pSyncEnd = shardusGetTime()
         p2pJoinTime = (p2pSyncEnd - p2pSyncStart) / 1000
 
         nestedCountersInstance.countEvent('p2p', `sync time ${p2pJoinTime} seconds`)
@@ -317,7 +318,7 @@ export function startupV2(): Promise<boolean> {
 //     firstTime = false
 //   } while (utils.isUndefined(isFirst) || utils.isUndefined(id))
 
-//   p2pSyncStart = Date.now()
+//   p2pSyncStart = shardusGetTime()
 
 //   /* prettier-ignore */ if (logFlags.important_as_fatal) info('Emitting `joined` event.')
 //   emitter.emit('joined', id, publicKey)
@@ -332,7 +333,7 @@ export function startupV2(): Promise<boolean> {
 
 //   // Start creating cycle records
 //   await CycleCreator.startCycles()
-//   p2pSyncEnd = Date.now()
+//   p2pSyncEnd = shardusGetTime()
 //   p2pJoinTime = (p2pSyncEnd - p2pSyncStart) / 1000
 
 //   nestedCountersInstance.countEvent('p2p', `sync time ${p2pJoinTime} seconds`)
@@ -408,13 +409,16 @@ export function updateNodeState(updatedState: NodeStatus, because = ''): void {
         NodeList.byPubKey.get(pubKey) &&
         NodeList.byPubKey.get(pubKey).status) ||
       null,
-    timestamp: Date.now(),
+    timestamp: shardusGetTime(),
     isoDateTime: new Date().toISOString(),
     uptime: utils.readableDuration(startTimestamp),
     newestCycleCounter: (CycleChain.getNewest() && CycleChain.getNewest().counter) || null,
     quarter: CycleCreator.currentCycle,
     because: because,
   }
+
+  /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `stateupdate: ${updatedState} c:${CycleCreator.currentCycle}` )
+
   // changing status is infrequent, so log it always
   /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Node status changed to ${updatedState}:\n${JSON.stringify(entry, null, 2)}`)
   statusHistory.push(entry)
@@ -445,10 +449,10 @@ async function joinNetworkV2(activeNodes): Promise<void> {
 
   // Figure out when Q1 is from the latestCycle
   const { startQ1 } = calcIncomingTimes(latestCycle)
-  /* prettier-ignore */ if (logFlags.important_as_fatal) info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
+  /* prettier-ignore */ if (logFlags.important_as_fatal) info(`Next cycles Q1 start ${startQ1}; Currently ${shardusGetTime()}`)
 
   // Wait until a Q1 then send join request to active nodes
-  let untilQ1 = startQ1 - Date.now()
+  let untilQ1 = startQ1 - shardusGetTime()
   //make untilQ1 in the future if needed
   while (untilQ1 < 0) {
     untilQ1 += latestCycle.duration * 1000
@@ -518,7 +522,7 @@ async function joinNetworkV2(activeNodes): Promise<void> {
 
 //   // Figure out when Q1 is from the latestCycle
 //   const { startQ1, startQ4 } = calcIncomingTimes(latestCycle)
-//   if (logFlags.important_as_fatal) info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
+//   if (logFlags.important_as_fatal) info(`Next cycles Q1 start ${startQ1}; Currently ${shardusGetTime()}`)
 
 //   // create the Promise that we will `await` to wait for the 'accepted' event,
 //   // in case of Join v2. this registers the listener ahead of time
@@ -527,7 +531,7 @@ async function joinNetworkV2(activeNodes): Promise<void> {
 //   // only submit join requests if we are using the old protocol or if we have not yet successfully submitted a join request
 //   if (!Context.config.p2p.useJoinProtocolV2 || !Join.getHasSubmittedJoinRequest()) {
 //     // Wait until a Q1 then send join request to active nodes
-//     let untilQ1 = startQ1 - Date.now()
+//     let untilQ1 = startQ1 - shardusGetTime()
 //     while (untilQ1 < 0) {
 //       untilQ1 += latestCycle.duration * 1000
 //     }
@@ -550,7 +554,7 @@ async function joinNetworkV2(activeNodes): Promise<void> {
 //     // This is a bit faster than before and should allow nodes to try joining
 //     // without skipping a cycle
 //     if (logFlags.p2pNonFatal) info('Waiting approx. one cycle then checking again...')
-//     let untilQ4 = startQ4 - Date.now()
+//     let untilQ4 = startQ4 - shardusGetTime()
 //     while (untilQ4 < 0) {
 //       untilQ4 += latestCycle.duration * 1000
 //     }

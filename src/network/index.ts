@@ -36,6 +36,8 @@ let natClient: any
 
 export let ipInfo: IPInfo
 
+let ntpOffsetMs: number = 0
+
 /** CLASS */
 
 export class NetworkClass extends EventEmitter {
@@ -84,6 +86,7 @@ export class NetworkClass extends EventEmitter {
     this.InternalAskCounter = 1
     this.debugNetworkDelay = 0
     this.statisticsInstance = null
+    ntpOffsetMs = 0
 
     if (config && config.debug && config.debug.fakeNetworkDelay) {
       this.debugNetworkDelay = config.debug.fakeNetworkDelay
@@ -739,7 +742,7 @@ class ConnectTest extends EventEmitter {
   }
 }
 
-export async function checkTimeSynced(timeServers) {
+export async function checkAndUpdateTimeSyncedOffset(timeServers) {
   // Ignore time check if debug flag is set
   if (config.debug.ignoreTimeCheck === true) return true
 
@@ -750,17 +753,42 @@ export async function checkTimeSynced(timeServers) {
         host,
         timeout: 10000,
       })
-      return time.t <= config.p2p.syncLimit
+      //update our offset convert from seconds to MS
+      ntpOffsetMs = Math.floor(time.t * 1000)
+      const isInRange = time.t <= config.p2p.syncLimit
+
+      //check if ntpOffsetMs is a number
+      if (isNaN(ntpOffsetMs)) {
+        mainLogger.warn(`NTP Error time.t is NaN ${ntpOffsetMs}`)
+        ntpOffsetMs = 0
+      }
+
+      /* prettier-ignore */ if (logFlags.important_as_fatal) mainLogger.info(`ntpOffset ${ntpOffsetMs} Offset is in range: ${isInRange} `)
+      return isInRange
     } catch (e) {
       mainLogger.warn(`Couldn't fetch ntp time from server at ${host}`)
+      ntpOffsetMs = 0
     }
   }
   throw Error('Unable to check local time against time servers.')
 }
 
+export function shardusGetTime(): number {
+  if (config.p2p.useNTPOffsets === true) {
+    return Date.now() + ntpOffsetMs
+  }
+  return Date.now()
+}
+
+export function getNetworkTimeOffset(): number {
+  if (config.p2p.useNTPOffsets === true) {
+    return ntpOffsetMs
+  }
+  return ntpOffsetMs
+}
+
 async function discoverExternalIp(servers: string[]) {
   // Figure out if we're behind a NAT
-
   // Attempt NAT traversal with UPnP
 
   //

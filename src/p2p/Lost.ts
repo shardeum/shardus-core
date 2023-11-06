@@ -27,6 +27,7 @@ import { activeByIdOrder, byIdOrder, nodes } from './NodeList'
 import * as Self from './Self'
 import { generateUUID } from './Utils'
 import { CycleData } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
+import { shardusGetTime } from '../network'
 
 /** STATE */
 
@@ -275,7 +276,7 @@ export function updateRecord(
 
   if (config.p2p.detectLostSyncing) {
     const syncingNodes = NodeList.syncingByIdOrder
-    const now = Math.floor(Date.now() / 1000)
+    const now = Math.floor(shardusGetTime() / 1000)
     for (const syncingNode of syncingNodes) {
       const syncTime = now - syncingNode.syncingTimestamp
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log('syncTime vs maxSyncTime', syncTime, record.maxSyncTime)
@@ -437,7 +438,7 @@ export function scheduleLostReport(target: P2P.NodeListTypes.Node, reason: strin
   scheduledForLostReport.set(key, {
     reason: reason,
     targetNode: target,
-    timestamp: Date.now(),
+    timestamp: shardusGetTime(),
     scheduledInCycle: currentCycle,
     requestId: requestId,
   })
@@ -471,7 +472,7 @@ function reportLost(target, reason: string, requestId: string) {
   /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${JSON.stringify(msg)}`)
 
   const msgCopy = JSON.parse(shardusCrypto.stringify(msg))
-  msgCopy.timestamp = Date.now()
+  msgCopy.timestamp = shardusGetTime()
   msgCopy.requestId = requestId
   msg = crypto.sign(msgCopy)
   lost.set(key, obj)
@@ -615,7 +616,7 @@ async function isDownCache(node, requestId: string) {
 }
 
 export function setIsUpTs(nodeId: string) {
-  let timestamp = Date.now()
+  let timestamp = shardusGetTime()
   isUpTs[nodeId] = timestamp
 }
 
@@ -624,7 +625,7 @@ export function isNodeUpRecent(
   maxAge: number
 ): { upRecent: boolean; state: string; age: number } {
   let lastCheck = isUpTs[nodeId]
-  let age = Date.now() - lastCheck
+  let age = shardusGetTime() - lastCheck
 
   if (isNaN(age)) {
     return { upRecent: false, state: 'noLastState', age }

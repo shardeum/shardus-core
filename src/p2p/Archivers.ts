@@ -27,6 +27,7 @@ import { StateMetaData } from '@shardus/types/build/src/p2p/SnapshotTypes'
 import { DataRequest } from '@shardus/types/build/src/p2p/ArchiversTypes'
 import * as CycleChain from './CycleChain'
 import rfdc from 'rfdc'
+import { shardusGetTime } from '../network'
 
 const clone = rfdc()
 
@@ -478,7 +479,7 @@ async function forwardReceipts() {
   const LEAST_LAST_PING_TIME_MS = 5000
   if (
     config.p2p.instantForwardReceipts &&
-    Date.now() - stateManager.transactionQueue.receiptsForwardedTimestamp < LEAST_LAST_PING_TIME_MS
+    shardusGetTime() - stateManager.transactionQueue.receiptsForwardedTimestamp < LEAST_LAST_PING_TIME_MS
   ) {
     pingNeeded = false
   }
@@ -503,7 +504,7 @@ async function forwardReceipts() {
       if (!lastTimeForwardedArchivers.includes(publicKey)) {
         newArchiversToForward.push(publicKey)
       } else stillConnectedArchivers.push(publicKey)
-    if (pingNeeded) stateManager.transactionQueue.receiptsForwardedTimestamp = Date.now()
+    if (pingNeeded) stateManager.transactionQueue.receiptsForwardedTimestamp = shardusGetTime()
     else continue
     if (logFlags.console)
       console.log('pingNeeded', pingNeeded, stateManager.transactionQueue.receiptsForwardedTimestamp)

@@ -1,17 +1,20 @@
+import { shardusGetTime } from '../../network'
+
 export const sleep = (ms): Promise<void> => {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
 }
 
+/** Be very careful this uses shardusGetTime() the timetamp passed in must repect this */
 export const getTime = (format = 'ms'): number => {
   let time
   switch (format) {
     case 'ms':
-      time = Date.now()
+      time = shardusGetTime()
       break
     case 's':
-      time = Math.floor(Date.now() / 1000)
+      time = Math.floor(shardusGetTime() / 1000)
       break
     default:
       throw Error('Error: Invalid format given.')
@@ -19,8 +22,9 @@ export const getTime = (format = 'ms'): number => {
   return time
 }
 
+/** Be very careful this uses shardusGetTime() the timetamp passed in must repect this */
 export const setAlarm = (callback, timestamp): void => {
-  const now = Date.now()
+  const now = shardusGetTime()
   if (timestamp <= now) {
     callback()
     return
@@ -30,7 +34,7 @@ export const setAlarm = (callback, timestamp): void => {
 }
 
 export function inRangeOfCurrentTime(timestamp: number, before: number, after: number): boolean {
-  const currentTime = Date.now()
+  const currentTime = shardusGetTime()
   if (timestamp - currentTime <= after) {
     if (currentTime - timestamp <= before) {
       return true

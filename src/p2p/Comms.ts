@@ -15,6 +15,7 @@ import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
+import { shardusGetTime } from '../network'
 
 /** ROUTES */
 
@@ -200,10 +201,10 @@ function _wrapAndSignMessage(msg, tracker = '') {
 }
 
 function createMsgTracker(route = '') {
-  return 'key_' + route + '_' + utils.makeShortHash(Self.id) + '_' + Date.now() + '_' + keyCounter++
+  return 'key_' + route + '_' + utils.makeShortHash(Self.id) + '_' + shardusGetTime() + '_' + keyCounter++
 }
 function createGossipTracker() {
-  return 'gkey_' + utils.makeShortHash(Self.id) + '_' + Date.now() + '_' + keyCounter++
+  return 'gkey_' + utils.makeShortHash(Self.id) + '_' + shardusGetTime() + '_' + keyCounter++
 }
 
 // Our own P2P version of the network tell, with a sign added

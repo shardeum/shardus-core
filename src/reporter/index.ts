@@ -1,7 +1,7 @@
 import Log4js from 'log4js'
 import LoadDetection from '../load-detection'
 import Logger, { logFlags } from '../logger'
-import { ipInfo } from '../network'
+import { ipInfo, shardusGetTime } from '../network'
 import { config, crypto } from '../p2p/Context'
 import * as Shardus from '../shardus/shardus-types'
 import * as Archivers from '../p2p/Archivers'
@@ -69,7 +69,7 @@ class Reporter {
     this.reportingInterval = null
     this.socketReportInterval = null
 
-    this.lastTime = Date.now()
+    this.lastTime = shardusGetTime()
 
     this.doConsoleReport = isDebugModeAnd((config) => config.profiler)
 
@@ -329,7 +329,7 @@ class Reporter {
         desiredNodes,
         lastScalingTypeWinner, // "up" "down" or null.  last scaling action decided by this node
         lastScalingTypeRequested, // "up" "down" or null.  last scaling action decided by this node
-        timestamp: Date.now() / 1000,
+        timestamp: shardusGetTime() / 1000,
         txInjected,
         txApplied,
         txRejected,
@@ -412,7 +412,7 @@ class Reporter {
   }
 
   consoleReport() {
-    const time = Date.now()
+    const time = shardusGetTime()
     let delta = time - this.lastTime
     delta = delta * 0.001
     const txInjected = this.statistics ? this.statistics.getPreviousElement('txInjected') : 0

@@ -658,14 +658,14 @@ class Storage {
   // async addAcceptedTransactions2 (acceptedTransactions) {
   //   this._checkInit()
   //   try {
-  //     // await this._create(this.storageModels.acceptedTxs, acceptedTransactions) //, Date.now(), Date.now(),
+  //     // await this._create(this.storageModels.acceptedTxs, acceptedTransactions) //, shardusGetTime(), shardusGetTime(),
   //     // await new Promise(resolve => this.db.run("INSERT INTO acceptedTxs ('id','timestamp','data','status','receipt','createdAt','updatedAt') VALUES (?, ?2, ?3, ?3, ?4, ?5, ?6, ?7)",
-  //     //   [acceptedTransactions.id, acceptedTransactions.timestamp, acceptedTransactions.data, acceptedTransactions.status, acceptedTransactions.receipt, Date.now(), Date.now()],
+  //     //   [acceptedTransactions.id, acceptedTransactions.timestamp, acceptedTransactions.data, acceptedTransactions.status, acceptedTransactions.receipt, shardusGetTime(), shardusGetTime()],
   //     //   resolve))
 
   //     // if (logFlags.console) console.log(' data: ' + JSON.stringify(acceptedTransactions.data))
   //     await this.run(`INSERT INTO acceptedTxs (id,timestamp,data,status,receipt,createdAt,updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  //       [acceptedTransactions.id, acceptedTransactions.timestamp, stringify(acceptedTransactions.data), acceptedTransactions.status, stringify(acceptedTransactions.receipt), Date.now(), Date.now()])
+  //       [acceptedTransactions.id, acceptedTransactions.timestamp, stringify(acceptedTransactions.data), acceptedTransactions.status, stringify(acceptedTransactions.receipt), shardusGetTime(), shardusGetTime()])
 
   //     // INSERT INTO `acceptedTxs`(`id`,`timestamp`,`data`,`status`,`receipt`,`createdAt`,`updatedAt`) VALUES (770270327989,0,'','','','','');
   //   } catch (e) {

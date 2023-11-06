@@ -3,6 +3,7 @@ import * as Context from '../p2p/Context'
 import * as utils from '../utils'
 import Crypto from '../crypto'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { getNetworkTimeOffset, shardusGetTime } from '../network'
 
 type CounterMap = Map<string, CounterNode>
 interface CounterNode {
@@ -36,7 +37,7 @@ class NestedCounters {
       const arrayReport = this.arrayitizeAndSort(this.eventCounters)
 
       // TODO: This doesn't return the counts to the caller
-      res.write(`${Date.now()}\n`)
+      res.write(`Counts at time: ${shardusGetTime()} offset: ${getNetworkTimeOffset()}\n`)
 
       this.printArrayReport(arrayReport, res, 0)
       res.end()
@@ -45,13 +46,13 @@ class NestedCounters {
 
     Context.network.registerExternalGet('counts-reset', isDebugModeMiddleware, (req, res) => {
       this.eventCounters = new Map()
-      res.write(`counts reset ${Date.now()}`)
+      res.write(`counts reset ${shardusGetTime()} offset: ${getNetworkTimeOffset()}`)
       res.end()
     })
 
     Context.network.registerExternalGet('rare-counts-reset', isDebugModeMiddleware, (req, res) => {
       this.rareEventCounters = new Map()
-      res.write(`Rare counts reset ${Date.now()}`)
+      res.write(`Rare counts reset ${shardusGetTime()} offset: ${getNetworkTimeOffset()}`)
       res.end()
     })
 

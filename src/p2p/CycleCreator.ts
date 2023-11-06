@@ -25,6 +25,7 @@ import { errorToStringFull, formatErrorMessage } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { randomBytes } from '@shardus/crypto-utils'
 import { digestCycle, syncNewCycles } from './Sync'
+import { shardusGetTime } from '../network'
 
 /** CONSTANTS */
 
@@ -537,7 +538,7 @@ async function runQ4() {
   // Compare your cert for this cycle with the network
   const myC = currentCycle
   const myQ = currentQuarter
-  const enterTime = Date.now()
+  const enterTime = shardusGetTime()
   const cycleDuration = config.p2p.cycleDuration * SECOND
   try {
     let matched
@@ -550,7 +551,7 @@ async function runQ4() {
           return
         }
         await utils.sleep(100)
-        if (enterTime + cycleDuration < Date.now()) {
+        if (enterTime + cycleDuration < shardusGetTime()) {
           /* prettier-ignore */ warn( `In Q4 waited ${config.p2p.cycleDuration} seconds for compareCycleCert with DESIRED_CERT_MATCHES of ${DESIRED_CERT_MATCHES}` )
           //profilerInstance.profileSectionEnd('CycleCreator-runQ4')
           //return
@@ -748,7 +749,7 @@ function currentCycleQuarterByTime(record: P2P.CycleCreatorTypes.CycleRecord) {
   const quarterDuration = cycleDuration / 4
   const start = record.start * SECOND + cycleDuration
 
-  const now = Date.now()
+  const now = shardusGetTime()
   const elapsed = now - start
   const elapsedQuarters = elapsed / quarterDuration
 
@@ -793,7 +794,7 @@ export function schedule<T, U extends unknown[]>(
   ...args: U
 ) {
   return new Promise<void>((resolve) => {
-    const now = Date.now()
+    const now = shardusGetTime()
     if (now >= time) {
       if (now - time <= runEvenIfLateBy) {
         setImmediate(async () => {

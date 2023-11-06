@@ -14,6 +14,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import { OpaqueTransaction } from '../shardus/shardus-types'
+import { shardusGetTime } from '../network'
 
 /** ROUTES */
 // [TODO] - need to add validattion of types to the routes
@@ -222,14 +223,14 @@ export function processReceipt(receipt: P2P.GlobalAccountsTypes.Receipt) {
   tracker.timestamp = receipt.tx.when
   if (tracker.gossiped) return false
   Context.shardus.put(receipt.tx.value as OpaqueTransaction, false, true)
-  /* prettier-ignore */ if (logFlags.console) console.log(`Processed set-global receipt: ${JSON.stringify(receipt)} now:${Date.now()}`)
+  /* prettier-ignore */ if (logFlags.console) console.log(`Processed set-global receipt: ${JSON.stringify(receipt)} now:${shardusGetTime()}`)
   tracker.gossiped = true
   attemptCleanup()
   return true
 }
 
 export function attemptCleanup() {
-  const now = Date.now()
+  const now = shardusGetTime()
   if (now - lastClean < 60000) return
   lastClean = now
 

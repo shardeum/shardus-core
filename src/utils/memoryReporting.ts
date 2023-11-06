@@ -9,6 +9,7 @@ import process, { resourceUsage } from 'process'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import * as NodeList from '../p2p/NodeList'
 import { spawn } from 'child_process'
+import { getNetworkTimeOffset, shardusGetTime } from '../network'
 
 type CounterMap = Map<string, CounterNode>
 interface CounterNode {
@@ -45,7 +46,7 @@ class MemoryReporting {
     Context.network.registerExternalGet('memory', isDebugModeMiddleware, (req, res) => {
       const toMB = 1 / 1000000
       const report = process.memoryUsage()
-      res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
+      res.write(`System Memory Report.  Timestamp: ${shardusGetTime()}\n`)
       res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
       res.write(`heapTotal: ${(report.heapTotal * toMB).toFixed(2)} MB\n`)
       res.write(`heapUsed: ${(report.heapUsed * toMB).toFixed(2)} MB\n`)
@@ -63,7 +64,7 @@ class MemoryReporting {
 
       const toMB = 1 / 1000000
       const report = process.memoryUsage()
-      res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
+      res.write(`System Memory Report.  Timestamp: ${shardusGetTime()}\n`)
       res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
       res.write(`heapTotal: ${(report.heapTotal * toMB).toFixed(2)} MB\n`)
       res.write(`heapUsed: ${(report.heapUsed * toMB).toFixed(2)} MB\n`)
@@ -128,7 +129,7 @@ class MemoryReporting {
     })
 
     Context.network.registerExternalGet('memory-gc', isDebugModeMiddleware, (req, res) => {
-      res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
+      res.write(`System Memory Report.  Timestamp: ${shardusGetTime()}\n`)
       try {
         if (global.gc) {
           global.gc()
@@ -143,7 +144,7 @@ class MemoryReporting {
     })
 
     Context.network.registerExternalGet('scaleFactor', isDebugModeMiddleware, (req, res) => {
-      res.write(`Scale debug  Timestamp: ${Date.now()}\n`)
+      res.write(`Scale debug  Timestamp: ${shardusGetTime()} offset: ${getNetworkTimeOffset()} \n`)
       try {
         res.write(`CycleAutoScale.  ${CycleCreator.scaleFactor}`)
       } catch (e) {
