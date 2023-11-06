@@ -754,7 +754,8 @@ export async function checkAndUpdateTimeSyncedOffset(timeServers) {
         timeout: 10000,
       })
       //update our offset convert from seconds to MS
-      ntpOffsetMs = Math.floor(time.t * 1000)
+      //docs are wrong... time.t seems to be in ms
+      ntpOffsetMs = Math.floor(time.t)
       const isInRange = time.t <= config.p2p.syncLimit
 
       //check if ntpOffsetMs is a number
