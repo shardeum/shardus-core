@@ -97,16 +97,17 @@ function makeRobustQueryCall<T>(nodes: ActiveNode[], endpointName: string): Robu
 function attemptSimpleFetch<T>(
   node: ActiveNode,
   endpointName: string,
-  params: Record<string, string> = {}
+  params: Record<string, string> = {},
+  timeout = 1000
 ): ResultAsync<T, Error> {
-  let url = `${node.ip}:${node.port}/${endpointName}`;
+  let url = `${node.ip}:${node.port}/${endpointName}`
   if (params) {
-    const encodedParams = new URLSearchParams(params).toString();
-    url += `?${encodedParams}`;
+    const encodedParams = new URLSearchParams(params).toString()
+    url += `?${encodedParams}`
   }
 
   return ResultAsync.fromPromise(
-    attempt(async () => await http.get(url), {
+    attempt(async () => await http.get(url, false, timeout), {
       maxRetries: MAX_RETRIES,
       logPrefix: `syncv2-simple-fetch-${endpointName}`,
       logger: mainLogger,
@@ -123,7 +124,7 @@ export function robustQueryForCycleRecordHash(nodes: ActiveNode[]): RobustQueryR
 /** Executes a robust query to retrieve the validator list hash and next cycle timestamp from the network. */
 export function robustQueryForValidatorListHash(
   nodes: ActiveNode[]
-): RobustQueryResultAsync<{ nodeListHash: hexstring, nextCycleTimestamp: number }> {
+): RobustQueryResultAsync<{ nodeListHash: hexstring; nextCycleTimestamp: number }> {
   return makeRobustQueryCall(nodes, 'validator-list-hash')
 }
 
@@ -142,29 +143,51 @@ export function robustQueryForStandbyNodeListHash(
 }
 
 /** Retrives the cycle by marker from the node. */
-export function getCycleDataFromNode(node: ActiveNode, expectedMarker: hexstring): ResultAsync<CycleRecord, Error> {
+export function getCycleDataFromNode(
+  node: ActiveNode,
+  expectedMarker: hexstring
+): ResultAsync<CycleRecord, Error> {
   return attemptSimpleFetch(node, 'cycle-by-marker', {
-    marker: expectedMarker
+    marker: expectedMarker,
   })
 }
 
 /** Gets the full validator list from the specified node. */
-export function getValidatorListFromNode(node: ActiveNode, expectedHash: hexstring): ResultAsync<Validator[], Error> {
-  return attemptSimpleFetch(node, 'validator-list', {
-    hash: expectedHash,
-  })
+export function getValidatorListFromNode(
+  node: ActiveNode,
+  expectedHash: hexstring
+): ResultAsync<Validator[], Error> {
+  return attemptSimpleFetch(
+    node,
+    'validator-list',
+    {
+      hash: expectedHash,
+    },
+    10000
+  )
 }
 
 /** Gets the full archiver list from the specified archiver. */
-export function getArchiverListFromNode(node: ActiveNode, expectedHash: hexstring): ResultAsync<Archiver[], Error> {
+export function getArchiverListFromNode(
+  node: ActiveNode,
+  expectedHash: hexstring
+): ResultAsync<Archiver[], Error> {
   return attemptSimpleFetch(node, 'archiver-list', {
     hash: expectedHash,
   })
 }
 
 /** Gets the full standby list from the specified standby. */
-export function getStandbyNodeListFromNode(node: ActiveNode, expectedHash: hexstring): ResultAsync<JoinRequest[], Error> {
-  return attemptSimpleFetch(node, 'standby-list', {
-    hash: expectedHash,
-  })
+export function getStandbyNodeListFromNode(
+  node: ActiveNode,
+  expectedHash: hexstring
+): ResultAsync<JoinRequest[], Error> {
+  return attemptSimpleFetch(
+    node,
+    'standby-list',
+    {
+      hash: expectedHash,
+    },
+    10000 //TODO need to make this scale when there could be millions of entries
+  )
 }

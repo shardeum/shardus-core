@@ -500,6 +500,9 @@ export interface AttemptOptions {
 
   /** The logger to write to on failures. */
   logger?: Logger
+
+  /** optional timeout default 1000ms */
+  timeout?: number
 }
 
 export function generateUUID(): string {
