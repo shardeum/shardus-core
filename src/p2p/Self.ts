@@ -30,7 +30,7 @@ const deepCopy = rfdc()
 
 /** STATE */
 
-const startTimestamp = shardusGetTime()
+const startTimestamp = Date.now()
 
 export const emitter = new events.EventEmitter()
 
