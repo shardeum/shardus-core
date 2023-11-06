@@ -763,7 +763,7 @@ export async function checkAndUpdateTimeSyncedOffset(timeServers) {
         ntpOffsetMs = 0
       }
 
-      /* prettier-ignore */ if (logFlags.important_as_fatal) mainLogger.info(`ntpOffset ${ntpOffsetMs} Offset is in range: ${isInRange} `)
+      /* prettier-ignore */ console.log(`ntpOffset ${ntpOffsetMs} Offset is in range: ${isInRange} time:${JSON.stringify(time)} host:${host}}`)
       return isInRange
     } catch (e) {
       mainLogger.warn(`Couldn't fetch ntp time from server at ${host}`)

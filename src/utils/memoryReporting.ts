@@ -152,6 +152,12 @@ class MemoryReporting {
       }
       res.end()
     })
+
+    Context.network.registerExternalGet('time-report', isDebugModeMiddleware, (req, res) => {
+      const timeReport = { now: Date.now, shardusGetTime: shardusGetTime(), offset: getNetworkTimeOffset() }
+      res.write(JSON.stringify(timeReport, null, 2))
+      res.end()
+    })
   }
 
   private addNodesToReport(): void {
