@@ -744,6 +744,13 @@ class ConnectTest extends EventEmitter {
   }
 }
 
+/**
+ * Gets and offset time from NTP servers.  Returns false if not within
+ * config.p2p.syncLimit although this is tuned wrong (too high)
+ * and not used
+ * @param timeServers
+ * @returns
+ */
 export async function checkAndUpdateTimeSyncedOffset(timeServers) {
   // Ignore time check if debug flag is set
   if (config.debug.ignoreTimeCheck === true) return true
@@ -758,7 +765,7 @@ export async function checkAndUpdateTimeSyncedOffset(timeServers) {
       //update our offset convert from seconds to MS
       //docs are wrong... time.t seems to be in ms
       ntpOffsetMs = Math.floor(time.t)
-      const isInRange = time.t <= config.p2p.syncLimit
+      const isInRange = time.t <= config.p2p.syncLimit * 1000 //convert config to ms
 
       lastNTPTimeObj = time
       //check if ntpOffsetMs is a number
