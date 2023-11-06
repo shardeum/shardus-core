@@ -9,7 +9,7 @@ import process, { resourceUsage } from 'process'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import * as NodeList from '../p2p/NodeList'
 import { spawn } from 'child_process'
-import { getNetworkTimeOffset, shardusGetTime } from '../network'
+import { getLastNTPObject, getNetworkTimeOffset, shardusGetTime } from '../network'
 
 type CounterMap = Map<string, CounterNode>
 interface CounterNode {
@@ -154,7 +154,12 @@ class MemoryReporting {
     })
 
     Context.network.registerExternalGet('time-report', isDebugModeMiddleware, (req, res) => {
-      const timeReport = { now: Date.now, shardusGetTime: shardusGetTime(), offset: getNetworkTimeOffset() }
+      const timeReport = {
+        now: Date.now,
+        shardusGetTime: shardusGetTime(),
+        offset: getNetworkTimeOffset(),
+        NPT: getLastNTPObject(),
+      }
       res.write(JSON.stringify(timeReport, null, 2))
       res.end()
     })

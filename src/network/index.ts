@@ -38,6 +38,8 @@ export let ipInfo: IPInfo
 
 let ntpOffsetMs: number = 0
 
+let lastNTPTimeObj = {}
+
 /** CLASS */
 
 export class NetworkClass extends EventEmitter {
@@ -758,6 +760,7 @@ export async function checkAndUpdateTimeSyncedOffset(timeServers) {
       ntpOffsetMs = Math.floor(time.t)
       const isInRange = time.t <= config.p2p.syncLimit
 
+      lastNTPTimeObj = time
       //check if ntpOffsetMs is a number
       if (isNaN(ntpOffsetMs)) {
         mainLogger.warn(`NTP Error time.t is NaN ${ntpOffsetMs}`)
@@ -786,6 +789,10 @@ export function getNetworkTimeOffset(): number {
     return ntpOffsetMs
   }
   return ntpOffsetMs
+}
+
+export function getLastNTPObject(): any {
+  return lastNTPTimeObj
 }
 
 async function discoverExternalIp(servers: string[]) {
