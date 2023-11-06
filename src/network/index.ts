@@ -748,6 +748,7 @@ class ConnectTest extends EventEmitter {
  * Gets and offset time from NTP servers.  Returns false if not within
  * config.p2p.syncLimit although this is tuned wrong (too high)
  * and not used
+ *
  * @param timeServers
  * @returns
  */
