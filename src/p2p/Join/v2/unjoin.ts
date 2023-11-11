@@ -99,8 +99,8 @@ export function drainNewUnjoinRequests(): hexstring[] {
 
 export function deleteStandbyNode(publicKey: hexstring): void {
   if (getStandbyNodesInfoMap().delete(publicKey)) {
-    console.log(`removed standby node ${publicKey}`)
+    console.log(`--removed standby node ${publicKey} count: ${getStandbyNodesInfoMap().size}`)
   } else {
-    console.log(`failed to remove standby node ${publicKey}`)
+    console.log(`--failed to remove standby node ${publicKey} count: ${getStandbyNodesInfoMap().size}`)
   }
 }

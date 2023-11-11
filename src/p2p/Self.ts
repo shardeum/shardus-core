@@ -245,9 +245,12 @@ export function startupV2(): Promise<boolean> {
             nestedCountersInstance.countEvent('p2p', 'detected standby list removal of our node')
             /* prettier-ignore */ if (logFlags.important_as_fatal) console.log('startupV2 our node has been removed from the standby list and will restart')
 
+            console.log(`self:startupV2.  standby=>not standby.  restarting`)
             //  todo this may not be the correct UX
             const message = `validator removed from standby list`
             emitter.emit('invoke-exit', `removed from standby list`, getCallstack(), message, true)
+            attemptJoiningRunning = false
+            return
           }
         }
 

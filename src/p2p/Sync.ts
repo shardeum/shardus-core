@@ -326,8 +326,8 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
     }
     if (cycle.standbyRemove) {
       for (const publicKey of cycle.standbyRemove) {
+        console.log(`sync:digestCycle cycle: ${cycle.counter} removed standby node ${publicKey}`)
         deleteStandbyNode(publicKey)
-        console.log(`cycle: ${cycle.counter} removed standby node ${publicKey}`)
       }
     }
   }

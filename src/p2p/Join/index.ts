@@ -20,7 +20,7 @@ import { routes } from './routes'
 import { drainNewJoinRequests, getLastHashedStandbyList, getStandbyNodesInfoMap, saveJoinRequest } from './v2'
 import { err, ok, Result } from 'neverthrow'
 import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
-import { drainNewUnjoinRequests } from './v2/unjoin'
+import { deleteStandbyNode, drainNewUnjoinRequests } from './v2/unjoin'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { updateNodeState } from '../Self'
 import { HTTPError } from 'got'
@@ -266,7 +266,9 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       const counterRefreshed = record.counter
 
       // finally, remove the node from the standby list
-      getStandbyNodesInfoMap().delete(publicKey)
+      //getStandbyNodesInfoMap().delete(publicKey)
+      console.log(`join:updateRecord cycle: ${record.counter} removed standby node ${publicKey}`)
+      deleteStandbyNode(publicKey)
 
       record.joinedConsensors.push({ ...nodeInfo, cycleJoined, counterRefreshed, id })
     }
