@@ -100,6 +100,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     useJoinProtocolV2: true,
     randomJoinRequestWait: 2000, //todo set this to 1000 before release
     standbyListCyclesTTL: 5, //todo release should be > 1000
+    standbyListMaxRemoveTTL: 3, //todo set this be 100 for production
   },
   ip: {
     externalIp: '0.0.0.0',

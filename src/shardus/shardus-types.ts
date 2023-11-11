@@ -743,6 +743,11 @@ export interface ServerConfiguration {
      * clean exit which will allow it to restart
      */
     standbyListCyclesTTL: number
+
+    /** This limitts the amount of nodes removed from the network in a single cycle.  This is to prevent a large number of nodes
+     * leaving all at once.  leaving is not a big deal but then they may try to sync/join again at the same time
+     */
+    standbyListMaxRemoveTTL: number
   }
   /** Server IP configuration */
   ip?: {

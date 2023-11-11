@@ -17,7 +17,7 @@ import { nestedCountersInstance } from '../../utils/nestedCounters'
 import { Logger } from 'log4js'
 import { calculateToAcceptV2 } from '../ModeSystemFuncs'
 import { routes } from './routes'
-import { drainNewJoinRequests, getStandbyNodesInfoMap, saveJoinRequest } from './v2'
+import { drainNewJoinRequests, getLastHashedStandbyList, getStandbyNodesInfoMap, saveJoinRequest } from './v2'
 import { err, ok, Result } from 'neverthrow'
 import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
 import { drainNewUnjoinRequests } from './v2/unjoin'
@@ -229,11 +229,17 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     }
 
     // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles
-    const standbyList = getStandbyNodesInfoMap()
-    for (const [publicKey, value] of standbyList.entries()) {
+    const standbyList = getLastHashedStandbyList()
+    let removedTTLCount = 0
+    for (const joinRequest of standbyList) {
       const maxAge = 1000 * record.duration * config.p2p.standbyListCyclesTTL
-      if (value.nodeInfo.joinRequestTimestamp < Date.now() - maxAge) {
-        record.standbyRemove.push(publicKey)
+      if (joinRequest.nodeInfo.joinRequestTimestamp < Date.now() - maxAge) {
+        const key = joinRequest.nodeInfo.publicKey
+        record.standbyRemove.push(key)
+        removedTTLCount++
+        if (removedTTLCount > config.p2p.standbyListMaxRemoveTTL) {
+          break
+        }
       }
     }
 
