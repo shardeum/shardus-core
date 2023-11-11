@@ -232,16 +232,17 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     const standbyList = getLastHashedStandbyList()
     let removedTTLCount = 0
     for (const joinRequest of standbyList) {
-      const maxAge = 1000 * record.duration * config.p2p.standbyListCyclesTTL
-      if (joinRequest.nodeInfo.joinRequestTimestamp < Date.now() - maxAge) {
+      const maxAge = record.duration * config.p2p.standbyListCyclesTTL
+      if (record.start - joinRequest.nodeInfo.joinRequestTimestamp > maxAge) {
         const key = joinRequest.nodeInfo.publicKey
         record.standbyRemove.push(key)
         removedTTLCount++
-        if (removedTTLCount > config.p2p.standbyListMaxRemoveTTL) {
+        if (removedTTLCount >= config.p2p.standbyListMaxRemoveTTL) {
           break
         }
       }
     }
+    console.log(`cycle number: ${record.counter}  removed list: ${record.standbyRemove} `)
 
     record.standbyAdd.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
     record.standbyRemove.sort()

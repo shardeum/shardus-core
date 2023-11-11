@@ -1,16 +1,16 @@
-import { SignedObject } from "@shardus/types/build/src/p2p/P2PTypes";
+import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import { crypto } from '../../Context'
-import { err, ok, Result } from "neverthrow";
-import { hexstring } from "@shardus/types";
+import { err, ok, Result } from 'neverthrow'
+import { hexstring } from '@shardus/types'
 import * as utils from '../../../utils'
 import * as http from '../../../http'
 import * as NodeList from '../../NodeList'
-import { getStandbyNodesInfoMap } from ".";
-import { getActiveNodesFromArchiver, getRandomAvailableArchiver } from "../../Utils";
+import { getStandbyNodesInfoMap } from '.'
+import { getActiveNodesFromArchiver, getRandomAvailableArchiver } from '../../Utils'
 
 /**
-  * A request to leave the network's standby node list.
-  */
+ * A request to leave the network's standby node list.
+ */
 export type UnjoinRequest = SignedObject<{
   publicKey: hexstring
 }>
@@ -19,11 +19,11 @@ export type UnjoinRequest = SignedObject<{
 const newUnjoinRequests: Set<hexstring> = new Set()
 
 /**
-  * Submits a request to leave the network's standby node list.
-  */
+ * Submits a request to leave the network's standby node list.
+ */
 export async function submitUnjoin(): Promise<Result<void, Error>> {
   const unjoinRequest = crypto.sign({
-    publicKey: crypto.keypair.publicKey
+    publicKey: crypto.keypair.publicKey,
   })
 
   const archiver = getRandomAvailableArchiver()
@@ -42,13 +42,13 @@ export async function submitUnjoin(): Promise<Result<void, Error>> {
 }
 
 /**
-  * Process a new unjoin request, adding it to the set of new unjoin requests
-  * that will be recorded in the next cycle.
-  *
-  * Returns with an error if the unjoin request is invalid.
-  */
+ * Process a new unjoin request, adding it to the set of new unjoin requests
+ * that will be recorded in the next cycle.
+ *
+ * Returns with an error if the unjoin request is invalid.
+ */
 export function processNewUnjoinRequest(unjoinRequest: UnjoinRequest): Result<void, Error> {
-  console.log("processing unjoin request for", unjoinRequest.publicKey)
+  console.log('processing unjoin request for', unjoinRequest.publicKey)
 
   // validate the unjoin request and then add it if it is valid
   return validateUnjoinRequest(unjoinRequest).map(() => {
@@ -57,8 +57,8 @@ export function processNewUnjoinRequest(unjoinRequest: UnjoinRequest): Result<vo
 }
 
 /**
-  * Validates an unjoin request by its signature.
-  */
+ * Validates an unjoin request by its signature.
+ */
 export function validateUnjoinRequest(unjoinRequest: UnjoinRequest): Result<void, Error> {
   // ignore if the unjoin request already exists
   if (newUnjoinRequests.has(unjoinRequest.publicKey)) {
@@ -68,13 +68,19 @@ export function validateUnjoinRequest(unjoinRequest: UnjoinRequest): Result<void
   // ignore if the unjoin request is from a node that is active
   const foundInActiveNodes = NodeList.byPubKey.has(unjoinRequest.publicKey)
   if (foundInActiveNodes) {
-    return err(new Error(`unjoin request from ${unjoinRequest.publicKey} is from an active node that can't unjoin`))
+    return err(
+      new Error(`unjoin request from ${unjoinRequest.publicKey} is from an active node that can't unjoin`)
+    )
   }
 
   // ignore if the unjoin request is from a node that is not in standby
   const foundInStandbyNodes = getStandbyNodesInfoMap().has(unjoinRequest.publicKey)
   if (!foundInStandbyNodes) {
-    return err(new Error(`unjoin request from ${unjoinRequest.publicKey} is from a node not in standby (doesn't exist?)`))
+    return err(
+      new Error(
+        `unjoin request from ${unjoinRequest.publicKey} is from a node not in standby (doesn't exist?)`
+      )
+    )
   }
 
   // lastly, verify the signature of the join request
@@ -92,5 +98,9 @@ export function drainNewUnjoinRequests(): hexstring[] {
 }
 
 export function deleteStandbyNode(publicKey: hexstring): void {
-  getStandbyNodesInfoMap().delete(publicKey)
+  if (getStandbyNodesInfoMap().delete(publicKey)) {
+    console.log(`removed standby node ${publicKey}`)
+  } else {
+    console.log(`failed to remove standby node ${publicKey}`)
+  }
 }
