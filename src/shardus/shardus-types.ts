@@ -737,6 +737,12 @@ export interface ServerConfiguration {
      * for example the nodes trying to join do not have the same cycle time as the network
      */
     randomJoinRequestWait: number
+
+    /** number of cycles a node can age while in the standby list.  when it has been in the list beyond this time
+     * it is added to standbyRemove and removed from the list.  The waiting node will detect this and do a
+     * clean exit which will allow it to restart
+     */
+    standbyListCyclesTTL: number
   }
   /** Server IP configuration */
   ip?: {

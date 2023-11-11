@@ -227,6 +227,16 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     for (const publicKey of drainNewUnjoinRequests()) {
       record.standbyRemove.push(publicKey)
     }
+
+    // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles
+    const standbyList = getStandbyNodesInfoMap()
+    for (const [publicKey, value] of standbyList.entries()) {
+      const maxAge = 1000 * record.duration * config.p2p.standbyListCyclesTTL
+      if (value.nodeInfo.joinRequestTimestamp < Date.now() - maxAge) {
+        record.standbyRemove.push(publicKey)
+      }
+    }
+
     record.standbyAdd.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
     record.standbyRemove.sort()
 

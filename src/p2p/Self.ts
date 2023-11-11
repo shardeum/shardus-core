@@ -26,6 +26,7 @@ import { getRandomAvailableArchiver, SeedNodesList } from './Utils'
 import * as CycleChain from './CycleChain'
 import rfdc from 'rfdc'
 import { shardusGetTime } from '../network'
+import getCallstack from '../utils/getCallstack'
 const deepCopy = rfdc()
 
 /** STATE */
@@ -57,6 +58,9 @@ let mode = null
   SYNCING -> ACTIVE = Node has synced and is now active
 */
 let state = P2P.P2PTypes.NodeStatus.INITIALIZING
+
+// This starts false and once we detect our node is in standby we set it to true.
+let standbyFlagSet = false
 
 /** ROUTES */
 
@@ -141,7 +145,10 @@ export function startupV2(): Promise<boolean> {
       }
     }
 
-    // Function to attempt to join the network
+    // This funciton will be called repeatedly until the node is accepted to become an active node
+    // It has two phases the first phase is to wait for isOnStandbyList to be come true
+    // which indicates we are now on the standby list (per the consenced cycle record)
+    // Then the node will wait for and "id" the presense of an id indicates we have been selected to become an active node
     const attemptJoining = async (): Promise<void> => {
       // Prevent scheduler from running multiple times
       if (attemptJoiningRunning) {
@@ -187,6 +194,12 @@ export function startupV2(): Promise<boolean> {
         // Query network for node status
         const resp = await Join.fetchJoinedV2(activeNodes)
 
+        // note the list below is in priority order of what operation is the most important
+        // mainly this matters on something like our node being selected to join but also on the
+        // same cycle could be cut due to version
+
+        // If we see and id with a real value then our node has been selected to go active
+        // start the syncing process and stop looping the attemptJoining function
         if (resp?.id) {
           id = resp.id
           await enterSyncingState()
@@ -194,11 +207,16 @@ export function startupV2(): Promise<boolean> {
           return
         }
 
+        // If we see that isOnStandbyList is true then we are on standby.
+        // If our state is not STANDBY yet set it to STANDBY (this is mainly for operator CLI purposes)
+        // Note that attemptJoining isn't just to get on the standby list, but also
+        // we will be checking above to see when our node is selected to go active
         if (resp?.isOnStandbyList === true) {
-          if(state !== P2P.P2PTypes.NodeStatus.STANDBY) {
+          if (state !== P2P.P2PTypes.NodeStatus.STANDBY) {
             updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
           }
-          // Call scheduler after 5 cycles
+          // Call scheduler after 5 cycles... does this mean it may be 5 cycles before we realized we were
+          // accepted to go active?
           attemptJoiningTimer = setTimeout(() => {
             attemptJoining()
           }, 5 * cycleDuration * 1000)
@@ -206,6 +224,10 @@ export function startupV2(): Promise<boolean> {
           return
         }
 
+        // If we see that isOnStandbyList is false then we are not on standby.
+        // we should call joinNetworkV2 to try to get on the standby list
+        // note this may not actually result in a message to the network, as the dapp
+        // may need to check stain and take other actions before it isReadyToJoin
         if (resp?.isOnStandbyList === false) {
           await joinNetworkV2(activeNodes)
           // Call scheduler after 2 cycles
@@ -215,6 +237,25 @@ export function startupV2(): Promise<boolean> {
           attemptJoiningRunning = false
           return
         }
+
+        // If we are in state stanby but suddenly isOnStandbyList becomes false again
+        // then we have been kicked from the stanby list.  The node should exit with error
+        if (state === P2P.P2PTypes.NodeStatus.STANDBY) {
+          if (resp?.isOnStandbyList === false) {
+            nestedCountersInstance.countEvent('p2p', 'detected standby list removal of our node')
+            /* prettier-ignore */ if (logFlags.important_as_fatal) console.log('startupV2 our node has been removed from the standby list and will restart')
+
+            //  todo this may not be the correct UX
+            const message = `validator removed from standby list`
+            emitter.emit('invoke-exit', `removed from standby list`, getCallstack(), message, true)
+          }
+        }
+
+        // iff we need to ever jump out of standby ??
+        // if (state === P2P.P2PTypes.NodeStatus.STANDBY) {
+        //   //check our own version against the latest version
+        //   //quite if we are wrong.
+        // }
 
         //this should help us feel safer that attemptJoining will not finish until we are ready for it to do so
         nestedCountersInstance.countEvent('p2p', 'attemptJoining: error got too far without an action')
