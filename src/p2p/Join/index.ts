@@ -17,7 +17,13 @@ import { nestedCountersInstance } from '../../utils/nestedCounters'
 import { Logger } from 'log4js'
 import { calculateToAcceptV2 } from '../ModeSystemFuncs'
 import { routes } from './routes'
-import { drainNewJoinRequests, getLastHashedStandbyList, getStandbyNodesInfoMap, saveJoinRequest } from './v2'
+import {
+  debugDumpJoinRequestList,
+  drainNewJoinRequests,
+  getLastHashedStandbyList,
+  getStandbyNodesInfoMap,
+  saveJoinRequest,
+} from './v2'
 import { err, ok, Result } from 'neverthrow'
 import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
 import { deleteStandbyNode, drainNewUnjoinRequests } from './v2/unjoin'
@@ -242,10 +248,18 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
         }
       }
     }
-    console.log(`cycle number: ${record.counter}  removed list: ${record.standbyRemove} `)
+    console.log(`join:updateRecord cycle number: ${record.counter}  removed list: ${record.standbyRemove} `)
 
     record.standbyAdd.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
     record.standbyRemove.sort()
+
+    debugDumpJoinRequestList(standbyList, `join.updateRecord: last-hashed ${record.counter}`)
+
+    debugDumpJoinRequestList(
+      Array.from(getStandbyNodesInfoMap().values()),
+      `join.updateRecord: standby-map ${record.counter}`
+    )
+    let standbyActivated = false
 
     // ... then add any standby nodes that are now allowed to join
     const selectedPublicKeys = drainSelectedPublicKeys()
@@ -267,11 +281,20 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
       // finally, remove the node from the standby list
       //getStandbyNodesInfoMap().delete(publicKey)
-      console.log(`join:updateRecord cycle: ${record.counter} removed standby node ${publicKey}`)
+      console.log(`join:updateRecord node-selcted cycle: ${record.counter} removed standby node ${publicKey}`)
       deleteStandbyNode(publicKey)
+      standbyActivated = true
 
       record.joinedConsensors.push({ ...nodeInfo, cycleJoined, counterRefreshed, id })
     }
+
+    //if we activated any standby nodes re-log the list
+    if (standbyActivated)
+      debugDumpJoinRequestList(
+        Array.from(getStandbyNodesInfoMap().values()),
+        `join.updateRecord: standby-map ${record.counter} some activated:${record.counter}`
+      )
+
     record.joinedConsensors.sort()
   } else {
     // old protocol handling

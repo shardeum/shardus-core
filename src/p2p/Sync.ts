@@ -15,7 +15,12 @@ import { robustQuery } from './Utils'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { byJoinOrder } from './NodeList'
-import { addStandbyJoinRequests } from './Join/v2'
+import {
+  addStandbyJoinRequests,
+  debugDumpJoinRequestList,
+  getLastHashedStandbyList,
+  getStandbyNodesInfoMap,
+} from './Join/v2'
 import * as JoinV2 from './Join/v2'
 import { deleteStandbyNode } from './Join/v2/unjoin'
 import { logFlags } from '../logger'
@@ -331,6 +336,13 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
       }
     }
   }
+
+  debugDumpJoinRequestList(
+    Array.from(getStandbyNodesInfoMap().values()),
+    `sync.digestCycle: standby-map ${cycle.counter}`
+  )
+  const standbyList = getLastHashedStandbyList()
+  debugDumpJoinRequestList(standbyList, `sync.digestCycle: last-hashed ${cycle.counter}`)
 
   CycleChain.append(cycle)
 

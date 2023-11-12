@@ -161,6 +161,17 @@ export function isOnStandbyList(publicKey: string): boolean {
   }
 }
 
+export function debugDumpJoinRequestList(list: JoinRequest[], message: string): void {
+  list.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
+  //let getSortedStandbyNodeList = JoinV2.getSortedStandbyJoinRequests()
+  const result = list.map((node) => ({
+    pubKey: node.nodeInfo.publicKey,
+    //ip: node.nodeInfo.externalIp,
+    port: node.nodeInfo.externalPort,
+  }))
+  console.log(`Standby list:${list.length} `, message, stringifyReduce(result))
+}
+
 /**
  * Handles unjoining from the network.
  */
