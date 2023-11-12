@@ -1,4 +1,5 @@
 import { P2P } from '@shardus/types'
+import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 export type Node = P2P.NodeListTypes.Node
 export type Cycle = P2P.CycleCreatorTypes.CycleRecord
 //import { RequestHandler } from "express"; //express was causing problems.
@@ -318,6 +319,7 @@ export interface App {
   updateNetworkChangeQueue?: (account: WrappedData, appData: any) => Promise<WrappedData[]>
   pruneNetworkChangeQueue?: (account: WrappedData, appData: any) => Promise<WrappedData[]>
   beforeStateAccountFilter?: (account: WrappedData) => boolean
+  canStayOnStandby: (joinInfo: JoinRequest) => { canStay: boolean; reason: string }
 }
 
 export interface TransactionKeys {
@@ -748,6 +750,11 @@ export interface ServerConfiguration {
      * leaving all at once.  leaving is not a big deal but then they may try to sync/join again at the same time
      */
     standbyListMaxRemoveTTL: number
+
+    /** remove nodes form the standb list that have been in for too long (standbyListCyclesTTL) */
+    standbyAgeScrub: boolean
+    /** remove nodes from the list that are the wrong version */
+    standbyVersionScrub: boolean
   }
   /** Server IP configuration */
   ip?: {

@@ -47,6 +47,7 @@ import { startSaving } from './saveConsoleOutput'
 import { isDebugMode } from '../debug'
 import * as JoinV2 from '../p2p/Join/v2'
 import { getNetworkTimeOffset, shardusGetTime } from '../network'
+import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -1993,6 +1994,11 @@ class Shardus extends EventEmitter {
           appData: any
         ) => application.pruneNetworkChangeQueue(account, appData)
       }
+      if (typeof application.canStayOnStandby === 'function') {
+        applicationInterfaceImpl.canStayOnStandby = (joinInfo: JoinRequest) =>
+          application.canStayOnStandby(joinInfo)
+      }
+
       if (typeof application.signAppData === 'function') {
         applicationInterfaceImpl.signAppData = async (
           type,

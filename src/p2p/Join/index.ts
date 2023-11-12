@@ -234,41 +234,65 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       record.standbyRemove.push(publicKey)
     }
 
-    // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles
-    const standbyList = getLastHashedStandbyList()
-    let removedTTLCount = 0
-    const standbyListMap = getStandbyNodesInfoMap()
+    let standbyRemved_Age = 0
+    let standbyRemoved_joined = 0
+    let standbyRemoved_App = 0
     let skipped = 0
-    for (const joinRequest of standbyList) {
-      const maxAge = record.duration * config.p2p.standbyListCyclesTTL
-      if (record.start - joinRequest.nodeInfo.joinRequestTimestamp > maxAge) {
-        const key = joinRequest.nodeInfo.publicKey
+    const standbyList = getLastHashedStandbyList()
+    if (config.p2p.standbyAgeScrub) {
+      // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles
 
+      const standbyListMap = getStandbyNodesInfoMap()
+
+      for (const joinRequest of standbyList) {
+        const maxAge = record.duration * config.p2p.standbyListCyclesTTL
+        if (record.start - joinRequest.nodeInfo.joinRequestTimestamp > maxAge) {
+          const key = joinRequest.nodeInfo.publicKey
+
+          if (standbyListMap.has(key) === false) {
+            skipped++
+            continue
+          }
+
+          record.standbyRemove.push(key)
+          standbyRemved_Age++
+          if (standbyRemved_Age >= config.p2p.standbyListMaxRemoveTTL) {
+            break
+          }
+        }
+      }
+
+      for (const joinRequest of standbyList) {
+        const key = joinRequest.nodeInfo.publicKey
         if (standbyListMap.has(key) === false) {
           skipped++
           continue
         }
 
-        record.standbyRemove.push(key)
-        removedTTLCount++
-        if (removedTTLCount >= config.p2p.standbyListMaxRemoveTTL) {
-          break
+        const { canStay, reason } = shardus.app.canStayOnStandby(joinRequest)
+        if (canStay === false) {
+          record.standbyRemove.push(key)
+          console.log(
+            `join:updateRecord cycle number: ${record.counter} removed standby node ${key} reason: ${reason}`
+          )
+          standbyRemoved_App++
         }
       }
+
+      console.log(
+        `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${standbyRemved_Age}  removed list: ${record.standbyRemove} `
+      )
+      debugDumpJoinRequestList(standbyList, `join.updateRecord: last-hashed ${record.counter}`)
+
+      debugDumpJoinRequestList(
+        Array.from(getStandbyNodesInfoMap().values()),
+        `join.updateRecord: standby-map ${record.counter}`
+      )
     }
-    console.log(
-      `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${removedTTLCount}  removed list: ${record.standbyRemove} `
-    )
 
     record.standbyAdd.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
     record.standbyRemove.sort()
 
-    debugDumpJoinRequestList(standbyList, `join.updateRecord: last-hashed ${record.counter}`)
-
-    debugDumpJoinRequestList(
-      Array.from(getStandbyNodesInfoMap().values()),
-      `join.updateRecord: standby-map ${record.counter}`
-    )
     let standbyActivated = false
 
     // ... then add any standby nodes that are now allowed to join
@@ -294,16 +318,21 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       console.log(`join:updateRecord node-selcted cycle: ${record.counter} removed standby node ${publicKey}`)
       deleteStandbyNode(publicKey)
       standbyActivated = true
+      standbyRemoved_joined++
 
       record.joinedConsensors.push({ ...nodeInfo, cycleJoined, counterRefreshed, id })
     }
 
     //if we activated any standby nodes re-log the list
-    if (standbyActivated)
+    if (standbyActivated) {
       debugDumpJoinRequestList(
         Array.from(getStandbyNodesInfoMap().values()),
         `join.updateRecord: standby-map ${record.counter} some activated:${record.counter}`
       )
+    }
+    console.log(
+      `standbyRemved_Age: ${standbyRemved_Age} standbyRemoved_joined: ${standbyRemoved_joined} standbyRemoved_App: ${standbyRemoved_App}`
+    )
 
     record.joinedConsensors.sort()
   } else {

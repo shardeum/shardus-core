@@ -464,7 +464,7 @@ export function updateNodeState(updatedState: NodeStatus, because = ''): void {
     because: because,
   }
 
-  /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `stateupdate: ${updatedState} c:${CycleCreator.currentCycle}` )
+  /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `stateupdate: ${updatedState} c:${entry.newestCycleCounter}` )
 
   // changing status is infrequent, so log it always
   /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Node status changed to ${updatedState}:\n${JSON.stringify(entry, null, 2)}`)
