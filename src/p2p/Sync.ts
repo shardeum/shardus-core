@@ -337,12 +337,12 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
     }
   }
 
+  const standbyList = getLastHashedStandbyList()
+  debugDumpJoinRequestList(standbyList, `sync.digestCycle: last-hashed ${cycle.counter}`)
   debugDumpJoinRequestList(
     Array.from(getStandbyNodesInfoMap().values()),
     `sync.digestCycle: standby-map ${cycle.counter}`
   )
-  const standbyList = getLastHashedStandbyList()
-  debugDumpJoinRequestList(standbyList, `sync.digestCycle: last-hashed ${cycle.counter}`)
 
   CycleChain.append(cycle)
 

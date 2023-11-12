@@ -768,10 +768,10 @@ export async function handleGossip(payload, sender, tracker = '', msgSize = cNoS
 
   // Simulating bad network by dropping received gossip
   //   set the propability of dropping to a number between 0 to 1
-  if (Math.random() < 0.0) {
-    warn('Dropped gossip to simulate bad network')
-    return
-  }
+  // if (Math.random() < 0.0) {
+  //   warn('Dropped gossip to simulate bad network')
+  //   return
+  // }
 
   const type = payload.type
   const data = payload.data

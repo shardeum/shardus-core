@@ -237,10 +237,18 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles
     const standbyList = getLastHashedStandbyList()
     let removedTTLCount = 0
+    const standbyListMap = getStandbyNodesInfoMap()
+    let skipped = 0
     for (const joinRequest of standbyList) {
       const maxAge = record.duration * config.p2p.standbyListCyclesTTL
       if (record.start - joinRequest.nodeInfo.joinRequestTimestamp > maxAge) {
         const key = joinRequest.nodeInfo.publicKey
+
+        if (standbyListMap.has(key) === false) {
+          skipped++
+          continue
+        }
+
         record.standbyRemove.push(key)
         removedTTLCount++
         if (removedTTLCount >= config.p2p.standbyListMaxRemoveTTL) {
@@ -248,7 +256,9 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
         }
       }
     }
-    console.log(`join:updateRecord cycle number: ${record.counter}  removed list: ${record.standbyRemove} `)
+    console.log(
+      `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${removedTTLCount}  removed list: ${record.standbyRemove} `
+    )
 
     record.standbyAdd.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
     record.standbyRemove.sort()

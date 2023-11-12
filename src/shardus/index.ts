@@ -1518,6 +1518,7 @@ class Shardus extends EventEmitter {
     message: string,
     verboseRequired: boolean
   ): boolean {
+    //MAIN-NET disable this.
     if (this.stateManager.testFailChance(failChance, debugName, key, message, verboseRequired)) {
       return true
     } else {
