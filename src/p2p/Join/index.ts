@@ -239,11 +239,9 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     let standbyRemoved_App = 0
     let skipped = 0
     const standbyList = getLastHashedStandbyList()
+    const standbyListMap = getStandbyNodesInfoMap()
     if (config.p2p.standbyAgeScrub) {
       // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles
-
-      const standbyListMap = getStandbyNodesInfoMap()
-
       for (const joinRequest of standbyList) {
         const maxAge = record.duration * config.p2p.standbyListCyclesTTL
         if (record.start - joinRequest.nodeInfo.joinRequestTimestamp > maxAge) {
@@ -261,14 +259,14 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
           }
         }
       }
-
+    }
+    if (config.p2p.standbyVersionScrub) {
       for (const joinRequest of standbyList) {
         const key = joinRequest.nodeInfo.publicKey
         if (standbyListMap.has(key) === false) {
           skipped++
           continue
         }
-
         const { canStay, reason } = shardus.app.canStayOnStandby(joinRequest)
         if (canStay === false) {
           record.standbyRemove.push(key)
