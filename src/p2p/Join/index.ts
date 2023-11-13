@@ -355,14 +355,14 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
     // finally, remove the node from the standby list
 
     const publicKey = node.publicKey
-    console.log(`join:updateRecord node-selcted cycle: ${record.counter} removed standby node ${publicKey}`)
+    console.log(`join:parseRecord node-selcted cycle: ${record.counter} removed standby node ${publicKey}`)
     deleteStandbyNode(publicKey)
   }
 
   if (added.length > 0) {
     debugDumpJoinRequestList(
       Array.from(getStandbyNodesInfoMap().values()),
-      `join.updateRecord: standby-map ${record.counter} some activated:${record.counter}`
+      `join.parseRecord: standby-map ${record.counter} some activated:${record.counter}`
     )
   }
 
