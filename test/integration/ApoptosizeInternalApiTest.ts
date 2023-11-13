@@ -28,6 +28,7 @@ const node: ShardusTypes.Node = {
   cycleJoined: '',
   counterRefreshed: 0,
   id: '6b169279669234dc9c9c86a138b9aef217bf4f784d2c1593238f5dbc05c27677',
+  syncingTimestamp: Date.now(),
 }
 
 const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG
