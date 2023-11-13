@@ -149,7 +149,7 @@ class LoadDetection extends EventEmitter {
         this.statistics.setManualStat('netExternalDuty', dutyCycleLoad.netInternlDuty)
 
         let cpuPercent = memoryReportingInstance.cpuPercent()
-        this.statistics.setManualStat('cpuPercent', cpuPercent)
+        this.statistics.setFifoStat('cpuPercent', cpuPercent)
 
         let internalDutyAvg = this.statistics.getAverage('netInternalDuty')
         let externalDutyAvg = this.statistics.getAverage('netExternalDuty')

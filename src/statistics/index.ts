@@ -14,6 +14,7 @@ interface Statistics {
   watcherDefs: any
   timerDefs: { [name: string]: TimerRing }
   manualStatDefs: any[]
+  fifoStatDefs: any[]
   interval: NodeJS.Timeout
   snapshotWriteFns: any[]
   stream: Readable
@@ -22,7 +23,9 @@ interface Statistics {
   watchers: any
   timers: any
   manualStats: { [name: string]: ManualRing }
+  fifoStats: { [name: string]: FifoStats }
   ringOverrides: { [override: string]: number }
+  fifoOverrides: { [override: string]: number }
   countedEventMap: CountedEventMap
 }
 
@@ -35,13 +38,17 @@ class Statistics extends EventEmitter {
       watchers = {},
       timers = [],
       manualStats = [],
+      fifoStats = [],
       ringOverrides = {},
+      fifoOverrides = {},
     }: {
       counters: string[]
       watchers: any
       timers: any
       manualStats: string[]
+      fifoStats: string[]
       ringOverrides: { [override: string]: number }
+      fifoOverrides: { [override: string]: number }
     },
     context
   ) {
@@ -53,7 +60,9 @@ class Statistics extends EventEmitter {
     this.watcherDefs = watchers
     this.timerDefs = timers
     this.manualStatDefs = manualStats
+    this.fifoStatDefs = fifoStats
     this.ringOverrides = ringOverrides
+    this.fifoOverrides = fifoOverrides
     this.countedEventMap = new Map()
 
     this.initialize()
@@ -96,6 +105,7 @@ class Statistics extends EventEmitter {
     this.watchers = this._initializeWatchers(this.watcherDefs, this.context)
     this.timers = this._initializeTimers(this.timerDefs)
     this.manualStats = this._initializeManualStats(this.manualStatDefs, this.ringOverrides)
+    this.fifoStats = this._initializeFifoStats(this.fifoStatDefs, this.fifoOverrides)
   }
 
   getStream() {
@@ -195,6 +205,12 @@ class Statistics extends EventEmitter {
     //nestedCountersInstance.countEvent('statistics', manualStatName)
   }
 
+  setFifoStat(fifoStatName, value: number) {
+    const fifoStat = this.fifoStats[fifoStatName]
+    if (!fifoStat) throw new Error(`fifoStat '${fifoStatName}' is undefined.`)
+    fifoStat.save(value)
+  }
+
   // Returns the current count of the given CounterRing
   getCurrentCount(counterName) {
     const counter = this.counters[counterName]
@@ -232,6 +248,10 @@ class Statistics extends EventEmitter {
 
   // Returns the current average of all elements in the given WatcherRing, CounterRing, or TimerRing
   getAverage(name) {
+    const fifoHolder = this.fifoStats[name]
+    if (fifoHolder) {
+      return fifoHolder.average()
+    }
     const ringHolder =
       this.counters[name] || this.watchers[name] || this.timers[name] || this.manualStats[name]
     if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
@@ -239,6 +259,10 @@ class Statistics extends EventEmitter {
   }
 
   getMultiStatReport(name) {
+    const fifoHolder = this.fifoStats[name]
+    if (fifoHolder) {
+      return fifoHolder.multiStats()
+    }
     const ringHolder =
       this.counters[name] || this.watchers[name] || this.timers[name] || this.manualStats[name]
     if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
@@ -295,6 +319,18 @@ class Statistics extends EventEmitter {
       manualStats[name] = new ManualRing(count) //should it be a config
     }
     return manualStats
+  }
+
+  _initializeFifoStats(fifoStatsDefs = [], statsOverrides = {}) {
+    const fifoStats = {}
+    for (const name of fifoStatsDefs) {
+      let count = 240
+      if (statsOverrides[name] != null) {
+        count = statsOverrides[name]
+      }
+      fifoStats[name] = new FifoStats(count) //should it be a config
+    }
+    return fifoStats
   }
 
   _takeSnapshot() {
@@ -471,6 +507,65 @@ class TimerRing {
 
 interface ManualRing {
   ring: Ring
+}
+
+class FifoStats {
+  private items: any[]
+  private length: number
+
+  constructor(limit: number = 240) {
+    this.items = []
+    this.length = limit
+  }
+
+  // Add an item to the front of the queue
+  save(item: any): void {
+    this.items.unshift(item)
+
+    // Check if length has been exceeded
+    if (this.items.length > this.length) {
+      // Remove the oldest item (the last in the array)
+      this.items.pop()
+    }
+  }
+
+  // return average of all elements in the queue
+  average(): number {
+    let sum = 0
+    let total = 0
+    for (const element of this.items) {
+      if (_exists(element)) {
+        sum += Number(element)
+        total++
+      }
+    }
+    return total > 0 ? sum / total : 0
+  }
+
+  multiStats() {
+    let sum = 0
+    let total = 0
+    let min = Number.MAX_VALUE
+    let max = Number.MIN_VALUE
+    let allVals = []
+    for (const item of this.items) {
+      if (_exists(item)) {
+        let val = Number(item)
+        sum += val
+        total++
+
+        if (val < min) {
+          min = val
+        }
+        if (val > max) {
+          max = val
+        }
+        allVals.push(val)
+      }
+    }
+    let avg = total > 0 ? sum / total : 0
+    return { min, max, avg, allVals, sum }
+  }
 }
 
 class ManualRing {

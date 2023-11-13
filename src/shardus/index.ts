@@ -532,8 +532,10 @@ class Shardus extends EventEmitter {
           serverLoad: () => (this.loadDetection ? this.loadDetection.getCurrentLoad() : 0),
         },
         timers: ['txTimeInQueue'],
-        manualStats: ['netInternalDuty', 'netExternalDuty', 'cpuPercent'],
-        ringOverrides: { cpuPercent: 60 },
+        manualStats: ['netInternalDuty', 'netExternalDuty'],
+        fifoStats: ['cpuPercent'],
+        ringOverrides: {},
+        fifoOverrides: { cpuPercent: 240 },
       },
       this
     )
