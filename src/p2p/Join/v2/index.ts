@@ -63,8 +63,8 @@ export function init(): void {
 export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = false): void {
   if (logFlags.verbose) console.log('saving join request:', joinRequest)
 
-  // if first node, add to standby list immediately
-  if (persistImmediately) {
+  // if first node or node with golden ticket enabled, add to standby list immediately
+  if (persistImmediately || joinRequest.appJoinData?.adminCert?.goldenTicket === true) {
     standbyNodesInfo.set(joinRequest.nodeInfo.publicKey, joinRequest)
     return
   }

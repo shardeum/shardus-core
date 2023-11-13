@@ -760,6 +760,8 @@ export interface ServerConfiguration {
      * NTP gets us closer, but it will never be perfect
      */
     q1DelayPercent: number
+    /* Golden ticket enablement to allow nodes join the network without staking and have priority over other nodes */
+    goldenTicketEnabled: boolean
   }
   /** Server IP configuration */
   ip?: {

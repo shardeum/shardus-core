@@ -104,6 +104,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     standbyAgeScrub: true,
     standbyVersionScrub: true,
     q1DelayPercent: 0.125,
+    goldenTicketEnabled: true,
   },
   ip: {
     externalIp: '0.0.0.0',

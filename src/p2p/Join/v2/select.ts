@@ -3,7 +3,7 @@
  * to join the network.
  */
 
-import { crypto } from '../../Context'
+import { crypto, shardus } from '../../Context'
 import * as Self from '../../Self'
 import * as CycleChain from '../../CycleChain'
 import * as NodeList from '../../NodeList'
@@ -51,9 +51,17 @@ export function selectNodes(maxAllowed: number): void {
   // construct a list of objects that we'll sort by `selectionNum`. we'll use
   // the public key to get the join request associated with the public key and
   // inform the node later that it has been accepted
-  const objs: { publicKey: string; selectionNum: string }[] = []
+  const objs: {
+    publicKey: string
+    selectionNum: string
+    appJoinData?: Record<string, any> | null //appJoinData is required for golden ticket
+  }[] = []
   for (const [publicKey, info] of standbyNodesInfo) {
-    objs.push({ publicKey, selectionNum: info.selectionNum })
+    objs.push({
+      publicKey,
+      selectionNum: info.selectionNum,
+      appJoinData: info.appJoinData,
+    })
   }
 
   // sort the objects by their selection numbers
@@ -63,6 +71,15 @@ export function selectNodes(maxAllowed: number): void {
   for (let i = 0; i < objs.length && selectedPublicKeys.size < maxAllowed; i++) {
     // eslint-disable-next-line security/detect-object-injection
     selectedPublicKeys.add(objs[i].publicKey)
+  }
+
+  // If golden ticket is enabled, add nodes with adminCert + golden ticket to selectedPublicKeys if they are not already there
+  if (shardus.config.p2p.goldenTicketEnabled === true) {
+    for (const obj of objs) {
+      if (obj.appJoinData?.adminCert?.goldenTicket === true && !selectedPublicKeys.has(obj.publicKey)) {
+        selectedPublicKeys.add(obj.publicKey)
+      }
+    }
   }
 }
 
