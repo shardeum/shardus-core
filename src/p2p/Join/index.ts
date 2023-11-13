@@ -51,10 +51,10 @@ export function getAllowBogon(): boolean {
 
 let mode = null
 
-let hasSubmittedJoinRequest = false
-export function getHasSubmittedJoinRequest(): boolean {
-  return hasSubmittedJoinRequest
-}
+// let hasSubmittedJoinRequest = false
+// export function getHasSubmittedJoinRequest(): boolean {
+//   return hasSubmittedJoinRequest
+// }
 
 /** FUNCTIONS */
 
@@ -235,7 +235,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     }
 
     let standbyRemved_Age = 0
-    let standbyRemoved_joined = 0
+    //let standbyRemoved_joined = 0
     let standbyRemoved_App = 0
     let skipped = 0
     const standbyList = getLastHashedStandbyList()
@@ -291,7 +291,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     record.standbyAdd.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
     record.standbyRemove.sort()
 
-    let standbyActivated = false
+    //let standbyActivated = false
 
     // ... then add any standby nodes that are now allowed to join
     const selectedPublicKeys = drainSelectedPublicKeys()
@@ -313,23 +313,23 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
       // finally, remove the node from the standby list
       //getStandbyNodesInfoMap().delete(publicKey)
-      console.log(`join:updateRecord node-selcted cycle: ${record.counter} removed standby node ${publicKey}`)
-      deleteStandbyNode(publicKey)
-      standbyActivated = true
-      standbyRemoved_joined++
+      // console.log(`join:updateRecord node-selcted cycle: ${record.counter} removed standby node ${publicKey}`)
+      // deleteStandbyNode(publicKey)
+      // standbyActivated = true
+      // standbyRemoved_joined++
 
       record.joinedConsensors.push({ ...nodeInfo, cycleJoined, counterRefreshed, id })
     }
 
     //if we activated any standby nodes re-log the list
-    if (standbyActivated) {
-      debugDumpJoinRequestList(
-        Array.from(getStandbyNodesInfoMap().values()),
-        `join.updateRecord: standby-map ${record.counter} some activated:${record.counter}`
-      )
-    }
+    // if (standbyActivated) {
+    //   debugDumpJoinRequestList(
+    //     Array.from(getStandbyNodesInfoMap().values()),
+    //     `join.updateRecord: standby-map ${record.counter} some activated:${record.counter}`
+    //   )
+    // }
     console.log(
-      `standbyRemved_Age: ${standbyRemved_Age} standbyRemoved_joined: ${standbyRemoved_joined} standbyRemoved_App: ${standbyRemoved_App}`
+      `standbyRemved_Age: ${standbyRemved_Age} standbyRemoved_App: ${standbyRemoved_App}` //standbyRemoved_joined: ${standbyRemoved_joined}
     )
 
     record.joinedConsensors.sort()
@@ -352,6 +352,18 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
   for (const node of added) {
     node.syncingTimestamp = record.start
+    // finally, remove the node from the standby list
+
+    const publicKey = node.publicKey
+    console.log(`join:updateRecord node-selcted cycle: ${record.counter} removed standby node ${publicKey}`)
+    deleteStandbyNode(publicKey)
+  }
+
+  if (added.length > 0) {
+    debugDumpJoinRequestList(
+      Array.from(getStandbyNodesInfoMap().values()),
+      `join.updateRecord: standby-map ${record.counter} some activated:${record.counter}`
+    )
   }
 
   return {

@@ -59,9 +59,6 @@ let mode = null
 */
 let state = P2P.P2PTypes.NodeStatus.INITIALIZING
 
-// This starts false and once we detect our node is in standby we set it to true.
-let standbyFlagSet = false
-
 /** ROUTES */
 
 /** FUNCTIONS */
@@ -224,20 +221,6 @@ export function startupV2(): Promise<boolean> {
           return
         }
 
-        // If we see that isOnStandbyList is false then we are not on standby.
-        // we should call joinNetworkV2 to try to get on the standby list
-        // note this may not actually result in a message to the network, as the dapp
-        // may need to check stain and take other actions before it isReadyToJoin
-        if (resp?.isOnStandbyList === false) {
-          await joinNetworkV2(activeNodes)
-          // Call scheduler after 2 cycles
-          attemptJoiningTimer = setTimeout(() => {
-            attemptJoining()
-          }, 2 * cycleDuration * 1000)
-          attemptJoiningRunning = false
-          return
-        }
-
         // If we are in state stanby but suddenly isOnStandbyList becomes false again
         // then we have been kicked from the stanby list.  The node should exit with error
         if (state === P2P.P2PTypes.NodeStatus.STANDBY) {
@@ -252,6 +235,20 @@ export function startupV2(): Promise<boolean> {
             attemptJoiningRunning = false
             return
           }
+        }
+
+        // If we see that isOnStandbyList is false then we are not on standby.
+        // we should call joinNetworkV2 to try to get on the standby list
+        // note this may not actually result in a message to the network, as the dapp
+        // may need to check stain and take other actions before it isReadyToJoin
+        if (resp?.isOnStandbyList === false) {
+          await joinNetworkV2(activeNodes)
+          // Call scheduler after 2 cycles
+          attemptJoiningTimer = setTimeout(() => {
+            attemptJoining()
+          }, 2 * cycleDuration * 1000)
+          attemptJoiningRunning = false
+          return
         }
 
         // iff we need to ever jump out of standby ??
