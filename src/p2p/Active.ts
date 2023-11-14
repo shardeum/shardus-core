@@ -167,18 +167,19 @@ export function updateRecord(
             (item) => item.nodeId === node.id && item.activeTimestamp === node.activeTimestamp
           )
           if (included && included.length > 0) continue
-          const syncTime = node.activeTimestamp - node.joinRequestTimestamp
+          const syncTime = node.activeTimestamp - node.syncingTimestamp
 
           syncTimes.push({
             nodeId: node.id,
             activeTimestamp: node.activeTimestamp,
-            joinTimestamp: node.joinRequestTimestamp,
+            syncStartTimestamp: node.syncingTimestamp,
             syncTime,
             refreshedCounter: cycle.counter,
           })
           addedCount += 1
         }
 
+        // todo deprecate no refreshedConsensors post join v2 sync v2
         // collect sync time from refreshed active nodes
         for (const node of cycle.refreshedConsensors) {
           const included = syncTimes.filter(
@@ -190,7 +191,7 @@ export function updateRecord(
           syncTimes.push({
             nodeId: node.id,
             activeTimestamp: node.activeTimestamp,
-            joinTimestamp: node.joinRequestTimestamp,
+            syncStartTimestamp: node.joinRequestTimestamp,
             syncTime,
             refreshedCounter: cycle.counter,
           })
@@ -211,7 +212,7 @@ export function updateRecord(
     }
     if (syncTimes.length > 0) lastCheckedCycleForSyncTimes = syncTimes[0].refreshedCounter // updated last checked cycle
     const syncDurations = syncTimes
-      .map((syncTime) => syncTime.activeTimestamp - syncTime.joinTimestamp)
+      .map((syncTime) => syncTime.activeTimestamp - syncTime.syncStartTimestamp)
       .sort((a, b) => a - b)
     const medianIndex = Math.floor(syncDurations.length / 2)
     const medianSyncTime = syncDurations[medianIndex]
