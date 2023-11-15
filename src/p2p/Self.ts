@@ -457,11 +457,11 @@ export function updateNodeState(updatedState: NodeStatus, because = ''): void {
     isoDateTime: new Date().toISOString(),
     uptime: utils.readableDuration(startTimestamp),
     newestCycleCounter: (CycleChain.getNewest() && CycleChain.getNewest().counter) || null,
-    quarter: CycleCreator.currentCycle,
+    quarter: CycleCreator.currentCycle, //should this be current quarter?
     because: because,
   }
 
-  /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `stateupdate: ${updatedState} c:${entry.newestCycleCounter}` )
+  /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `stateupdate: ${updatedState} c:${entry.newestCycleCounter} q:${entry.quarter}` )
 
   // changing status is infrequent, so log it always
   /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Node status changed to ${updatedState}:\n${JSON.stringify(entry, null, 2)}`)

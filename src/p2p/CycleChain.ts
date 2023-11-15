@@ -4,6 +4,7 @@ import { hexstring, P2P } from '@shardus/types'
 import { nodes } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { logFlags } from '../logger'
+import { shardusGetTime } from '../network'
 
 /** STATE */
 
@@ -258,5 +259,18 @@ export function getDebug() {
 
 /** Returns the last appended cycle's marker. */
 export function getCurrentCycleMarker(): hexstring {
-    return currentCycleMarker
+  return currentCycleMarker
+}
+
+/**
+ * this gets the most recently finished cycle and puts it in a logs str wth message and time
+ * this cycle is never the most current one as we start working on the next as soon as we update
+ * newest
+ * @param msg
+ * @returns
+ */
+export function getNewestCycleInfoLogStr(msg: string): string {
+  let cycleNumber = newest ? newest.counter : -1
+  const res = `Cycle: ${cycleNumber} Time:${shardusGetTime()} ${msg}`
+  return res
 }

@@ -11,6 +11,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 let syncTimes = []
 let lastCheckedCycleForSyncTimes = 0
@@ -48,13 +49,20 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
     const isOrig = signer.id === sender
 
     // Only accept original txs in quarter 1
-    if (isOrig && CycleCreator.currentQuarter > 1) return
+    if (isOrig && CycleCreator.currentQuarter > 1) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:gossip-active CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
+      return
+    }
 
     // Do not forward gossip after quarter 2
-    if (!isOrig && CycleCreator.currentQuarter > 2) return
+    if (!isOrig && CycleCreator.currentQuarter > 2) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:gossip-active CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
+      return
+    }
 
-    if (addActiveTx(payload))
+    if (addActiveTx(payload)) {
       Comms.sendGossip('gossip-active', payload, tracker, sender, NodeList.byIdOrder, false)
+    }
   } finally {
     profilerInstance.scopedProfileSectionEnd('gossip-active')
   }
@@ -140,6 +148,9 @@ export function updateRecord(
     if (node) {
       activated.push(node.id)
       activatedPublicKeys.push(node.publicKey)
+    } else {
+      /* prettier-ignore */ warn(`active:updateRecord: node not found: ${publicKey}`)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:updateRecord node not found: ${publicKey}`) //remove perfore push
     }
   }
 
@@ -261,8 +272,12 @@ export function sendRequests() {
     const activeTx = crypto.sign(queuedRequest)
     queuedRequest = undefined
 
-    if (logFlags.p2pNonFatal) info(`Gossiping active request: ${JSON.stringify(activeTx)}`)
-    addActiveTx(activeTx)
+    if (logFlags.important_as_fatal) info(`Gossiping active request: ${JSON.stringify(activeTx)}`)
+    nestedCountersInstance.countEvent('p2p', `p2p:sendRequests Gossiping active request`)
+
+    if (addActiveTx(activeTx) === false) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:sendRequests failed to add our own request`)
+    }
     Comms.sendGossip('gossip-active', activeTx, '', null, NodeList.byIdOrder, true)
 
     // Check if we went active and try again if we didn't in 1 cycle duration
@@ -270,6 +285,7 @@ export function sendRequests() {
 
     Self.emitter.once('active', () => {
       info(`Went active!`)
+      nestedCountersInstance.countEvent('p2p', `p2p:sendRequests went active`)
       clearTimeout(activeTimeout)
     })
   }
@@ -297,9 +313,15 @@ function createActiveRequest(): P2P.ActiveTypes.ActiveRequest {
 }
 
 function addActiveTx(request: P2P.ActiveTypes.SignedActiveRequest) {
-  if (!request) return false
-  if (!validateActiveRequest(request)) return false
-  if (activeRequests.has(request.sign.owner)) return false
+  if (!request) {
+    return false
+  }
+  if (!validateActiveRequest(request)) {
+    return false
+  }
+  if (activeRequests.has(request.sign.owner)) {
+    return false
+  }
 
   activeRequests.set(request.sign.owner, request)
   return true
@@ -308,17 +330,23 @@ function addActiveTx(request: P2P.ActiveTypes.SignedActiveRequest) {
 function validateActiveRequest(request: P2P.ActiveTypes.SignedActiveRequest) {
   const node = NodeList.nodes.get(request.nodeId)
   if (!node) {
-    warn(`validateActiveRequest: node not found, nodeId: ${request.nodeId}`)
+    /* prettier-ignore */ warn(`validateActiveRequest: node not found, nodeId: ${request.nodeId}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:validateActiveRequest node not found ${request.nodeId}`) //remove perfore push
     return false
   }
   if (!crypto.verify(request, node.publicKey)) {
-    warn(`validateActiveRequest: bad signature, request: ${JSON.stringify(request)}`)
+    /* prettier-ignore */ warn(`validateActiveRequest: bad signature, request: ${JSON.stringify(request)} ${request.nodeId}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:validateActiveRequests bad signature ${request.nodeId}`) //remove perfore push
     return false
   }
   if (config.p2p.validateActiveRequests === true) {
     // Do not accept active request if node is already active
     const existing = NodeList.nodes.get(request.nodeId)
-    if (existing && existing.status === NodeStatus.ACTIVE) return false
+    if (existing && existing.status === NodeStatus.ACTIVE) {
+      /* prettier-ignore */ warn(`validateActiveRequest: already active , nodeId: ${request.nodeId}`)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:validateActiveRequest already active ${request.nodeId}`) //remove perfore push
+      return false
+    }
     // [TODO] Discuss and implement more active request validation
   }
   return true
