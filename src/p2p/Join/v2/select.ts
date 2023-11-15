@@ -77,6 +77,7 @@ export function selectNodes(maxAllowed: number): void {
   if (shardus.config.p2p.goldenTicketEnabled === true) {
     for (const obj of objs) {
       if (obj.appJoinData?.adminCert?.goldenTicket === true && !selectedPublicKeys.has(obj.publicKey)) {
+        /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('selecting golden ticket nodes from standbyNodesInfo')
         selectedPublicKeys.add(obj.publicKey)
       }
     }

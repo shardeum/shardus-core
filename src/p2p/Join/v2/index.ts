@@ -5,7 +5,7 @@
 
 import { hexstring } from '@shardus/types'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
-import { config, crypto } from '../../Context'
+import { config, crypto, shardus } from '../../Context'
 import * as CycleChain from '../../CycleChain'
 import * as Self from '../../Self'
 import rfdc from 'rfdc'
@@ -63,11 +63,21 @@ export function init(): void {
 export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = false): void {
   if (logFlags.verbose) console.log('saving join request:', joinRequest)
 
-  // if first node or node with golden ticket enabled, add to standby list immediately
-  if (persistImmediately || joinRequest.appJoinData?.adminCert?.goldenTicket === true) {
+  // if first node, add to standby list immediately
+  if (persistImmediately) {
     standbyNodesInfo.set(joinRequest.nodeInfo.publicKey, joinRequest)
     return
   }
+
+  // if golden ticket is enabled, add nodes with adminCert + golden ticket to standbyNodesInfo immediately
+  if (
+    shardus.config.p2p.goldenTicketEnabled === true &&
+    joinRequest.appJoinData?.adminCert?.goldenTicket === true
+  ) {
+    standbyNodesInfo.set(joinRequest.nodeInfo.publicKey, joinRequest)
+    return
+  }
+
   newJoinRequests.push(joinRequest)
 }
 
