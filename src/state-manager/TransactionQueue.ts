@@ -1008,6 +1008,39 @@ class TransactionQueue {
         //looks like this next line could be wiping out state from just above that used accountWrites
         //we have a task to refactor his code that needs to happen for executeInOneShard to work
         wrappedStates = {}
+
+        // Check if we received all data correctly
+        if (
+          queueEntry.collectedFinalData === undefined ||
+          Object.keys(queueEntry.collectedFinalData).length === 0
+        ) {
+          // We have not received the data to be commited from the execution group
+          this.mainLogger.debug(
+            'commitConsensedTransaction: We have not received the data to be commited from the execution group. Using fallback'
+          )
+
+          // Find nodes to ask data from
+          // Do we ask for all states from a single node or do we ask the home node for each state?
+          // For now asking a single node from execution group for all states
+          const nodeToAsk = queueEntry.executionGroup?.[0]
+
+          if (!nodeToAsk) {
+            throw new Error('commitConsensedTransaction: could not find node from execution group')
+          }
+
+          const response = await this.p2p.ask(nodeToAsk, 'request_tx_and_state')
+          for (const data of response.stateList) {
+            if (data == null) {
+              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`commitConsensedTransaction data == null`)
+              continue
+            }
+            if (queueEntry.collectedFinalData[data.accountId] == null) {
+              queueEntry.collectedFinalData[data.accountId] = data
+              /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('commitConsensedTransaction', `${queueEntry.logID}`, `commitConsensedTransaction addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
+            }
+          }
+        }
+
         /* eslint-disable security/detect-object-injection */
         for (const key of Object.keys(queueEntry.collectedFinalData)) {
           const finalAccount = queueEntry.collectedFinalData[key]
