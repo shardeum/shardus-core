@@ -2037,8 +2037,8 @@ class Shardus extends EventEmitter {
   _registerRoutes() {
     // DEBUG routes
     this.network.registerExternalPost('exit', isDebugModeMiddleware, async (req, res) => {
-      await this.shutdown()
       res.json({ success: true })
+      await this.shutdown()
     })
     this.network.registerExternalPost('exit-apop', isDebugModeMiddleware, async (req, res) => {
       apoptosizeSelf('Apoptosis called at exit-apop route')
