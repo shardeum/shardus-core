@@ -421,7 +421,7 @@ async function runQ1() {
 
   //we sleep for 1/8 of the quarter duration before we send messages to improve tolerance of
   //what cycle nodes think they are in
-  await utils.sleep(quarterDuration * 0.125)
+  await utils.sleep(quarterDuration * config.p2p.q1DelayPercent)
 
   // Tell submodules to sign and send their requests
   if (logFlags.p2pNonFatal) info('Triggering submodules to send requests...')
