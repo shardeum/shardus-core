@@ -34,7 +34,7 @@ import { shardusGetTime } from '../network'
 =======
 import { networkMode } from '../p2p/Modes'
 import ArchiverSyncTracker from './ArchiverSyncTracker'
-import { archivers } from '../p2p/Archivers'
+import { getArchiversList } from '../p2p/Archivers'
 import * as http from '../http'
 >>>>>>> d86961fb (Put the changes required for syncing data in the restore mode)
 
@@ -924,6 +924,7 @@ class AccountSync {
    * @returns GlobalAccountReportResp
    */
   async getRobustGlobalReport(tag = '', syncFromArchiver: boolean = false): Promise<GlobalAccountReportResp> {
+    console.log('getRobustGlobalReport start', tag, syncFromArchiver)
     if (!syncFromArchiver) {
       this.lastWinningGlobalReportNodes = []
     }
@@ -966,19 +967,15 @@ class AccountSync {
     const queryFnFromArchiver = async (
       archiver: Shardus.Archiver
     ): Promise<Partial<GlobalAccountReportResp> & { msg: string }> => {
+      const payload = {}
+      const signedPayload = this.crypto.sign(payload)
+      console.log('getGlobalAccountReportFromArchiver messsage', signedPayload)
+
       const getGlobalAccountReportFromArchiver = async () => {
-        const globalAccountReportArchiverUrl = `http://${archiver.ip}:${archiver.port}/get_globalaccountreport`
-        const payload = {}
-        this.crypto.sign(payload)
+        const globalAccountReportArchiverUrl = `http://${archiver.ip}:${archiver.port}/get_globalaccountreport_archiver`
 
         try {
-          const r = await http.post(
-            // `http://${randomArchiver.ip}:${randomArchiver.port}/get_account_data_archiver`,
-            globalAccountReportArchiverUrl,
-            payload,
-            false,
-            2000
-          )
+          const r = await http.post(globalAccountReportArchiverUrl, signedPayload, false, 2000)
           console.log('getGlobalAccountReportFromArchiver result', r)
           return r
         } catch (error) {
@@ -1032,7 +1029,7 @@ class AccountSync {
 
     let nodes: Shardus.Node[] | Shardus.Archiver[]
     if (syncFromArchiver) {
-      nodes = [...Object.values(archivers)]
+      nodes = getArchiversList()
       if (nodes.length === 0) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} no archivers available`)
         /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`no archivers available`)

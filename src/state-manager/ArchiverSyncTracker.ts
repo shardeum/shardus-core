@@ -7,10 +7,10 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import AccountSync from './AccountSync'
 import { logFlags } from '../logger'
 import { errorToStringFull } from '../utils'
-import { P2PModuleContext as P2P } from '../p2p/Context'
+import { P2PModuleContext as P2P, crypto } from '../p2p/Context'
 import { SyncTrackerInterface } from './NodeSyncTracker'
 import ArchiverDataSourceHelper from './ArchiverDataSourceHelper'
-import { archivers } from '../p2p/Archivers'
+import { getArchiversList } from '../p2p/Archivers'
 import * as http from '../http'
 
 export default class ArchiverSyncTracker implements SyncTrackerInterface {
@@ -209,11 +209,12 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
 
         //Get globals list and hash.
         const globalReport: GlobalAccountReportResp = await this.accountSync.getRobustGlobalReport(
-          'syncTrackerGlobal'
+          'syncTrackerGlobal',
+          true
         )
 
         // Added all archivers to the list of archivers to ask for data
-        this.archiverDataSourceHelper.initWithList([...Object.values(archivers)])
+        this.archiverDataSourceHelper.initWithList(getArchiversList())
 
         let hasAllGlobalData = false
 
@@ -236,21 +237,21 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
 
         if (this.accountSync.dataSourceTest === true) {
           if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData1') == false) {
-            throw new Error('out of account nodes to ask: dataSourceTest')
+            throw new Error('out of account archivers to ask: dataSourceTest')
           }
           while (this.accountSync.debugFail4) {
             await utils.sleep(1000)
             if (
               this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData1 debugFail4') == false
             ) {
-              throw new Error('out of account nodes to ask: dataSourceTest debugFail4')
+              throw new Error('out of account archivers to ask: dataSourceTest debugFail4')
             }
           }
         }
 
         //This normally should complete in one pass, but we allow 20 retries.
         //It can fail for a few reasons:
-        //  -the node asked for data fails to respond, or doesn't give us any/all accounts needed
+        //  -the archiver asked for data fails to respond, or doesn't give us any/all accounts needed
         //  -the global accounts we got back
         //
         while (hasAllGlobalData === false) {
@@ -261,20 +262,21 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
           }
           /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: syncStateDataGlobals hasAllGlobalData === false `)
 
-          // Node Precheck!
-          if (
-            this.accountSync.stateManager.isNodeValidForInternalMessage(
-              this.archiverDataSourceHelper.dataSourceArchiver.publicKey,
-              'syncStateDataGlobals',
-              true,
-              true
-            ) === false
-          ) {
-            if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncStateDataGlobals1') == false) {
-              throw new Error('out of account nodes to ask: syncStateDataGlobals1')
-            }
-            continue
-          }
+          // We might not need this for data syncing from archivers. but some kind of archiver precheck would be still good to have.
+          // // Node Precheck!
+          // if (
+          //   this.accountSync.stateManager.isNodeValidForInternalMessage(
+          //     this.archiverDataSourceHelper.dataSourceArchiver.publicKey,
+          //     'syncStateDataGlobals',
+          //     true,
+          //     true
+          //   ) === false
+          // ) {
+          //   if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncStateDataGlobals1') == false) {
+          //     throw new Error('out of account archivers to ask: syncStateDataGlobals1')
+          //   }
+          //   continue
+          // }
 
           //TODO, long term. need to support cases where we could have 100k+ global accounts, and be able to make
           //paged requests.
@@ -282,26 +284,46 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
 
           //Get accounts.
           const message = { accountIds: remainingAccountsToSync }
+          const signedMessage = crypto.sign(message)
+          console.log('getAccountDataByListFromArchiver message', signedMessage)
 
-          // TODO: added by Jai - Update this to use the new API from the archiver
-          // const result = await this.p2p.ask(
-          //   this.dataSourceHelper.dataSourceNode,
-          //   'get_account_data_by_list',
-          //   message
-          // )
-          let result
+          const getAccountDataByListFromArchiver = async (payload) => {
+            const dataSourceArchiver = this.archiverDataSourceHelper.dataSourceArchiver
+            const accountDataByListArchiverUrl = `http://${dataSourceArchiver.ip}:${dataSourceArchiver.port}/get_account_data_by_list_archiver`
+            try {
+              const result = await http.post(accountDataByListArchiverUrl, payload, false, 5000)
+              console.log('getAccountDataByListFromArchiver result', result)
+              return result
+            } catch (error) {
+              console.error('getAccountDataByListFromArchiver error', error)
+              return null
+            }
+          }
+
+          const result = await getAccountDataByListFromArchiver(signedMessage)
 
           if (result == null) {
             /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result == null')
             if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncStateDataGlobals2') == false) {
-              throw new Error('out of account nodes to ask: syncStateDataGlobals2')
+              throw new Error('out of account archivers to ask: syncStateDataGlobals1')
             }
             continue
           }
+
+          if (result.success === false) {
+            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result == success:false')
+            if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('ArchiverReponseFail') == false) {
+              throw new Error(
+                'out of account archivers to ask: syncStateDataGlobals- archiver success:false response'
+              )
+            }
+            continue
+          }
+
           if (result.accountData == null) {
             /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
             if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncStateDataGlobals3') == false) {
-              throw new Error('out of account nodes to ask: syncStateDataGlobals3')
+              throw new Error('out of account archivers to ask: syncStateDataGlobals3')
             }
             continue
           }
@@ -311,12 +333,12 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
           //Get globals list and hash (if changes then update said accounts and repeath)
           //diff the list and update remainingAccountsToSync
           // add any new accounts to globalAccounts
-          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: syncStateDataGlobals get_account_data_by_list ${utils.stringifyReduce(result)} `)
+          /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`ARCHIVER_DATASYNC: syncStateDataGlobals get_account_data_by_list_archiver ${utils.stringifyReduce(result)} `)
 
-          globalReport2 = await this.accountSync.getRobustGlobalReport('syncTrackerGlobal2')
+          globalReport2 = await this.accountSync.getRobustGlobalReport('syncTrackerGlobal2', true)
 
           // Added all archivers to the list of archivers to ask for data
-          this.archiverDataSourceHelper.initWithList([...Object.values(archivers)])
+          this.archiverDataSourceHelper.initWithList(getArchiversList())
 
           const accountReportsByID2: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
           for (const report of globalReport2.accounts) {
@@ -403,7 +425,6 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
 
   async syncAccountData2(lowAddress: string, highAddress: string): Promise<number> {
     // Sync the Account data
-    //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
     if (logFlags.console) console.log(`syncAccountData3` + '   time:' + Date.now())
 
     if (this.accountSync.config.stateManager == null) {
@@ -423,11 +444,11 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
     let lowTimeQuery = startTime
 
     // Added all archivers to the list of archivers to ask for data
-    this.archiverDataSourceHelper.initWithList([...Object.values(archivers)])
+    this.archiverDataSourceHelper.initWithList(getArchiversList())
 
     if (this.archiverDataSourceHelper.dataSourceArchiver == null) {
       /* prettier-ignore */ if (logFlags.error) this.accountSync.mainLogger.error(`syncAccountData: dataSourceArchiver == null ${lowAddress} - ${highAddress}`)
-      //if we see this then getDataSourceNode failed.
+      //if we see this then getDataSourceArchiver failed.
       // this is most likely because the ranges selected when we started sync are now invalid and too wide to be filled.
 
       //throwing this specific error text will bubble us up to the main sync loop and cause re-init of all the non global sync ranges/trackers
@@ -442,24 +463,38 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
     let offset = 0
     let accountOffset = ''
 
-    let askRetriesLeft = 20
+    // The number of times we can retry asking the same archiver for data before moving on to the next archiver
+    let askRetriesLeft = 3
 
     if (this.accountSync.dataSourceTest === true) {
       if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData1') == false) {
-        throw new Error('out of account nodes to ask: dataSourceTest')
+        throw new Error('out of account archivers to ask: dataSourceTest')
       }
 
       while (this.accountSync.debugFail4) {
         await utils.sleep(1000)
         if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData1 debugFail4') == false) {
-          throw new Error('out of account nodes to ask: dataSourceTest debugFail4')
+          throw new Error('out of account archivers to ask: dataSourceTest debugFail4')
         }
       }
     }
 
-    //number of times we can reset the list of nodes we ask from when they timeout
-    //only available when ther is a small number of nodes.
-    //we clear this if we get a good response from any node, so to fail we have to
+    let receivedBusyMessageTimes = 0
+
+    const retryWithNextArchiver = async (debugMessage: string, errorString: string) => {
+      if (this.archiverDataSourceHelper.tryNextDataSourceArchiver(debugMessage) == false) {
+        // If we have received busy message from more than half of the archivers, then try again from the start of the list of archivers after waiting for 10 seconds
+        if (receivedBusyMessageTimes > this.archiverDataSourceHelper.getNumberArchivers() / 2) {
+          // Try again from the start of the list of archivers after waiting for 10 seconds
+          receivedBusyMessageTimes = 0
+          await utils.sleep(10000)
+        } else throw new Error(errorString)
+      }
+    }
+
+    //number of times we can reset the list of archivers we ask from when they timeout
+    //only available when ther is a small number of archivers.
+    //we clear this if we get a good response from any archiver, so to fail we have to
     //get this many loop fails without any good responses
     let restartListRetriesLeft = 5
     let totalRestartList = 0
@@ -467,7 +502,7 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
       let moreAskTime = 0
-      // We might not need this for data syncing from archivers
+      // We might not need this for data syncing from archivers. but some kind of archiver precheck would be still good to have.
       // // Node Precheck!
       // if (
       //   this.accountSync.stateManager.isNodeValidForInternalMessage(
@@ -479,8 +514,8 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
       // ) {
       //   if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData1') == false) {
       //     if (restartListRetriesLeft <= 0) {
-      //       /* prettier-ignore */ nestedCountersInstance.countEvent('archiver_sync', `out of account nodes to ask: syncAccountData1 totalRestartList: ${totalRestartList}`)
-      //       throw new Error(`out of account nodes to ask: syncAccountData1 + restartList`)
+      //       /* prettier-ignore */ nestedCountersInstance.countEvent('archiver_sync', `out of account archivers to ask: syncAccountData1 totalRestartList: ${totalRestartList}`)
+      //       throw new Error(`out of account archivers to ask: syncAccountData1 + restartList`)
       //     }
 
       //     if (this.archiverDataSourceHelper.tryRestartList('syncAccountData1') === true) {
@@ -491,7 +526,7 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
       //       restartListRetriesLeft--
       //       totalRestartList++
       //     } else {
-      //       throw new Error('out of account nodes to ask: syncAccountData1')
+      //       throw new Error('out of account archivers to ask: syncAccountData1')
       //     }
       //   }
       //   continue
@@ -506,18 +541,13 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
         offset,
         accountOffset,
       }
+      const signedMessage = crypto.sign(message)
+      console.log('getAccountDataFromArchiver message', signedMessage)
       const getAccountDataFromArchiver = async (payload) => {
-        // const randomArchiver = archivers.values()[Math.floor(Math.random() * archivers.size)]
         const dataSourceArchiver = this.archiverDataSourceHelper.dataSourceArchiver
         const accountDataArchiverUrl = `http://${dataSourceArchiver.ip}:${dataSourceArchiver.port}/get_account_data_archiver`
         try {
-          const result = await http.post(
-            // `http://${randomArchiver.ip}:${randomArchiver.port}/get_account_data_archiver`,
-            accountDataArchiverUrl,
-            payload,
-            false,
-            5000 + moreAskTime
-          )
+          const result = await http.post(accountDataArchiverUrl, payload, false, 5000 + moreAskTime)
           console.log('getAccountDataFromArchiver result', result)
           return result
         } catch (error) {
@@ -525,30 +555,35 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
           return error
         }
       }
-
-      let r: GetAccountData3Resp | boolean
+      let result: GetAccountData3Resp & { success: boolean; error: string }
       try {
-        r = await getAccountDataFromArchiver(message)
+        result = await getAccountDataFromArchiver(signedMessage)
       } catch (ex) {
         /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncAccountData2`, `syncAccountData2 retries:${askRetriesLeft} ask: ` + errorToStringFull(ex) )
-        //wait 5 sec
-        await utils.sleep(5000)
+        //wait 2 sec
+        await utils.sleep(2000)
         //max retries
         if (askRetriesLeft > 0) {
           askRetriesLeft--
-          continue
         } else {
-          throw new Error('out of account sync retries')
+          retryWithNextArchiver('syncAccountData1', 'out of archiver account sync retries')
         }
+        continue
       }
 
-      // TSConversion need to consider better error handling here!
-      const result: GetAccountData3Resp = r as GetAccountData3Resp
-
       if (result == null) {
-        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.archiverDataSourceHelper.dataSourceArchiver.publicKey}`)
-        if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData2') == false) {
-          throw new Error('out of account nodes to ask: syncAccountData2')
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result == null archiver:${this.archiverDataSourceHelper.dataSourceArchiver.publicKey}`)
+        retryWithNextArchiver('syncAccountData2', 'out of account archivers to ask: syncAccountData2')
+        continue
+      }
+
+      if (result.success === false) {
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result == success:false archiver:${this.archiverDataSourceHelper.dataSourceArchiver.publicKey}`)
+        if (result.error === 'Archiver is busy serving other validators at the moment!') {
+          receivedBusyMessageTimes++
+          retryWithNextArchiver('archiver success:false', 'Archiver is busy serving other validators')
+        } else {
+          retryWithNextArchiver('archiver success:false', result.error)
         }
         continue
       }
@@ -556,10 +591,8 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
       restartListRetriesLeft = 5
 
       if (result.data == null) {
-        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.archiverDataSourceHelper.dataSourceArchiver.publicKey}`)
-        if (this.archiverDataSourceHelper.tryNextDataSourceArchiver('syncAccountData3') == false) {
-          throw new Error('out of account nodes to ask: syncAccountData3')
-        }
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result.data == null archiver:${this.archiverDataSourceHelper.dataSourceArchiver.publicKey}`)
+        retryWithNextArchiver('syncAccountData3', 'out of account archivers to ask: syncAccountData3')
         continue
       }
       // accountData is in the form [{accountId, stateId, data}] for n accounts.

@@ -12,6 +12,7 @@ import {
 import { shuffleMapIterator, sleep, validateTypes } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
+import * as Self from './Self'
 import * as Comms from './Comms'
 import * as Context from './Context'
 import { isBogonIP } from '../utils/functions/checkIP'
@@ -471,6 +472,10 @@ export function addDataRecipient(
   recipients.set(nodeInfo.publicKey, recipient)
 }
 
+export function getArchiversList() {
+  return [...archivers.values()]
+}
+
 async function forwardReceipts() {
   if (!config.p2p.experimentalSnapshot) return
 
@@ -828,7 +833,7 @@ export function sendData() {
 }
 
 export function getRefreshedArchivers(record) {
-  let refreshedArchivers = [...archivers.values()]
+  let refreshedArchivers = getArchiversList()
   // if (leaveRequests.length > 0) {
   //   for (const archiverInfo of leaveRequests) {
   //     refreshedArchivers = refreshedArchivers.filter(
@@ -1047,7 +1052,10 @@ export function registerRoutes() {
   })
 
   network.registerExternalGet('archivers', (req, res) => {
-    res.json({ archivers: [...archivers.values()] })
+    let archivers = getArchiversList()
+    // In restart network, when there is only one node, we just send the first archiver which is serving as data recipient
+    if (Self.isFirst && Self.isRestartNetwork && NodeList.nodes.size < 2) archivers = [...recipients.values()]
+    res.json({ archivers })
   })
 
   network.registerExternalGet('datarecipients', (req, res) => {

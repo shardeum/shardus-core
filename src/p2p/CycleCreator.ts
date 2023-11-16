@@ -391,8 +391,10 @@ async function cycleCreator() {
       hasAlreadyEnteredProcessing = true
     }
     if (prevRecord.mode === 'shutdown') {
-      console.log(`❌ Shutdown mode activated at Cycle ${prevRecord.counter}. Exiting Network after 60s.`)
-      utils.sleep(60 * SECOND)
+      console.log(
+        `❌ Shutdown mode activated at Cycle ${prevRecord.counter}. Exiting Network after ${prevRecord.duration}s.`
+      )
+      await utils.sleep(prevRecord.duration * SECOND)
       Self.emitter.emit('invoke-exit', 'Shutdown-Mode') // Terminating the validator process
     }
 
@@ -630,7 +632,10 @@ function makeCycleRecord(
     networkId: prevRecord ? prevRecord.networkId : randomBytes(32),
     counter: prevRecord ? prevRecord.counter + 1 : 0,
     previous: prevRecord ? makeCycleMarker(prevRecord) : '0'.repeat(64),
-    start: prevRecord && prevRecord.mode !== 'shutdown' ? prevRecord.start + prevRecord.duration : utils.getTime('s'),
+    start:
+      prevRecord && prevRecord.mode !== 'shutdown'
+        ? prevRecord.start + prevRecord.duration
+        : utils.getTime('s'),
     duration: prevRecord ? prevRecord.duration : config.p2p.cycleDuration,
     networkConfigHash: makeNetworkConfigHash(),
   }

@@ -2320,6 +2320,9 @@ class Shardus extends EventEmitter {
       let changeObj = change.change
       let appData = change.appData
 
+      // If there is initShutdown change, if the latest cycle is greater than the cycle of the change, then skip it
+      if (changeObj['p2p'] && changeObj['p2p']['initShutdown'] && change.cycle !== lastCycle.counter) continue
+
       this.patchObject(this.config, changeObj, appData)
 
       const prunedData: WrappedData[] = await this.app.pruneNetworkChangeQueue(account, lastCycle.counter)

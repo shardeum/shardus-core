@@ -71,7 +71,6 @@ export function updateRecord(
   prev: P2P.CycleCreatorTypes.CycleRecord
 ): void {
   const active = NodeList.activeByIdOrder.length
-  const syncing = NodeList.syncingByIdOrder.length
 
   const { initShutdown } = Context.config.p2p
   // If Shutdown mode in triggered from Admin/DAO tx
@@ -101,18 +100,18 @@ export function updateRecord(
           record.mode = 'processing'
         }
       } else if (prev.mode === 'processing') {
-        if (enterRecovery(active)) {
-          record.mode = 'recovery'
-        } else if (enterShutdown(active)) {
+        if (enterShutdown(active)) {
           record.mode = 'shutdown'
+        } else if (enterRecovery(active)) {
+          record.mode = 'recovery'
         } else if (enterSafety(active, prev)) {
           record.mode = 'safety'
         }
       } else if (prev.mode === 'safety') {
-        if (enterRecovery(active)) {
-          record.mode = 'recovery'
-        } else if (enterShutdown(active)) {
+        if (enterShutdown(active)) {
           record.mode = 'shutdown'
+        } else if (enterRecovery(active)) {
+          record.mode = 'recovery'
         } else if (enterProcessing(active)) {
           record.mode = 'processing'
         }
@@ -120,10 +119,12 @@ export function updateRecord(
         if (enterShutdown(active)) {
           record.mode = 'shutdown'
         }
+        // TODO: // Add enterRestore() check
       } else if (prev.mode === 'shutdown' && Self.isFirst) {
         if (Self.isRestartNetwork) Object.assign(record, { mode: 'restart' })
       } else if (prev.mode === 'restart') {
-        if (enterRestore(syncing)) {
+        // Use prev.syncing to be sure that new joined nodes in the previous cycle have synced the cycle data before we trigger the `restore` mode to start syncing the state data
+        if (enterRestore(prev.syncing)) {
           record.mode = 'restore'
         }
       } else if (prev.mode === 'restore') {

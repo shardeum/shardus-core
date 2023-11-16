@@ -2,6 +2,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { logFlags } from '../logger'
 import StateManager from '.'
 import { P2P } from '@shardus/types'
+import * as utils from '../utils'
 
 /**
  * Help provide a list of archivers that can be used to ask for data
@@ -19,10 +20,10 @@ export default class ArchiverDataSourceHelper {
     this.stateManager = stateManager
   }
 
-  // TODO - init by random index
   initWithList(listOfArchivers: P2P.ArchiversTypes.JoinedArchiver[]): void {
+    utils.shuffleArray(listOfArchivers)
     this.dataSourceArchiverIndex = 0
-    this.dataSourceArchiver = listOfArchivers[this.dataSourceArchiverIndex] // Todo random index
+    this.dataSourceArchiver = listOfArchivers[this.dataSourceArchiverIndex]
     this.dataSourceArchiverList = [...listOfArchivers]
   }
 

@@ -201,6 +201,7 @@ export function startupV2(): Promise<boolean> {
           (node) => node.ip === network.ipInfo.externalIp && node.port === network.ipInfo.externalPort
         )
         if (ourIdx > -1) {
+          if (activeNodes.length === 1) isFirst = undefined // looks like I'm  in the list;
           activeNodes.splice(ourIdx, 1)
         }
 
@@ -701,7 +702,7 @@ async function syncCycleChain(): Promise<void> {
 }
 
 async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
-  const maxRetries = 3
+  const maxRetries = 10
   let retry = maxRetries
   const failArchivers: string[] = []
   let archiver: P2P.SyncTypes.ActiveNode
@@ -710,36 +711,30 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
   while (retry > 0) {
     try {
       archiver = getRandomAvailableArchiver()
-      if (!failArchivers.includes(archiver.ip)) failArchivers.push(archiver.ip)
+      if (!failArchivers.includes(archiver.ip + ':' + archiver.port))
+        failArchivers.push(archiver.ip + ':' + archiver.port)
       activeNodesSigned = await getActiveNodesFromArchiver(archiver)
+      if (
+        activeNodesSigned == null ||
+        activeNodesSigned.nodeList == null ||
+        activeNodesSigned.nodeList.length === 0
+      )
+        continue
+      if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
+        info(`Got signed seed list: ${JSON.stringify(activeNodesSigned)}`)
+        throw Error(
+          `Fatal: _getSeedNodes seed list was not signed by archiver!. Archiver: ${archiver.ip}:${archiver.port}, signature: ${activeNodesSigned.sign}`
+        )
+      }
       break // To stop this loop if it gets the response without failing
     } catch (e) {
       if (retry === 1) {
-        throw Error(`Could not get seed list from seed node server ${failArchivers}`)
+        throw Error(
+          `Could not get seed list from seed node server ${failArchivers} after ${maxRetries} retries:`
+        )
       }
     }
     retry--
-  }
-
-  // This probably cant happen but adding it for completeness
-  if (activeNodesSigned == null || activeNodesSigned.nodeList == null) {
-    throw Error(
-      `Fatal: activeNodesSigned == null || activeNodesSigned.nodeList == null Archiver: ${archiver.ip}`
-    )
-  }
-
-  if (activeNodesSigned.nodeList.length === 0) {
-    throw new Error(
-      `Fatal: getActiveNodesFromArchiver returned an empty list after ${
-        maxRetries - retry
-      } attempts from seed node servers ${failArchivers}`
-    )
-  }
-  if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
-    info(`Got signed seed list: ${JSON.stringify(activeNodesSigned)}`)
-    throw Error(
-      `Fatal: _getSeedNodes seed list was not signed by archiver!. Archiver: ${archiver.ip}:${archiver.port}, signature: ${activeNodesSigned.sign}`
-    )
   }
 
   const joinRequest: P2P.ArchiversTypes.Request | undefined = activeNodesSigned.joinRequest as
@@ -764,6 +759,7 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
   if (restartCycleRecord) {
     // The archiver is sending a cycle record with shutdown mode from previous network
     // TODO - Make sure the cycle record is valid
+    restartCycleRecord.desired = Context.config.p2p.minNodes
     CycleChain.prepend(restartCycleRecord)
     isRestartNetwork = true
     if (Context.config.p2p.experimentalSnapshot && Context.config.features.archiverDataSubscriptionsUpdate) {
@@ -776,6 +772,9 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
         firstNodeDataRequest,
         firstNodeDataRequest.dataRequestCycle
       )
+      for (const archiverInfo of restartCycleRecord.archiversAtShutdown) {
+        Archivers.archivers.set(archiverInfo.publicKey, archiverInfo)
+      }
       // Using this flag due to isFirst check is not working as expected yet in the first consensor-archiver connection establishment
       allowConnectionToFirstNode = true
       return activeNodesSigned.nodeList
