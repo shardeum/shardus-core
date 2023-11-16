@@ -11,8 +11,8 @@ export type TxDebug = {
 }
 
 export type QueueEntry = {
-  eligibleNodesToVote: Shardus.NodeWithRank[]
-  eligibleNodesToConfirm: Shardus.NodeWithRank[]
+  eligibleNodeIdsToVote: Set<string>
+  eligibleNodeIdsToConfirm: Set<string>
   acceptedTx: Shardus.AcceptedTx
   txKeys: Shardus.TransactionKeys
   /** This is data that is collected or loaded locally before it attemps to call apply() */
@@ -69,7 +69,7 @@ export type QueueEntry = {
   conensusGroup?: Shardus.Node[]
   transactionGroup?: Shardus.Node[]
   executionGroup?: Shardus.NodeWithRank[] //List of nodes that are in the execution group
-  executionIdSet?: Set<string> //set of node accountIDs for nodes that are in the execution group
+  executionGroupMap?: Map<string, Shardus.NodeWithRank>
   txGroupCycle: number
   updatedTransactionGroup?: Shardus.Node[]
   updatedTxGroupCycle: number

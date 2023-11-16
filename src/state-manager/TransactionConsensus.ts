@@ -1126,10 +1126,8 @@ class TransactionConsenus {
 
             // Received another challenge receipt. Compare ranks
             let bestNodeFromRobustQuery: Shardus.NodeWithRank
-            for (const node of queueEntry.executionGroup) {
-              if (node.id === robustConfirmOrChallenge.appliedVote.node_id) {
-                bestNodeFromRobustQuery = node
-              }
+            if (queueEntry.executionGroupMap.has(robustConfirmOrChallenge.appliedVote.node_id)) {
+              bestNodeFromRobustQuery = queueEntry.executionGroupMap.get(robustConfirmOrChallenge.appliedVote.node_id)
             }
             const isRobustQueryNodeBetter =
               bestNodeFromRobustQuery.rank < queueEntry.receivedBestChallenger.rank
@@ -1258,10 +1256,10 @@ class TransactionConsenus {
 
             // Received another confirm receipt. Compare ranks
             let bestNodeFromRobustQuery: Shardus.NodeWithRank
-            for (const node of queueEntry.executionGroup) {
-              if (node.id === robustConfirmOrChallenge.appliedVote.node_id) {
-                bestNodeFromRobustQuery = node
-              }
+            if (queueEntry.executionGroupMap.has(robustConfirmOrChallenge.appliedVote.node_id)) {
+              bestNodeFromRobustQuery = queueEntry.executionGroupMap.get(
+                robustConfirmOrChallenge.appliedVote.node_id
+              )
             }
 
             const isRobustQueryNodeBetter = bestNodeFromRobustQuery.rank < queueEntry.receivedBestVoter.rank
@@ -1623,13 +1621,7 @@ class TransactionConsenus {
         nestedCountersInstance.countEvent('confirmOrChallenge', 'hasWaitedLongEnough or hasWaitLimitReached')
         // stop accepting the vote messages for this tx
         queueEntry.acceptVoteMessage = false
-        let eligibleToConfirm = false
-        for (let i = 0; i < queueEntry.eligibleNodesToConfirm.length; i++) {
-          if (queueEntry.eligibleNodesToConfirm[i].id === Self.id) {
-            eligibleToConfirm = true
-            break
-          }
-        }
+        const eligibleToConfirm = queueEntry.eligibleNodeIdsToConfirm.has(Self.id)
         if (this.stateManager.consensusLog) {
           this.mainLogger.info(
             `confirmOrChallenge: ${queueEntry.logID} hasWaitedLongEnough: true. Now we will try to confirm or challenge. eligibleToConfirm: ${eligibleToConfirm}`
@@ -1702,7 +1694,7 @@ class TransactionConsenus {
 
         if (eligibleToConfirm && queueEntry.ourVoteHash === finalVoteHash) {
           // queueEntry.eligibleNodesToConfirm is sorted highest to lowest rank
-          const confirmNodeIds = queueEntry.eligibleNodesToConfirm.map((node) => node.id).reverse()
+          const confirmNodeIds = Array.from(queueEntry.eligibleNodeIdsToConfirm).reverse()
           const ourRankIndex = confirmNodeIds.indexOf(Self.id)
           let delayBeforeConfirm = ourRankIndex * 50 // 50ms
 
@@ -1908,11 +1900,7 @@ class TransactionConsenus {
 
     try {
       const ourNodeId = Self.id
-      const eligibleNodeIds = []
-      for (let i = 0; i < queueEntry.eligibleNodesToVote.length; i++) {
-        eligibleNodeIds.push(queueEntry.eligibleNodesToVote[i].id)
-      }
-      const isEligibleToShareVote = eligibleNodeIds.includes(ourNodeId)
+      const isEligibleToShareVote = queueEntry.eligibleNodeIdsToVote.has(ourNodeId)
       let isReceivedBetterVote = false
 
       // create our vote (for later use) even if we have received a better vote
@@ -2034,7 +2022,7 @@ class TransactionConsenus {
           )
           return
         }
-        const ourRankIndex = eligibleNodeIds.indexOf(ourNodeId)
+        const ourRankIndex = Array.from(queueEntry.eligibleNodeIdsToVote).indexOf(ourNodeId)
         let delayBeforeVote = ourRankIndex * 50 // 100ms
 
         if (delayBeforeVote > 500) {
@@ -2168,24 +2156,17 @@ class TransactionConsenus {
     /* prettier-ignore */
     if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID}   ${JSON.stringify(confirmOrChallenge)} `);
     // check if the node is in the execution group
-    const isMessageFromExecutionNode = queueEntry.executionIdSet.has(confirmOrChallenge.nodeId)
+    const isMessageFromExecutionNode = queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)
 
     if (!isMessageFromExecutionNode) {
       this.mainLogger.error(`tryAppendMessage: ${queueEntry.logID} Message is not from an execution node.`)
     }
 
     if (confirmOrChallenge.message === 'confirm') {
-      let foundNode
-      for (let i = 0; i < queueEntry.eligibleNodesToConfirm.length; i++) {
-        const node = queueEntry.eligibleNodesToConfirm[i]
-        if (
-          confirmOrChallenge.nodeId === node.id &&
-          this.crypto.verify(confirmOrChallenge as SignedObject, node.publicKey)
-        ) {
-          foundNode = node
-          break
-        }
-      }
+      const foundNode =
+        queueEntry.eligibleNodeIdsToConfirm.has(confirmOrChallenge.nodeId)
+        && this.crypto.verify(confirmOrChallenge as SignedObject,
+          queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId).publicKey)
 
       if (!foundNode) {
         this.mainLogger.error(
@@ -2239,11 +2220,8 @@ class TransactionConsenus {
         isBetterThanCurrentConfirmation = false
       else {
         // Compare ranks
-        for (let i = 0; i < queueEntry.executionGroup.length; i++) {
-          if (queueEntry.executionGroup[i].id === confirmOrChallenge.nodeId) {
-            receivedConfirmedNode = queueEntry.executionGroup[i]
-            break
-          }
+        if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
+          receivedConfirmedNode = queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId);
         }
 
         isBetterThanCurrentConfirmation =
@@ -2269,11 +2247,8 @@ class TransactionConsenus {
         queueEntry.receivedBestConfirmedNode = receivedConfirmedNode
         return true
       } else {
-        for (const node of queueEntry.executionGroup) {
-          if (node.id === confirmOrChallenge.nodeId) {
-            queueEntry.receivedBestConfirmedNode = node
-            return true
-          }
+        if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
+          queueEntry.receivedBestConfirmedNode = queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId)
         }
       }
     } else if (confirmOrChallenge.message === 'challenge') {
@@ -2304,11 +2279,8 @@ class TransactionConsenus {
         isBetterThanCurrentChallenge = false
       else {
         // Compare ranks
-        for (const node of queueEntry.executionGroup) {
-          if (node.id === confirmOrChallenge.nodeId) {
-            receivedChallenger = node
-            break
-          }
+        if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
+          receivedChallenger = queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId)
         }
         isBetterThanCurrentChallenge = receivedChallenger.rank < queueEntry.receivedBestChallenger.rank
       }
@@ -2327,11 +2299,8 @@ class TransactionConsenus {
       if (receivedChallenger) {
         queueEntry.receivedBestChallenger = receivedChallenger
       } else {
-        for (const node of queueEntry.executionGroup) {
-          if (node.id === confirmOrChallenge.nodeId) {
-            queueEntry.receivedBestChallenger = node
-            break
-          }
+        if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
+          queueEntry.receivedBestChallenger = queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId)
         }
       }
       if (logFlags.debug)
@@ -2389,14 +2358,9 @@ class TransactionConsenus {
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `vote: ${utils.stringifyReduce(vote)}`)
       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   vote: ${utils.stringifyReduce(vote)}`)
 
-      let isEligibleToVote = null
-      for (let i = 0; i < queueEntry.eligibleNodesToVote.length; i++) {
-        const node = queueEntry.eligibleNodesToVote[i]
-        if (vote.node_id === node.id && this.crypto.verify(vote as SignedObject, node.publicKey)) {
-          isEligibleToVote = node
-          break
-        }
-      }
+      const isEligibleToVote =
+        queueEntry.eligibleNodeIdsToVote.has(vote.node_id) &&
+        this.crypto.verify(vote as SignedObject, queueEntry.executionGroupMap.get(vote.node_id).publicKey)
 
       if (!isEligibleToVote) {
         if (logFlags.debug) {
@@ -2405,7 +2369,7 @@ class TransactionConsenus {
               queueEntry.logID
             } received node is not part of eligible nodes to vote, vote: ${utils.stringify(
               vote
-            )}, eligibleNodesToVote: ${utils.stringify(queueEntry.eligibleNodesToVote)}`
+            )}, eligibleNodesToVote: ${utils.stringify(queueEntry.eligibleNodeIdsToVote)}`
           )
         }
         return
@@ -2428,11 +2392,8 @@ class TransactionConsenus {
         isBetterThanCurrentVote = false
       else {
         // Compare ranks
-        for (let i = 0, length = queueEntry.executionGroup.length; i < length; i++) {
-          if (queueEntry.executionGroup[i].id === vote.node_id) {
-            receivedVoter = queueEntry.executionGroup[i]
-            break
-          }
+        if (queueEntry.executionGroupMap.has(vote.node_id)) {
+          receivedVoter = queueEntry.executionGroupMap.get(vote.node_id)
         }
         isBetterThanCurrentVote = receivedVoter.rank > queueEntry.receivedBestVoter.rank
       }
@@ -2458,11 +2419,9 @@ class TransactionConsenus {
         queueEntry.receivedBestVoter = receivedVoter
         return true
       } else {
-        for (const node of queueEntry.executionGroup) {
-          if (node.id === vote.node_id) {
-            queueEntry.receivedBestVoter = node
-            return true
-          }
+        if (queueEntry.executionGroupMap.has(vote.node_id)) {
+          queueEntry.receivedBestVoter = queueEntry.executionGroupMap.get(vote.node_id)
+          return true
         }
       }
       // No need to forward the gossip here as it's being done in the gossip handler

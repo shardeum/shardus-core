@@ -271,7 +271,7 @@ class TransactionRepair {
         let coveredKey = false
         const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(key)
         const shortKey = utils.stringifyReduce(key)
-        const eligibleNodes = []
+        let eligibleNodeIds = new Set<string>()
         if (this.stateManager.transactionQueue.useNewPOQ === false) {
           for (let i = 0; i < voters.length; i++) {
             const voter = voters[i]
@@ -279,23 +279,15 @@ class TransactionRepair {
             if (node == null) {
               continue
             }
-            eligibleNodes.push(node)
+            eligibleNodeIds.add(node.id)
           }
         } else {
-          for (const node of queueEntry.eligibleNodesToVote) {
-            eligibleNodes.push(node)
-          }
+          eligibleNodeIds = queueEntry.eligibleNodeIdsToVote
         }
         //It modifying global.
-        for (let i = 0; i < eligibleNodes.length; i++) {
+        for (const node_id of eligibleNodeIds) {
           /* eslint-disable security/detect-object-injection */
           stats.rLoop2++
-
-          const node = eligibleNodes[i]
-          if (node == null) {
-            continue
-          }
-          const node_id = node.id
           for (let j = 0; j < appliedVote.account_id.length; j++) {
             stats.rLoop3++
             const id = appliedVote.account_id[j]
@@ -357,7 +349,7 @@ class TransactionRepair {
               }
 
               //only need to check for account being in range if the node is not in the execution group?
-              if (queueEntry.executionIdSet.has(node_id) === false) {
+              if (queueEntry.executionGroupMap.has(node_id) === false) {
                 // if the account is not global check if it is in range.
                 if (
                   isGlobal === false &&
