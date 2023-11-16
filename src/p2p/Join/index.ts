@@ -270,22 +270,14 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
         const { canStay, reason } = shardus.app.canStayOnStandby(joinRequest)
         if (canStay === false) {
           record.standbyRemove.push(key)
-          console.log(
-            `join:updateRecord cycle number: ${record.counter} removed standby node ${key} reason: ${reason}`
-          )
+          /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `join:updateRecord cycle number: ${record.counter} removed standby node ${key} reason: ${reason}` )
           standbyRemoved_App++
         }
       }
 
-      console.log(
-        `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${standbyRemved_Age}  removed list: ${record.standbyRemove} `
-      )
-      debugDumpJoinRequestList(standbyList, `join.updateRecord: last-hashed ${record.counter}`)
-
-      debugDumpJoinRequestList(
-        Array.from(getStandbyNodesInfoMap().values()),
-        `join.updateRecord: standby-map ${record.counter}`
-      )
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${standbyRemved_Age}  removed list: ${record.standbyRemove} ` )
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList(standbyList, `join.updateRecord: last-hashed ${record.counter}`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList( Array.from(getStandbyNodesInfoMap().values()), `join.updateRecord: standby-map ${record.counter}` )
     }
 
     record.standbyAdd.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
@@ -311,26 +303,10 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       const id = computeNodeId(nodeInfo.publicKey, standbyInfo.cycleMarker)
       const counterRefreshed = record.counter
 
-      // finally, remove the node from the standby list
-      //getStandbyNodesInfoMap().delete(publicKey)
-      // console.log(`join:updateRecord node-selcted cycle: ${record.counter} removed standby node ${publicKey}`)
-      // deleteStandbyNode(publicKey)
-      // standbyActivated = true
-      // standbyRemoved_joined++
-
       record.joinedConsensors.push({ ...nodeInfo, cycleJoined, counterRefreshed, id })
     }
 
-    //if we activated any standby nodes re-log the list
-    // if (standbyActivated) {
-    //   debugDumpJoinRequestList(
-    //     Array.from(getStandbyNodesInfoMap().values()),
-    //     `join.updateRecord: standby-map ${record.counter} some activated:${record.counter}`
-    //   )
-    // }
-    console.log(
-      `standbyRemved_Age: ${standbyRemved_Age} standbyRemoved_App: ${standbyRemoved_App}` //standbyRemoved_joined: ${standbyRemoved_joined}
-    )
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `standbyRemved_Age: ${standbyRemved_Age} standbyRemoved_App: ${standbyRemoved_App}` )
 
     record.joinedConsensors.sort()
   } else {
@@ -355,15 +331,12 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
     // finally, remove the node from the standby list
 
     const publicKey = node.publicKey
-    console.log(`join:parseRecord node-selcted cycle: ${record.counter} removed standby node ${publicKey}`)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:parseRecord node-selcted cycle: ${record.counter} removed standby node ${publicKey}`)
     deleteStandbyNode(publicKey)
   }
 
   if (added.length > 0) {
-    debugDumpJoinRequestList(
-      Array.from(getStandbyNodesInfoMap().values()),
-      `join.parseRecord: standby-map ${record.counter} some activated:${record.counter}`
-    )
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList( Array.from(getStandbyNodesInfoMap().values()), `join.parseRecord: standby-map ${record.counter} some activated:${record.counter}` )
   }
 
   return {

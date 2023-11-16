@@ -149,8 +149,8 @@ export function updateRecord(
       activated.push(node.id)
       activatedPublicKeys.push(node.publicKey)
     } else {
-      /* prettier-ignore */ warn(`active:updateRecord: node not found: ${publicKey}`)
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:updateRecord node not found: ${publicKey}`) //remove perfore push
+      /* prettier-ignore */ if(logFlags.important_as_error) warn(`active:updateRecord: node not found: ${publicKey}`)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:updateRecord node not found`)
     }
   }
 
@@ -234,11 +234,15 @@ export function updateRecord(
       /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`)
     }
     let maxSyncTime = medianSyncTime ? medianSyncTime * 2 : 0
+
     if (maxSyncTime < config.p2p.maxSyncTimeFloor) {
       maxSyncTime = config.p2p.maxSyncTimeFloor
     }
     record.maxSyncTime = maxSyncTime
     // record.maxSyncTime = Math.min(config.p2p.maxSyncTimeFloor, maxSyncTime)
+
+    //higher pri on this log so we can analyze it and correct as needed
+    /* prettier-ignore */ if (logFlags.important_as_error) info(`maxSyncTime ${CycleChain.newest.counter} is ${maxSyncTime} medianSyncTime*2: ${medianSyncTime}`)
   } catch (e) {
     record.maxSyncTime = config.p2p.maxSyncTimeFloor
     /* prettier-ignore */ if (logFlags.error) error(`calculateMaxSyncTime: Unable to calculate max sync time`, e)
@@ -330,21 +334,21 @@ function addActiveTx(request: P2P.ActiveTypes.SignedActiveRequest) {
 function validateActiveRequest(request: P2P.ActiveTypes.SignedActiveRequest) {
   const node = NodeList.nodes.get(request.nodeId)
   if (!node) {
-    /* prettier-ignore */ warn(`validateActiveRequest: node not found, nodeId: ${request.nodeId}`)
-    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:validateActiveRequest node not found ${request.nodeId}`) //remove perfore push
+    /* prettier-ignore */ if(logFlags.important_as_error) warn(`validateActiveRequest: node not found, nodeId: ${request.nodeId}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:validateActiveRequest node not found`)
     return false
   }
   if (!crypto.verify(request, node.publicKey)) {
-    /* prettier-ignore */ warn(`validateActiveRequest: bad signature, request: ${JSON.stringify(request)} ${request.nodeId}`)
-    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:validateActiveRequests bad signature ${request.nodeId}`) //remove perfore push
+    /* prettier-ignore */ if(logFlags.important_as_error) warn(`validateActiveRequest: bad signature, request: ${JSON.stringify(request)} ${request.nodeId}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:validateActiveRequests bad signature`)
     return false
   }
   if (config.p2p.validateActiveRequests === true) {
     // Do not accept active request if node is already active
     const existing = NodeList.nodes.get(request.nodeId)
     if (existing && existing.status === NodeStatus.ACTIVE) {
-      /* prettier-ignore */ warn(`validateActiveRequest: already active , nodeId: ${request.nodeId}`)
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:validateActiveRequest already active ${request.nodeId}`) //remove perfore push
+      /* prettier-ignore */ if(logFlags.important_as_error) warn(`validateActiveRequest: already active , nodeId: ${request.nodeId}`)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:validateActiveRequest already active`)
       return false
     }
     // [TODO] Discuss and implement more active request validation
