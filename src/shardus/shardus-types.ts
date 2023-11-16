@@ -755,6 +755,11 @@ export interface ServerConfiguration {
     standbyAgeScrub: boolean
     /** remove nodes from the list that are the wrong version */
     standbyVersionScrub: boolean
+    /** this is the percent delay fraction of a quarter cycle duration that we wait before sending cycle transactions
+     * This is needed because of small delays between what time the cycle starts for any given node.
+     * NTP gets us closer, but it will never be perfect
+     */
+    q1DelayPercent: number
   }
   /** Server IP configuration */
   ip?: {
@@ -861,6 +866,8 @@ export interface ServerConfiguration {
     ignoreTimeCheck: boolean
     /** Flag to toggle Shardus address format verification, checks if an address is 32-bytes in size & 64 chars long */
     checkAddressFormat: boolean
+    /**   add a random error to our ntp offset time +- */
+    debugNTPErrorWindowMs: number
   }
   /** Options for the statistics module */
   statistics?: {

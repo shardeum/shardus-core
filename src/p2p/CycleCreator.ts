@@ -397,15 +397,31 @@ async function cycleCreator() {
   }
 }
 
+// network:  |q1           |q2           |q3            |q4          |q1           |q2           |q3            |q4           |
+//                                                                 r
+//                                                                *
+// us:   |q1           |q2           |q3            |q4          |q1           |q2           |q3            |q4           |
+
+//      |                                                                                           |
+//  |             2                                                             13              |
+
 /**
  * Handles cycle record creation tasks for quarter 1
  */
-function runQ1() {
+async function runQ1() {
   currentQuarter = 1
   Self.emitter.emit('cycle_q1_start')
   profilerInstance.profileSectionStart('CycleCreator-runQ1')
 
   if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
+
+  const SECOND = 1000
+  const cycleDuration = record.duration * SECOND
+  const quarterDuration = cycleDuration / 4
+
+  //we sleep for 1/8 of the quarter duration before we send messages to improve tolerance of
+  //what cycle nodes think they are in
+  await utils.sleep(quarterDuration * 0.125)
 
   // Tell submodules to sign and send their requests
   if (logFlags.p2pNonFatal) info('Triggering submodules to send requests...')

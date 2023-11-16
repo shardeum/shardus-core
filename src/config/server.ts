@@ -103,6 +103,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     standbyListMaxRemoveTTL: 3, //todo set this be 100 for production
     standbyAgeScrub: true,
     standbyVersionScrub: true,
+    q1DelayPercent: 0.125,
   },
   ip: {
     externalIp: '0.0.0.0',
@@ -154,6 +155,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     checkTxGroupChanges: true,
     ignoreTimeCheck: false,
     checkAddressFormat: false,
+    debugNTPErrorWindowMs: 200,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {
