@@ -1085,6 +1085,14 @@ class Shardus extends EventEmitter {
         }
       }
 
+      if (!this.app.isInternalTx(tx) && networkMode !== 'processing') {
+        return {
+          success: false,
+          reason: `Application transactions are only allowed in processing Mode.`,
+          status: 500,
+        }
+      }
+
       // Give the dapp an opportunity to do some up front work and generate
       // appData metadata for the applied TX
       await this.app.txPreCrackData(tx, appData)

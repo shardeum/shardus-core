@@ -173,7 +173,7 @@ export function sendRequests(): void {
  */
 
 export function enterRecovery(activeCount: number): boolean {
-  return activeCount < 0.5 * Context.config.p2p.minNodes
+  return activeCount < 0.75 * Context.config.p2p.minNodes
 }
 
 export function enterShutdown(activeCount: number): boolean {
@@ -181,11 +181,7 @@ export function enterShutdown(activeCount: number): boolean {
 }
 
 export function enterSafety(activeCount: number, prevRecord: P2P.CycleCreatorTypes.CycleRecord): boolean {
-  if (prevRecord.mode === 'recovery') {
-    return activeCount >= 0.6 * Context.config.p2p.minNodes && activeCount < 0.9 * Context.config.p2p.minNodes
-  } else {
-    return activeCount >= 0.5 * Context.config.p2p.minNodes && activeCount < 0.9 * Context.config.p2p.minNodes
-  }
+  return activeCount >= 0.75 * Context.config.p2p.minNodes && activeCount < 0.9 * Context.config.p2p.minNodes
 }
 
 export function enterProcessing(activeCount: number): boolean {
