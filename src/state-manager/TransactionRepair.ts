@@ -142,7 +142,12 @@ class TransactionRepair {
       utils.shuffleArray(voters)
 
       if (queueEntry.ourVoteHash != null) {
-        if (queueEntry.ourVoteHash === this.crypto.hash(queueEntry.appliedReceiptForRepair2.appliedVote)) {
+        if (
+          queueEntry.ourVoteHash ===
+          this.stateManager.transactionConsensus.calculateVoteHash(
+            queueEntry.appliedReceiptForRepair2.appliedVote
+          )
+        ) {
           //This case is ok.  A tx in the queue may get expired after it pre-applied and cast a vote.
           //This method should detect that we already have correct state available for the accounts and
           //simply apply this repair with 100% local data.
@@ -155,7 +160,7 @@ class TransactionRepair {
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `appliedVoters ${utils.stringifyReduce(voters)}  `)
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
 
-      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`repairToMatchReceipt: ${txLogID} queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
+      /* prettier-ignore */ if (logFlags.debug || this.stateManager.consensusLog) this.mainLogger.debug(`repairToMatchReceipt: ${txLogID} queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
 
       // Build a request object for each key involved.
       // once we have a valid request object add in alternate nodes we could use as a backup
@@ -266,13 +271,27 @@ class TransactionRepair {
         let coveredKey = false
         const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(key)
         const shortKey = utils.stringifyReduce(key)
+        const eligibleNodes = []
+        if (this.stateManager.transactionQueue.useNewPOQ === false) {
+          for (let i = 0; i < voters.length; i++) {
+            const voter = voters[i]
+            const node = this.stateManager.p2p.state.getNodeByPubKey(voter.owner)
+            if (node == null) {
+              continue
+            }
+            eligibleNodes.push(node)
+          }
+        } else {
+          for (const node of queueEntry.eligibleNodesToVote) {
+            eligibleNodes.push(node)
+          }
+        }
         //It modifying global.
-        for (let i = 0; i < voters.length; i++) {
+        for (let i = 0; i < eligibleNodes.length; i++) {
           /* eslint-disable security/detect-object-injection */
           stats.rLoop2++
 
-          const voter = voters[i]
-          const node = this.stateManager.p2p.state.getNodeByPubKey(voter.owner)
+          const node = eligibleNodes[i]
           if (node == null) {
             continue
           }

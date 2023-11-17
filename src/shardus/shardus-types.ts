@@ -3,8 +3,14 @@ import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 export type Node = P2P.NodeListTypes.Node
 export type Cycle = P2P.CycleCreatorTypes.CycleRecord
 export type Archiver = P2P.ArchiversTypes.JoinedArchiver
-export interface NodeWithRank extends P2P.NodeListTypes.Node {
+export interface NodeWithRank {
   rank: bigint
+  id: string
+  publicKey: string
+  externalIp: string
+  externalPort: number
+  internalIp: string
+  internalPort: number
 }
 //import { RequestHandler } from "express"; //express was causing problems.
 
@@ -994,6 +1000,8 @@ export interface ServerConfiguration {
     waitTimeBeforeReceipt: number
     // max limit on how long to wait before confirming or challenge since first vote
     waitLimitAfterFirstMessage: number
+    // number of unique challenges to produce a fail receipt
+    minRequiredChallenges: number
   }
   /** Options for sharding calculations */
   sharding?: {

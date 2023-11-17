@@ -179,6 +179,8 @@ class StateManager {
 
   extendedRepairLogging: boolean
 
+  consensusLog: boolean
+
   //canDataRepair: boolean // the old repair.. todo depricate further.
   lastActiveNodeCount: number
 
@@ -256,6 +258,7 @@ class StateManager {
     this.lastActiveNodeCount = 0
 
     this.extendedRepairLogging = true
+    this.consensusLog = false
 
     this.shardValuesByCycle = new Map()
     this.currentCycleShardData = null as CycleShardData | null
@@ -1383,7 +1386,7 @@ class StateManager {
             response.note = `has queue entry but not final data: ${utils.stringifyReduce(payload.txid)}  ${
               payload.timestamp
             } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post hasValidFinalData==false')
+            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', `request_state_for_tx_post hasValidFinalData==false, tx state: ${queueEntry.state}`)
             await respond(response)
             return
           }
@@ -1709,6 +1712,12 @@ class StateManager {
         debugNodeList.push(nodeEntry)
       }
       res.json(debugNodeList)
+    })
+
+    Context.network.registerExternalGet('debug-consensus-log', isDebugModeMiddleware, (req, res) => {
+      this.consensusLog = !this.consensusLog
+      res.write(`consensusLog: ${this.consensusLog}`)
+      res.end()
     })
 
     Context.network.registerExternalGet('debug-stuck-processing', isDebugModeMiddleware, (_req, res) => {

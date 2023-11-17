@@ -40,16 +40,15 @@ class NestedCounters {
         // Send JSON response
         res.setHeader('Content-Type', 'application/json')
         res.json({
-          timestamp: Date.now(),
-          report: arrayReport
+          timestamp: shardusGetTime(),
+          report: arrayReport,
         })
       } else {
         // TODO: This doesn't return the counts to the caller
-      	res.write(`Counts at time: ${shardusGetTime()} offset: ${getNetworkTimeOffset()}\n`)
+        res.write(`Counts at time: ${shardusGetTime()} offset: ${getNetworkTimeOffset()}\n`)
         this.printArrayReport(arrayReport, res, 0)
         res.end()
       }
-      
 
       profilerInstance.scopedProfileSectionEnd('counts')
     })

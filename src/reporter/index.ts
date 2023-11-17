@@ -391,7 +391,7 @@ class Reporter {
       self.collectStatisticToReport()
 
       //temp mem debugging:
-      this.mainLogger.info(memoryReportingInstance.getMemoryStringBasic())
+      if (logFlags.debug) this.mainLogger.info(memoryReportingInstance.getMemoryStringBasic())
     }, 1000)
 
     //log a socket report every 5 minutes

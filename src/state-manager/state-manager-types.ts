@@ -11,8 +11,8 @@ export type TxDebug = {
 }
 
 export type QueueEntry = {
-  eligibleNodesToVote: Shardus.Node[]
-  eligibleNodesToConfirm: Shardus.Node[]
+  eligibleNodesToVote: Shardus.NodeWithRank[]
+  eligibleNodesToConfirm: Shardus.NodeWithRank[]
   acceptedTx: Shardus.AcceptedTx
   txKeys: Shardus.TransactionKeys
   /** This is data that is collected or loaded locally before it attemps to call apply() */
@@ -99,7 +99,11 @@ export type QueueEntry = {
   completedConfirmedOrChallenge: boolean
   acceptVoteMessage: boolean
   acceptConfirmOrChallenge: boolean
+  uniqueChallenges: { [key: string]: ConfirmOrChallengeMessage }
+  uniqueChallengesCount: number
   robustAccountDataPromises?: { [key: string]: Promise<Shardus.WrappedData> }
+  queryingRobustVote?: boolean
+  queryingRobustConfirmOrChallenge?: boolean
 
   gossipedReceipt: boolean
   gossipedVote: boolean
@@ -686,6 +690,7 @@ export type ConfirmOrChallengeQueryResponse = {
   txId: string
   appliedVoteHash: string
   result: ConfirmOrChallengeMessage
+  uniqueCount: number
 }
 
 // export type AppliedReceiptGossip2 = {

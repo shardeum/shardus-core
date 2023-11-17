@@ -5,6 +5,7 @@ import * as utils from '../utils'
 import { getRandom, sleep, stringifyReduce } from '../utils'
 import FastRandomIterator from '../utils/FastRandomIterator'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { profilerInstance } from '../utils/profiler'
 import { config, stateManager } from './Context'
 import * as Context from './Context'
 import * as Self from './Self'
@@ -15,7 +16,6 @@ import { Result } from 'neverthrow'
 import { getPublicNodeInfo } from './Self'
 import * as http from '../http'
 import { ok, err } from 'neverthrow'
-
 export type QueryFunction<Node, Response> = (node: Node) => PromiseLike<Response>
 
 export type VerifyFunction<Result> = (result: Result) => boolean
@@ -261,7 +261,8 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   redundancy = 3,
   shuffleNodes = true,
   strictRedundancy = false,
-  extraDebugging = false
+  extraDebugging = false,
+  note = 'general'
 ): Promise<RobustQueryResult<Node, Response>> {
   if (nodes.length === 0) throw new Error('No nodes given.')
   if (typeof queryFn !== 'function') {
@@ -274,7 +275,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   if (redundancy > nodes.length) {
     if (strictRedundancy) {
       if (extraDebugging)
-        nestedCountersInstance.countEvent('robustQuery', `not enough nodes to meet strictRedundancy`)
+        nestedCountersInstance.countEvent('robustQuery', `${note} not enough nodes to meet strictRedundancy`)
       if (logFlags.console || config.debug.robustQueryDebug || extraDebugging)
         console.log('robustQuery: isRobustResult=false. not enough nodes to meet strictRedundancy')
       return { topResult: null, winningNodes: [], isRobustResult: false }
@@ -314,40 +315,42 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       const node = nodes[i]
       queries.push(wrappedQuery(node))
     }
+    profilerInstance.scopedProfileSectionStart(`robustQuery ${note} queryNodes`)
     const [results, errs] = await utils.robustPromiseAll<{ response: Response; node: Node }>(queries)
+    profilerInstance.scopedProfileSectionEnd(`robustQuery ${note} queryNodes`)
 
     if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) {
-      // console.log('robustQuery results', results)
-      // console.log('robustQuery errs', errs)
+      console.log('robustQuery results', note, results)
+      console.log('robustQuery errs', note, errs)
     }
 
     let finalResult: TallyItem<Node, Response>
     for (const result of results) {
       const { response, node } = result
       if (response === null) {
-        if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `response is null`)
+        if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `${note} response is null`)
         continue
       } // ignore null response; can be null if we tried to query ourself
       finalResult = responses.add(response, node)
       if (finalResult) {
-        if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `got final result`)
+        if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `${note} got final result`)
         break
       }
     }
     if (extraDebugging) {
-      console.log('robustQuery tally items', responses.items)
-      console.log('robustQuery final result', finalResult)
+      console.log('robustQuery tally items', note, responses.items)
+      console.log('robustQuery final result', note, finalResult)
     }
 
     for (const err of errs) {
       if (logFlags.console || config.debug.robustQueryDebug || extraDebugging)
         console.log('robustQuery: err:', err)
       errors += 1
-      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `error: ${err.message}`)
+      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `${note} error: ${err.message}`)
     }
 
     if (!finalResult) {
-      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `no final result`)
+      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `${note} no final result`)
       return null
     }
     return finalResult
@@ -359,9 +362,12 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     tries += 1
     const toQuery = redundancy - responses.getHighestCount()
     if (nodes.length < toQuery) {
-      /* prettier-ignore */ if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) console.log('robustQuery: stopping since we ran out of nodes to query.')
+      /* prettier-ignore */ if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) console.log(`robustQuery: ${note} stopping since we ran out of nodes to query.`)
       if (extraDebugging)
-        nestedCountersInstance.countEvent('robustQuery', `stopping since we ran out of nodes to query.`)
+        nestedCountersInstance.countEvent(
+          'robustQuery',
+          `${note} stopping since we ran out of nodes to query.`
+        )
       break
     }
     let nodesToQuery: Node[]
@@ -378,18 +384,19 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     finalResult = await queryNodes(nodesToQuery)
     if (tries >= 20) {
       /* prettier-ignore */ if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) console.log('robustQuery: stopping after 20 tries.')
-      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `stopped after 20 tries`)
+      if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `${note} stopped after 20 tries`)
       break
     }
   }
+  nestedCountersInstance.countEvent('robustQuery', `${note} tries: ${tries}`)
   if (finalResult) {
     const isRobustResult = finalResult.count >= redundancy
     if (config.debug.robustQueryDebug || extraDebugging)
-      console.log(`robustQuery: stopping since we got a finalResult:${stringifyReduce(finalResult)}`)
+      console.log(`robustQuery: ${note} stopping since we got a finalResult:${stringifyReduce(finalResult)}`)
     if (extraDebugging)
       nestedCountersInstance.countEvent(
         'robustQuery',
-        `stopping since we got finalResult:${stringifyReduce(finalResult)}`
+        `${note} stopping since we got finalResult:${stringifyReduce(finalResult)}`
       )
     return {
       topResult: finalResult.value,
@@ -428,7 +435,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     if (extraDebugging)
       nestedCountersInstance.countEvent(
         'robustQuery',
-        `isRobustResult=false. returning highest count response. ${stringifyReduce(responses)}`
+        `${note} isRobustResult=false. returning highest count response. ${stringifyReduce(responses)}`
       )
     return {
       topResult: highestCountItem.value,
