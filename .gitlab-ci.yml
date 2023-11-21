@@ -1,3 +1,5 @@
+include:
+  - remote: 'https://gitlab.com/pod_security/shared-ci/-/raw/main/security.yml'
 # Define cache settings
 cache:
   key: ${CI_COMMIT_REF_SLUG}
@@ -11,6 +13,7 @@ image: 'registry.gitlab.com/shardus/dev-container:latest_node18'
 stages:
   - prepare
   - build_and_lint_and_check
+  - appsec
 
 # Prepare job: Install Node.js dependencies
 prepare-job:
