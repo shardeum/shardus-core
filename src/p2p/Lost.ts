@@ -18,7 +18,7 @@ import { binarySearch, logNode, validateTypes } from '../utils'
 import getCallstack from '../utils/getCallstack'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
-import { isApopMarkedNode } from './Apoptosis'
+import { isApopMarkedNode, nodeDownString } from './Apoptosis'
 import * as Comms from './Comms'
 import { config, crypto, logger, network } from './Context'
 import { currentCycle, currentQuarter } from './CycleCreator'
@@ -701,6 +701,11 @@ async function isDownCheck(node) {
   try {
     if (typeof res.s !== 'string') {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-1', 1)
+      return 'down'
+    }
+    //adding this check so that a node can repond that is is down. aka, realizes it is not funcitonal and wants to be removed from the network
+    if (res.s === nodeDownString) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-self-reported-zombie', 1)
       return 'down'
     }
   } catch {

@@ -40,6 +40,12 @@ let p2pLogger: log4js.Logger
 export let id: string
 export let isFirst: boolean
 export let isActive = false
+
+/** This flag shows that our node has failed and should not be in the network
+ *  It could even be that the node has restart but is still in the active list
+ *  and waiting to be removed first before it can join again
+ */
+export let isFailed = false
 export let allowConnectionToFirstNode = false
 export let ip: string
 export let port: number
@@ -58,6 +64,8 @@ let mode = null
   SYNCING -> ACTIVE = Node has synced and is now active
 */
 let state = P2P.P2PTypes.NodeStatus.INITIALIZING
+
+let firstTimeJoiningLoop = true
 
 /** ROUTES */
 
@@ -198,12 +206,37 @@ export function startupV2(): Promise<boolean> {
         // If we see and id with a real value then our node has been selected to go active
         // start the syncing process and stop looping the attemptJoining function
         if (resp?.id) {
+          //detect if we are a zombie node (bounce and network think we are still active)
+          //if we never even tried to join yet but the network thinks we are active
+          //then we are a zombie node
+          if (firstTimeJoiningLoop === true) {
+            isFailed = true
+
+            /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `detected self as zombie ${latestCycle.counter}`, 1)
+
+            //TODO in the future if we are more confident in our ablility to shut down the node from functioning
+            // we could have a shutdown wait. (but there is a lot of surface area)
+            // the other method would be to request to be shut down but that is tricky and may not be possible
+            // in all cases  i.e. our key changed
+            const message = `node detected as zombie node, please wait a few minutes before restart`
+            emitter.emit(
+              'invoke-exit',
+              `node restarted ungracefully, needs to restart`,
+              getCallstack(),
+              message,
+              false //force shutdown for now in a way that requires the user to restart again
+            )
+            attemptJoiningRunning = false
+            return
+          }
+
           id = resp.id
           await enterSyncingState()
           attemptJoiningRunning = false
           return
         }
 
+        firstTimeJoiningLoop = false
         // If we see that isOnStandbyList is true then we are on standby.
         // If our state is not STANDBY yet set it to STANDBY (this is mainly for operator CLI purposes)
         // Note that attemptJoining isn't just to get on the standby list, but also

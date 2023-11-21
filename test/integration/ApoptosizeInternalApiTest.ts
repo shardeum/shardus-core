@@ -109,33 +109,34 @@ const ask2Test = async (): Promise<void> => {
     console.log('Test2: Error:', e)
   }
 
-  try {
-    console.log('Test3: apoptosize: isDownCheck 2')
-    const obj: ApoptosisProposalReq = {
-      id: 'bad',
-      when: 1,
-    }
-    const resp = await Comms.ask2<ApoptosisProposalReq, ApoptosisProposalResp>(
-      node,
-      'apoptosize',
-      obj,
-      serializeApoptosisProposalReq,
-      deserializeApoptosisProposalResp,
-      {
-        sender_id: 'sender_id',
-      }
-    )
-    if (resp.s === 'node is not down' && resp.r === 2) {
-      console.log('Test3: Pass')
-      pass++
-    } else {
-      console.log(`Test3: Fail: Response: ${JSON.stringify(resp)}`)
-      fail++
-    }
-  } catch (e) {
-    fail++
-    console.log('Test3: Error:', e)
-  }
+  //this test is not needed anymore as we removed the 'bad' options
+  // try {
+  //   console.log('Test3: apoptosize: isDownCheck 2')
+  //   const obj: ApoptosisProposalReq = {
+  //     id: 'bad',
+  //     when: 1,
+  //   }
+  //   const resp = await Comms.ask2<ApoptosisProposalReq, ApoptosisProposalResp>(
+  //     node,
+  //     'apoptosize',
+  //     obj,
+  //     serializeApoptosisProposalReq,
+  //     deserializeApoptosisProposalResp,
+  //     {
+  //       sender_id: 'sender_id',
+  //     }
+  //   )
+  //   if (resp.s === 'node is not down' && resp.r === 2) {
+  //     console.log('Test3: Pass')
+  //     pass++
+  //   } else {
+  //     console.log(`Test3: Fail: Response: ${JSON.stringify(resp)}`)
+  //     fail++
+  //   }
+  // } catch (e) {
+  //   fail++
+  //   console.log('Test3: Error:', e)
+  // }
 
   try {
     console.log('Test4: apoptosize: success')

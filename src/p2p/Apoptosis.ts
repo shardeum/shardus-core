@@ -53,6 +53,9 @@ import { logFlags } from '../logger'
 export const cycleDataName = 'apoptosized'
 export const cycleUpdatesName = 'apoptosis'
 
+export const nodeDownString = 'node is down'
+export const nodeNotDownString = 'node is not down'
+
 const internalRouteName = 'apoptosize'
 const gossipRouteName = 'apoptosis'
 
@@ -111,16 +114,15 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> 
       let err = ''
 
       if (apopProposal.id === 'isDownCheck') {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-isDownCheck c:${currentCycle}`, 1)
-        let resp: ApoptosisProposalResp = { s: 'node is not down', r: 1 }
-        response(resp, serializeApoptosisProposalResp)
-        return
-      }
+        let down_msg = nodeNotDownString
 
-      //expand compatibility with old nodes, can remove this later probably after 1.5.1
-      if (apopProposal.id === 'bad') {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-isDownCheck-bad c:${currentCycle}`, 1)
-        let resp: ApoptosisProposalResp = { s: 'node is not down', r: 2 }
+        // IF we are not active or syncing then need to return fail. or not return at all?
+        if (Self.isFailed === true) {
+          down_msg = nodeDownString
+        }
+
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-isDownCheck c:${currentCycle} ${down_msg}`, 1)
+        let resp: ApoptosisProposalResp = { s: down_msg, r: 1 }
         response(resp, serializeApoptosisProposalResp)
         return
       }
