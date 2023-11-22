@@ -457,7 +457,19 @@ export function scheduleLostReport(target: P2P.NodeListTypes.Node, reason: strin
   })
 }
 
-// This gets called from Shardus when network module emits timeout or error
+/**
+ * This gets called from Shardus when network module emits timeout or error
+ *
+ * This code will call 'lost-report' on another node which will help it do the actual down check
+ *
+ * currently this down check is a bit of a hack as it uses the 'apoptosize' route with a param
+ * to indicate that it is not a normal apoptosize action
+ *
+ * @param target
+ * @param reason
+ * @param requestId
+ * @returns
+ */
 function reportLost(target, reason: string, requestId: string) {
   info(`Reporting lost for ${target.id}, requestId: ${requestId}.`)
   info(`Target node details for requestId: ${requestId}: ${logNode(target)}`)

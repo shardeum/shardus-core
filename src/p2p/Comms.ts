@@ -479,14 +479,10 @@ export function registerInternal(route, handler) {
         : await _wrapAndTagMessage(message, tracker, node)
 
       if (logFlags.verbose && logFlags.p2pNonFatal) {
-        info(
-          `The signed wrapped response to send back: ${utils.stringifyReduceLimit(respWithAuth)} size:${
-            respWithAuth.msgSize
-          }`
-        )
+        /* prettier-ignore */ info( `The signed wrapped response to send back: ${utils.stringifyReduceLimit(respWithAuth)} size:${ respWithAuth.msgSize }` )
       }
       if (route !== 'gossip') {
-        logger.playbackLog(sender, 'self', 'InternalRecvResp', route, tracker, response)
+        /* prettier-ignore */ if (logFlags.playback) logger.playbackLog(sender, 'self', 'InternalRecvResp', route, tracker, response)
       }
       await respond(respWithAuth)
 
@@ -510,7 +506,7 @@ export function registerInternal(route, handler) {
       return
     }
     if (route !== 'gossip') {
-      logger.playbackLog(sender, 'self', 'InternalRecv', route, tracker, payload)
+      /* prettier-ignore */ if (logFlags.playback) logger.playbackLog(sender, 'self', 'InternalRecv', route, tracker, payload)
     }
     await handler(payload, respondWrapped, sender, tracker, msgSize)
   }
@@ -539,13 +535,13 @@ export function registerInternal2(route: string, handler: InternalBinaryHandler)
       responseHeaders.tracker_id = header.tracker_id
       /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternal2: wrapped response to send back: ${wrappedRespStream.getBuffer()} size: ${wrappedRespStream.getBufferLength()}`)
       if (route !== 'gossip') {
-        /* prettier-ignore */ if (logFlags.newFilter) logger.playbackLog(header.sender_id, 'self', 'InternalRecvResp', route, header.tracker_id, response)
+        /* prettier-ignore */ if (logFlags.playback) logger.playbackLog(header.sender_id, 'self', 'InternalRecvResp', route, header.tracker_id, response)
       }
       await respond(wrappedRespStream.getBuffer(), responseHeaders)
       return wrappedRespStream.getBufferLength()
     }
-    /* prettier-ignore */ if (logFlags.newFilter) console.log('header:', header)
-    /* prettier-ignore */ if (logFlags.newFilter) info(`registerInternal2: request info: route: ${route} header: ${JSON.stringify(header)} sign: ${JSON.stringify(sign)}`)
+    /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) console.log('header:', header)
+    /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternal2: request info: route: ${route} header: ${JSON.stringify(header)} sign: ${JSON.stringify(sign)}`)
     if (!NodeList.byPubKey.has(sign.owner) && !NodeList.nodes.has(header.sender_id)) {
       warn('registerInternal2: internal routes can only be used by nodes in the network...')
       return
@@ -557,7 +553,7 @@ export function registerInternal2(route: string, handler: InternalBinaryHandler)
       return
     }
     if (route !== 'gossip') {
-      /* prettier-ignore */ logger.playbackLog(header.sender_id, 'self', 'InternalRecv', route, header.tracker_id, requestPayload)
+      /* prettier-ignore */ if (logFlags.playback) logger.playbackLog(header.sender_id, 'self', 'InternalRecv', route, header.tracker_id, requestPayload)
     }
     await handler(requestPayload, respondWrapped, header, sign)
   }
@@ -656,7 +652,7 @@ export async function sendGossip(
       )
     }
     for (const node of recipients) {
-      /* prettier-ignore */ if (logFlags.newFilter) logger.playbackLog('self', node.id, 'GossipInSend', type, tracker, gossipPayload)
+      /* prettier-ignore */ if (logFlags.playback) logger.playbackLog('self', node.id, 'GossipInSend', type, tracker, gossipPayload)
       gossipSent++
       gossipTypeSent[type] = gossipTypeSent[type] ? gossipTypeSent[type] + 1 : 1
     }
@@ -736,7 +732,7 @@ export async function sendGossipAll(
       )
     }
     for (const node of recipients) {
-      logger.playbackLog('self', node.id, 'GossipInSend', type, tracker, gossipPayload)
+      /* prettier-ignore */ if (logFlags.playback) logger.playbackLog('self', node.id, 'GossipInSend', type, tracker, gossipPayload)
     }
 
     if (commsCounters) {
@@ -844,7 +840,7 @@ export async function handleGossip(payload, sender, tracker = '', msgSize = cNoS
 
   gossipRecv++
   gossipTypeRecv[type] = gossipTypeRecv[type] ? gossipTypeRecv[type] + 1 : 1
-  logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
+  /* prettier-ignore */ if (logFlags.playback) logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
   // [TODO] - maybe we don't need to await the following line
   await gossipHandler(data, sender, tracker, msgSize)
   if (logFlags.verbose && logFlags.p2pNonFatal) {

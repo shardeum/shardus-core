@@ -484,27 +484,36 @@ class Shardus extends EventEmitter {
     } catch (e) {
       this.mainLogger.error('Socket connection break', e)
     }
-    this.network.on('timeout', (node, requestId: string, context: string) => {
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `In Shardus got network timeout-${context} for request ID - ${requestId} from node: ${logNode(node)}` )
+    this.network.on('timeout', (node, requestId: string, context: string, route: string) => {
+      const ipPort = `${node.internalIp}:${node.internalPort}`
+      //this console log is probably redundant but are disabled most of the time anyhow.
+      //They may help slighly in the case of adding some context to the out.log file when full debugging is on.
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`In Shardus got network timeout-${context} for request ID - ${requestId} from node: ${utils.logNode(node)} ${ipPort}` )
       const result = isApopMarkedNode(node.id)
       if (result) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `timeout-apop-${context}-${route}`)
         return
       }
       if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'timeout', requestId)
       /** [TODO] Report lost */
       /* prettier-ignore */ if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('lostNodes', `timeout-${context}`)
       // context has been added to provide info on the type of timeout and where it happened
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) nestedCountersInstance.countRareEvent( 'lostNodes', `timeout-${context} ${node.internalIp}:${node.internalPort}` )
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) nestedCountersInstance.countRareEvent( 'lostNodes', `timeout-${context}  ${ipPort}` )
       if (this.network.statisticsInstance) this.network.statisticsInstance.incrementCounter('lostNodeTimeout')
     })
-    this.network.on('error', (node, requestId: string, context: string, errorGroup: string) => {
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `In Shardus got network error-${context} for request ID ${requestId} from node: ${logNode(node)}` )
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`Error group for request ID - ${requestId}: ${errorGroup}`)
-      if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'error', requestId)
-      /** [TODO] Report lost */
-      /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `error-${context}`)
-      /* prettier-ignore */ nestedCountersInstance.countRareEvent( 'lostNodes', `error-${context}  ${node.internalIp}:${node.internalPort}` )
-    })
+    this.network.on(
+      'error',
+      (node, requestId: string, context: string, errorGroup: string, route: string) => {
+        const ipPort = `${node.internalIp}:${node.internalPort}`
+        //this console log is probably redundant but are disabled most of the time anyhow.
+        //They may help slighly in the case of adding some context to the out.log file when full debugging is on.
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`In Shardus got network error-${context} for request ID ${requestId} from node: ${utils.logNode(node)} ${ipPort} error:${errorGroup}` )
+        if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'error', requestId)
+        /** [TODO] Report lost */
+        /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `error-${context}-${route}`)
+        /* prettier-ignore */ nestedCountersInstance.countRareEvent( 'lostNodes', `error-${context}  ${ipPort}` )
+      }
+    )
 
     // Setup other modules
     this.debug = new Debug(this.config.baseDir, this.network)
