@@ -107,11 +107,20 @@ function _authenticateByNode(message, node) {
 // Extracts the payload from binary serialized wrapped messages.
 // This method could have done a complete deserialization into the specific type but,
 // that is avoided as we want to delay parsing of payload until header checks succeed.
-function _extractPayload2(wrappedPayload: { type: string; data: number[] }): Buffer {
-  if (wrappedPayload.type !== 'Buffer' || !Array.isArray(wrappedPayload.data))
-    throw new Error('Invalid wrappedPayload object')
+function _extractPayload2(wrappedPayload): Buffer {
+  /* prettier-ignore */ if (logFlags.verbose) console.log('extractPayload2: wrappedPayload', JSON.stringify(wrappedPayload))
+  let buffer = null
+  if (wrappedPayload instanceof Buffer) {
+    /* prettier-ignore */ if (logFlags.verbose) info(`_extractPayload2: wrappedPayload is a buffer: ${wrappedPayload}`)
+    buffer = wrappedPayload
+  } else if (wrappedPayload.type === 'Buffer' && Array.isArray(wrappedPayload.data)) {
+    /* prettier-ignore */ if (logFlags.verbose) info(`_extractPayload2: wrappedPayload is a buffer struct: ${wrappedPayload}`)
+    buffer = Buffer.from(wrappedPayload.data)
+  } else {
+    nestedCountersInstance.countEvent('comms-route', `extractPayload2: bad wrappedPayload`)
+    throw new Error(`Unsupported wrappedPayload type: ${wrappedPayload.type}`)
+  }
 
-  const buffer = Buffer.from(wrappedPayload.data)
   const stream = VectorBufferStream.fromBuffer(buffer)
   const payloadType = stream.readUInt16()
   switch (payloadType) {

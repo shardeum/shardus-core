@@ -89,6 +89,17 @@ const killOtherExternalRoute: P2P.P2PTypes.Route<Handler> = {
   },
 }
 
+const isDownCheckRoute: P2P.P2PTypes.Route<Handler> = {
+  method: 'GET',
+  name: 'down-check',
+  handler: async (_req, res) => {
+    const nodeId = _req.query.nodeId
+    const node = nodes.get(nodeId.toString())
+    const result = await isDownCheck(node)
+    res.json({ status: result })
+  },
+}
+
 const lostReportRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<P2P.LostTypes.SignedLostReport>> = {
   name: 'lost-report',
   handler: lostReportHandler,
