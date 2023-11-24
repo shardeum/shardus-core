@@ -1,6 +1,6 @@
-import * as Shardus from '../shardus/shardus-types'
 import { StateManager } from '@shardus/types'
-export { App, Cycle, Sign, AcceptedTx, ApplyResponse } from '../shardus/shardus-types'
+import * as Shardus from '../shardus/shardus-types'
+export { AcceptedTx, App, ApplyResponse, Cycle, Sign } from '../shardus/shardus-types'
 
 export type WrappedStateArray = Shardus.WrappedData[]
 
@@ -1127,6 +1127,7 @@ export type ShardusMemoryPatternsSets = {
   rw: Set<string>
   wo: Set<string>
   on: Set<string>
+  ri: Set<string>
 }
 
 export type ExecutionDebug = {

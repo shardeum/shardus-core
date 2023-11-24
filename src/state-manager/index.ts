@@ -2128,7 +2128,12 @@ class StateManager {
   // todo support metadata so we can serve up only a portion of the account
   // todo 2? communicate directly back to client... could have security issue.
   // todo 3? require a relatively stout client proof of work
-  async getLocalOrRemoteAccount(address: string): Promise<Shardus.WrappedDataFromQueue | null> {
+  async getLocalOrRemoteAccount(
+    address: string,
+    opts: {
+      useRICache: boolean // enables the RI cache. enable only for immutable data
+    } = { useRICache: false }
+  ): Promise<Shardus.WrappedDataFromQueue | null> {
     let wrappedAccount: Shardus.WrappedDataFromQueue | null = null
     if (!isServiceMode()) {
       if (this.currentCycleShardData == null) {
@@ -2137,6 +2142,18 @@ class StateManager {
       // TSConversion since this should never happen due to the above function should we assert that the value is non null?.  Still need to figure out the best practice.
       if (this.currentCycleShardData == null) {
         throw new Error('getLocalOrRemoteAccount: network not ready')
+      }
+    }
+
+    // If enabled, check the RI cache first
+    if (opts.useRICache) {
+      const riCacheResult = await this.app.getCachedRIAccountData([address])
+      if (riCacheResult != null) {
+        if (riCacheResult.length > 0) {
+          if (logFlags.verbose) this.mainLogger.debug(`getLocalOrRemoteAccount: RI cache hit for ${address}`)
+          wrappedAccount = riCacheResult[0] as Shardus.WrappedDataFromQueue
+        }
+        return wrappedAccount
       }
     }
 

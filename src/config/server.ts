@@ -208,6 +208,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     fixHomeNodeCheckForTXGroupChanges: false,
     archiverDataSubscriptionsUpdate: false,
     startInServiceMode: false,
+    enableRIAccountsCache: true,
   },
 }
 export default SERVER_CONFIG

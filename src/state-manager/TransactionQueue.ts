@@ -2,9 +2,9 @@ import { StateManager as StateManagerTypes } from '@shardus/types'
 import StateManager from '.'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
-import { P2PModuleContext as P2P } from '../p2p/Context'
-import * as Archivers from '../p2p/Archivers'
 import * as Apoptosis from '../p2p/Apoptosis'
+import * as Archivers from '../p2p/Archivers'
+import { P2PModuleContext as P2P } from '../p2p/Context'
 import * as CycleChain from '../p2p/CycleChain'
 import { potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
@@ -19,25 +19,25 @@ import {
   AccountFilter,
   CommitConsensedTransactionResult,
   PreApplyAcceptedTransactionResult,
+  ProcessQueueStats,
+  QueueCountsResult,
   QueueEntry,
-  TxDebug,
   RequestReceiptForTxResp,
+  RequestReceiptForTxResp_old,
   RequestStateForTxReq,
   RequestStateForTxResp,
   SeenAccounts,
+  SimpleNumberStats,
   StringBoolObjectMap,
   StringNodeObjectMap,
+  TxDebug,
   WrappedResponses,
-  RequestReceiptForTxResp_old,
-  ProcessQueueStats,
-  SimpleNumberStats,
-  QueueCountsResult,
 } from './state-manager-types'
 import { isInternalTxAllowed, networkMode } from '../p2p/Modes'
-import { stringify } from '../utils'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
 import { Logger as L4jsLogger } from 'log4js'
 import { shardusGetTime } from '../network'
+import { stringify } from '../utils'
 
 interface Receipt {
   tx: AcceptedTx
@@ -1580,11 +1580,15 @@ class TransactionQueue {
             rw: new Set(acceptedTx.shardusMemoryPatterns.rw),
             wo: new Set(acceptedTx.shardusMemoryPatterns.wo),
             on: new Set(acceptedTx.shardusMemoryPatterns.on),
+            ri: new Set(acceptedTx.shardusMemoryPatterns.ri),
           }
           nestedCountersInstance.countEvent('transactionQueue', 'shardusMemoryPatternSets included')
         } else {
           nestedCountersInstance.countEvent('transactionQueue', 'shardusMemoryPatternSets not included')
         }
+
+        // This call is not awaited. It is expected to be fast and will be done in the background.
+        this.queueEntryPrePush(txQueueEntry)
 
         this.pendingTransactionQueue.push(txQueueEntry)
         this.pendingTransactionQueueByID.set(txQueueEntry.acceptedTx.txId, txQueueEntry)
@@ -1603,6 +1607,37 @@ class TransactionQueue {
       return true
     } finally {
       this.profiler.profileSectionEnd('enqueue')
+    }
+  }
+
+  async queueEntryPrePush(txQueueEntry: QueueEntry): Promise<void> {
+    // Pre fetch immutable read account data for this TX
+    if (
+      this.config.features.enableRIAccountsCache &&
+      txQueueEntry.shardusMemoryPatternSets &&
+      txQueueEntry.shardusMemoryPatternSets.ri &&
+      txQueueEntry.shardusMemoryPatternSets.ri.size > 0
+    ) {
+      for (const key of txQueueEntry.shardusMemoryPatternSets.ri) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('transactionQueue', 'queueEntryPrePush_ri')
+        /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.info(`queueEntryPrePush: fetching immutable data for tx ${txQueueEntry.acceptedTx.txId} key ${key}`)
+        const accountData = await this.stateManager.getLocalOrRemoteAccount(key, {
+          useRICache: true,
+        })
+        if (accountData != null) {
+          this.app.setCachedRIAccountData([accountData])
+          this.queueEntryAddData(txQueueEntry, {
+            accountId: accountData.accountId,
+            stateId: accountData.stateId,
+            data: accountData.data,
+            timestamp: accountData.timestamp,
+            syncData: accountData.syncData,
+            accountCreated: false,
+            isPartial: false,
+          })
+          /* prettier-ignore */ nestedCountersInstance.countEvent('transactionQueue', 'queueEntryPrePush_ri_added')
+        }
+      }
     }
   }
 

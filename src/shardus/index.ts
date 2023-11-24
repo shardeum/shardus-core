@@ -1498,9 +1498,14 @@ class Shardus extends EventEmitter {
   }
 
   // USED BY SIMPLECOINAPP
-  async getLocalOrRemoteAccount(address) {
+  async getLocalOrRemoteAccount(
+    address,
+    opts: {
+      useRICache: boolean // enables the RI cache. enable only for immutable data
+    } = { useRICache: false }
+  ) {
     if (this.p2p.allowTransactions() || isServiceMode()) {
-      return this.stateManager.getLocalOrRemoteAccount(address)
+      return this.stateManager.getLocalOrRemoteAccount(address, opts)
     } else {
       return null
     }
@@ -1857,6 +1862,29 @@ class Shardus extends EventEmitter {
         }
       } else {
         throw new Error('Missing required interface function. getAccountData()')
+      }
+
+      if (typeof application.getCachedRIAccountData === 'function') {
+        applicationInterfaceImpl.getCachedRIAccountData = async (addressList: string[]) => {
+          this.profiler.scopedProfileSectionStart('process-dapp.getCachedRIAccountData', false)
+          const res = await application.getCachedRIAccountData(addressList)
+          this.profiler.scopedProfileSectionEnd('process-dapp.getCachedRIAccountData')
+          return res
+        }
+      } else {
+        applicationInterfaceImpl.getCachedRIAccountData = async (addressList: string[]) => {
+          return []
+        }
+      }
+
+      if (typeof application.setCachedRIAccountData === 'function') {
+        applicationInterfaceImpl.setCachedRIAccountData = async (accountRecords: any[]) => {
+          this.profiler.scopedProfileSectionStart('process-dapp.setCachedRIAccountData', false)
+          await application.setCachedRIAccountData(accountRecords)
+          this.profiler.scopedProfileSectionEnd('process-dapp.setCachedRIAccountData')
+        }
+      } else {
+        applicationInterfaceImpl.setCachedRIAccountData = async (accountRecords: any[]) => {}
       }
 
       if (typeof application.getAccountDataByRange === 'function') {

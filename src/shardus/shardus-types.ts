@@ -286,6 +286,10 @@ export interface App {
 
   getAccountDataByList: (addressList: string[]) => Promise<WrappedData[]>
 
+  getCachedRIAccountData: (addressList: string[]) => Promise<WrappedData[]>
+
+  setCachedRIAccountData: (accountRecords: unknown[]) => Promise<void>
+
   getNetworkAccount: () => Promise<WrappedData>
 
   deleteLocalAccountData: () => Promise<void>
@@ -992,6 +996,8 @@ export interface ServerConfiguration {
     /** To enable at shardeum v1.1.3 */
     archiverDataSubscriptionsUpdate?: boolean
     startInServiceMode?: boolean
+    /** This flag defaults to true. If set to true, addresses marked as ir will be fetched when tx is ageing. */
+    enableRIAccountsCache: boolean
   }
 }
 
@@ -1186,6 +1192,7 @@ export type ShardusMemoryPatternsInput = {
   rw: string[]
   wo: string[]
   on: string[]
+  ri: string[]
 }
 
 export interface TxReceipt {
