@@ -28,6 +28,7 @@ import rfdc from 'rfdc'
 import { shardusGetTime } from '../network'
 import getCallstack from '../utils/getCallstack'
 const deepCopy = rfdc()
+import { isServiceMode } from '../debug'
 
 /** STATE */
 
@@ -76,6 +77,13 @@ export function init(): void {
   ip = network.ipInfo.externalIp
   port = network.ipInfo.externalPort
 
+  // Create a logger for yourself
+  p2pLogger = Context.logger.getLogger('p2p')
+
+  if (isServiceMode()) {
+    info('p2p/Self/init disabled: Starting in service mode.')
+    return
+  }
   // Init submodules
   Comms.init()
   Archivers.init()
@@ -103,6 +111,10 @@ export function init(): void {
 
 export function startupV2(): Promise<boolean> {
   const promise = new Promise<boolean>((resolve, reject) => {
+    if (isServiceMode()) {
+      info('p2p/Self/startup disabled: Starting in service mode.')
+      return true
+    }
     const publicKey = Context.crypto.getPublicKey()
     let attemptJoiningTimer = null
     let attemptJoiningRunning = false

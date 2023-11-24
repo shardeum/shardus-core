@@ -206,6 +206,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
   features: {
     fixHomeNodeCheckForTXGroupChanges: false,
     archiverDataSubscriptionsUpdate: false,
+    startInServiceMode: false,
   },
 }
 export default SERVER_CONFIG

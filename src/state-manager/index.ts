@@ -77,6 +77,7 @@ import { Logger as Log4jsLogger } from 'log4js'
 import { NodeInfo } from '@shardus/types/build/src/p2p/P2PTypes'
 import { timingSafeEqual } from 'crypto'
 import { shardusGetTime } from '../network'
+import { isServiceMode } from '../debug'
 
 export type Callback = (...args: unknown[]) => void
 
@@ -2101,28 +2102,31 @@ class StateManager {
   // todo 3? require a relatively stout client proof of work
   async getLocalOrRemoteAccount(address: string): Promise<Shardus.WrappedDataFromQueue | null> {
     let wrappedAccount: Shardus.WrappedDataFromQueue | null = null
-
-    if (this.currentCycleShardData == null) {
-      await this.waitForShardData()
-    }
-    // TSConversion since this should never happen due to the above function should we assert that the value is non null?.  Still need to figure out the best practice.
-    if (this.currentCycleShardData == null) {
-      throw new Error('getLocalOrRemoteAccount: network not ready')
+    if (!isServiceMode()) {
+      if (this.currentCycleShardData == null) {
+        await this.waitForShardData()
+      }
+      // TSConversion since this should never happen due to the above function should we assert that the value is non null?.  Still need to figure out the best practice.
+      if (this.currentCycleShardData == null) {
+        throw new Error('getLocalOrRemoteAccount: network not ready')
+      }
     }
 
     let forceLocalGlobalLookup = false
 
-    if (this.accountGlobals.isGlobalAccount(address)) {
+    if (this.accountGlobals.isGlobalAccount(address) || isServiceMode()) {
       forceLocalGlobalLookup = true
     }
-    let accountIsRemote = this.transactionQueue.isAccountRemote(address)
+    let accountIsRemote = isServiceMode() ? true : this.transactionQueue.isAccountRemote(address)
 
     // hack to say we have all the data
-    if (
-      this.currentCycleShardData.activeNodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius
-    ) {
-      accountIsRemote = false
-    }
+    if (!isServiceMode())
+      if (
+        this.currentCycleShardData.activeNodes.length <=
+        this.currentCycleShardData.shardGlobals.consensusRadius
+      ) {
+        accountIsRemote = false
+      }
     if (forceLocalGlobalLookup) {
       accountIsRemote = false
     }

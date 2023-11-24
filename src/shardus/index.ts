@@ -44,7 +44,7 @@ import MemoryReporting from '../utils/memoryReporting'
 import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
 import { startSaving } from './saveConsoleOutput'
-import { isDebugMode } from '../debug'
+import { isDebugMode, isServiceMode } from '../debug'
 import * as JoinV2 from '../p2p/Join/v2'
 import { getNetworkTimeOffset, shardusGetTime } from '../network'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
@@ -405,8 +405,10 @@ class Shardus extends EventEmitter {
       // throw new Error(`Time is not synced with the network`)
     }
 
-    // Setup storage
-    await this.storage.init()
+    if (!isServiceMode()) {
+      // Setup storage
+      await this.storage.init()
+    }
 
     // Setup crypto
     await this.crypto.init()
@@ -520,34 +522,36 @@ class Shardus extends EventEmitter {
     this.debug.addToArchive(this.logger.logDir, './logs')
     this.debug.addToArchive(path.parse(this.storage.storage.storageConfig.options.storage).dir, './db')
 
-    this.statistics = new Statistics(
-      this.config.baseDir,
-      this.config.statistics,
-      {
-        counters: [
-          'txInjected',
-          'txApplied',
-          'txRejected',
-          'txExpired',
-          'txProcessed',
-          'networkTimeout',
-          'lostNodeTimeout',
-        ],
-        watchers: {
-          queueLength: () =>
-            this.stateManager ? this.stateManager.transactionQueue._transactionQueue.length : 0,
-          executeQueueLength: () =>
-            this.stateManager ? this.stateManager.transactionQueue.getExecuteQueueLength() : 0,
-          serverLoad: () => (this.loadDetection ? this.loadDetection.getCurrentLoad() : 0),
+    if (!isServiceMode()) {
+      this.statistics = new Statistics(
+        this.config.baseDir,
+        this.config.statistics,
+        {
+          counters: [
+            'txInjected',
+            'txApplied',
+            'txRejected',
+            'txExpired',
+            'txProcessed',
+            'networkTimeout',
+            'lostNodeTimeout',
+          ],
+          watchers: {
+            queueLength: () =>
+              this.stateManager ? this.stateManager.transactionQueue._transactionQueue.length : 0,
+            executeQueueLength: () =>
+              this.stateManager ? this.stateManager.transactionQueue.getExecuteQueueLength() : 0,
+            serverLoad: () => (this.loadDetection ? this.loadDetection.getCurrentLoad() : 0),
+          },
+          timers: ['txTimeInQueue'],
+          manualStats: ['netInternalDuty', 'netExternalDuty'],
+          fifoStats: ['cpuPercent'],
+          ringOverrides: {},
+          fifoOverrides: { cpuPercent: 240 },
         },
-        timers: ['txTimeInQueue'],
-        manualStats: ['netInternalDuty', 'netExternalDuty'],
-        fifoStats: ['cpuPercent'],
-        ringOverrides: {},
-        fifoOverrides: { cpuPercent: 240 },
-      },
-      this
-    )
+        this
+      )
+    }
     this.debug.addToArchive('./statistics.tsv', './statistics.tsv')
 
     this.profiler.setStatisticsInstance(this.statistics)
@@ -567,7 +571,7 @@ class Shardus extends EventEmitter {
       AutoScaling.requestNetworkDownsize()
     })
 
-    this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
+    if (!isServiceMode()) this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
 
     this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection)
 
@@ -586,16 +590,17 @@ class Shardus extends EventEmitter {
       }
     }
 
-    this.reporter = this.config.reporting.report
-      ? new Reporter(
-          this.config.reporting,
-          this.logger,
-          this.statistics,
-          this.stateManager,
-          this.profiler,
-          this.loadDetection
-        )
-      : null
+    this.reporter =
+      this.config.reporting.report && !isServiceMode()
+        ? new Reporter(
+            this.config.reporting,
+            this.logger,
+            this.statistics,
+            this.stateManager,
+            this.profiler,
+            this.loadDetection
+          )
+        : null
     Context.setReporterContext(this.reporter)
 
     this._registerRoutes()
@@ -1441,7 +1446,7 @@ class Shardus extends EventEmitter {
 
   // USED BY SIMPLECOINAPP
   async getLocalOrRemoteAccount(address) {
-    if (this.p2p.allowTransactions()) {
+    if (this.p2p.allowTransactions() || isServiceMode()) {
       return this.stateManager.getLocalOrRemoteAccount(address)
     } else {
       return null

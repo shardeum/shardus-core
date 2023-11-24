@@ -18,6 +18,10 @@ export function isDebugModeAnd(
   return isDebugMode() && !!predicate(config.debug || ({} as Partial<DebugConfigurations>))
 }
 
+export function isServiceMode(): boolean {
+  return config && config.features && config.features.startInServiceMode
+}
+
 export function getHashedDevKey(): string {
   if (config && config.debug && config.debug.hashedDevAuth) {
     return config.debug.hashedDevAuth

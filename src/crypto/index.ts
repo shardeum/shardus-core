@@ -6,7 +6,7 @@ import path from 'path'
 import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
-import {cryptoStringify} from '../utils'
+import { cryptoStringify } from '../utils'
 
 export type HashableObject = (object | string) & { sign?: Shardus.Sign }
 
@@ -45,12 +45,17 @@ class Crypto {
     crypto.init(this.config.crypto.hashKey)
     crypto.setCustomStringifier(cryptoStringify, 'shardus_crypto_stringify')
 
-    const keypair = await this.storage.getProperty('keypair')
-    if (keypair) {
-      this.mainLogger.info('Keypair loaded from database', this.getKeyPairFile())
-      this.keypair = keypair
-      this.setCurveKeyPair(this.keypair)
-      return
+    try {
+      this.storage._checkInit()
+      const keypair = await this.storage.getProperty('keypair')
+      if (keypair) {
+        this.mainLogger.info('Keypair loaded from database', this.getKeyPairFile())
+        this.keypair = keypair
+        this.setCurveKeyPair(this.keypair)
+        return
+      }
+    } catch (e) {
+      if (logFlags.error) this.mainLogger.error(`error fetching keypair from database ${JSON.stringify(e)}`)
     }
 
     if (this.config.crypto.keyPairConfig.useKeyPairFromFile) {
