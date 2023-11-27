@@ -400,6 +400,13 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
           targetCount = config.p2p.maxNodes
         }
       }
+    } else if ( // In these modes, the target count should be set to the desired/min count
+      prevRecord.mode === 'safety' ||
+      prevRecord.mode === 'recovery' ||
+      prevRecord.mode === 'restore'
+    ) {
+      // For the number of nodes to be added in each cycle during these modes is defined in the calculateToAcceptV2 function
+      targetCount = config.p2p.minNodes
     } else if (prevRecord.mode === 'restart') {
       // In restart mode, all the nodes remain in 'syncing' mode until the desired number of nodes are reached
       /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in restart")

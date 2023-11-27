@@ -1,6 +1,6 @@
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import { enterRecovery, enterSafety, enterProcessing } from './Modes'
+import { enterRecovery, enterSafety, enterProcessing, enterShutdown } from './Modes'
 import { config } from './Context'
 import { targetCount } from './CycleAutoScale'
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -155,7 +155,7 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
           }
         }
         // Is this needed for lost nodes? lost nodes didn't get removed in next cycle if they refuted
-        // Or is the intention is to use the removed nodes in the previous cycle?
+        // Or is the intention to use the removed nodes in the previous cycle? If so, we can also consider apoptosized nodes as well.
         addRem += prevRecord.lost.length // compensate for nodes that were lost; though this could add more burden on existing nodes
         if (addRem > 0) {
           add = Math.ceil(addRem)
@@ -164,11 +164,11 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
         }
       }
     } else if (prevRecord.mode === 'recovery') {
-      if (enterSafety(active, prevRecord) === false) {
-        let addRem = 0.62 * config.p2p.minNodes - (active + syncing) // we try to overshoot min value by 2%; for slow syncing nodes
-        if (addRem > active * 0.1) {
-          // we really should be looking at how many archivers are available to sync from
-          addRem = ~~(active * 0.1)
+      if (enterShutdown(active) === false) {
+        const totalNodeCount = active + syncing
+        let addRem = target - totalNodeCount
+        if (addRem > totalNodeCount * 0.2) {
+          addRem = ~~(totalNodeCount * 0.2) // Add 20% more nodes on each cycle
           if (addRem === 0) {
             addRem = 1
           }
@@ -178,6 +178,12 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
           remove = 0
           return { add, remove }
         }
+      }
+    } else if (prevRecord.mode === 'restore') {
+      const addRem = target - (active + syncing)
+      if (addRem > 0) {
+        add = Math.ceil(addRem)
+        return { add, remove }
       }
     }
   }

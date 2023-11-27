@@ -387,6 +387,36 @@ class StateManager {
     this.lastActiveCount = -1
   }
 
+  renewState() {
+    //BLOCK1
+    this.lastSeenAccountsMap = null
+
+    this.appFinishedSyncing = false
+
+    //BLOCK2
+
+    //BLOCK3
+    this.dataPhaseTag = 'DATASYNC: '
+
+    //BLOCK4
+    this.lastActiveNodeCount = 0
+
+    this.preTXQueue = []
+
+    //RESET some required modules
+
+    this.accountCache.resetAccountCache()
+
+    this.accountSync.clearSyncData()
+    this.accountSync.clearSyncTrackers()
+    this.accountSync.dataSyncMainPhaseComplete = false
+
+    this.processCycleSummaries = false //starts false and get enabled when startProcessingCycleSummaries() is called
+
+    //Fifo locks.
+    this.fifoLocks = {}
+  }
+
   configsInit() {
     //this.canDataRepair = false
     // this controls the OLD repair portion of data repair.

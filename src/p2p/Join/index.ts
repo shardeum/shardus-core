@@ -104,8 +104,8 @@ export function calculateToAccept(): number {
     CycleChain.newest.safetyMode === true
       ? CycleChain.newest.safetyNum
       : Math.floor(
-          config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor * CycleCreator.scaleFactorSyncBoost
-        )
+        config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor * CycleCreator.scaleFactorSyncBoost
+      )
 
   //The first batch of nodes to join the network after the seed node server can join at a higher rate if firstCycleJoin is set.
   //This first batch will sync the full data range from the seed node, which should be very little data.
@@ -162,19 +162,19 @@ export function calculateToAccept(): number {
     lastLoggedCycle = cycle
     info(
       'scale dump:' +
-        JSON.stringify({
-          cycle,
-          scaleFactor: CycleCreator.scaleFactor,
-          needed,
-          desired,
-          active,
-          syncing,
-          canSync,
-          syncMax,
-          maxJoin,
-          expired,
-          scaleFactorSyncBoost: CycleCreator.scaleFactorSyncBoost,
-        })
+      JSON.stringify({
+        cycle,
+        scaleFactor: CycleCreator.scaleFactor,
+        needed,
+        desired,
+        active,
+        syncing,
+        canSync,
+        syncMax,
+        maxJoin,
+        expired,
+        scaleFactorSyncBoost: CycleCreator.scaleFactorSyncBoost,
+      })
     )
   }
   return needed

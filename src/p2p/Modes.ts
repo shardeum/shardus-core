@@ -118,17 +118,17 @@ export function updateRecord(
       } else if (prev.mode === 'recovery') {
         if (enterShutdown(active)) {
           record.mode = 'shutdown'
+        } else if (enterRestore(active + prev.syncing)) {
+          record.mode = 'restore'
         }
-        // TODO: // Add enterRestore() check
       } else if (prev.mode === 'shutdown' && Self.isFirst) {
-        if (Self.isRestartNetwork) Object.assign(record, { mode: 'restart' })
+        record.mode = 'restart'
       } else if (prev.mode === 'restart') {
         // Use prev.syncing to be sure that new joined nodes in the previous cycle have synced the cycle data before we trigger the `restore` mode to start syncing the state data
         if (enterRestore(prev.syncing)) {
           record.mode = 'restore'
         }
       } else if (prev.mode === 'restore') {
-        // This might need to be changed later when adding the restore feature
         if (enterProcessing(active)) {
           record.mode = 'processing'
         }
@@ -136,7 +136,7 @@ export function updateRecord(
     }
   } else if (Self.isFirst) {
     // If you're the first node
-    Object.assign(record, { mode: 'forming' })
+    record.mode = 'forming'
   }
 }
 
@@ -197,6 +197,6 @@ export function isInternalTxAllowed(): boolean {
   return ['processing', 'safety', 'forming'].includes(networkMode)
 }
 
-export function enterRestore(syncingCount: number): boolean {
-  return syncingCount >= Context.config.p2p.minNodes
+export function enterRestore(totalNodeCount: number): boolean {
+  return totalNodeCount >= Context.config.p2p.minNodes
 }

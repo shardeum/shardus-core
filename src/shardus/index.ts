@@ -632,7 +632,7 @@ class Shardus extends EventEmitter {
       if (newest && newest.safetyMode === true) {
         // Use snapshot to put old app data into state-manager then go active
         await Snapshot.safetySync()
-      } else if (newest && newest.mode === 'restart') {
+      } else if (newest && (newest.mode === 'restart' || newest.mode === 'recovery')) {
         // Stay in syncing mode and let other nodes join
         Self.setp2pIgnoreJoinRequests(false)
         console.log('p2pIgnoreJoinRequests = false')
@@ -645,10 +645,12 @@ class Shardus extends EventEmitter {
       }
     })
     Self.emitter.on('restore', async (cycleNumber: number) => {
+      console.log('restore mode triggered on cycle', cycleNumber)
       this.logger.playbackLogState('restore', '', `Restore mode triggered on cycle ${cycleNumber}`)
       await this.stateManager.waitForShardCalcs()
       // Start restoring state data
       try {
+        this.stateManager.renewState()
         await this.stateManager.accountSync.initialSyncMain(3)
         console.log('syncAppData - initialSyncMain finished')
       } catch (err) {
@@ -1077,15 +1079,15 @@ class Shardus extends EventEmitter {
 
       let appData = {}
 
-      if (this.app.isInternalTx(tx) && !isInternalTxAllowed()) {
+      const internalTx = this.app.isInternalTx(tx)
+      if (internalTx && !isInternalTxAllowed()) {
         return {
           success: false,
           reason: `Internal transactions are not allowed in ${networkMode} Mode.`,
           status: 500,
         }
       }
-
-      if (!this.app.isInternalTx(tx) && networkMode !== 'processing') {
+      if (!internalTx && networkMode !== 'processing') {
         return {
           success: false,
           reason: `Application transactions are only allowed in processing Mode.`,

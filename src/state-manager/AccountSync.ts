@@ -29,14 +29,11 @@ import {
   GetAccountStateReq,
   GlobalAccountReportResp,
 } from './state-manager-types'
-<<<<<<< HEAD
 import { shardusGetTime } from '../network'
-=======
 import { networkMode } from '../p2p/Modes'
 import ArchiverSyncTracker from './ArchiverSyncTracker'
 import { getArchiversList } from '../p2p/Archivers'
 import * as http from '../http'
->>>>>>> d86961fb (Put the changes required for syncing data in the restore mode)
 
 const REDUNDANCY = 3
 

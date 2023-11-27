@@ -8,12 +8,12 @@ import * as Self from '../../Self'
 import * as CycleChain from '../../CycleChain'
 import * as NodeList from '../../NodeList'
 import * as http from '../../../http'
-import { getStandbyNodesInfoMap } from ".";
-import { calculateToAcceptV2 } from "../../ModeSystemFuncs";
-import { fastIsPicked } from "../../../utils";
-import { getOurNodeIndex, getOurNodeIndexFromSyncingList } from "../../Utils";
-import { nestedCountersInstance } from "../../../utils/nestedCounters";
-import { logFlags } from "../../../logger";
+import { getStandbyNodesInfoMap } from '.'
+import { calculateToAcceptV2 } from '../../ModeSystemFuncs'
+import { fastIsPicked } from '../../../utils'
+import { getOurNodeIndex, getOurNodeIndexFromSyncingList } from '../../Utils'
+import { nestedCountersInstance } from '../../../utils/nestedCounters'
+import { logFlags } from '../../../logger'
 
 const selectedPublicKeys: Set<string> = new Set()
 
@@ -26,14 +26,15 @@ const NUM_NOTIFYING_NODES = 5
  * skipped.
  */
 export function executeNodeSelection(): void {
-  if (!Self.isActive && !Self.getIsFirst()) {
+  // Only if the node is active or if it is the first node in the restart mode network
+  if (Self.isActive || (!Self.isActive && Self.isFirst && Self.isRestartNetwork)) {
+    const { add } = calculateToAcceptV2(CycleChain.newest)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`selecting ${add} nodes to accept`)
+    selectNodes(add)
+  } else {
     /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.warn('not selecting nodes because we are not active yet')
     return
   }
-
-  const { add } = calculateToAcceptV2(CycleChain.newest)
-  /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`selecting ${add} nodes to accept`)
-  selectNodes(add)
 }
 
 /**
@@ -80,57 +81,61 @@ export function selectNodes(maxAllowed: number): void {
         selectedPublicKeys.add(obj.publicKey)
       }
     }
+  }
+}
 /**
-  * Notifies the nodes that have been selected that they have been selected by
-  * calling their `accepted` endpoints.`
-  */
+ * Notifies the nodes that have been selected that they have been selected by
+ * calling their `accepted` endpoints.`
+ */
 export async function notifyNewestJoinedConsensors(): Promise<void> {
-  const counter = CycleChain.getNewest().counter
+  return //accepted endpoint seem deprecated and always fails!
 
-  if (!Self.isActive) {
-    if (Self.isRestartNetwork && Self.isFirst) {
-      nestedCountersInstance.countEvent('joinV2', `C${counter}: notifyNewestJoinedConsensors: isRestartNetwork && isFirst`)
-      notifyingNewestJoinedConsensors()
-      // // decide if we should be in charge of notifying joining nodes
-      // const params = {
-      //   getOurNodeIndex: CycleChain.getNewest().mode === 'restart' ? 0 : getOurNodeIndex(),
-      //   activeByIdOrderLength:
-      //     CycleChain.getNewest().mode === 'restart' ? 1 : NodeList.activeByIdOrder.length,
-      //   NUM_NOTIFYING_NODES,
-      //   CycleChainNewestCounter: CycleChain.newest.counter,
-      // }
-      // console.log(`C${counter} fastIsPicked params: ${JSON.stringify(params)}`)
-      // const shouldNotify = fastIsPicked(
-      //   CycleChain.getNewest().mode === 'restart' ? 1 : getOurNodeIndex(),
-      //   CycleChain.getNewest().mode === 'restart' ? 0 : NodeList.activeByIdOrder.length,
-      //   NUM_NOTIFYING_NODES,
-      //   CycleChain.newest.counter
-      // )
-      // console.log(`C${counter} shouldNotify: ${shouldNotify}`)
-    } else console.warn(`C${counter} not notifying nodes because we are not active yet`)
-    return
-  }
+  //   const counter = CycleChain.getNewest().counter
 
-  // decide if we should be in charge of notifying joining nodes
-  const params = {
-    getOurNodeIndex: getOurNodeIndex(),
-    activeByIdOrderLength: NodeList.activeByIdOrder.length,
-    NUM_NOTIFYING_NODES,
-    CycleChainNewestCounter: CycleChain.newest.counter
-  }
-  console.log(`C${counter} fastIsPicked params: ${JSON.stringify(params)}`)
-  const shouldNotify = fastIsPicked(
-    getOurNodeIndex(),
-    NodeList.activeByIdOrder.length,
-    NUM_NOTIFYING_NODES,
-    CycleChain.newest.counter
-  )
+  //   if (!Self.isActive) {
+  //     if (Self.isRestartNetwork && Self.isFirst) {
+  //       nestedCountersInstance.countEvent('joinV2', `C${counter}: notifyNewestJoinedConsensors: isRestartNetwork && isFirst`)
+  //       notifyingNewestJoinedConsensors()
+  //       // // decide if we should be in charge of notifying joining nodes
+  //       // const params = {
+  //       //   getOurNodeIndex: CycleChain.getNewest().mode === 'restart' ? 0 : getOurNodeIndex(),
+  //       //   activeByIdOrderLength:
+  //       //     CycleChain.getNewest().mode === 'restart' ? 1 : NodeList.activeByIdOrder.length,
+  //       //   NUM_NOTIFYING_NODES,
+  //       //   CycleChainNewestCounter: CycleChain.newest.counter,
+  //       // }
+  //       // console.log(`C${counter} fastIsPicked params: ${JSON.stringify(params)}`)
+  //       // const shouldNotify = fastIsPicked(
+  //       //   CycleChain.getNewest().mode === 'restart' ? 1 : getOurNodeIndex(),
+  //       //   CycleChain.getNewest().mode === 'restart' ? 0 : NodeList.activeByIdOrder.length,
+  //       //   NUM_NOTIFYING_NODES,
+  //       //   CycleChain.newest.counter
+  //       // )
+  //       // console.log(`C${counter} shouldNotify: ${shouldNotify}`)
+  //     } else console.warn(`C${counter} not notifying nodes because we are not active yet`)
+  //     return
+  //   }
 
-  // if so, do so
-  if (shouldNotify) {
-    nestedCountersInstance.countEvent('joinV2', `C${counter}: notifyNewestJoinedConsensors: shouldNotify`)
-    notifyingNewestJoinedConsensors()
-  }
+  //   // decide if we should be in charge of notifying joining nodes
+  //   const params = {
+  //     getOurNodeIndex: getOurNodeIndex(),
+  //     activeByIdOrderLength: NodeList.activeByIdOrder.length,
+  //     NUM_NOTIFYING_NODES,
+  //     CycleChainNewestCounter: CycleChain.newest.counter
+  //   }
+  //   console.log(`C${counter} fastIsPicked params: ${JSON.stringify(params)}`)
+  //   const shouldNotify = fastIsPicked(
+  //     getOurNodeIndex(),
+  //     NodeList.activeByIdOrder.length,
+  //     NUM_NOTIFYING_NODES,
+  //     CycleChain.newest.counter
+  //   )
+
+  //   // if so, do so
+  //   if (shouldNotify) {
+  //     nestedCountersInstance.countEvent('joinV2', `C${counter}: notifyNewestJoinedConsensors: shouldNotify`)
+  //     notifyingNewestJoinedConsensors()
+  //   }
 }
 
 export async function notifyingNewestJoinedConsensors(): Promise<void> {
@@ -163,9 +168,9 @@ export async function notifyingNewestJoinedConsensors(): Promise<void> {
   }
 }
 /**
-  * Returns the list of public keys of the nodes that have been selected and
-  * empties the list.
-  */
+ * Returns the list of public keys of the nodes that have been selected and
+ * empties the list.
+ */
 export function drainSelectedPublicKeys(): string[] {
   const tmp = [...selectedPublicKeys.values()]
   selectedPublicKeys.clear()

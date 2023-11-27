@@ -302,6 +302,8 @@ async function cycleCreator() {
     }
 
     /* prettier-ignore */ if (logFlags.verbose) info(`cc: prevRecord.counter: ${prevRecord.counter} ${callTag}`)
+    info(`cc: prevRecord.counter: ${prevRecord.counter} ${callTag}`)
+    const networkModeBefore = Modes.networkMode // Before applying new record
     //WE complete Sync.digestCycle each cycle even thought we are failing later to get to cycleLogger.info
 
     // Apply the previous records changes to the NodeList
@@ -390,6 +392,11 @@ async function cycleCreator() {
     if (prevRecord.active >= config.p2p.minNodes && hasAlreadyEnteredProcessing === false) {
       hasAlreadyEnteredProcessing = true
     }
+    const networkModeAfter = Modes.networkMode // After applying new record
+    if (networkModeBefore === 'recovery' && networkModeAfter === 'restore') {
+      NodeList.changeNodeListInRestore(prevRecord.start)
+    }
+
     if (prevRecord.mode === 'shutdown') {
       console.log(
         `❌ Shutdown mode activated at Cycle ${prevRecord.counter}. Exiting Network after ${prevRecord.duration}s.`

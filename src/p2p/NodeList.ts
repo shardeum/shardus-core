@@ -343,6 +343,54 @@ export function getLastHashedNodeList(): P2P.NodeListTypes.Node[] {
   return lastHashedList
 }
 
+export function changeNodeListInRestore(cycleStartTimestamp: number) {
+  if (activeByIdOrder.length === 0) return
+  // Combine activeByIdOrder to syncingByIdOrder nodelist; Clear activeByIdOrder and activeOthersByIdOrder nodelists
+  for (const node of activeByIdOrder) {
+    node.syncingTimestamp = cycleStartTimestamp
+    insertSorted(syncingByIdOrder, node, propComparator('id'))
+  }
+  activeByIdOrder = []
+  activeOthersByIdOrder = []
+  // change active status nodes to syncing status
+  for (const [, node] of nodes) {
+    if (node.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
+      node.status = P2P.P2PTypes.NodeStatus.SYNCING
+      node.syncingTimestamp = cycleStartTimestamp
+    }
+  }
+  for (const [, node] of byPubKey) {
+    if (node.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
+      node.status = P2P.P2PTypes.NodeStatus.SYNCING
+      node.syncingTimestamp = cycleStartTimestamp
+    }
+  }
+  for (const [, node] of byIpPort) {
+    if (node.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
+      node.status = P2P.P2PTypes.NodeStatus.SYNCING
+      node.syncingTimestamp = cycleStartTimestamp
+    }
+  }
+  for (const node of byJoinOrder) {
+    if (node.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
+      node.status = P2P.P2PTypes.NodeStatus.SYNCING
+      node.syncingTimestamp = cycleStartTimestamp
+    }
+  }
+  for (const node of byIdOrder) {
+    if (node.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
+      node.status = P2P.P2PTypes.NodeStatus.SYNCING
+      node.syncingTimestamp = cycleStartTimestamp
+    }
+  }
+  for (const node of othersByIdOrder) {
+    if (node.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
+      node.status = P2P.P2PTypes.NodeStatus.SYNCING
+      node.syncingTimestamp = cycleStartTimestamp
+    }
+  }
+}
+
 /** ROUTES */
 
 function info(...msg: string[]) {

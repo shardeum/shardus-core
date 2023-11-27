@@ -70,6 +70,16 @@ class AccountCache {
     this.cacheUpdateQueue = { accountIDs: [], accountHashesSorted: [] }
   }
 
+  resetAccountCache(): void {
+    this.accountsHashCache3 = {
+      currentCalculationCycle: -1,
+      workingHistoryList: { accountIDs: [], accountHashesSorted: [] },
+      accountHashMap: new Map(),
+      futureHistoryList: { accountIDs: [], accountHashesSorted: [] },
+    }
+    this.cacheUpdateQueue = { accountIDs: [], accountHashesSorted: [] }
+  }
+
   ////////////////////////////////
   /**
      * updateAccountHash
