@@ -585,6 +585,14 @@ export enum ServerMode {
   Release = 'release',
 }
 
+// enum for security levels
+export enum DevSecurityLevel {
+  Unauthorized = 0,
+  Low = 1,
+  Medium = 2,
+  High = 3,
+}
+
 export interface ServerConfiguration {
   /** The heartbeatInterval parameter is an Integer that defines the number of seconds between each heartbeat logged within shardus */
   heartbeatInterval?: number
@@ -882,7 +890,9 @@ export interface ServerConfiguration {
     countEndpointStop?: number
     //** hash of our dev auth key */
     hashedDevAuth?: string
-    devPublicKey?: string
+    devPublicKeys?: {
+      [pubKey: string]: DevSecurityLevel
+    }
     /** dump extra data for robust query even if in error/fatal logggin only mode */
     robustQueryDebug: boolean
     /** pretty sure we don't want this ever but making a config so we can AB test as needed */

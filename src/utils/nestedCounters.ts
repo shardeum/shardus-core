@@ -2,7 +2,7 @@ import { profilerInstance } from './profiler'
 import * as Context from '../p2p/Context'
 import * as utils from '../utils'
 import Crypto from '../crypto'
-import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import { getNetworkTimeOffset, shardusGetTime } from '../network'
 
 type CounterMap = Map<string, CounterNode>
@@ -31,7 +31,7 @@ class NestedCounters {
   }
 
   registerEndpoints(): void {
-    Context.network.registerExternalGet('counts', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('counts', isDebugModeMiddlewareLow, (req, res) => {
       profilerInstance.scopedProfileSectionStart('counts')
 
       const arrayReport = this.arrayitizeAndSort(this.eventCounters)
@@ -53,7 +53,7 @@ class NestedCounters {
       profilerInstance.scopedProfileSectionEnd('counts')
     })
 
-    Context.network.registerExternalGet('counts-reset', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('counts-reset', isDebugModeMiddlewareLow, (req, res) => {
       this.eventCounters = new Map()
       res.write(`counts reset ${shardusGetTime()} offset: ${getNetworkTimeOffset()}`)
       res.end()

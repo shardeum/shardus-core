@@ -6,7 +6,12 @@ import path from 'path'
 import { inspect } from 'util'
 import SHARDUS_CONFIG from '../config'
 import Crypto from '../crypto'
-import Debug, { getDevPublicKey } from '../debug'
+import Debug, {
+  getDevPublicKeys,
+  getDevPublicKey,
+  getDevPublicKeyMaxLevel,
+  ensureKeySecurity,
+} from '../debug'
 import ExitHandler from '../exit-handler'
 import LoadDetection from '../load-detection'
 import Logger, { logFlags, LogFlags } from '../logger'
@@ -29,7 +34,7 @@ import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
 import * as ShardusTypes from '../shardus/shardus-types'
-import { WrappedData } from '../shardus/shardus-types'
+import { WrappedData, DevSecurityLevel } from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
 import { CachedAppData, QueueCountsResult } from '../state-manager/state-manager-types'
@@ -1710,8 +1715,23 @@ class Shardus extends EventEmitter {
   }
 
   // Expose dev public key to verify things on the app
-  getDevPublicKey() {
-    return getDevPublicKey()
+  getDevPublicKeys() {
+    return getDevPublicKeys()
+  }
+
+  // Expose dev public key to verify things on the app
+  getDevPublicKey(keyName?: string) {
+    return getDevPublicKey(keyName)
+  }
+
+  // Expose dev key with highest security level
+  getDevPublicKeyMaxLevel(clearance?: DevSecurityLevel) {
+    return getDevPublicKeyMaxLevel(clearance)
+  }
+
+  // Verify that the key is the dev key and has the required security level
+  ensureKeySecurity(keyName: string, clearance: DevSecurityLevel) {
+    return ensureKeySecurity(keyName, clearance)
   }
 
   /**

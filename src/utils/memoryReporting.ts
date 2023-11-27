@@ -6,7 +6,7 @@ import * as CycleCreator from '../p2p/CycleCreator'
 import os from 'os'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import process, { resourceUsage } from 'process'
-import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import * as NodeList from '../p2p/NodeList'
 import { spawn } from 'child_process'
 import { getLastNTPObject, getNetworkTimeOffset, shardusGetTime } from '../network'
@@ -43,7 +43,7 @@ class MemoryReporting {
   }
 
   registerEndpoints(): void {
-    Context.network.registerExternalGet('memory', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('memory', isDebugModeMiddlewareLow, (req, res) => {
       const toMB = 1 / 1000000
       const report = process.memoryUsage()
       res.write(`System Memory Report.  Timestamp: ${shardusGetTime()}\n`)

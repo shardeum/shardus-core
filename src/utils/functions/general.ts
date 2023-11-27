@@ -1,6 +1,7 @@
 import { P2P } from '@shardus/types'
 import { Ordering } from '..'
 import { Response } from 'express-serve-static-core'
+import { DevSecurityLevel } from '../../shardus/shardus-types'
 
 const replacer = (key: string, value: any): any => {
   if (typeof value === 'bigint') {
@@ -242,7 +243,9 @@ export function generateObjectSchema(obj, options = { arrTypeDiversity: false })
   for (const [key, value] of Object.entries(obj)) {
     /* eslint-disable security/detect-object-injection */
     if (Object.prototype.hasOwnProperty.call(obj, key) && obj[key] !== null) {
-      if (value.constructor === Object) {
+      if (key === 'devPublicKeys' && isDevPublicKeysValid(schema[key])) {
+        schema[key] = '{ [publicKey: string]: DevSecurityLevel }'
+      } else if (value.constructor === Object) {
         schema[key] = generateObjectSchema(value, { arrTypeDiversity: options.arrTypeDiversity })
       } else if (Array.isArray(value)) {
         schema[key] = generateArraySchema(value, { diversity: options.arrTypeDiversity })
@@ -253,6 +256,18 @@ export function generateObjectSchema(obj, options = { arrTypeDiversity: false })
     /* eslint-enable security/detect-object-injection */
   }
   return schema
+}
+
+//Validate devPublicKeys object
+function isDevPublicKeysValid(devPublicKeys: { [publicKey: string]: DevSecurityLevel }): boolean {
+  for (const key in devPublicKeys) {
+    // Check if the value associated with the key is of type DevSecurityLevel (number)
+    // eslint-disable-next-line security/detect-object-injection
+    if (typeof devPublicKeys[key] !== 'number') {
+      return false // If any value is not of the expected type, return false
+    }
+  }
+  return true // If all values are of the expected type, return true
 }
 
 // @param {Array} arr, the array to generate schema

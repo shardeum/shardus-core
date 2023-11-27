@@ -1,4 +1,4 @@
-import { ServerMode, StrictServerConfiguration } from '../shardus/shardus-types'
+import { ServerMode, StrictServerConfiguration, DevSecurityLevel } from '../shardus/shardus-types'
 import { config } from '../p2p/Context'
 
 export type DebugConfigurations = StrictServerConfiguration['debug']
@@ -28,9 +28,47 @@ export function getHashedDevKey(): string {
   }
   return ''
 }
-export function getDevPublicKey(): string {
-  if (config && config.debug && config.debug.devPublicKey) {
-    return config.debug.devPublicKey
+
+export function getDevPublicKeys(): DebugConfigurations['devPublicKeys'] {
+  if (config && config.debug && config.debug.devPublicKeys) {
+    return config.debug.devPublicKeys
   }
-  return ''
+  return {}
+}
+
+export function ensureKeySecurity(pubKey: string, level: DevSecurityLevel): boolean {
+  const devPublicKeys = getDevPublicKeys()
+  // eslint-disable-next-line security/detect-object-injection
+  const pkClearance = devPublicKeys[pubKey]
+  return pkClearance !== undefined && pkClearance >= level
+}
+
+export function getDevPublicKey(key: string): string | null {
+  const devPublicKeys = getDevPublicKeys()
+  // eslint-disable-next-line security/detect-object-injection
+  const pkClearance = devPublicKeys[key]
+  if (pkClearance !== undefined) return key
+  return null
+}
+
+export function getDevPublicKeyMaxLevel(clearance?: DevSecurityLevel): string | null {
+  const devPublicKeys = getDevPublicKeys()
+  let maxLevel = -Infinity
+  let maxKey = null
+  for (const key in devPublicKeys) {
+    // eslint-disable-next-line security/detect-object-injection
+    if (devPublicKeys[key]) {
+      // eslint-disable-next-line security/detect-object-injection
+      if (clearance && devPublicKeys[key] >= clearance) return key
+      else {
+        // eslint-disable-next-line security/detect-object-injection
+        const level = devPublicKeys[key]
+        if (level > maxLevel) {
+          maxLevel = level
+          maxKey = key
+        }
+      }
+    }
+  }
+  return maxKey
 }
