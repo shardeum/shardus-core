@@ -1002,6 +1002,8 @@ export interface ServerConfiguration {
     waitLimitAfterFirstMessage: number
     // number of unique challenges to produce a fail receipt
     minRequiredChallenges: number
+    // turn on the improved Proof of Quorum for large shards sizes
+    useNewPOQ: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

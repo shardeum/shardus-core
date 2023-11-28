@@ -208,6 +208,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     waitLimitAfterFirstVote: 2000,
     waitLimitAfterFirstMessage: 2000,
     minRequiredChallenges: 3,
+    useNewPOQ: false
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

@@ -152,6 +152,7 @@ class TransactionQueue {
     this.p2p = p2p
     this.storage = storage
     this.stateManager = stateManager
+    this.useNewPOQ = this.config.stateManager.useNewPOQ
 
     this.mainLogger = logger.getLogger('main')
     this.fatalLogger = logger.getLogger('fatal')
@@ -187,7 +188,6 @@ class TransactionQueue {
     this.transactionQueueHasRemainingWork = false
 
     this.executeInOneShard = false
-    this.useNewPOQ = true
 
     if (this.config.sharding.executeInOneShard === true) {
       this.executeInOneShard = true
@@ -4756,7 +4756,7 @@ class TransactionQueue {
                     }
                   }
 
-                  if (queueEntry.recievedAppliedReceipt.result === true) {
+                  if (queueEntry.recievedAppliedReceipt?.result === true) {
                     queueEntry.state = 'pass'
                   } else {
                     queueEntry.state = 'fail'
