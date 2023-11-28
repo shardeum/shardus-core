@@ -451,7 +451,7 @@ class TransactionConsenus {
       ) => {
         nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2')
         profilerInstance.scopedProfileSectionStart('spread_appliedReceipt2', false, msgSize)
-        let respondSize = cUninitializedSize
+        const respondSize = cUninitializedSize
         try {
           const appliedReceipt = payload as AppliedReceipt2
           let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
@@ -540,7 +540,7 @@ class TransactionConsenus {
                 gossipGroup
               )
               //no await so we cant get the message out size in a reasonable way
-              respondSize = await this.p2p.sendGossipIn(
+              this.p2p.sendGossipIn(
                 'spread_appliedReceipt2',
                 appliedReceipt,
                 tracker,
@@ -559,7 +559,7 @@ class TransactionConsenus {
             'spread_appliedReceipt2 endpoint failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
           )
         } finally {
-          profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt2', respondSize)
+          profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt2')
         }
       }
     )
@@ -1127,7 +1127,9 @@ class TransactionConsenus {
             // Received another challenge receipt. Compare ranks
             let bestNodeFromRobustQuery: Shardus.NodeWithRank
             if (queueEntry.executionGroupMap.has(robustConfirmOrChallenge.appliedVote.node_id)) {
-              bestNodeFromRobustQuery = queueEntry.executionGroupMap.get(robustConfirmOrChallenge.appliedVote.node_id)
+              bestNodeFromRobustQuery = queueEntry.executionGroupMap.get(
+                robustConfirmOrChallenge.appliedVote.node_id
+              )
             }
             const isRobustQueryNodeBetter =
               bestNodeFromRobustQuery.rank < queueEntry.receivedBestChallenger.rank
@@ -2164,9 +2166,11 @@ class TransactionConsenus {
 
     if (confirmOrChallenge.message === 'confirm') {
       const foundNode =
-        queueEntry.eligibleNodeIdsToConfirm.has(confirmOrChallenge.nodeId)
-        && this.crypto.verify(confirmOrChallenge as SignedObject,
-          queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId).publicKey)
+        queueEntry.eligibleNodeIdsToConfirm.has(confirmOrChallenge.nodeId) &&
+        this.crypto.verify(
+          confirmOrChallenge as SignedObject,
+          queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId).publicKey
+        )
 
       if (!foundNode) {
         this.mainLogger.error(
@@ -2221,7 +2225,7 @@ class TransactionConsenus {
       else {
         // Compare ranks
         if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
-          receivedConfirmedNode = queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId);
+          receivedConfirmedNode = queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId)
         }
 
         isBetterThanCurrentConfirmation =
