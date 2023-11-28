@@ -224,7 +224,7 @@ export class NetworkClass extends EventEmitter {
    * @param message
    * @param alreadyLogged this is so that gossip system can indicate that we already have recorded playback logs
    */
-  async tell(nodes: Shardus.Node[], route: string, message, alreadyLogged = false) {
+  async tell(nodes: Shardus.Node[], route: string, message, alreadyLogged = false, subRoute = '') {
     const data = { route, payload: message }
     const promises = []
     let id = ''
@@ -236,22 +236,22 @@ export class NetworkClass extends EventEmitter {
       const requestId = generateUUID()
       /* prettier-ignore */ if (logFlags.net_verbose) mainLogger.info(`Initiating tell request with requestId: ${requestId}`)
       /* prettier-ignore */ if (logFlags.net_verbose) mainLogger.info(`requestId: ${requestId}, node: ${utils.logNode(node)}`)
-      /* prettier-ignore */ if (logFlags.net_verbose) mainLogger.info(`route: ${route}, message: ${message} requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.net_verbose) mainLogger.info(`route: ${route} ${subRoute}, message: ${message} requestId: ${requestId}`)
       this.InternalTellCounter++
       const promise = this.sn.send(node.internalPort, node.internalIp, data)
       promise.catch((err) => {
-        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tell) on ${route}: ${formatErrorMessage(err)}` )
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tell) on ${route} ${subRoute}: ${formatErrorMessage(err)}` )
         let errorGroup = ('' + err).slice(0, 20)
-        nestedCountersInstance.countEvent('network', `error2-tell ${route}`)
-        this.emit('error', node, requestId, 'tell', errorGroup, route)
+        nestedCountersInstance.countEvent('network', `error2-tell ${route} ${subRoute}`)
+        this.emit('error', node, requestId, 'tell', errorGroup, route, subRoute)
       })
       promises.push(promise)
     }
     try {
       await Promise.all(promises)
     } catch (err) {
-      nestedCountersInstance.countEvent('network', `error-tell ${route}`)
-      /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tell-err) on ${route}: ${formatErrorMessage(err)}`)
+      nestedCountersInstance.countEvent('network', `error-tell ${route} ${subRoute}`)
+      /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tell-err) on ${route} ${subRoute}: ${formatErrorMessage(err)}`)
     }
   }
 
@@ -277,7 +277,7 @@ export class NetworkClass extends EventEmitter {
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tellBinary) on ${route}: ${formatErrorMessage(err)}`)
         let errorGroup = ('' + err).slice(0, 20)
         nestedCountersInstance.countEvent('network', `error2-tellBinary ${route}`)
-        this.emit('error', node, requestId, 'tellBinary', errorGroup, route)
+        this.emit('error', node, requestId, 'tellBinary', errorGroup, route, '')
       })
       promises.push(promise)
     }
@@ -337,7 +337,7 @@ export class NetworkClass extends EventEmitter {
           nestedCountersInstance.countEvent('network', `error-ask ${route}`)
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (ask-err) on ${route}: ${formatErrorMessage(err)}`)
           let errorGroup = ('' + err).slice(0, 20)
-          this.emit('error', node, requestId, 'ask', errorGroup, route)
+          this.emit('error', node, requestId, 'ask', errorGroup, route, '')
         }
       } finally {
         profilerInstance.profileSectionEnd('net-ask')
@@ -400,7 +400,7 @@ export class NetworkClass extends EventEmitter {
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (askBinary) on ${route}: ${formatErrorMessage(err)}`)
           let errorGroup = ('' + err).slice(0, 20)
           //this.mainLogger.info(`askBinary: sendWithHeader: error: ${err}`)
-          this.emit('error', node, requestId, 'ask', errorGroup, route)
+          this.emit('error', node, requestId, 'ask', errorGroup, route, '')
         }
       } finally {
         profilerInstance.profileSectionEnd('net-askBinary')

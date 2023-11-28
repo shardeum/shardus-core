@@ -507,7 +507,7 @@ class Shardus extends EventEmitter {
       const ipPort = `${node.internalIp}:${node.internalPort}`
       //this console log is probably redundant but are disabled most of the time anyhow.
       //They may help slighly in the case of adding some context to the out.log file when full debugging is on.
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`In Shardus got network timeout-${context} for request ID - ${requestId} from node: ${utils.logNode(node)} ${ipPort}` )
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`In Shardus got network timeout-${context}-${route} for request ID - ${requestId} from node: ${utils.logNode(node)} ${ipPort}` )
       const result = isApopMarkedNode(node.id)
       if (result) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `timeout-apop-${context}-${route}`)
@@ -522,14 +522,14 @@ class Shardus extends EventEmitter {
     })
     this.network.on(
       'error',
-      (node, requestId: string, context: string, errorGroup: string, route: string) => {
+      (node, requestId: string, context: string, errorGroup: string, route: string, subRoute = '') => {
         const ipPort = `${node.internalIp}:${node.internalPort}`
         //this console log is probably redundant but are disabled most of the time anyhow.
         //They may help slighly in the case of adding some context to the out.log file when full debugging is on.
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`In Shardus got network error-${context} for request ID ${requestId} from node: ${utils.logNode(node)} ${ipPort} error:${errorGroup}` )
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`In Shardus got network error-${context} ${route}-${subRoute} for request ID ${requestId} from node: ${utils.logNode(node)} ${ipPort} error:${errorGroup}` )
         if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'error', requestId)
         /** [TODO] Report lost */
-        /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `error-${context}-${route}`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `error-${context}-${route}-${subRoute}`)
         /* prettier-ignore */ nestedCountersInstance.countRareEvent( 'lostNodes', `error-${context}  ${ipPort}` )
       }
     )
