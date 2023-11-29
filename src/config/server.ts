@@ -107,6 +107,10 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     standbyVersionScrub: true,
     q1DelayPercent: 0.125,
     goldenTicketEnabled: true,
+    preGossipNodeCheck: true,
+    preGossipDownCheck: true,
+    preGossipLostCheck: true,
+    preGossipRecentCheck: true,
     initShutdown: false,
     lostArchiversCyclesToWait: 3,
     standbyListFastHash: false, //todo set to false and migrate
