@@ -1129,7 +1129,7 @@ class TransactionConsenus {
             if (queueEntry.executionGroupMap.has(robustConfirmOrChallenge.appliedVote.node_id)) {
               bestNodeFromRobustQuery = queueEntry.executionGroupMap.get(
                 robustConfirmOrChallenge.appliedVote.node_id
-              )
+              ) as Shardus.NodeWithRank
             }
             const isRobustQueryNodeBetter =
               bestNodeFromRobustQuery.rank < queueEntry.receivedBestChallenger.rank
@@ -1261,7 +1261,7 @@ class TransactionConsenus {
             if (queueEntry.executionGroupMap.has(robustConfirmOrChallenge.appliedVote.node_id)) {
               bestNodeFromRobustQuery = queueEntry.executionGroupMap.get(
                 robustConfirmOrChallenge.appliedVote.node_id
-              )
+              ) as Shardus.NodeWithRank
             }
 
             const isRobustQueryNodeBetter = bestNodeFromRobustQuery.rank < queueEntry.receivedBestVoter.rank
@@ -1642,7 +1642,7 @@ class TransactionConsenus {
         for (let i = 0; i < queueEntry.executionGroup.length; i++) {
           const node = queueEntry.executionGroup[i]
           if (node.id === voteFromRobustQuery.node_id) {
-            bestVoterFromRobustQuery = node
+            bestVoterFromRobustQuery = node as Shardus.NodeWithRank
             break
           }
         }
@@ -2225,7 +2225,9 @@ class TransactionConsenus {
       else {
         // Compare ranks
         if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
-          receivedConfirmedNode = queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId)
+          receivedConfirmedNode = queueEntry.executionGroupMap.get(
+            confirmOrChallenge.nodeId
+          ) as Shardus.NodeWithRank
         }
 
         isBetterThanCurrentConfirmation =
@@ -2252,7 +2254,9 @@ class TransactionConsenus {
         return true
       } else {
         if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
-          queueEntry.receivedBestConfirmedNode = queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId)
+          queueEntry.receivedBestConfirmedNode = queueEntry.executionGroupMap.get(
+            confirmOrChallenge.nodeId
+          ) as Shardus.NodeWithRank
         }
       }
     } else if (confirmOrChallenge.message === 'challenge') {
@@ -2284,7 +2288,9 @@ class TransactionConsenus {
       else {
         // Compare ranks
         if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
-          receivedChallenger = queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId)
+          receivedChallenger = queueEntry.executionGroupMap.get(
+            confirmOrChallenge.nodeId
+          ) as Shardus.NodeWithRank
         }
         isBetterThanCurrentChallenge = receivedChallenger.rank < queueEntry.receivedBestChallenger.rank
       }
@@ -2304,7 +2310,9 @@ class TransactionConsenus {
         queueEntry.receivedBestChallenger = receivedChallenger
       } else {
         if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
-          queueEntry.receivedBestChallenger = queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId)
+          queueEntry.receivedBestChallenger = queueEntry.executionGroupMap.get(
+            confirmOrChallenge.nodeId
+          ) as Shardus.NodeWithRank
         }
       }
       if (logFlags.debug)
@@ -2397,7 +2405,7 @@ class TransactionConsenus {
       else {
         // Compare ranks
         if (queueEntry.executionGroupMap.has(vote.node_id)) {
-          receivedVoter = queueEntry.executionGroupMap.get(vote.node_id)
+          receivedVoter = queueEntry.executionGroupMap.get(vote.node_id) as Shardus.NodeWithRank
         }
         isBetterThanCurrentVote = receivedVoter.rank > queueEntry.receivedBestVoter.rank
       }
@@ -2424,7 +2432,9 @@ class TransactionConsenus {
         return true
       } else {
         if (queueEntry.executionGroupMap.has(vote.node_id)) {
-          queueEntry.receivedBestVoter = queueEntry.executionGroupMap.get(vote.node_id)
+          queueEntry.receivedBestVoter = queueEntry.executionGroupMap.get(
+            vote.node_id
+          ) as Shardus.NodeWithRank
           return true
         }
       }

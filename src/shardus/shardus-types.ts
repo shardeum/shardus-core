@@ -6,6 +6,7 @@ export type Archiver = P2P.ArchiversTypes.JoinedArchiver
 export interface NodeWithRank {
   rank: bigint
   id: string
+  status: string
   publicKey: string
   externalIp: string
   externalPort: number

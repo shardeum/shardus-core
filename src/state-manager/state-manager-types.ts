@@ -68,8 +68,8 @@ export type QueueEntry = {
   ourExGroupIndex: number //our index in the execution group
   conensusGroup?: Shardus.Node[]
   transactionGroup?: Shardus.Node[]
-  executionGroup?: Shardus.NodeWithRank[] //List of nodes that are in the execution group
-  executionGroupMap?: Map<string, Shardus.NodeWithRank>
+  executionGroup?: Shardus.NodeWithRank[] | Shardus.Node[] //List of nodes that are in the execution group
+  executionGroupMap?: Map<string, Shardus.NodeWithRank | Shardus.Node>
   txGroupCycle: number
   updatedTransactionGroup?: Shardus.Node[]
   updatedTxGroupCycle: number

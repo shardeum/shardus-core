@@ -17,6 +17,7 @@ import ShardFunctions from './shardFunctions'
 import {
   AcceptedTx,
   AccountFilter,
+  AppliedReceipt,
   CommitConsensedTransactionResult,
   PreApplyAcceptedTransactionResult,
   ProcessQueueStats,
@@ -32,7 +33,6 @@ import {
   StringNodeObjectMap,
   TxDebug,
   WrappedResponses,
-  AppliedReceipt,
 } from './state-manager-types'
 import { isInternalTxAllowed, networkMode } from '../p2p/Modes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
@@ -737,6 +737,12 @@ class TransactionQueue {
     }
   }
 
+  configUpdated(): void {
+    this.useNewPOQ = this.config.stateManager.useNewPOQ
+    console.log('Config updated for stateManager.useNewPOQ', this.useNewPOQ)
+    nestedCountersInstance.countEvent('stateManager', `useNewPOQ config updated to ${this.useNewPOQ}`)
+  }
+
   resetTxCoverageMap(): void {
     this.txCoverageMap = {}
   }
@@ -1385,7 +1391,12 @@ class TransactionQueue {
           //set the nodes that are in the executionGroup.
           //This is needed so that consensus will expect less nodes to be voting
           const unRankedExecutionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
-          txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
+          if (this.useNewPOQ) {
+            txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
+          } else {
+            txQueueEntry.executionGroup = unRankedExecutionGroup
+          }
+
           if (txQueueEntry.isInExecutionHome) {
             txQueueEntry.ourNodeRank = this.computeNodeRank(
               this.stateManager.currentCycleShardData.ourNode.id,
@@ -1422,7 +1433,9 @@ class TransactionQueue {
           }
 
           //if we are not in the execution group then set isInExecutionHome to false
-          if (txQueueEntry.executionGroupMap.has(this.stateManager.currentCycleShardData.ourNode.id) === false) {
+          if (
+            txQueueEntry.executionGroupMap.has(this.stateManager.currentCycleShardData.ourNode.id) === false
+          ) {
             txQueueEntry.isInExecutionHome = false
           }
 
@@ -2305,6 +2318,7 @@ class TransactionQueue {
       const nodeWithRank: Shardus.NodeWithRank = {
         rank,
         id: node.id,
+        status: node.status,
         publicKey: node.publicKey,
         externalIp: node.externalIp,
         externalPort: node.externalPort,
@@ -4429,32 +4443,34 @@ class TransactionQueue {
               let didNotMatchReceipt = false
 
               let finishedConsensing = false
+              let result: AppliedReceipt
 
               if (this.useNewPOQ) {
                 // if we are in execution group, try to "confirm" or "challenge" the highest ranked vote
                 this.stateManager.transactionConsensus.confirmOrChallenge(queueEntry)
-              }
 
-              // try to produce a receipt
-              /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
+                // try to produce a receipt
+                /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
 
-              let result: AppliedReceipt
-              const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
-              if (receipt2 != null) {
-                nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
-                //we have a receipt2, so we can make a receipt
-                result = {
-                  result: receipt2.result,
-                  appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
-                  txid: receipt2.txid,
-                  app_data_hash: receipt2.app_data_hash,
+                const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+                if (receipt2 != null) {
+                  nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
+                  //we have a receipt2, so we can make a receipt
+                  result = {
+                    result: receipt2.result,
+                    appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
+                    txid: receipt2.txid,
+                    app_data_hash: receipt2.app_data_hash,
+                  }
+                } else {
+                  result = queueEntry.appliedReceipt
+                }
+
+                if (result == null) {
+                  this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
                 }
               } else {
-                result = queueEntry.appliedReceipt
-              }
-
-              if (result == null) {
-                this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
+                result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
               }
 
               /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt result : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
