@@ -38,7 +38,6 @@ import { isInternalTxAllowed, networkMode } from '../p2p/Modes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
 import { Logger as L4jsLogger } from 'log4js'
 import { shardusGetTime } from '../network'
-import { stringify } from '../utils'
 
 interface Receipt {
   tx: AcceptedTx
@@ -2620,7 +2619,7 @@ class TransactionQueue {
         this.stateManager.currentCycleShardData.nodeShardDataMap,
         this.stateManager.currentCycleShardData.parititionShardDataMap,
         homeNode,
-        this.stateManager.currentCycleShardData.activeNodes
+        this.stateManager.currentCycleShardData.nodes
       )
     }
 
