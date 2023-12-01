@@ -1,6 +1,6 @@
 # Lost Archiver Detection Planning Doc
 
-![lost-archiver-detection-protocol-diagram.png](./lost-archiver-detection-protocol-diagram.png)
+<img title="" src="./lost-archiver-detection-protocol-diagram.png" alt="lost-archiver-detection-protocol-diagram.png" width="738">
 
 > Notes:
 > 
@@ -39,3 +39,42 @@
 ## Needed Logic/Functions:
 
 [WIP]
+
+
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle : Start state of a node
+    Idle --> Investigating: S finds T unresponsive
+    Idle --> Investigated: I receives “investigate”
+    Investigating --> Idle: I reports T is up
+    Investigated --> Down: I confirms T is down
+    Down --> Up: T sends “node up” and verified
+    Up --> Idle: Node reintegrated
+
+    state Idle {
+        [*] --> State1
+        State1 : Awaiting actions
+    }
+
+    state Investigating {
+        [*] --> State2
+        State2 : Node S has sent investigate
+    }
+
+    state Investigated {
+        [*] --> State3
+        State3 : Node I is investigating T
+    }
+
+    state Down {
+        [*] --> State4
+        State4 : Node T is confirmed down
+    }
+
+    state Up {
+        [*] --> State5
+        State5 : Node T is up after being down
+    }
+```

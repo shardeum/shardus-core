@@ -19,6 +19,13 @@ const internalInvestigateTxRoute: Route<InternalHandler<ArchiverInvestigateTrans
   name: 'internal-investigate-tx',
   handler: (payload, response, sender) => {
     // TODO
+    
+    // We will be receiving Investigate messages here for us to investigate Archivers
+
+    // Ignore hits here if we're not the designated Investigator for the given Archiver 
+    // and cycle
+
+    // Call the investigateArchiver function to continue with investigation
   },
 }
 
