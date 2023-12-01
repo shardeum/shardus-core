@@ -1,26 +1,26 @@
-/** Lost Archivers Functions */
-
-import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
-import { LostArchiverRecord } from './state'
+import { publicKey } from '@shardus/types'
+import { CycleMarker } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
 import {
   ArchiverDownMsg,
   ArchiverUpMsg,
   InvestigateArchiverMsg,
 } from '@shardus/types/build/src/p2p/LostArchiverTypes'
-import { publicKey } from '@shardus/types'
-import { CycleMarker } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
+import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
+import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
+
+/** Lost Archivers Functions */
 
 /**
  * Marks an Archiver as lost in our internal map.
  * This function gets called anytime communication with an Archiver breaks down
  */
-function reportLostArchiver(): void {
+export function reportLostArchiver(publicKey: publicKey): void {
   // Add new entry to lostArchiversMap for reported Archiver
   // Set status to 'reported'
   // If entry exists, do nothing
 }
 
-function investigateArchiver(): void {
+export function investigateArchiver(publicKey: publicKey): void {
   // If no entry exists in lostArchiversMap for target Archiver
   //   create new entry
   //   set isInvestigator to true
@@ -34,7 +34,7 @@ function investigateArchiver(): void {
   //    set status = 'down'
 }
 
-function reportArchiverUp(): void {
+export function reportArchiverUp(publicKey: publicKey): void {
   // After an Archiver tells us its still up
   // We need to gossip the up message to the rest of the network
 }
@@ -74,20 +74,28 @@ async function getArchiverInfo(host: string, port: number): Promise<object> | nu
  * @param record record in from the lostArchiverRecordMap
  * @returns The node ID of the investigator for that specific record
  */
-function getInvestigator(target: publicKey, marker: CycleMarker): Node {
+export function getInvestigator(target: publicKey, marker: CycleMarker): Node {
   // hash target + marker
   // return node from Nodelist with id closest to hash
   return
 }
 
-function validateArchiverDownMsg(msg: ArchiverDownMsg): boolean {
-  return true
+export function informInvestigator(target: publicKey): void {
+  // Create InvestigateArchiverMsg and send it to the lostArchiverInvestigate route
 }
 
-function validateArchiverUpMsg(msg: ArchiverUpMsg): boolean {
-  return true
+export function tellNetworkArchiverIsDown(target: publicKey): void {
+  // Create ArchiverDownMsg and gossip it on the lostArchiverDownGossip route
 }
 
-function validateInvestigateArchiverMsg(msg: InvestigateArchiverMsg): boolean {
-  return true
+export function errorForArchiverDownMsg(msg: SignedObject<ArchiverDownMsg>): null | string {
+  return null
+}
+
+export function errorForArchiverUpMsg(msg: SignedObject<ArchiverUpMsg>): null | string {
+  return null
+}
+
+export function errorForInvestigateArchiverMsg(msg: SignedObject<InvestigateArchiverMsg>): null | string {
+  return null
 }

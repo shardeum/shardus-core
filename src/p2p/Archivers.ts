@@ -1,4 +1,4 @@
-import { hexstring, P2P, StateManager } from '@shardus/types'
+import { hexstring, P2P, publicKey, StateManager } from '@shardus/types'
 import deepmerge from 'deepmerge'
 import * as http from '../http'
 import { logFlags } from '../logger'
@@ -32,6 +32,7 @@ import { shardusGetTime } from '../network'
 import { scheduleLostArchiverReport } from '../p2p/LostArchivers/functions'
 import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
 import { Result, ResultAsync } from 'neverthrow'
+import { arch } from 'os'
 
 const clone = rfdc()
 
@@ -417,13 +418,22 @@ export function getArchiverUpdates() {
   return joinRequests
 }
 
-export function updateArchivers(record) {
+export function removeArchiverByPublicKey(publicKey: publicKey) {
+  const archiverInfo = archivers.get(publicKey)
+  removeArchiver(archiverInfo)
+}
+
+export function removeArchiver(nodeInfo: JoinedArchiver) {
+  archivers.delete(nodeInfo.publicKey)
+  removeDataRecipient(nodeInfo.publicKey)
+  removeArchiverConnection(nodeInfo.publicKey)
+  leaveRequests = leaveRequests.filter((request) => request.nodeInfo.publicKey !== nodeInfo.publicKey)
+}
+
+export function updateArchivers(record: P2P.CycleCreatorTypes.CycleRecord) {
   // Update archiversList
   for (const nodeInfo of record.leavingArchivers) {
-    archivers.delete(nodeInfo.publicKey)
-    removeDataRecipient(nodeInfo.publicKey)
-    removeArchiverConnection(nodeInfo.publicKey)
-    leaveRequests = leaveRequests.filter((request) => request.nodeInfo.publicKey !== nodeInfo.publicKey)
+    removeArchiver(nodeInfo)
   }
   for (const nodeInfo of record.joinedArchivers) {
     archivers.set(nodeInfo.publicKey, nodeInfo)
@@ -587,6 +597,7 @@ async function forwardDataToSubscribedArchivers(responses, publicKey, recipient)
     } else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
   } catch (e) {
     error('Run into issue in forwarding data', e)
+    /** [TODO] Call into LostArchivers to report Archiver as lost */
   }
 }
 
@@ -682,6 +693,7 @@ export async function forwardAccounts(data: InitialAccountsData) {
       }
     } catch (e) {
       error('Run into error in forwarding accounts', e)
+      /** [TODO] Call into LostArchivers to report Archiver as lost */
     }
   }
 }
@@ -736,6 +748,7 @@ export function sendData() {
         else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
       } catch (e) {
         error('Run into issue in forwarding cycles data', e)
+        /** [TODO] Call into LostArchivers to report Archiver as lost */
       }
     }
     return
@@ -822,6 +835,7 @@ export function sendData() {
       else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
     } catch (e) {
       error('Run into issue in forwarding cycles data', e)
+      /** [TODO] Call into LostArchivers to report Archiver as lost */
     }
 
     // http

@@ -1,6 +1,6 @@
 import { publicKey } from '@shardus/types'
-import { ArchiverDownMsg } from '@shardus/types/src/p2p/LostArchiverTypes'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
+import { ArchiverDownMsg, ArchiverUpMsg } from '@shardus/types/src/p2p/LostArchiverTypes'
 
 /** TYPES */
 
@@ -9,7 +9,8 @@ export interface LostArchiverRecord {
   gossipped: boolean
   target: publicKey
   status: 'reported' | 'investigating' | 'down' | 'up'
-  archiverDownMsg: SignedObject<ArchiverDownMsg>
+  archiverDownMsg?: SignedObject<ArchiverDownMsg>
+  archiverUpMsg?: SignedObject<ArchiverUpMsg>
   cyclesToWait: number
 }
 

@@ -1,6 +1,15 @@
 import { P2P } from '@shardus/types'
+import { insertSorted } from '../../utils'
+import { removeArchiverByPublicKey } from '../Archivers'
+import {
+  errorForArchiverDownMsg,
+  errorForArchiverUpMsg,
+  informInvestigator,
+  tellNetworkArchiverIsDown,
+} from './functions'
 import { info, initLogging } from './logging'
 import { registerRoutes } from './routes'
+import { lostArchiversMap } from './state'
 
 /** CycleCreator Functions */
 
@@ -9,6 +18,9 @@ import { registerRoutes } from './routes'
      These functions are called by CycleCreator
 */
 
+/**
+ * Gets called once when the CycleCreator system is initialized
+ */
 export function init(): void {
   initLogging()
   info('init() called')
@@ -34,18 +46,26 @@ export function reset(): void {
 export function getTxs(): P2P.LostArchiverTypes.Txs {
   info('getTxs() called')
 
-  // loop through lostArchiversMap
-  //   if status == 'down'
-  //     Put entry's ArchiverDownMsg into lostArchivers array
-  //   if status == 'up'
-  //     Put entry's ArchiverUpMsg into refutedArchivers array
+  const lostArchivers = []
+  const refutedArchivers = []
 
-  // collect all ArchiverDownMsgs and put them into lostArchivers array
-  // collect all ArchiverUpMsgs and put them into refutedArchivers array
+  // loop through lostArchiversMap
+  for (const entry of lostArchiversMap.values()) {
+    // Don't include entries you haven't investigated yet
+    if (entry.isInvestigator && !entry.gossipped) continue
+    // if status == 'down', Put entry's ArchiverDownMsg into lostArchivers array
+    if (entry.status === 'down' && entry.archiverDownMsg) {
+      lostArchivers.push(entry.archiverDownMsg)
+    }
+    // if status == 'up', Put entry's ArchiverUpMsg into refutedArchivers array
+    if (entry.status === 'up' && entry.archiverUpMsg) {
+      lostArchivers.push(entry.archiverUpMsg)
+    }
+  }
 
   return {
-    lostArchivers: [],
-    refutedArchivers: [],
+    lostArchivers,
+    refutedArchivers,
   }
 }
 
@@ -58,11 +78,13 @@ export function dropInvalidTxs(txs: P2P.LostArchiverTypes.Txs): P2P.LostArchiver
   info('dropInvalidTxs() called')
 
   // filter lostArchivers array of any invalid ArchiverDownMsgs
+  const lostArchivers = txs.lostArchivers.filter((tx) => errorForArchiverDownMsg(tx) === null)
   // filter refutedArchivers array of any invalid ArchiverUpMsgs
+  const refutedArchivers = txs.refutedArchivers.filter((tx) => errorForArchiverUpMsg(tx) === null)
 
   return {
-    lostArchivers: [],
-    refutedArchivers: [],
+    lostArchivers,
+    refutedArchivers,
   }
 }
 
@@ -81,15 +103,29 @@ export function updateRecord(
   info('updateRecord function called')
 
   // add all txs.lostArchivers publicKeys to record.lostArchivers
+  for (const tx of txs.lostArchivers) {
+    insertSorted(record.lostArchivers, tx.investigateTx.target)
+  }
   // add all txs.refutedArchivers publicKeys to record.refutedArchivers
+  for (const tx of txs.refutedArchivers) {
+    insertSorted(record.refutedArchivers, tx.downTx.investigateTx.target)
+  }
 
   // loop through prev.lostArchivers
-  //   get lostArchiversMap entry from publicKey
-  //   if cyclesToWait is > 0
-  //     decrement cyclesToWait
-  //     continue
-  //   else
-  //     add publicKey to record.removedArchivers
+  for (const publicKey of prev.lostArchivers) {
+    // get lostArchiversMap entry from publicKey
+    const entry = lostArchiversMap.get(publicKey)
+    if (!entry) continue
+
+    // wait cyclesToWait before adding the lostArchiver to removedArchivers
+    if (entry.cyclesToWait > 0) {
+      // decrement cyclesToWait
+      entry.cyclesToWait--
+    } else {
+      // add publicKey to record.removedArchivers
+      insertSorted(record.removedArchivers, publicKey)
+    }
+  }
 }
 
 /**
@@ -99,12 +135,20 @@ export function updateRecord(
  */
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   info('parseRecord function called')
+
   // loop through publicKeys from record.removedArchivers
-  //   delete publicKey entry from Archivers.archivers map
-  //   delete publicKey entry from lostArchiversMap
+  for (const publicKey of record.removedArchivers) {
+    // delete publicKey entry from Archivers.archivers map
+    removeArchiverByPublicKey(publicKey)
+    // delete publicKey entry from lostArchiversMap
+    lostArchiversMap.delete(publicKey)
+  }
 
   // loop through publicKeys from record.refutedArchivers
-  //   delete publicKey entry from lostArchiversMap
+  for (const publicKey of record.refutedArchivers) {
+    // delete publicKey entry from lostArchiversMap
+    lostArchiversMap.delete(publicKey)
+  }
   return
 }
 
@@ -119,15 +163,25 @@ export function sendRequests(): void {
   info('sendRequests function called')
 
   // loop through lostArchiversMap
-  //
-  //   any entries with status 'reported'
-  //     send off an InvestigateArchiverMessage to the investigator
-  //     remove entry from the lostArchiversMap
-  //
-  //   if isInvestigator
-  //     if status == 'down' && not gossipped
-  //       Create ArchiverDownMsg and gossip it on the lostArchiverDownGossip route
-  //       set gossipped to true
-  //
+  for (const [publicKey, entry] of lostArchiversMap) {
+    // any entries with status 'reported'
+    if (entry.status === 'reported') {
+      // Create InvestigateArchiverMsg and send it to the lostArchiverInvestigate route
+      informInvestigator(publicKey)
+      // remove entry from the lostArchiversMap
+      lostArchiversMap.delete(publicKey)
+      continue
+    }
+    // if isInvestigator
+    if (entry.isInvestigator) {
+      // if status == 'down' && not gossipped
+      if (entry.status === 'down' && !entry.gossipped) {
+        // Create ArchiverDownMsg and gossip it on the lostArchiverDownGossip route
+        tellNetworkArchiverIsDown(publicKey)
+        // set gossipped to true
+        entry.gossipped = true
+      }
+    }
+  }
   return
 }
