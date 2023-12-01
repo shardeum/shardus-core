@@ -1,20 +1,19 @@
-import { Handler } from 'express'
 import { P2P } from '@shardus/types'
-import { Node } from '@shardus/types/src/p2p/NodeListTypes'
-import { GossipHandler, InternalHandler, Route, SignedObject } from '@shardus/types/src/p2p/P2PTypes'
-import * as Comms from '../Comms'
-import { crypto, network } from '../Context'
-import { getRandomAvailableArchiver } from '../Utils'
-import * as logging from './logging'
-import { cyclesToWait, lostArchiversMap } from './state'
-import { currentCycle, currentQuarter } from '../CycleCreator'
-import * as Self from '../../p2p/Self'
-import * as funcs from './functions'
 import {
   ArchiverDownMsg,
   ArchiverUpMsg,
   InvestigateArchiverMsg,
 } from '@shardus/types/src/p2p/LostArchiverTypes'
+import { Node } from '@shardus/types/src/p2p/NodeListTypes'
+import { GossipHandler, InternalHandler, Route, SignedObject } from '@shardus/types/src/p2p/P2PTypes'
+import { Handler } from 'express'
+import * as Comms from '../Comms'
+import * as Context from '../Context'
+import { crypto, network } from '../Context'
+import { getRandomAvailableArchiver } from '../Utils'
+import * as funcs from './functions'
+import * as logging from './logging'
+import { lostArchiversMap } from './state'
 
 /**
  * Returns true if the given object is not nullish and has all the given keys.
@@ -106,7 +105,7 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
       target,
       status: 'down',
       archiverDownMsg: downMsg,
-      cyclesToWait
+      cyclesToWait: Context.config.p2p.lostArchiversCyclesToWait,
     }
     lostArchiversMap.set(target, record)
   }

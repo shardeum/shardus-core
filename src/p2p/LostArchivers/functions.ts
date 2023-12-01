@@ -15,6 +15,7 @@ import * as Comms from '../Comms'
 import * as Context from '../Context'
 import * as NodeList from '../NodeList'
 import { lostArchiversMap } from './state'
+import { config } from 'process'
 
 /** Lost Archivers Functions */
 
@@ -44,7 +45,7 @@ export function reportLostArchiver(publicKey: publicKey, errorMsg: string): void
       gossipped: false,
       target: publicKey,
       status: 'reported',
-      cyclesToWait: 0,
+      cyclesToWait: Context.config.p2p.lostArchiversCyclesToWait,
     })
   }
   // don't gossip here; that is initiated in sendRequests()
@@ -70,7 +71,7 @@ export async function investigateArchiver(publicKey: publicKey): Promise<void> {
     gossipped: false,
     target: publicKey,
     status: 'investigating',
-    cyclesToWait: 0,
+    cyclesToWait: Context.config.p2p.lostArchiversCyclesToWait,
   }
   // record it
   lostArchiversMap.set(publicKey, record)

@@ -214,7 +214,7 @@ export class NetworkClass extends EventEmitter {
     console.log(`Internal server running on port ${this.ipInfo.internalPort}...`)
 
     //pass logflags to shardus network
-    this.sn.setLogFlags(logFlags)
+    // this.sn.setLogFlags(logFlags)
   }
 
   /**

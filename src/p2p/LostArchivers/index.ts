@@ -154,6 +154,8 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   info('\n=== lostArchiversMap ===')
   info(`${JSON.stringify(lostArchiversMap, null, 2)}`)
   info('=== lostArchiversMap ===\n')
+
+  return
 }
 
 export function queueRequest(request: any): void {
