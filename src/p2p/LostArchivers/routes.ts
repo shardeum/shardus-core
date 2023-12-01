@@ -16,7 +16,6 @@ import {
   InvestigateArchiverMsg,
 } from '@shardus/types/src/p2p/LostArchiverTypes'
 
-
 // to-do: make a setting?
 const initialCyclesToWait = 3
 
@@ -127,7 +126,9 @@ const investigateLostArchiverRoute: Route<InternalHandler<SignedObject<Investiga
   handler: (payload, response, sender) => {
     // we're being told to investigate a seemingly lost archiver
 
-    logging.info(`investigateLostArchiverRoute: payload: ${payload}, response: ${response}, sender: ${sender}`)
+    logging.info(
+      `investigateLostArchiverRoute: payload: ${payload}, response: ${response}, sender: ${sender}`
+    )
 
     // check args
     if (!payload) throw new Error(`lostArchiverDownGossip: missing payload`)
@@ -151,14 +152,6 @@ const investigateLostArchiverRoute: Route<InternalHandler<SignedObject<Investiga
     }
 
     funcs.investigateArchiver(payload.target)
-
-    // Call the investigateArchiver function to continue with investigation
-    // investigator node investigates lost archiver
-    // puts the lost archiver into its own lostArchiversMap
-    // to-do: does the step below belong here? in that case the investigateArchiver() above will likely need a return value
-    //        or is this done by the investigateArchiver() function?
-    // if archiver is down
-    //   schedules to gossip SignedArchiverDownMsg on downArchiver gossip route in next sendRequests()
   },
 }
 
@@ -232,10 +225,13 @@ const routes = {
 }
 
 export function registerRoutes(): void {
-  for (const route of routes.external)
+  for (const route of routes.external) {
     network._registerExternal(route.method, route.name, route.handler)
-  for (const route of routes.internal)
+  }
+  for (const route of routes.internal) {
     Comms.registerInternal(route.name, route.handler)
-  for (const [name, handler] of Object.entries(routes.gossip))
+  }
+  for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
+  }
 }
