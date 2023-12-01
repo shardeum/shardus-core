@@ -14,13 +14,10 @@ import * as Comms from '../Comms'
 import * as Context from '../Context'
 import * as NodeList from '../NodeList'
 import { LostArchiverRecord, lostArchiversMap } from './state'
-import { config } from 'process'
-import { info } from './logging'
+import { info, warn } from './logging'
 import { id } from '../Self'
 import { binarySearch } from '../../utils/functions/arrays'
 import { activeByIdOrder } from '../NodeList'
-import Crypto from '../../crypto'
-import { isNullOrUndefined } from 'util'
 
 /** Lost Archivers Functions */
 
@@ -73,6 +70,13 @@ export function reportLostArchiver(publicKey: publicKey, errorMsg: string): void
  */
 export async function investigateArchiver(investigateMsg: SignedObject<InvestigateArchiverMsg>): Promise<void> {
   const publicKey = investigateMsg.target
+  const archiver = Archivers.archivers.get(publicKey)
+  if (!archiver) {
+    // don't know the archiver
+    warn(`investigateArchiver: asked to investigate archiver '${publicKey}', but it's not in the archivers list`)
+    return
+  }
+
   // Retrieve the record of the Archiver from the lostArchiversMap
   info(`investigateArchiver: publicKey: ${publicKey}`)
   let record = lostArchiversMap.get(publicKey)
@@ -94,7 +98,6 @@ export async function investigateArchiver(investigateMsg: SignedObject<Investiga
   lostArchiversMap.set(publicKey, record)
 
   // ping the archiver
-  const archiver = Archivers.archivers.get(publicKey)
   const isReachable = await pingArchiver(archiver.ip, archiver.port)
 
   // handle the result
