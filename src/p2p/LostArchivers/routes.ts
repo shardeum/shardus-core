@@ -34,6 +34,7 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
   // Ignore gossip outside of Q1 and Q2
   if (![1, 2].includes(currentQuarter)) {
     logging.warn('lostArchiverUpGossip: not in Q1 or Q2')
+    return
   }
 
   // to-do: need a guard on logging logging.info() and others?
@@ -85,6 +86,7 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
   // Ignore gossip outside of Q1 and Q2
   if (![1, 2].includes(currentQuarter)) {
     logging.warn('lostArchiverUpGossip: not in Q1 or Q2')
+    return
   }
 
   logging.info(`lostArchiverDownGossip: payload: ${inspect(payload)}, sender: ${sender}, tracker: ${tracker}`)
@@ -163,10 +165,10 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
   handler: (req, res) => {
     // to-do: verify that validateArchiverUpMsg checks the signature or that whatever machinery invokes this route does; or do it ourselves
     // called by a refuting archiver
-    const error = funcs.errorForArchiverUpMsg(req.body)
+    const error = funcs.errorForArchiverRefutesLostMsg(req.body)
     if (error) {
       logging.warn(
-        `refuteLostArchiverRoute: invalid archiver up message error: ${error}, payload: ${req.body}`
+        `refuteLostArchiverRoute: invalid archiver up message error: ${error}, payload: ${inspect(req.body)}`
       )
       res.json({ status: 'failure', message: error })
       return

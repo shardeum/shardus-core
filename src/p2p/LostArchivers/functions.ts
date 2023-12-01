@@ -2,6 +2,7 @@ import { publicKey } from '@shardus/types'
 import { CycleMarker } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
 import {
   ArchiverDownMsg,
+  ArchiverRefutesLostMsg,
   ArchiverUpMsg,
   InvestigateArchiverMsg,
 } from '@shardus/types/build/src/p2p/LostArchiverTypes'
@@ -86,7 +87,7 @@ export async function investigateArchiver(
   // Retrieve the record of the Archiver from the lostArchiversMap
   info(`investigateArchiver: publicKey: ${publicKey}`)
   let record = lostArchiversMap.get(publicKey)
-  if (record) {
+  if (record && ['investigating', 'down', 'up'].includes(record.status)) {
     info('investigateArchiver: already have LostArchiverRecord')
     // already investigated
     return
@@ -270,6 +271,20 @@ export function errorForArchiverUpMsg(msg: SignedObject<ArchiverUpMsg> | null): 
     downMsg: ArchiverDownMsg;
     refuteMsg: ArchiverRefutesLostMsg;
   */
+  // to-do: check for valid signature
+  return null
+}
+
+/**
+ * Checks for errors in an ArchiverRefutesLostMsg
+ * @param msg - The ArchiverUpMsg to check
+ * @returns null if there are no errors, and a string describing the error otherwise
+ */
+export function errorForArchiverRefutesLostMsg(msg: SignedObject<ArchiverRefutesLostMsg> | null): string | null {
+  if (msg == null) return 'null message'
+  if (msg.sign == null) return 'no signature'
+  const missing = missingProperties(msg, 'archiver cycle')
+  if (missing.length) return `missing properties: ${missing.join(', ')}`
   // to-do: check for valid signature
   return null
 }

@@ -69,10 +69,10 @@ export function getTxs(): P2P.LostArchiverTypes.Txs {
     }
   }
 
-  info(`
-    lostArchivers: [ ${lostArchivers.map(tx => `${tx.cycle}:${tx.investigateMsg.target.substring(0, 5)}`).join(', ')} ]
-    refutedArchiver: [ ${refutedArchivers.map(tx => `${tx.cycle}:${tx.downMsg.investigateMsg.target.substring(0, 5)}`).join(', ')} ]
-  `)
+  info('===Lost Archivers Txs===')
+  info(`lostArchivers: ${inspect(lostArchivers)}`)
+  info(`refutedArchivers: ${inspect(refutedArchivers)}`)
+  info('===Lost Archivers Txs===')
 
   return {
     lostArchivers,
@@ -130,13 +130,13 @@ export function updateRecord(
   if (prev) {
     for (const publicKey of prev.lostArchivers) {
       // get lostArchiversMap entry from publicKey
-      const entry = lostArchiversMap.get(publicKey)
-      if (!entry) continue
+      const record = lostArchiversMap.get(publicKey)
+      if (!record) continue
 
       // wait cyclesToWait before adding the lostArchiver to removedArchivers
-      if (entry.cyclesToWait > 0) {
+      if (record.cyclesToWait > 0) {
         // decrement cyclesToWait
-        entry.cyclesToWait--
+        record.cyclesToWait--
       } else {
         // add publicKey to record.removedArchivers
         insertSorted(removedArchivers, publicKey)
@@ -171,11 +171,6 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
     lostArchiversMap.delete(publicKey)
   }
 
-  // DBG pretty print internal lostArchiversMap to logs
-  info('=== lostArchiversMap ===')
-  info(`${inspect(lostArchiversMap)}`)
-  info('=== lostArchiversMap ===')
-
   return {
     added: [],
     removed: [],
@@ -192,6 +187,11 @@ export function queueRequest(request: any): void {
  */
 export function sendRequests(): void {
   info('sendRequests function called')
+
+  // DBG pretty print internal lostArchiversMap to logs
+  info('=== lostArchiversMap ===')
+  info(`${inspect(lostArchiversMap)}`)
+  info('=== lostArchiversMap ===')
 
   // loop through lostArchiversMap
   for (const [publicKey, record] of lostArchiversMap) {
