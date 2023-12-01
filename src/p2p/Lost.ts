@@ -31,6 +31,19 @@ import { shardusGetTime } from '../network'
 import { ApoptosisProposalResp, deserializeApoptosisProposalResp } from '../types/ApoptosisProposalResp'
 import { ApoptosisProposalReq, serializeApoptosisProposalReq } from '../types/ApoptosisProposalReq'
 
+/** TYPES */
+
+export type ScheduledLostReport<Target> = {
+  targetNode: Target
+  reason: string
+  timestamp: number
+  scheduledInCycle: number
+  requestId: string
+}
+
+type ScheduledLostNodeReport = ScheduledLostReport<P2P.NodeListTypes.Node>
+
+
 /** STATE */
 
 // [TODO] - This enables the /kill /killother debug route and should be set to false after testing
@@ -45,15 +58,7 @@ let isUpTs = {}
 let stopReporting = {}
 let sendRefute = -1
 // map of <node_id-cycle_counter>
-let scheduledForLostReport: Map<string, ScheduledLostReport> = new Map<string, ScheduledLostReport>()
-
-interface ScheduledLostReport {
-  reason: string
-  targetNode: P2P.NodeListTypes.Node
-  timestamp: number
-  scheduledInCycle: number
-  requestId: string
-}
+let scheduledForLostReport: Map<string, ScheduledLostNodeReport> = new Map<string, ScheduledLostNodeReport>()
 
 //const CACHE_CYCLES = 10 replaced by multiple configs
 
@@ -374,7 +379,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 // This is called once per cycle at the start of Q1 by CycleCreator
 export function sendRequests() {
   if (config.p2p.aggregateLostReportsTillQ1) {
-    scheduledForLostReport.forEach((value: ScheduledLostReport, key: string) => {
+    scheduledForLostReport.forEach((value: ScheduledLostNodeReport, key: string) => {
       if (value.scheduledInCycle < currentCycle - config.p2p.delayLostReportByNumOfCycles) {
         /* prettier-ignore */ info(`Reporting lost: requestId: ${value.requestId}, scheduled in cycle: ${value.scheduledInCycle}, reporting in cycle ${currentCycle}, originally reported at ${value.timestamp}`)
         reportLost(value.targetNode, value.reason, value.requestId)

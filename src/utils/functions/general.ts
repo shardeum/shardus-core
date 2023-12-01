@@ -1,6 +1,5 @@
 import { P2P } from '@shardus/types'
 import { Ordering } from '..'
-import { stringify } from './stringify'
 import { Response } from 'express-serve-static-core'
 
 const replacer = (key: string, value: any): any => {
@@ -57,11 +56,11 @@ export function propComparator2<T>(prop: keyof T, prop2: keyof T): (a: T, b: T) 
       ? a[prop2] === b[prop2]
         ? 0
         : a[prop2] > b[prop2]
+          ? 1
+          : -1
+      : a[prop] > b[prop]
         ? 1
         : -1
-      : a[prop] > b[prop]
-      ? 1
-      : -1
   /* eslint-enable security/detect-object-injection */
   return comparator
 }
@@ -469,4 +468,47 @@ export function jsonHttpResWithSize(
   res.write(str)
   res.end()
   return str.length
+}
+
+/**
+ * Returns a string for the given object, using the given keys, usually for logging and debugging purposes.
+ * Keys can be null or undefined, in which case all keys are used.
+ * Keys can be a single string of comma- or space-separated keys.
+ * Keys can be an array of keys.
+ * If the object is an array, the keys are applied to each element of the array.
+ * Do not pass in data with circular references.
+ * Does not throw exceptions which would be bad for logging, but instead returns a string with the exception info.
+ * Examples:
+ * stringForKeys(node, 'publicKey ip host')
+ * stringForKeys(nodelist, 'publicKey ip host')
+ */
+export function stringForKeys(obj: unknown, keys: ArrayLike<string> | string | null = null): string {
+  if (obj === undefined)
+    return 'undefined'
+  if (obj === null)
+    return 'null'
+  try {
+    if (Array.isArray(obj))
+      return `[${obj.map(item => stringForKeys(item, keys)).join(', ')}]`
+    // at this point, obj is really an object
+    if (keys == null)
+      keys = Object.keys(obj)
+    else if (typeof keys == 'string')
+      keys = keys.split(/[ ,]+/)
+    // justification for the suppression below: the keys are not originated by user input, but developer source code
+    const items = Array
+      .from(keys)
+      .map(key => obj[key] === undefined ? 'undefined' : JSON.stringify(obj[key])) // eslint-disable-line security/detect-object-injection
+      .join(', ')
+    return `{${items}}`
+  } catch (e) {
+    // throwing an exception would be bad for logging/debugging, so we just return a string
+    let objStr: string
+    try {
+      objStr = JSON.stringify(obj)
+    } catch (e) {
+      objStr = '(stringForKeys(): exception for JSON.stringify())'
+    }
+    return `(stringForKeys(): exception: ${e}, obj: ${objStr})`
+  }
 }

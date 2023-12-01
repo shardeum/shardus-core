@@ -3,7 +3,7 @@ import { publicKey } from "@shardus/types";
 /**
   * A message that an archiver could not be reached.
   */
-export interface ArchiverDownTranaction {
+export interface ArchiverDownTransaction {
   publicKey: publicKey;
   ip: string;
   port: number;

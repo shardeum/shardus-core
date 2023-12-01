@@ -1,12 +1,16 @@
-// TODO lots to do here!
-
-
-/** FUNCTIONS */
+/** Lost Archiver Detection Functions */
 
 import { P2P } from "@shardus/types"
-import { routes } from "./routes"
 import * as Comms from "../Comms"
+import { generateUUID } from '../Utils'
+import { currentCycle, currentQuarter } from '../CycleCreator'
+import { stringForKeys } from '../../utils'
 import { info, initLogging } from "./logging"
+import { routes } from "./routes"
+import { ScheduledLostReport } from '../Lost'
+
+type ScheduledLostArchiverReport = ScheduledLostReport<P2P.ArchiversTypes.JoinedArchiver>
+
 
 /** CycleCreator Functions */
 
@@ -71,6 +75,32 @@ export function sendRequests(): void {
 /** Lost Archivers Functions */
 
 /**
+ * The accumulated lost reports from invocations of scheduleLostArchiverReport().
+ * Key is 'publicKey-ip-port-cycle'.
+ */
+const scheduledForLostReport = new Map<string, ScheduledLostArchiverReport>()
+
+
+export function scheduleLostArchiverReport(archiver: P2P.ArchiversTypes.JoinedArchiver, reason: string, requestId: string|null = null): void {
+  if (!requestId) requestId = generateUUID()
+  /* prettier-ignore */ info(`scheduleLostArchiverReport(): target: ${stringForKeys(archiver, 'publicKey ip port')}, reason: ${reason}, requestId: ${requestId}, currentCycle: ${currentCycle}, currentQuarter: ${currentQuarter}`)
+  const key = `${archiver.publicKey}-${archiver.ip}-${archiver.port}-${currentCycle}`
+  if (scheduledForLostReport.has(key)) {
+    const previousScheduleValue = scheduledForLostReport.get(key)
+    /* prettier-ignore */ info(`Target node ${archiver.publicKey} already scheduled for lost report, previous report: ${JSON.stringify(previousScheduleValue)}`)
+    // to-do: return here or fall through? lost node detection falls through, thereby overwriting the previous report; was that intentional?
+  }
+  scheduledForLostReport.set(key, {
+    reason: reason,
+    targetNode: archiver,
+    timestamp: Date.now(),
+    scheduledInCycle: currentCycle,
+    requestId: requestId,
+  })
+}
+
+
+/**
  * This function is called whenever communication with an Archiver
  * breaks down to let the network start the process of marking it as Lost.
  */
@@ -101,7 +131,3 @@ function reportArchiverUp(): void {
   // After an Archiver tells us its still up 
   // We need to gossip the up message to the rest of the network
 }
-
-/**
- * 
- */

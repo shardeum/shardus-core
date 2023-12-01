@@ -29,6 +29,7 @@ import { DataRequest } from '@shardus/types/build/src/p2p/ArchiversTypes'
 import * as CycleChain from './CycleChain'
 import rfdc from 'rfdc'
 import { shardusGetTime } from '../network'
+import { scheduleLostArchiverReport } from '../p2p/LostArchivers/functions'
 
 const clone = rfdc()
 
@@ -621,28 +622,30 @@ export async function instantForwardOriginalTxData(originalTxData) {
  * network is down by checking if all Archivers are down. If so, it causes
  * the node to apoptosize itself.
  */
-async function hasNetworkStopped() {
+async function hasNetworkStopped(): Promise<boolean> {
   // If network check still in progress, return
   if (networkCheckInProgress) return
   networkCheckInProgress = true
-
-  // Get a randomized list of all Archivers
-  const shuffledArchivers = shuffleMapIterator(archivers)
-
-  // Loop through them and check their /nodelist endpoint for a response
-  for (const archiver of shuffledArchivers) {
-    try {
-      const response: { data: unknown } = await http.get(`http://${archiver.ip}:${archiver.port}/nodelist`)
-
-      // If any one of them responds, return
-      if (response.data) return false
-    } catch (error) {
-      warn(`hasNetworkStopped: Archiver ${archiver.ip}:${archiver.port} is down`)
+  try {
+    // Get a randomized list of all Archivers
+    const shuffledArchivers = shuffleMapIterator(archivers)
+    // Loop through them and check their /nodelist endpoint for a response
+    for (const archiver of shuffledArchivers) {
+      try {
+        const response: { data: unknown } = await http.get(`http://${archiver.ip}:${archiver.port}/nodelist`)
+        // If any one of them responds, return false
+        if (response.data) return false
+      } catch (error) {
+        warn(`hasNetworkStopped: Archiver ${archiver.ip}:${archiver.port} is down`)
+        scheduleLostArchiverReport(archiver, 'hasNetworkStopped() cannot reach /nodelist')
+      }
     }
+    // If all of them do not respond, initiate apoptosis
+    return true
+  } finally {
+    networkCheckInProgress = false
   }
 
-  // If all of them do not respond, initiate apoptosis
-  return true
 }
 
 export interface InitialAccountsData {
