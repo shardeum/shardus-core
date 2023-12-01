@@ -49,6 +49,7 @@ import * as JoinV2 from '../p2p/Join/v2'
 import { getNetworkTimeOffset, shardusGetTime } from '../network'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { networkMode, isInternalTxAllowed } from '../p2p/Modes'
+import { lostArchiversMap } from '../p2p/LostArchivers/state'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -2165,6 +2166,7 @@ class Shardus extends EventEmitter {
           currentQuarter: CycleCreator.currentQuarter,
           currentCycleMarker: CycleChain.getCurrentCycleMarker() ?? null,
           newestCycle: CycleChain.getNewest() ?? null,
+          lostArchiversMap: lostArchiversMap,
         }
       }
       res.json(result)
