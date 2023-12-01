@@ -49,6 +49,9 @@ const cycles = [
     standbyAdd: { type: Sequelize.TEXT, allowNull: false },
     standbyNodeListHash: { type: Sequelize.TEXT, allowNull: false },
     standbyRemove: { type: Sequelize.TEXT, allowNull: false },
+    lostArchivers: { type: Sequelize.TEXT, allowNull: false },
+    refutedArchivers: { type: Sequelize.TEXT, allowNull: false },
+    removedArchivers: { type: Sequelize.TEXT, allowNull: false },
     ...P2PApoptosis.sequelizeCycleFieldModel,
   },
 ]

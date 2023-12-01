@@ -151,6 +151,9 @@ class Storage {
           '`standbyAdd` JSON NOT NULL',
           '`standbyNodeListHash` TEXT NOT NULL',
           '`standbyRemove` JSON NOT NULL',
+          '`lostArchivers` TEXT NOT NULL',
+          '`refutedArchivers` TEXT NOT NULL',
+          '`removedArchivers` TEXT NOT NULL',
         ].join(', ') +
         ')'
     )

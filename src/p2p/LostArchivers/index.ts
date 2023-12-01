@@ -102,30 +102,40 @@ export function updateRecord(
 ): void {
   info('updateRecord function called')
 
+  const lostArchivers = []
+  const refutedArchivers = []
+  const removedArchivers = []
+
   // add all txs.lostArchivers publicKeys to record.lostArchivers
   for (const tx of txs.lostArchivers) {
-    insertSorted(record.lostArchivers, tx.investigateTx.target)
+    insertSorted(lostArchivers, tx.investigateTx.target)
   }
   // add all txs.refutedArchivers publicKeys to record.refutedArchivers
   for (const tx of txs.refutedArchivers) {
-    insertSorted(record.refutedArchivers, tx.downTx.investigateTx.target)
+    insertSorted(refutedArchivers, tx.downTx.investigateTx.target)
   }
 
   // loop through prev.lostArchivers
-  for (const publicKey of prev.lostArchivers) {
-    // get lostArchiversMap entry from publicKey
-    const entry = lostArchiversMap.get(publicKey)
-    if (!entry) continue
+  if (prev) {
+    for (const publicKey of prev.lostArchivers) {
+      // get lostArchiversMap entry from publicKey
+      const entry = lostArchiversMap.get(publicKey)
+      if (!entry) continue
 
-    // wait cyclesToWait before adding the lostArchiver to removedArchivers
-    if (entry.cyclesToWait > 0) {
-      // decrement cyclesToWait
-      entry.cyclesToWait--
-    } else {
-      // add publicKey to record.removedArchivers
-      insertSorted(record.removedArchivers, publicKey)
+      // wait cyclesToWait before adding the lostArchiver to removedArchivers
+      if (entry.cyclesToWait > 0) {
+        // decrement cyclesToWait
+        entry.cyclesToWait--
+      } else {
+        // add publicKey to record.removedArchivers
+        insertSorted(removedArchivers, publicKey)
+      }
     }
   }
+
+  record.lostArchivers = lostArchivers
+  record.refutedArchivers = refutedArchivers
+  record.removedArchivers = removedArchivers
 }
 
 /**
@@ -155,7 +165,11 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   info(`${JSON.stringify(lostArchiversMap, null, 2)}`)
   info('=== lostArchiversMap ===\n')
 
-  return
+  return {
+    added: [],
+    removed: [],
+    updated: [],
+  }
 }
 
 export function queueRequest(request: any): void {
