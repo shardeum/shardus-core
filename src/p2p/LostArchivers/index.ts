@@ -191,3 +191,8 @@ export function sendRequests(): void {
   }
   return
 }
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function validateRecordTypes(rec: P2P.ActiveTypes.Record): string {
+  return ''
+}

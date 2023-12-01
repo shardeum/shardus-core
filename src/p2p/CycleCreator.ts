@@ -20,6 +20,7 @@ import * as Rotation from './Rotation'
 import * as SafetyMode from './SafetyMode'
 import * as Modes from './Modes'
 import * as Self from './Self'
+import * as LostArchivers from './LostArchivers'
 import { compareQuery, Comparison } from './Utils'
 import { errorToStringFull, formatErrorMessage } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -46,6 +47,7 @@ type submoduleTypes =
   | typeof SafetyMode
   | typeof Modes
   | typeof CycleAutoScale
+  | typeof LostArchivers
 
 /** STATE */
 
@@ -69,6 +71,7 @@ export let submodules: submoduleTypes[] = [
   // SafetyMode,
   Modes,
   CycleAutoScale,
+  LostArchivers,
 ]
 
 export let currentQuarter = -1 // means we have not started creating cycles
