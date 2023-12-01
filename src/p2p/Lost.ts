@@ -51,7 +51,7 @@ const allowKillRoute = false
 
 let p2pLogger
 
-let lost: Map<string, P2P.LostTypes.LostRecord> = new Map<string, P2P.LostTypes.LostRecord>()
+let lostRecordMap = new Map<string, P2P.LostTypes.LostRecord>()
 export let isDown = {}
 let isUp = {}
 let isUpTs = {}
@@ -194,15 +194,15 @@ export function init() {
 // This gets called before start of Q1
 export function reset() {
   const lostCacheCycles = config.p2p.lostMapPruneCycles
-  for (const [key, obj] of lost) {
+  for (const [key, obj] of lostRecordMap) {
     // delete old lost reports
     if (obj.cycle < currentCycle - lostCacheCycles) {
-      lost.delete(key)
+      lostRecordMap.delete(key)
       continue
     }
     // delete once the target is removed from the node list
     if (!nodes.get(obj.target)) {
-      lost.delete(key)
+      lostRecordMap.delete(key)
       continue
     }
   }
@@ -215,14 +215,14 @@ export function getTxs(): P2P.LostTypes.Txs {
   let lostTxs = []
   let refutedTxs = []
   // Check if the node in the lost list is in the apop list; remove it if there is one
-  for (const [key, obj] of lost) {
+  for (const [key, obj] of lostRecordMap) {
     const { target } = obj
     if (isApopMarkedNode(target)) {
-      lost.delete(key)
+      lostRecordMap.delete(key)
     }
   }
   let seen = {} // used to make sure we don't add the same node twice
-  for (const [key, obj] of lost) {
+  for (const [key, obj] of lostRecordMap) {
     if (seen[obj.target]) continue
     if (obj.message && obj.message.report && obj.message.cycle === currentCycle) {
       lostTxs.push(obj.message)
@@ -230,7 +230,7 @@ export function getTxs(): P2P.LostTypes.Txs {
     }
   }
   seen = {}
-  for (const [key, obj] of lost) {
+  for (const [key, obj] of lostRecordMap) {
     if (seen[obj.target]) continue
     if (obj.message && obj.message.status === 'up' && obj.message.cycle === currentCycle) {
       refutedTxs.push(obj.message)
@@ -388,7 +388,7 @@ export function sendRequests() {
     })
   }
 
-  for (const [key, obj] of lost) {
+  for (const [key, obj] of lostRecordMap) {
     if (obj.status !== 'down') continue // TEST
     if (obj.message && obj.message.checker && obj.message.checker === Self.id) {
       if (obj.gossiped) continue
@@ -495,7 +495,7 @@ function reportLost(target, reason: string, requestId: string) {
   // we set isDown cache to the cycle number here; to speed up deciding if a node is down
   isDown[target.id] = currentCycle
   const key = `${target.id}-${currentCycle}`
-  const lostRec = lost.get(key)
+  const lostRec = lostRecordMap.get(key)
   if (lostRec) return // we have already seen this node for this cycle
   let obj = { target: target.id, status: 'reported', cycle: currentCycle }
   const checker = getCheckerNode(target.id, currentCycle)
@@ -517,7 +517,7 @@ function reportLost(target, reason: string, requestId: string) {
   msgCopy.timestamp = shardusGetTime()
   msgCopy.requestId = requestId
   msg = crypto.sign(msgCopy)
-  lost.set(key, obj)
+  lostRecordMap.set(key, obj)
   Comms.tell([checker], 'lost-report', msg)
 }
 
@@ -560,7 +560,7 @@ async function lostReportHandler(payload, response, sender) {
     }
     if (stopReporting[payload.target]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
     const key = `${payload.target}-${payload.cycle}`
-    if (lost.get(key)) return // we have already seen this node for this cycle
+    if (lostRecordMap.get(key)) return // we have already seen this node for this cycle
     const [valid, reason] = checkReport(payload, currentCycle + 1)
     if (!valid) {
       warn(`Got bad investigate request. requestId: ${requestId}, reason: ${reason}`)
@@ -574,7 +574,7 @@ async function lostReportHandler(payload, response, sender) {
       status: 'checking',
       message: payload,
     }
-    lost.set(key, obj)
+    lostRecordMap.set(key, obj)
     // check if we already know that this node is down
     if (isDown[payload.target]) {
       obj.status = 'down'
@@ -687,7 +687,7 @@ export function isNodeDown(nodeId: string): { down: boolean; state: string } {
 export function isNodeLost(nodeId: string): boolean {
   // First check the isUp isDown caches to see if we already checked this node before
   const key = `${nodeId}-${currentCycle}`
-  const lostRec = lost.get(key)
+  const lostRec = lostRecordMap.get(key)
   if (lostRec != null) {
     return true
   }
@@ -802,7 +802,7 @@ function downGossipHandler(payload: P2P.LostTypes.SignedDownGossipMessage, sende
     return
   }
   const key = `${payload.report.target}-${payload.report.cycle}`
-  let rec = lost.get(key)
+  let rec = lostRecordMap.get(key)
   if (rec && ['up', 'down'].includes(rec.status)) return // we have already gossiped this node for this cycle
   let [valid, reason] = checkQuarter(payload.report.checker, sender)
   if (!valid) {
@@ -822,7 +822,7 @@ function downGossipHandler(payload: P2P.LostTypes.SignedDownGossipMessage, sende
     status: 'down',
     message: payload,
   }
-  lost.set(key, obj)
+  lostRecordMap.set(key, obj)
   Comms.sendGossip('lost-down', payload, tracker, Self.id, byIdOrder, false)
   // After message has been gossiped in Q1 and Q2 we wait for getTxs() to be invoked in Q3
 }
@@ -865,7 +865,7 @@ function upGossipHandler(payload, sender, tracker) {
     return
   }
   const key = `${payload.target}-${payload.cycle}`
-  const rec = lost.get(key)
+  const rec = lostRecordMap.get(key)
   if (rec && rec.status === 'up') return // we have already gossiped this node for this cycle
   ;[valid, reason] = checkUpMsg(payload, currentCycle)
   if (!valid) {
@@ -873,7 +873,7 @@ function upGossipHandler(payload, sender, tracker) {
     return
   }
   let obj = { target: payload.target, status: 'up', cycle: payload.cycle, message: payload }
-  lost.set(key, obj)
+  lostRecordMap.set(key, obj)
   Comms.sendGossip('lost-up', payload, tracker, Self.id, byIdOrder, false)
   // the getTxs() function will loop through the lost object to make txs in Q3 and build the cycle record from them
 }

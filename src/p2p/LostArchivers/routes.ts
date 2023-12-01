@@ -15,7 +15,7 @@ type Route<T> = P2P.P2PTypes.Route<T>
 type InternalHandler<P> = P2P.P2PTypes.InternalHandler<P>
 type GossipHandler<P, S> = P2P.P2PTypes.GossipHandler<P, S>
 
-const gossipNodeDownTxRoute: GossipHandler<ArchiverDownTransaction, Node['id']> = (
+const gossipArchiverDownTxRoute: GossipHandler<ArchiverDownTransaction, Node['id']> = (
   payload,
   sender,
   tracker
@@ -23,7 +23,7 @@ const gossipNodeDownTxRoute: GossipHandler<ArchiverDownTransaction, Node['id']> 
   // TODO
 }
 
-const gossipNodeUpTxRoute: GossipHandler<ArchiverUpTransaction, Node['id']> = (payload, sender, tracker) => {
+const gossipArchiverUpTxRoute: GossipHandler<ArchiverUpTransaction, Node['id']> = (payload, sender, tracker) => {
   // TODO
 }
 
@@ -44,7 +44,7 @@ const enableReportFakeLostArchiver = false // set this to `true` during testing,
 // to-do: debug middleware?
 const reportFakeLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
-  name: 'repot-fake-lost-archiver',
+  name: 'report-fake-lost-archiver',
   handler: (_req, res) => {
     if (enableReportFakeLostArchiver) {
       logging.warn('/report-fake-lost-archiver: reporting fake lost archiver')
@@ -76,7 +76,7 @@ export const routes = {
   external: [reportFakeLostArchiverRoute],
   internal: [internalInvestigateTxRoute, internalPingRoute],
   gossip: {
-    'gossip-node-down-tx': gossipNodeDownTxRoute,
-    'gossip-node-up-tx': gossipNodeUpTxRoute,
+    'gossip-node-down-tx': gossipArchiverDownTxRoute,
+    'gossip-node-up-tx': gossipArchiverUpTxRoute,
   },
 }
