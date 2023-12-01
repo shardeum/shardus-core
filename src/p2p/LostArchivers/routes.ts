@@ -6,7 +6,7 @@ import * as Comms from '../Comms'
 import { crypto, network } from '../Context'
 import { getRandomAvailableArchiver } from '../Utils'
 import * as logging from './logging'
-import { lostArchiversMap } from './state'
+import { cyclesToWait, lostArchiversMap } from './state'
 import { currentCycle, currentQuarter } from '../CycleCreator'
 import * as Self from '../../p2p/Self'
 import * as funcs from './functions'
@@ -15,9 +15,6 @@ import {
   ArchiverUpMsg,
   InvestigateArchiverMsg,
 } from '@shardus/types/src/p2p/LostArchiverTypes'
-
-// to-do: make a setting?
-const initialCyclesToWait = 3
 
 /**
  * Returns true if the given object is not nullish and has all the given keys.
@@ -109,7 +106,7 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
       target,
       status: 'down',
       archiverDownMsg: downMsg,
-      cyclesToWait: initialCyclesToWait,
+      cyclesToWait
     }
     lostArchiversMap.set(target, record)
   }

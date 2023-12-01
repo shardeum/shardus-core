@@ -106,6 +106,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     q1DelayPercent: 0.125,
     goldenTicketEnabled: true,
     initShutdown: false,
+    lostArchiversCyclesToWait: 0,
   },
   ip: {
     externalIp: '0.0.0.0',

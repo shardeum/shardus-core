@@ -786,6 +786,8 @@ export interface ServerConfiguration {
     goldenTicketEnabled: boolean
     /** The initShutdown flag can be switched on by an Admin/DAO via Change-Server-Config Tx to put the network in 'shutdown' mode */
     initShutdown: boolean
+    /** The number of consecutive cycles an Archiver has refute its appearance in the lostArchivers field before it is actually removed */
+    lostArchiversCyclesToWait: number
   }
   /** Server IP configuration */
   ip?: {

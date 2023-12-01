@@ -1,6 +1,7 @@
 import { publicKey } from '@shardus/types'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import { ArchiverDownMsg, ArchiverUpMsg } from '@shardus/types/src/p2p/LostArchiverTypes'
+import { config } from '../Context'
 
 /** TYPES */
 
@@ -21,3 +22,5 @@ export interface LostArchiverRecord {
  * Maps Archiver public key to a LostRecord in the map.
  */
 export const lostArchiversMap = new Map<publicKey, LostArchiverRecord>()
+
+export const cyclesToWait = config.p2p.lostArchiversCyclesToWait
