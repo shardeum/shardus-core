@@ -473,9 +473,18 @@ export function scheduleLostReport(target: P2P.NodeListTypes.Node, reason: strin
 function reportLost(target, reason: string, requestId: string) {
   info(`Reporting lost for ${target.id}, requestId: ${requestId}.`)
   info(`Target node details for requestId: ${requestId}: ${logNode(target)}`)
-  if (target.id === Self.id) return // don't report self
-  if (stopReporting[target.id]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
-  if (nodes.get(target.id).status === 'syncing') return // don't report syncing nodes
+  if (target.id === Self.id){
+    nestedCountersInstance.countEvent('p2p', 'reportLost skip: self')
+    return // don't report self
+  }
+  if (stopReporting[target.id]) {
+    nestedCountersInstance.countEvent('p2p', 'reportLost skip: already stopped reporting')
+    return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
+  }
+  if (nodes.get(target.id)?.status === 'syncing'){
+    nestedCountersInstance.countEvent('p2p', 'reportLost skip: node syncing')
+    return // don't report syncing nodes
+  }
   // we set isDown cache to the cycle number here; to speed up deciding if a node is down
   isDown[target.id] = currentCycle
   const key = `${target.id}-${currentCycle}`
