@@ -1,15 +1,35 @@
+import { publicKey } from "@shardus/types";
+
+/**
+  * A message that an archiver could not be reached.
+  */
 export interface ArchiverDownTranaction {
-  // TODO
+  publicKey: publicKey;
+  ip: string;
+  port: number;
 }
 
+/**
+  * A message that an archiver has come back up.
+  */
 export interface ArchiverUpTransaction {
-  // TODO
+  publicKey: publicKey;
 }
 
+/**
+  * A message to investiage an archiver that is potentially lost.
+  */
 export interface ArchiverInvestigateTransaction {
-  // TODO
+  publicKey: publicKey;
+  ip: string;
+  port: number;
 }
 
+/**
+  * A message to ping an archiver that is potentially lost.
+  */
 export interface ArchiverPingMessage {
-  // TODO
+  publicKey: publicKey;
+  ip: string;
+  port: number;
 }

@@ -1,7 +1,11 @@
-export interface LostArchivers {
-  // TODO
-}
+import { publicKey } from "@shardus/types";
 
-export interface InvestigatedArchivers {
-  // TODO
-}
+/**
+  * The set of archiver public keys that are lost.
+  */
+export type LostArchivers = Set<publicKey>;
+
+/**
+  * The set of archiver public keys that have been investigated.
+  */
+export type InvestigatedArchivers = Set<publicKey>;
