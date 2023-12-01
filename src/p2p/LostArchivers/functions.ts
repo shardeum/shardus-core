@@ -7,20 +7,35 @@ import {
 } from '@shardus/types/build/src/p2p/LostArchiverTypes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
-import { info } from 'console'
 import * as http from '../../http'
 import * as CycleChain from '../../p2p/CycleChain'
 import * as Archivers from '../Archivers'
 import * as Comms from '../Comms'
 import * as Context from '../Context'
 import * as NodeList from '../NodeList'
-import { lostArchiversMap } from './state'
+import { LostArchiverRecord, lostArchiversMap } from './state'
 import { config } from 'process'
+import { info } from './logging'
+import { id } from '../Self'
+import { binarySearch } from '../../utils/functions/arrays'
+import { activeByIdOrder } from '../NodeList'
+import Crypto from '../../crypto'
+import { isNullOrUndefined } from 'util'
 
 /** Lost Archivers Functions */
 
 function stringify(obj: object): string {
   return JSON.stringify(obj, null, 2)
+}
+
+export function createLostArchiverRecord(obj: Partial<LostArchiverRecord>): LostArchiverRecord {
+  if (obj.isInvestigator == null) obj.isInvestigator = false
+  if (obj.gossippedDownMsg == null) obj.gossippedDownMsg = false
+  if (obj.gossippedUpMsg == null) obj.gossippedUpMsg = false
+  if (obj.target == null) throw 'Must specify a target for LostArchiverRecord'
+  if (obj.status == null) obj.status = 'reported'
+  if (obj.cyclesToWait == null) obj.cyclesToWait = Context.config.p2p.lostArchiversCyclesToWait
+  return obj as LostArchiverRecord
 }
 
 /**
@@ -32,7 +47,7 @@ function stringify(obj: object): string {
  */
 export function reportLostArchiver(publicKey: publicKey, errorMsg: string): void {
   info(`reportLostArchiver: publicKey: ${publicKey}, errorMsg: ${errorMsg}`)
-  // Add new entry to lostArchiversMap for reported Archiver if it doesnt exist
+  // Add new entry to lostArchiversMap for reported Archiver if it doesn't exist
   // This is to ensure that we don't overwrite existing entries
   if (lostArchiversMap.has(publicKey)) {
     info('reportLostArchiver: already have LostArchiverRecord')
@@ -40,13 +55,13 @@ export function reportLostArchiver(publicKey: publicKey, errorMsg: string): void
     info('reportLostArchiver: adding new LostArchiverRecord')
     // Set status to 'reported'
     // This status indicates that the Archiver has been reported as lost, but not yet investigated
-    lostArchiversMap.set(publicKey, {
-      isInvestigator: false,
-      gossipped: false,
-      target: publicKey,
-      status: 'reported',
-      cyclesToWait: Context.config.p2p.lostArchiversCyclesToWait,
-    })
+    lostArchiversMap.set(
+      publicKey,
+      createLostArchiverRecord({
+        target: publicKey,
+        status: 'reported',
+      })
+    )
   }
   // don't gossip here; that is initiated in sendRequests()
 }
@@ -56,7 +71,8 @@ export function reportLostArchiver(publicKey: publicKey, errorMsg: string): void
  * This function gets called to verify if an Archiver is indeed lost
  * @param publicKey - The public key of the Archiver to investigate
  */
-export async function investigateArchiver(publicKey: publicKey): Promise<void> {
+export async function investigateArchiver(investigateMsg: SignedObject<InvestigateArchiverMsg>): Promise<void> {
+  const publicKey = investigateMsg.target
   // Retrieve the record of the Archiver from the lostArchiversMap
   info(`investigateArchiver: publicKey: ${publicKey}`)
   let record = lostArchiversMap.get(publicKey)
@@ -66,18 +82,21 @@ export async function investigateArchiver(publicKey: publicKey): Promise<void> {
     return
   }
   // starting investigation
-  record = {
+  record = createLostArchiverRecord({
     isInvestigator: true,
-    gossipped: false,
     target: publicKey,
     status: 'investigating',
-    cyclesToWait: Context.config.p2p.lostArchiversCyclesToWait,
-  }
+    gossippedDownMsg: false,
+    investigateMsg
+  })
+
   // record it
   lostArchiversMap.set(publicKey, record)
+
   // ping the archiver
   const archiver = Archivers.archivers.get(publicKey)
   const isReachable = await pingArchiver(archiver.ip, archiver.port)
+
   // handle the result
   if (isReachable) {
     lostArchiversMap.delete(publicKey)
@@ -88,23 +107,6 @@ export async function investigateArchiver(publicKey: publicKey): Promise<void> {
 }
 
 /**
- * Reports an Archiver as up.
- * This function gets called when an Archiver that was previously marked as down is now reachable
- * @param publicKey - The public key of the Archiver that is now up
- */
-export function reportArchiverUp(publicKey: publicKey): void {
-  // Retrieve the record of the Archiver from the lostArchiversMap
-  const record = lostArchiversMap.get(publicKey)
-  // If the record exists and the status of the Archiver is 'down', mark it as 'up'
-  // This is to ensure that we only update the status of Archivers that were previously marked as down
-  if (record && record.status === 'down') {
-    record.status = 'up'
-    // TODO: Implement gossiping the up message to the rest of the network
-    // This is to inform the rest of the network that the Archiver is now up
-  }
-}
-
-/**
  * Picks an investigator node for lost archiver detection
  * @param record record in from the lostArchiverRecordMap
  * @returns The node ID of the investigator for that specific record
@@ -112,7 +114,14 @@ export function reportArchiverUp(publicKey: publicKey): void {
 export function getInvestigator(target: publicKey, marker: CycleMarker): Node {
   // TODO: Implement hashing target + marker and returning node from Nodelist with id closest to hash
   // This is to ensure that the investigator node is chosen in a deterministic manner
-  return null
+  const obj = { id, marker }
+  const near = Context.crypto.hash(obj)
+  let idx = binarySearch(activeByIdOrder, near, (i, r) => i.localeCompare(r.id))
+  if (idx < 0) idx = (-1 - idx) % activeByIdOrder.length
+  // eslint-disable-next-line security/detect-object-injection
+  if (activeByIdOrder[idx].id === id) idx = (idx + 1) % activeByIdOrder.length // skip to next node if the selected node is target
+  // eslint-disable-next-line security/detect-object-injection
+  return activeByIdOrder[idx]
 }
 
 /**
@@ -122,28 +131,60 @@ export function getInvestigator(target: publicKey, marker: CycleMarker): Node {
 export function informInvestigator(target: publicKey): void {
   // TODO: Create InvestigateArchiverMsg and send it to the lostArchiverInvestigate route
   // This is to initiate the investigation process
+
+  // Compute investigator based off of hash(target + cycle marker)
+  const cycle = CycleChain.getCurrentCycleMarker()
+  const investigator = getInvestigator(target, cycle)
+  // Don't send yourself an InvestigateArchiverMsg
+  if (id === investigator.id) return
+
+  // Form msg
+  const investigateMsg: SignedObject<InvestigateArchiverMsg> = Context.crypto.sign({
+    type: 'investigate',
+    target,
+    investigator: investigator.id,
+    sender: id,
+    cycle,
+  })
+
+  // Send message to investigator
+  Comms.tell([investigator], 'lost-archiver-investigate', investigateMsg)
 }
 
 /**
  * Tells the network that an Archiver is down
  * @param archiverKey - The public key of the down Archiver
  */
-export function tellNetworkArchiverIsDown(archiverKey: publicKey): void {
+export function tellNetworkArchiverIsDown(record: LostArchiverRecord): void {
+  const archiverKey = record.target
   info(`tellNetworkArchiverIsDown: archiverKey: ${archiverKey}`)
-  const downMsg: ArchiverDownMsg = {
+  const downMsg: SignedObject<ArchiverDownMsg> = Context.crypto.sign({
     type: 'down',
     cycle: CycleChain.getCurrentCycleMarker(),
-    investigateTx: {
-      type: 'investigate',
-      target: archiverKey,
-      investigator: Context.crypto.getPublicKey(),
-      sender: Context.crypto.getPublicKey(),
-      cycle: CycleChain.getCurrentCycleMarker(),
-    },
-  }
+    investigateMsg: record.investigateMsg,
+  })
   info(`tellNetworkArchiverIsDown: downMsg: ${stringify(downMsg)}`)
+  record.archiverDownMsg = downMsg
   Comms.sendGossip('lost-archiver-down', downMsg, '', null, NodeList.byIdOrder, /* isOrigin */ true)
   // This is to inform the rest of the network that the Archiver is down
+}
+
+/**
+ * Tells the network thtellNetworkArchiverIsUpat an Archiver as up.
+ * @param publicKey - The public key of the Archiver that is now up
+ */
+export function tellNetworkArchiverIsUp(record: LostArchiverRecord): void {
+  // Create an ArchiverUpMsg using the saved ArchiverRefutedLostMsg
+  const upMsg: SignedObject<ArchiverUpMsg> = Context.crypto.sign({
+    type: 'up',
+    downMsg: record.archiverDownMsg,
+    refuteMsg: record.archiverRefuteMsg,
+    cycle: CycleChain.getCurrentCycleMarker(),
+  })
+  record.archiverUpMsg = upMsg
+  // Gossip the ArchiverUpMsg to the rest of the network
+  info(`tellNetworkArchiverIsUp: upMsg: ${stringify(upMsg)}`)
+  Comms.sendGossip('lost-archiver-up', upMsg, '', null, NodeList.byIdOrder, /* isOrigin */ true)
 }
 
 /**

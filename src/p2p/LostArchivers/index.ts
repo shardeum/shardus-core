@@ -6,10 +6,14 @@ import {
   errorForArchiverUpMsg,
   informInvestigator,
   tellNetworkArchiverIsDown,
+  tellNetworkArchiverIsUp,
 } from './functions'
 import { info, initLogging } from './logging'
 import { registerRoutes } from './routes'
 import { lostArchiversMap } from './state'
+import { ArchiverDownMsg, ArchiverUpMsg } from '@shardus/types/build/src/p2p/LostArchiverTypes'
+import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
+import { inspect } from 'util'
 
 /** CycleCreator Functions */
 
@@ -46,22 +50,31 @@ export function reset(): void {
 export function getTxs(): P2P.LostArchiverTypes.Txs {
   info('getTxs() called')
 
-  const lostArchivers = []
-  const refutedArchivers = []
+  const lostArchivers: SignedObject<ArchiverDownMsg>[] = []
+  const refutedArchivers: SignedObject<ArchiverUpMsg>[] = []
 
   // loop through lostArchiversMap
+  info('  looping through lostArchiversMap')
   for (const entry of lostArchiversMap.values()) {
+    info(`    record: ${JSON.stringify(entry)}`)
     // Don't include entries you haven't investigated yet
-    if (entry.isInvestigator && !entry.gossipped) continue
+    if (entry.isInvestigator && !entry.gossippedDownMsg) continue
     // if status == 'down', Put entry's ArchiverDownMsg into lostArchivers array
     if (entry.status === 'down' && entry.archiverDownMsg) {
-      lostArchivers.push(entry.archiverDownMsg)
+      insertSorted(lostArchivers, entry.archiverDownMsg)
     }
     // if status == 'up', Put entry's ArchiverUpMsg into refutedArchivers array
     if (entry.status === 'up' && entry.archiverUpMsg) {
-      lostArchivers.push(entry.archiverUpMsg)
+      insertSorted(refutedArchivers, entry.archiverUpMsg)
     }
   }
+
+  info(`
+
+    lostArchivers: [ ${lostArchivers.map(tx => `${tx.cycle}:${tx.investigateMsg.target.substring(0, 5)}`).join(', ')} ]
+    refutedArchiver: [ ${refutedArchivers.map(tx => `${tx.cycle}:${tx.downMsg.investigateMsg.target.substring(0, 5)}`).join(', ')} ]
+
+  `)
 
   return {
     lostArchivers,
@@ -108,11 +121,11 @@ export function updateRecord(
 
   // add all txs.lostArchivers publicKeys to record.lostArchivers
   for (const tx of txs.lostArchivers) {
-    insertSorted(lostArchivers, tx.investigateTx.target)
+    insertSorted(lostArchivers, tx.investigateMsg.target)
   }
   // add all txs.refutedArchivers publicKeys to record.refutedArchivers
   for (const tx of txs.refutedArchivers) {
-    insertSorted(refutedArchivers, tx.downTx.investigateTx.target)
+    insertSorted(refutedArchivers, tx.downMsg.investigateMsg.target)
   }
 
   // loop through prev.lostArchivers
@@ -161,9 +174,9 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   }
 
   // DBG pretty print internal lostArchiversMap to logs
-  info('\n=== lostArchiversMap ===')
-  info(`${JSON.stringify(lostArchiversMap, null, 2)}`)
-  info('=== lostArchiversMap ===\n')
+  info('=== lostArchiversMap ===')
+  info(`${inspect(lostArchiversMap)}`)
+  info('=== lostArchiversMap ===')
 
   return {
     added: [],
@@ -183,24 +196,32 @@ export function sendRequests(): void {
   info('sendRequests function called')
 
   // loop through lostArchiversMap
-  for (const [publicKey, entry] of lostArchiversMap) {
+  for (const [publicKey, record] of lostArchiversMap) {
     // any entries with status 'reported'
-    if (entry.status === 'reported') {
+    if (record.status === 'reported') {
       // Create InvestigateArchiverMsg and send it to the lostArchiverInvestigate route
       informInvestigator(publicKey)
-      // remove entry from the lostArchiversMap
+      // Delete record from map
       lostArchiversMap.delete(publicKey)
       continue
     }
     // if isInvestigator
-    if (entry.isInvestigator) {
+    if (record.isInvestigator) {
       // if status == 'down' && not gossipped
-      if (entry.status === 'down' && !entry.gossipped) {
+      if (record.status === 'down' && !record.gossippedDownMsg) {
         // Create ArchiverDownMsg and gossip it on the lostArchiverDownGossip route
-        tellNetworkArchiverIsDown(publicKey)
+        tellNetworkArchiverIsDown(record)
         // set gossipped to true
-        entry.gossipped = true
+        record.gossippedDownMsg = true
       }
+      continue
+    }
+    if (record.status === 'up' && !record.gossippedUpMsg) {
+      // Create ArchiverUpMsg and gossip it on the lostArchiverUpGossip route
+      tellNetworkArchiverIsUp(record) 
+      // set gossiped to true
+      record.gossippedUpMsg = true
+      continue
     }
   }
   return

@@ -1,17 +1,20 @@
 import { publicKey } from '@shardus/types'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
-import { ArchiverDownMsg, ArchiverUpMsg } from '@shardus/types/src/p2p/LostArchiverTypes'
-import { config } from '../Context'
+import { ArchiverDownMsg, ArchiverRefutesLostMsg, ArchiverUpMsg, InvestigateArchiverMsg } from '@shardus/types/build/src/p2p/LostArchiverTypes'
+import { Sign } from 'crypto'
 
 /** TYPES */
 
 export interface LostArchiverRecord {
   isInvestigator: boolean
-  gossipped: boolean
+  gossippedDownMsg: boolean
+  gossippedUpMsg: boolean
   target: publicKey
   status: 'reported' | 'investigating' | 'down' | 'up'
+  investigateMsg?: SignedObject<InvestigateArchiverMsg>
   archiverDownMsg?: SignedObject<ArchiverDownMsg>
   archiverUpMsg?: SignedObject<ArchiverUpMsg>
+  archiverRefuteMsg?: SignedObject<ArchiverRefutesLostMsg>
   cyclesToWait: number
 }
 

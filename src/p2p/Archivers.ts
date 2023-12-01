@@ -594,7 +594,11 @@ async function forwardDataToSubscribedArchivers(responses, publicKey, recipient)
       if (logFlags.console)
         console.log('Forwarded Archiver', recipient.nodeInfo.ip + ':' + recipient.nodeInfo.port)
       io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
-    } else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
+    } else {
+      warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
+      // Call into LostArchivers to report Archiver as lost
+      reportLostArchiver(publicKey, 'forwardDataToSubscribedArchivers() error');
+    }
   } catch (e) {
     error('Run into issue in forwarding data', e)
     // Call into LostArchivers to report Archiver as lost
@@ -747,7 +751,11 @@ export function sendData() {
         // console.log('connected socketes', publicKey, connectedSockets)
         if (io.sockets.sockets[connectedSockets[publicKey]])
           io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
-        else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
+        else {
+          warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
+          // Call into LostArchivers to report Archiver as lost
+          reportLostArchiver(publicKey, 'sendData() error');
+        }
       } catch (e) {
         error('Run into issue in forwarding cycles data', e)
         // Call into LostArchivers to report Archiver as lost
@@ -835,7 +843,11 @@ export function sendData() {
       // console.log('connected socketes', publicKey, connectedSockets)
       if (io.sockets.sockets[connectedSockets[publicKey]])
         io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
-      else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
+      else {
+        warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
+        // Call into LostArchivers to report Archiver as lost
+        reportLostArchiver(publicKey, 'sendData() error');
+      }
     } catch (e) {
       error('Run into issue in forwarding cycles data', e)
       // Call into LostArchivers to report Archiver as lost
