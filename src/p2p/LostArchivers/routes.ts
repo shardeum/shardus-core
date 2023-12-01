@@ -1,6 +1,7 @@
 import { P2P } from '@shardus/types'
 import {
   ArchiverDownMsg,
+  ArchiverRefutesLostMsg,
   ArchiverUpMsg,
   InvestigateArchiverMsg,
 } from '@shardus/types/src/p2p/LostArchiverTypes'
@@ -167,8 +168,8 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
       res.json({ status: 'failure', message: error })
       return
     }
-    const upMsg = req.body as SignedObject<ArchiverUpMsg>
-    const target = upMsg.downTx.investigateTx.target
+    const refuteMsg = req.body as SignedObject<ArchiverRefutesLostMsg>
+    const target = refuteMsg.archiver
     // to-do: check target is a string or hexstring and min length
     const record = lostArchiversMap.get(target)
     if (!record) {
@@ -182,7 +183,7 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
     // update refuting archiver in their lostArchiversMap
 
     // gossip SignedArchiverUpMsg to other nodes on the upArchiverGossip route
-    Comms.sendGossip('lost-archiver-up', upMsg, null, null, null, true) // isOrigin: true
+    Comms.sendGossip('lost-archiver-up', refuteMsg, null, null, null, true) // isOrigin: true
 
     res.json({ status: 'success' })
   },
