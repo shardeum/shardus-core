@@ -597,7 +597,8 @@ async function forwardDataToSubscribedArchivers(responses, publicKey, recipient)
     } else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
   } catch (e) {
     error('Run into issue in forwarding data', e)
-    /** [TODO] Call into LostArchivers to report Archiver as lost */
+    // Call into LostArchivers to report Archiver as lost
+    reportLostArchiver(publicKey, 'forwardDataToSubscribedArchivers() error');
   }
 }
 
@@ -693,7 +694,8 @@ export async function forwardAccounts(data: InitialAccountsData) {
       }
     } catch (e) {
       error('Run into error in forwarding accounts', e)
-      /** [TODO] Call into LostArchivers to report Archiver as lost */
+      // Call into LostArchivers to report Archiver as lost
+      reportLostArchiver(publicKey, 'forwardAccounts() error');
     }
   }
 }
@@ -748,7 +750,8 @@ export function sendData() {
         else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
       } catch (e) {
         error('Run into issue in forwarding cycles data', e)
-        /** [TODO] Call into LostArchivers to report Archiver as lost */
+        // Call into LostArchivers to report Archiver as lost
+        reportLostArchiver(publicKey, 'sendData() error');
       }
     }
     return
@@ -835,7 +838,8 @@ export function sendData() {
       else warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
     } catch (e) {
       error('Run into issue in forwarding cycles data', e)
-      /** [TODO] Call into LostArchivers to report Archiver as lost */
+      // Call into LostArchivers to report Archiver as lost
+      reportLostArchiver(publicKey, 'sendData() error');
     }
 
     // http
