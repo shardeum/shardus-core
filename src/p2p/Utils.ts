@@ -16,6 +16,9 @@ import { Result } from 'neverthrow'
 import { getPublicNodeInfo } from './Self'
 import * as http from '../http'
 import { ok, err } from 'neverthrow'
+import { postToArchiver } from './Archivers'
+import { JoinedArchiver } from '@shardus/types/build/src/p2p/ArchiversTypes'
+import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
 export type QueryFunction<Node, Response> = (node: Node) => PromiseLike<Response>
 
 export type VerifyFunction<Result> = (result: Result) => boolean
@@ -408,8 +411,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     //        The calling code can now check isRobustResult to see if a topResult is valid
     if (logFlags.console || config.debug.robustQueryDebug || extraDebugging)
       console.log(
-        `robustQuery: Could not get ${redundancy} ${
-          redundancy > 1 ? 'redundant responses' : 'response'
+        `robustQuery: Could not get ${redundancy} ${redundancy > 1 ? 'redundant responses' : 'response'
         } from ${nodeCount} ${nodeCount !== 1 ? 'nodes' : 'node'}. Encountered ${errors} query errors.`
       )
     const highestCountItem = responses.getHighestCountItem()
@@ -548,26 +550,23 @@ export function getRandomAvailableArchiver(): P2P.SyncTypes.ActiveNode {
 }
 
 export async function getActiveNodesFromArchiver(
-  archiver: P2P.SyncTypes.ActiveNode
+  archiver: ActiveNode
 ): Promise<Result<P2P.P2PTypes.SignedObject<SeedNodesList>, Error>> {
-  const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
   const nodeInfo = getPublicNodeInfo()
-  let seedListSigned: P2P.P2PTypes.SignedObject<SeedNodesList>
-  try {
-    seedListSigned = await http.post(
-      nodeListUrl,
-      Context.crypto.sign({
-        nodeInfo,
-      }),
-      false,
-      10000
-    )
-  } catch (e) {
+  return await postToArchiver<unknown, P2P.P2PTypes.SignedObject<SeedNodesList>>(
+    archiver,
+    'nodelist',
+    Context.crypto.sign({
+      nodeInfo,
+    }),
+    10000
+  ).mapErr((e) => {
+    // transform the error if we get one
     nestedCountersInstance.countRareEvent(
       'archiver_nodelist',
       'Could not get seed list from seed node server'
     )
-    return err(Error(`Could not get seed list from seed node server ${nodeListUrl}: ` + e.message))
-  }
-  return ok(seedListSigned)
+    const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
+    return Error(`Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
+  })
 }

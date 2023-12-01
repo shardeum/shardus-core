@@ -13,8 +13,9 @@ import * as http from '../../http'
 import { info, initLogging } from './logging'
 import { routes } from './routes'
 import { ArchiverInvestigateTransaction } from './txs'
+import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
 
-type ScheduledLostArchiverReport = ScheduledLostReport<P2P.ArchiversTypes.JoinedArchiver>
+type ScheduledLostArchiverReport = ScheduledLostReport<ActiveNode>
 
 /** CycleCreator Functions */
 
@@ -108,7 +109,7 @@ const scheduledForLostReport = new Map<string, ScheduledLostArchiverReport>()
  * breaks down to let the network start the process of marking it as Lost.
  */
 export function scheduleLostArchiverReport(
-  archiver: P2P.ArchiversTypes.JoinedArchiver,
+  archiver: ActiveNode,
   reason: string,
   requestId: string | null = null
 ): void {

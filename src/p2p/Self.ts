@@ -2,10 +2,8 @@ import { P2P } from '@shardus/types'
 import { NodeStatus, SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import * as events from 'events'
 import * as log4js from 'log4js'
-import * as http from '../http'
 import { logFlags } from '../logger'
 import * as network from '../network'
-import * as snapshot from '../snapshot'
 import * as utils from '../utils'
 import { isInvalidIP } from '../utils/functions/checkIP'
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -20,13 +18,14 @@ import * as JoinV2 from './Join/v2'
 import * as Acceptance from './Join/v2/acceptance'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
-import { getNewestCycle } from './Sync'
 import * as SyncV2 from './SyncV2/'
 import { getRandomAvailableArchiver, SeedNodesList } from './Utils'
 import * as CycleChain from './CycleChain'
 import rfdc from 'rfdc'
 import { shardusGetTime } from '../network'
 import getCallstack from '../utils/getCallstack'
+import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
+import { Result } from 'neverthrow'
 const deepCopy = rfdc()
 import { isServiceMode } from '../debug'
 
@@ -522,7 +521,7 @@ async function joinNetworkV2(activeNodes): Promise<void> {
   const publicKey = Context.crypto.getPublicKey()
   const isReadyToJoin = await Context.shardus.app.isReadyToJoin(latestCycle, publicKey, activeNodes, mode)
   if (!isReadyToJoin) {
-    /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `joinNetworkV2:isReadyToJoin:false` )
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `joinNetworkV2:isReadyToJoin:false`)
     // Wait for Context.config.p2p.cycleDuration and try again
     throw new Error('Node not ready to join')
   }
@@ -693,7 +692,7 @@ async function syncCycleChain(): Promise<void> {
       }
     } catch (err) {
       synced = false
-      /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `syncCycleChain: ex: ${err.message}` )
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `syncCycleChain: ex: ${err.message}`)
       /* prettier-ignore */ if (logFlags.important_as_fatal) warn('syncCycleChain:', utils.formatErrorMessage(err))
       if (logFlags.p2pNonFatal) info('Trying again in 2 sec...')
       await utils.sleep(2000)
@@ -819,39 +818,51 @@ function checkIfFirstSeedNode(seedNodes: P2P.P2PTypes.Node[]): boolean {
 }
 
 async function getActiveNodesFromArchiver(
-  archiver: P2P.SyncTypes.ActiveNode
+  archiver: ActiveNode
 ): Promise<P2P.P2PTypes.SignedObject<SeedNodesList>> {
-  const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
   const nodeInfo = getPublicNodeInfo()
-  let seedListSigned: P2P.P2PTypes.SignedObject<SeedNodesList>
-  try {
-    seedListSigned = await http.post(
-      nodeListUrl,
-      Context.crypto.sign({
-        nodeInfo,
-      }),
-      false,
-      10000
-    )
-  } catch (e) {
-    /* prettier-ignore */ nestedCountersInstance.countRareEvent( 'archiver_nodelist', 'Could not get seed list from seed node server' )
+  const seedListResult: Result<
+    P2P.P2PTypes.SignedObject<SeedNodesList>,
+    Error
+  > = await Archivers.postToArchiver(
+    archiver,
+    'nodelist',
+    Context.crypto.sign({
+      nodeInfo,
+    }),
+    10000
+  )
+  if (seedListResult.isErr()) {
+    const e = seedListResult.error
+    const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
+    /* prettier-ignore */ nestedCountersInstance.countRareEvent('archiver_nodelist', 'Could not get seed list from seed node server')
     /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
     throw Error(e.message)
   }
+
+  const seedListSigned = seedListResult.value
   if (logFlags.p2pNonFatal) info(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
+
   return seedListSigned
 }
 
 export async function getFullNodesFromArchiver(
   archiver: P2P.SyncTypes.ActiveNode = Context.config.p2p.existingArchivers[0]
 ): Promise<SignedObject<{ nodeList: P2P.NodeListTypes.Node[] }>> {
-  const nodeListUrl = `http://${archiver.ip}:${archiver.port}/full-nodelist`
-  let fullNodeList: SignedObject<{ nodeList: P2P.NodeListTypes.Node[] }>
-  try {
-    fullNodeList = await http.get(nodeListUrl)
-  } catch (e) {
-    throw Error(`Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
+  const fullNodeListResult: Result<
+    SignedObject<{ nodeList: P2P.NodeListTypes.Node[] }>,
+    Error
+  > = await Archivers.getFromArchiver(archiver, 'full-nodelist')
+
+  if (fullNodeListResult.isErr()) {
+    const nodeListUrl = `http://${archiver.ip}:${archiver.port}/full-nodelist`
+    throw Error(
+      `Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` +
+      fullNodeListResult.error.message
+    )
   }
+
+  const fullNodeList = fullNodeListResult.value
   if (logFlags.p2pNonFatal) info(`Got signed full node list: ${JSON.stringify(fullNodeList)}`)
   return fullNodeList
 }
@@ -862,8 +873,8 @@ export type NodeInfo = {
   publicKey: string
   curvePublicKey: string
 } & network.IPInfo & {
-    status: P2P.P2PTypes.NodeStatus
-  }
+  status: P2P.P2PTypes.NodeStatus
+}
 
 export function getPublicNodeInfo(reportIntermediateStatus = false): NodeInfo {
   const publicKey = Context.crypto.getPublicKey()

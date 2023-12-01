@@ -25,11 +25,13 @@ import { apoptosizeSelf } from './Apoptosis'
 import { randomInt } from 'crypto'
 import { CycleRecord } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
 import { StateMetaData } from '@shardus/types/build/src/p2p/SnapshotTypes'
-import { DataRequest } from '@shardus/types/build/src/p2p/ArchiversTypes'
+import { DataRequest, JoinedArchiver } from '@shardus/types/build/src/p2p/ArchiversTypes'
 import * as CycleChain from './CycleChain'
 import rfdc from 'rfdc'
 import { shardusGetTime } from '../network'
 import { scheduleLostArchiverReport } from '../p2p/LostArchivers/functions'
+import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
+import { Result, ResultAsync } from 'neverthrow'
 
 const clone = rfdc()
 
@@ -631,13 +633,16 @@ async function hasNetworkStopped(): Promise<boolean> {
     const shuffledArchivers = shuffleMapIterator(archivers)
     // Loop through them and check their /nodelist endpoint for a response
     for (const archiver of shuffledArchivers) {
-      try {
-        const response: { data: unknown } = await http.get(`http://${archiver.ip}:${archiver.port}/nodelist`)
-        // If any one of them responds, return false
-        if (response.data) return false
-      } catch (error) {
-        warn(`hasNetworkStopped: Archiver ${archiver.ip}:${archiver.port} is down`)
-        scheduleLostArchiverReport(archiver, 'hasNetworkStopped() cannot reach /nodelist')
+      const response: Result<{ data: unknown }, Error> = await getFromArchiver(
+        archiver,
+        '/nodelist',
+        'hasNetworkStopped() could not fetch nodelist'
+      )
+      // If any one of them responds, return false
+      if (response.isOk() && response.value.data) {
+        return false
+      } else if (response.isErr()) {
+        warn(`hasNetworkStopped(): network error: ${response.error.message}`)
       }
     }
     // If all of them do not respond, initiate apoptosis
@@ -1109,6 +1114,51 @@ let lastHashedList: P2P.ArchiversTypes.JoinedArchiver[] = []
 export function getLastHashedArchiverList(): P2P.ArchiversTypes.JoinedArchiver[] {
   /* prettier-ignore */ if (logFlags.p2pNonFatal) info('returning last hashed archiver list:', JSON.stringify(lastHashedList))
   return lastHashedList
+}
+
+/**
+ * A utility function that performs an HTTP GET request to an archiver. If
+ * there is an error, it will handle scheduling a lost archiver report and
+ * return undefined.
+ */
+export function getFromArchiver<R>(
+  archiver: ActiveNode,
+  endpoint: string,
+  failureReportMessage?: string
+): ResultAsync<R, Error> {
+  return ResultAsync.fromPromise(
+    http.get(`http://${archiver.ip}:${archiver.port}/${endpoint}`),
+    (e: Error) => {
+      warn(`${archiver.ip}:${archiver.port} is unreachable`)
+      scheduleLostArchiverReport(archiver, failureReportMessage || `cannot GET archiver endpoint ${endpoint}`)
+      return e
+    }
+  )
+}
+
+/**
+ * A utility function that performs an HTTP POST request to an archiver. If
+ * there is an error, it will handle scheduling a lost archiver report and
+ * return undefined.
+ */
+export function postToArchiver<B, R>(
+  archiver: ActiveNode,
+  endpoint: string,
+  body?: B,
+  timeout?: number,
+  failureReportMessage?: string
+): ResultAsync<R, Error> {
+  return ResultAsync.fromPromise(
+    http.post(`http://${archiver.ip}:${archiver.port}/${endpoint}`, body, false, timeout),
+    (e: Error) => {
+      warn(`${archiver.ip}:${archiver.port} is unreachable`)
+      scheduleLostArchiverReport(
+        archiver,
+        failureReportMessage || `cannot POST archiver endpoint ${endpoint}`
+      )
+      return e
+    }
+  )
 }
 
 function info(...msg) {
