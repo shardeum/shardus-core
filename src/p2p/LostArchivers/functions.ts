@@ -1,16 +1,15 @@
 /** Lost Archiver Detection Functions */
 
-import { P2P } from "@shardus/types"
-import * as Comms from "../Comms"
+import { P2P } from '@shardus/types'
+import * as Comms from '../Comms'
 import { generateUUID } from '../Utils'
 import { currentCycle, currentQuarter } from '../CycleCreator'
 import { stringForKeys } from '../../utils'
-import { info, initLogging } from "./logging"
-import { routes } from "./routes"
+import { info, initLogging } from './logging'
+import { routes } from './routes'
 import { ScheduledLostReport } from '../Lost'
 
 type ScheduledLostArchiverReport = ScheduledLostReport<P2P.ArchiversTypes.JoinedArchiver>
-
 
 /** CycleCreator Functions */
 
@@ -20,7 +19,7 @@ type ScheduledLostArchiverReport = ScheduledLostReport<P2P.ArchiversTypes.Joined
 */
 
 export function init(): void {
-  initLogging();
+  initLogging()
 
   // Init state
   reset()
@@ -80,8 +79,11 @@ export function sendRequests(): void {
  */
 const scheduledForLostReport = new Map<string, ScheduledLostArchiverReport>()
 
-
-export function scheduleLostArchiverReport(archiver: P2P.ArchiversTypes.JoinedArchiver, reason: string, requestId: string|null = null): void {
+export function scheduleLostArchiverReport(
+  archiver: P2P.ArchiversTypes.JoinedArchiver,
+  reason: string,
+  requestId: string | null = null
+): void {
   if (!requestId) requestId = generateUUID()
   /* prettier-ignore */ info(`scheduleLostArchiverReport(): target: ${stringForKeys(archiver, 'publicKey ip port')}, reason: ${reason}, requestId: ${requestId}, currentCycle: ${currentCycle}, currentQuarter: ${currentQuarter}`)
   const key = `${archiver.publicKey}-${archiver.ip}-${archiver.port}-${currentCycle}`
@@ -99,35 +101,29 @@ export function scheduleLostArchiverReport(archiver: P2P.ArchiversTypes.JoinedAr
   })
 }
 
-
 /**
  * This function is called whenever communication with an Archiver
  * breaks down to let the network start the process of marking it as Lost.
  */
 function reportLost(): void {
   // Mark the Archiver that you want to report as lost in your data structure to hold lost things
-
   // During the next Q1:
-    // Determine the investigator for the given Archiver
-    // Create an investigate tx
-    // Send it to the investigator
+  // Determine the investigator for the given Archiver
+  // Create an investigate tx
+  // Send it to the investigator
 }
 
 function investigateArchiver(): void {
   // Trigger investigation of a reported lost Archiver
-
   // Hit the ping endpoint of the Archiver to check if its up or down
-
   // If the Archiver is up, do nothing and the lost process for it ends
-
   // If the Archiver is down
-    // wait for the next Q1
-    // create a down tx
-    // gossip it to the rest of the network
-
+  // wait for the next Q1
+  // create a down tx
+  // gossip it to the rest of the network
 }
 
 function reportArchiverUp(): void {
-  // After an Archiver tells us its still up 
+  // After an Archiver tells us its still up
   // We need to gossip the up message to the rest of the network
 }

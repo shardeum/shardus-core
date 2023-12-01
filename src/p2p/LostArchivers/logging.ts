@@ -1,5 +1,5 @@
-import { logger } from "../Context";
-import { Logger } from "log4js";
+import { logger } from '../Context'
+import { Logger } from 'log4js'
 
 let p2pLogger: Logger
 
