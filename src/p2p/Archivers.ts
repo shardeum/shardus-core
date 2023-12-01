@@ -74,6 +74,24 @@ export let archiverDataSubscriptionsUpdateFeatureActivated = false
 
 /** FUNCTIONS */
 
+/** Accessor Functions */
+
+export function getNumArchivers(): number {
+  return archivers.size
+}
+
+export function getArchiverWithPublicKey(
+  publicKey: publicKey
+): P2P.ArchiversTypes.JoinedArchiver | undefined {
+  return archivers.get(publicKey)
+}
+
+export function getRandomArchiver(): P2P.ArchiversTypes.JoinedArchiver | null {
+  if (archivers.size === 0) return null
+  const list = Array.from(archivers.values())
+  return list[Math.floor(Math.random() * list.length)]
+}
+
 /** CycleCreator Functions */
 
 export function init() {
@@ -597,12 +615,12 @@ async function forwardDataToSubscribedArchivers(responses, publicKey, recipient)
     } else {
       warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
       // Call into LostArchivers to report Archiver as lost
-      reportLostArchiver(publicKey, 'forwardDataToSubscribedArchivers() error');
+      reportLostArchiver(publicKey, 'forwardDataToSubscribedArchivers() error')
     }
   } catch (e) {
     error('Run into issue in forwarding data', e)
     // Call into LostArchivers to report Archiver as lost
-    reportLostArchiver(publicKey, 'forwardDataToSubscribedArchivers() error');
+    reportLostArchiver(publicKey, 'forwardDataToSubscribedArchivers() error')
   }
 }
 
@@ -666,7 +684,6 @@ async function hasNetworkStopped(): Promise<boolean> {
   } finally {
     networkCheckInProgress = false
   }
-
 }
 
 export interface InitialAccountsData {
@@ -699,7 +716,7 @@ export async function forwardAccounts(data: InitialAccountsData) {
     } catch (e) {
       error('Run into error in forwarding accounts', e)
       // Call into LostArchivers to report Archiver as lost
-      reportLostArchiver(publicKey, 'forwardAccounts() error');
+      reportLostArchiver(publicKey, 'forwardAccounts() error')
     }
   }
 }
@@ -754,12 +771,12 @@ export function sendData() {
         else {
           warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
           // Call into LostArchivers to report Archiver as lost
-          reportLostArchiver(publicKey, 'sendData() error');
+          reportLostArchiver(publicKey, 'sendData() error')
         }
       } catch (e) {
         error('Run into issue in forwarding cycles data', e)
         // Call into LostArchivers to report Archiver as lost
-        reportLostArchiver(publicKey, 'sendData() error');
+        reportLostArchiver(publicKey, 'sendData() error')
       }
     }
     return
@@ -846,12 +863,12 @@ export function sendData() {
       else {
         warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
         // Call into LostArchivers to report Archiver as lost
-        reportLostArchiver(publicKey, 'sendData() error');
+        reportLostArchiver(publicKey, 'sendData() error')
       }
     } catch (e) {
       error('Run into issue in forwarding cycles data', e)
       // Call into LostArchivers to report Archiver as lost
-      reportLostArchiver(publicKey, 'sendData() error');
+      reportLostArchiver(publicKey, 'sendData() error')
     }
 
     // http
@@ -1160,7 +1177,10 @@ export function getFromArchiver<R>(
     http.get(`http://${archiver.ip}:${archiver.port}/${endpoint}`),
     (e: Error) => {
       warn(`${archiver.ip}:${archiver.port} is unreachable`)
-      reportLostArchiver(archiver.publicKey, failureReportMessage || `cannot GET archiver endpoint ${endpoint}`)
+      reportLostArchiver(
+        archiver.publicKey,
+        failureReportMessage || `cannot GET archiver endpoint ${endpoint}`
+      )
       return e
     }
   )

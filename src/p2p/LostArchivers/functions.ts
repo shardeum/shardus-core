@@ -102,8 +102,10 @@ export async function investigateArchiver(investigateMsg: SignedObject<Investiga
 
   // handle the result
   if (isReachable) {
+    info(`investigateArchiver: archiver is reachable`)
     lostArchiversMap.delete(publicKey)
   } else {
+    info(`investigateArchiver: archiver is not reachable`)
     record.status = 'down'
   }
   // don't gossip here; that is initiated in sendRequests()

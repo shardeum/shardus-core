@@ -18,6 +18,8 @@ import { currentQuarter } from '../CycleCreator'
 import { id } from '../Self'
 import { inspect } from 'util'
 import { byIdOrder } from '../NodeList'
+import { isDebugModeMiddleware } from '../../network/debugMiddleware'
+import { archivers, getArchiverWithPublicKey } from '../Archivers'
 
 /**
  * Returns true if the given object is not nullish and has all the given keys.
@@ -124,7 +126,7 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
     record = funcs.createLostArchiverRecord({
       target,
       status: 'down',
-      archiverDownMsg: downMsg
+      archiverDownMsg: downMsg,
     })
     lostArchiversMap.set(target, record)
   }
@@ -146,9 +148,7 @@ const investigateLostArchiverRoute: Route<InternalHandler<SignedObject<Investiga
   handler: (payload, response, sender) => {
     // we're being told to investigate a seemingly lost archiver
 
-    logging.info(
-      `investigateLostArchiverRoute: payload: ${payload}, sender: ${sender}`
-    )
+    logging.info(`investigateLostArchiverRoute: payload: ${payload}, sender: ${sender}`)
 
     // check args
     if (!payload) throw new Error(`investigateLostArchiverRoute: missing payload`)
@@ -196,7 +196,7 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
     // to-do: check target is a string or hexstring and min length
     let record = lostArchiversMap.get(target)
     if (!record) {
-      record = funcs.createLostArchiverRecord({target, status: 'up', archiverRefuteMsg: refuteMsg})
+      record = funcs.createLostArchiverRecord({ target, status: 'up', archiverRefuteMsg: refuteMsg })
       lostArchiversMap.set(target, record)
     }
     if (record.status !== 'up') record.status = 'up'
@@ -205,31 +205,43 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
   },
 }
 
-const enableReportFakeLostArchiver = false // set this to `true` during testing, but never commit as `true`
-
-// to-do: debug middleware?
 const reportFakeLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'report-fake-lost-archiver',
-  handler: (_req, res) => {
-    if (enableReportFakeLostArchiver) {
-      logging.warn('/report-fake-lost-archiver: reporting fake lost archiver')
+  handler: (req, res) => {
+    logging.warn('/report-fake-lost-archiver: reporting fake lost archiver')
+    // the archiver can be specified with an optional 'publicKey' or 'publickey' query param
+    // otherwise a random one is chosen
+    let publicKey: string | null = typeof(req.query.publicKey) === 'string' ? req.query.publicKey : null
+    if (publicKey == null) publicKey = req.body.publickey // lowercase k
+    const pick = publicKey ? 'specified' : 'random'
+    const archiver = publicKey ? getArchiverWithPublicKey(publicKey) : getRandomAvailableArchiver()
+    if (archiver) {
+      funcs.reportLostArchiver(archiver.publicKey, 'fake lost archiver report')
       res.json(
         crypto.sign({
           status: 'accepted',
+          pick,
+          archiver,
           message: 'will report fake lost archiver',
         })
       )
-      const arch = getRandomAvailableArchiver()
-      if (arch) {
-        // to-do: report it lost
-      }
+    } else {
+      res.json(
+        crypto.sign({
+          status: 'failed',
+          pick,
+          archiver,
+          message: 'archiver not found',
+        })
+      )
     }
   },
 }
 
 const routes = {
-  external: [refuteLostArchiverRoute, reportFakeLostArchiverRoute],
+  debugExternal: [reportFakeLostArchiverRoute],
+  external: [refuteLostArchiverRoute],
   internal: [investigateLostArchiverRoute],
   gossip: {
     'lost-archiver-up': lostArchiverUpGossip,
@@ -238,6 +250,9 @@ const routes = {
 }
 
 export function registerRoutes(): void {
+  for (const route of routes.debugExternal) {
+    network._registerExternal(route.method, route.name, isDebugModeMiddleware, route.handler)
+  }
   for (const route of routes.external) {
     network._registerExternal(route.method, route.name, route.handler)
   }

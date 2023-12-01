@@ -16,7 +16,7 @@ import { Result } from 'neverthrow'
 import { getPublicNodeInfo } from './Self'
 import * as http from '../http'
 import { ok, err } from 'neverthrow'
-import { postToArchiver } from './Archivers'
+import { postToArchiver, getNumArchivers, getRandomArchiver } from './Archivers'
 import { JoinedArchiver } from '@shardus/types/build/src/p2p/ArchiversTypes'
 import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
 export type QueryFunction<Node, Response> = (node: Node) => PromiseLike<Response>
@@ -411,7 +411,8 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     //        The calling code can now check isRobustResult to see if a topResult is valid
     if (logFlags.console || config.debug.robustQueryDebug || extraDebugging)
       console.log(
-        `robustQuery: Could not get ${redundancy} ${redundancy > 1 ? 'redundant responses' : 'response'
+        `robustQuery: Could not get ${redundancy} ${
+          redundancy > 1 ? 'redundant responses' : 'response'
         } from ${nodeCount} ${nodeCount !== 1 ? 'nodes' : 'node'}. Encountered ${errors} query errors.`
       )
     const highestCountItem = responses.getHighestCountItem()
@@ -545,8 +546,14 @@ export const getOurNodeIndexFromSyncingList = (): number | null => {
 }
 
 export function getRandomAvailableArchiver(): P2P.SyncTypes.ActiveNode {
-  const availableArchivers = Context.config.p2p.existingArchivers
-  return getRandom(availableArchivers, 1)[0]
+  if (getNumArchivers() === 0) {
+    // original version - choose among *configured* archivers
+    // note that over time these could go down and new ones could join the network
+    // but may be useful during startup (not verified)
+    const availableArchivers = Context.config.p2p.existingArchivers
+    return getRandom(availableArchivers, 1)[0]
+  }
+  return getRandomArchiver() // from Archivers.ts
 }
 
 export async function getActiveNodesFromArchiver(
