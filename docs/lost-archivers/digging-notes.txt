@@ -1,0 +1,30 @@
+* checkDownMsg() from Lost.ts is validating the signature twice on down tx gossip handler
+* in getTxs() from Lost.ts we're looping through the lost map 3 times when could just loop it once
+
+## Lifecycle of Cycle Creator's Cycle Module Hook Functions
+
+CYCLE START
+
+  *Right Before Q1*
+
+    parseRecord([Latest Cycle Record])
+
+  Q1
+
+    sendRequests()
+
+  Q2
+
+    ...
+
+  Q3
+
+    getTxs() => [Module Specific Txs]
+
+    dropInvalidTxs([Module Specific Txs]) => [Filtered Module Specific Txs]
+
+    updateRecord([Filtered Module Specific Txs]) => Mutates its own module specific fields in the in-progress Cycle Record
+
+  Q4
+
+    ...

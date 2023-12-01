@@ -628,7 +628,7 @@ and a conditional check for a nonzero entry has a result of true.
 We export the isDown table so that other modules can easily check if a node is down.
 However, if isDown returns false it does not mean that a node is not actually down.
 But if it returns true it means that the node was found to be down recently.
-Also if isUp returns false it does not mean that a node is actually up, but if it
+Also if isUp returns false it does not mean that a node is actually not up, but if it
 returns true it means that it was found to be up recently.
 */
 async function isDownCache(node, requestId: string) {
@@ -827,13 +827,14 @@ function downGossipHandler(payload: P2P.LostTypes.SignedDownGossipMessage, sende
   // After message has been gossiped in Q1 and Q2 we wait for getTxs() to be invoked in Q3
 }
 
+// Fn is used to limit gossip to Q1 and Q2 of the cycle and stop originator from gossiping in Q2
 function checkQuarter(source, sender) {
   if (![1, 2].includes(currentQuarter)) return [false, 'not in Q1 or Q2']
   if (sender === source && currentQuarter === 2) return [false, 'originator cannot gossip in Q2']
   return [true, '']
 }
 
-function checkDownMsg(payload: P2P.LostTypes.SignedDownGossipMessage, expectedCycle) {
+function checkDownMsg(payload: P2P.LostTypes.SignedDownGossipMessage, expectedCycle: number) {
   if (payload.cycle !== expectedCycle) return [false, 'checker cycle is not as expected']
   const [valid, reason] = checkReport(payload.report, expectedCycle - 1)
   if (!valid) return [valid, reason]
