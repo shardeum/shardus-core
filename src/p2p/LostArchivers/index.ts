@@ -56,7 +56,7 @@ export function getTxs(): P2P.LostArchiverTypes.Txs {
   // loop through lostArchiversMap
   info('  looping through lostArchiversMap')
   for (const entry of lostArchiversMap.values()) {
-    info(`    record: ${JSON.stringify(entry)}`)
+    info(`    record: ${inspect(entry)}`)
     // Don't include entries you haven't investigated yet
     if (entry.isInvestigator && !entry.gossippedDownMsg) continue
     // if status == 'down', Put entry's ArchiverDownMsg into lostArchivers array
@@ -70,10 +70,8 @@ export function getTxs(): P2P.LostArchiverTypes.Txs {
   }
 
   info(`
-
     lostArchivers: [ ${lostArchivers.map(tx => `${tx.cycle}:${tx.investigateMsg.target.substring(0, 5)}`).join(', ')} ]
     refutedArchiver: [ ${refutedArchivers.map(tx => `${tx.cycle}:${tx.downMsg.investigateMsg.target.substring(0, 5)}`).join(', ')} ]
-
   `)
 
   return {
@@ -197,6 +195,7 @@ export function sendRequests(): void {
 
   // loop through lostArchiversMap
   for (const [publicKey, record] of lostArchiversMap) {
+    info(`  record: ${inspect(record)}`)
     // any entries with status 'reported'
     if (record.status === 'reported') {
       // Create InvestigateArchiverMsg and send it to the lostArchiverInvestigate route

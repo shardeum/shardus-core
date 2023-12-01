@@ -21,19 +21,6 @@ import { byIdOrder } from '../NodeList'
 import { isDebugModeMiddleware } from '../../network/debugMiddleware'
 import { archivers, getArchiverWithPublicKey } from '../Archivers'
 
-/**
- * Returns true if the given object is not nullish and has all the given keys.
- * Used for checking arguments.
- */
-function hasProperties(obj: object, keys: string | string[]): boolean {
-  if (obj == null) return false
-  if (typeof keys === 'string') keys = keys.split(/\s+/)
-  for (const key of keys) {
-    if (!(key in obj)) return false
-  }
-  return true
-}
-
 /** Gossip */
 
 const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id']> = (
@@ -50,17 +37,15 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
   }
 
   // to-do: need a guard on logging logging.info() and others?
-  logging.info(`lostArchiverUpGossip: payload: ${payload}, sender: ${sender}, tracker: ${tracker}`)
+  logging.info(`lostArchiverUpGossip: payload: ${inspect(payload)}, sender: ${sender}, tracker: ${tracker}`)
 
   // check args
   if (!payload) throw new Error(`lostArchiverUpGossip: missing payload`)
   if (!sender) throw new Error(`lostArchiverUpGossip: missing sender`)
   if (!tracker) throw new Error(`lostArchiverUpGossip: missing tracker`)
-  if (!hasProperties(payload, 'type downTx cycle'))
-    throw new Error(`lostArchiverUpGossip: invalid payload: ${payload}`)
   const error = funcs.errorForArchiverUpMsg(payload)
   if (error) {
-    logging.warn(`lostArchiverUpGossip: invalid payload error: ${error}, payload: ${payload}`)
+    logging.warn(`lostArchiverUpGossip: invalid payload error: ${error}, payload: ${inspect(payload)}`)
     return
   }
 
@@ -108,8 +93,6 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
   if (!payload) throw new Error(`lostArchiverDownGossip: missing payload`)
   if (!sender) throw new Error(`lostArchiverDownGossip: missing sender`)
   if (!tracker) throw new Error(`lostArchiverDownGossip: missing tracker`)
-  if (!hasProperties(payload, 'type investigateMsg cycle'))
-    throw new Error(`lostArchiverDownGossip: invalid payload: ${inspect(payload)}`)
   const error = funcs.errorForArchiverDownMsg(payload)
   if (error) {
     logging.warn(`lostArchiverDownGossip: invalid payload error: ${error}, payload: ${inspect(payload)}`)
@@ -149,20 +132,15 @@ const investigateLostArchiverRoute: Route<InternalHandler<SignedObject<Investiga
   handler: (payload, response, sender) => {
     // we're being told to investigate a seemingly lost archiver
 
-    logging.info(`investigateLostArchiverRoute: payload: ${payload}, sender: ${sender}`)
+    logging.info(`investigateLostArchiverRoute: payload: ${inspect(payload)}, sender: ${sender}`)
 
     // check args
     if (!payload) throw new Error(`investigateLostArchiverRoute: missing payload`)
     if (!response) throw new Error(`investigateLostArchiverRoute: missing response`)
     if (!sender) throw new Error(`investigateLostArchiverRoute: missing sender`)
-    if (!hasProperties(payload, 'type target investigator sender cycle'))
-      throw new Error(`investigateLostArchiverRoute: invalid payload: ${payload}`)
-    if (payload.type !== 'investigate')
-      throw new Error(`investigateLostArchiverRoute: invalid payload type: ${payload.type}`)
-    if (funcs.errorForInvestigateArchiverMsg(payload)) {
-      logging.warn(`investigateLostArchiverRoute: invalid payload: ${payload}`)
-      return
-    }
+    const error = funcs.errorForInvestigateArchiverMsg(payload)
+    if (error)
+      throw new Error(`investigateLostArchiverRoute: invalid payload error: ${error}, payload: ${inspect(payload)}`)
 
     if (id !== payload.investigator) {
       logging.info(`investigateLostArchiverRoute: not the investigator. returning`)
@@ -172,6 +150,7 @@ const investigateLostArchiverRoute: Route<InternalHandler<SignedObject<Investiga
       // Ignore hits here if we're not the designated Investigator for the given Archiver and cycle
     }
 
+    logging.info(`investigateLostArchiverRoute: calling investigateArchiver()`)
     funcs.investigateArchiver(payload)
   },
 }

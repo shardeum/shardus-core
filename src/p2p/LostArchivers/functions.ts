@@ -18,6 +18,7 @@ import { info, warn } from './logging'
 import { id } from '../Self'
 import { binarySearch } from '../../utils/functions/arrays'
 import { activeByIdOrder } from '../NodeList'
+import { inspect } from 'util'
 
 /** Lost Archivers Functions */
 
@@ -68,12 +69,17 @@ export function reportLostArchiver(publicKey: publicKey, errorMsg: string): void
  * This function gets called to verify if an Archiver is indeed lost
  * @param publicKey - The public key of the Archiver to investigate
  */
-export async function investigateArchiver(investigateMsg: SignedObject<InvestigateArchiverMsg>): Promise<void> {
+export async function investigateArchiver(
+  investigateMsg: SignedObject<InvestigateArchiverMsg>
+): Promise<void> {
+  info(`investigateArchiver: investigateMsg: ${inspect(investigateMsg)}`)
   const publicKey = investigateMsg.target
   const archiver = Archivers.archivers.get(publicKey)
   if (!archiver) {
     // don't know the archiver
-    warn(`investigateArchiver: asked to investigate archiver '${publicKey}', but it's not in the archivers list`)
+    warn(
+      `investigateArchiver: asked to investigate archiver '${publicKey}', but it's not in the archivers list`
+    )
     return
   }
 
@@ -91,7 +97,7 @@ export async function investigateArchiver(investigateMsg: SignedObject<Investiga
     target: publicKey,
     status: 'investigating',
     gossippedDownMsg: false,
-    investigateMsg
+    investigateMsg,
   })
 
   // record it
@@ -134,14 +140,16 @@ export function getInvestigator(target: publicKey, marker: CycleMarker): Node {
  * @param target - The public key of the lost Archiver
  */
 export function informInvestigator(target: publicKey): void {
-  // TODO: Create InvestigateArchiverMsg and send it to the lostArchiverInvestigate route
   // This is to initiate the investigation process
 
   // Compute investigator based off of hash(target + cycle marker)
   const cycle = CycleChain.getCurrentCycleMarker()
   const investigator = getInvestigator(target, cycle)
   // Don't send yourself an InvestigateArchiverMsg
-  if (id === investigator.id) return
+  if (id === investigator.id) {
+    info(`informInvestigator: investigator is self, not sending InvestigateArchiverMsg`)
+    return
+  }
 
   // Form msg
   const investigateMsg: SignedObject<InvestigateArchiverMsg> = Context.crypto.sign({
@@ -153,6 +161,7 @@ export function informInvestigator(target: publicKey): void {
   })
 
   // Send message to investigator
+  info(`informInvestigator: sending InvestigateArchiverMsg: ${inspect(investigateMsg)}`)
   Comms.tell([investigator], 'lost-archiver-investigate', investigateMsg)
 }
 
@@ -222,6 +231,16 @@ async function getArchiverInfo(host: string, port: number): Promise<object> | nu
   }
 }
 
+function missingProperties(obj: object, keys: string | string[]): string[] {
+  if (typeof keys === 'string') keys = keys.split(/\s+/)
+  if (obj == null) return keys
+  const missing = []
+  for (const key of keys) {
+    if (!(key in obj)) missing.push(key)
+  }
+  return missing
+}
+
 /**
  * Checks for errors in an ArchiverDownMsg
  * @param msg - The ArchiverDownMsg to check
@@ -230,9 +249,10 @@ async function getArchiverInfo(host: string, port: number): Promise<object> | nu
 export function errorForArchiverDownMsg(msg: SignedObject<ArchiverDownMsg> | null): string | null {
   if (msg == null) return 'null message'
   if (msg.sign == null) return 'no signature'
-  // TODO: Implement error checking for ArchiverDownMsg
-  // This is to ensure that the message is valid
-  return null
+  const missing = missingProperties(msg, 'type investigateMsg cycle')
+  if (missing.length) return `missing properties: ${missing.join(', ')}`
+  return _errorForInvestigateArchiverMsg(msg.investigateMsg)
+  // to-do: check for valid signature
 }
 
 /**
@@ -243,8 +263,14 @@ export function errorForArchiverDownMsg(msg: SignedObject<ArchiverDownMsg> | nul
 export function errorForArchiverUpMsg(msg: SignedObject<ArchiverUpMsg> | null): string | null {
   if (msg == null) return 'null message'
   if (msg.sign == null) return 'no signature'
-  // TODO: Implement error checking for ArchiverUpMsg
-  // This is to ensure that the message is valid
+  const missing = missingProperties(msg, 'type downMsg refuteMsg cycle')
+  if (missing.length) return `missing properties: ${missing.join(', ')}`
+  /*
+  to-do:
+    downMsg: ArchiverDownMsg;
+    refuteMsg: ArchiverRefutesLostMsg;
+  */
+  // to-do: check for valid signature
   return null
 }
 
@@ -258,7 +284,16 @@ export function errorForInvestigateArchiverMsg(
 ): string | null {
   if (msg == null) return 'null message'
   if (msg.sign == null) return 'no signature'
-  // TODO: Implement error checking for InvestigateArchiverMsg
-  // This is to ensure that the message is valid
+  const error = _errorForInvestigateArchiverMsg(msg)
+  if (error) return error
+  // to-do: check for valid signature
+  return null
+}
+
+function _errorForInvestigateArchiverMsg(msg: InvestigateArchiverMsg | null): string | null {
+  if (msg == null) return 'null message'
+  const missing = missingProperties(msg, 'type target investigator sender cycle')
+  if (missing.length) return `missing properties: ${missing.join(', ')}`
+  if (msg.type !== 'investigate') return `invalid type: ${msg.type}`
   return null
 }
