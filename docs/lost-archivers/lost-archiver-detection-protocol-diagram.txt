@@ -1,0 +1,50 @@
+|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
+Q1       Q2       Q3       Q4       Q1       Q2       Q3       Q4       Q1       Q2       Q3       Q4
+
+|                                   |                                   |                                   |
+C1                                  C2                                  C3                                  C4
+
+  |
+  node sends 'investigate tx' about lost archiver to investigator node
+  |
+  investigator node investigates lost archiver
+
+                                       |
+                                       investigator gossips 'down tx' to rest of network
+
+                                                |
+                                                network ignores new gossip from investigator
+                                                but continues to gossip 'down tx'
+
+                                       |        |
+                                       *NEW* nodes that have been selected to forward data to archivers
+                                       can additionally forward the 'archiver down tx' to the archiver
+                                       to let it refute the down tx
+
+
+                                                                            |
+                                                                            lost node can gossip 'archiver up tx'
+                                                                            to invalidate 'down tx' about itself
+
+                                                                            |
+                                                                            *NEW* 2 potential ways for lost archiver to refute 'archiver down tx'
+
+                                                                            lost archiver can send its subscribed nodes an 'archiver up tx'
+                                                                            which they then gossip on its behalf
+                                                                              * The archivers subscribed validators would gossip this 
+                                                                                in C3 Q1 on its behalf
+
+                                                                            OR
+
+                                                                            lost archiver can send an 'archiver up tx' to a new
+                                                                            'archiver up' external route on any node provided by the
+                                                                            LostArchivers module
+                                                                              * Archiver would have to time sending this tx at C3 Q1
+
+                                                                            (discuss w Andrew/Omar to pick which one)
+
+                                                                                              |
+                                                                                              network compares 'down tx' and 'archiver up tx'
+                                                                                              to determine if lost archiver should be added
+                                                                                              to lostArchiver list of C3
+
