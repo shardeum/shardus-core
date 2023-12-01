@@ -2,7 +2,11 @@
 
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
 import { LostArchiverRecord } from './state'
-import { ArchiverDownMsg, ArchiverUpMsg, InvestigateArchiverMsg } from '@shardus/types/build/src/p2p/LostArchiverTypes'
+import {
+  ArchiverDownMsg,
+  ArchiverUpMsg,
+  InvestigateArchiverMsg,
+} from '@shardus/types/build/src/p2p/LostArchiverTypes'
 import { publicKey } from '@shardus/types'
 import { CycleMarker } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
 
@@ -23,7 +27,6 @@ function investigateArchiver(): void {
   //   set status = 'investigating'
   // Else if entry exists
   //   return
-
   // Asynchronously ping the archiver to investigate it
   //  if it comes back as reachable
   //    delete target from map and return

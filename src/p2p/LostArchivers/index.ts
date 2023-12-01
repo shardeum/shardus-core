@@ -128,6 +128,6 @@ export function sendRequests(): void {
   //     if status == 'down' && not gossipped
   //       Create ArchiverDownMsg and gossip it on the lostArchiverDownGossip route
   //       set gossipped to true
-  // 
+  //
   return
 }

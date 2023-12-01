@@ -1,21 +1,57 @@
-import { P2P } from '@shardus/types'
-import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
-import { GossipHandler, InternalHandler, Route, SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import { Handler } from 'express'
+import { P2P } from '@shardus/types'
+import { Node } from '@shardus/types/src/p2p/NodeListTypes'
+import { GossipHandler, InternalHandler, Route, SignedObject } from '@shardus/types/src/p2p/P2PTypes'
 import * as Comms from '../Comms'
 import { crypto, network } from '../Context'
 import { getRandomAvailableArchiver } from '../Utils'
 import * as logging from './logging'
-import { ArchiverDownMsg, ArchiverUpMsg, InvestigateArchiverMsg } from '@shardus/types/build/src/p2p/LostArchiverTypes'
+import { lostArchiversMap } from './state'
+import { currentCycle, currentQuarter } from '../CycleCreator'
+import { ArchiverDownMsg, ArchiverUpMsg, InvestigateArchiverMsg } from '@shardus/types/src/p2p/LostArchiverTypes'
+import { info } from 'console'
+
+
+// to-do: make a setting?
+const initialCyclesToWait = 3
 
 /** Gossip */
 
-const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id']> = (payload, sender, tracker) => {
-  // nodes receive ArchiverUpMsg from gossiping nodes
-  // if target archiver not in lostArchiverMap, return
-  // update target archiver in their lostArchiversMap
-  //   set status = 'up'
-  // gossip ArchiverUpMsg to other nodes
+const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id']> = (
+  payload,
+  sender,
+  tracker
+) => {
+  // the original gossip source is a node or nodes that the archiver notified as to the fact
+  // that rumors of its death were highly exaggerated
+
+  // check args
+  if (!payload) throw new Error(`lostArchiverUpGossip: missing payload`)
+  if (!sender) throw new Error(`lostArchiverUpGossip: missing sender`)
+  if (!tracker) throw new Error(`lostArchiverUpGossip: missing tracker`)
+  if (!('type' in payload && 'downTx' in payload && 'cycle' in payload))
+    throw new Error(`lostArchiverUpGossip: invalid payload: ${payload}`)
+
+  // to-do: need a guard on logging info() and others
+  info(`lostArchiverUpGossip: payload: ${payload}, sender: ${sender}, tracker: ${tracker}`)
+  const upMsg = payload as SignedObject<ArchiverUpMsg>
+  const target = upMsg.downTx.investigateTx.target
+  // to-do: check target is a string or hexstring and min length
+  const record = lostArchiversMap.get(target)
+  if (!record) {
+    // nothing to do
+    info(`lostArchiverUpGossip: no record for target ${target}. returning`)
+    return
+  }
+  info(`lostArchiverUpGossip: record: ${record}`)
+  info(`lostArchiverUpGossip: setting status to 'up' and gossiping`)
+  record.status = 'up'
+  // to-do: idea:
+  // record.updated = {source: 'lostArchiverUpGossip', cycle: currentCycle, quarter: currentQuarter, what: 'up'}
+  // or even:
+  // record.updated.push({source: 'lostArchiverUpGossip', cycle: currentCycle, quarter: currentQuarter, what: 'up'})
+  // ... is LostArchiverRecord in the cycle record? if not, we're good to add this debugging info
+  Comms.sendGossip('lost-archiver-up', payload, tracker, sender, null, false) // isOrigin: false
 }
 
 const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node['id']> = (
@@ -23,12 +59,34 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
   sender,
   tracker
 ) => {
-  // nodes receive ArchiverDownMsg gossip from investigator
-  // add lost archiver to their own lostArchiversMap if not already there
-  //   set status = 'down'
-  //   set gossipped = false
-  // gossip ArchiverDownMsg to other nodes
-  //   set gossipped = true
+  // the original gossip source is the investigator node that confirmed the archiver is down
+
+  // check args
+  if (!payload) throw new Error(`lostArchiverDownGossip: missing payload`)
+  if (!sender) throw new Error(`lostArchiverDownGossip: missing sender`)
+  if (!tracker) throw new Error(`lostArchiverDownGossip: missing tracker`)
+  if (!('type' in payload && 'investigate' in payload && 'cycle' in payload))
+    throw new Error(`lostArchiverUpGossip: invalid payload: ${payload}`)
+  
+  info(`lostArchiverDownGossip: payload: ${payload}, sender: ${sender}, tracker: ${tracker}`)
+  const downMsg = payload as SignedObject<ArchiverDownMsg>
+  const target = downMsg.investigateTx.target
+  // to-do: check target is a string or hexstring and min length
+  let record = lostArchiversMap.get(target)
+  if (!record) {
+    record = {
+      isInvestigator: false, // to-do: is this correct?
+      gossipped: false,
+      target,
+      status: 'down',
+      archiverDownMsg: downMsg,
+      cyclesToWait: initialCyclesToWait,
+    }
+    lostArchiversMap.set(target, record)
+  }
+  Comms.sendGossip('lost-archiver-down', payload, tracker, sender, null, false) // isOrigin: false
+  record.gossipped = true
+  // to-do: idea: record the update
 }
 
 /** Internal */

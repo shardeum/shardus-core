@@ -1,5 +1,5 @@
 import { publicKey } from '@shardus/types'
-import { ArchiverDownMsg } from '@shardus/types/build/src/p2p/LostArchiverTypes'
+import { ArchiverDownMsg } from '@shardus/types/src/p2p/LostArchiverTypes'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 
 /** TYPES */
