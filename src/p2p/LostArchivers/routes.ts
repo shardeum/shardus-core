@@ -1,33 +1,39 @@
-import { Handler } from 'express'
 import { P2P } from '@shardus/types'
-import { crypto } from '../Context'
+import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
+import { GossipHandler, InternalHandler, Route, SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
+import { Handler } from 'express'
+import * as Comms from '../Comms'
+import { crypto, network } from '../Context'
 import { getRandomAvailableArchiver } from '../Utils'
-import {
-  ArchiverDownTransaction,
-  ArchiverInvestigateTransaction,
-  ArchiverPingMessage,
-  ArchiverUpTransaction,
-} from './txs'
 import * as logging from './logging'
+import { ArchiverDownMsg, ArchiverUpMsg, InvestigateArchiverMsg } from '@shardus/types/build/src/p2p/LostArchiverTypes'
 
-type Node = P2P.NodeListTypes.Node
-type Route<T> = P2P.P2PTypes.Route<T>
-type InternalHandler<P> = P2P.P2PTypes.InternalHandler<P>
-type GossipHandler<P, S> = P2P.P2PTypes.GossipHandler<P, S>
+/** Gossip */
 
-const gossipArchiverDownTxRoute: GossipHandler<ArchiverDownTransaction, Node['id']> = (
+const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id']> = (payload, sender, tracker) => {
+  // nodes receive ArchiverUpMsg from gossiping nodes
+  // if target archiver not in lostArchiverMap, return
+  // update target archiver in their lostArchiversMap
+  //   set status = 'up'
+  // gossip ArchiverUpMsg to other nodes
+}
+
+const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node['id']> = (
   payload,
   sender,
   tracker
 ) => {
-  // TODO
+  // nodes receive ArchiverDownMsg gossip from investigator
+  // add lost archiver to their own lostArchiversMap if not already there
+  //   set status = 'down'
+  //   set gossipped = false
+  // gossip ArchiverDownMsg to other nodes
+  //   set gossipped = true
 }
 
-const gossipArchiverUpTxRoute: GossipHandler<ArchiverUpTransaction, Node['id']> = (payload, sender, tracker) => {
-  // TODO
-}
+/** Internal */
 
-const internalInvestigateTxRoute: Route<InternalHandler<ArchiverInvestigateTransaction>> = {
+const lostArchiverInvestigate: Route<InternalHandler<SignedObject<InvestigateArchiverMsg>>> = {
   method: 'GET',
   name: 'internal-investigate-tx',
   handler: (payload, response, sender) => {
@@ -36,6 +42,24 @@ const internalInvestigateTxRoute: Route<InternalHandler<ArchiverInvestigateTrans
     // Ignore hits here if we're not the designated Investigator for the given Archiver
     // and cycle
     // Call the investigateArchiver function to continue with investigation
+    // investigator node investigates lost archiver
+    // puts the lost archiver into its own lostArchiversMap
+    // if archiver is down
+    //   schedules to gossip SignedArchiverDownMsg on downArchiver gossip route in next sendRequests()
+  },
+}
+
+/** External */
+
+const lostArchiverRefute: P2P.P2PTypes.Route<Handler> = {
+  method: 'POST',
+  name: 'lost-archiver-refute',
+  handler: (req, res) => {
+    // node receives SignedArchiverUpMsg from refuting archiver
+    // update refuting archiver in their lostArchiversMap
+    // gossip SignedArchiverUpMsg to other nodes on the upArchiverGossip route
+
+    res.json({ success: true })
   },
 }
 
@@ -62,21 +86,23 @@ const reportFakeLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
   },
 }
 
-const internalPingRoute: Route<InternalHandler<ArchiverPingMessage>> = {
-  method: 'GET',
-  name: 'internal-ping',
-  handler: (payload, response, sender) => {
-    // TODO
-    // to-do: The Lost (node) module already has a ping route, can we just reuse it, or do we have different requirements?
-    //        Lost.ts line 100, const pingNodeRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<SignedPingMessage>>
+const routes = {
+  external: [lostArchiverRefute, reportFakeLostArchiverRoute],
+  internal: [lostArchiverInvestigate],
+  gossip: {
+    'lost-archiver-up': lostArchiverUpGossip,
+    'lost-archiver-down': lostArchiverDownGossip,
   },
 }
 
-export const routes = {
-  external: [reportFakeLostArchiverRoute],
-  internal: [internalInvestigateTxRoute, internalPingRoute],
-  gossip: {
-    'gossip-node-down-tx': gossipArchiverDownTxRoute,
-    'gossip-node-up-tx': gossipArchiverUpTxRoute,
-  },
+export function registerRoutes(): void {
+  for (const route of routes.external) {
+    network._registerExternal(route.method, route.name, route.handler)
+  }
+  for (const route of routes.internal) {
+    Comms.registerInternal(route.name, route.handler)
+  }
+  for (const [name, handler] of Object.entries(routes.gossip)) {
+    Comms.registerGossipHandler(name, handler)
+  }
 }

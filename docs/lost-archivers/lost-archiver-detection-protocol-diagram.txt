@@ -1,50 +1,192 @@
+# Lost Archiver Detection Protocol Diagram
+
+```
+
 |--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
 Q1       Q2       Q3       Q4       Q1       Q2       Q3       Q4       Q1       Q2       Q3       Q4
 
 |                                   |                                   |                                   |
 C1                                  C2                                  C3                                  C4
 
+
+[TODO] Fill out logic for parseCycles() fn called at the end of every cycle
+
+[TODO] Fill out logic for sendRequests() fn called in Q1 of every cycle
+[TODO] Fill out logic for all routes that receive msgs when sendRequests() is called in Q1 of every cycle
+
+[TODO] Fill out logic for getTxs(), dropInvalidTxs(), and updateRecord() fns called in Q3 of every cycle
+
+Use behavior described in `lost-detection-implementation-diagram.txt` and modify for lost archiver detetection
+
+
+  C1:Q1
   |
-  node sends 'investigate tx' about lost archiver to investigator node
-  |
-  investigator node investigates lost archiver
+  sendRequests()
 
-                                       |
-                                       investigator gossips 'down tx' to rest of network
+    loop through lostArchiversMap 
+    node sends InvestigateArchiverTx about lost archiver to investigator node on investigateArchiver route
+    investigator gossips ArchiverDownTx to rest of network on downArchiverGossip route
 
-                                                |
-                                                network ignores new gossip from investigator
-                                                but continues to gossip 'down tx'
+    C1:Q1
+    |
+    lostArchiverInvestigate()
 
-                                       |        |
-                                       *NEW* nodes that have been selected to forward data to archivers
-                                       can additionally forward the 'archiver down tx' to the archiver
-                                       to let it refute the down tx
+      investigator node investigates lost archiver
+      puts the lost archiver into its own lostArchiversMap
+      if archiver is down
+        schedules to gossip ArchiverDownTx on downArchiver gossip route in next sendRequests() 
+
+    C1:Q1
+    |
+    lostArchiverDownGossip()
+
+      nodes receive ArchiverDownTx gossip from investigator
+      add lost archiver to their own lostArchiversMap
+      gossip ArchiverDownTx to other nodes
+
+    C1:Q1
+    |
+    lostArchiverUpGossip()
+
+      nodes receive ArchiverUpTx from gossiping node
+      update refuting archiver in their lostArchiversMap
+      gossip ArchiverUpTx to other nodes
+
+    C1:Q1
+    |
+    lostArchiverRefute()
+
+      node receives ArchiverUpTx from refuting archiver
+      update refuting archiver in their lostArchiversMap
+      gossip ArchiverUpTx to other nodes on the upArchiverGossip route
 
 
-                                                                            |
-                                                                            lost node can gossip 'archiver up tx'
-                                                                            to invalidate 'down tx' about itself
 
-                                                                            |
-                                                                            *NEW* 2 potential ways for lost archiver to refute 'archiver down tx'
 
-                                                                            lost archiver can send its subscribed nodes an 'archiver up tx'
-                                                                            which they then gossip on its behalf
-                                                                              * The archivers subscribed validators would gossip this 
-                                                                                in C3 Q1 on its behalf
+                     C1:Q3
+                     |
+                     getTxs()
+                      |
+                      dropInvalidTxs()
+                       |
+                       updateRecord()
 
-                                                                            OR
+                        nodes go through their lostArchiversMap
+                        add nodes from the prev cycle's 'lostArchivers' field to the 'removedArchivers' field
+                        clear archivers that are going to be removed from lostArchiversMap
+                        add 'down' archivers to the cycle's 'lostArchivers' field
+                        add 'up' archivers to the cycle's 'refutedArchivers' field
 
-                                                                            lost archiver can send an 'archiver up tx' to a new
-                                                                            'archiver up' external route on any node provided by the
-                                                                            LostArchivers module
-                                                                              * Archiver would have to time sending this tx at C3 Q1
 
-                                                                            (discuss w Andrew/Omar to pick which one)
+                                    C2:Q0
+                                    |
+                                    parseRecord() **ON THE NODE**
 
-                                                                                              |
-                                                                                              network compares 'down tx' and 'archiver up tx'
-                                                                                              to determine if lost archiver should be added
-                                                                                              to lostArchiver list of C3
+                                      nodes parse the created cycle record
+                                      actually remove archivers in the 'removedArchivers' field of the cycle record from Archivers.archivers map
+
+                                    C2:Q0
+                                    |
+                                    parseRecord() **ON THE ARCHIVER**
+
+                                      archivers parse the created cycle record
+                                      if self in 'lostArchivers' field, schedule a refute in the next cycle's Q1
+                                      if self in 'refutedArchivers' field, stop sending refutes
+                                      if self in 'removedArchivers' field, shut down
+
+
+
+
+
+```
+
+## ROUTES
+
+### Validator
+
+```ts
+/** External */
+
+archiverrefute
+
+/** Internal */
+
+investigate-archiver
+
+/** Gossip */
+
+archiver-up
+
+archiver-down
+
+```
+
+### Archiver
+
+```ts
+/** External */
+
+ping-archiver
+```
+
+## TYPES
+
+```ts
+
+type hexstring = string
+
+type publicKey = hexstring
+
+interface LostArchiverRecord {
+  target: publicKey
+  status: "reported" | "investigating" | "down" | "up"
+}
+
+export interface InvestigateArchiverTx {
+  type: 'investigate';
+  target: publicKey;
+  investigator: publicKey;
+  sender: publicKey;
+  cycle: CycleMarker;
+}
+
+export interface ArchiverDownTx {
+  type: 'down';
+  investigateTx: InvestigateArchiverTx;
+  cycle: CycleMarker;
+}
+
+export interface ArchiverUpTx {
+  type: 'up';
+  downTx: ArchiverDownTx;
+  cycle: CycleMarker;
+}
+
+export type SignedInvestigateArchiverTx = InvestigateArchiverTx & SignedObject;
+export type SignedArchiverDownTx = ArchiverDownTx & SignedObject;
+export type SignedArchiverUpTx = ArchiverUpTx & SignedObject;
+
+export interface Txs {
+  lostArchivers: SignedArchiverDownTx[];
+  refutedArchivers: SignedArchiverUpTx[];
+}
+
+export interface Record {
+  lostArchivers: publicKey[];
+  refutedArchivers: publicKey[];
+  removedArchivers: publicKey[];
+}
+
+
+
+````
+
+## STATE
+
+```ts
+const lostArchiversMap = new Map<publicKey, LostArchiverRecord>()
+
+````
+
+
 

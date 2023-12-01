@@ -802,7 +802,7 @@ function downGossipHandler(payload: P2P.LostTypes.SignedDownGossipMessage, sende
     return
   }
   const key = `${payload.report.target}-${payload.report.cycle}`
-  let rec = lostRecordMap.get(key)
+  const rec = lostRecordMap.get(key)
   if (rec && ['up', 'down'].includes(rec.status)) return // we have already gossiped this node for this cycle
   let [valid, reason] = checkQuarter(payload.report.checker, sender)
   if (!valid) {

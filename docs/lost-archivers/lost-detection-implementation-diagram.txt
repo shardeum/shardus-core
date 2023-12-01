@@ -1,0 +1,177 @@
+|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
+Q1       Q2       Q3       Q4       Q1       Q2       Q3       Q4       Q1       Q2       Q3       Q4       Q1       Q2       Q3       Q4
+
+|                                   |                                   |                                   |                                   |
+C1                                  C2                                  C3                                  C4                                  C5
+
+ |_________________________________| 
+                  C1:Q1-Q4
+                  |
+                  node gets network error while contacting another node and
+                  schedules to report it as lost
+
+                    * `shardus-global-server.src.shardus.index.Shardus.start.network.on('timeout') callback`
+                      * scheduleLostReport(node, 'timeout', requestId)
+                    * `shardus-global-server.src.shardus.index.Shardus.start.network.on('error') callback`
+                      * scheduleLostReport(node, 'error', requestId)
+
+
+                                      C2:Q1
+                                      |
+                                      node sends 'investigate tx' about lost node to investigator node
+
+                                        * `shardus-global-server.src.p2p.Lost.sendRequests.scheduledForLostReport.forEach() callback`
+                                          * reportLost(value.targetNode, value.reason, value.requestId)
+                                            * `shardus-global-server.src.p2p.Lost.reportLost`
+                                              * Comms.tell([checker], 'lost-report', msg)
+
+
+                                        C2:Q1
+                                        |
+                                        investigator node investigates lost node
+                                        puts the node into its own lostRecordMap
+                                        and schedules to send 'down tx' if down
+
+                                          * `shardus-global-server.src.p2p.Lost.lostReportHandler`
+                                            * lostRecordMap.set(key, obj)
+                                            * let result = await isDownCache(nodes.get(payload.target), requestId)
+                                            * if (obj.status === 'checking') obj.status = result
+
+
+
+
+                                                                           C3:Q1
+                                                                           |
+                                                                           investigator gossips 'down tx' to rest of network
+
+                                                                             * `shardus-global-server.src.p2p.Lost.sendRequests`
+                                                                               * Comms.sendGossip('lost-down', msg, '', null, byIdOrder, true)
+
+
+                                                                             C3:Q1
+                                                                             |
+                                                                             nodes receive 'down tx' gossip from investigator
+                                                                             add lost node to their own lostRecordMaps
+                                                                             gossip 'down tx' to other nodes
+
+                                                                               * `shardus-global-server.src.p2p.Lost.downGossipHandler`
+                                                                                 * lostRecordMap.set(key, obj)
+
+
+                                                                                   C3:Q2
+                                                                                   |
+                                                                                   network ignores new gossip from investigator
+                                                                                   but continues to gossip 'down tx'
+
+                                                                                     * `shardus-global-server.src.p2p.Lost.downGossipHandler`
+                                                                                       * let [valid, reason] = checkQuarter(payload.report.checker, sender)
+
+
+                                                                                              C3:Q3
+                                                                                              |
+                                                                                              nodes go through their lostRecordMaps
+                                                                                              clear nodes that are going to be removed from lostRecordMap
+                                                                                              add 'down' nodes to the cycle's 'lost' field
+                                                                                              add 'up' nodes to the cycle's 'refuted' field
+                                                                                              add nodes from the prev cycle's 'lost' field to the apoptosized field
+
+                                                                                                * `shardus-global-server.src.p2p.Lost.getTxs`
+                                                                                                  * lostRecordMap.delete(key)
+                                                                                                  * lostTxs.push(obj.message)
+                                                                                                  * refutedTxs.push(obj.message)
+                                                                                                * `shardus-global-server.src.p2p.Lost.updateRecord`
+                                                                                                  * record.lost = lostNodeIds.sort()
+                                                                                                  * record.refuted = refutedNodeIds.sort()
+                                                                                                  * let apop = prev.lost.filter((id) => nodes.has(id)) // remove nodes that are no longer in the network
+                                                                                                  * apop = apop.filter((id) => !refutedNodeIds.includes(id)) // remove nodes that refuted
+                                                                                                  * record.apoptosized = [...apop, ...apopSyncing, ...record.apoptosized].sort()
+
+
+                                                                                                            C4:Q0
+                                                                                                            |
+                                                                                                            nodes parse the created cycle record
+                                                                                                            if self in 'lost' field, schedule a refute in
+                                                                                                            the next cycle
+
+                                                                                                              * `shardus-global-server.src.p2p.Lost.parseRecord`
+                                                                                                                * sendRefute = record.counter + 1
+
+                                                                                                            if self in 'refuted' field, stop sending refutes
+
+                                                                                                              * `shardus-global-server.src.p2p.Lost.parseRecord`
+                                                                                                                * if (id === Self.id) sendRefute = -1
+
+                                                                                                            if self in 'lostSyncing' field, apoptosize self
+
+                                                                                                              * `shardus-global-server.src.p2p.Lost.parseRecord`
+                                                                                                                * Self.emitter.emit('invoke-exit', ...)
+
+                                                                                                            the Apoptosis module will rid nodelist of apoptosized nodes
+
+                                                                                                              * `shardus-global-server.src.p2p.Apoptosis.parseRecord`
+                                                                                                                * removed: record.apoptosized,
+
+
+                                                                                                              C4:Q1
+                                                                                                              |
+                                                                                                              node sends out refute gossip if saw itself
+                                                                                                              in lost field of prev cycle
+
+                                                                                                                * `shardus-global-server.src.p2p.Lost.sendRequests`
+                                                                                                                  * if (sendRefute === currentCycle) {
+                                                                                                                  * Comms.sendGossip('lost-up', msg, '', null, byIdOrder, true)
+
+                                                                                                                C4:Q1
+                                                                                                                |
+                                                                                                                nodes receive 'up tx' from refuting node
+                                                                                                                add refuting node to their lostRecordMaps
+                                                                                                                gossip 'up tx' to other nodes
+
+                                                                                                                  * `shardus-global-server.src.p2p.Lost.upGossipHandler`
+                                                                                                                    * lostRecordMap.set(key, obj)
+                                                                                                                    * Comms.sendGossip('lost-up', payload, tracker, Self.id, byIdOrder, false)
+
+
+                                                                                                                                  C4:Q3
+                                                                                                                                  |
+                                                                                                                                  nodes go through their lostRecordMaps
+                                                                                                                                  clear nodes that are going to be removed from lostRecordMap
+                                                                                                                                  add 'down' nodes to the cycle's 'lost' field
+                                                                                                                                  add 'up' nodes to the cycle's 'refuted' field
+                                                                                                                                  add nodes from the prev cycle's 'lost' field to the apoptosized field
+
+                                                                                                                                    * `shardus-global-server.src.p2p.Lost.getTxs`
+                                                                                                                                      * lostRecordMap.delete(key)
+                                                                                                                                      * lostTxs.push(obj.message)
+                                                                                                                                      * refutedTxs.push(obj.message)
+                                                                                                                                    * `shardus-global-server.src.p2p.Lost.updateRecord`
+                                                                                                                                      * record.lost = lostNodeIds.sort()
+                                                                                                                                      * record.refuted = refutedNodeIds.sort()
+                                                                                                                                      * let apop = prev.lost.filter((id) => nodes.has(id)) // remove nodes that are no longer in the network
+                                                                                                                                      * apop = apop.filter((id) => !refutedNodeIds.includes(id)) // remove nodes that refuted
+                                                                                                                                      * record.apoptosized = [...apop, ...apopSyncing, ...record.apoptosized].sort()
+
+
+                                                                                                                                                C5:Q0
+                                                                                                                                                |
+                                                                                                                                                nodes parse the created cycle record
+                                                                                                                                                if self in 'lost' field, schedule a refute in
+                                                                                                                                                the next cycle
+
+                                                                                                                                                  * `shardus-global-server.src.p2p.Lost.parseRecord`
+                                                                                                                                                    * sendRefute = record.counter + 1
+
+                                                                                                                                                if self in 'refuted' field, stop sending refutes
+
+                                                                                                                                                  * `shardus-global-server.src.p2p.Lost.parseRecord`
+                                                                                                                                                    * if (id === Self.id) sendRefute = -1
+
+                                                                                                                                                if self in 'lostSyncing' field, apoptosize self
+
+                                                                                                                                                  * `shardus-global-server.src.p2p.Lost.parseRecord`
+                                                                                                                                                    * Self.emitter.emit('invoke-exit', ...)
+
+                                                                                                                                                the Apoptosis module will rid nodelist of apoptosized nodes
+
+                                                                                                                                                  * `shardus-global-server.src.p2p.Apoptosis.parseRecord`
+                                                                                                                                                    * removed: record.apoptosized,
