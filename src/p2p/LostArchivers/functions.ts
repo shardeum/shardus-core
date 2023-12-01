@@ -7,6 +7,7 @@ import {
 } from '@shardus/types/build/src/p2p/LostArchiverTypes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
+import * as http from '../../http'
 
 /** Lost Archivers Functions */
 
@@ -14,7 +15,7 @@ import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
  * Marks an Archiver as lost in our internal map.
  * This function gets called anytime communication with an Archiver breaks down
  */
-export function reportLostArchiver(publicKey: publicKey): void {
+export function reportLostArchiver(publicKey: publicKey, errorMsg: string): void {
   // Add new entry to lostArchiversMap for reported Archiver
   // Set status to 'reported'
   // If entry exists, do nothing

@@ -222,11 +222,11 @@ export function getTxs(): P2P.LostTypes.Txs {
     }
   }
   let seen = {} // used to make sure we don't add the same node twice
-  for (const [key, obj] of lostRecordMap) {
-    if (seen[obj.target]) continue
-    if (obj.message && obj.message.report && obj.message.cycle === currentCycle) {
-      lostTxs.push(obj.message)
-      seen[obj.target] = true
+  for (const [key, lostRecord] of lostRecordMap) {
+    if (seen[lostRecord.target]) continue
+    if (lostRecord.message && lostRecord.message.report && lostRecord.message.cycle === currentCycle) {
+      lostTxs.push(lostRecord.message)
+      seen[lostRecord.target] = true
     }
   }
   seen = {}

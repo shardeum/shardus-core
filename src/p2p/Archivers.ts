@@ -29,7 +29,7 @@ import { DataRequest, JoinedArchiver } from '@shardus/types/build/src/p2p/Archiv
 import * as CycleChain from './CycleChain'
 import rfdc from 'rfdc'
 import { shardusGetTime } from '../network'
-import { scheduleLostArchiverReport } from '../p2p/LostArchivers/functions'
+import { reportLostArchiver } from '../p2p/LostArchivers/functions'
 import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
 import { Result, ResultAsync } from 'neverthrow'
 import { arch } from 'os'
@@ -1144,7 +1144,7 @@ export function getFromArchiver<R>(
     http.get(`http://${archiver.ip}:${archiver.port}/${endpoint}`),
     (e: Error) => {
       warn(`${archiver.ip}:${archiver.port} is unreachable`)
-      scheduleLostArchiverReport(archiver, failureReportMessage || `cannot GET archiver endpoint ${endpoint}`)
+      reportLostArchiver(archiver.publicKey, failureReportMessage || `cannot GET archiver endpoint ${endpoint}`)
       return e
     }
   )
@@ -1166,8 +1166,8 @@ export function postToArchiver<B, R>(
     http.post(`http://${archiver.ip}:${archiver.port}/${endpoint}`, body, false, timeout),
     (e: Error) => {
       warn(`${archiver.ip}:${archiver.port} is unreachable`)
-      scheduleLostArchiverReport(
-        archiver,
+      reportLostArchiver(
+        archiver.publicKey,
         failureReportMessage || `cannot POST archiver endpoint ${endpoint}`
       )
       return e
