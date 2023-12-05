@@ -519,7 +519,7 @@ class TransactionConsenus {
             /* prettier-ignore */
             if (logFlags.debug || this.stateManager.consensusLog)
               this.mainLogger.debug(
-                `spread_appliedReceipt2 update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`
+                `spread_appliedReceipt2 update ${queueEntry.logID} receiptNotNull:${receiptNotNull}, appliedReceipt2: ${utils.stringifyReduce(appliedReceipt)}`
               )
 
             if (queueEntry.archived === false) {
@@ -754,12 +754,13 @@ class TransactionConsenus {
   hasAppliedReceiptMatchingPreApply(queueEntry: QueueEntry, appliedReceipt: AppliedReceipt): boolean {
     // This is much easier than the old way
     if (queueEntry.ourVote) {
-      const reciept = queueEntry.appliedReceipt2 ?? queueEntry.recievedAppliedReceipt2
-      if (reciept != null && queueEntry.ourVoteHash != null) {
-        if (this.calculateVoteHash(reciept.appliedVote) === queueEntry.ourVoteHash) {
+      const receipt = queueEntry.appliedReceipt2 ?? queueEntry.recievedAppliedReceipt2
+      if (receipt != null && queueEntry.ourVoteHash != null) {
+        const receiptVoteHash = this.calculateVoteHash(receipt.appliedVote)
+        if (receiptVoteHash === queueEntry.ourVoteHash) {
           return true
         } else {
-          /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match missing id:${utils.stringifyReduce(reciept.txid)} `)
+          /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} voteHashes do not match, ${receiptVoteHash} != ${queueEntry.ourVoteHash} `)
           return false
         }
       }
@@ -859,6 +860,8 @@ class TransactionConsenus {
         }
         if (found === false) {
           /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match missing id:${utils.stringifyReduce(id)} `)
+          /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} collectedData:${utils.stringifyReduce(Object.keys(queueEntry.collectedData))} `)
+
           return false
         }
         /* eslint-enable security/detect-object-injection */
@@ -883,6 +886,8 @@ class TransactionConsenus {
     this.profiler.scopedProfileSectionStart('tryProduceReceipt')
     try {
       if (queueEntry.waitForReceiptOnly === true) {
+        if (logFlags.debug)
+          this.mainLogger.debug(`tryProduceReceipt ${queueEntry.logID} waitForReceiptOnly === true`)
         nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt waitForReceiptOnly === true')
         return null
       }
@@ -2005,7 +2010,7 @@ class TransactionConsenus {
         this.mainLogger.debug(
           `createAndShareVote ${queueEntry.logID} created ourVote: ${utils.stringifyReduce(
             ourVote
-          )}, isEligibleToShareVote: ${isEligibleToShareVote}, isReceivedBetterVote: ${isReceivedBetterVote}`
+          )},ourVoteHash: ${voteHash}, isEligibleToShareVote: ${isEligibleToShareVote}, isReceivedBetterVote: ${isReceivedBetterVote}`
         )
 
       //append our vote

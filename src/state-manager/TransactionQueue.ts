@@ -261,6 +261,8 @@ class TransactionQueue {
       async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
         profilerInstance.scopedProfileSectionStart('broadcast_finalstate')
         try {
+          if (logFlags.debug)
+            this.mainLogger.debug(`broadcast_finalstate ${payload.txid}, ${stringify(payload.stateList)}`)
           // make sure we have it
           const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
           if (queueEntry == null) {
@@ -702,12 +704,14 @@ class TransactionQueue {
         passedApply = true
         applyResult = 'applied'
       }
-      /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      /* prettier-ignore */
+      if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction ${queueEntry.logID} post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`);
       /* prettier-ignore */ if (this.stateManager.consensusLog) this.mainLogger.debug(`preApplyTransaction ${queueEntry.logID} completed.`)
 
       //applyResponse = queueEntry?.preApplyTXResult?.applyResponse
       //super verbose option:
-      /* prettier-ignore */ if (logFlags.verbose && applyResponse != null) this.mainLogger.debug(`preApplyTransaction  post applyResponse: ${utils.stringifyReduce(applyResponse)}`)
+      /* prettier-ignore */
+      if (logFlags.verbose && applyResponse != null) this.mainLogger.debug(`preApplyTransaction ${queueEntry.logID}  post applyResponse: ${utils.stringifyReduce(applyResponse)}`);
     } catch (ex) {
       /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.txId)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.txId)}  ${utils.stringifyReduce(acceptedTX)}`)
@@ -4469,7 +4473,23 @@ class TransactionQueue {
                   this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
                 }
               } else {
-                result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
+                const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+                if (receipt2 != null) {
+                  if (logFlags.debug)
+                    this.mainLogger.debug(
+                      `processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`
+                    )
+                  nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
+                  //we have a receipt2, so we can make a receipt
+                  result = {
+                    result: receipt2.result,
+                    appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
+                    txid: receipt2.txid,
+                    app_data_hash: receipt2.app_data_hash,
+                  }
+                } else {
+                  result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
+                }
               }
 
               /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt result : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
@@ -4671,7 +4691,7 @@ class TransactionQueue {
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
 
               //temp hack ... hopefully this hack can go away
-              if (queueEntry.recievedAppliedReceipt == null) {
+              if (queueEntry.recievedAppliedReceipt == null || queueEntry.recievedAppliedReceipt2 == null) {
                 const result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
                 if (result != null) {
                   queueEntry.recievedAppliedReceipt = result
@@ -4710,6 +4730,10 @@ class TransactionQueue {
                     break
                   }
                   if (wrappedAccount.stateId != accountHash) {
+                    if (logFlags.debug)
+                      this.mainLogger.debug(
+                        `shrd_awaitFinalData_failed : ${queueEntry.logID} wrappedAccount.stateId != accountHash`
+                      )
                     failed = true
                     break
                   }
@@ -4771,9 +4795,14 @@ class TransactionQueue {
                     }
                   }
 
-                  if (queueEntry.recievedAppliedReceipt?.result === true) {
+                  if (
+                    queueEntry.recievedAppliedReceipt?.result === true ||
+                    queueEntry.recievedAppliedReceipt2?.result === true
+                  ) {
                     queueEntry.state = 'pass'
                   } else {
+                    /* prettier-ignore */
+                    if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_fail : ${queueEntry.logID} no receivedAppliedRecipt or recievedAppliedReceipt2`);
                     queueEntry.state = 'fail'
                   }
                   this.removeFromQueue(queueEntry, currentIndex)
