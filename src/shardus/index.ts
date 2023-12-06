@@ -1102,8 +1102,6 @@ class Shardus extends EventEmitter {
 
       const injectedTimestamp = this.app.getTimestampFromTransaction(tx, appData)
 
-      //this tx id is not good.. need to ask dapp for it!
-      //may be moot though where it matters
       const txId = this.app.calculateTxId(tx)
       let timestampReceipt: ShardusTypes.TimestampReceipt
       if (!injectedTimestamp || injectedTimestamp === -1) {
