@@ -128,17 +128,6 @@ interface CompareCertRes {
   record: P2P.CycleCreatorTypes.CycleRecord
 }
 
-const compareMarkerRoute: P2P.P2PTypes.InternalHandler<CompareMarkerReq, CompareMarkerRes> = (
-  payload,
-  respond,
-  sender
-) => {
-  profilerInstance.scopedProfileSectionStart('compareMarker')
-  const req = payload
-  respond(compareCycleMarkersEndpoint(req))
-  profilerInstance.scopedProfileSectionStart('compareMarker')
-}
-
 const compareCertRoute: P2P.P2PTypes.InternalHandler<
   CompareCertReq,
   CompareCertRes,
@@ -159,7 +148,6 @@ const gossipCertRoute: P2P.P2PTypes.GossipHandler<CompareCertReq, P2P.NodeListTy
 
 const routes = {
   internal: {
-    'compare-marker': compareMarkerRoute,
     'compare-cert': compareCertRoute,
   },
   gossip: {
@@ -692,35 +680,6 @@ function makeNetworkConfigHash() {
   }
   delete netConfig.p2p.existingArchivers
   return crypto.hash(netConfig)
-}
-
-// This is not being used anymore. If we decide to use it, be sure to validate the inputs.
-function compareCycleMarkersEndpoint(req: CompareMarkerReq): CompareMarkerRes {
-  // If your markers matches, just send back a marker
-  if (req.marker === marker) {
-    return { marker }
-  }
-
-  // Get txs they have that you missed
-  const unseen = unseenTxs(txs, req.txs)
-  const validUnseen = dropInvalidTxs(unseen)
-  if (Object.entries(validUnseen).length < 1) {
-    // If there are no txs they have that you missed, send back marker + txs
-    return { marker, txs }
-  }
-
-  // Update this cycle's txs, record, marker, and cert
-  txs = deepmerge(txs, validUnseen)
-  ;({ record, marker, cert } = makeCycleData(txs, CycleChain.newest))
-
-  // If your newly computed marker matches, just send back a marker
-  if (req.marker === marker) {
-    return { marker }
-  }
-
-  // They had txs you missed, you added them, and markers still don't match
-  // Send back your marker + txs (they are probably missing some)
-  return { marker, txs }
 }
 
 function unseenTxs(ours: P2P.CycleCreatorTypes.CycleTxs, theirs: P2P.CycleCreatorTypes.CycleTxs) {
