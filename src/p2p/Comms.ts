@@ -436,8 +436,8 @@ export async function ask2<TReq, TResp>(
     const deserializedResp = responseDeserializer(respStream, respDeserializerFunc)
     return deserializedResp
   } catch (err) {
-    error('P2P: ask2: _extractPayload2: ' + err)
-    console.log('P2P: ask2: _extractPayload2: ' + err)
+    error('P2P: ask2: response extraction: ' + err)
+    console.log('P2P: ask2: response extraction: ' + err)
     throw err
   }
 }
@@ -456,12 +456,14 @@ export function registerInternal(route, handler) {
     // We have internal requests turned off until we have a node id
     if (!acceptInternal) {
       if (logFlags.p2pNonFatal) info('We are not currently accepting internal requests...')
+      await respond({ error: 'Not accepting internal requests' })
       return
     }
 
     let msgSize = 0
 
     let tracker = ''
+    let hasHandlerResponded = false
     // Create wrapped respond function for sending back signed data
     const respondWrapped = async (response) => {
       /**
@@ -485,6 +487,7 @@ export function registerInternal(route, handler) {
         /* prettier-ignore */ if (logFlags.playback) logger.playbackLog(sender, 'self', 'InternalRecvResp', route, tracker, response)
       }
       await respond(respWithAuth)
+      hasHandlerResponded = true
 
       //return the message size in bytes
       return respWithAuth.msgSize
@@ -499,16 +502,25 @@ export function registerInternal(route, handler) {
     msgSize = payloadArray[3] || cNoSizeTrack
     if (!payload) {
       warn('Payload unable to be extracted, possible missing signature...')
+      await respond({ error: 'Payload unable to be extracted' })
       return
     }
     if (!NodeList.nodes.has(sender)) {
       warn('Internal routes can only be used by nodes in the network...')
+      await respond({ error: 'Sender not in node list' })
       return
     }
     if (route !== 'gossip') {
       /* prettier-ignore */ if (logFlags.playback) logger.playbackLog(sender, 'self', 'InternalRecv', route, tracker, payload)
     }
     await handler(payload, respondWrapped, sender, tracker, msgSize)
+
+    // If the handler didn't call respondWrapped, we need to send an empty response
+    if (!hasHandlerResponded && route !== 'gossip') {
+      nestedCountersInstance.countEvent('comms-route', `no-response`)
+      nestedCountersInstance.countEvent('comms-route', `no-response ${route}`)
+      await respond({ error: 'No response from handler' })
+    }
   }
   // Include that in the handler function that is passed
   network.registerInternal(route, wrappedHandler)

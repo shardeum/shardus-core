@@ -72,7 +72,7 @@ class AccountGlobals {
       'get_globalaccountreport',
       async (
         _payload: unknown,
-        respond: (arg0: GlobalAccountReportResp) => Promise<number>,
+        respond: (arg0: GlobalAccountReportResp | { error: string }) => Promise<number>,
         _sender: unknown,
         _tracker: string,
         msgSize: number
@@ -124,6 +124,7 @@ class AccountGlobals {
 
           if (result.ready === false) {
             nestedCountersInstance.countEvent(`sync`, `HACKFIX - forgot to return!`)
+            await respond({ error: 'Result not ready' })
             return
           }
 

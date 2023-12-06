@@ -132,9 +132,9 @@ const compareCertRoute: P2P.P2PTypes.InternalHandler<
   CompareCertReq,
   CompareCertRes,
   P2P.NodeListTypes.Node['id']
-> = (payload, respond, sender) => {
+> = async (payload, respond, sender) => {
   profilerInstance.scopedProfileSectionStart('compareCert')
-  respond(compareCycleCertEndpoint(payload, sender))
+  await respond(compareCycleCertEndpoint(payload, sender))
   profilerInstance.scopedProfileSectionEnd('compareCert')
 }
 

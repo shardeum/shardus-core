@@ -23,7 +23,7 @@ export const responseDeserializer = <T>(
   data.position = 0
   const responseType = data.readUInt16()
   if (responseType !== cWrappedResp) {
-    throw new Error(`Invalid request stream: ${responseType}`)
+    throw new Error(`Invalid response stream: ${responseType}`)
   }
   const wrappedResp = deserializeWrappedResp(data)
   const payloadStream = VectorBufferStream.fromBuffer(wrappedResp.payload)
