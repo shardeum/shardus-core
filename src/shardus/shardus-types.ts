@@ -247,6 +247,8 @@ export interface App {
     appData: {}
   ) => number
 
+  calculateTxId: (inTx: OpaqueTransaction) => string
+
   /**
    * A function that returns the Keys for the accounts involved in the transaction
    */

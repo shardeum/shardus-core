@@ -1104,14 +1104,15 @@ class Shardus extends EventEmitter {
 
       //this tx id is not good.. need to ask dapp for it!
       //may be moot though where it matters
-      const txId = this.crypto.hash(tx)
+      const txId = this.app.calculateTxId(tx)
       let timestampReceipt: ShardusTypes.TimestampReceipt
       if (!injectedTimestamp || injectedTimestamp === -1) {
         if (injectedTimestamp === -1) {
           /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('Dapp request to generate a new timestmap for the tx')
         }
         timestampReceipt = await this.stateManager.transactionConsensus.askTxnTimestampFromNode(tx, txId)
-        /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('Network generated a timestamp', timestampReceipt)
+        /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('Network generated a' +
+          ' timestamp', txId, timestampReceipt)
       }
       if (!injectedTimestamp && !timestampReceipt) {
         this.shardus_fatal(
@@ -1791,6 +1792,12 @@ class Shardus extends EventEmitter {
           application.getTimestampFromTransaction(inTx, appData)
       } else {
         throw new Error('Missing requried interface function.getTimestampFromTransaction()')
+      }
+
+      if (typeof application.calculateTxId === 'function') {
+        applicationInterfaceImpl.calculateTxId = (inTx) => application.calculateTxId(inTx)
+      } else {
+        throw new Error('Missing requried interface function.calculateTxId()')
       }
 
       if (typeof application.apply === 'function') {
