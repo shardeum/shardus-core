@@ -11,6 +11,27 @@ const replacer = (key: string, value: any): any => {
   }
   return value
 }
+export const appdata_replacer = <T, K, V>(
+  _key,
+  value: Map<K, V> | T
+):
+  | { dataType: 'stringifyReduce_map_2_array'; value: [K, V][] }
+  | T
+  | string => {
+  const originalObject = value;
+
+  if (originalObject instanceof Map) {
+    return {
+      dataType: 'stringifyReduce_map_2_array',
+      value: Array.from(originalObject.entries()),
+    };
+  } else if (typeof originalObject === 'bigint') {
+    // Convert BigInt to string
+    return originalObject.toString();
+  } else {
+    return value as T;
+  }
+};
 const reviver = (key: string, value: any): any => {
   if (value && value.__BigInt__) {
     return BigInt(value.__BigInt__)

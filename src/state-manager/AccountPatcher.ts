@@ -34,7 +34,7 @@ import {
   CycleShardData,
 } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
-import { errorToStringFull, Ordering } from '../utils'
+import { appdata_replacer, errorToStringFull, Ordering } from '../utils'
 import { Response } from 'express-serve-static-core'
 import { shardusGetTime } from '../network'
 
@@ -844,11 +844,10 @@ class AccountPatcher {
         const accountHash = this.stateManager.accountCache.getAccountHash(id)
         const accountHashFull = this.stateManager.accountCache.getAccountDebugObject(id) //this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(id)
         const accountData = await this.app.getAccountDataByList([id])
-
         res.write(`trieAccount: ${JSON.stringify(trieAccount)} \n`)
         res.write(`accountHash: ${JSON.stringify(accountHash)} \n`)
         res.write(`accountHashFull: ${JSON.stringify(accountHashFull)} \n`)
-        res.write(`accountData: ${JSON.stringify(accountData)} \n\n`)
+        res.write(`accountData: ${JSON.stringify(accountData,appdata_replacer)} \n\n`)
         res.write(`tests: \n`)
         if (accountData != null && accountData.length === 1 && accountHash != null) {
           res.write(`accountData hash matches cache ${accountData[0].stateId === accountHash.h} \n`)
