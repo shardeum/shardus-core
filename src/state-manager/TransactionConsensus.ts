@@ -1849,7 +1849,7 @@ class TransactionConsenus {
 
   async checkAccountIntegrity(queueEntry: QueueEntry): Promise<boolean> {
     this.profiler.profileSectionStart('checkAccountIntegrity')
-    const success = true
+    let success = true
     // check account integrity before sending challenge
     if (
       queueEntry.robustAccountDataPromises &&
@@ -1870,6 +1870,7 @@ class TransactionConsenus {
           if (logFlags.debug)
             this.mainLogger.debug(`checkAccountIntegrity: ${queueEntry.logID} key: ${key} ok`)
         } else {
+          success = false
           nestedCountersInstance.countEvent('checkAccountIntegrity', 'collected data and robust data match')
           if (logFlags.debug) {
             this.mainLogger.debug(
