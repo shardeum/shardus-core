@@ -4,7 +4,7 @@ import { P2P } from '@shardus/types'
 import * as utils from '../utils'
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
-import { config, crypto, logger } from './Context'
+import { config, crypto, logger, network } from './Context'
 import * as CycleCreator from './CycleCreator'
 import * as CycleChain from './CycleChain'
 import * as NodeList from './NodeList'
@@ -12,6 +12,7 @@ import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 let syncTimes = []
 let lastCheckedCycleForSyncTimes = 0
@@ -81,6 +82,7 @@ let p2pLogger: Logger
 
 let activeRequests: Map<P2P.NodeListTypes.Node['publicKey'], P2P.ActiveTypes.SignedActiveRequest>
 let queuedRequest: P2P.ActiveTypes.ActiveRequest
+let neverGoActive = false
 
 /** FUNCTIONS */
 
@@ -100,6 +102,11 @@ export function init() {
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
   }
+
+  network.registerExternalGet('debug-neverGoActive', isDebugModeMiddleware, (req, res) => {
+    neverGoActive = !neverGoActive
+    res.json({ status: 'ok', neverGoActive: neverGoActive })
+  })
 }
 
 export function reset() {
@@ -251,7 +258,7 @@ export function updateRecord(
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   // Look at the activated id's and make Self emit 'active' if your own id is there
-  if (record.activated.includes(Self.id)) {
+  if (record.activated.includes(Self.id) && !neverGoActive) {
     Self.setActive()
     Self.emitter.emit('active', Self.id)
     Self.updateNodeState(P2P.P2PTypes.NodeStatus.ACTIVE)

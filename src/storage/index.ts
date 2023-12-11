@@ -142,6 +142,7 @@ class Storage {
           '`activated` JSON NOT NULL',
           '`activatedPublicKeys` JSON NOT NULL',
           '`removed` JSON NOT NULL',
+          '`appRemoved` JSON NOT NULL',
           '`returned` JSON NOT NULL',
           '`lost` JSON NOT NULL',
           '`lostSyncing` JSON NOT NULL',

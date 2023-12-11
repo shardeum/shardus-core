@@ -20,16 +20,17 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import { isApopMarkedNode, nodeDownString } from './Apoptosis'
 import * as Comms from './Comms'
-import { config, crypto, logger, network } from './Context'
+import { config, crypto, logger, network, shardus } from "./Context";
 import { currentCycle, currentQuarter } from './CycleCreator'
 import * as NodeList from './NodeList'
-import { activeByIdOrder, byIdOrder, nodes } from './NodeList'
+import { activeByIdOrder, byIdOrder, byPubKey, nodes } from './NodeList'
 import * as Self from './Self'
 import { generateUUID } from './Utils'
 import { CycleData } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
 import { shardusGetTime } from '../network'
 import { ApoptosisProposalResp, deserializeApoptosisProposalResp } from '../types/ApoptosisProposalResp'
 import { ApoptosisProposalReq, serializeApoptosisProposalReq } from '../types/ApoptosisProposalReq'
+import { ShardusEvent } from '../shardus/shardus-types'
 
 /** TYPES */
 
@@ -41,16 +42,28 @@ export type ScheduledLostReport<Target> = {
   requestId: string
 }
 
+export type ScheduledRemoveByApp<Target> = {
+  target: Target
+  reason: string
+  timestamp: number
+  certificate: P2P.LostTypes.RemoveCertificate
+}
+
 type ScheduledLostNodeReport = ScheduledLostReport<P2P.NodeListTypes.Node>
+type ScheduledRemoveNodeByApp = ScheduledRemoveByApp<P2P.NodeListTypes.Node>
 
 /** STATE */
 
 // [TODO] - This enables the /kill /killother debug route and should be set to false after testing
-const allowKillRoute = false
+const allowKillRoute = true
 
 let p2pLogger
 
-let lostRecordMap = new Map<string, P2P.LostTypes.LostRecord>()
+let lostReported = new Map<string, P2P.LostTypes.LostReport>()
+let receivedLostRecordMap = new Map<string, Map<string, P2P.LostTypes.LostRecord>>()
+let checkedLostRecordMap = new Map<string, P2P.LostTypes.LostRecord>()
+let upGossipMap = new Map<string, P2P.LostTypes.SignedUpGossipMessage>()
+let appRemoved = new Map<string, P2P.LostTypes.RemoveByAppMessage>()
 export let isDown = {}
 let isUp = {}
 let isUpTs = {}
@@ -58,6 +71,7 @@ let stopReporting = {}
 let sendRefute = -1
 // map of <node_id-cycle_counter>
 let scheduledForLostReport: Map<string, ScheduledLostNodeReport> = new Map<string, ScheduledLostNodeReport>()
+let scheduledRemoveApp: Map<string, ScheduledRemoveNodeByApp> = new Map<string, ScheduledRemoveNodeByApp>()
 
 //const CACHE_CYCLES = 10 replaced by multiple configs
 
@@ -156,12 +170,26 @@ const lostUpRoute: P2P.P2PTypes.GossipHandler = (
   }
 }
 
+const removeByAppRoute: P2P.P2PTypes.GossipHandler = (
+  payload: P2P.LostTypes.RemoveCertificate,
+  sender,
+  tracker
+) => {
+  profilerInstance.scopedProfileSectionStart('remove-by-app')
+  try {
+    removeByAppHandler(payload, sender, tracker)
+  } finally {
+    profilerInstance.scopedProfileSectionStart('remove-by-app')
+  }
+}
+
 const routes = {
   external: [killExternalRoute, killOtherExternalRoute],
   internal: [lostReportRoute, pingNodeRoute],
   gossip: {
     'lost-down': lostDownRoute,
     'lost-up': lostUpRoute,
+    'remove-by-app': removeByAppRoute,
   },
 }
 
@@ -193,18 +221,28 @@ export function init() {
 // This gets called before start of Q1
 export function reset() {
   const lostCacheCycles = config.p2p.lostMapPruneCycles
-  for (const [key, obj] of lostRecordMap) {
-    // delete old lost reports
-    if (obj.cycle < currentCycle - lostCacheCycles) {
-      lostRecordMap.delete(key)
-      continue
+  for (let [key, lostRecordItems] of receivedLostRecordMap) {
+    let shouldRemove = false
+    for (let [checker, report] of lostRecordItems) {
+      // delete old lost reports
+      if (report.cycle < currentCycle - lostCacheCycles) {
+        shouldRemove = true
+        break
+      }
+      // delete once the target is removed from the node list
+      if (nodes.get(report.target) == null) {
+        shouldRemove = true
+        break
+      }
     }
-    // delete once the target is removed from the node list
-    if (!nodes.get(obj.target)) {
-      lostRecordMap.delete(key)
-      continue
+    if (shouldRemove) {
+      lostReported.delete(key)
+      checkedLostRecordMap.delete(key)
+      receivedLostRecordMap.delete(key)
+      upGossipMap.delete(key)
     }
   }
+  appRemoved.clear()
   pruneIsDown() // prune isUp and isDown status cache
   pruneStopReporting() // prune stopReporting cache
 }
@@ -213,43 +251,77 @@ export function reset() {
 export function getTxs(): P2P.LostTypes.Txs {
   let lostTxs = []
   let refutedTxs = []
+  let removedByAppTxs = []
   // Check if the node in the lost list is in the apop list; remove it if there is one
-  for (const [key, obj] of lostRecordMap) {
-    const { target } = obj
-    if (isApopMarkedNode(target)) {
-      lostRecordMap.delete(key)
+  for (const [key, lostRecordItems] of receivedLostRecordMap) {
+    if (lostRecordItems == null || lostRecordItems.size === 0) continue
+    let target: string
+    for (const [checker, record] of lostRecordItems) {
+      if (record.target != null) {
+        target = record.target
+        break
+      }
+    }
+    if (target && isApopMarkedNode(target)) {
+      receivedLostRecordMap.delete(key)
     }
   }
+
+  // get winning item for each target from the array of lost records
   let seen = {} // used to make sure we don't add the same node twice
-  for (const [key, lostRecord] of lostRecordMap) {
-    if (seen[lostRecord.target]) continue
-    if (lostRecord.message && lostRecord.message.report && lostRecord.message.cycle === currentCycle) {
-      lostTxs.push(lostRecord.message)
-      seen[lostRecord.target] = true
+  for (const [checker, lostRecordItems] of receivedLostRecordMap) {
+    if (lostRecordItems == null || lostRecordItems.size === 0) continue
+    let downMsgCount = 0
+    let downRecord: P2P.LostTypes.LostRecord
+    for (const [checker, record] of lostRecordItems) {
+      if (seen[record.target]) continue
+      // if (record.cycle !== currentCycle) continue
+      if (record.status === 'down') {
+        downMsgCount++
+        downRecord = record
+      }
+    }
+    if (downMsgCount >= 3) {
+      lostTxs.push(downRecord.message)
+      seen[downRecord.target] = true
+      info(`Adding lost record for ${downRecord.target} to lostTxs`)
+    } else {
+      info(`Not enough down messages to be considered lost: ${JSON.stringify(downRecord)}`)
+    }
+  }
+
+  // include up gossip messages that we received
+  for (const [key, upGossipMsg] of upGossipMap) {
+    let { target, cycle, status } = upGossipMsg
+    if (cycle == currentCycle) {
+      refutedTxs.push(upGossipMsg)
+      info(`Adding up gossip message for ${target} to refutedTxs`)
     }
   }
   seen = {}
-  for (const [key, obj] of lostRecordMap) {
+  for (const [key, obj] of appRemoved) {
     if (seen[obj.target]) continue
-    if (obj.message && obj.message.status === 'up' && obj.message.cycle === currentCycle) {
-      refutedTxs.push(obj.message)
-      seen[obj.target] = true
-    }
+    removedByAppTxs.push(obj)
+    seen[obj.target] = true
   }
   return {
     lost: [...lostTxs],
     refuted: [...refutedTxs],
+    removedByApp: [...removedByAppTxs],
   }
 }
 
 export function validateRecordTypes(rec: P2P.LostTypes.Record): string {
-  let err = validateTypes(rec, { lost: 'a', refuted: 'a' })
+  let err = validateTypes(rec, { lost: 'a', refuted: 'a', appRemoved: 'a' })
   if (err) return err
   for (const item of rec.lost) {
     if (typeof item !== 'string') return 'items of lost array must be strings'
   }
   for (const item of rec.refuted) {
     if (typeof item !== 'string') return 'items of refuted array must be strings'
+  }
+  for (const item of rec.appRemoved) {
+    if (typeof item !== 'string') return 'items of appRemoved array must be strings'
   }
   return ''
 }
@@ -258,7 +330,10 @@ export function validateRecordTypes(rec: P2P.LostTypes.Record): string {
 export function dropInvalidTxs(txs: P2P.LostTypes.Txs): P2P.LostTypes.Txs {
   const validLost = txs.lost.filter((request) => checkDownMsg(request, currentCycle)[0])
   const validRefuted = txs.refuted.filter((request) => checkUpMsg(request, currentCycle)[0])
-  return { lost: validLost, refuted: validRefuted }
+  const validRemovedByApp = txs.removedByApp.filter(
+    (request) => checkRemoveByAppMsg(request, currentCycle)[0]
+  )
+  return { lost: validLost, refuted: validRefuted, removedByApp: validRemovedByApp }
 }
 
 /*
@@ -273,6 +348,7 @@ export function updateRecord(
   const lostNodeIds = []
   const lostSyncingNodeIds = []
   const refutedNodeIds = []
+  const removedByAppNodeIds = []
   let seen = {} // used to make sure we don't add the same node twice
   for (const request of txs.lost) {
     if (seen[request.report.target]) continue
@@ -285,7 +361,12 @@ export function updateRecord(
     refutedNodeIds.push(request.target)
     seen[request.target] = true
   }
-
+  seen = {}
+  for (const request of txs.removedByApp) {
+    if (seen[request.target]) continue
+    removedByAppNodeIds.push(request.target)
+    seen[request.target] = true
+  }
   // remove activated nodes from syncing by id order
   for (const nodeId of record.activated) {
     NodeList.removeSyncingNode(nodeId)
@@ -305,6 +386,7 @@ export function updateRecord(
         //todo remove this later after we feel good about the system.. it wont really be that rare, so we dont want to swamp rare counters
         /* prettier-ignore */ nestedCountersInstance.countRareEvent('lost', 'sync timeout ' + `${utils.stringifyReduce(syncingNode.id)} ${syncTime} > ${record.maxSyncTime}`)
         lostSyncingNodeIds.push(syncingNode.id)
+        NodeList.emitSyncTimeoutEvent(syncingNode, record)
       }
     }
   }
@@ -312,14 +394,17 @@ export function updateRecord(
   record.lost = lostNodeIds.sort()
   record.lostSyncing = lostSyncingNodeIds.sort()
   record.refuted = refutedNodeIds.sort()
+  record.appRemoved = removedByAppNodeIds.sort()
 
   if (prev) {
     let apop = prev.lost.filter((id) => nodes.has(id)) // remove nodes that are no longer in the network
+    apop = apop.filter((id) => !prev.appRemoved.includes(id))
+
     let apopSyncing = []
     if (config.p2p.detectLostSyncing) {
       apopSyncing = prev.lostSyncing.filter((id) => nodes.has(id))
     }
-    // remove nodes that are no longer in the network
+    // neglect nodes that are refuted
     apop = apop.filter((id) => !refutedNodeIds.includes(id)) // remove nodes that refuted
 
     // filter adding nodes that are already in the apop record
@@ -341,6 +426,19 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   // If we see our node in the refute field clear flag to send an 'up' message at start of next cycle
   //   We ndded to do this check before checking the lost field for our node.
   for (const id of record.refuted) {
+    const node = NodeList.nodes.get(id)
+    if (node == null) {
+      error(`Refuted node ${id} is not in the network`)
+      continue
+    }
+    const emitParams: Omit<ShardusEvent, 'type'> = {
+      nodeId: node.id,
+      reason: 'Node refuted',
+      time: record.start,
+      publicKey: node.publicKey,
+      cycleNumber: record.counter,
+    }
+    Self.emitter.emit('node-refuted', emitParams)
     if (id === Self.id) sendRefute = -1
   }
   // Once we see any node in the lost field of the cycle record, we should stop
@@ -366,11 +464,18 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
     )
   }
 
+  // Look at the app removed id's and make Self emit 'removed' if your own id is there
+  if (record.appRemoved.includes(Self.id)) {
+    /* prettier-ignore */
+    nestedCountersInstance.countEvent("p2p", `app-removed c:${currentCycle}`, 1);
+    Self.emitter.emit('app-removed', Self.id)
+  }
+
   // We don't actually have to set removed because the Apoptosis module will do it.
   // Make sure the Lost module is listed after Apoptosis in the CycleCreator submodules list
   return {
     added: [],
-    removed: [],
+    removed: [...record.appRemoved],
     updated: [],
   }
 }
@@ -387,21 +492,32 @@ export function sendRequests() {
     })
   }
 
-  for (const [key, obj] of lostRecordMap) {
-    if (obj.status !== 'down') continue // TEST
-    if (obj.message && obj.message.checker && obj.message.checker === Self.id) {
-      if (obj.gossiped) continue
-      if (obj.status !== 'down') continue
-      if (stopReporting[obj.message.target]) continue // TEST // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
-      let msg = { report: obj.message, cycle: currentCycle, status: 'down' }
+  for (const [key, obj] of scheduledRemoveApp) {
+    removeByApp(obj.target, obj.certificate)
+    scheduledRemoveApp.delete(key)
+  }
+
+  // we will gossip the "down" lost records that we already checked for this cycle
+  for (const [key, record] of checkedLostRecordMap) {
+    if (record.status !== 'down') continue // TEST
+    if (record.message && record.checker && record.checker === Self.id) {
+      if (record.gossiped) continue
+      if (record.status !== 'down') continue
+      if (stopReporting[record.message.target]) continue // TEST // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
+      let msg = { report: record.message, cycle: currentCycle, status: 'down' }
       msg = crypto.sign(msg)
-      obj.message = msg
-      obj.gossiped = true
+      record.message = msg
+      record.gossiped = true
       info(`Gossiping node down message: ${JSON.stringify(msg)}`)
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'send-lost-down', 1)
       //this next line is probably too spammy to leave in forever (but ok to comment out and keep)
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `send-lost-down c:${currentCycle}`, 1)
       Comms.sendGossip('lost-down', msg, '', null, byIdOrder, true)
+      // we add to our own map
+      if (!receivedLostRecordMap.has(key)) {
+        receivedLostRecordMap.set(key, new Map<string, P2P.LostTypes.LostRecord>())
+        receivedLostRecordMap.get(key).set(record.checker, record)
+      }
     }
   }
   // We cannot count on the lost node seeing the gossip and refuting based on that.
@@ -412,13 +528,14 @@ export function sendRequests() {
     warn(`pending sendRefute:${sendRefute} currentCycle:${currentCycle}`)
   }
   if (sendRefute === currentCycle) {
-    let msg = { target: Self.id, status: 'up', cycle: currentCycle }
-    warn(`Gossiping node up message: ${JSON.stringify(msg)}`)
-    msg = crypto.sign(msg)
+    let upGossipMsg = { target: Self.id, status: 'up', cycle: currentCycle }
+    warn(`Gossiping node up message: ${JSON.stringify(upGossipMsg)}`)
+    let signedUpGossipMsg: P2P.LostTypes.SignedUpGossipMessage = crypto.sign(upGossipMsg)
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'self-refute', 1)
     //this next line is probably too spammy to leave in forever (but ok to comment out and keep)
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-refute c:${currentCycle}`, 1)
-    Comms.sendGossip('lost-up', msg, '', null, byIdOrder, true)
+    Comms.sendGossip('lost-up', signedUpGossipMsg, '', null, byIdOrder, true)
+    upGossipMap.set(`${Self.id}-${currentCycle}`, signedUpGossipMsg)
   }
 }
 
@@ -494,30 +611,85 @@ function reportLost(target, reason: string, requestId: string) {
   // we set isDown cache to the cycle number here; to speed up deciding if a node is down
   isDown[target.id] = currentCycle
   const key = `${target.id}-${currentCycle}`
-  const lostRec = lostRecordMap.get(key)
+  const lostRec = lostReported.get(key)
   if (lostRec) return // we have already seen this node for this cycle
   let obj = { target: target.id, status: 'reported', cycle: currentCycle }
-  const checker = getCheckerNode(target.id, currentCycle)
-  if (checker.id === Self.id && activeByIdOrder.length >= 3) return // we cannot be reporter and checker if there is 3 or more nodes in the network
-  let msg: P2P.LostTypes.LostReport = {
-    target: target.id,
-    checker: checker.id,
-    reporter: Self.id,
-    cycle: currentCycle,
-  }
-  // [TODO] - remove the following line after testing killother
-  if (allowKillRoute && reason === 'killother') msg.killother = true
-  /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, reporter: ${Self.ip}:${Self.port} id: ${Self.id}`)
-  /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, checker: ${checker.internalIp}:${checker.internalPort} node details: ${logNode(checker)}`)
-  /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, target: ${target.internalIp}:${target.internalPort} node details: ${logNode(target)}`)
-  /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${JSON.stringify(msg)}`)
+  let lostCycle = currentCycle
+  let checkerNodes = getMultipleCheckerNodes(target.id, lostCycle, Self.id)
+  for (let checker of checkerNodes) {
+    // const checker = getCheckerNode(target.id, currentCycle)
+    if (checker.id === Self.id && activeByIdOrder.length >= 3) return // we cannot be reporter and checker if there is 3 or more nodes in the network
+    let report: P2P.LostTypes.LostReport = {
+      target: target.id,
+      checker: checker.id,
+      reporter: Self.id,
+      cycle: currentCycle,
+    }
+    // [TODO] - remove the following line after testing killother
+    if (allowKillRoute && reason === 'killother') report.killother = true
+    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, reporter: ${Self.ip}:${Self.port} id: ${Self.id}`)
+    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, checker: ${checker.internalIp}:${checker.internalPort} node details: ${logNode(checker)}`)
+    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, target: ${target.internalIp}:${target.internalPort} node details: ${logNode(target)}`)
+    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${JSON.stringify(report)}`)
 
-  const msgCopy = JSON.parse(shardusCrypto.stringify(msg))
-  msgCopy.timestamp = shardusGetTime()
-  msgCopy.requestId = requestId
-  msg = crypto.sign(msgCopy)
-  lostRecordMap.set(key, obj)
-  Comms.tell([checker], 'lost-report', msg)
+    const msgCopy = JSON.parse(shardusCrypto.stringify(report))
+    msgCopy.timestamp = shardusGetTime()
+    msgCopy.requestId = requestId
+    report = crypto.sign(msgCopy)
+    lostReported.set(key, report)
+    Comms.tell([checker], 'lost-report', report)
+  }
+}
+
+function getMultipleCheckerNodes(
+  target: string,
+  lostCycle: number,
+  reporter: string
+): P2P.NodeListTypes.Node[] {
+  let checkerNodes: Map<string, P2P.NodeListTypes.Node> = new Map()
+  let obj = { target, cycle: lostCycle }
+  let key = crypto.hash(obj)
+  const firstFourBytesOfMarker = key.slice(0, 8)
+  const offset = parseInt(firstFourBytesOfMarker, 16)
+  let pickedIndexes = utils.getIndexesPicked(activeByIdOrder.length, 3, offset)
+  for (let i = 0; i < pickedIndexes.length; i++) {
+    let pickedIndex = pickedIndexes[i]
+    if (activeByIdOrder[pickedIndex].id === reporter) {
+      pickedIndex += 1
+      pickedIndex = pickedIndex % activeByIdOrder.length // make sure we dont go out of bounds
+    }
+    if (activeByIdOrder[pickedIndex].id === target) {
+      pickedIndex += 1
+      pickedIndex = pickedIndex % activeByIdOrder.length // make sure we dont go out of bounds
+    }
+    if (checkerNodes.has(activeByIdOrder[pickedIndex].id)) {
+      pickedIndex += 1
+      pickedIndex = pickedIndex % activeByIdOrder.length // make sure we dont go out of bounds
+    }
+    checkerNodes.set(activeByIdOrder[pickedIndex].id, activeByIdOrder[pickedIndex])
+  }
+  let selectedNodes = [...checkerNodes.values()]
+  info(
+    `in getMultipleCheckerNodes checkerNodes for target: ${target}, reporter: ${reporter}, cycle: ${lostCycle}: ${JSON.stringify(
+      selectedNodes
+    )}`
+  )
+  return selectedNodes
+}
+
+function removeByApp(target: P2P.NodeListTypes.Node, certificate: P2P.LostTypes.RemoveCertificate) {
+  info(`Gossip remove for ${target}`)
+  if (target.id === Self.id) {
+    nestedCountersInstance.countEvent('p2p', 'removeByApp skip: self')
+    return // don't report self
+  }
+  // we set isDown cache to the cycle number here; to speed up deciding if a node is down
+  isDown[target.id] = currentCycle
+
+  const removedRec = appRemoved.get(target.id)
+  if (removedRec) return // we have already removed this node for this cycle
+  appRemoved.set(target.id, {certificate, target: target.id})
+  Comms.sendGossip('remove-by-app', certificate, '', Self.id, byIdOrder, true)
 }
 
 function getCheckerNode(id, cycle) {
@@ -559,7 +731,7 @@ async function lostReportHandler(payload, response, sender) {
     }
     if (stopReporting[payload.target]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
     const key = `${payload.target}-${payload.cycle}`
-    if (lostRecordMap.get(key)) return // we have already seen this node for this cycle
+    if (checkedLostRecordMap.get(key)) return // we have already seen this node for this cycle
     const [valid, reason] = checkReport(payload, currentCycle + 1)
     if (!valid) {
       warn(`Got bad investigate request. requestId: ${requestId}, reason: ${reason}`)
@@ -567,23 +739,27 @@ async function lostReportHandler(payload, response, sender) {
     }
     if (sender !== payload.reporter) return // sender must be same as reporter
     if (payload.checker !== Self.id) return // the checker should be our node id
-    let obj: P2P.LostTypes.LostRecord = {
+    let record: P2P.LostTypes.LostRecord = {
       target: payload.target,
       cycle: payload.cycle,
       status: 'checking',
       message: payload,
+      reporter: payload.reporter,
+      checker: payload.checker,
     }
-    lostRecordMap.set(key, obj)
     // check if we already know that this node is down
     if (isDown[payload.target]) {
-      obj.status = 'down'
+      record.status = 'down'
       return
     }
     let result = await isDownCache(nodes.get(payload.target), requestId)
     /* prettier-ignore */ info(`isDownCache for requestId: ${requestId}, result ${result}`)
     if (allowKillRoute && payload.killother) result = 'down'
-    if (obj.status === 'checking') obj.status = result
-    info('Status after checking is ' + obj.status)
+    if (record.status === 'checking') record.status = result
+    info('Status after checking is ' + record.status)
+    if (!checkedLostRecordMap.has(key)) {
+      checkedLostRecordMap.set(key, record)
+    }
     // At start of Q1 of the next cycle sendRequests() will start a gossip if the node was found to be down
   } finally {
     profilerInstance.scopedProfileSectionEnd('lost-report')
@@ -609,9 +785,17 @@ function checkReport(report, expectCycle) {
   if (!nodes.has(report.target)) return [false, 'target not in network']
   if (!nodes.has(report.reporter)) return [false, 'reporter not in network']
   if (!nodes.has(report.checker)) return [false, 'checker not in network']
-  let checkerNode = getCheckerNode(report.target, report.cycle)
-  if (checkerNode.id !== report.checker)
-    return [false, `checker node should be ${checkerNode.id} and not ${report.checker}`] // we should be the checker based on our own calculations
+  let checkerNodes = getMultipleCheckerNodes(report.target, report.cycle, report.reporter)
+  let checkNodeIds = checkerNodes.map((node) => node.id)
+  if (!checkNodeIds.includes(report.checker)) {
+    error(`checkReport: report.checker ${report.checker} is not one of the valid checkers ${checkNodeIds}`)
+    return [
+      false,
+      `report.checker ${report.checker} is not part of eligible checkers: ${utils.stringifyReduce(
+        checkNodeIds
+      )}`,
+    ]
+  }
   if (!crypto.verify(report, nodes.get(report.reporter).publicKey)) return [false, 'bad sign from reporter'] // the report should be properly signed
   return [true, '']
 }
@@ -686,11 +870,41 @@ export function isNodeDown(nodeId: string): { down: boolean; state: string } {
 export function isNodeLost(nodeId: string): boolean {
   // First check the isUp isDown caches to see if we already checked this node before
   const key = `${nodeId}-${currentCycle}`
-  const lostRec = lostRecordMap.get(key)
+  const lostRec = receivedLostRecordMap.get(key)
   if (lostRec != null) {
     return true
   }
   return false
+}
+
+export function removeNodeWithCertificiate(
+  certificate: P2P.LostTypes.RemoveCertificate
+): void {
+  const [success, message] = verifyRemoveCertificate(certificate, currentCycle - 1)
+  if (!success) {
+    error(`Bad certificate. reason:${message}`)
+    return
+  }
+  const node = byPubKey.get(certificate.nodePublicKey)
+  if (node == null) {
+    /* prettier-ignore */
+    error(`Target remove node ${certificate.nodePublicKey} is not found in the activeList`);
+    return
+  }
+  if (scheduledRemoveApp.has(certificate.nodePublicKey)) {
+    const previousScheduleValue = scheduledRemoveApp.get(certificate.nodePublicKey)
+    if (logFlags.verbose) {
+      /* prettier-ignore */ info(`Target node ${certificate.nodePublicKey} already scheduled for removing.`)
+      /* prettier-ignore */ info(`Previous scheduled lost report details for ${certificate.nodePublicKey}: ${utils.stringify(previousScheduleValue)}`)
+    }
+    return
+  }
+  scheduledRemoveApp.set(certificate.nodePublicKey, {
+    target: node,
+    reason: 'remove-by-app',
+    certificate,
+    timestamp: shardusGetTime(),
+  })
 }
 
 // This is called once per cycle by reset
@@ -738,7 +952,10 @@ async function isDownCheck(node) {
       deserializeApoptosisProposalResp,
       {}
     )
-
+    if (res == null) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-0', 1)
+      return 'down'
+    }
     if (typeof res.s !== 'string') {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-1', 1)
       return 'down'
@@ -748,7 +965,7 @@ async function isDownCheck(node) {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-self-reported-zombie', 1)
       return 'down'
     }
-  } catch {
+  } catch (e) {
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-2', 1)
     return 'down'
   }
@@ -802,8 +1019,16 @@ function downGossipHandler(payload: P2P.LostTypes.SignedDownGossipMessage, sende
     return
   }
   const key = `${payload.report.target}-${payload.report.cycle}`
-  const rec = lostRecordMap.get(key)
-  if (rec && ['up', 'down'].includes(rec.status)) return // we have already gossiped this node for this cycle
+  const checkedRecord = checkedLostRecordMap.get(key)
+  if (checkedRecord && ['up', 'down'].includes(checkedRecord.status)) {
+    return // we have already gossiped this node for this cycle
+  }
+  const alreadyProcessedLostRecord = receivedLostRecordMap.get(key)
+    ? receivedLostRecordMap.get(key).get(payload.report.checker)
+    : null
+  if (alreadyProcessedLostRecord && ['up', 'down'].includes(alreadyProcessedLostRecord.status)) {
+    return // we have already gossiped this node for this cycle
+  }
   let [valid, reason] = checkQuarter(payload.report.checker, sender)
   if (!valid) {
     warn(`Bad downGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
@@ -816,13 +1041,20 @@ function downGossipHandler(payload: P2P.LostTypes.SignedDownGossipMessage, sende
     warn(`cycle:${currentCycle} quarter:${currentQuarter} sender:${sender}`)
     return
   }
-  let obj: P2P.LostTypes.LostRecord = {
+  let receivedRecord: P2P.LostTypes.LostRecord = {
     target: payload.report.target,
     cycle: payload.report.cycle,
     status: 'down',
     message: payload,
+    checker: payload.report.checker,
+    reporter: payload.report.reporter,
   }
-  lostRecordMap.set(key, obj)
+  if (receivedLostRecordMap.has(key)) {
+    receivedLostRecordMap.get(key).set(payload.report.checker, receivedRecord)
+  } else {
+    receivedLostRecordMap.set(key, new Map())
+    receivedLostRecordMap.get(key).set(payload.report.checker, receivedRecord)
+  }
   Comms.sendGossip('lost-down', payload, tracker, Self.id, byIdOrder, false)
   // After message has been gossiped in Q1 and Q2 we wait for getTxs() to be invoked in Q3
 }
@@ -866,23 +1098,68 @@ function upGossipHandler(payload, sender, tracker) {
     return
   }
   const key = `${payload.target}-${payload.cycle}`
-  const rec = lostRecordMap.get(key)
+  const rec = upGossipMap.get(key)
   if (rec && rec.status === 'up') return // we have already gossiped this node for this cycle
   ;[valid, reason] = checkUpMsg(payload, currentCycle)
   if (!valid) {
     warn(`Bad upGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
     return
   }
-  let obj = { target: payload.target, status: 'up', cycle: payload.cycle, message: payload }
-  lostRecordMap.set(key, obj)
+  upGossipMap.set(key, payload)
   Comms.sendGossip('lost-up', payload, tracker, Self.id, byIdOrder, false)
   // the getTxs() function will loop through the lost object to make txs in Q3 and build the cycle record from them
+}
+
+function removeByAppHandler(payload: P2P.LostTypes.RemoveCertificate, sender, tracker) {
+  const [success, message] = verifyRemoveCertificate(payload, currentCycle - 2)
+  if (!success) {
+    error(`Bad certificate. reason:${message}`)
+    return
+  }
+  const target = byPubKey.get(payload.nodePublicKey).id
+  const rec = appRemoved.get(target)
+  if (rec) return // we have already gossiped this node for this cycle
+  let [valid, reason] = checkQuarter(target, sender)
+  if (!valid) {
+    warn(`Bad downGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
+    warn(`cycle:${currentCycle} quarter:${currentQuarter} sender:${sender}`)
+    return
+  }
+  appRemoved.set(target, {target: target, certificate: payload})
+  Comms.sendGossip('remove-by-app', payload, tracker, Self.id, byIdOrder, false)
 }
 
 function checkUpMsg(payload: P2P.LostTypes.SignedUpGossipMessage, expectedCycle) {
   if (!nodes.has(payload.target))
     return [false, `target is not an active node  ${payload.target}  ${JSON.stringify(activeByIdOrder)}`]
   if (!crypto.verify(payload, nodes.get(payload.target).publicKey)) return [false, 'bad sign from target']
+  return [true, '']
+}
+
+function checkRemoveByAppMsg(payload: P2P.LostTypes.RemoveByAppMessage, expectedCycle) {
+  if (!nodes.has(payload.target))
+    return [false, `target is not an active node  ${payload.target}  ${JSON.stringify(activeByIdOrder)}`]
+  // todo: verify signature
+  // if (!crypto.verify(payload, nodes.get(payload.target).publicKey)) return [false, 'bad sign from target']
+  return [true, '']
+}
+
+function verifyRemoveCertificate(certificate: P2P.LostTypes.RemoveCertificate, cycle: number) {
+  if (!certificate) return [false, 'no certificate given']
+  if (!certificate.nodePublicKey || typeof certificate.nodePublicKey !== 'string')
+    return [false, 'no nodePublicKey field']
+  const node = byPubKey.get(certificate.nodePublicKey)
+  if (!node) return [false, 'nodePublicKey not in network']
+  if (node.publicKey !== certificate.nodePublicKey) return [false, 'nodePublicKey does not match node']
+  // the cycle should be the previous cycle when processing
+  if (certificate.cycle !== cycle) return [false, `cycle is not as expected. certificate.cycle: ${certificate.cycle} expected: ${cycle}`]
+
+  const { success, reason } = shardus.validateClosestActiveNodeSignatures(
+    certificate,
+    certificate.signs,
+    4, 5, 2
+  )
+  if (!success) return [false, reason]
   return [true, '']
 }
 

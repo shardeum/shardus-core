@@ -974,6 +974,7 @@ class TransactionConsenus {
             txid: queueEntry.acceptedTx.txId,
             result: undefined,
             appliedVote: undefined,
+            confirmOrChallenge: null,
             signatures: [],
             app_data_hash: '',
             // transaction_result: false //this was missing before..
@@ -1009,6 +1010,7 @@ class TransactionConsenus {
               txid: queueEntry.acceptedTx.txId,
               result: queueEntry.ourVote.transaction_result,
               appliedVotes: [queueEntry.ourVote],
+              confirmOrChallenge: [],
               app_data_hash: appliedReceipt2.app_data_hash,
             }
             queueEntry.appliedReceipt = appliedReceipt
@@ -1077,12 +1079,14 @@ class TransactionConsenus {
               txid: queueEntry.receivedBestChallenge.appliedVote.txid,
               result: false,
               appliedVotes: [queueEntry.receivedBestChallenge.appliedVote],
+              confirmOrChallenge: [queueEntry.receivedBestChallenge],
               app_data_hash: '',
             }
             const appliedReceipt2: AppliedReceipt2 = {
               txid: queueEntry.receivedBestChallenge.appliedVote.txid,
               result: false,
               appliedVote: queueEntry.receivedBestChallenge.appliedVote,
+              confirmOrChallenge: queueEntry.receivedBestChallenge,
               app_data_hash: '',
               signatures: [queueEntry.receivedBestChallenge.appliedVote.sign],
             }
@@ -1095,7 +1099,6 @@ class TransactionConsenus {
                 )}`
               )
 
-            // todo: podA reconsider querying the best receipt
             const robustQueryResult = await this.robustQueryConfirmOrChallenge(queueEntry)
             const robustConfirmOrChallenge = robustQueryResult?.result
             const robustUniqueCount = robustQueryResult?.uniqueCount
@@ -1158,12 +1161,14 @@ class TransactionConsenus {
                 txid: robustConfirmOrChallenge.appliedVote.txid,
                 result: robustConfirmOrChallenge.appliedVote.transaction_result,
                 appliedVotes: [robustConfirmOrChallenge.appliedVote],
+                confirmOrChallenge: [robustConfirmOrChallenge],
                 app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
               }
               const robustReceipt2: AppliedReceipt2 = {
                 txid: robustConfirmOrChallenge.appliedVote.txid,
                 result: robustConfirmOrChallenge.appliedVote.transaction_result,
                 appliedVote: robustConfirmOrChallenge.appliedVote,
+                confirmOrChallenge: robustConfirmOrChallenge,
                 app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
                 signatures: [robustConfirmOrChallenge.appliedVote.sign],
               }
@@ -1190,12 +1195,14 @@ class TransactionConsenus {
               txid: winningVote.txid,
               result: winningVote.transaction_result,
               appliedVotes: [winningVote],
+              confirmOrChallenge: [queueEntry.receivedBestConfirmation],
               app_data_hash: '',
             }
             const appliedReceipt2: AppliedReceipt2 = {
               txid: winningVote.txid,
               result: winningVote.transaction_result,
               appliedVote: winningVote,
+              confirmOrChallenge: queueEntry.receivedBestConfirmation,
               app_data_hash: '',
               signatures: [winningVote.sign],
             }
@@ -1247,12 +1254,14 @@ class TransactionConsenus {
                 txid: robustConfirmOrChallenge.appliedVote.txid,
                 result: robustConfirmOrChallenge.appliedVote.transaction_result,
                 appliedVotes: [robustConfirmOrChallenge.appliedVote],
+                confirmOrChallenge: [robustConfirmOrChallenge],
                 app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
               }
               const robustReceipt2: AppliedReceipt2 = {
                 txid: robustConfirmOrChallenge.appliedVote.txid,
                 result: robustConfirmOrChallenge.appliedVote.transaction_result,
                 appliedVote: robustConfirmOrChallenge.appliedVote,
+                confirmOrChallenge: robustConfirmOrChallenge,
                 app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
                 signatures: [robustConfirmOrChallenge.appliedVote.sign],
               }
@@ -1296,12 +1305,14 @@ class TransactionConsenus {
                 txid: robustConfirmOrChallenge.appliedVote.txid,
                 result: robustConfirmOrChallenge.appliedVote.transaction_result,
                 appliedVotes: [robustConfirmOrChallenge.appliedVote],
+                confirmOrChallenge: [robustConfirmOrChallenge],
                 app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
               }
               const robustReceipt2: AppliedReceipt2 = {
                 txid: robustConfirmOrChallenge.appliedVote.txid,
                 result: robustConfirmOrChallenge.appliedVote.transaction_result,
                 appliedVote: robustConfirmOrChallenge.appliedVote,
+                confirmOrChallenge: robustConfirmOrChallenge,
                 app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
                 signatures: [robustConfirmOrChallenge.appliedVote.sign],
               }
@@ -1778,8 +1789,8 @@ class TransactionConsenus {
       // podA: POQ3 create confirm message and share to tx group
       const confirmMessage: ConfirmOrChallengeMessage = {
         message: 'confirm',
-        nodeId: queueEntry.ourVote.node_id,
-        appliedVote: queueEntry.ourVote,
+        nodeId: Self.id,
+        appliedVote: queueEntry.receivedBestVote,
       }
       const signedConfirmMessage = this.crypto.sign(confirmMessage)
       if (this.stateManager.consensusLog) this.mainLogger.debug(`confirmVoteAndShare: ${queueEntry.logID}`)

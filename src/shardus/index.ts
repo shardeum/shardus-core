@@ -1,4 +1,5 @@
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
+import { RemoveCertificate } from '@shardus/types/build/src/p2p/LostTypes'
 import { EventEmitter } from 'events'
 import { Handler } from 'express'
 import Log4js from 'log4js'
@@ -26,7 +27,7 @@ import * as CycleChain from '../p2p/CycleChain'
 import * as CycleCreator from '../p2p/CycleCreator'
 import { netConfig } from '../p2p/CycleCreator'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
-import { scheduleLostReport } from '../p2p/Lost'
+import { scheduleLostReport, removeNodeWithCertificiate } from '../p2p/Lost'
 import { activeByIdOrder } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import { attempt } from '../p2p/Utils'
@@ -56,6 +57,7 @@ import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { networkMode, isInternalTxAllowed } from '../p2p/Modes'
 import { lostArchiversMap } from '../p2p/LostArchivers/state'
 import getCallstack from '../utils/getCallstack'
+import * as crypto from '@shardus/crypto-utils'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -727,6 +729,14 @@ class Shardus extends EventEmitter {
       }
       this.exitHandler.exitCleanly(`removed`, `removed from network in normal conditions`) // exits with status 0 so that PM2 can restart the process
     })
+    Self.emitter.on('app-removed', async () => {
+      this.mainLogger.info(`exitCleanly: app removed`)
+      if (this.reporter) {
+        this.reporter.stopReporting()
+        await this.reporter.reportRemoved(Self.id)
+      }
+      this.exitHandler.exitCleanly(`removed`, `removed from network requested by app`) // exits with status 0 so that
+    })
     Self.emitter.on(
       'invoke-exit',
       async (tag: string, callstack: string, message: string, restart: boolean) => {
@@ -785,11 +795,48 @@ class Shardus extends EventEmitter {
         this.mainLogger.error(`Error: while processing node-deactivated event stack: ${e.stack}`)
       }
     })
+    Self.emitter.on('node-refuted', ({ ...params }) => {
+      try {
+        if (!this.stateManager.currentCycleShardData) throw new Error('No current cycle data')
+        if (params.publicKey == null) throw new Error('No node publicKey provided for node-refuted event')
+        const consensusNodes = this.getConsenusGroupForAccount(params.publicKey)
+        for (let node of consensusNodes) {
+          if (node.id === Self.id) {
+            this.app.eventNotify?.({ type: 'node-refuted', ...params })
+          }
+        }
+      } catch (e) {
+        this.mainLogger.error(`Error: while processing node-refuted event stack: ${e.stack}`)
+      }
+    })
     Self.emitter.on('node-left-early', ({ ...params }) => {
       try {
-        this.app.eventNotify?.({ type: 'node-left-early', ...params })
+        if (!this.stateManager.currentCycleShardData) throw new Error('No current cycle data')
+        if (params.publicKey == null) throw new Error('No node publicKey provided for node-left-early event')
+        const consensusNodes = this.getConsenusGroupForAccount(params.publicKey)
+        for (let node of consensusNodes) {
+          if (node.id === Self.id) {
+            this.app.eventNotify?.({ type: 'node-left-early', ...params })
+          }
+        }
       } catch (e) {
         this.mainLogger.error(`Error: while processing node-left-early event stack: ${e.stack}`)
+      }
+    })
+    Self.emitter.on('node-sync-timeout', ({ ...params }) => {
+      try {
+        if (!this.stateManager.currentCycleShardData) throw new Error('No current cycle data')
+        if (params.publicKey == null)
+          throw new Error('No node publicKey provided for node-sync-timeout event')
+        const consensusNodes = this.getConsenusGroupForAccount(params.publicKey)
+        for (let node of consensusNodes) {
+          if (node.id === Self.id) {
+            this.app.eventNotify?.({ type: 'node-sync-timeout', ...params })
+            break
+          }
+        }
+      } catch (e) {
+        this.mainLogger.error(`Error: while processing node-sync-timeout event stack: ${e.stack}`)
       }
     })
 
@@ -1329,6 +1376,14 @@ class Shardus extends EventEmitter {
     return this.stateManager.getClosestNodesGlobal(hash, count)
   }
 
+  removeNodeWithCertificiate(cert: RemoveCertificate) {
+    return removeNodeWithCertificiate(cert)
+  }
+
+  computeNodeRank(nodeId: string, txId: string, timestamp: number): bigint {
+    return this.stateManager.transactionQueue.computeNodeRank(nodeId, txId, timestamp)
+  }
+
   getShardusProfiler() {
     return profilerInstance
   }
@@ -1357,6 +1412,55 @@ class Shardus extends EventEmitter {
       const nodePublicKey = sign.owner
       appData.sign = sign // attach the node's sig for verification
       const node = this.p2p.state.getNodeByPubKey(nodePublicKey)
+      const isValid = this.crypto.verify(appData, nodePublicKey)
+      if (node && isValid) {
+        validNodeCount++
+      }
+      // early break loop
+      if (validNodeCount >= minRequired) {
+        // if (validNodes.length >= minRequired) {
+        return {
+          success: true,
+          reason: `Validated by ${minRequired} valid nodes!`,
+        }
+      }
+    }
+    return {
+      success: false,
+      reason: `Fail to verify enough valid nodes signatures`,
+    }
+  }
+
+  validateClosestActiveNodeSignatures(
+    signedAppData: any,
+    signs: ShardusTypes.Sign[],
+    minRequired: number,
+    nodesToSign: number,
+    allowedBackupNodes: number
+  ): { success: boolean; reason: string } {
+    let validNodeCount = 0
+    // let validNodes = []
+    let appData = { ...signedAppData }
+    if (appData.signs) delete appData.signs
+    if (appData.sign) delete appData.sign
+    const hash = crypto.hashObj(appData)
+    const closestNodes = this.getClosestNodes(hash, nodesToSign + allowedBackupNodes)
+    const closestNodesByPubKey = new Map()
+    for (let i = 0; i < closestNodes.length; i++) {
+      const node = this.p2p.state.getNode(closestNodes[i])
+      if (node) {
+        closestNodesByPubKey.set(node.publicKey, node)
+      }
+    }
+    for (let i = 0; i < signs.length; i++) {
+      const sign = signs[i]
+      const nodePublicKey = sign.owner
+      appData.sign = sign // attach the node's sig for verification
+      if (!closestNodesByPubKey.has(nodePublicKey)) {
+        this.mainLogger.warn(`Node ${nodePublicKey} is not in the closest nodes list. Skipping`)
+        continue
+      }
+      const node = closestNodesByPubKey.get(nodePublicKey)
       const isValid = this.crypto.verify(appData, nodePublicKey)
       if (node && isValid) {
         validNodeCount++

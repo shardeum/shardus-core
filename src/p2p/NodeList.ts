@@ -192,6 +192,18 @@ export function removeNode(
     }
   }
 }
+
+export function emitSyncTimeoutEvent(node: P2P.NodeListTypes.Node, cycle: P2P.CycleCreatorTypes.CycleRecord) {
+  const emitParams: Omit<ShardusEvent, 'type'> = {
+    nodeId: node.id,
+    reason: 'Node sync timeout',
+    time: cycle.start,
+    publicKey: node.publicKey,
+    cycleNumber: cycle.counter,
+  }
+  emitter.emit('node-sync-timeout', emitParams)
+}
+
 export function removeNodes(
   ids: string[],
   raiseEvents: boolean,
@@ -249,6 +261,9 @@ export function updateNodes(
 
 export function isNodeLeftNetworkEarly(node: P2P.NodeListTypes.Node) {
   return CycleChain.newest && CycleChain.newest.lost.includes(node.id)
+}
+export function isNodeRefuted(node: P2P.NodeListTypes.Node) {
+  return CycleChain.newest && CycleChain.newest.refuted.includes(node.id)
 }
 export function createNode(joined: P2P.JoinTypes.JoinedConsensor) {
   const node: P2P.NodeListTypes.Node = {

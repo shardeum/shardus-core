@@ -473,6 +473,7 @@ export function activeNodeCount(cycle: P2P.CycleCreatorTypes.CycleRecord) {
     cycle.activated.length +
     -cycle.apoptosized.length +
     -cycle.removed.length +
+    -cycle.appRemoved.length +
     -cycle.lost.length
   )
 }
@@ -484,6 +485,7 @@ export function showNodeCount(cycle: P2P.CycleCreatorTypes.CycleRecord) {
     ${cycle.active} +
     ${cycle.apoptosized.length} -
     ${cycle.removed.length} -
+    ${cycle.appRemoved.length} -
     ${cycle.lost.length}
     ${cycle.counter}
   `)
@@ -498,6 +500,7 @@ export function totalNodeCount(cycle: P2P.CycleCreatorTypes.CycleRecord) {
     //    cycle.activated.length -      // don't count activated because it was already counted in syncing
     -cycle.apoptosized.length +
     -cycle.removed.length
+    -cycle.appRemoved.length
     // -cycle.lost.length
   )
 }

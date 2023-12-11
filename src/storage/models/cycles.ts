@@ -40,6 +40,7 @@ const cycles = [
     activated: { type: Sequelize.JSON, allowNull: false },
     activatedPublicKeys: { type: Sequelize.JSON, allowNull: false },
     removed: { type: Sequelize.JSON, allowNull: false },
+    appRemoved: { type: Sequelize.JSON, allowNull: false },
     returned: { type: Sequelize.JSON, allowNull: false },
     lost: { type: Sequelize.JSON, allowNull: false },
     lostSyncing: { type: Sequelize.JSON, allowNull: false },

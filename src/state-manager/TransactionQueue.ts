@@ -33,6 +33,7 @@ import {
   StringNodeObjectMap,
   TxDebug,
   WrappedResponses,
+  ArchiverReceipt,
 } from './state-manager-types'
 import { isInternalTxAllowed, networkMode } from '../p2p/Modes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
@@ -4459,6 +4460,7 @@ class TransactionQueue {
                   result = {
                     result: receipt2.result,
                     appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
+                    confirmOrChallenge: [receipt2.confirmOrChallenge],
                     txid: receipt2.txid,
                     app_data_hash: receipt2.app_data_hash,
                   }
@@ -4481,6 +4483,7 @@ class TransactionQueue {
                   result = {
                     result: receipt2.result,
                     appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
+                    confirmOrChallenge: [receipt2.confirmOrChallenge],
                     txid: receipt2.txid,
                     app_data_hash: receipt2.app_data_hash,
                   }
@@ -5110,29 +5113,16 @@ class TransactionQueue {
   }
 
   addReceiptToForward(queueEntry: QueueEntry): void {
-    const netId = '123abc'
+    // const netId = '123abc'
     // const receipt = this.stateManager.getReceipt(queueEntry)
     // const status = receipt.result === true ? 'applied' : 'rejected'
-    const status = this.stateManager.getReceiptResult(queueEntry) === true ? 'applied' : 'rejected'
+    // const status = this.stateManager.getReceiptResult(queueEntry) === true ? 'applied' : 'rejected'
 
-    const txHash = queueEntry.acceptedTx.txId
-    const obj = { tx: queueEntry.acceptedTx.data, status, netId }
-    const txResultFullHash = this.crypto.hash(obj)
-    const txIdShort = utils.short(txHash)
-    const txResult = utils.short(txResultFullHash)
-
-    const txReceiptToPass = {
-      tx: {
-        originalTxData: queueEntry.acceptedTx.data['tx'] || queueEntry.acceptedTx.data,
-        txId: txHash,
-        timestamp: queueEntry.acceptedTx.timestamp,
-      } as unknown as AcceptedTx,
-      cycle: queueEntry.cycleToRecordOn,
-      result: { txIdShort, txResult },
-      beforeStateAccounts: [],
-      accounts: [],
-      receipt: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
-    }
+    // const txHash = queueEntry.acceptedTx.txId
+    // const obj = { tx: queueEntry.acceptedTx.data, status, netId }
+    // const txResultFullHash = this.crypto.hash(obj)
+    // const txIdShort = utils.short(txHash)
+    // const txResult = utils.short(txResultFullHash)x
 
     const accountsToAdd = {} as Shardus.AccountsCopy
     const beforeAccountsToAdd = {} as Shardus.AccountsCopy
@@ -5173,8 +5163,19 @@ class TransactionQueue {
       }
     }
 
-    txReceiptToPass.accounts = [...Object.values(accountsToAdd)]
-    txReceiptToPass.beforeStateAccounts = [...Object.values(beforeAccountsToAdd)]
+    const txReceiptToPass: ArchiverReceipt = {
+      tx: {
+        originalTxData: queueEntry.acceptedTx.data,
+        txId: queueEntry.acceptedTx.txId,
+        timestamp: queueEntry.acceptedTx.timestamp,
+      },
+      cycle: queueEntry.cycleToRecordOn,
+      beforeStateAccounts: [...Object.values(beforeAccountsToAdd)],
+      accounts: [...Object.values(accountsToAdd)],
+      appReceiptData: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
+      appliedReceipt: queueEntry.appliedReceiptFinal2,
+      executionShardKey: queueEntry.executionShardKey,
+    }
     // console.log('acceptedTx', queueEntry.acceptedTx)
     // console.log('txReceiptToPass', txReceiptToPass.tx.txId, txReceiptToPass)
 
