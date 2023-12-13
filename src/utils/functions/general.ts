@@ -432,6 +432,16 @@ export function selectIndexesWithOffeset(arraySize: number, numberToPick: number
     if (currentIndex >= arraySize) {
       currentIndex -= arraySize
     }
+
+    //linear probing if this index is already in the list.  This prevents being stuck forever
+    //..assuming the input parameters are valid
+    while(selectedIndexes.has(currentIndex)){
+      currentIndex++
+      if (currentIndex >= arraySize) {
+        currentIndex = 0
+      }
+    }
+
     selectedIndexes.add(currentIndex)
   }
   return Array.from(selectedIndexes)

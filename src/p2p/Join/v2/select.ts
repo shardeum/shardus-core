@@ -90,8 +90,8 @@ export function selectNodes(maxAllowed: number): void {
       selectedPublicKeys.add(objs[selectedIndex].publicKey)
     }
   } else {
-    /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console)
-    console.log('Invalid input parameters for selection')
+    /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`Invalid input parameters for selection: array length: ${objs.length} maxAllowed:${maxAllowed} offset:${offset}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('joinV2', 'selectNodes: Invalid input parameters for selection')
   }
 
   // If golden ticket is enabled, add nodes with adminCert + golden ticket to selectedPublicKeys if they are not already there
