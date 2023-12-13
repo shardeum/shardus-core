@@ -77,11 +77,11 @@ export function propComparator2<T>(prop: keyof T, prop2: keyof T): (a: T, b: T) 
       ? a[prop2] === b[prop2]
         ? 0
         : a[prop2] > b[prop2]
-          ? 1
-          : -1
-      : a[prop] > b[prop]
         ? 1
         : -1
+      : a[prop] > b[prop]
+      ? 1
+      : -1
   /* eslint-enable security/detect-object-injection */
   return comparator
 }
@@ -421,6 +421,22 @@ export function getIndexesPicked(groupSize: number, numToPick: number, offset = 
   return indexesPicked
 }
 
+//Selects a specific number of unique indexes from an array, starting at an offset and using a dynamic stride for spacing
+export function selectIndexesWithOffeset(arraySize: number, numberToPick: number, offset: number): number[] {
+  let currentIndex = mod(offset, arraySize)
+  const strideAmount = Math.max(1, (offset + 1337) % Math.ceil(arraySize / numberToPick))
+  const selectedIndexes = new Set<number>()
+
+  while (selectedIndexes.size < numberToPick) {
+    currentIndex += strideAmount
+    if (currentIndex >= arraySize) {
+      currentIndex -= arraySize
+    }
+    selectedIndexes.add(currentIndex)
+  }
+  return Array.from(selectedIndexes)
+}
+
 /**
  * Try to print a variety of possible erros for debug purposes
  * @param err
@@ -504,22 +520,16 @@ export function jsonHttpResWithSize(
  * stringForKeys(nodelist, 'publicKey ip host')
  */
 export function stringForKeys(obj: unknown, keys: ArrayLike<string> | string | null = null): string {
-  if (obj === undefined)
-    return 'undefined'
-  if (obj === null)
-    return 'null'
+  if (obj === undefined) return 'undefined'
+  if (obj === null) return 'null'
   try {
-    if (Array.isArray(obj))
-      return `[${obj.map(item => stringForKeys(item, keys)).join(', ')}]`
+    if (Array.isArray(obj)) return `[${obj.map((item) => stringForKeys(item, keys)).join(', ')}]`
     // at this point, obj is really an object
-    if (keys == null)
-      keys = Object.keys(obj)
-    else if (typeof keys == 'string')
-      keys = keys.split(/[ ,]+/)
+    if (keys == null) keys = Object.keys(obj)
+    else if (typeof keys == 'string') keys = keys.split(/[ ,]+/)
     // justification for the suppression below: the keys are not originated by user input, but developer source code
-    const items = Array
-      .from(keys)
-      .map(key => obj[key] === undefined ? 'undefined' : JSON.stringify(obj[key])) // eslint-disable-line security/detect-object-injection
+    const items = Array.from(keys)
+      .map((key) => (obj[key] === undefined ? 'undefined' : JSON.stringify(obj[key]))) // eslint-disable-line security/detect-object-injection
       .join(', ')
     return `{${items}}`
   } catch (e) {

@@ -10,7 +10,7 @@ import * as NodeList from '../../NodeList'
 import * as http from '../../../http'
 import { getStandbyNodesInfoMap } from '.'
 import { calculateToAcceptV2 } from '../../ModeSystemFuncs'
-import { fastIsPicked } from '../../../utils'
+import { fastIsPicked, selectIndexesWithOffeset } from '../../../utils'
 import { getOurNodeIndex, getOurNodeIndexFromSyncingList } from '../../Utils'
 import { nestedCountersInstance } from '../../../utils/nestedCounters'
 import { logFlags } from '../../../logger'
@@ -67,10 +67,31 @@ export function selectNodes(maxAllowed: number): void {
   // sort the objects by their selection numbers
   objs.sort((a, b) => (a.selectionNum < b.selectionNum ? 1 : a.selectionNum > b.selectionNum ? -1 : 0))
 
-  // add as many keys as we're allowed to the set
-  for (let i = 0; i < objs.length && selectedPublicKeys.size < maxAllowed; i++) {
-    // eslint-disable-next-line security/detect-object-injection
-    selectedPublicKeys.add(objs[i].publicKey)
+  let offset = 0
+  const cycleMarker = CycleChain.getCurrentCycleMarker()
+  if (cycleMarker) {
+    const first8HexChars = cycleMarker.substring(0, 8)
+    offset = parseInt(first8HexChars, 16)
+  }
+
+  /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console)
+  console.log('Input parameters to selectIndexesWithOffset - Max allowed:', maxAllowed, 'Offset:', offset, 'Array Size: ',objs.length);
+
+  if (offset >= 0 && maxAllowed >= 1 && maxAllowed <= objs.length) {
+    const selectedIndexes = selectIndexesWithOffeset(objs.length, maxAllowed, offset)
+
+    /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console)
+    console.log("SelectedIndexes: ",selectedIndexes)
+
+    for (let i = 0; i < selectedIndexes.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection
+      const selectedIndex = selectedIndexes[i]
+      // eslint-disable-next-line security/detect-object-injection
+      selectedPublicKeys.add(objs[selectedIndex].publicKey)
+    }
+  } else {
+    /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console)
+    console.log('Invalid input parameters for selection')
   }
 
   // If golden ticket is enabled, add nodes with adminCert + golden ticket to selectedPublicKeys if they are not already there
