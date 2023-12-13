@@ -103,9 +103,11 @@ class Reporter {
     }
     try {
       const nodeIpInfo = ipInfo
+      const appData = this.getAppData()
       await http.post(`${this.config.recipient}/joining`, {
         publicKey,
         nodeIpInfo,
+        appData,
       })
     } catch (e) {
       if (logFlags.error)
@@ -120,10 +122,12 @@ class Reporter {
     }
     try {
       const nodeIpInfo = ipInfo
+      const appData = this.getAppData()
       await http.post(`${this.config.recipient}/joined`, {
         publicKey,
         nodeId,
         nodeIpInfo,
+        appData,
       })
     } catch (e) {
       if (logFlags.error)
