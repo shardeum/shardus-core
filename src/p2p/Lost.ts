@@ -901,6 +901,7 @@ export function removeNodeWithCertificiate(
     }
     return
   }
+  const completeCert = { ...certificate, cycle: currentCycle } as P2P.LostTypes.RemoveCertificate
   scheduledRemoveApp.set(certificate.nodePublicKey, {
     target: node,
     reason: 'remove-by-app',
