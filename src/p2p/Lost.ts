@@ -43,7 +43,6 @@ export type ScheduledLostReport<Target> = {
 
 type ScheduledLostNodeReport = ScheduledLostReport<P2P.NodeListTypes.Node>
 
-
 /** STATE */
 
 // [TODO] - This enables the /kill /killother debug route and should be set to false after testing
@@ -480,7 +479,7 @@ export function scheduleLostReport(target: P2P.NodeListTypes.Node, reason: strin
 function reportLost(target, reason: string, requestId: string) {
   info(`Reporting lost for ${target.id}, requestId: ${requestId}.`)
   info(`Target node details for requestId: ${requestId}: ${logNode(target)}`)
-  if (target.id === Self.id){
+  if (target.id === Self.id) {
     nestedCountersInstance.countEvent('p2p', 'reportLost skip: self')
     return // don't report self
   }
@@ -488,7 +487,7 @@ function reportLost(target, reason: string, requestId: string) {
     nestedCountersInstance.countEvent('p2p', 'reportLost skip: already stopped reporting')
     return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
   }
-  if (nodes.get(target.id)?.status === 'syncing'){
+  if (nodes.get(target.id)?.status === 'syncing') {
     nestedCountersInstance.countEvent('p2p', 'reportLost skip: node syncing')
     return // don't report syncing nodes
   }
@@ -726,19 +725,20 @@ async function isDownCheck(node) {
   // The timeout for this is controled by the network.timeout paramater in server.json
   info(`Checking internal connection for ${node.id}`)
 
-  //using the 'apoptosize' route to check if the node is up.
-  const res = await Comms.ask2<ApoptosisProposalReq, ApoptosisProposalResp>(
-    node,
-    'apoptosize',
-    {
-      id: 'isDownCheck',
-      when: 1,
-    },
-    serializeApoptosisProposalReq,
-    deserializeApoptosisProposalResp,
-    {}
-  )
   try {
+    //using the 'apoptosize' route to check if the node is up.
+    const res = await Comms.ask2<ApoptosisProposalReq, ApoptosisProposalResp>(
+      node,
+      'apoptosize',
+      {
+        id: 'isDownCheck',
+        when: 1,
+      },
+      serializeApoptosisProposalReq,
+      deserializeApoptosisProposalResp,
+      {}
+    )
+
     if (typeof res.s !== 'string') {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-1', 1)
       return 'down'
