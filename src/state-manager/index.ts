@@ -2162,8 +2162,8 @@ class StateManager {
         if (riCacheResult.length > 0) {
           if (logFlags.verbose) this.mainLogger.debug(`getLocalOrRemoteAccount: RI cache hit for ${address}`)
           wrappedAccount = riCacheResult[0] as Shardus.WrappedDataFromQueue
+          return wrappedAccount
         }
-        return wrappedAccount
       }
     }
 

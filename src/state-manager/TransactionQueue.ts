@@ -890,6 +890,7 @@ class TransactionQueue {
           if (isLocal) {
             filter[writtenAccount.accountId] = 1
           }
+          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  tx:${queueEntry.logID} ts:${timestamp} setWritefilter: ${isLocal}  acc:${writtenAccount.accountId} `)
         }
       }
 
@@ -902,6 +903,7 @@ class TransactionQueue {
           if (isLocal) {
             filter[writtenAccount.accountId] = 1
           }
+          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction queueEntry.collectedFinalData != null tx:${queueEntry.logID} ts:${timestamp} setWritefilter: ${isLocal}  acc:${writtenAccount.accountId} `)
         }
       }
 
