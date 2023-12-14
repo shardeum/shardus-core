@@ -234,7 +234,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       record.standbyRemove.push(publicKey)
     }
 
-    let standbyRemved_Age = 0
+    let standbyRemoved_Age = 0
     //let standbyRemoved_joined = 0
     let standbyRemoved_App = 0
     let skipped = 0
@@ -253,8 +253,8 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
           }
 
           record.standbyRemove.push(key)
-          standbyRemved_Age++
-          if (standbyRemved_Age >= config.p2p.standbyListMaxRemoveTTL) {
+          standbyRemoved_Age++
+          if (standbyRemoved_Age >= config.p2p.standbyListMaxRemoveTTL) {
             break
           }
         }
@@ -272,10 +272,13 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
           record.standbyRemove.push(key)
           /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `join:updateRecord cycle number: ${record.counter} removed standby node ${key} reason: ${reason}` )
           standbyRemoved_App++
+          if (standbyRemoved_App >= config.p2p.standbyListMaxRemoveTTL) {
+            break
+          }
         }
       }
 
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${standbyRemved_Age}  removed list: ${record.standbyRemove} ` )
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${standbyRemoved_Age}  removed list: ${record.standbyRemove} ` )
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList(standbyList, `join.updateRecord: last-hashed ${record.counter}`)
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList( Array.from(getStandbyNodesInfoMap().values()), `join.updateRecord: standby-map ${record.counter}` )
     }
@@ -306,7 +309,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       record.joinedConsensors.push({ ...nodeInfo, cycleJoined, counterRefreshed, id })
     }
 
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `standbyRemved_Age: ${standbyRemved_Age} standbyRemoved_App: ${standbyRemoved_App}` )
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `standbyRemved_Age: ${standbyRemoved_Age} standbyRemoved_App: ${standbyRemoved_App}` )
 
     record.joinedConsensors.sort()
   } else {

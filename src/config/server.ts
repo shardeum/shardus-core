@@ -99,8 +99,9 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     useNetworkModes: true,
     useJoinProtocolV2: true,
     randomJoinRequestWait: 2000, //todo set this to 1000 before release
-    standbyListCyclesTTL: 60, //todo release should be > 1000
+    standbyListCyclesTTL: 120, //todo release should be > 1000
     standbyListMaxRemoveTTL: 100, //todo set this be 100 for production
+    standbyListMaxRemoveApp: 100, //todo set this be 100 for production
     standbyAgeScrub: true,
     standbyVersionScrub: true,
     q1DelayPercent: 0.125,

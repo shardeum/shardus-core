@@ -770,10 +770,15 @@ export interface ServerConfiguration {
      */
     standbyListCyclesTTL: number
 
-    /** This limitts the amount of nodes removed from the network in a single cycle.  This is to prevent a large number of nodes
-     * leaving all at once.  leaving is not a big deal but then they may try to sync/join again at the same time
+    /** This limitts the amount of nodes removed from the network in a single cycle due to age in the strandby list.  
+     * This is to prevent a large number of nodes leaving all at once.  leaving is not a big deal but then they may try to sync/join again at the same time
      */
     standbyListMaxRemoveTTL: number
+
+    /**This limitts the amount of nodes removed from the network in a single cycle due to app reasons (for example an app version check.
+     * This is to prevent a large number of nodes leaving all at once.  leaving is not a big deal but then they may try to sync/join again at the same time
+     */
+    standbyListMaxRemoveApp: number
 
     /** remove nodes form the standb list that have been in for too long (standbyListCyclesTTL) */
     standbyAgeScrub: boolean
