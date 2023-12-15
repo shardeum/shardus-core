@@ -50,6 +50,7 @@ import { getNetworkTimeOffset, shardusGetTime } from '../network'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { networkMode, isInternalTxAllowed } from '../p2p/Modes'
 import { lostArchiversMap } from '../p2p/LostArchivers/state'
+import getCallstack from '../utils/getCallstack'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -1397,6 +1398,26 @@ class Shardus extends EventEmitter {
       appReceiptDataHash: null,
     }
     return replyObject
+  }
+
+  async shutdownFromDapp(tag: string, message: string, restart: boolean) {
+    const exitType = restart ? 'exitCleanly' : 'exitUncleanly'
+    nestedCountersInstance.countRareEvent('fatal', `invoke-exit: ${exitType}: ${tag}`)
+    this.mainLogger.error(`invoke-exit: ${exitType}: ${tag}`)
+    this.mainLogger.error(message)
+    this.mainLogger.error(getCallstack())
+    if (this.reporter) {
+      this.reporter.stopReporting()
+      await this.reporter.reportRemoved(Self.id)
+    }
+    if (restart)
+      // exits with status 0 so that PM2 can restart the process
+      this.exitHandler.exitCleanly(
+        `invoke-exit: ${tag}`,
+        `invoke-exit: ${tag}. but exiting cleanly for a restart`
+      )
+    // exits with status 1 so that PM2 CANNOT restart the process
+    else this.exitHandler.exitUncleanly(`invoke-exit: ${tag}`, `invoke-exit: ${exitType}: ${tag}`)
   }
 
   applyResponseAddReceiptData(
