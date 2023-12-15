@@ -12,7 +12,8 @@ import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { isNodeSelectedReadyList  } from './Join/v2/syncFinished'
+import { getSortedStandbyJoinRequests } from './Join/v2'
+import { isNodeSelectedReadyList } from './Join/v2/syncFinished'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 let syncTimes = []
@@ -168,6 +169,7 @@ export function updateRecord(
   record.active = active
   record.activated = activated.sort()
   record.activatedPublicKeys = activatedPublicKeys.sort()
+  record.standby = getSortedStandbyJoinRequests().length
 
   try {
     let cycleCounter = CycleChain.newest ? CycleChain.newest.counter : 0

@@ -55,22 +55,21 @@ export function init(): void {
   })
 }
 
-function addJoinRequestToStandbyMap(joinRequest: JoinRequest): void{
+function addJoinRequestToStandbyMap(joinRequest: JoinRequest): void {
   //this is the same as before.  add the join request to the map
   standbyNodesInfo.set(joinRequest.nodeInfo.publicKey, joinRequest)
   //here we add the hash of the joinrequest to a different map
   standbyNodesInfoHashes.set(joinRequest.nodeInfo.publicKey, crypto.hash(joinRequest))
 }
 
-export function deleteStandbyNodeFromMap(key: publickey):boolean{
-  if(standbyNodesInfo.has(key)){
-    standbyNodesInfo.delete(key )
+export function deleteStandbyNodeFromMap(key: publickey): boolean {
+  if (standbyNodesInfo.has(key)) {
+    standbyNodesInfo.delete(key)
     standbyNodesInfoHashes.delete(key)
     return true
   }
   return false
 }
-
 
 /**
  * Pushes the join request onto the list of new join requests. Its node's info
@@ -147,8 +146,7 @@ export function getSortedStandbyJoinRequests(): JoinRequest[] {
 
 /** Calculates and returns a hash based on the list of standby nodes, sorted by public key. This will also update the recorded `lastHashedList` of nodes, which can be retrieved via `getLastHashedStandbyList`. */
 export function computeNewStandbyListHash(): hexstring {
-
-  if(config.p2p.standbyListFastHash){
+  if (config.p2p.standbyListFastHash) {
     //this field must be udpated as it is used by other functions
     lastHashedList = clone(getSortedStandbyJoinRequests())
     //sort hashes by value.  could sort by ID, but this is a bit faster
