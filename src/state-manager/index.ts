@@ -72,7 +72,7 @@ import {
   QueueCountsResult,
   ConfirmOrChallengeMessage,
 } from './state-manager-types'
-import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
 import { Logger as Log4jsLogger } from 'log4js'
 import { timingSafeEqual } from 'crypto'
@@ -1683,18 +1683,18 @@ class StateManager {
       res.json({ cycle, blob })
     })
 
-    Context.network.registerExternalGet('clear_tx_debug', isDebugModeMiddleware, (_req, res) => {
+    Context.network.registerExternalGet('clear_tx_debug', isDebugModeMiddlewareLow, (_req, res) => {
       this.transactionQueue.clearTxDebugStatList()
       res.json({ success: true })
     })
 
-    Context.network.registerExternalGet('print_tx_debug', isDebugModeMiddleware, (_req, res) => {
+    Context.network.registerExternalGet('print_tx_debug', isDebugModeMiddlewareLow, (_req, res) => {
       const result = this.transactionQueue.printTxDebug()
       res.write(result)
       res.end()
     })
 
-    Context.network.registerExternalGet('last_process_stats', isDebugModeMiddleware, (_req, res) => {
+    Context.network.registerExternalGet('last_process_stats', isDebugModeMiddlewareLow, (_req, res) => {
       const result = JSON.stringify(this.transactionQueue.lastProcessStats, null, 2)
       res.write(result)
       res.end()

@@ -10,6 +10,8 @@ export { CachedAppData } from './state-manager/state-manager-types'
 
 export { nestedCountersInstance } from './utils/nestedCounters'
 
+export { DevSecurityLevel } from './shardus/shardus-types'
+
 //export { JoinRequest } from './shardus/shardus-types'
 
 // Temporary private export to avoid digging into shardus source code for

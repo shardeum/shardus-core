@@ -5,7 +5,7 @@ import * as Context from '../p2p/Context'
 import { sleep } from '../utils/functions/time'
 import { humanFileSize } from '.'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import { memoryReportingInstance } from '../utils/memoryReporting'
 import { shardusGetTime, getNetworkTimeOffset } from '../network'
 
@@ -119,7 +119,7 @@ class Profiler {
       res.end()
     })
 
-    Context.network.registerExternalGet('combined-debug', isDebugModeMiddleware, async (req, res) => {
+    Context.network.registerExternalGet('combined-debug', isDebugModeMiddlewareLow, async (req, res) => {
       const waitTime = Number.parseInt(req.query.wait as string, 10) || 60
 
       // hit "counts-reset" endpoint

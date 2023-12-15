@@ -1,7 +1,7 @@
 import { hexstring, stringify } from '@shardus/crypto-utils'
 import { P2P } from '@shardus/types'
 import { Logger } from 'log4js'
-import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import { ShardusEvent } from '../shardus/shardus-types'
 import { binarySearch, insertSorted, propComparator, propComparator2 } from '../utils'
 import * as Comms from './Comms'
@@ -51,7 +51,7 @@ export function init() {
       console.log(`Error getting load: ${e.message}`)
     }
   })
-  network.registerExternalGet('age-index', isDebugModeMiddleware, (req, res) => {
+  network.registerExternalGet('age-index', isDebugModeMiddlewareLow, (req, res) => {
     try {
       return res.json(getAgeIndex())
     } catch (e) {

@@ -33,7 +33,7 @@ import {
   TrieAccount,
   CycleShardData,
 } from './state-manager-types'
-import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { isDebugModeMiddleware, isDebugModeMiddlewareLow, isDebugModeMiddlewareMedium } from '../network/debugMiddleware'
 import { appdata_replacer, errorToStringFull, Ordering } from '../utils'
 import { Response } from 'express-serve-static-core'
 import { shardusGetTime } from '../network'
@@ -571,7 +571,7 @@ class AccountPatcher {
       }
       res.end()
     })
-    Context.network.registerExternalGet('debug-patcher-dumpTree', isDebugModeMiddleware, (_req, res) => {
+    Context.network.registerExternalGet('debug-patcher-dumpTree', isDebugModeMiddlewareMedium, (_req, res) => {
       try {
         // this.statemanager_fatal('debug shardTrie',`temp shardTrie ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}`)
         // res.write(`${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}\n`)
@@ -595,7 +595,7 @@ class AccountPatcher {
 
     Context.network.registerExternalGet(
       'debug-patcher-dumpTree-partial',
-      isDebugModeMiddleware,
+      isDebugModeMiddlewareMedium,
       (req, res) => {
         try {
           const subTree: boolean = req.query.subtree === 'true' ? true : false
@@ -627,7 +627,7 @@ class AccountPatcher {
       }
     )
 
-    Context.network.registerExternalGet('debug-patcher-fail-hashes', isDebugModeMiddleware, (_req, res) => {
+    Context.network.registerExternalGet('debug-patcher-fail-hashes', isDebugModeMiddlewareLow, (_req, res) => {
       try {
         const lastCycle = this.p2p.state.getLastCycle()
         const cycle = lastCycle.counter
@@ -680,60 +680,11 @@ class AccountPatcher {
       res.end()
     })
 
-    Context.network.registerExternalGet('get-tree-last-insync', isDebugModeMiddleware, (_req, res) => {
+    Context.network.registerExternalGet('get-tree-last-insync', isDebugModeMiddlewareLow, (_req, res) => {
       res.write(`${this.failedLastTrieSync === false}\n`)
 
       res.end()
     })
-
-    //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet(
-      'get-tree-last-insync-all',
-      isDebugModeMiddleware,
-      async (req, res) => {
-        const format = req.query.format ?? 'text'
-        const resData = {
-          nodes: [],
-          totalOOS: 0,
-          inSync: false,
-        }
-        try {
-          //wow, why does Context.p2p not work..
-          let oosCount = 0
-          const activeNodes = Wrapper.p2p.state.getNodes()
-          if (activeNodes) {
-            for (const node of activeNodes.values()) {
-              const getResp = await this.logger._internalHackGetWithResp(
-                `${node.externalIp}:${node.externalPort}/get-tree-last-insync`
-              )
-              if (getResp.body && getResp.body.includes('false')) {
-                oosCount++
-              }
-              resData.nodes.push({
-                node: `${node.externalIp}:${node.externalPort}`,
-                data: `${getResp.body ? getResp.body.trim() : 'no data'}`,
-              })
-            }
-          }
-
-          resData.totalOOS = oosCount
-          resData.inSync = this.failedLastTrieSync === false
-
-          if (format === 'text') {
-            for (const node of resData.nodes) {
-              res.write(`inSync: ${node.data}  ${node.node}\n`)
-            }
-            res.write(`this node in sync:${this.failedLastTrieSync === false} totalOOS:${oosCount} \n`)
-          } else {
-            res.status(200).jsonp(resData)
-          }
-        } catch (e) {
-          res.status(500).jsonp(e)
-        }
-
-        res.end()
-      }
-    )
 
     Context.network.registerExternalGet('trie-repair-dump', isDebugModeMiddleware, (_req, res) => {
       res.write(`${utils.stringifyReduce(this.lastRepairInfo)}\n`)
@@ -743,53 +694,6 @@ class AccountPatcher {
     //
     Context.network.registerExternalGet('get-shard-dump', isDebugModeMiddleware, (_req, res) => {
       res.write(`${this.stateManager.lastShardReport}\n`)
-      res.end()
-    })
-
-    //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('get-shard-dump-all', isDebugModeMiddleware, async (_req, res) => {
-      try {
-        //wow, why does Context.p2p not work..
-        res.write(`last shard reports \n`)
-        const activeNodes = Wrapper.p2p.state.getNodes()
-        if (activeNodes) {
-          for (const node of activeNodes.values()) {
-            const getResp = await this.logger._internalHackGetWithResp(
-              `${node.externalIp}:${node.externalPort}/get-shard-dump`
-            )
-            res.write(`${node.externalIp}:${node.externalPort}; `)
-            res.write(getResp.body ? getResp.body : '')
-            res.write('\n')
-          }
-        }
-        //res.write(`this node in sync:${this.failedLastTrieSync} \n`)
-      } catch (e) {
-        res.write(`${e}\n`)
-      }
-      res.end()
-    })
-
-    Context.network.registerExternalGet('get-shard-report-all', isDebugModeMiddleware, async (_req, res) => {
-      try {
-        //wow, why does Context.p2p not work..
-        res.write(`building shard report \n`)
-        const activeNodes = Wrapper.p2p.state.getNodes()
-        const lines = []
-        if (activeNodes) {
-          for (const node of activeNodes.values()) {
-            const getResp = await this.logger._internalHackGetWithResp(
-              `${node.externalIp}:${node.externalPort}/get-shard-dump`
-            )
-            if (getResp.body != null && getResp.body != '') {
-              lines.push({ raw: getResp.body, file: { owner: `${node.externalIp}:${node.externalPort}` } })
-            }
-          }
-          this.processShardDump(res, lines)
-        }
-        //res.write(`this node in sync:${this.failedLastTrieSync} \n`)
-      } catch (e) {
-        res.write(`${e}\n`)
-      }
       res.end()
     })
 

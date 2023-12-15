@@ -16,7 +16,7 @@ import ExitHandler from '../exit-handler'
 import LoadDetection from '../load-detection'
 import Logger, { logFlags, LogFlags } from '../logger'
 import * as Network from '../network'
-import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { isDebugModeMiddleware, isDebugModeMiddlewareHigh, isDebugModeMiddlewareLow, isDebugModeMiddlewareMedium } from '../network/debugMiddleware'
 import { apoptosizeSelf, isApopMarkedNode } from '../p2p/Apoptosis'
 import * as Archivers from '../p2p/Archivers'
 import * as Context from '../p2p/Context'
@@ -2181,16 +2181,17 @@ class Shardus extends EventEmitter {
    */
   _registerRoutes() {
     // DEBUG routes
-    this.network.registerExternalPost('exit', isDebugModeMiddleware, async (req, res) => {
+    this.network.registerExternalPost('exit', isDebugModeMiddlewareHigh, async (req, res) => {
       res.json({ success: true })
       await this.shutdown()
     })
-    this.network.registerExternalPost('exit-apop', isDebugModeMiddleware, async (req, res) => {
+    // TODO elevate security beyond high when we get multi sig.  or is that too slow when needed?
+    this.network.registerExternalPost('exit-apop', isDebugModeMiddlewareHigh, async (req, res) => {
       apoptosizeSelf('Apoptosis called at exit-apop route')
       res.json({ success: true })
     })
 
-    this.network.registerExternalGet('config', isDebugModeMiddleware, async (req, res) => {
+    this.network.registerExternalGet('config', isDebugModeMiddlewareLow, async (req, res) => {
       res.json({ config: this.config })
     })
     this.network.registerExternalGet('netconfig', async (req, res) => {
@@ -2218,7 +2219,7 @@ class Shardus extends EventEmitter {
       res.json(result)
     })
 
-    this.network.registerExternalGet('joinInfo', isDebugModeMiddleware, async (req, res) => {
+    this.network.registerExternalGet('joinInfo', isDebugModeMiddlewareMedium, async (req, res) => {
       const nodeInfo = Self.getPublicNodeInfo(true)
       let result = {
         respondedWhen: new Date().toISOString(),
@@ -2239,7 +2240,7 @@ class Shardus extends EventEmitter {
       res.json(deepReplace(result, undefined, '__undefined__'))
     })
 
-    this.network.registerExternalGet('standby-list-debug', isDebugModeMiddleware, async (req, res) => {
+    this.network.registerExternalGet('standby-list-debug', isDebugModeMiddlewareLow, async (req, res) => {
       let getSortedStandbyNodeList = JoinV2.getSortedStandbyJoinRequests()
       let result = getSortedStandbyNodeList.map((node) => ({
         pubKey: node.nodeInfo.publicKey,
@@ -2249,12 +2250,12 @@ class Shardus extends EventEmitter {
       res.json(result)
     })
 
-    this.network.registerExternalGet('status-history', isDebugModeMiddleware, async (req, res) => {
+    this.network.registerExternalGet('status-history', isDebugModeMiddlewareLow, async (req, res) => {
       let result = Self.getStatusHistoryCopy()
       res.json(deepReplace(result, undefined, '__undefined__'))
     })
 
-    this.network.registerExternalGet('socketReport', isDebugModeMiddleware, async (req, res) => {
+    this.network.registerExternalGet('socketReport', isDebugModeMiddlewareLow, async (req, res) => {
       res.json(await getSocketReport())
     })
     this.network.registerExternalGet('forceCycleSync', isDebugModeMiddleware, async (req, res) => {
@@ -2479,6 +2480,15 @@ class Shardus extends EventEmitter {
 
   getDebugModeMiddleware() {
     return isDebugModeMiddleware
+  }
+  getDebugModeMiddlewareLow() {
+    return isDebugModeMiddlewareLow
+  }
+  getDebugModeMiddlewareMedium() {
+    return isDebugModeMiddlewareMedium
+  }
+  getDebugModeMiddlewareHigh() {
+    return isDebugModeMiddlewareHigh
   }
 
   shardus_fatal(key, log, log2 = null) {

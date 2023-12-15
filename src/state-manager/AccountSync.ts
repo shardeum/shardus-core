@@ -421,42 +421,6 @@ class AccountSync {
       res.end()
     })
 
-    //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('sync-statement-all', isDebugModeMiddleware, async (_req, res) => {
-      try {
-        //wow, why does Context.p2p not work..
-        const activeNodes = Wrapper.p2p.state.getNodes()
-        if (activeNodes) {
-          for (const node of activeNodes.values()) {
-            const getResp = await this.logger._internalHackGetWithResp(
-              `${node.externalIp}:${node.externalPort}/sync-statement`
-            )
-            console.log('getResp active', getResp.body)
-            res.write(`${node.externalIp}:${node.externalPort}/sync-statement\n`)
-            res.write(getResp.body ? getResp.body : 'no data')
-          }
-        }
-        res.write(`joining nodes...\n`)
-        const joiningNodes = Wrapper.p2p.state.getNodesRequestingJoin()
-        if (joiningNodes) {
-          for (const node of joiningNodes.values()) {
-            const getResp = await this.logger._internalHackGetWithResp(
-              `${node.externalIp}:${node.externalPort}/sync-statement`
-            )
-            console.log('getResp syncing', getResp.body)
-            res.write(`${node.externalIp}:${node.externalPort}/sync-statement\n`)
-            res.write(getResp.body ? getResp.body : 'no data')
-          }
-        }
-
-        res.write(`sending default logs to all nodes\n`)
-      } catch (e) {
-        res.write(`${e}\n`)
-      }
-
-      res.end()
-    })
-
     Context.network.registerExternalGet('forceFinishSync', isDebugModeMiddleware, (_req, res) => {
       res.write(`sync forcing complete. \n`)
       this.forceSyncComplete = true

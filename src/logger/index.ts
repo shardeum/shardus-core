@@ -10,7 +10,7 @@ const { stringify } = require('../utils')
 const log4jsExtend = require('log4js-extend')
 import got from 'got'
 import { parse as parseUrl } from 'url'
-import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { isDebugModeMiddleware, isDebugModeMiddlewareLow, isDebugModeMiddlewareMedium } from '../network/debugMiddleware'
 import { isDebugMode } from '../debug'
 import { shardusGetTime } from '../network'
 
@@ -354,35 +354,35 @@ class Logger {
   }
 
   registerEndpoints(Context) {
-    Context.network.registerExternalGet('log-fatal', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('log-fatal', isDebugModeMiddlewareMedium, (req, res) => {
       this.setFatalFlags()
       for (const [key, value] of Object.entries(logFlags)) {
         res.write(`${key}: ${value}\n`)
       }
       res.end()
     })
-    Context.network.registerExternalGet('log-disable', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('log-disable', isDebugModeMiddlewareMedium, (req, res) => {
       this.setDisableAllFlags()
       for (const [key, value] of Object.entries(logFlags)) {
         res.write(`${key}: ${value}\n`)
       }
       res.end()
     })
-    Context.network.registerExternalGet('log-error', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('log-error', isDebugModeMiddlewareMedium, (req, res) => {
       this.setErrorFlags()
       for (const [key, value] of Object.entries(logFlags)) {
         res.write(`${key}: ${value}\n`)
       }
       res.end()
     })
-    Context.network.registerExternalGet('log-default', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('log-default', isDebugModeMiddlewareMedium, (req, res) => {
       this.setDefaultFlags()
       for (const [key, value] of Object.entries(logFlags)) {
         res.write(`${key}: ${value}\n`)
       }
       res.end()
     })
-    Context.network.registerExternalGet('log-flag', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('log-flag', isDebugModeMiddlewareMedium, (req, res) => {
       //example of this endpont: http://localhost:9001/log-flag?name=verbose&value=true
 
       //check a query param for the flag name and value then call setFlagByName
@@ -396,75 +396,9 @@ class Logger {
       }
       res.end()
     })
-    Context.network.registerExternalGet('log-getflags', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('log-getflags', isDebugModeMiddlewareLow, (req, res) => {
       for (const [key, value] of Object.entries(logFlags)) {
         res.write(`${key}: ${value}\n`)
-      }
-      res.end()
-    })
-    // DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('log-default-all', isDebugModeMiddleware, (req, res) => {
-      if (isDebugMode() == false) {
-        res.write(`only available in debug mode\n`)
-        res.end()
-        return
-      }
-
-      this.setDefaultFlags()
-
-      try {
-        let activeNodes = Context.p2p.state.getNodes()
-        if (activeNodes) {
-          for (let node of activeNodes.values()) {
-            this._internalHackGet(`${node.externalIp}:${node.externalPort}/log-default`)
-            res.write(`${node.externalIp}:${node.externalPort}/log-default\n`)
-          }
-        }
-        res.write(`joining nodes...\n`)
-        let joiningNodes = Context.p2p.state.getNodesRequestingJoin()
-        if (joiningNodes) {
-          for (let node of joiningNodes.values()) {
-            this._internalHackGet(`${node.externalIp}:${node.externalPort}/log-default`)
-            res.write(`${node.externalIp}:${node.externalPort}/log-default\n`)
-          }
-        }
-
-        res.write(`sending default logs to all nodes\n`)
-      } catch (e) {
-        res.write(`${e}\n`)
-      }
-
-      res.end()
-    })
-
-    // DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('log-fatal-all', isDebugModeMiddleware, (req, res) => {
-      if (isDebugMode() == false) {
-        res.write(`only available in debug mode\n`)
-        res.end()
-        return
-      }
-
-      this.setFatalFlags()
-      try {
-        let activeNodes = Context.p2p.state.getNodes()
-        if (activeNodes) {
-          for (let node of activeNodes.values()) {
-            this._internalHackGet(`${node.externalIp}:${node.externalPort}/log-fatal`)
-            res.write(`${node.externalIp}:${node.externalPort}/log-fatal\n`)
-          }
-        }
-        res.write(`joining nodes...\n`)
-        let joiningNodes = Context.p2p.state.getNodesRequestingJoin()
-        if (joiningNodes) {
-          for (let node of joiningNodes.values()) {
-            this._internalHackGet(`${node.externalIp}:${node.externalPort}/log-fatal`)
-            res.write(`${node.externalIp}:${node.externalPort}/log-fatal\n`)
-          }
-        }
-        res.write(`sending fatal logs to all nodes\n`)
-      } catch (e) {
-        res.write(`${e}\n`)
       }
       res.end()
     })
