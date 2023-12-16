@@ -35,41 +35,61 @@ export const stringifyReduce = (val, isArrayProp?: boolean): string => {
         }
         return stringifyReduce(mapContainer)
       } else {
-        toStr = objToString.call(val)
-        if (toStr === '[object Array]') {
-          str = '['
-          max = val.length - 1
-          for (i = 0; i < max; i++) {
-            // eslint-disable-next-line security/detect-object-injection
-            str += stringifyReduce(val[i], true) + ','
-          }
-          if (max > -1) {
-            // eslint-disable-next-line security/detect-object-injection
-            str += stringifyReduce(val[i], true)
-          }
-          return str + ']'
-        } else if (toStr === '[object Object]') {
-          // only object is left
-          keys = objKeys(val).sort()
-          max = keys.length
-          str = ''
-          i = 0
-          while (i < max) {
-            // eslint-disable-next-line security/detect-object-injection
-            key = keys[i]
-            // eslint-disable-next-line security/detect-object-injection
-            propVal = stringifyReduce(val[key], false)
-            if (propVal !== undefined) {
-              if (str) {
-                str += ','
-              }
-              str += JSON.stringify(key) + ':' + propVal
+        if (val.hasOwnProperty('codeHash') || val.hasOwnProperty('storageRoot')) {
+          let codeHash;
+          let storageRoot
+          if(val.hasOwnProperty('codeHash')){
+            val.codeHash=Object.values(val?.codeHash).map(vnum=>{
+                 vnum = Number(vnum).toString(16).padStart(2, '0')
+                 return vnum;
+              }).join('')
+           }
+           if(val.hasOwnProperty('storageRoot')){
+            val.storageRoot=Object.values(val?.storageRoot).map(vnum=>{
+                 vnum = Number(vnum).toString(16).padStart(2, '0')
+                 return vnum;
+              }).join('')
+           }
+          
+          return val;
+        }  else {
+          toStr = objToString.call(val)
+
+          if (toStr === '[object Array]') {
+            str = '['
+            max = val.length - 1
+            for (i = 0; i < max; i++) {
+              // eslint-disable-next-line security/detect-object-injection
+              str += stringifyReduce(val[i], true) + ','
             }
-            i++
+            if (max > -1) {
+              // eslint-disable-next-line security/detect-object-injection
+              str += stringifyReduce(val[i], true)
+            }
+            return str + ']'
+          } else if (toStr === '[object Object]') {
+            // only object is left
+            keys = objKeys(val).sort()
+            max = keys.length
+            str = ''
+            i = 0
+            while (i < max) {
+              // eslint-disable-next-line security/detect-object-injection
+              key = keys[i]
+              // eslint-disable-next-line security/detect-object-injection
+              propVal = stringifyReduce(val[key], false)
+              if (propVal !== undefined) {
+                if (str) {
+                  str += ','
+                }
+                str += JSON.stringify(key) + ':' + propVal
+              }
+              i++
+            }
+            return '{' + str + '}'
+          } else {
+            return JSON.stringify(val)
           }
-          return '{' + str + '}'
-        } else {
-          return JSON.stringify(val)
         }
       }
     case 'function':
