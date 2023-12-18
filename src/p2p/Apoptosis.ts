@@ -280,6 +280,7 @@ export function parseRecord(record: P2P.ApoptosisTypes.Record): P2P.CycleParserT
     /* prettier-ignore */ if (logFlags.important_as_fatal) error(`We got marked for apoptosis even though we didn't ask for it. Being nice and leaving.`)
     Self.emitter.emit(
       'invoke-exit',
+      'node left active state due to un-refuted lost report',
       getCallstack(),
       `invoke-exit being called at parseRecord() => src/p2p/Apoptosis.ts: found our id in the apoptosis list`
     )
