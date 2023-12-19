@@ -77,6 +77,11 @@ export function selectNodes(maxAllowed: number): void {
   /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console)
   console.log('Input parameters to selectIndexesWithOffset - Max allowed:', maxAllowed, 'Offset:', offset, 'Array Size: ',objs.length);
 
+  if(maxAllowed > objs.length){
+    /* prettier-ignore */ nestedCountersInstance.countEvent('joinV2', `selectNodes: capping maxAllowed ${maxAllowed} to ${objs.length}`)
+    maxAllowed = objs.length
+  }
+
   if (offset >= 0 && maxAllowed >= 1 && maxAllowed <= objs.length) {
     const selectedIndexes = selectIndexesWithOffeset(objs.length, maxAllowed, offset)
 
