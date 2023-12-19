@@ -25,6 +25,7 @@ import { currentCycle, currentQuarter } from './CycleCreator'
 import * as NodeList from './NodeList'
 import { activeByIdOrder, byIdOrder, byPubKey, nodes } from './NodeList'
 import * as Self from './Self'
+import * as CycleChain from './CycleChain'
 import { generateUUID } from './Utils'
 import { CycleData } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
 import { shardusGetTime } from '../network'
@@ -303,6 +304,7 @@ export function getTxs(): P2P.LostTypes.Txs {
     if (seen[obj.target]) continue
     removedByAppTxs.push(obj)
     seen[obj.target] = true
+
   }
   return {
     lost: [...lostTxs],
