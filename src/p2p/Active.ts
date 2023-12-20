@@ -167,61 +167,26 @@ export function updateRecord(
 
   try {
     let cycleCounter = CycleChain.newest ? CycleChain.newest.counter : 0
-    let loopCount = 0
     let addedCount = 0
-    const maxLoopCount = 1000 // to prevent unexpected infinite loops
-    const cycles = CycleChain.cycles
-    let index = cycles.length - 1
 
-    // loop through cycle chain and collect sync times
-    while (index >= 0 && cycleCounter > lastCheckedCycleForSyncTimes && loopCount < maxLoopCount) {
-      loopCount++
-      const cycle = cycles[index]
-      if (cycle) {
-        // collect sync time from recently activated nodes
-        for (const nodeId of cycle.activated) {
-          const node = NodeList.nodes.get(nodeId)
-          const included = syncTimes.filter(
-            (item) => item.nodeId === node.id && item.activeTimestamp === node.activeTimestamp
-          )
-          if (included && included.length > 0) continue
-          const syncTime = node.activeTimestamp - node.syncingTimestamp
+    for (const node of NodeList.activeByIdOrder) {
+      if (node.id === Self.id) continue
+      const included = syncTimes.filter(
+        (item) => item.nodeId === node.id && item.activeTimestamp === node.activeTimestamp
+      )
+      if (included && included.length > 0) continue
+      const syncTime = node.activeTimestamp - node.syncingTimestamp
 
-          syncTimes.push({
-            nodeId: node.id,
-            activeTimestamp: node.activeTimestamp,
-            syncStartTimestamp: node.syncingTimestamp,
-            syncTime,
-            refreshedCounter: cycle.counter,
-          })
-          addedCount += 1
-        }
-
-        // todo deprecate no refreshedConsensors post join v2 sync v2
-        // collect sync time from refreshed active nodes
-        for (const node of cycle.refreshedConsensors) {
-          const included = syncTimes.filter(
-            (item) => item.nodeId === node.id && item.activeTimestamp === node.activeTimestamp
-          )
-          if (included && included.length > 0) continue
-          const syncTime = node.activeTimestamp - node.joinRequestTimestamp
-
-          syncTimes.push({
-            nodeId: node.id,
-            activeTimestamp: node.activeTimestamp,
-            syncStartTimestamp: node.joinRequestTimestamp,
-            syncTime,
-            refreshedCounter: cycle.counter,
-          })
-          addedCount += 1
-        }
-      } else {
-        //update 2023/10/23 this loop has been fixed. so if we see this error again it is a new problem
-        /* prettier-ignore */ if (logFlags.error) error(`Found no cycle for counter ${cycleCounter}`)
-      }
-      cycleCounter--
-      index--
+      syncTimes.push({
+        nodeId: node.id,
+        activeTimestamp: node.activeTimestamp,
+        syncStartTimestamp: node.syncingTimestamp,
+        syncTime,
+        refreshedCounter: cycleCounter,
+      })
+      addedCount += 1
     }
+
     if (addedCount > 0) {
       syncTimes = syncTimes.sort((a, b) => b.activeTimestamp - a.activeTimestamp)
       if (syncTimes.length > config.p2p.maxNodeForSyncTime) {
@@ -279,7 +244,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 }
 
 export function sendRequests() {
-  if (queuedRequest) {
+  if (queuedRequest && !neverGoActive) {
     const activeTx = crypto.sign(queuedRequest)
     queuedRequest = undefined
 
