@@ -17,11 +17,16 @@ import ExitHandler from '../exit-handler'
 import LoadDetection from '../load-detection'
 import Logger, { logFlags, LogFlags } from '../logger'
 import * as Network from '../network'
-import { isDebugModeMiddleware, isDebugModeMiddlewareHigh, isDebugModeMiddlewareLow, isDebugModeMiddlewareMedium } from '../network/debugMiddleware'
+import {
+  isDebugModeMiddleware,
+  isDebugModeMiddlewareHigh,
+  isDebugModeMiddlewareLow,
+  isDebugModeMiddlewareMedium,
+} from '../network/debugMiddleware'
 import { apoptosizeSelf, isApopMarkedNode } from '../p2p/Apoptosis'
 import * as Archivers from '../p2p/Archivers'
 import * as Context from '../p2p/Context'
-import { config } from '../p2p/Context'
+import { config, stateManager } from '../p2p/Context'
 import * as AutoScaling from '../p2p/CycleAutoScale'
 import * as CycleChain from '../p2p/CycleChain'
 import * as CycleCreator from '../p2p/CycleCreator'
@@ -38,7 +43,7 @@ import * as ShardusTypes from '../shardus/shardus-types'
 import { WrappedData, DevSecurityLevel } from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
-import { CachedAppData, QueueCountsResult } from '../state-manager/state-manager-types'
+import { ArchiverReceipt, CachedAppData, QueueCountsResult } from '../state-manager/state-manager-types'
 import { DebugComplete } from '../state-manager/TransactionQueue'
 import Statistics from '../statistics'
 import Storage from '../storage'
@@ -2366,6 +2371,37 @@ class Shardus extends EventEmitter {
       let enable = req.query.enable === 'true' || false
       config.p2p.hackForceCycleSyncComplete = enable
       res.json(await getSocketReport())
+    })
+
+    this.network.registerExternalGet('get-tx-receipt', async (req, res) => {
+      try {
+        const { txId, full_receipt } = req.query
+        if (stateManager.transactionQueue.archivedQueueEntriesByID.has(txId as string)) {
+          const queueEntry = stateManager.transactionQueue.archivedQueueEntriesByID.get(txId as string)
+          const fullReceipt: ArchiverReceipt =
+            stateManager.transactionQueue.getArchiverReceiptFromQueueEntry(queueEntry)
+          if (full_receipt === 'true') {
+            for (const account of fullReceipt.accounts as any) {
+              // converting BN to string (to avoid stringify issues)
+              account.data.account.nonce = account.data.account.nonce.toString()
+              account.data.account.balance = account.data.account.balance.toString()
+            }
+            // converting BN to string (to avoid stringify issues)
+            ;(fullReceipt.appReceiptData as any).data.receipt.cumulativeBlockGasUsed = (
+              fullReceipt.appReceiptData as any
+            ).data.receipt.cumulativeBlockGasUsed.toString()
+            res.json({ success: true, receipt: fullReceipt })
+          } else {
+            // returning appliedReceipt (AppliedReceipt2) from the fullReceipt (ArchiverReceipt)
+            res.json({ success: true, receipt: stateManager.getReceipt2(queueEntry) })
+          }
+        } else {
+          res.json({ success: false, reason: 'Receipt Not Found.' })
+        }
+      } catch (e) {
+        console.log('Error caught in /get-tx-receipt: ', e)
+        res.json({ success: false, error: e })
+      }
     })
 
     this.p2p.registerInternal(
