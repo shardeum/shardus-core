@@ -43,7 +43,12 @@ import * as ShardusTypes from '../shardus/shardus-types'
 import { WrappedData, DevSecurityLevel } from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
-import { ArchiverReceipt, CachedAppData, QueueCountsResult } from '../state-manager/state-manager-types'
+import {
+  ArchiverReceipt,
+  AppliedReceipt2,
+  CachedAppData,
+  QueueCountsResult,
+} from '../state-manager/state-manager-types'
 import { DebugComplete } from '../state-manager/TransactionQueue'
 import Statistics from '../statistics'
 import Storage from '../storage'
@@ -2374,33 +2379,26 @@ class Shardus extends EventEmitter {
     })
 
     this.network.registerExternalGet('get-tx-receipt', async (req, res) => {
+      let result: { success: boolean; receipt?: ArchiverReceipt | AppliedReceipt2; reason?: string }
       try {
         const { txId, full_receipt } = req.query
         if (stateManager.transactionQueue.archivedQueueEntriesByID.has(txId as string)) {
           const queueEntry = stateManager.transactionQueue.archivedQueueEntriesByID.get(txId as string)
-          const fullReceipt: ArchiverReceipt =
-            stateManager.transactionQueue.getArchiverReceiptFromQueueEntry(queueEntry)
           if (full_receipt === 'true') {
-            for (const account of fullReceipt.accounts as any) {
-              // converting BN to string (to avoid stringify issues)
-              account.data.account.nonce = account.data.account.nonce.toString()
-              account.data.account.balance = account.data.account.balance.toString()
-            }
-            // converting BN to string (to avoid stringify issues)
-            ;(fullReceipt.appReceiptData as any).data.receipt.cumulativeBlockGasUsed = (
-              fullReceipt.appReceiptData as any
-            ).data.receipt.cumulativeBlockGasUsed.toString()
-            res.json({ success: true, receipt: fullReceipt })
+            const fullReceipt: ArchiverReceipt =
+              stateManager.transactionQueue.getArchiverReceiptFromQueueEntry(queueEntry)
+            result = { success: true, receipt: fullReceipt }
           } else {
             // returning appliedReceipt (AppliedReceipt2) from the fullReceipt (ArchiverReceipt)
-            res.json({ success: true, receipt: stateManager.getReceipt2(queueEntry) })
+            result = { success: true, receipt: stateManager.getReceipt2(queueEntry) }
           }
         } else {
-          res.json({ success: false, reason: 'Receipt Not Found.' })
+          result = { success: false, reason: 'Receipt Not Found.' }
         }
+        res.json(this.signAsNode(result))
       } catch (e) {
         console.log('Error caught in /get-tx-receipt: ', e)
-        res.json({ success: false, error: e })
+        res.json(this.signAsNode({ success: false, error: e }))
       }
     })
 
