@@ -20,8 +20,9 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import { isApopMarkedNode, nodeDownString } from './Apoptosis'
 import * as Comms from './Comms'
-import { config, crypto, logger, network, shardus } from "./Context";
+import { config, p2p, crypto, logger, network, stateManager } from './Context'
 import { currentCycle, currentQuarter } from './CycleCreator'
+import { cycles } from './CycleChain'
 import * as NodeList from './NodeList'
 import { activeByIdOrder, byIdOrder, byPubKey, nodes } from './NodeList'
 import * as Self from './Self'
@@ -30,7 +31,8 @@ import { CycleData } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
 import { shardusGetTime } from '../network'
 import { ApoptosisProposalResp, deserializeApoptosisProposalResp } from '../types/ApoptosisProposalResp'
 import { ApoptosisProposalReq, serializeApoptosisProposalReq } from '../types/ApoptosisProposalReq'
-import { ShardusEvent } from '../shardus/shardus-types'
+import { ShardusEvent, Node } from '../shardus/shardus-types'
+import { HashTrieReq, ProxyRequest, ProxyResponse } from '../state-manager/state-manager-types'
 
 /** TYPES */
 
@@ -58,6 +60,7 @@ type ScheduledRemoveNodeByApp = ScheduledRemoveByApp<P2P.NodeListTypes.Node>
 const allowKillRoute = true
 
 let p2pLogger
+let useProxyForDownCheck = true
 
 let lostReported = new Map<string, P2P.LostTypes.LostReport>()
 let receivedLostRecordMap = new Map<string, Map<string, P2P.LostTypes.LostRecord>>()
@@ -216,6 +219,41 @@ export function init() {
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
   }
+  p2p.registerInternal(
+    'proxy',
+    async (
+      payload: ProxyRequest,
+      respond: (arg0: ProxyResponse) => Promise<number>,
+      _sender: string,
+      _tracker: string,
+      msgSize: number
+    ) => {
+      profilerInstance.scopedProfileSectionStart('proxy')
+      let proxyRes: ProxyResponse = {
+        success: false,
+        response: null,
+      }
+      try {
+        let targetNode = nodes.get(payload.nodeId)
+        if (targetNode == null) {
+          error(`proxy handler targetNode is null`)
+          await respond(proxyRes)
+          return
+        }
+        let res = await Comms.ask(targetNode, payload.route, payload.message)
+        proxyRes = {
+          success: true,
+          response: res,
+        }
+        await respond(proxyRes)
+      } catch (e) {
+        error(`proxy handler error: ${e.message}`)
+        await respond(proxyRes)
+      } finally {
+        profilerInstance.scopedProfileSectionEnd('proxy')
+      }
+    }
+  )
 }
 
 // This gets called before start of Q1
@@ -269,7 +307,7 @@ export function getTxs(): P2P.LostTypes.Txs {
 
   // get winning item for each target from the array of lost records
   let seen = {} // used to make sure we don't add the same node twice
-  for (const [checker, lostRecordItems] of receivedLostRecordMap) {
+  for (const [key, lostRecordItems] of receivedLostRecordMap) {
     if (lostRecordItems == null || lostRecordItems.size === 0) continue
     let downMsgCount = 0
     let downRecord: P2P.LostTypes.LostRecord
@@ -509,7 +547,12 @@ export function sendRequests() {
       msg = crypto.sign(msg)
       record.message = msg
       record.gossiped = true
-      info(`Gossiping node down message: ${JSON.stringify(msg)}`)
+      if (logFlags.verbose)
+        info(
+          `Gossiping node down message for node: ${record.target} payload.cycle ${
+            record.cycle
+          }: ${JSON.stringify(msg)}`
+        )
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'send-lost-down', 1)
       //this next line is probably too spammy to leave in forever (but ok to comment out and keep)
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `send-lost-down c:${currentCycle}`, 1)
@@ -630,7 +673,7 @@ function reportLost(target, reason: string, requestId: string) {
     if (allowKillRoute && reason === 'killother') report.killother = true
     /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, reporter: ${Self.ip}:${Self.port} id: ${Self.id}`)
     /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, checker: ${checker.internalIp}:${checker.internalPort} node details: ${logNode(checker)}`)
-    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, target: ${target.internalIp}:${target.internalPort} node details: ${logNode(target)}`)
+    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, target: ${target.internalIp}:${target.internalPort} cycle: ${report.cycle} node details: ${logNode(target)}`)
     /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${JSON.stringify(report)}`)
 
     const msgCopy = JSON.parse(shardusCrypto.stringify(report))
@@ -757,7 +800,10 @@ async function lostReportHandler(payload, response, sender) {
     /* prettier-ignore */ info(`isDownCache for requestId: ${requestId}, result ${result}`)
     if (allowKillRoute && payload.killother) result = 'down'
     if (record.status === 'checking') record.status = result
-    info('Status after checking is ' + record.status)
+    info(
+      `Status after checking for node ${payload.target} payload cycle: ${payload.cycle}, currentCycle: ${currentCycle} is ` +
+        record.status
+    )
     if (!checkedLostRecordMap.has(key)) {
       checkedLostRecordMap.set(key, record)
     }
@@ -938,33 +984,71 @@ function pruneStopReporting() {
 async function isDownCheck(node) {
   // Check the internal route
   // The timeout for this is controled by the network.timeout paramater in server.json
-  info(`Checking internal connection for ${node.id}`)
+  info(`Checking internal connection for ${node.id}, cycle: ${currentCycle}`)
 
   try {
-    //using the 'apoptosize' route to check if the node is up.
-    const res = await Comms.ask2<ApoptosisProposalReq, ApoptosisProposalResp>(
-      node,
-      'apoptosize',
-      {
-        id: 'isDownCheck',
-        when: 1,
-      },
-      serializeApoptosisProposalReq,
-      deserializeApoptosisProposalResp,
-      {}
-    )
-    if (res == null) {
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-0', 1)
-      return 'down'
-    }
-    if (typeof res.s !== 'string') {
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-1', 1)
-      return 'down'
-    }
-    //adding this check so that a node can repond that is is down. aka, realizes it is not funcitonal and wants to be removed from the network
-    if (res.s === nodeDownString) {
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-self-reported-zombie', 1)
-      return 'down'
+    if (useProxyForDownCheck) {
+      //using the 'apoptosize' route to check if the node is up.
+      let obj = { counter: currentCycle, checker: Self.id, target: node.id, timestamp: shardusGetTime() }
+      let hash = crypto.hash(obj)
+      let closestNodes = stateManager.getClosestNodes(hash, 5, true)
+      let proxyNode: P2P.NodeListTypes.Node
+      for (let closetNode of closestNodes) {
+        if (closetNode.id !== node.id) {
+          proxyNode = closetNode
+          break
+        }
+      }
+      if (proxyNode == null) {
+        throw new Error(`isDownCheck unable to get proxy node to check the target node`)
+      }
+      let hashTrieReq: HashTrieReq = {
+        radixList: ['0'],
+      }
+
+      let proxyRequest: ProxyRequest = {
+        nodeId: node.id,
+        route: 'get_trie_hashes',
+        message: hashTrieReq,
+      }
+      const res = await Comms.ask(proxyNode, 'proxy', proxyRequest, true, '', 3000)
+      if (logFlags.verbose)
+        info(`lost check result for node ${node.id} cycle ${currentCycle} is ${utils.stringifyReduce(res)}`)
+      if (res == null || res.success === false || res.response == null || res.response.isResponse == null) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-proxy-fail', 1)
+        return 'down'
+      }
+      let nodeHashes = res.response.nodeHashes
+      if (nodeHashes == null || nodeHashes.length === 0) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-via-proxy-empty-hashes', 1)
+        return 'down'
+      }
+    } else {
+      //using the 'apoptosize' route to check if the node is up.
+      const res = await Comms.ask2<ApoptosisProposalReq, ApoptosisProposalResp>(
+        node,
+        'apoptosize',
+        {
+          id: 'isDownCheck',
+          when: 1,
+        },
+        serializeApoptosisProposalReq,
+        deserializeApoptosisProposalResp,
+        {}
+      )
+      if (res == null) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-0', 1)
+        return 'down'
+      }
+      if (typeof res.s !== 'string') {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-1', 1)
+        return 'down'
+      }
+      //adding this check so that a node can repond that is is down. aka, realizes it is not funcitonal and wants to be removed from the network
+      if (res.s === nodeDownString) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-self-reported-zombie', 1)
+        return 'down'
+      }
     }
   } catch (e) {
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-2', 1)
@@ -1050,12 +1134,23 @@ function downGossipHandler(payload: P2P.LostTypes.SignedDownGossipMessage, sende
     checker: payload.report.checker,
     reporter: payload.report.reporter,
   }
+  if (receivedLostRecordMap.has(key) && receivedLostRecordMap.get(key).has(payload.report.checker)) {
+    if (logFlags.verbose)
+      info(`downGossip already seen and processed. report ${JSON.stringify(payload.report)}`)
+    return
+  }
   if (receivedLostRecordMap.has(key)) {
     receivedLostRecordMap.get(key).set(payload.report.checker, receivedRecord)
   } else {
     receivedLostRecordMap.set(key, new Map())
     receivedLostRecordMap.get(key).set(payload.report.checker, receivedRecord)
   }
+  if (logFlags.verbose)
+    info(
+      `downGossip for target ${payload.report.target} at cycle ${
+        payload.report.cycle
+      } is processed. Total received: ${receivedLostRecordMap.get(key).size}`
+    )
   Comms.sendGossip('lost-down', payload, tracker, Self.id, byIdOrder, false)
   // After message has been gossiped in Q1 and Q2 we wait for getTxs() to be invoked in Q3
 }

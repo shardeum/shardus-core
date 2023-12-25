@@ -11,6 +11,7 @@ import StateManager from '.'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as NodeList from '../p2p/NodeList'
 import * as Context from '../p2p/Context'
+import * as Self from '../p2p/Self'
 import * as Wrapper from '../p2p/Wrapper'
 import {
   AccountHashCache,
@@ -225,30 +226,36 @@ class AccountPatcher {
         profilerInstance.scopedProfileSectionStart('get_trie_hashes', false, msgSize)
         const result = { nodeHashes: [] } as HashTrieResp
         let responseCount = 0
-        for (const radix of payload.radixList) {
-          const level = radix.length
-          const layerMap = this.shardTrie.layerMaps[level] // eslint-disable-line security/detect-object-injection
-          if (layerMap == null) {
-            /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_hashes badrange:${level}`)
-            break
-          }
+        let respondSize
 
-          const hashTrieNode = layerMap.get(radix)
-          if (hashTrieNode != null) {
-            for (const childTreeNode of hashTrieNode.children) {
-              if (childTreeNode != null) {
-                result.nodeHashes.push({ radix: childTreeNode.radix, hash: childTreeNode.hash })
-                responseCount++
+        if (Self.isFailed) {
+          respondSize = await respond(result)
+        } else {
+          for (const radix of payload.radixList) {
+            const level = radix.length
+            const layerMap = this.shardTrie.layerMaps[level] // eslint-disable-line security/detect-object-injection
+            if (layerMap == null) {
+              /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_hashes badrange:${level}`)
+              break
+            }
+
+            const hashTrieNode = layerMap.get(radix)
+            if (hashTrieNode != null) {
+              for (const childTreeNode of hashTrieNode.children) {
+                if (childTreeNode != null) {
+                  result.nodeHashes.push({ radix: childTreeNode.radix, hash: childTreeNode.hash })
+                  responseCount++
+                }
               }
             }
           }
+
+          /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_hashes c:${this.stateManager.currentCycleShardData.cycleNumber}`, responseCount)
+
+          // todo could recored a split time here.. so we know time spend on handling the request vs sending the response?
+          // that would not be completely accurate because the time to get the data is outide of this handler...
+          respondSize = await respond(result)
         }
-
-        /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_hashes c:${this.stateManager.currentCycleShardData.cycleNumber}`, responseCount)
-
-        // todo could recored a split time here.. so we know time spend on handling the request vs sending the response?
-        // that would not be completely accurate because the time to get the data is outide of this handler...
-        const respondSize = await respond(result)
         profilerInstance.scopedProfileSectionEnd('get_trie_hashes', respondSize)
       }
     )

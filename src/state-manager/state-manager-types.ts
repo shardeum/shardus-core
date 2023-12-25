@@ -1077,6 +1077,17 @@ export type HashTrieResp = {
   nodeHashes: RadixAndHash[] //{radix:string, hash:string}[]
 }
 
+export type ProxyRequest = {
+  nodeId: string
+  route: string
+  message: any
+}
+
+export type ProxyResponse = {
+  success: boolean
+  response: any
+}
+
 export type RadixAndHash = {
   radix: string
   hash: string
