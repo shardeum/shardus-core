@@ -55,7 +55,7 @@ let networkCheckInProgress = false
 export let connectedSockets = {}
 let lastSentCycle = -1
 let lastTimeForwardedArchivers = []
-export const RECEIPT_FORWARD_INTERVAL_MS = 10000
+export const RECEIPT_FORWARD_INTERVAL_MS = 5000
 
 export enum DataRequestTypes {
   SUBSCRIBE = 'SUBSCRIBE',
@@ -513,7 +513,7 @@ async function forwardReceipts() {
   profilerInstance.scopedProfileSectionStart('forwardReceipts')
 
   let pingNeeded = true
-  // Ping the archivers if the last ping/forward receipts was more than 5 seconds ago
+  // Ping the archivers if the last ping/forward receipts was 5 seconds ago
   const LEAST_LAST_PING_TIME_MS = 5000
   if (
     config.p2p.instantForwardReceipts &&
@@ -524,17 +524,7 @@ async function forwardReceipts() {
 
   // TODO: add a new type for receipt
   const responses: any = {}
-  if (config.p2p.instantForwardReceipts)
-    responses.RECEIPT = [] // It's just to ping the archivers with empty receipts
-  else responses.RECEIPT = stateManager.transactionQueue.getReceiptsToForward()
-  if (recipients.size > 0) {
-    for (const receipt of responses.RECEIPT) {
-      // console.log('forwarded receipt', receipt.tx.txId)
-      if (!stateManager.transactionQueue.forwardedReceipts.has(receipt.tx.txId)) {
-        stateManager.transactionQueue.forwardedReceipts.set(receipt.tx.txId, true)
-      }
-    }
-  }
+  responses.RECEIPT = [] // It's just to ping the archivers with empty receipts
   const newArchiversToForward = []
   const stillConnectedArchivers = []
   for (const [publicKey, recipient] of recipients) {
@@ -550,7 +540,21 @@ async function forwardReceipts() {
   }
 
   if (config.p2p.instantForwardReceipts) {
-    if (newArchiversToForward.length > 0) {
+    const receiptsStorageUpdate = true
+    if (newArchiversToForward.length > 0 && receiptsStorageUpdate) {
+      const receipts = stateManager.transactionQueue.getReceiptsToForward()
+      if (receipts && receipts.length > 0) {
+        responses.RECEIPT = receipts
+        if (logFlags.console) console.log('newArchiversToForward', newArchiversToForward)
+        for (let publicKey of newArchiversToForward) {
+          if (logFlags.console)
+            console.log('Sending last 15s receipts to newly subscribed archivers', publicKey)
+          const recipient = recipients.get(publicKey)
+          if (!recipient) continue
+          forwardDataToSubscribedArchivers(responses, publicKey, recipient)
+        }
+      }
+    } else if (newArchiversToForward.length > 0 && !receiptsStorageUpdate) {
       if (logFlags.console) console.log('newArchiversToForward', newArchiversToForward)
       // Send last 30s, 20s, 10s and fresh receipts to new subscribed archivers
       const _30SECS__DATA = stateManager.transactionQueue.receiptsBundleByInterval.get(

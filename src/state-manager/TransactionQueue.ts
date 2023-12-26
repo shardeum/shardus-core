@@ -78,12 +78,10 @@ class TransactionQueue {
   _transactionQueueByID: Map<string, QueueEntry> //old name: newAcceptedTxQueueByID
   pendingTransactionQueueByID: Map<string, QueueEntry> //old name: newAcceptedTxQueueTempInjestByID
   archivedQueueEntriesByID: Map<string, QueueEntry>
-  receiptsToForward: Receipt[]
-  forwardedReceipts: Map<string, boolean>
-  oldNotForwardedReceipts: Map<string, boolean>
-  receiptsBundleByInterval: Map<number, Receipt[]>
+  receiptsToForward: ArchiverReceipt[]
+  forwardedReceiptsByTimestamp: Map<number, ArchiverReceipt>
+  receiptsBundleByInterval: Map<number, ArchiverReceipt[]>
   receiptsForwardedTimestamp: number
-  lastReceiptForwardResetTimestamp: number
 
   queueStopped: boolean
   queueEntryCounter: number
@@ -169,9 +167,7 @@ class TransactionQueue {
     this.archivedQueueEntries = []
     this.txDebugStatList = []
     this.receiptsToForward = []
-    this.forwardedReceipts = new Map()
-    this.oldNotForwardedReceipts = new Map()
-    this.lastReceiptForwardResetTimestamp = shardusGetTime()
+    this.forwardedReceiptsByTimestamp = new Map()
     this.receiptsBundleByInterval = new Map()
     this.receiptsForwardedTimestamp = shardusGetTime()
 
@@ -5112,7 +5108,7 @@ class TransactionQueue {
     }
   }
 
-  addReceiptToForward(queueEntry: QueueEntry): void {
+  getArchiverReceiptFromQueueEntry(queueEntry: QueueEntry): ArchiverReceipt {
     // const netId = '123abc'
     // const receipt = this.stateManager.getReceipt(queueEntry)
     // const status = receipt.result === true ? 'applied' : 'rejected'
@@ -5122,10 +5118,10 @@ class TransactionQueue {
     // const obj = { tx: queueEntry.acceptedTx.data, status, netId }
     // const txResultFullHash = this.crypto.hash(obj)
     // const txIdShort = utils.short(txHash)
-    // const txResult = utils.short(txResultFullHash)x
+    // const txResult = utils.short(txResultFullHash)
 
-    const accountsToAdd = {} as Shardus.AccountsCopy
-    const beforeAccountsToAdd = {} as Shardus.AccountsCopy
+    const accountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
+    const beforeAccountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
 
     if (this.config.stateManager.includeBeforeStatesInReceipts) {
       for (const account of Object.values(queueEntry.collectedData)) {
@@ -5137,10 +5133,10 @@ class TransactionQueue {
           const accountCopy = {
             accountId: account.accountId,
             data: account.data,
+            hash: account.stateId,
             timestamp: account.timestamp,
-            stateId: account.stateId,
             isGlobal,
-          }
+          } as Shardus.AccountsCopy
           beforeAccountsToAdd[account.accountId] = accountCopy
         }
       }
@@ -5153,77 +5149,56 @@ class TransactionQueue {
     ) {
       for (const account of queueEntry.preApplyTXResult.applyResponse.accountWrites) {
         const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(account.accountId)
-        accountsToAdd[account.accountId] = {
+        const accountCopy = {
           accountId: account.accountId,
           data: account.data.data,
           timestamp: account.timestamp,
-          stateId: account.data.stateId,
+          hash: account.data.stateId,
           isGlobal,
-        }
+        } as Shardus.AccountsCopy
+        accountsToAdd[account.accountId] = accountCopy
       }
     }
 
-    const txReceiptToPass: ArchiverReceipt = {
+    const archiverReceipt: ArchiverReceipt = {
       tx: {
         originalTxData: queueEntry.acceptedTx.data,
         txId: queueEntry.acceptedTx.txId,
         timestamp: queueEntry.acceptedTx.timestamp,
       },
-      cycle: queueEntry.cycleToRecordOn,
+      cycle: queueEntry.txGroupCycle, // Updated to use txGroupCycle instead of cycleToRecordOn because when the receipt is arrived at the archiver, the cycleToRecordOn cycle might not exist yet.
       beforeStateAccounts: [...Object.values(beforeAccountsToAdd)],
       accounts: [...Object.values(accountsToAdd)],
       appReceiptData: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
-      appliedReceipt: queueEntry.appliedReceiptFinal2,
+      appliedReceipt: this.stateManager.getReceipt2(queueEntry),
       executionShardKey: queueEntry.executionShardKey,
     }
-    // console.log('acceptedTx', queueEntry.acceptedTx)
-    // console.log('txReceiptToPass', txReceiptToPass.tx.txId, txReceiptToPass)
-
-    // console.log('App Receipt', queueEntry.preApplyTXResult.applyResponse.appReceiptData)
-    // console.log('App Receipt Data Hash', queueEntry.preApplyTXResult.applyResponse.appReceiptDataHash)
-
-    const signedTxReceiptToPass: any = this.crypto.sign(txReceiptToPass)
-
-    if (this.config.p2p.instantForwardReceipts) {
-      Archivers.instantForwardReceipts([signedTxReceiptToPass])
-      this.receiptsForwardedTimestamp = shardusGetTime()
-    }
-    this.receiptsToForward.push(signedTxReceiptToPass)
+    return archiverReceipt
   }
 
-  getReceiptsToForward(): Receipt[] {
-    const freshReceipts = []
-    for (const receipt of this.receiptsToForward) {
-      if (!this.forwardedReceipts.has(receipt.tx.txId)) {
-        freshReceipts.push(receipt)
-      }
-    }
-    return freshReceipts
+  addReceiptToForward(queueEntry: QueueEntry): void {
+    const archiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
+    Archivers.instantForwardReceipts([archiverReceipt])
+    this.receiptsForwardedTimestamp = shardusGetTime()
+    this.forwardedReceiptsByTimestamp.set(this.receiptsForwardedTimestamp, archiverReceipt)
+    // this.receiptsToForward.push(archiverReceipt)
+  }
+
+  getReceiptsToForward(): ArchiverReceipt[] {
+    return [...this.forwardedReceiptsByTimestamp.values()]
   }
 
   resetReceiptsToForward(): void {
-    const RECEIPT_CLEANUP_INTERVAL_MS = 30000 // 30 seconds
-    if (
-      !this.config.p2p.instantForwardReceipts &&
-      shardusGetTime() - this.lastReceiptForwardResetTimestamp >= RECEIPT_CLEANUP_INTERVAL_MS
-    ) {
-      const lastReceiptsToForward = [...this.receiptsToForward]
-      this.receiptsToForward = []
-      for (const receipt of lastReceiptsToForward) {
-        // Start sending from the last receipts it saved (30s of data) when a new node is selected
-        if (
-          !this.forwardedReceipts.has(receipt.tx.txId) &&
-          !this.oldNotForwardedReceipts.has(receipt.tx.txId)
-        ) {
-          this.receiptsToForward.push(receipt)
+    const receiptsStorageUpdate = true
+    if (receiptsStorageUpdate) {
+      const MAX_RECEIPT_AGE_MS = 15000
+      const now = shardusGetTime()
+      // Clear receipts that are older than MAX_RECEIPT_AGE_MS
+      for (const [key] of this.forwardedReceiptsByTimestamp) {
+        if (now - key > MAX_RECEIPT_AGE_MS) {
+          this.forwardedReceiptsByTimestamp.delete(key)
         }
       }
-      this.forwardedReceipts = new Map()
-      this.oldNotForwardedReceipts = new Map()
-      for (const receipt of this.receiptsToForward) {
-        this.oldNotForwardedReceipts.set(receipt.tx.txId, true)
-      }
-      this.lastReceiptForwardResetTimestamp = shardusGetTime()
     } else if (this.config.p2p.instantForwardReceipts) {
       const lastReceiptsToForward = [...this.receiptsToForward]
       this.receiptsToForward = []
@@ -5241,7 +5216,6 @@ class TransactionQueue {
         lastReceiptsToForward
       )
       if (logFlags.console) console.log('receiptsBundleByInterval', this.receiptsBundleByInterval)
-      this.lastReceiptForwardResetTimestamp = shardusGetTime()
     }
   }
 

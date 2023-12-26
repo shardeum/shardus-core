@@ -700,7 +700,11 @@ export type ConfirmOrChallengeQueryResponse = {
  * ArchiverReceipt is the full data (shardusReceipt + appReceiptData + accounts ) of a tx that is sent to the archiver
  */
 export interface ArchiverReceipt {
-  tx: Shardus.AcceptedTx['data']
+  tx: {
+    originalTxData: Shardus.OpaqueTransaction
+    txId: string
+    timestamp: number
+  }
   cycle: number
   beforeStateAccounts: Shardus.AccountsCopy[]
   accounts: Shardus.AccountsCopy[]
