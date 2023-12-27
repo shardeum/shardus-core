@@ -2378,30 +2378,6 @@ class Shardus extends EventEmitter {
       res.json(await getSocketReport())
     })
 
-    this.network.registerExternalGet('get-tx-receipt', async (req, res) => {
-      let result: { success: boolean; receipt?: ArchiverReceipt | AppliedReceipt2; reason?: string }
-      try {
-        const { txId, full_receipt } = req.query
-        if (stateManager.transactionQueue.archivedQueueEntriesByID.has(txId as string)) {
-          const queueEntry = stateManager.transactionQueue.archivedQueueEntriesByID.get(txId as string)
-          if (full_receipt === 'true') {
-            const fullReceipt: ArchiverReceipt =
-              stateManager.transactionQueue.getArchiverReceiptFromQueueEntry(queueEntry)
-            result = { success: true, receipt: fullReceipt }
-          } else {
-            // returning appliedReceipt (AppliedReceipt2) from the fullReceipt (ArchiverReceipt)
-            result = { success: true, receipt: stateManager.getReceipt2(queueEntry) }
-          }
-        } else {
-          result = { success: false, reason: 'Receipt Not Found.' }
-        }
-        res.json(this.signAsNode(result))
-      } catch (e) {
-        console.log('Error caught in /get-tx-receipt: ', e)
-        res.json(this.signAsNode({ success: false, error: e }))
-      }
-    })
-
     this.p2p.registerInternal(
       'sign-app-data',
       async (

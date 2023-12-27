@@ -4,7 +4,7 @@ import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import * as Apoptosis from '../p2p/Apoptosis'
 import * as Archivers from '../p2p/Archivers'
-import { P2PModuleContext as P2P } from '../p2p/Context'
+import { P2PModuleContext as P2P, network as networkContext } from '../p2p/Context'
 import * as CycleChain from '../p2p/CycleChain'
 import { potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
@@ -18,6 +18,7 @@ import {
   AcceptedTx,
   AccountFilter,
   AppliedReceipt,
+  AppliedReceipt2,
   CommitConsensedTransactionResult,
   PreApplyAcceptedTransactionResult,
   ProcessQueueStats,
@@ -410,6 +411,50 @@ class TransactionQueue {
         }
       }
     )
+
+    networkContext.registerExternalPost('get-tx-receipt', async (req, res) => {
+      let result: { success: boolean; receipt?: ArchiverReceipt | AppliedReceipt2; reason?: string }
+      try {
+        const error = utils.validateTypes(req.body, {
+          txId: 's',
+          full_receipt: 's',
+          sign: 'o',
+        })
+        if (error) res.json({ success: false, error })
+
+        const { txId, full_receipt } = req.body
+        const isReqFromArchiver = Archivers.archivers.has(req.body.sign.owner)
+        if (!isReqFromArchiver) {
+          result = { success: false, reason: 'Request not from Archiver.' }
+        } else {
+          const isValidSignature = this.crypto.verify(req.body, req.body.sign.owner)
+          if (isValidSignature) {
+            if (this.stateManager.transactionQueue.archivedQueueEntriesByID.has(txId as string)) {
+              const queueEntry = this.stateManager.transactionQueue.archivedQueueEntriesByID.get(
+                txId as string
+              )
+              if (full_receipt === 'true') {
+                const fullReceipt: ArchiverReceipt =
+                  this.stateManager.transactionQueue.getArchiverReceiptFromQueueEntry(queueEntry)
+                result = JSON.parse(utils.cryptoStringify({ success: true, receipt: fullReceipt }))
+              } else {
+                // returning appliedReceipt (AppliedReceipt2) from the fullReceipt (ArchiverReceipt)
+                result = { success: true, receipt: this.stateManager.getReceipt2(queueEntry) }
+              }
+            } else {
+              result = { success: false, reason: 'Receipt Not Found.' }
+            }
+          } else {
+            result = { success: false, reason: 'Invalid Signature.' }
+          }
+        }
+        if (!result.success) res.status(400).json(result)
+        else res.json(result)
+      } catch (e) {
+        console.log('Error caught in /get-tx-receipt: ', e)
+        res.json(this.crypto.sign({ success: false, error: e }))
+      }
+    })
   }
 
   handleSharedTX(tx: Shardus.OpaqueTransaction, appData: unknown, sender: Shardus.Node): QueueEntry {
