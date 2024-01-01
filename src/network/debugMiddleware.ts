@@ -1,5 +1,6 @@
 import { isDebugMode, getHashedDevKey, getDevPublicKeys, ensureKeySecurity } from '../debug'
 import * as Context from '../p2p/Context'
+import { DevSecurityLevel } from '../shardus/shardus-types'
 
 let lastCounter = 0
 
@@ -23,7 +24,7 @@ function handleDebugAuth(_req, res, next, authLevel) {
     //auth with a signature
     if (_req.query.sig != null && _req.query.sig_counter != null) {
       const devPublicKeys = getDevPublicKeys() // This should return list of public keys
-      let requestSig = _req.query.sig
+      const requestSig = _req.query.sig
       // Check if signature is valid for any of the public keys
       for (const ownerPk in devPublicKeys) {
         let sigObj = {
@@ -33,17 +34,15 @@ function handleDebugAuth(_req, res, next, authLevel) {
         }
         //reguire a larger counter than before. This prevents replay attacks
         if (parseInt(sigObj.count) > lastCounter) {
-          let verified = Context.crypto.verify(sigObj, ownerPk)
-          if (verified === true) {
+          if (Context.crypto.verify(sigObj, ownerPk)) {
             lastCounter = parseInt(sigObj.count) // Update counter
-            const authorized = ensureKeySecurity(ownerPk, authLevel)
-            if (authorized) {
+            if (ensureKeySecurity(ownerPk, authLevel)) {
               next()
               return
             } else {
-              return res.status(401).json({
-                status: 401,
-                message: 'Unauthorized!',
+              return res.status(403).json({
+                status: 403,
+                message: 'FORBIDDEN!',
               })
             }
           } else {
@@ -55,9 +54,9 @@ function handleDebugAuth(_req, res, next, authLevel) {
       }
     }
   } catch (error) {}
-  return res.status(403).json({
-    status: 403,
-    message: 'FORBIDDEN. Endpoint is only available in debug mode.',
+  return res.status(401).json({
+    status: 401,
+    message: 'Unauthorized!',
   })
 }
 
@@ -72,7 +71,7 @@ export const isDebugModeMiddleware = (_req, res, next) => {
 export const isDebugModeMiddlewareLow = (_req, res, next) => {
   const isDebug = isDebugMode()
   if (!isDebug) {
-    handleDebugAuth(_req, res, next, 1)
+    handleDebugAuth(_req, res, next, DevSecurityLevel.Low)
   } else next()
 }
 
@@ -80,7 +79,7 @@ export const isDebugModeMiddlewareLow = (_req, res, next) => {
 export const isDebugModeMiddlewareMedium = (_req, res, next) => {
   const isDebug = isDebugMode()
   if (!isDebug) {
-    handleDebugAuth(_req, res, next, 2)
+    handleDebugAuth(_req, res, next, DevSecurityLevel.Medium)
   } else next()
 }
 
@@ -88,6 +87,6 @@ export const isDebugModeMiddlewareMedium = (_req, res, next) => {
 export const isDebugModeMiddlewareHigh = (_req, res, next) => {
   const isDebug = isDebugMode()
   if (!isDebug) {
-    handleDebugAuth(_req, res, next, 3)
+    handleDebugAuth(_req, res, next, DevSecurityLevel.High)
   } else next()
 }
