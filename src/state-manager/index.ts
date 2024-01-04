@@ -3297,18 +3297,56 @@ class StateManager {
     if (queueEntry.appliedReceiptFinal2 != null) {
       return queueEntry.appliedReceiptFinal2
     }
-    // start with a receipt we made
-    let receipt: AppliedReceipt2 = queueEntry.appliedReceipt2
-    if (receipt == null) {
-      // or see if we got one
-      receipt = queueEntry.recievedAppliedReceipt2
+    if (Context.config.stateManager.useNewPOQ === false) {
+      // start with a receipt we made
+      let receipt: AppliedReceipt2 = queueEntry.appliedReceipt2
+      if (receipt == null) {
+        // or see if we got one
+        receipt = queueEntry.recievedAppliedReceipt2
+      }
+      // if we had to repair use that instead. this stomps the other ones
+      if (queueEntry.appliedReceiptForRepair2 != null) {
+        receipt = queueEntry.appliedReceiptForRepair2
+      }
+      queueEntry.appliedReceiptFinal2 = receipt
+      return receipt
+    } else {
+      let finalReceipt: AppliedReceipt2
+      if (queueEntry.appliedReceipt2 && queueEntry.recievedAppliedReceipt2 == null) {
+        finalReceipt = queueEntry.appliedReceipt2
+      }
+      if (queueEntry.appliedReceipt2 == null && queueEntry.recievedAppliedReceipt2) {
+        // or see if we got one
+        finalReceipt = queueEntry.recievedAppliedReceipt2
+      } else if (queueEntry.appliedReceipt2 && queueEntry.recievedAppliedReceipt2) {
+        // we have 2 receipts, use a better one
+        const localReceiptNodeId = queueEntry.appliedReceipt2.confirmOrChallenge.nodeId
+        const receivedReceiptNodeId = queueEntry.recievedAppliedReceipt2.confirmOrChallenge.nodeId
+
+        const localReceiptNodeRank = this.transactionQueue.computeNodeRank(
+          localReceiptNodeId,
+          queueEntry.acceptedTx.txId,
+          queueEntry.acceptedTx.timestamp
+        )
+        const receivedReceiptNodeRank = this.transactionQueue.computeNodeRank(
+          receivedReceiptNodeId,
+          queueEntry.acceptedTx.txId,
+          queueEntry.acceptedTx.timestamp
+        )
+        if (localReceiptNodeRank < receivedReceiptNodeRank) {
+          // lower the rank, the better the receipt
+          finalReceipt = queueEntry.appliedReceipt2
+        } else {
+          finalReceipt = queueEntry.recievedAppliedReceipt2
+        }
+      }
+      // if we had to repair use that instead. this stomps the other ones
+      if (queueEntry.appliedReceiptForRepair2 != null) {
+        finalReceipt = queueEntry.appliedReceiptForRepair2
+      }
+      queueEntry.appliedReceiptFinal2 = finalReceipt
+      return finalReceipt
     }
-    // if we had to repair use that instead. this stomps the other ones
-    if (queueEntry.appliedReceiptForRepair2 != null) {
-      receipt = queueEntry.appliedReceiptForRepair2
-    }
-    queueEntry.appliedReceiptFinal2 = receipt
-    return receipt
   }
 
   hasReceipt(queueEntry: QueueEntry) {

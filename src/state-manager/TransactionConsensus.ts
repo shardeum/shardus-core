@@ -518,7 +518,7 @@ class TransactionConsenus {
           if (this.config.stateManager.useNewPOQ === false) {
             shouldStoreAndForward = queueEntry.gossipedReceipt === false
           } else {
-            const localAppliedReceipt2 = this.stateManager.getReceipt2(queueEntry)
+            const localAppliedReceipt2 = queueEntry.appliedReceipt2
             if (localAppliedReceipt2) {
               const localReceiptConfirmNode = localAppliedReceipt2.confirmOrChallenge.nodeId
               const receivedReceiptConfirmNode = receivedAppliedReceipt2.confirmOrChallenge.nodeId
@@ -562,7 +562,7 @@ class TransactionConsenus {
             }
           }
 
-          if (shouldStoreAndForward === true) {
+          if (shouldStoreAndForward === true && queueEntry.gossipedReceipt === false) {
             queueEntry.gossipedReceipt = true
             /* prettier-ignore */
             if (logFlags.debug || this.stateManager.consensusLog)
