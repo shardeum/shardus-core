@@ -70,20 +70,12 @@ function stringifier(
           //need to review the perf aspects of how we first detect that this is buffer by fully
           //running toStr = objToString.call(val) above or is that a fast/goo way to handle things compared to typeof?
         } else if (options.bufferEncoding !== 'none' && isBufferValue(toStr, val)) {
-          switch (options.bufferEncoding) {
-            case 'base64':
-              return JSON.stringify({
-                data: Buffer.from(val['data']).toString('base64'),
-                dataType: 'bh',
-              })
-            case 'hex':
-              return JSON.stringify({
-                data: Buffer.from(val['data']).toString(),
-                dataType: 'bh',
-              })
-          }
+          // Handling buffer values with hex encoding directly
+          return JSON.stringify({
+            data: Buffer.from(val['data']).toString('hex'),
+            dataType: 'bh',
+          })
         } else if (toStr === '[object Object]') {
-          // only object is left
           keys = objKeys(val).sort()
           max = keys.length
           str = ''
@@ -112,7 +104,7 @@ function stringifier(
     case 'bigint':
       // Add some special identifier for bigint
       // return JSON.stringify({__BigInt__: val.toString()})
-      return JSON.stringify(val.toString(16))
+      return JSON.stringify(bigIntToHex(val).slice(2))
     default:
       return isFinite(val) ? val : null
   }
@@ -174,7 +166,7 @@ function cryptoStringifier(val, isArrayProp): string {
     case 'string':
       return JSON.stringify(val)
     case 'bigint':
-      return JSON.stringify(val.toString(16))
+      return JSON.stringify(bigIntToHex(val).slice(2))
     default:
       return isFinite(val) ? val : null
   }
@@ -194,4 +186,13 @@ export function cryptoStringify(val: unknown, isArrayProp = false): string {
     return '' + returnVal
   }
   return ''
+}
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function bigIntToHex(val: bigint) {
+  if (typeof val !== 'bigint') {
+    throw new TypeError('The provided value is not a BigInt.')
+  }
+
+  // Convert the BigInt to a hexadecimal string.
+  return val.toString(16)
 }
