@@ -380,6 +380,7 @@ async function cycleCreator() {
     // I think once the network has reached to processing mode and some nodes drop to 10% and goes into safety mode
     // At this point, the new node might find that active count from previous record is still less than minNodes and would not flip hasAlreadyEnteredProcessing to true
     // I think we should flip hasAlreadyEnteredProcessing to true any mode other than forming in the previous record
+    // using minNodes since this is dealing with going into processing mode. minNodes and baselineNodes are the same value at start
     if (prevRecord.active >= config.p2p.minNodes && hasAlreadyEnteredProcessing === false) {
       hasAlreadyEnteredProcessing = true
     }

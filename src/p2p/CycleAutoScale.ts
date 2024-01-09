@@ -87,11 +87,14 @@ export function reset() {
 
 export function getDesiredCount(): number {
   // having trouble finding a better way to update this!
-  if (desiredCount < config.p2p.minNodes) {
-    desiredCount = config.p2p.minNodes
+  // Check the feature flag and set the lower limit accordingly
+  if (config.p2p.networkBaselineEnabled && desiredCount < config.p2p.baselineNodes) {
+    return (desiredCount = config.p2p.baselineNodes)
+  } else if (desiredCount < config.p2p.minNodes) {
+    return (desiredCount = config.p2p.minNodes)
+  } else {
+    return desiredCount
   }
-
-  return desiredCount
 }
 
 function createScaleRequest(scaleType): P2P.CycleAutoScaleTypes.SignedScaleRequest {
@@ -150,6 +153,7 @@ export function requestNetworkUpsize() {
 }
 
 export function requestNetworkDownsize() {
+  // minNodes is used in absense of load, not baselineNodes. Main idea here is to grow to desired which is essentially minNodes
   if (getDesiredCount() <= config.p2p.minNodes) {
     return
   }
@@ -326,6 +330,7 @@ function _checkScaling() {
     case P2P.CycleAutoScaleTypes.ScaleType.DOWN:
       newDesired = CycleChain.newest.desired - config.p2p.amountToGrow
       // If newDesired less than minNodes, set newDesired to minNodes
+      // minNodes is used in absense of load, not baselineNodes. Main idea here is to grow to desired which is essentially minNodes
       if (newDesired < config.p2p.minNodes) newDesired = config.p2p.minNodes
 
       setDesiredCount(newDesired)
@@ -338,7 +343,10 @@ function _checkScaling() {
 }
 
 function setDesiredCount(count: number) {
-  if (count >= config.p2p.minNodes && count <= config.p2p.maxNodes) {
+  // Set lower limit based on the feature flag
+  const lowerLimit = config.p2p.networkBaselineEnabled ? config.p2p.baselineNodes : config.p2p.minNodes
+
+  if (count >= lowerLimit && count <= config.p2p.maxNodes) {
     console.log('Setting desired count to', count)
     desiredCount = count
   }
@@ -380,7 +388,7 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
       }
     } else if (prevRecord.mode === 'processing') {
       /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in processing")
-      if (enterSafety(active, prevRecord) === false && enterRecovery(active) === false) {
+      if (enterSafety(active) === false && enterRecovery(active) === false) {
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: not in safety")
         let addRem = (desired - prevRecord.target) * 0.1
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`addRem: ${addRem}, desired: ${desired}, prevTarget: ${prevRecord.target}`)
@@ -393,19 +401,22 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`CycleAutoScale: prev target is ${prevRecord.target} and addRem is ${addRem}`)
         targetCount = prevRecord.target + addRem
         // may want to swap config values to values from cycle record
-        if (targetCount < config.p2p.minNodes) {
+        if (config.p2p.networkBaselineEnabled && targetCount < config.p2p.baselineNodes) {
+          targetCount = config.p2p.baselineNodes
+        } else if (targetCount < config.p2p.minNodes) {
           targetCount = config.p2p.minNodes
-        }
-        if (targetCount > config.p2p.maxNodes) {
+        } else if (targetCount > config.p2p.maxNodes) {
           targetCount = config.p2p.maxNodes
         }
       }
-    } else if ( // In these modes, the target count should be set to the desired/min count
+    } else if (
+      // In these modes, the target count should be set to the desired/min count
       prevRecord.mode === 'safety' ||
       prevRecord.mode === 'recovery' ||
       prevRecord.mode === 'restore'
     ) {
       // For the number of nodes to be added in each cycle during these modes is defined in the calculateToAcceptV2 function
+      // using minNodes here since target is what will be used to get into processing mode
       targetCount = config.p2p.minNodes
     } else if (prevRecord.mode === 'restart') {
       // In restart mode, all the nodes remain in 'syncing' mode until the desired number of nodes are reached
@@ -422,7 +433,7 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
         }
       }
     } else if (prevRecord.mode === 'shutdown') targetCount = 7
-  } else if(Self.isFirst && active < 1) {
+  } else if (Self.isFirst && active < 1) {
     /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in Self.isFirst condition")
     targetCount = 7
   }
@@ -431,7 +442,9 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
 }
 
 export function configUpdated() {
-  if (desiredCount < config.p2p.minNodes) {
+  if (config.p2p.networkBaselineEnabled && desiredCount < config.p2p.baselineNodes) {
+    desiredCount = config.p2p.baselineNodes
+  } else if (desiredCount < config.p2p.minNodes) {
     desiredCount = config.p2p.minNodes
     //requestNetworkUpsize updates desiredCount internally
     //we may still want this, but need some special testing to be sure

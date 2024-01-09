@@ -322,6 +322,7 @@ export interface App {
   dataSummaryInit?: (blob: any, accountData: any) => void
   dataSummaryUpdate?: (blob: any, accountDataBefore: any, accountDataAfter: any) => void
   txSummaryUpdate?: (blob: any, tx: any, wrappedStates: any) => void
+  // use of minNodes instead of baselineNodes here do to minNodes used when not in processing mode (check shardeum-server condition where used)
   validateJoinRequest?: (
     data: any,
     mode: P2P.ModesTypes.Record['mode'] | null,
@@ -667,6 +668,8 @@ export interface ServerConfiguration {
      *  If the number of active nodes in the network is less than (minNodesPerctToAllowExitOnException) * (minNodes), then the node will not exit on exception.
      */
     minNodesPerctToAllowExitOnException?: number
+    /** The baselineNodes parameter is an Integer specifying the minimum number of nodes that need to be active to not change the mode into safety, recovery, and restore. */
+    baselineNodes?: number
     /** The minNodes parameter is an Integer specifying the minimum number of nodes that need to be active in the network in order to process transactions. */
     minNodes?: number
     /** The maxNodes parameter is an Integer specifying the maximum number of nodes that can be active in the network at once. */
@@ -805,6 +808,8 @@ export interface ServerConfiguration {
     lostArchiversCyclesToWait: number
     /** enable new logic for creating a hash of our join list */
     standbyListFastHash: boolean
+    /** networkBaselineEnabled is a boolean that enables the use of the new config `baselineNodes` which is used as the new threshold for safety, recovery, and restore modes. */
+    networkBaselineEnabled: boolean
   }
   /** Server IP configuration */
   ip?: {

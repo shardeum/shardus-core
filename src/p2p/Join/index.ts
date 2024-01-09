@@ -991,6 +991,7 @@ function getSelectionKey(joinRequest: JoinRequest): Result<string, JoinRequestRe
         joinRequest,
         mode,
         CycleChain.newest,
+        // use minNodes instead of baselineNodes here since validateJoinRequest's arguemnt minNodes is used check for adminCert when not in processing mode
         config.p2p.minNodes
       )
 

@@ -50,6 +50,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     minNodesToAllowTxs: 1,
     continueOnException: false,
     minNodesPerctToAllowExitOnException: 0.66,
+    baselineNodes: 15, // config used for new threshold for entering recovery, restore, and safety. Should be equivalient to minNodes on network startup
     minNodes: 15,
     maxNodes: 30,
     seedNodeOffset: 4,
@@ -109,6 +110,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     initShutdown: false,
     lostArchiversCyclesToWait: 3,
     standbyListFastHash: false, //todo set to false and migrate
+    networkBaselineEnabled: false, // feature flag to enable use of baselineNodes that's new threshold for the safety, restore, and recovery modes instead of minNodes
   },
   ip: {
     externalIp: '0.0.0.0',

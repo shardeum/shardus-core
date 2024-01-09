@@ -86,7 +86,7 @@ export function updateRecord(
         record.mode = 'forming'
       } else if (enterProcessing(active)) {
         record.mode = 'processing'
-      } else if (enterSafety(active, prev)) {
+      } else if (enterSafety(active)) {
         record.mode = 'safety'
       } else if (enterRecovery(active)) {
         record.mode = 'recovery'
@@ -104,7 +104,7 @@ export function updateRecord(
           record.mode = 'shutdown'
         } else if (enterRecovery(active)) {
           record.mode = 'recovery'
-        } else if (enterSafety(active, prev)) {
+        } else if (enterSafety(active)) {
           record.mode = 'safety'
         }
       } else if (prev.mode === 'safety') {
@@ -171,17 +171,27 @@ export function sendRequests(): void {
 
 /* These functions make the code neater and easier to understand
  */
-
+// use baselineNodes for the below functions since it deals with losing nodes and unexpected downsizing
+// baselineNodes is the baseline number of nodes required to be in the network to be considered safe
 export function enterRecovery(activeCount: number): boolean {
-  return activeCount < 0.75 * Context.config.p2p.minNodes
+  const threshold = Context.config.p2p.networkBaselineEnabled
+    ? Context.config.p2p.baselineNodes
+    : Context.config.p2p.minNodes
+  return activeCount < 0.75 * threshold
 }
 
 export function enterShutdown(activeCount: number): boolean {
-  return activeCount <= 0.3 * Context.config.p2p.minNodes
+  const threshold = Context.config.p2p.networkBaselineEnabled
+    ? Context.config.p2p.baselineNodes
+    : Context.config.p2p.minNodes
+  return activeCount <= 0.3 * threshold
 }
 
-export function enterSafety(activeCount: number, prevRecord: P2P.CycleCreatorTypes.CycleRecord): boolean {
-  return activeCount >= 0.75 * Context.config.p2p.minNodes && activeCount < 0.9 * Context.config.p2p.minNodes
+export function enterSafety(activeCount: number): boolean {
+  const threshold = Context.config.p2p.networkBaselineEnabled
+    ? Context.config.p2p.baselineNodes
+    : Context.config.p2p.minNodes
+  return activeCount >= 0.75 * threshold && activeCount < 0.9 * threshold
 }
 
 export function enterProcessing(activeCount: number): boolean {
@@ -190,6 +200,7 @@ export function enterProcessing(activeCount: number): boolean {
   per Andrew, we may want a sticky state that doesn't enter processing until something indicates the data is restored,
   and we may even want the nodes to get to minnodes count before the archivers start patching data
   */
+  // use of minNodes instead of baselineNodes since dealing with going into processing mode
   return activeCount >= Context.config.p2p.minNodes
 }
 /** An internal tx is allowed to be processed if the network is in one of the modes mentioned in the function */
@@ -198,5 +209,9 @@ export function isInternalTxAllowed(): boolean {
 }
 
 export function enterRestore(totalNodeCount: number): boolean {
-  return totalNodeCount >= Context.config.p2p.minNodes
+  // use of baselineNodes since dealing with going into restore mode and baselineNodes is the minimum number of nodes required to go into safety, restore, and recovery mode
+  const threshold = Context.config.p2p.networkBaselineEnabled
+    ? Context.config.p2p.baselineNodes
+    : Context.config.p2p.minNodes
+  return totalNodeCount >= threshold
 }

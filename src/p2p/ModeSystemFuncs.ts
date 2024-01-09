@@ -70,7 +70,7 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
         }
       }
     } else if (prevRecord.mode === 'processing') {
-      if (enterSafety(active, prevRecord) === false && enterRecovery(active) === false) {
+      if (enterSafety(active) === false && enterRecovery(active) === false) {
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("max rotated per cycle: ", config.p2p.maxRotatedPerCycle)
         if (active !== ~~target) {
           // calculate nodes to add or remove
@@ -147,6 +147,7 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
       }
     } else if (prevRecord.mode === 'safety') {
       if (enterProcessing(active) === false && enterRecovery(active) === false) {
+        // since in safety mode, will use minNodes as the threshold to enter back into processing mode
         let addRem = 1.02 * config.p2p.minNodes - (active + syncing) // we try to overshoot min value by 2%; for slow syncing nodes
         if (addRem > active * 0.05) {
           addRem = ~~(active * 0.05)

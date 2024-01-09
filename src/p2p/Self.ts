@@ -758,6 +758,7 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
   if (restartCycleRecord) {
     // The archiver is sending a cycle record with shutdown mode from previous network
     // TODO - Make sure the cycle record is valid
+    // use minNodes since we are below baseline for safety and looking to upsize to get into processing mode
     restartCycleRecord.desired = Context.config.p2p.minNodes
     restartCycleRecord.duration = Context.config.p2p.cycleDuration
     CycleChain.prepend(restartCycleRecord)
