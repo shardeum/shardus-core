@@ -3,8 +3,8 @@
  * TODO: Rename this module later?
  */
 
-import { hexstring } from '@shardus/types'
-import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
+import { P2P, hexstring } from '@shardus/types'
+import { JoinRequest, KeepInStandby } from '@shardus/types/build/src/p2p/JoinTypes'
 import { config, crypto, shardus } from '../../Context'
 import * as CycleChain from '../../CycleChain'
 import * as Self from '../../Self'
@@ -26,6 +26,8 @@ type publickey = JoinRequest['nodeInfo']['publicKey']
 export const standbyNodesInfo: Map<publickey, JoinRequest> = new Map()
 
 export const standbyNodesInfoHashes: Map<publickey, string> = new Map()
+/** This list is a map of standby node public keys to refreshed time in seconds */
+export const standbyNodesRefresh: Map<publickey, number> = new Map()
 
 /**
  * New join requests received during the node's current cycle. This list is
@@ -33,6 +35,7 @@ export const standbyNodesInfoHashes: Map<publickey, string> = new Map()
  * digestion. appetizing!
  */
 let newJoinRequests: JoinRequest[] = []
+let newStandbyRefreshRequests: Map<publickey, KeepInStandby> = new Map()
 
 export function init(): void {
   console.log('initializing join protocol v2')
@@ -99,6 +102,40 @@ export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = f
   newJoinRequests.push(joinRequest)
 }
 
+//KeepInStandby
+export interface StanbyRefreshRequestResponse {
+  
+  success: boolean
+ 
+  reason: string
+
+  fatal: boolean
+}
+
+export function addStandbyRefresh(keepInStandbyRequest: P2P.JoinTypes.KeepInStandby): StanbyRefreshRequestResponse {
+  
+  //validate keepInStandbyRequest
+
+
+  //add it to TXs
+  if(newStandbyRefreshRequests.has(keepInStandbyRequest.publicKey) === true){
+    return {
+      success: false,
+      reason: '',
+      fatal: false,
+    }
+  }
+
+  newStandbyRefreshRequests.set(keepInStandbyRequest.publicKey, keepInStandbyRequest)
+
+  return {
+    success: true,
+    reason: '',
+    fatal: false,
+  }
+  
+}
+
 /**
  * Returns the list of new standby join requests and empties the list.
  */
@@ -106,6 +143,16 @@ export function drainNewJoinRequests(): JoinRequest[] {
   if (logFlags.verbose) console.log('draining new standby info:', newJoinRequests)
   const tmp = newJoinRequests
   newJoinRequests = []
+  return tmp
+}
+
+/**
+ * Returns the list of new KeepInStandby requests and empties the list.
+ */
+export function drainKeepInStandbyRequests(): KeepInStandby[] {
+  if (logFlags.verbose) console.log('draining new KeepInStandby info:', newJoinRequests)
+  const tmp = Array.from(newStandbyRefreshRequests.values())
+  newStandbyRefreshRequests = new Map()
   return tmp
 }
 

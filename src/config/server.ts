@@ -105,6 +105,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     standbyListMaxRemoveApp: 100, //todo set this be 100 for production
     standbyAgeScrub: true,
     standbyVersionScrub: true,
+    standbyAgeCheck: true, //todo consider for migration 
     q1DelayPercent: 0.125,
     goldenTicketEnabled: true,
     preGossipNodeCheck: true,

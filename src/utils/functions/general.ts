@@ -576,3 +576,22 @@ export function stringForKeys(obj: unknown, keys: ArrayLike<string> | string | n
     return `(stringForKeys(): exception: ${e}, obj: ${objStr})`
   }
 }
+
+export function getPrefixInt(hexAddress: string, length = 8): number {
+  // if (hexAddress.length !== 64) {
+  //   throw new Error("Input hex address should be exactly 64 characters long.");
+  // }
+
+  if (length < 1 || length > 8) {
+    throw new Error("Length parameter should be between 1 and 8.");
+  }
+
+  const prefixHex = hexAddress.slice(0, length);
+  const prefixInt = parseInt(prefixHex, 16);
+
+  if (isNaN(prefixInt)) {
+    throw new Error("Invalid hex characters in the input.");
+  }
+
+  return prefixInt;
+}

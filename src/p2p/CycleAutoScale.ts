@@ -211,6 +211,9 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
     warn(`Invalid scaling request, not a known node. Request: ${JSON.stringify(scalingRequest)}`)
     return false
   }
+
+  // TODO need to verify if the node was a valid sender in the sub commitee 
+
   // Return false if fails validation for signature
   if (!crypto.verify(scalingRequest, node.publicKey)) {
     warn(`Invalid scaling request, signature is not valid. Request: ${JSON.stringify(scalingRequest)}`)

@@ -10,6 +10,7 @@ import { Handler } from 'express'
 import { P2P } from '@shardus/types'
 import {
   addJoinRequest,
+  addStandbyRefresh,
   computeSelectionNum,
   getAllowBogon,
   setAllowBogon,
@@ -447,6 +448,28 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
   }
 }
 
+const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.KeepInStandby, P2P.NodeListTypes.Node['id']> = async (
+  payload,
+  sender,
+  tracker
+) => {
+  profilerInstance.scopedProfileSectionStart('gossip-standby-refresh')
+  try {
+    //if (logFlags.p2pNonFatal) info(`Got scale request: ${JSON.stringify(payload)}`)
+    if (!payload) {
+      warn('No payload provided for the `scaling` request.')
+      return
+    }
+
+    const added = addStandbyRefresh(payload)
+    if (!added) return
+    Comms.sendGossip('gossip-standby-refresh', payload, tracker, sender, NodeList.byIdOrder, false, 2)
+  } finally {
+    profilerInstance.scopedProfileSectionEnd('gossip-standby-refresh')
+  }
+}
+
+
 export const routes = {
   external: [cycleMarkerRoute, joinRoute, joinedRoute, joinedV2Route, acceptedRoute, unjoinRoute],
   gossip: {
@@ -455,5 +478,6 @@ export const routes = {
     'gossip-unjoin': gossipUnjoinRequests,
     'gossip-sync-started': gossipSyncStartedRoute,
     'gossip-sync-finished': gossipSyncFinishedRoute,
+    'gossip-standby-refresh' : gossipStandbyRefresh,
   },
 }

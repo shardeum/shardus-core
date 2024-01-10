@@ -801,6 +801,8 @@ export interface ServerConfiguration {
     standbyAgeScrub: boolean
     /** remove nodes from the list that are the wrong version */
     standbyVersionScrub: boolean
+    /** check a standby node to see if it is still up */
+    standbyAgeCheck: boolean
     /** this is the percent delay fraction of a quarter cycle duration that we wait before sending cycle transactions
      * This is needed because of small delays between what time the cycle starts for any given node.
      * NTP gets us closer, but it will never be perfect

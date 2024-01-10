@@ -4,14 +4,14 @@ import * as http from '../../http'
 import { logFlags } from '../../logger'
 import { hexstring, P2P } from '@shardus/types'
 import * as utils from '../../utils'
-import { validateTypes, isEqualOrNewerVersion } from '../../utils'
+import { validateTypes, isEqualOrNewerVersion, fastIsPicked, getPrefixInt } from '../../utils'
 import * as Comms from '../Comms'
 import { config, crypto, logger, network, shardus } from '../Context'
 import * as CycleChain from '../CycleChain'
 import * as CycleCreator from '../CycleCreator'
 import * as NodeList from '../NodeList'
 import * as Self from '../Self'
-import { robustQuery } from '../Utils'
+import { getOurNodeIndex, robustQuery } from '../Utils'
 import { isBogonIP, isInvalidIP, isIPv6 } from '../../utils/functions/checkIP'
 import { nestedCountersInstance } from '../../utils/nestedCounters'
 import { Logger } from 'log4js'
@@ -19,15 +19,17 @@ import { calculateToAcceptV2 } from '../ModeSystemFuncs'
 import { routes } from './routes'
 import {
   debugDumpJoinRequestList,
+  drainKeepInStandbyRequests,
   drainNewJoinRequests,
   getLastHashedStandbyList,
   getStandbyNodesInfoMap,
   saveJoinRequest,
+  standbyNodesRefresh,
 } from './v2'
 import { err, ok, Result } from 'neverthrow'
 import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
 import { deleteStandbyNode, drainNewUnjoinRequests } from './v2/unjoin'
-import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
+import { JoinRequest, KeepInStandby } from '@shardus/types/build/src/p2p/JoinTypes'
 import { updateNodeState } from '../Self'
 import { HTTPError } from 'got'
 import { drainLostAfterSelectionNodes, drainSyncStarted, nodesYetToStartSyncing, lostAfterSelection } from './v2/syncStarted'
@@ -40,6 +42,9 @@ let mainLogger: Logger
 
 let requests: P2P.JoinTypes.JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
+
+let keepInStandbyCollector: Map<string,KeepInStandby>
+let localStandbyCheckerJobs: Set<string>
 
 let lastLoggedCycle = 0
 
@@ -80,6 +85,7 @@ export function init(): void {
 export function reset(): void {
   requests = []
   seen = new Set()
+  keepInStandbyCollector = new Map()
 }
 
 export function getNodeRequestingJoin(): P2P.P2PTypes.P2PNode[] {
@@ -186,9 +192,10 @@ export function getTxs(): P2P.JoinTypes.Txs {
   // Omar - maybe we don't have to make a copy
   // [IMPORTANT] Must return a copy to avoid mutation
   const requestsCopy = deepmerge({}, requests)
-
+  const keepInStandbyCopy = [...Object.values(keepInStandbyCollector)]
   return {
     join: requestsCopy,
+    keepInStandby : keepInStandbyCopy
   }
 }
 
@@ -217,7 +224,7 @@ export function validateRecordTypes(rec: P2P.JoinTypes.Record): string {
 export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
   // TODO drop any invalid join requests. NOTE: this has never been implemented
   // yet, so this task is not a side effect of any work on join v2.
-  return { join: txs.join }
+  return { join: txs.join, keepInStandby: txs.keepInStandby }
 }
 
 export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
@@ -254,6 +261,13 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       record.finishedSyncing.push(nodeId)
     }
 
+    // drain our list of standby refresh TXs to the list 
+    // not sure full network gossip is the way to go here...
+    // what about TX sharing in cycle process?
+    for (const standbyRefresh of drainKeepInStandbyRequests()) {
+      record.standbyRefresh.push(standbyRefresh.publicKey)
+    }
+    
     let standbyRemoved_Age = 0
     //let standbyRemoved_joined = 0
     let standbyRemoved_App = 0
@@ -265,14 +279,55 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles
       for (const joinRequest of standbyList) {
         const maxAge = record.duration * config.p2p.standbyListCyclesTTL
-        if (record.start - joinRequest.nodeInfo.joinRequestTimestamp > maxAge) {
-          const key = joinRequest.nodeInfo.publicKey
-
+        const key = joinRequest.nodeInfo.publicKey
+        let lastStandbyTimerRefresh = joinRequest.nodeInfo.joinRequestTimestamp
+        //check the refresh map to get a more up to date cycle age for this node
+        if(standbyNodesRefresh.has(key)){
+          lastStandbyTimerRefresh = standbyNodesRefresh.get(key)
+        }
+        //check 2 cycles before we would remove this node
+        if (record.start - lastStandbyTimerRefresh > maxAge - 2) {
+          
           if (standbyListMap.has(key) === false) {
             skipped++
             continue
           }
 
+          //TODO deterministic selection of a node to query if the standby node is up
+          //this checked response will become a cycle TX for the next cycle.
+          
+          const offset = getPrefixInt(key, 8)
+          const numActiveNodes = NodeList.activeByIdOrder.length
+          const numCheckerNodes = 1
+          const queueStandbyCheck = fastIsPicked(ourIndex, numActiveNodes, numCheckerNodes, offset)
+
+          //schedule a job or us to check on 
+          if(queueStandbyCheck){
+            localStandbyCheckerJobs.add(key)
+          }
+
+          //WE only set this map when digesting the cycle record if this node did a proper refresh action
+          //use this cycle start time as an updated time in the mapp of standby nodes refresh 
+          //standbyNodesRefresh.set(key, record.start)
+        }
+      }
+    }
+
+    if (config.p2p.standbyAgeScrub) {
+      // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles
+      for (const joinRequest of standbyList) {
+        const maxAge = record.duration * config.p2p.standbyListCyclesTTL
+        const key = joinRequest.nodeInfo.publicKey
+        let lastStandbyTimerRefresh = joinRequest.nodeInfo.joinRequestTimestamp
+        //check the refresh map to get a more up to date cycle age for this node
+        if(standbyNodesRefresh.has(key)){
+          lastStandbyTimerRefresh = standbyNodesRefresh.get(key)
+        }
+        if (record.start - lastStandbyTimerRefresh > maxAge) {
+          if (standbyListMap.has(key) === false) {
+            skipped++
+            continue
+          }
           record.standbyRemove.push(key)
           standbyRemoved_Age++
           if (standbyRemoved_Age >= config.p2p.standbyListMaxRemoveTTL) {
@@ -306,6 +361,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
     record.standbyAdd.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
     record.standbyRemove.sort()
+    record.standbyRefresh.sort()
 
     //let standbyActivated = false
 
@@ -463,6 +519,9 @@ export interface JoinRequestResponse {
   fatal: boolean
 }
 
+
+
+
 /**
  * Processes a join request by validating the joining node's information,
  * ensuring compatibility with the network's version, checking cryptographic signatures, and responding
@@ -475,6 +534,8 @@ export interface JoinRequestResponse {
  * @param {P2P.JoinTypes.JoinRequest} joinRequest - The request object containing information about the joining node.
  * @returns {JoinRequestResponse} The result of the join request, with details about acceptance or rejection.
  * @throws {Error} Throws an error if the validation of the join request fails.
+ * 
+ * 
  */
 export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse {
   if (Self.p2pIgnoreJoinRequests === true) {
@@ -505,6 +566,8 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
     }
   }
 }
+
+
 
 export async function firstJoin(): Promise<string> {
   let marker: string
