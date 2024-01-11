@@ -87,13 +87,19 @@ export const stringifyReduce = (val, isArrayProp?: boolean): string => {
         } else {
           return JSON.stringify(val)
         }
+      case 'function':
+      case 'undefined':
+        return isArrayProp ? null : undefined
+      case 'string': {
+        const reduced = makeShortHash(val)
+        return JSON.stringify(reduced)
       }
-    case 'function':
-    case 'undefined':
-      return isArrayProp ? null : undefined
-    case 'string': {
-      const reduced = makeShortHash(val)
-      return JSON.stringify(reduced)
+      
+      default:
+        if (typeof val === 'bigint') {
+          val = val.toString()
+        }  
+        return isFinite(val) ? val : null
     }
     case 'bigint':
       // Add some special identifier for bigint
@@ -105,7 +111,6 @@ export const stringifyReduce = (val, isArrayProp?: boolean): string => {
       }
       return isFinite(val) ? val : null
   }
-}
 
 export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean): string => {
   let i, max, str, keys, key, propVal, toStr
