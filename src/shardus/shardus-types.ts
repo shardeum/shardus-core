@@ -803,6 +803,8 @@ export interface ServerConfiguration {
     initShutdown: boolean
     /** The number of consecutive cycles an Archiver has refute its appearance in the lostArchivers field before it is actually removed */
     lostArchiversCyclesToWait: number
+    /** enable new logic for creating a hash of our join list */
+    standbyListFastHash: boolean
   }
   /** Server IP configuration */
   ip?: {

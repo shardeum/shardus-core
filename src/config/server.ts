@@ -108,6 +108,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     goldenTicketEnabled: true,
     initShutdown: false,
     lostArchiversCyclesToWait: 3,
+    standbyListFastHash: false, //todo set to false and migrate
   },
   ip: {
     externalIp: '0.0.0.0',

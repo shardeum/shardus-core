@@ -26,6 +26,8 @@ type publickey = JoinRequest['nodeInfo']['publicKey']
 /** The list of nodes that are currently on standby. */
 export const standbyNodesInfo: Map<publickey, JoinRequest> = new Map()
 
+export const standbyNodesInfoHashes: Map<publickey, string> = new Map()
+
 /**
  * New join requests received during the node's current cycle. This list is
  * "drained" when the cycle is digested. Its entries are added to `standbyNodeList` as part of cycle...
@@ -52,6 +54,23 @@ export function init(): void {
   })
 }
 
+function addJoinRequestToStandbyMap(joinRequest: JoinRequest): void{
+  //this is the same as before.  add the join request to the map
+  standbyNodesInfo.set(joinRequest.nodeInfo.publicKey, joinRequest)
+  //here we add the hash of the joinrequest to a different map
+  standbyNodesInfoHashes.set(joinRequest.nodeInfo.publicKey, crypto.hash(joinRequest))
+}
+
+export function deleteStandbyNodeFromMap(key: publickey):boolean{
+  if(standbyNodesInfo.has(key)){
+    standbyNodesInfo.delete(key )
+    standbyNodesInfoHashes.delete(key)
+    return true
+  }
+  return false
+}
+
+
 /**
  * Pushes the join request onto the list of new join requests. Its node's info
  * will be added to the standby node list at the end of the cycle during cycle
@@ -65,7 +84,7 @@ export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = f
 
   // if first node, add to standby list immediately
   if (persistImmediately) {
-    standbyNodesInfo.set(joinRequest.nodeInfo.publicKey, joinRequest)
+    addJoinRequestToStandbyMap(joinRequest)
     return
   }
 
@@ -74,7 +93,7 @@ export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = f
     shardus.config.p2p.goldenTicketEnabled === true &&
     joinRequest.appJoinData?.adminCert?.goldenTicket === true
   ) {
-    standbyNodesInfo.set(joinRequest.nodeInfo.publicKey, joinRequest)
+    addJoinRequestToStandbyMap(joinRequest)
     return
   }
 
@@ -97,16 +116,16 @@ export function drainNewJoinRequests(): JoinRequest[] {
 export function addStandbyJoinRequests(nodes: JoinRequest[], logErrors = false): void {
   if (logFlags.verbose) console.log('adding standby nodes:', nodes)
   //TODO proper input validation
-  for (const node of nodes) {
-    if (node == null) {
+  for (const joinRequest of nodes) {
+    if (joinRequest == null) {
       /* prettier-ignore */ if (logErrors && logFlags.important_as_fatal) console.error('null node in standby list')
       continue
     }
-    if (node.nodeInfo == null) {
-      /* prettier-ignore */ if (logErrors && logFlags.important_as_fatal) console.error('null node.nodeInfo in standby list: ' + JSON.stringify(node))
+    if (joinRequest.nodeInfo == null) {
+      /* prettier-ignore */ if (logErrors && logFlags.important_as_fatal) console.error('null node.nodeInfo in standby list: ' + JSON.stringify(joinRequest))
       continue
     }
-    standbyNodesInfo.set(node.nodeInfo.publicKey, node)
+    addJoinRequestToStandbyMap(joinRequest)
   }
 }
 
@@ -127,6 +146,15 @@ export function getSortedStandbyJoinRequests(): JoinRequest[] {
 
 /** Calculates and returns a hash based on the list of standby nodes, sorted by public key. This will also update the recorded `lastHashedList` of nodes, which can be retrieved via `getLastHashedStandbyList`. */
 export function computeNewStandbyListHash(): hexstring {
+
+  if(config.p2p.standbyListFastHash){
+    //sort hashes by value.  could sort by ID, but this is a bit faster
+    const hashes = Array.from(standbyNodesInfoHashes.values())
+    hashes.sort()
+    const hash = crypto.hash(hashes)
+    return hash
+  }
+
   // set the lastHashedList to the current list by pubkey, then hash.
   // deep cloning is necessary as standby node information may be mutated by
   // reference.
