@@ -20,17 +20,9 @@ let lastLoggedCycle: number
 
 /** ROUTES */
 
-// [TODO] - since we don't have any routes, no need to create and register this emply function
-const gossipRoute: P2P.P2PTypes.GossipHandler = () => {
-  return
-}
-
-const routes = {
-  internal: {},
-  gossip: {
-    gossip: gossipRoute,
-  },
-}
+// const routes = {
+//   internal: {},
+// }
 
 /** FUNCTIONS */
 
@@ -45,12 +37,9 @@ export function init(): void {
   lastLoggedCycle = 0
 
   // Register routes
-  for (const [name, handler] of Object.entries(routes.internal)) {
-    Comms.registerInternal(name, handler)
-  }
-  for (const [name, handler] of Object.entries(routes.gossip)) {
-    Comms.registerGossipHandler(name, handler)
-  }
+  // for (const [name, handler] of Object.entries(routes.internal)) {
+  //   Comms.registerInternal(name, handler)
+  // }
 }
 
 export function reset(): void {
