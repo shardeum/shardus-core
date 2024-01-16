@@ -13,7 +13,7 @@ let p2pLogger: Logger
 export let networkMode: P2P.ModesTypes.Record['mode'] = 'forming'
 
 /** ROUTES */
-
+/*
 const gossipRoute: P2P.P2PTypes.GossipHandler = () => {
   return
 }
@@ -24,6 +24,7 @@ const routes = {
     gossip: gossipRoute,
   },
 }
+*/
 
 /** FUNCTIONS */
 
@@ -42,12 +43,14 @@ export function init(): void {
   reset()
 
   // Register routes
+  /*
   for (const [name, handler] of Object.entries(routes.internal)) {
     Comms.registerInternal(name, handler)
   }
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
   }
+  */
 }
 
 export function reset(): void {

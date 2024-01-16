@@ -11,6 +11,7 @@ let p2pLogger: Logger
 
 /** ROUTES */
 
+/*
 const gossipRoute: P2P.P2PTypes.GossipHandler = (payload) => {}
 
 const routes = {
@@ -19,6 +20,7 @@ const routes = {
     gossip: gossipRoute,
   },
 }
+*/
 
 let cycleNumberForNetworkDataHash: number = 0
 let cycleNumberForNetworkReceiptHash: number = 0
@@ -41,12 +43,14 @@ export function init() {
   reset()
 
   // Register routes
+  /*
   for (const [name, handler] of Object.entries(routes.internal)) {
     Comms.registerInternal(name, handler)
   }
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
   }
+  */
 }
 
 export function reset() {}
