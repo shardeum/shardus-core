@@ -44,6 +44,7 @@ function stringifier(
   if (val === false) {
     return 'false'
   }
+  // not 100% this is correct, based on how buferes are printed later
   if (isUnit8Array(val)) {
     val = Buffer.from(val)
   }
@@ -66,6 +67,8 @@ function stringifier(
             str += stringifier(val[i], true, options)
           }
           return str + ']'
+          //need to review the perf aspects of how we first detect that this is buffer by fully
+          //running toStr = objToString.call(val) above or is that a fast/goo way to handle things compared to typeof?
         } else if (options.bufferEncoding !== 'none' && isBufferValue(toStr, val)) {
           switch (options.bufferEncoding) {
             case 'base64':

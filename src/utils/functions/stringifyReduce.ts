@@ -1,5 +1,18 @@
 import { makeShortHash } from '../'
 
+function isBufferValue(toStr, val: Record<string, unknown>): boolean {
+  return (
+    toStr === '[object Object]' &&
+    objKeys(val).length == 2 &&
+    objKeys(val).includes('type') &&
+    val['type'] == 'Buffer'
+  )
+}
+
+function isUnit8Array(value: unknown): boolean {
+  return value instanceof Uint8Array
+}
+
 const objToString = Object.prototype.toString
 const objKeys =
   Object.keys ||
@@ -11,7 +24,6 @@ const objKeys =
     }
     return keys
   })
-
 export const stringifyReduce = (val, isArrayProp?: boolean): string => {
   let i, max, str, keys, key, propVal, toStr
   if (val === true) {
@@ -34,62 +46,46 @@ export const stringifyReduce = (val, isArrayProp?: boolean): string => {
           value: Array.from(val.entries()), // or with spread: value: [...originalObject]
         }
         return stringifyReduce(mapContainer)
+      } else if (val instanceof Uint8Array) {
+        // this seems to work.  choosing a lossy option but that is more readable for this context
+        const buffer = Buffer.from(val)
+        return buffer.toString('hex')
       } else {
-        if (val.hasOwnProperty('codeHash') || val.hasOwnProperty('storageRoot')) {
-          let codeHash;
-          let storageRoot
-          if(val.hasOwnProperty('codeHash')){
-            val.codeHash=Object.values(val?.codeHash).map(vnum=>{
-                 vnum = Number(vnum).toString(16).padStart(2, '0')
-                 return vnum;
-              }).join('')
-           }
-           if(val.hasOwnProperty('storageRoot')){
-            val.storageRoot=Object.values(val?.storageRoot).map(vnum=>{
-                 vnum = Number(vnum).toString(16).padStart(2, '0')
-                 return vnum;
-              }).join('')
-           }
-          
-          return val;
-        }  else {
-          toStr = objToString.call(val)
-
-          if (toStr === '[object Array]') {
-            str = '['
-            max = val.length - 1
-            for (i = 0; i < max; i++) {
-              // eslint-disable-next-line security/detect-object-injection
-              str += stringifyReduce(val[i], true) + ','
-            }
-            if (max > -1) {
-              // eslint-disable-next-line security/detect-object-injection
-              str += stringifyReduce(val[i], true)
-            }
-            return str + ']'
-          } else if (toStr === '[object Object]') {
-            // only object is left
-            keys = objKeys(val).sort()
-            max = keys.length
-            str = ''
-            i = 0
-            while (i < max) {
-              // eslint-disable-next-line security/detect-object-injection
-              key = keys[i]
-              // eslint-disable-next-line security/detect-object-injection
-              propVal = stringifyReduce(val[key], false)
-              if (propVal !== undefined) {
-                if (str) {
-                  str += ','
-                }
-                str += JSON.stringify(key) + ':' + propVal
-              }
-              i++
-            }
-            return '{' + str + '}'
-          } else {
-            return JSON.stringify(val)
+        toStr = objToString.call(val)
+        if (toStr === '[object Array]') {
+          str = '['
+          max = val.length - 1
+          for (i = 0; i < max; i++) {
+            // eslint-disable-next-line security/detect-object-injection
+            str += stringifyReduce(val[i], true) + ','
           }
+          if (max > -1) {
+            // eslint-disable-next-line security/detect-object-injection
+            str += stringifyReduce(val[i], true)
+          }
+          return str + ']'
+        } else if (toStr === '[object Object]') {
+          // only object is left
+          keys = objKeys(val).sort()
+          max = keys.length
+          str = ''
+          i = 0
+          while (i < max) {
+            // eslint-disable-next-line security/detect-object-injection
+            key = keys[i]
+            // eslint-disable-next-line security/detect-object-injection
+            propVal = stringifyReduce(val[key], false)
+            if (propVal !== undefined) {
+              if (str) {
+                str += ','
+              }
+              str += JSON.stringify(key) + ':' + propVal
+            }
+            i++
+          }
+          return '{' + str + '}'
+        } else {
+          return JSON.stringify(val)
         }
       }
     case 'function':
@@ -99,9 +95,13 @@ export const stringifyReduce = (val, isArrayProp?: boolean): string => {
       const reduced = makeShortHash(val)
       return JSON.stringify(reduced)
     }
+    case 'bigint':
+      // Add some special identifier for bigint
+      // return JSON.stringify({__BigInt__: val.toString()})
+      return JSON.stringify(val.toString(16))
     default:
       if (typeof val === 'bigint') {
-        val = val.toString()
+        val = val.toString(16)
       }
       return isFinite(val) ? val : null
   }

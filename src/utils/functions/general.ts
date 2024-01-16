@@ -12,27 +12,35 @@ const replacer = (key: string, value: any): any => {
   }
   return value
 }
+
+/**
+ * this helper replacer is lossy and only for logging
+ * @param _key
+ * @param value
+ * @returns
+ */
 export const appdata_replacer = <T, K, V>(
   _key,
   value: Map<K, V> | T
-):
-  | { dataType: 'stringifyReduce_map_2_array'; value: [K, V][] }
-  | T
-  | string => {
-  const originalObject = value;
+): { dataType: 'stringifyReduce_map_2_array'; value: [K, V][] } | T | string => {
+  const originalObject = value
 
   if (originalObject instanceof Map) {
     return {
       dataType: 'stringifyReduce_map_2_array',
       value: Array.from(originalObject.entries()),
-    };
+    }
   } else if (typeof originalObject === 'bigint') {
     // Convert BigInt to string
-    return originalObject.toString();
+    return originalObject.toString()
+  } else if (originalObject instanceof Uint8Array) {
+    //this is lossy but usefull for logs
+    const buffer = Buffer.from(originalObject)
+    return buffer.toString('hex')
   } else {
-    return value as T;
+    return value as T
   }
-};
+}
 const reviver = (key: string, value: any): any => {
   if (value && value.__BigInt__) {
     return BigInt(value.__BigInt__)
@@ -450,7 +458,7 @@ export function selectIndexesWithOffeset(arraySize: number, numberToPick: number
 
     //linear probing if this index is already in the list.  This prevents being stuck forever
     //..assuming the input parameters are valid
-    while(selectedIndexes.has(currentIndex)){
+    while (selectedIndexes.has(currentIndex)) {
       currentIndex++
       if (currentIndex >= arraySize) {
         currentIndex = 0
