@@ -33,7 +33,7 @@ const node: ShardusTypes.Node = {
 
 const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG
 
-const ask2Test = async (): Promise<void> => {
+const askBinaryTest = async (): Promise<void> => {
   // setup
   const logger = new Logger(defaultConfigs.server.baseDir, defaultConfigs.logs, 'fatal')
   const networkContext = new NetworkClass(defaultConfigs.server, logger, undefined)
@@ -59,7 +59,7 @@ const ask2Test = async (): Promise<void> => {
       s: 'test',
       r: 1,
     }
-    const resp = await Comms.ask2<ApoptosisProposalResp, ApoptosisProposalResp>(
+    const resp = await Comms.askBinary<ApoptosisProposalResp, ApoptosisProposalResp>(
       node,
       'apoptosize',
       obj,
@@ -87,7 +87,7 @@ const ask2Test = async (): Promise<void> => {
       id: 'isDownCheck',
       when: 1,
     }
-    const resp = await Comms.ask2<ApoptosisProposalReq, ApoptosisProposalResp>(
+    const resp = await Comms.askBinary<ApoptosisProposalReq, ApoptosisProposalResp>(
       node,
       'apoptosize',
       obj,
@@ -116,7 +116,7 @@ const ask2Test = async (): Promise<void> => {
   //     id: 'bad',
   //     when: 1,
   //   }
-  //   const resp = await Comms.ask2<ApoptosisProposalReq, ApoptosisProposalResp>(
+  //   const resp = await Comms.askBinary<ApoptosisProposalReq, ApoptosisProposalResp>(
   //     node,
   //     'apoptosize',
   //     obj,
@@ -144,7 +144,7 @@ const ask2Test = async (): Promise<void> => {
       id: 'sender_id',
       when: 3,
     }
-    const resp = await Comms.ask2<ApoptosisProposalReq, ApoptosisProposalResp>(
+    const resp = await Comms.askBinary<ApoptosisProposalReq, ApoptosisProposalResp>(
       node,
       'apoptosize',
       obj,
@@ -170,7 +170,7 @@ const ask2Test = async (): Promise<void> => {
   console.log('Fail:', fail)
 }
 
-const tell2Test = async (): Promise<void> => {
+const tellBinaryTest = async (): Promise<void> => {
   // setup
   const logger = new Logger(defaultConfigs.server.baseDir, defaultConfigs.logs, 'fatal')
   const networkContext = new NetworkClass(defaultConfigs.server, logger, undefined)
@@ -196,7 +196,7 @@ const tell2Test = async (): Promise<void> => {
       id: 'isDownCheck',
       when: 1,
     }
-    await Comms.tell2<ApoptosisProposalReq>([node], 'apoptosize', obj, serializeApoptosisProposalReq, {
+    await Comms.tellBinary<ApoptosisProposalReq>([node], 'apoptosize', obj, serializeApoptosisProposalReq, {
       sender_id: 'sender_id',
     })
     console.log('Test1: Pass')
@@ -211,5 +211,5 @@ const tell2Test = async (): Promise<void> => {
   console.log('Fail:', fail)
 }
 
-ask2Test()
-tell2Test()
+askBinaryTest()
+tellBinaryTest()

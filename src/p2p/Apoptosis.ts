@@ -22,6 +22,7 @@ import { P2P } from '@shardus/types'
 import { Handler } from 'express'
 import * as Sequelize from 'sequelize'
 import { isDebugMode } from '../debug'
+import { logFlags } from '../logger'
 import {
   ApoptosisProposalReq,
   cApoptosisProposalReq,
@@ -45,7 +46,6 @@ import { currentCycle, currentQuarter } from './CycleCreator'
 import { activeByIdOrder, byIdOrder, byPubKey, nodes } from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
-import { logFlags } from '../logger'
 
 /** STATE */
 
@@ -222,7 +222,7 @@ export function init() {
     Comms.registerInternal(route.name, route.handler)
   }
   for (const route of routes.internal2) {
-    Comms.registerInternal2(route.name, route.handler)
+    Comms.registerInternalBinary(route.name, route.handler)
   }
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
@@ -315,7 +315,7 @@ export async function apoptosizeSelf(message: string) {
     id: proposal.id,
     when: proposal.when,
   }
-  await Comms.tell2<ApoptosisProposalReq>(
+  await Comms.tellBinary<ApoptosisProposalReq>(
     activeNodes,
     internalRouteName,
     apopProposalReq,
@@ -327,7 +327,7 @@ export async function apoptosizeSelf(message: string) {
     //          acknowledge it received the request by sending 'pass'
     if (node.id === Self.id) return null
     try {
-      const res = Comms.ask2<ApoptosisProposalReq, ApoptosisProposalResp>(
+      const res = Comms.askBinary<ApoptosisProposalReq, ApoptosisProposalResp>(
         node,
         internalRouteName,
         apopProposalReq,

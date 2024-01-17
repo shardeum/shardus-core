@@ -1,5 +1,6 @@
 import { P2P } from '@shardus/types'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
+import { AppObjEnum } from '../types/enum/AppObjEnum'
 export type Node = P2P.NodeListTypes.Node
 export type Cycle = P2P.CycleCreatorTypes.CycleRecord
 export type Archiver = P2P.ArchiversTypes.JoinedArchiver
@@ -13,6 +14,9 @@ export interface NodeWithRank {
   internalIp: string
   internalPort: number
 }
+
+export { AppObjEnum }
+
 //import { RequestHandler } from "express"; //express was causing problems.
 
 // Type definitions for Shardus
@@ -345,6 +349,8 @@ export interface App {
   pruneNetworkChangeQueue?: (account: WrappedData, appData: any) => Promise<WrappedData[]>
   beforeStateAccountFilter?: (account: WrappedData) => boolean
   canStayOnStandby: (joinInfo: JoinRequest) => { canStay: boolean; reason: string }
+  binarySerializeObject: (identifier: AppObjEnum, obj: any) => Buffer
+  binaryDeserializeObject: (identifier: AppObjEnum, buffer: Buffer) => any
 }
 
 export interface TransactionKeys {
@@ -810,6 +816,7 @@ export interface ServerConfiguration {
     standbyListFastHash: boolean
     /** networkBaselineEnabled is a boolean that enables the use of the new config `baselineNodes` which is used as the new threshold for safety, recovery, and restore modes. */
     networkBaselineEnabled: boolean
+    useBinarySerializedEndpoints: boolean
   }
   /** Server IP configuration */
   ip?: {

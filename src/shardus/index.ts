@@ -35,12 +35,11 @@ import * as GlobalAccounts from '../p2p/GlobalAccounts'
 import { scheduleLostReport, removeNodeWithCertificiate } from '../p2p/Lost'
 import { activeByIdOrder } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
-import { attempt } from '../p2p/Utils'
 import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
 import * as ShardusTypes from '../shardus/shardus-types'
-import { WrappedData, DevSecurityLevel } from '../shardus/shardus-types'
+import { WrappedData, DevSecurityLevel, AppObjEnum } from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
 import { CachedAppData, QueueCountsResult } from '../state-manager/state-manager-types'
@@ -2280,6 +2279,32 @@ class Shardus extends EventEmitter {
       }
       if (typeof application.beforeStateAccountFilter === 'function') {
         applicationInterfaceImpl.beforeStateAccountFilter = application.beforeStateAccountFilter
+      }
+      if (typeof application.binarySerializeObject === 'function') {
+        applicationInterfaceImpl.binarySerializeObject = (identifier: AppObjEnum, obj: any): Buffer => {
+          this.profiler.scopedProfileSectionStart('process-dapp.binarySerializeObject', false)
+          const res = application.binarySerializeObject(identifier, obj)
+          this.profiler.scopedProfileSectionEnd('process-dapp.binarySerializeObject')
+          return res
+        }
+      } else {
+        console.log('binarySerializeObject not implemented')
+        applicationInterfaceImpl.binarySerializeObject = (identifier: string, obj: any): Buffer => {
+          return Buffer.from(utils.cryptoStringify(obj), 'utf8')
+        }
+      }
+      if (typeof application.binaryDeserializeObject === 'function') {
+        applicationInterfaceImpl.binaryDeserializeObject = (identifier: AppObjEnum, buffer: Buffer): any => {
+          this.profiler.scopedProfileSectionStart('process-dapp.binaryDeserializeObject', false)
+          const res = application.binaryDeserializeObject(identifier, buffer)
+          this.profiler.scopedProfileSectionEnd('process-dapp.binaryDeserializeObject')
+          return res
+        }
+      } else {
+        console.log('binaryDeserializeObject not implemented')
+        applicationInterfaceImpl.binaryDeserializeObject = (identifier: string, buffer: Buffer): any => {
+          return JSON.parse(buffer.toString('utf8'))
+        }
       }
     } catch (ex) {
       this.shardus_fatal(

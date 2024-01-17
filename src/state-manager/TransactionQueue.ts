@@ -1,4 +1,4 @@
-import { StateManager as StateManagerTypes } from '@shardus/types'
+import { P2P as P2PTypes, StateManager as StateManagerTypes } from '@shardus/types'
 import StateManager from '.'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
@@ -40,6 +40,17 @@ import { isInternalTxAllowed, networkMode } from '../p2p/Modes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
 import { Logger as L4jsLogger } from 'log4js'
 import { shardusGetTime } from '../network'
+import { InternalBinaryHandler } from '../types/Handler'
+import {
+  BroadcastStateReq,
+  cBroadcastStateReq,
+  deserializeBroadcastStateReq,
+  serializeBroadcastStateReq,
+} from '../types/BroadcastStateReq'
+import { AppObjEnum } from '../types/enum/AppObjEnum'
+import { getStreamWithTypeCheck, requestErrorHandler, verificationDataCombiner } from '../types/Helpers'
+import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 
 interface Receipt {
   tx: AcceptedTx
@@ -253,6 +264,93 @@ class TransactionQueue {
         }
       }
     )
+
+    const broadcastStateRoute: P2PTypes.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.broadcast_state2,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      handler: (payload, response, header, sign) => {
+        nestedCountersInstance.countEvent('internal', 'broadcast_state2')
+        profilerInstance.scopedProfileSectionStart('broadcast_state2', true, payload.length)
+        const errorHandler = (
+          errorType: RequestErrorEnum,
+          opts?: { customErrorLog?: string; customCounterSuffix?: string }
+        ): void => requestErrorHandler(InternalRouteEnum.broadcast_state2, errorType, header, opts)
+
+        try {
+          const requestStream = getStreamWithTypeCheck(payload, cBroadcastStateReq)
+          if (!requestStream) {
+            return errorHandler(RequestErrorEnum.InvalidRequest)
+          }
+
+          // verification data checks
+          if (header.verification_data == null) {
+            return errorHandler(RequestErrorEnum.MissingVerificationData)
+          }
+          const verificationDataParts = header.verification_data.split(':')
+          if (verificationDataParts.length !== 3) {
+            return errorHandler(RequestErrorEnum.InvalidVerificationData)
+          }
+          const [vTxId, vStateSize, vStateAddress] = verificationDataParts
+          const queueEntry = this.getQueueEntrySafe(vTxId)
+          if (queueEntry == null) {
+            /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_state2 cant find queueEntry for: ${utils.makeShortHash(vTxId)}`)
+            return errorHandler(RequestErrorEnum.InvalidVerificationData)
+          }
+
+          const isSenderValid = this.validateCorrespondingTellSender(
+            queueEntry,
+            vStateAddress,
+            header.sender_id
+          )
+          /* prettier-ignore */ if (logFlags.verbose && logFlags.console) console.log(`broadcast_state2 TxId: ${vTxId} isSenderValid: ${isSenderValid}`)
+          if (!isSenderValid) {
+            /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_state2 validateCorrespondingTellSender failed`)
+            return errorHandler(RequestErrorEnum.InvalidSender)
+          }
+
+          const req = deserializeBroadcastStateReq(requestStream)
+          if (req.txid !== vTxId) {
+            return errorHandler(RequestErrorEnum.InvalidVerificationData)
+          }
+
+          if (req.stateList.length !== parseInt(vStateSize)) {
+            return errorHandler(RequestErrorEnum.InvalidVerificationData)
+          }
+          /* prettier-ignore */ if (logFlags.verbose && logFlags.console) console.log(`broadcast_state2: txId: ${req.txid} stateSize: ${req.stateList.length} stateAddress: ${vStateAddress}`)
+
+          for (let i = 0; i < req.stateList.length; i++) {
+            // eslint-disable-next-line security/detect-object-injection
+            const state = req.stateList[i]
+            if (
+              i !== 0 &&
+              !this.validateCorrespondingTellSender(queueEntry, state.accountId, header.sender_id)
+            ) {
+              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_state2 validateCorrespondingTellSender failed for ${state.accountId}`)
+              return errorHandler(RequestErrorEnum.InvalidSender)
+            }
+            const deserializedStateData = this.stateManager.app.binaryDeserializeObject(
+              AppObjEnum.AppData,
+              state.data
+            )
+            this.queueEntryAddData(queueEntry, {
+              accountCreated: state.accountCreated,
+              isPartial: state.isPartial,
+              accountId: state.accountId,
+              stateId: state.stateId,
+              data: deserializedStateData,
+              timestamp: state.timestamp,
+            })
+            if (queueEntry.state === 'syncing') {
+              /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${state.accountId}`)
+            }
+          }
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('broadcast_state2', payload.length)
+        }
+      },
+    }
+
+    this.p2p.registerInternalBinary(broadcastStateRoute.name, broadcastStateRoute.handler)
 
     this.p2p.registerInternal(
       'broadcast_finalstate',
@@ -2844,7 +2942,7 @@ class TransactionQueue {
       return
     }
 
-    let message: { stateList: unknown[]; txid: string }
+    let message: { stateList: Shardus.WrappedResponse[]; txid: string }
     let edgeNodeIds = []
     let consensusNodeIds = []
 
@@ -2970,13 +3068,48 @@ class TransactionQueue {
               }
               const filterdCorrespondingAccNodes = filteredNodes
 
-              // TODO Perf: need a tellMany enhancement.  that will minimize signing and stringify required!
-              this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_state', message)
+              this.broadcastState(filterdCorrespondingAccNodes, message)
             }
           }
         }
       }
     }
+  }
+
+  async broadcastState(
+    nodes: Shardus.Node[],
+    message: { stateList: Shardus.WrappedResponse[]; txid: string }
+  ): Promise<void> {
+    if (this.config.p2p.useBinarySerializedEndpoints) {
+      // convert legacy message to binary supported type
+      const request: BroadcastStateReq = {
+        txid: message.txid,
+        stateList: [],
+      }
+      for (const state of message.stateList) {
+        const serializedStateData = this.stateManager.app.binarySerializeObject(
+          AppObjEnum.AppData,
+          state.data
+        )
+        request.stateList.push({
+          accountCreated: state.accountCreated,
+          isPartial: state.isPartial,
+          accountId: state.accountId,
+          stateId: state.stateId,
+          data: serializedStateData,
+          timestamp: state.timestamp,
+        })
+      }
+      this.p2p.tellBinary<BroadcastStateReq>(nodes, 'broadcast_state2', request, serializeBroadcastStateReq, {
+        verification_data: verificationDataCombiner(
+          message.txid,
+          message.stateList.length.toString(),
+          request.stateList[0].accountId
+        ),
+      })
+      return
+    }
+    this.p2p.tell(nodes, 'broadcast_state', message)
   }
 
   /**
@@ -3098,7 +3231,7 @@ class TransactionQueue {
       return
     }
 
-    let message: { stateList: unknown[]; txid: string }
+    let message: { stateList: Shardus.WrappedResponse[]; txid: string }
     let edgeNodeIds = []
     let consensusNodeIds = []
 
@@ -3229,13 +3362,32 @@ class TransactionQueue {
               }
               const filterdCorrespondingAccNodes = filteredNodes
 
-              // TODO Perf: need a tellMany enhancement.  that will minimize signing and stringify required!
-              this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_state', message)
+              this.broadcastState(filterdCorrespondingAccNodes, message)
             }
           }
         }
       }
     }
+  }
+
+  validateCorrespondingTellSender(queueEntry: QueueEntry, dataKey: string, senderNodeId: string): boolean {
+    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`validateCorrespondingTellSender: data key: ${dataKey} sender node id: ${senderNodeId}`)
+    const receiverNode = this.stateManager.currentCycleShardData.nodeShardData
+    if (receiverNode == null) return false
+
+    const receiverIsInExecutionGroup = queueEntry.executionGroupMap.has(receiverNode.node.id)
+
+    const senderNode = this.stateManager.currentCycleShardData.nodeShardDataMap.get(senderNodeId)
+    if (senderNode === null) return false
+
+    const senderHasAddress = ShardFunctions.testAddressInRange(dataKey, senderNode.storedPartitions)
+
+    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`validateCorrespondingTellSender: data key: ${dataKey} sender node id: ${senderNodeId} senderHasAddress: ${senderHasAddress} receiverIsInExecutionGroup: ${receiverIsInExecutionGroup}`)
+    if (receiverIsInExecutionGroup === true || senderHasAddress === true) {
+      return true
+    }
+
+    return false
   }
 
   /**

@@ -155,6 +155,12 @@ export class VectorBufferStream {
     return value
   }
 
+  public readUInt8(): number {
+    const value = this.buffer.readUInt8(this.position)
+    this.position += 1
+    return value
+  }
+
   public readInt16(): number {
     const value = this.buffer.readInt16LE(this.position)
     this.position += 2

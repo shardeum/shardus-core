@@ -2,6 +2,7 @@ import { AppHeader } from '@shardus/net/build/src/types'
 import { P2P } from '@shardus/types'
 import { Logger } from 'log4js'
 import { logFlags } from '../logger'
+import { shardusGetTime } from '../network'
 import { setIsUpTs } from '../p2p/Lost'
 import { ShardusTypes } from '../shardus'
 import { Sign } from '../shardus/shardus-types'
@@ -15,7 +16,6 @@ import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import { shardusGetTime } from '../network'
 
 /** ROUTES */
 
@@ -240,7 +240,7 @@ export async function tell(nodes: ShardusTypes.Node[], route, message, logged = 
   return msgSize
 }
 
-export async function tell2<TReq>(
+export async function tellBinary<TReq>(
   nodes: ShardusTypes.Node[],
   route: string,
   message: TReq,
@@ -249,8 +249,8 @@ export async function tell2<TReq>(
   logged = false,
   tracker = ''
 ) {
-  profilerInstance.profileSectionStart('p2p-tell2')
-  profilerInstance.profileSectionStart(`p2p-tell2-${route}`)
+  profilerInstance.profileSectionStart('p2p-tellBinary')
+  profilerInstance.profileSectionStart(`p2p-tellBinary-${route}`)
   let msgSize = cUninitializedSize
   if (tracker === '') {
     tracker = createMsgTracker(route)
@@ -261,20 +261,24 @@ export async function tell2<TReq>(
   const wrappedReq = requestSerializer(message, serializerFunc)
 
   if (commsCounters) {
-    nestedCountersInstance.countEvent('comms-route', `tell2 ${route}`, nodes.length)
-    /* prettier-ignore */ nestedCountersInstance.countEvent('comms-route x recipients', `tell2 ${route} recipients:${nodes.length}`, nodes.length)
-    nestedCountersInstance.countEvent('comms-recipients', `tell2 recipients: ${nodes.length}`, nodes.length)
-    /* prettier-ignore */ nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `tell2 ${route} recipients:${nodes.length}`)
+    nestedCountersInstance.countEvent('comms-route', `tellBinary ${route}`, nodes.length)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('comms-route x recipients', `tellBinary ${route} recipients:${nodes.length}`, nodes.length)
+    nestedCountersInstance.countEvent(
+      'comms-recipients',
+      `tellBinary recipients: ${nodes.length}`,
+      nodes.length
+    )
+    /* prettier-ignore */ nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `tellBinary ${route} recipients:${nodes.length}`)
   }
 
   const nonSelfNodes = nodes.filter((node) => node.id !== Self.id)
   try {
-    await network.tell2(nonSelfNodes, route, wrappedReq.getBuffer(), appHeader, tracker, logged)
+    await network.tellBinary(nonSelfNodes, route, wrappedReq.getBuffer(), appHeader, tracker, logged)
   } catch (err) {
-    warn('tell2: network.tell2: P2P TELL2: failed', err)
+    warn('tellBinary: network.tellBinary: P2P TELL_BINARY: failed', err)
   }
-  profilerInstance.profileSectionEnd('p2p-tell2')
-  profilerInstance.profileSectionEnd(`p2p-tell2-${route}`)
+  profilerInstance.profileSectionEnd('p2p-tellBinary')
+  profilerInstance.profileSectionEnd(`p2p-tellBinary-${route}`)
   return msgSize
 }
 
@@ -375,7 +379,7 @@ export async function ask(
   }
 }
 
-export async function ask2<TReq, TResp>(
+export async function askBinary<TReq, TResp>(
   node: ShardusTypes.Node,
   route: string,
   message: TReq,
@@ -393,22 +397,22 @@ export async function ask2<TReq, TResp>(
   if (!appHeader.sender_id) appHeader.sender_id = Self.id
 
   if (node.id === Self.id) {
-    if (logFlags.p2pNonFatal) info('p2p/Comms: ask2: Not asking self')
+    if (logFlags.p2pNonFatal) info('p2p/Comms: askBinary: Not asking self')
     throw new Error('Not asking self')
   }
 
   const wrappedReq = requestSerializer(message, reqSerializerFunc)
 
   if (commsCounters) {
-    nestedCountersInstance.countEvent('comms-route', `ask2 ${route}`)
-    nestedCountersInstance.countEvent('comms-route x recipients', `ask2 ${route} recipients: 1`)
-    nestedCountersInstance.countEvent('comms-recipients', `ask2 recipients: 1`)
-    /* prettier-ignore */ nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `ask2 ${route} recipients: 1`)
+    nestedCountersInstance.countEvent('comms-route', `askBinary ${route}`)
+    nestedCountersInstance.countEvent('comms-route x recipients', `askBinary ${route} recipients: 1`)
+    nestedCountersInstance.countEvent('comms-recipients', `askBinary recipients: 1`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `askBinary ${route} recipients: 1`)
   }
 
   let res, header: AppHeader, sign: Sign
   try {
-    ;({ res, header, sign } = await network.ask2(
+    ;({ res, header, sign } = await network.askBinary(
       node,
       route,
       wrappedReq.getBuffer(),
@@ -418,26 +422,26 @@ export async function ask2<TReq, TResp>(
       extraTime
     ))
   } catch (err) {
-    console.log('P2P: ask2: network.ask: ' + err)
-    error('P2P: ask2: network.ask: ' + err)
+    console.log('P2P: askBinary: network.askBinary: ' + err)
+    error('P2P: askBinary: network.askBinary: ' + err)
     throw err
   }
   try {
     if (!res)
-      /* prettier-ignore */ throw new Error(`Empty response to ask2 request: ${route} -- ${JSON.stringify(message)} from node: ${node.id}`)
+      /* prettier-ignore */ throw new Error(`Empty response to askBinary request: ${route} -- ${JSON.stringify(message)} from node: ${node.id}`)
 
     if (header && sign)
       if (header.sender_id !== node.id || sign.owner !== node.publicKey) {
-        warn('ask2: response did not come from the expected node.')
-        throw new Error('ask2: response did not come from the expected node.')
+        warn('askBinary: response did not come from the expected node.')
+        throw new Error('askBinary: response did not come from the expected node.')
       }
 
     const respStream = VectorBufferStream.fromBuffer(res)
     const deserializedResp = responseDeserializer(respStream, respDeserializerFunc)
     return deserializedResp
   } catch (err) {
-    error('P2P: ask2: response extraction: ' + err)
-    console.log('P2P: ask2: response extraction: ' + err)
+    error('P2P: askBinary: response extraction: ' + err)
+    console.log('P2P: askBinary: response extraction: ' + err)
     throw err
   }
 }
@@ -526,13 +530,14 @@ export function registerInternal(route, handler) {
   network.registerInternal(route, wrappedHandler)
 }
 
-export function registerInternal2(route: string, handler: InternalBinaryHandler) {
+export function registerInternalBinary(route: string, handler: InternalBinaryHandler) {
   const wrappedHandler = async (wrappedPayload, respond, header: AppHeader, sign: Sign) => {
-    /* prettier-ignore */ if(logFlags.p2pNonFatal) info('registerInternal2: wrappedPayload', utils.stringifyReduceLimit(wrappedPayload))
+    /* prettier-ignore */ if(logFlags.p2pNonFatal) info('registerInternalBinary: wrappedPayload', utils.stringifyReduceLimit(wrappedPayload))
     internalRecvCounter++
     // We have internal requests turned off until we have a node id
     if (!acceptInternal) {
-      if (logFlags.p2pNonFatal) info('registerInternal2: we are not currently accepting internal requests...')
+      if (logFlags.p2pNonFatal)
+        info('registerInternalBinary: we are not currently accepting internal requests...')
       return
     }
 
@@ -545,7 +550,7 @@ export function registerInternal2(route: string, handler: InternalBinaryHandler)
       const wrappedRespStream = responseSerializer(response, serializerFunc)
       responseHeaders.sender_id = Self.id
       responseHeaders.tracker_id = header.tracker_id
-      /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternal2: wrapped response to send back: ${wrappedRespStream.getBuffer()} size: ${wrappedRespStream.getBufferLength()}`)
+      /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternalBinary: wrapped response to send back: ${wrappedRespStream.getBuffer()} size: ${wrappedRespStream.getBufferLength()}`)
       if (route !== 'gossip') {
         /* prettier-ignore */ if (logFlags.playback) logger.playbackLog(header.sender_id, 'self', 'InternalRecvResp', route, header.tracker_id, response)
       }
@@ -553,15 +558,15 @@ export function registerInternal2(route: string, handler: InternalBinaryHandler)
       return wrappedRespStream.getBufferLength()
     }
     /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) console.log('header:', header)
-    /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternal2: request info: route: ${route} header: ${JSON.stringify(header)} sign: ${JSON.stringify(sign)}`)
+    /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternalBinary: request info: route: ${route} header: ${JSON.stringify(header)} sign: ${JSON.stringify(sign)}`)
     if (!NodeList.byPubKey.has(sign.owner) && !NodeList.nodes.has(header.sender_id)) {
-      warn('registerInternal2: internal routes can only be used by nodes in the network...')
+      warn('registerInternalBinary: internal routes can only be used by nodes in the network...')
       return
     }
     // Checks to see if we can extract the actual payload from the wrapped message
     const requestPayload = _extractPayload2(wrappedPayload)
     if (!requestPayload) {
-      warn('registerInternal2: payload unable to be extracted, possible missing signature...')
+      warn('registerInternalBinary: payload unable to be extracted, possible missing signature...')
       return
     }
     if (route !== 'gossip') {

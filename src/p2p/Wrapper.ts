@@ -16,11 +16,15 @@ import { P2P as P2PTypings } from '@shardus/types'
 import * as CycleAutoScale from './CycleAutoScale'
 import { ShardusTypes } from '../shardus'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { AppHeader } from '@shardus/net/build/src/types'
+import { InternalBinaryHandler } from '../types/Handler'
 
 /* p2p functions */
 
 export class P2P extends EventEmitter {
   registerInternal: (route: any, handler: any) => void
+  registerInternalBinary: (route: string, handler: InternalBinaryHandler) => void
   registerGossipHandler: (type: any, handler: any) => void
   unregisterGossipHandler: (type: any) => void
   unregisterInternal: (route: any) => void
@@ -33,6 +37,15 @@ export class P2P extends EventEmitter {
     extraTime?: number
   ) => Promise<any>
   tell: (nodes: any, route: any, message: any, logged?: boolean, tracker?: string) => Promise<number>
+  tellBinary: <TReq>(
+    nodes: ShardusTypes.Node[],
+    route: string,
+    message: TReq,
+    serializerFunc: (stream: VectorBufferStream, obj: TReq, root?: boolean) => void,
+    appHeader: AppHeader,
+    logged?: boolean,
+    tracker?: string
+  ) => Promise<number>
   sendGossipIn: (
     type: any,
     payload: any,
@@ -56,11 +69,13 @@ export class P2P extends EventEmitter {
   constructor() {
     super()
     this.registerInternal = Comms.registerInternal
+    this.registerInternalBinary = Comms.registerInternalBinary
     this.registerGossipHandler = Comms.registerGossipHandler
     this.unregisterGossipHandler = Comms.unregisterGossipHandler
     this.unregisterInternal = Comms.unregisterInternal
     this.ask = Comms.ask
     this.tell = Comms.tell
+    this.tellBinary = Comms.tellBinary
     this.sendGossipIn = Comms.sendGossip
     this.robustQuery = Utils.robustQuery
     this.sendGossipAll = Comms.sendGossipAll //Need this but will try sendGossipIn as a work around
@@ -119,7 +134,7 @@ export class P2P extends EventEmitter {
       Self.emitter.on('active', () => resolve())
     })
     Active.requestActive()
-    console.log("return goActive promise...")
+    console.log('return goActive promise...')
     return activePromise
   }
 

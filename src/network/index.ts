@@ -255,7 +255,7 @@ export class NetworkClass extends EventEmitter {
     }
   }
 
-  async tell2(
+  async tellBinary(
     nodes: Shardus.Node[],
     route: string,
     message: Buffer,
@@ -266,26 +266,26 @@ export class NetworkClass extends EventEmitter {
     const data = { route, payload: message }
     const promises = []
     for (const node of nodes) {
-      /* prettier-ignore */ if (logFlags.playback && alreadyLogged === false) this.logger.playbackLog('self', node, 'InternalTell2', route, trackerId, message)
+      /* prettier-ignore */ if (logFlags.playback && alreadyLogged === false) this.logger.playbackLog('self', node, 'InternalTellBinary', route, trackerId, message)
       const requestId = generateUUID()
-      /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`tell2: initiating tell request with requestId: ${requestId}`)
-      /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`tell2: requestId: ${requestId}, node: ${utils.logNode(node)}`)
-      /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`tell2: route: ${route}, message: ${message} requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`tellBinary: initiating tell request with requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`tellBinary: requestId: ${requestId}, node: ${utils.logNode(node)}`)
+      /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`tellBinary: route: ${route}, message: ${message} requestId: ${requestId}`)
       this.InternalTellCounter++
       const promise = this.sn.sendWithHeader(node.internalPort, node.internalIp, data, appHeader)
       promise.catch((err) => {
-        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tell2) on ${route}: ${formatErrorMessage(err)}`)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tellBinary) on ${route}: ${formatErrorMessage(err)}`)
         let errorGroup = ('' + err).slice(0, 20)
-        nestedCountersInstance.countEvent('network', `error2-tell2 ${route}`)
-        this.emit('error', node, requestId, 'tell2', errorGroup, route)
+        nestedCountersInstance.countEvent('network', `error2-tellBinary ${route}`)
+        this.emit('error', node, requestId, 'tellBinary', errorGroup, route)
       })
       promises.push(promise)
     }
     try {
       await Promise.all(promises)
     } catch (err) {
-      nestedCountersInstance.countEvent('network', `error-tell2 ${route}`)
-      /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tell2-promise) on ${route}: ${formatErrorMessage(err)}`)
+      nestedCountersInstance.countEvent('network', `error-tellBinary ${route}`)
+      /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tellBinary-promise) on ${route}: ${formatErrorMessage(err)}`)
     }
   }
 
@@ -346,7 +346,7 @@ export class NetworkClass extends EventEmitter {
     })
   }
 
-  ask2(
+  askBinary(
     node,
     route: string,
     message: Buffer,
@@ -359,16 +359,16 @@ export class NetworkClass extends EventEmitter {
       this.InternalAskCounter++
 
       const requestId = generateUUID()
-      /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`ask2: initiating ask request with requestId: ${requestId}`)
-      /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`ask2: requestId: ${requestId}, node: ${utils.logNode(node)}`)
-      /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`ask2: route: ${route}, message: ${message} requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`askBinary: initiating ask request with requestId: ${requestId}`)
+      /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`askBinary: requestId: ${requestId}, node: ${utils.logNode(node)}`)
+      /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`askBinary: route: ${route}, message: ${message} requestId: ${requestId}`)
 
       try {
         if (this.debugNetworkDelay > 0) {
           await utils.sleep(this.debugNetworkDelay)
         }
-        profilerInstance.profileSectionStart('net-ask2')
-        profilerInstance.profileSectionStart(`net-ask2-${route}`)
+        profilerInstance.profileSectionStart('net-askBinary')
+        profilerInstance.profileSectionStart(`net-askBinary-${route}`)
 
         const data = { route, payload: message }
         const onRes = (res, header, sign) => {
@@ -378,10 +378,10 @@ export class NetworkClass extends EventEmitter {
         const onTimeout = () => {
           nestedCountersInstance.countEvent('network', 'timeout')
           if (this.statisticsInstance) this.statisticsInstance.incrementCounter('networkTimeout')
-          const err = new Error(`ask2: request timed out. ${utils.stringifyReduce(trackerId)}`)
+          const err = new Error(`askBinary: request timed out. ${utils.stringifyReduce(trackerId)}`)
           nestedCountersInstance.countRareEvent('network', 'timeout ' + route)
-          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network timeout (ask2) on ${route}: ${formatErrorMessage(err)}`)
-          this.emit('timeout', node, requestId, 'ask2')
+          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network timeout (askBinary) on ${route}: ${formatErrorMessage(err)}`)
+          this.emit('timeout', node, requestId, 'askBinary')
           reject(err)
         }
         /* prettier-ignore */ if (logFlags.playback && alreadyLogged === false) this.logger.playbackLog('self', node, 'InternalAsk', route, trackerId, message)
@@ -396,15 +396,15 @@ export class NetworkClass extends EventEmitter {
             onTimeout
           )
         } catch (err) {
-          nestedCountersInstance.countEvent('network', `error-ask2 ${route}`)
-          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (ask2) on ${route}: ${formatErrorMessage(err)}`)
+          nestedCountersInstance.countEvent('network', `error-askBinary ${route}`)
+          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (askBinary) on ${route}: ${formatErrorMessage(err)}`)
           let errorGroup = ('' + err).slice(0, 20)
-          //this.mainLogger.info(`ask2: sendWithHeader: error: ${err}`)
+          //this.mainLogger.info(`askBinary: sendWithHeader: error: ${err}`)
           this.emit('error', node, requestId, 'ask', errorGroup, route)
         }
       } finally {
-        profilerInstance.profileSectionEnd('net-ask2')
-        profilerInstance.profileSectionEnd(`net-ask2-${route}`)
+        profilerInstance.profileSectionEnd('net-askBinary')
+        profilerInstance.profileSectionEnd(`net-askBinary-${route}`)
       }
     })
   }

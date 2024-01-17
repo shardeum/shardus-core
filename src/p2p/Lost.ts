@@ -970,10 +970,10 @@ function pruneIsDown() {
   const cachePruneAge = config.p2p.isDownCachePruneCycles
 
   for (const [key, value] of Object.entries(isDown)) {
-    if (value < currentCycle - cachePruneAge) delete isDown[key]
+    if (typeof value === 'number' && value < currentCycle - cachePruneAge) delete isDown[key]
   }
   for (const [key, value] of Object.entries(isUp)) {
-    if (value < currentCycle - cachePruneAge) delete isUp[key]
+    if (typeof value === 'number' && value < currentCycle - cachePruneAge) delete isUp[key]
   }
 }
 
@@ -981,7 +981,7 @@ function pruneStopReporting() {
   const stopReportingPruneCycles = config.p2p.stopReportingLostPruneCycles
 
   for (const [key, value] of Object.entries(stopReporting)) {
-    if (value < currentCycle - stopReportingPruneCycles) delete stopReporting[key]
+    if ((value as number) < currentCycle - stopReportingPruneCycles) delete stopReporting[key]
   }
 }
 
@@ -1036,7 +1036,7 @@ async function isDownCheck(node) {
       }
     } else {
       //using the 'apoptosize' route to check if the node is up.
-      const res = await Comms.ask2<ApoptosisProposalReq, ApoptosisProposalResp>(
+      const res = await Comms.askBinary<ApoptosisProposalReq, ApoptosisProposalResp>(
         node,
         'apoptosize',
         {

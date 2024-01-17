@@ -12,6 +12,8 @@ export { nestedCountersInstance } from './utils/nestedCounters'
 
 export { DevSecurityLevel } from './shardus/shardus-types'
 
+export { VectorBufferStream } from './utils/serialization/VectorBufferStream'
+
 //export { JoinRequest } from './shardus/shardus-types'
 
 // Temporary private export to avoid digging into shardus source code for
