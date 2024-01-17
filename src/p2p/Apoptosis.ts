@@ -363,7 +363,7 @@ export async function apoptosizeSelf(message: string) {
     /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}   ${message}`)
   }
   // Omar - added the following line. Maybe we should emit an event when we apoptosize so other modules and app can clean up
-  Self.emitter.emit('invoke-exit', getCallstack(), message) // we can pass true as a parameter if we want to be restarted
+  Self.emitter.emit('invoke-exit', `In apoptosizeSelf. ${message}`, getCallstack(), message) // we can pass true as a parameter if we want to be restarted
   // Omar - we should not add any proposal since we are exiting; we already sent our proposal to some nodes
   //  addProposal(proposal)
   /* prettier-ignore */ if (logFlags.important_as_fatal) error(`We have been apoptosized. Exiting with status 1. Will not be restarted. ${message}`)
