@@ -715,6 +715,11 @@ class TransactionConsenus {
         txId,
         tx,
       })
+      if (!timestampReceipt) {
+        if (logFlags.error) this.mainLogger.error('Unable to get timestamp receipt from home node')
+        return null
+      }
+
       delete timestampReceipt.isResponse
       const isValid = this.crypto.verify(timestampReceipt, homeNode.node.publicKey)
       if (isValid) {
