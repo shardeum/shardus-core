@@ -5,8 +5,9 @@ import { hexstring } from '@shardus/types'
 import * as utils from '../../../utils'
 import * as http from '../../../http'
 import * as NodeList from '../../NodeList'
-import { getStandbyNodesInfoMap } from '.'
+import { deleteStandbyNodeFromMap, getStandbyNodesInfoMap } from '.'
 import { getActiveNodesFromArchiver, getRandomAvailableArchiver } from '../../Utils'
+import { logFlags } from '../../../logger'
 
 /**
  * A request to leave the network's standby node list.
@@ -98,8 +99,8 @@ export function drainNewUnjoinRequests(): hexstring[] {
 }
 
 export function deleteStandbyNode(publicKey: hexstring): void {
-  if (getStandbyNodesInfoMap().delete(publicKey)) {
-    console.log(`--removed standby node ${publicKey} count: ${getStandbyNodesInfoMap().size}`)
+  if (deleteStandbyNodeFromMap(publicKey)) {
+    /* prettier-ignore */ if (logFlags.verbose) console.log(`--removed standby node ${publicKey} count: ${getStandbyNodesInfoMap().size}`)
   } else {
     console.log(`--failed to remove standby node ${publicKey} count: ${getStandbyNodesInfoMap().size}`)
   }
