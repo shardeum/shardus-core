@@ -163,6 +163,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     produceBadVote: false,
     produceBadChallenge: false,
     debugNTPErrorWindowMs: 200,
+    enableScopedProfiling: true,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {
@@ -211,7 +212,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     waitLimitAfterFirstVote: 2000,
     waitLimitAfterFirstMessage: 2000,
     minRequiredChallenges: 3,
-    useNewPOQ: false
+    useNewPOQ: false,
+    integrityCheckBeforeChallenge: true,
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

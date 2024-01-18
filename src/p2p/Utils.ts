@@ -318,9 +318,10 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       const node = nodes[i]
       queries.push(wrappedQuery(node))
     }
-    profilerInstance.scopedProfileSectionStart(`robustQuery ${note} queryNodes`)
+    if (logFlags.profiling_verbose)
+      profilerInstance.scopedProfileSectionStart(`robustQuery ${note} queryNodes`)
     const [results, errs] = await utils.robustPromiseAll<{ response: Response; node: Node }>(queries)
-    profilerInstance.scopedProfileSectionEnd(`robustQuery ${note} queryNodes`)
+    if (logFlags.profiling_verbose) profilerInstance.scopedProfileSectionEnd(`robustQuery ${note} queryNodes`)
 
     if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) {
       console.log('robustQuery results', note, results)

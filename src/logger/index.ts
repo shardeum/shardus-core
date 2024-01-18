@@ -95,6 +95,7 @@ export type LogFlags = {
   net_stats: boolean //the shardus net library will read this flag and log stats info if true
   net_rust: boolean //controls net logging rust code  all or nothing
   dapp_verbose: boolean //the dapp using this library will read this flag and log more info if true
+  profiling_verbose: boolean
 }
 
 export let logFlags: LogFlags = {
@@ -124,6 +125,7 @@ export let logFlags: LogFlags = {
   net_verbose: false,
   net_stats: false,
   dapp_verbose: false,
+  profiling_verbose: false,
 }
 
 class Logger {

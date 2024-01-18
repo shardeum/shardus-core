@@ -296,6 +296,7 @@ class Profiler {
   }
 
   scopedProfileSectionStart(sectionName: string, internal = false, messageSize: number = cNoSizeTrack): void {
+    if (Context.config.debug.enableScopedProfiling === false) return
     // eslint-disable-next-line security/detect-object-injection
     let section: SectionStat = this.scopedSectionTimes[sectionName]
 
@@ -360,6 +361,7 @@ class Profiler {
   }
 
   scopedProfileSectionEnd(sectionName: string, messageSize: number = cNoSizeTrack): void {
+    if (Context.config.debug.enableScopedProfiling === false) return
     // eslint-disable-next-line security/detect-object-injection
     const section = this.scopedSectionTimes[sectionName]
     if (section == null || section.started === false) {

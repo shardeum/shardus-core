@@ -778,7 +778,7 @@ export interface ServerConfiguration {
      */
     standbyListCyclesTTL: number
 
-    /** This limitts the amount of nodes removed from the network in a single cycle due to age in the strandby list.  
+    /** This limitts the amount of nodes removed from the network in a single cycle due to age in the strandby list.
      * This is to prevent a large number of nodes leaving all at once.  leaving is not a big deal but then they may try to sync/join again at the same time
      */
     standbyListMaxRemoveTTL: number
@@ -919,6 +919,8 @@ export interface ServerConfiguration {
     produceBadChallenge: boolean
     /**   add a random error to our ntp offset time +- */
     debugNTPErrorWindowMs: number
+    /**  Flag to enable detail scoped profiling **/
+    enableScopedProfiling: boolean
   }
   /** Options for the statistics module */
   statistics?: {
@@ -1026,6 +1028,8 @@ export interface ServerConfiguration {
     minRequiredChallenges: number
     // turn on the improved Proof of Quorum for large shards sizes
     useNewPOQ: boolean
+    // whether the node should verify its data against the network before challenging
+    integrityCheckBeforeChallenge: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

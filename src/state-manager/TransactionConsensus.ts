@@ -883,7 +883,7 @@ class TransactionConsenus {
    */
   async tryProduceReceipt(queueEntry: QueueEntry): Promise<AppliedReceipt> {
     this.profiler.profileSectionStart('tryProduceReceipt')
-    this.profiler.scopedProfileSectionStart('tryProduceReceipt')
+    if (logFlags.profiling_verbose) this.profiler.scopedProfileSectionStart('tryProduceReceipt')
     try {
       if (queueEntry.waitForReceiptOnly === true) {
         if (logFlags.debug)
@@ -1336,7 +1336,7 @@ class TransactionConsenus {
     } catch (e) {
       this.mainLogger.error(`tryProduceReceipt: ${queueEntry.logID} error: ${e.message}`)
     } finally {
-      this.profiler.scopedProfileSectionEnd('tryProduceReceipt')
+      if (logFlags.profiling_verbose) this.profiler.scopedProfileSectionEnd('tryProduceReceipt')
       this.profiler.profileSectionEnd('tryProduceReceipt')
     }
   }
@@ -1548,6 +1548,7 @@ class TransactionConsenus {
     consensNodes: Shardus.Node[],
     accountId: string
   ): Promise<Shardus.WrappedData> {
+    profilerInstance.profileSectionStart('robustQueryAccountData')
     const queryFn = async (node: Shardus.Node): Promise<GetAccountData3Resp> => {
       const ip = node.externalIp
       const port = node.externalPort
@@ -1579,8 +1580,10 @@ class TransactionConsenus {
     const { topResult: response } = await robustQuery(consensNodes, queryFn, eqFn, redundancy, false)
     if (response && response.data) {
       const accountData = response.data.wrappedAccounts[0]
+      profilerInstance.profileSectionEnd('robustQueryAccountData')
       return accountData
     }
+    profilerInstance.profileSectionEnd('robustQueryAccountData')
   }
 
   async confirmOrChallenge(queueEntry: QueueEntry): Promise<void> {
@@ -1601,6 +1604,13 @@ class TransactionConsenus {
         nestedCountersInstance.countEvent('confirmOrChallenge', 'in the middle of querying robust vote')
         return
       }
+      if (queueEntry.queryingRobustAccountData) {
+        nestedCountersInstance.countEvent(
+          'confirmOrChallenge',
+          'in the middle of querying robust account data'
+        )
+        return
+      }
       if (logFlags.debug)
         this.mainLogger.debug(
           `confirmOrChallenge: ${queueEntry.logID}  receivedBestVote: ${JSON.stringify(
@@ -1609,7 +1619,7 @@ class TransactionConsenus {
         )
 
       this.profiler.profileSectionStart('confirmOrChallenge')
-      this.profiler.scopedProfileSectionStart('confirmOrChallenge')
+      if (logFlags.profiling_verbose) this.profiler.scopedProfileSectionStart('confirmOrChallenge')
 
       const now = shardusGetTime()
       //  if we are in lowest 10% of execution group and agrees with the highest ranked vote, send out a confirm msg
@@ -1750,8 +1760,8 @@ class TransactionConsenus {
     } catch (e) {
       this.mainLogger.error(`confirmOrChallenge: ${queueEntry.logID} error: ${e.message}, ${e.stack}`)
     } finally {
+      if (logFlags.profiling_verbose) this.profiler.scopedProfileSectionEnd('confirmOrChallenge')
       this.profiler.profileSectionEnd('confirmOrChallenge')
-      this.profiler.scopedProfileSectionEnd('confirmOrChallenge')
     }
   }
 
@@ -1810,7 +1820,16 @@ class TransactionConsenus {
           break
         }
       }
-      const isAccountIntegrityOk = doStatesMatch ? true : await this.checkAccountIntegrity(queueEntry)
+      if (this.produceBadChallenge) doStatesMatch = false
+      let isAccountIntegrityOk = false
+
+      if (doStatesMatch) {
+        isAccountIntegrityOk = true
+      } else if (doStatesMatch === false && this.config.stateManager.integrityCheckBeforeChallenge === true) {
+        isAccountIntegrityOk = await this.checkAccountIntegrity(queueEntry)
+      } else {
+        isAccountIntegrityOk = true
+      }
 
       if (!isAccountIntegrityOk) {
         nestedCountersInstance.countEvent(
@@ -1819,6 +1838,8 @@ class TransactionConsenus {
         )
         if (logFlags.verbose)
           this.mainLogger.debug(`challengeVoteAndShare: ${queueEntry.logID} account integrity is not ok`)
+        // we should not challenge or confirm if account integrity is not ok
+        queueEntry.completedConfirmedOrChallenge = true
         return
       }
 
@@ -1849,8 +1870,26 @@ class TransactionConsenus {
 
   async checkAccountIntegrity(queueEntry: QueueEntry): Promise<boolean> {
     this.profiler.profileSectionStart('checkAccountIntegrity')
+    this.profiler.scopedProfileSectionStart('checkAccountIntegrity')
+    queueEntry.queryingRobustAccountData = true
     let success = true
-    // check account integrity before sending challenge
+
+    for (const key of queueEntry.uniqueKeys) {
+      const collectedAccountData = queueEntry.collectedData[key]
+      if (collectedAccountData.accountCreated) {
+        // we do not need to check this newly created account
+        // todo: still possible that node has lost data for this account
+        continue
+      }
+      const consensuGroupForAccount =
+        this.stateManager.transactionQueue.queueEntryGetConsensusGroupForAccount(queueEntry, key)
+      const promise = this.stateManager.transactionConsensus.robustQueryAccountData(
+        consensuGroupForAccount,
+        key
+      )
+      queueEntry.robustAccountDataPromises[key] = promise
+    }
+
     if (
       queueEntry.robustAccountDataPromises &&
       Object.keys(queueEntry.robustAccountDataPromises).length > 0
@@ -1871,7 +1910,10 @@ class TransactionConsenus {
             this.mainLogger.debug(`checkAccountIntegrity: ${queueEntry.logID} key: ${key} ok`)
         } else {
           success = false
-          nestedCountersInstance.countEvent('checkAccountIntegrity', 'collected data and robust data match')
+          nestedCountersInstance.countEvent(
+            'checkAccountIntegrity',
+            'collected data and robust data do not match'
+          )
           if (logFlags.debug) {
             this.mainLogger.debug(
               `checkAccountIntegrity: ${
@@ -1886,7 +1928,9 @@ class TransactionConsenus {
     } else {
       nestedCountersInstance.countEvent('checkAccountIntegrity', 'robustAccountDataPromises empty')
     }
+    this.profiler.scopedProfileSectionEnd('checkAccountIntegrity')
     this.profiler.profileSectionEnd('checkAccountIntegrity')
+    queueEntry.queryingRobustAccountData = false
     return success
   }
   /**

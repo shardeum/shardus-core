@@ -416,18 +416,23 @@ class TransactionQueue {
   }
 
   handleSharedTX(tx: Shardus.OpaqueTransaction, appData: unknown, sender: Shardus.Node): QueueEntry {
+    profilerInstance.profileSectionStart('handleSharedTX')
     const internalTx = this.app.isInternalTx(tx)
     if ((internalTx && !isInternalTxAllowed()) || (!internalTx && networkMode !== 'processing')) {
+      profilerInstance.profileSectionEnd('handleSharedTX')
       // Block invalid txs in case a node maliciously relays them to other nodes
       return null
     }
     // Perform fast validation of the transaction fields
+    profilerInstance.scopedProfileSectionStart('handleSharedTX_validateTX')
     const validateResult = this.app.validate(tx, appData)
+    profilerInstance.scopedProfileSectionStart('handleSharedTX_validateTX')
     if (validateResult.success === false) {
       this.statemanager_fatal(
         `spread_tx_to_group_validateTX`,
         `spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(validateResult)}`
       )
+      profilerInstance.profileSectionEnd('handleSharedTX')
       return null
     }
 
@@ -437,6 +442,7 @@ class TransactionQueue {
     // Check if we already have this tx in our queue
     let queueEntry = this.getQueueEntrySafe(id) // , payload.timestamp)
     if (queueEntry) {
+      profilerInstance.profileSectionEnd('handleSharedTX')
       return null
     }
 
@@ -449,6 +455,7 @@ class TransactionQueue {
     if (inRangeOfCurrentTime(timestamp, mostOfQueueSitTimeMs, txExpireTimeMs) === false) {
       /* prettier-ignore */ this.statemanager_fatal( `spread_tx_to_group_OldTx_or_tooFuture`, 'spread_tx_to_group cannot accept tx with age: ' + age )
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOldOrTooFuture', '', 'spread_tx_to_group working on tx with age: ' + age)
+      profilerInstance.profileSectionEnd('handleSharedTX')
       return null
     }
 
@@ -471,12 +478,15 @@ class TransactionQueue {
       noConsensus
     )
     if (added === 'lost') {
+      profilerInstance.profileSectionEnd('handleSharedTX')
       return null // we are faking that the message got lost so bail here
     }
     if (added === 'out of range') {
+      profilerInstance.profileSectionEnd('handleSharedTX')
       return null
     }
     if (added === 'notReady') {
+      profilerInstance.profileSectionEnd('handleSharedTX')
       return null
     }
     queueEntry = this.getQueueEntrySafe(id) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
@@ -486,9 +496,11 @@ class TransactionQueue {
       // downgrading, this does not seem to be fatal, but may need further logs/testing
       //this.statemanager_fatal(`spread_tx_to_group_noQE`, `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('spread_tx_to_group_noQE', '', `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(id)}`)
+      profilerInstance.profileSectionEnd('handleSharedTX')
       return null
     }
 
+    profilerInstance.profileSectionEnd('handleSharedTX')
     return queueEntry
   }
 
@@ -4081,7 +4093,8 @@ class TransactionQueue {
         // HANDLE TX logic based on state.
         try {
           this.profiler.profileSectionStart(`process-${queueEntry.state}`)
-          profilerInstance.scopedProfileSectionStart(`scoped-process-${queueEntry.state}`, false)
+          if (logFlags.profiling_verbose)
+            profilerInstance.scopedProfileSectionStart(`scoped-process-${queueEntry.state}`, false)
           pushedProfilerTag = queueEntry.state
 
           if (queueEntry.state === 'syncing') {
@@ -4302,24 +4315,6 @@ class TransactionQueue {
 
                   if (queueEntry.transactionGroup.length > 1) {
                     queueEntry.robustAccountDataPromises = {}
-                    // confirm the node has good data
-                    for (const key of queueEntry.uniqueKeys) {
-                      const collectedAccountData = queueEntry.collectedData[key]
-                      if (collectedAccountData.accountCreated) {
-                        // we do not need to check this newly created account
-                        // todo: still possible that node has lost data for this account
-                        continue
-                      }
-                      const consensuGroupForAccount = this.queueEntryGetConsensusGroupForAccount(
-                        queueEntry,
-                        key
-                      )
-                      const promise = this.stateManager.transactionConsensus.robustQueryAccountData(
-                        consensuGroupForAccount,
-                        key
-                      )
-                      queueEntry.robustAccountDataPromises[key] = promise
-                    }
                   }
 
                   queueEntry.executionDebug.log2 = 'call pre apply'
@@ -5019,7 +5014,8 @@ class TransactionQueue {
           }
         } finally {
           this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
-          profilerInstance.scopedProfileSectionEnd(`scoped-process-${pushedProfilerTag}`)
+          if (logFlags.profiling_verbose)
+            profilerInstance.scopedProfileSectionEnd(`scoped-process-${pushedProfilerTag}`)
 
           //let do some more stats work
           const txElapsed = shardusGetTime() - txStartTime
