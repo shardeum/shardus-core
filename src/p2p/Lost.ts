@@ -20,7 +20,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import { isApopMarkedNode, nodeDownString } from './Apoptosis'
 import * as Comms from './Comms'
-import { config, p2p, crypto, logger, network, stateManager } from './Context'
+import { config, p2p, crypto, logger, network, stateManager, shardus } from './Context'
 import { currentCycle, currentQuarter } from './CycleCreator'
 import { cycles } from './CycleChain'
 import * as NodeList from './NodeList'
@@ -341,7 +341,6 @@ export function getTxs(): P2P.LostTypes.Txs {
     if (seen[obj.target]) continue
     removedByAppTxs.push(obj)
     seen[obj.target] = true
-
   }
   return {
     lost: [...lostTxs],
@@ -732,7 +731,7 @@ function removeByApp(target: P2P.NodeListTypes.Node, certificate: P2P.LostTypes.
 
   const removedRec = appRemoved.get(target.id)
   if (removedRec) return // we have already removed this node for this cycle
-  appRemoved.set(target.id, {certificate, target: target.id})
+  appRemoved.set(target.id, { certificate, target: target.id })
   Comms.sendGossip('remove-by-app', certificate, '', Self.id, byIdOrder, true)
 }
 
@@ -924,9 +923,7 @@ export function isNodeLost(nodeId: string): boolean {
   return false
 }
 
-export function removeNodeWithCertificiate(
-  certificate: P2P.LostTypes.RemoveCertificate
-): void {
+export function removeNodeWithCertificiate(certificate: P2P.LostTypes.RemoveCertificate): void {
   const [success, message] = verifyRemoveCertificate(certificate, currentCycle - 1)
   if (!success) {
     error(`Bad certificate. reason:${message}`)
@@ -1221,7 +1218,7 @@ function removeByAppHandler(payload: P2P.LostTypes.RemoveCertificate, sender, tr
     warn(`cycle:${currentCycle} quarter:${currentQuarter} sender:${sender}`)
     return
   }
-  appRemoved.set(target, {target: target, certificate: payload})
+  appRemoved.set(target, { target: target, certificate: payload })
   Comms.sendGossip('remove-by-app', payload, tracker, Self.id, byIdOrder, false)
 }
 
@@ -1248,12 +1245,15 @@ function verifyRemoveCertificate(certificate: P2P.LostTypes.RemoveCertificate, c
   if (!node) return [false, 'nodePublicKey not in network']
   if (node.publicKey !== certificate.nodePublicKey) return [false, 'nodePublicKey does not match node']
   // the cycle should be the previous cycle when processing
-  if (certificate.cycle !== cycle) return [false, `cycle is not as expected. certificate.cycle: ${certificate.cycle} expected: ${cycle}`]
+  if (certificate.cycle !== cycle)
+    return [false, `cycle is not as expected. certificate.cycle: ${certificate.cycle} expected: ${cycle}`]
 
   const { success, reason } = shardus.validateClosestActiveNodeSignatures(
     certificate,
     certificate.signs,
-    4, 5, 2
+    4,
+    5,
+    2
   )
   if (!success) return [false, reason]
   return [true, '']
