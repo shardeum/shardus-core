@@ -1,6 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
-export const cApoptosisProposalReq = 1
 export const cApoptosisProposalReqVersion = 1
 
 export interface ApoptosisProposalReq {
@@ -17,7 +17,7 @@ export function serializeApoptosisProposalReq(
   if (obj == null) throw new Error('null obj')
   if (obj.id == null) throw new Error('null obj.id')
   if (root) {
-    stream.writeUInt16(cApoptosisProposalReq)
+    stream.writeUInt16(TypeIdentifierEnum.cApoptosisProposalReq)
   }
   stream.writeUInt16(cApoptosisProposalReqVersion)
   stream.writeString(obj.id)

@@ -1,6 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
-export const cWrappedData = 5
 export const cWrappedDataVersion = 1
 
 export interface WrappedData {
@@ -14,7 +14,7 @@ export interface WrappedData {
 
 export function serializeWrappedData(stream: VectorBufferStream, obj: WrappedData, root = false): void {
   if (root) {
-    stream.writeUInt16(cWrappedData)
+    stream.writeUInt16(TypeIdentifierEnum.cWrappedData)
   }
   stream.writeUInt16(cWrappedDataVersion)
   stream.writeUInt8(obj.accountCreated ? 1 : 0)

@@ -1,7 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { WrappedData, deserializeWrappedData, serializeWrappedData } from './WrappedData'
+import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
-export const cBroadcastStateReq = 6
 export const cBroadcastStateReqVersion = 1
 
 export interface BroadcastStateReq {
@@ -15,7 +15,7 @@ export function serializeBroadcastStateReq(
   root = false
 ): void {
   if (root) {
-    stream.writeUInt16(cBroadcastStateReq)
+    stream.writeUInt16(TypeIdentifierEnum.cBroadcastStateReq)
   }
   stream.writeUInt16(cBroadcastStateReqVersion)
   stream.writeString(obj.txid)

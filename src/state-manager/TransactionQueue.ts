@@ -43,7 +43,6 @@ import { shardusGetTime } from '../network'
 import { InternalBinaryHandler } from '../types/Handler'
 import {
   BroadcastStateReq,
-  cBroadcastStateReq,
   deserializeBroadcastStateReq,
   serializeBroadcastStateReq,
 } from '../types/BroadcastStateReq'
@@ -51,6 +50,7 @@ import { AppObjEnum } from '../types/enum/AppObjEnum'
 import { getStreamWithTypeCheck, requestErrorHandler, verificationDataCombiner } from '../types/Helpers'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
+import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 
 interface Receipt {
   tx: AcceptedTx
@@ -266,18 +266,19 @@ class TransactionQueue {
     )
 
     const broadcastStateRoute: P2PTypes.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
-      name: InternalRouteEnum.broadcast_state2,
+      name: InternalRouteEnum.binary_broadcast_state,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       handler: (payload, response, header, sign) => {
-        nestedCountersInstance.countEvent('internal', 'broadcast_state2')
-        profilerInstance.scopedProfileSectionStart('broadcast_state2', true, payload.length)
+        const route = InternalRouteEnum.binary_broadcast_state
+        nestedCountersInstance.countEvent('internal', route)
+        profilerInstance.scopedProfileSectionStart(route, true, payload.length)
         const errorHandler = (
           errorType: RequestErrorEnum,
           opts?: { customErrorLog?: string; customCounterSuffix?: string }
-        ): void => requestErrorHandler(InternalRouteEnum.broadcast_state2, errorType, header, opts)
+        ): void => requestErrorHandler(route, errorType, header, opts)
 
         try {
-          const requestStream = getStreamWithTypeCheck(payload, cBroadcastStateReq)
+          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cBroadcastStateReq)
           if (!requestStream) {
             return errorHandler(RequestErrorEnum.InvalidRequest)
           }
@@ -293,7 +294,7 @@ class TransactionQueue {
           const [vTxId, vStateSize, vStateAddress] = verificationDataParts
           const queueEntry = this.getQueueEntrySafe(vTxId)
           if (queueEntry == null) {
-            /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_state2 cant find queueEntry for: ${utils.makeShortHash(vTxId)}`)
+            /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`${route} cant find queueEntry for: ${utils.makeShortHash(vTxId)}`)
             return errorHandler(RequestErrorEnum.InvalidVerificationData)
           }
 
@@ -302,9 +303,9 @@ class TransactionQueue {
             vStateAddress,
             header.sender_id
           )
-          /* prettier-ignore */ if (logFlags.verbose && logFlags.console) console.log(`broadcast_state2 TxId: ${vTxId} isSenderValid: ${isSenderValid}`)
+          /* prettier-ignore */ if (logFlags.verbose && logFlags.console) console.log(`${route} TxId: ${vTxId} isSenderValid: ${isSenderValid}`)
           if (!isSenderValid) {
-            /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_state2 validateCorrespondingTellSender failed`)
+            /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`${route} validateCorrespondingTellSender failed`)
             return errorHandler(RequestErrorEnum.InvalidSender)
           }
 
@@ -316,7 +317,7 @@ class TransactionQueue {
           if (req.stateList.length !== parseInt(vStateSize)) {
             return errorHandler(RequestErrorEnum.InvalidVerificationData)
           }
-          /* prettier-ignore */ if (logFlags.verbose && logFlags.console) console.log(`broadcast_state2: txId: ${req.txid} stateSize: ${req.stateList.length} stateAddress: ${vStateAddress}`)
+          /* prettier-ignore */ if (logFlags.verbose && logFlags.console) console.log(`${route}: txId: ${req.txid} stateSize: ${req.stateList.length} stateAddress: ${vStateAddress}`)
 
           for (let i = 0; i < req.stateList.length; i++) {
             // eslint-disable-next-line security/detect-object-injection
@@ -325,7 +326,7 @@ class TransactionQueue {
               i !== 0 &&
               !this.validateCorrespondingTellSender(queueEntry, state.accountId, header.sender_id)
             ) {
-              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_state2 validateCorrespondingTellSender failed for ${state.accountId}`)
+              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`${route} validateCorrespondingTellSender failed for ${state.accountId}`)
               return errorHandler(RequestErrorEnum.InvalidSender)
             }
             const deserializedStateData = this.stateManager.app.binaryDeserializeObject(
@@ -345,7 +346,7 @@ class TransactionQueue {
             }
           }
         } finally {
-          profilerInstance.scopedProfileSectionEnd('broadcast_state2', payload.length)
+          profilerInstance.scopedProfileSectionEnd(route, payload.length)
         }
       },
     }
@@ -3100,13 +3101,19 @@ class TransactionQueue {
           timestamp: state.timestamp,
         })
       }
-      this.p2p.tellBinary<BroadcastStateReq>(nodes, 'broadcast_state2', request, serializeBroadcastStateReq, {
-        verification_data: verificationDataCombiner(
-          message.txid,
-          message.stateList.length.toString(),
-          request.stateList[0].accountId
-        ),
-      })
+      this.p2p.tellBinary<BroadcastStateReq>(
+        nodes,
+        InternalRouteEnum.binary_broadcast_state,
+        request,
+        serializeBroadcastStateReq,
+        {
+          verification_data: verificationDataCombiner(
+            message.txid,
+            message.stateList.length.toString(),
+            request.stateList[0].accountId
+          ),
+        }
+      )
       return
     }
     this.p2p.tell(nodes, 'broadcast_state', message)

@@ -1,6 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
-export const cWrappedReq = 3
 export const cWrappedReqVersion = 1
 
 export interface WrappedReq {
@@ -9,7 +9,7 @@ export interface WrappedReq {
 
 export function serializeWrappedReq(stream: VectorBufferStream, obj: WrappedReq, root = false): void {
   if (root) {
-    stream.writeUInt16(cWrappedReq)
+    stream.writeUInt16(TypeIdentifierEnum.cWrappedReq)
   }
   stream.writeUInt16(cWrappedReqVersion)
   stream.writeBuffer(obj.payload)

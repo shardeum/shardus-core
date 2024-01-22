@@ -25,7 +25,6 @@ import { isDebugMode } from '../debug'
 import { logFlags } from '../logger'
 import {
   ApoptosisProposalReq,
-  cApoptosisProposalReq,
   deserializeApoptosisProposalReq,
   serializeApoptosisProposalReq,
 } from '../types/ApoptosisProposalReq'
@@ -46,6 +45,7 @@ import { currentCycle, currentQuarter } from './CycleCreator'
 import { activeByIdOrder, byIdOrder, byPubKey, nodes } from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
+import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 
 /** STATE */
 
@@ -98,7 +98,7 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> 
     try {
       const requestStream = VectorBufferStream.fromBuffer(payload)
       const requestType = requestStream.readUInt16()
-      if (requestType !== cApoptosisProposalReq) {
+      if (requestType !== TypeIdentifierEnum.cApoptosisProposalReq) {
         /* prettier-ignore */ if (logFlags.error) warn(`apoptosisInternalRoute: bad requestType: ${requestType}`)
         let resp: ApoptosisProposalResp = { s: 'bad request', r: 1 }
         response(resp, serializeApoptosisProposalResp)

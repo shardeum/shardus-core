@@ -3,9 +3,10 @@ import { logFlags } from '../logger'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { WrappedReq, serializeWrappedReq } from './WrappedReq'
-import { WrappedResp, cWrappedResp, deserializeWrappedResp, serializeWrappedResp } from './WrappedResp'
+import { WrappedResp, deserializeWrappedResp, serializeWrappedResp } from './WrappedResp'
 import { InternalRouteEnum } from './enum/InternalRouteEnum'
 import { RequestErrorEnum } from './enum/RequestErrorEnum'
+import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export const responseSerializer = <T>(
   data: T,
@@ -28,7 +29,7 @@ export const responseDeserializer = <T>(
 ): T => {
   data.position = 0
   const responseType = data.readUInt16()
-  if (responseType !== cWrappedResp) {
+  if (responseType !== TypeIdentifierEnum.cWrappedResp) {
     throw new Error(`Invalid response stream: ${responseType}`)
   }
   const wrappedResp = deserializeWrappedResp(data)
