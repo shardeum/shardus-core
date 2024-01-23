@@ -148,6 +148,8 @@ export function getSortedStandbyJoinRequests(): JoinRequest[] {
 export function computeNewStandbyListHash(): hexstring {
 
   if(config.p2p.standbyListFastHash){
+    //this field must be udpated as it is used by other functions
+    lastHashedList = clone(getSortedStandbyJoinRequests())
     //sort hashes by value.  could sort by ID, but this is a bit faster
     const hashes = Array.from(standbyNodesInfoHashes.values())
     hashes.sort()
