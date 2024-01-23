@@ -465,7 +465,7 @@ class TransactionQueue {
     // Perform fast validation of the transaction fields
     profilerInstance.scopedProfileSectionStart('handleSharedTX_validateTX')
     const validateResult = this.app.validate(tx, appData)
-    profilerInstance.scopedProfileSectionStart('handleSharedTX_validateTX')
+    profilerInstance.scopedProfileSectionEnd('handleSharedTX_validateTX')
     if (validateResult.success === false) {
       this.statemanager_fatal(
         `spread_tx_to_group_validateTX`,

@@ -1136,7 +1136,7 @@ class Shardus extends EventEmitter {
       // Perform basic validation of the transaction fields
       if (logFlags.verbose) this.mainLogger.debug('Performing initial validation of the transaction')
 
-      let appData = {}
+      let appData: any = {}
 
       const internalTx = this.app.isInternalTx(tx)
       if (internalTx && !isInternalTxAllowed()) {
@@ -1156,7 +1156,14 @@ class Shardus extends EventEmitter {
 
       // Give the dapp an opportunity to do some up front work and generate
       // appData metadata for the applied TX
-      await this.app.txPreCrackData(tx, appData)
+      const preCrackSuccess = await this.app.txPreCrackData(tx, appData)
+      if (preCrackSuccess === false) {
+        return {
+          success: false,
+          reason: `PreCrack has failed. Rejecting the tx.`,
+          status: 500,
+        }
+      }
 
       const injectedTimestamp = this.app.getTimestampFromTransaction(tx, appData)
 
@@ -1926,13 +1933,16 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.txPreCrackData === 'function') {
-        applicationInterfaceImpl.txPreCrackData = async (tx, appData) => {
+        applicationInterfaceImpl.txPreCrackData = async (tx, appData): Promise<boolean> => {
           this.profiler.scopedProfileSectionStart('process-dapp.txPreCrackData', false)
-          await application.txPreCrackData(tx, appData)
+          let success = await application.txPreCrackData(tx, appData)
           this.profiler.scopedProfileSectionEnd('process-dapp.txPreCrackData')
+          return success
         }
       } else {
-        applicationInterfaceImpl.txPreCrackData = async function () {}
+        applicationInterfaceImpl.txPreCrackData = async function () {
+          return true
+        }
       }
 
       if (typeof application.getTimestampFromTransaction === 'function') {
