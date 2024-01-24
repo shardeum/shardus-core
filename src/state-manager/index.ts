@@ -2160,10 +2160,13 @@ class StateManager {
       const riCacheResult = await this.app.getCachedRIAccountData([address])
       if (riCacheResult != null) {
         if (riCacheResult.length > 0) {
+          nestedCountersInstance.countEvent('stateManager', 'getLocalOrRemoteAccount: RI cache hit')
           if (logFlags.verbose) this.mainLogger.debug(`getLocalOrRemoteAccount: RI cache hit for ${address}`)
           wrappedAccount = riCacheResult[0] as Shardus.WrappedDataFromQueue
           return wrappedAccount
         }
+      } else {
+        nestedCountersInstance.countEvent('stateManager', 'getLocalOrRemoteAccount: RI cache miss')
       }
     }
 
