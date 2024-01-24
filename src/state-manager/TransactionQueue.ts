@@ -347,16 +347,7 @@ class TransactionQueue {
             /* prettier-ignore */ if (logFlags.verbose) console.log( 'queueEntry.isInExecutionHome', queueEntry.acceptedTx.txId, queueEntry.isInExecutionHome )
             // If our node is in the execution group, forward this raw tx to the subscribed archivers
             if (queueEntry.isInExecutionHome === true) {
-              /* prettier-ignore */ if (logFlags.verbose) console.log('originalTxData', queueEntry.acceptedTx.txId)
-              const { acceptedTx } = queueEntry
-              const originalTxData = {
-                txId: acceptedTx.txId,
-                originalTxData: acceptedTx.data,
-                cycle: queueEntry.cycleToRecordOn,
-                timestamp: acceptedTx.timestamp,
-              }
-              const signedOriginalTxData: any = this.crypto.sign(originalTxData)
-              Archivers.instantForwardOriginalTxData(signedOriginalTxData)
+              this.addOriginalTxDataToForward(queueEntry)
             }
           }
         } finally {
@@ -415,44 +406,50 @@ class TransactionQueue {
     networkContext.registerExternalPost('get-tx-receipt', async (req, res) => {
       let result: { success: boolean; receipt?: ArchiverReceipt | AppliedReceipt2; reason?: string }
       try {
-        const error = utils.validateTypes(req.body, {
+        let error = utils.validateTypes(req.body, {
           txId: 's',
-          full_receipt: 's',
+          full_receipt: 'b',
           sign: 'o',
         })
-        if (error) res.json({ success: false, error })
+        if (error) return res.json((result = { success: false, reason: error }))
+        error = utils.validateTypes(req.body.sign, {
+          owner: 's',
+          sig: 's',
+        })
+        if (error) return res.json((result = { success: false, reason: error }))
 
-        const { txId, full_receipt } = req.body
-        const isReqFromArchiver = Archivers.archivers.has(req.body.sign.owner)
+        const { txId, full_receipt, sign } = req.body
+        const isReqFromArchiver = Archivers.archivers.has(sign.owner)
         if (!isReqFromArchiver) {
           result = { success: false, reason: 'Request not from Archiver.' }
         } else {
-          const isValidSignature = this.crypto.verify(req.body, req.body.sign.owner)
+          const isValidSignature = this.crypto.verify(req.body, sign.owner)
           if (isValidSignature) {
-            if (this.stateManager.transactionQueue.archivedQueueEntriesByID.has(txId as string)) {
-              const queueEntry = this.stateManager.transactionQueue.archivedQueueEntriesByID.get(
-                txId as string
-              )
-              if (full_receipt === 'true') {
-                const fullReceipt: ArchiverReceipt =
-                  this.stateManager.transactionQueue.getArchiverReceiptFromQueueEntry(queueEntry)
+            if (this.archivedQueueEntriesByID.has(txId)) {
+              const queueEntry = this.archivedQueueEntriesByID.get(txId)
+              if (full_receipt) {
+                const fullReceipt: ArchiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
                 result = JSON.parse(utils.cryptoStringify({ success: true, receipt: fullReceipt }))
               } else {
-                // returning appliedReceipt (AppliedReceipt2) from the fullReceipt (ArchiverReceipt)
                 result = { success: true, receipt: this.stateManager.getReceipt2(queueEntry) }
+              }
+            } else if (!full_receipt && this._transactionQueueByID.get(txId)?.state === 'commiting') {
+              result = {
+                success: true,
+                receipt: this.stateManager.getReceipt2(this._transactionQueueByID.get(txId)),
               }
             } else {
               result = { success: false, reason: 'Receipt Not Found.' }
+              return res.status(400).json(result)
             }
           } else {
             result = { success: false, reason: 'Invalid Signature.' }
           }
         }
-        if (!result.success) res.status(400).json(result)
-        else res.json(result)
+        res.json(result)
       } catch (e) {
         console.log('Error caught in /get-tx-receipt: ', e)
-        res.json(this.crypto.sign({ success: false, error: e }))
+        res.json((result = { success: false, reason: e }))
       }
     })
   }
@@ -1614,6 +1611,7 @@ class TransactionQueue {
                 this.stateManager.debugNodeGroup(txId, timestamp, `share to neighbors`, transactionGroup)
                 this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, transactionGroup, true)
                 /* prettier-ignore */ if (logFlags.verbose) console.log( 'spread_tx_to_group', txId, txQueueEntry.executionGroup.length, txQueueEntry.conensusGroup.length, txQueueEntry.transactionGroup.length )
+                this.addOriginalTxDataToForward(txQueueEntry)
               }
               // /* prettier-ignore */ if (logFlags.playback ) this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
             } catch (ex) {
@@ -5219,6 +5217,19 @@ class TransactionQueue {
       executionShardKey: queueEntry.executionShardKey,
     }
     return archiverReceipt
+  }
+
+  addOriginalTxDataToForward(queueEntry: QueueEntry): void {
+    /* prettier-ignore */ if (logFlags.verbose) console.log('originalTxData', queueEntry.acceptedTx.txId)
+    const { acceptedTx } = queueEntry
+    const originalTxData = {
+      txId: acceptedTx.txId,
+      originalTxData: acceptedTx.data,
+      cycle: queueEntry.cycleToRecordOn,
+      timestamp: acceptedTx.timestamp,
+    }
+    // const signedOriginalTxData: any = this.crypto.sign(originalTxData) // maybe we don't need to send by signing it
+    Archivers.instantForwardOriginalTxData(originalTxData)
   }
 
   addReceiptToForward(queueEntry: QueueEntry): void {

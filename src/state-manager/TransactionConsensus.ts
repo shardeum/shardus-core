@@ -1129,14 +1129,14 @@ class TransactionConsenus {
               result: false,
               appliedVotes: [queueEntry.receivedBestChallenge.appliedVote],
               confirmOrChallenge: [queueEntry.receivedBestChallenge],
-              app_data_hash: '',
+              app_data_hash: queueEntry.receivedBestChallenge.appliedVote.app_data_hash,
             }
             const appliedReceipt2: AppliedReceipt2 = {
               txid: queueEntry.receivedBestChallenge.appliedVote.txid,
               result: false,
               appliedVote: queueEntry.receivedBestChallenge.appliedVote,
               confirmOrChallenge: queueEntry.receivedBestChallenge,
-              app_data_hash: '',
+              app_data_hash: queueEntry.receivedBestChallenge.appliedVote.app_data_hash,
               signatures: [queueEntry.receivedBestChallenge.appliedVote.sign],
             }
             if (logFlags.debug)
@@ -1245,14 +1245,14 @@ class TransactionConsenus {
               result: winningVote.transaction_result,
               appliedVotes: [winningVote],
               confirmOrChallenge: [queueEntry.receivedBestConfirmation],
-              app_data_hash: '',
+              app_data_hash: winningVote.app_data_hash,
             }
             const appliedReceipt2: AppliedReceipt2 = {
               txid: winningVote.txid,
               result: winningVote.transaction_result,
               appliedVote: winningVote,
               confirmOrChallenge: queueEntry.receivedBestConfirmation,
-              app_data_hash: '',
+              app_data_hash: winningVote.app_data_hash,
               signatures: [winningVote.sign],
             }
             if (logFlags.debug || this.stateManager.consensusLog)

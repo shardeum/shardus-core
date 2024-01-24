@@ -26,7 +26,7 @@ import {
 import { apoptosizeSelf, isApopMarkedNode } from '../p2p/Apoptosis'
 import * as Archivers from '../p2p/Archivers'
 import * as Context from '../p2p/Context'
-import { config, stateManager } from '../p2p/Context'
+import { config } from '../p2p/Context'
 import * as AutoScaling from '../p2p/CycleAutoScale'
 import * as CycleChain from '../p2p/CycleChain'
 import * as CycleCreator from '../p2p/CycleCreator'
@@ -43,12 +43,7 @@ import * as ShardusTypes from '../shardus/shardus-types'
 import { WrappedData, DevSecurityLevel } from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
-import {
-  ArchiverReceipt,
-  AppliedReceipt2,
-  CachedAppData,
-  QueueCountsResult,
-} from '../state-manager/state-manager-types'
+import { CachedAppData, QueueCountsResult } from '../state-manager/state-manager-types'
 import { DebugComplete } from '../state-manager/TransactionQueue'
 import Statistics from '../statistics'
 import Storage from '../storage'
