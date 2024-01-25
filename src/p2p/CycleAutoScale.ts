@@ -88,9 +88,7 @@ export function reset() {
 export function getDesiredCount(): number {
   // having trouble finding a better way to update this!
   // Check the feature flag and set the lower limit accordingly
-  if (config.p2p.networkBaselineEnabled && desiredCount < config.p2p.baselineNodes) {
-    return (desiredCount = config.p2p.baselineNodes)
-  } else if (desiredCount < config.p2p.minNodes) {
+  if (desiredCount < config.p2p.minNodes) {
     return (desiredCount = config.p2p.minNodes)
   } else {
     return desiredCount
@@ -343,8 +341,9 @@ function _checkScaling() {
 }
 
 function setDesiredCount(count: number) {
-  // Set lower limit based on the feature flag
-  const lowerLimit = config.p2p.networkBaselineEnabled ? config.p2p.baselineNodes : config.p2p.minNodes
+  // Always use minNodes as the lower limit to prevent scaling down below the minimum required nodes for the network.
+  // This is to ensure that the network will not scale down when node count is below minNodes.
+  const lowerLimit = config.p2p.minNodes
 
   if (count >= lowerLimit && count <= config.p2p.maxNodes) {
     console.log('Setting desired count to', count)
@@ -401,9 +400,7 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`CycleAutoScale: prev target is ${prevRecord.target} and addRem is ${addRem}`)
         targetCount = prevRecord.target + addRem
         // may want to swap config values to values from cycle record
-        if (config.p2p.networkBaselineEnabled && targetCount < config.p2p.baselineNodes) {
-          targetCount = config.p2p.baselineNodes
-        } else if (targetCount < config.p2p.minNodes) {
+        if (targetCount < config.p2p.minNodes) {
           targetCount = config.p2p.minNodes
         } else if (targetCount > config.p2p.maxNodes) {
           targetCount = config.p2p.maxNodes
@@ -442,9 +439,7 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
 }
 
 export function configUpdated() {
-  if (config.p2p.networkBaselineEnabled && desiredCount < config.p2p.baselineNodes) {
-    desiredCount = config.p2p.baselineNodes
-  } else if (desiredCount < config.p2p.minNodes) {
+  if (desiredCount < config.p2p.minNodes) {
     desiredCount = config.p2p.minNodes
     //requestNetworkUpsize updates desiredCount internally
     //we may still want this, but need some special testing to be sure
