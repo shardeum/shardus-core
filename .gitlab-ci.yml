@@ -29,7 +29,7 @@ prepare-job:
     - node -v
 
 # Lint job: Run ESLint for code linting
-lint-job:
+.lint-job:
   <<: *common-job-template
   stage: build_and_lint_and_check
   needs: ['prepare-job']
