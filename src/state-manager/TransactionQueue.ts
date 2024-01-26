@@ -5372,8 +5372,9 @@ class TransactionQueue {
       beforeStateAccounts: [...Object.values(beforeAccountsToAdd)],
       accounts: [...Object.values(accountsToAdd)],
       appReceiptData: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
-      appliedReceipt: this.stateManager.getReceipt2(queueEntry),
-      executionShardKey: queueEntry.executionShardKey,
+      appliedReceipt: this.stateManager.getReceipt2(queueEntry) || ({} as AppliedReceipt2),
+      executionShardKey: queueEntry.executionShardKey || '',
+      globalModification: queueEntry.globalModification,
     }
     return archiverReceipt
   }
