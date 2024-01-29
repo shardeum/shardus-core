@@ -1184,7 +1184,7 @@ class AccountSync {
               queueEntry.txGroupDebug = `${before} -> ${queueEntry.ourNodeInTransactionGroup}`
 
               //if(queueEntry.ourNodeInTransactionGroup === true){
-              queueEntry.state = 'aging'
+              this.stateManager.transactionQueue.updateTxState(queueEntry, 'aging')
               queueEntry.didWakeup = true
               this.stateManager.transactionQueue.updateHomeInformation(queueEntry)
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote( 'shrd_sync_wakeupTX', `${queueEntry.acceptedTx.txId}`, `before: ${before} inTXGrp: ${queueEntry.ourNodeInTransactionGroup} qId: ${ queueEntry.entryID } ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce( queueEntry.txKeys.allKeys )}` )

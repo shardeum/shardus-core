@@ -10,6 +10,7 @@ import { potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import * as utils from '../utils'
+import * as Self from '../p2p/Self'
 import { errorToStringFull, inRangeOfCurrentTime, stringify, withTimeout, XOR } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
@@ -358,8 +359,6 @@ class TransactionQueue {
       async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
         profilerInstance.scopedProfileSectionStart('broadcast_finalstate')
         try {
-          if (logFlags.debug)
-            this.mainLogger.debug(`broadcast_finalstate ${payload.txid}, ${stringify(payload.stateList)}`)
           // make sure we have it
           const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
           if (queueEntry == null) {
@@ -367,6 +366,8 @@ class TransactionQueue {
             //The normal mechanism of sharing TXs is good enough.
             return
           }
+          if (logFlags.debug)
+            this.mainLogger.debug(`broadcast_finalstate ${queueEntry.logID}, ${stringify(payload.stateList)}`)
           // add the data in
           for (const data of payload.stateList) {
             //let wrappedResponse = data as Shardus.WrappedResponse
@@ -723,6 +724,7 @@ class TransactionQueue {
 
     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log('preApplyTransaction ' + timestamp + ' debugInfo:' + debugInfo)
     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('preApplyTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+    this.txDebugMarkStartTime(queueEntry, 'preApplyTransaction')
 
     //TODO need to adjust logic to add in more stuff.
     // may only need this in the case where we have hopped over to another shard or additional
@@ -732,6 +734,7 @@ class TransactionQueue {
     for (const key of uniqueKeys) {
       if (wrappedStates[key] == null) {
         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.console) console.log(`preApplyTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
+        this.txDebugMarkEndTime(queueEntry, 'preApplyTransaction')
         return { applied: false, passed: false, applyResult: '', reason: 'missing some account data' }
       } else {
         const wrappedState = wrappedStates[key]
@@ -754,6 +757,7 @@ class TransactionQueue {
     if (!accountTimestampsAreOK) {
       if (logFlags.verbose) this.mainLogger.debug('preApplyTransaction pretest failed: ' + timestamp)
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tx_preapply_rejected 1', `${acceptedTX.txId}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+      this.txDebugMarkEndTime(queueEntry, 'preApplyTransaction')
       return {
         applied: false,
         passed: false,
@@ -793,13 +797,10 @@ class TransactionQueue {
 
       this.profiler.profileSectionStart('process-dapp.apply')
       this.profiler.scopedProfileSectionStart('apply_duration')
-      const startTime = process.hrtime()
 
       /* prettier-ignore */ this.setDebugLastAwaitedCallInner('stateManager.transactionQueue.app.apply(tx)')
       applyResponse = await this.app.apply(tx as Shardus.OpaqueTransaction, wrappedStates, appData)
       /* prettier-ignore */ this.setDebugLastAwaitedCallInner('stateManager.transactionQueue.app.apply(tx)', DebugComplete.Completed)
-      const endTime = process.hrtime(startTime)
-      queueEntry.txDebug.duration['apply_duration'] = endTime[1] / 1000000
       this.profiler.scopedProfileSectionEnd('apply_duration')
       this.profiler.profileSectionEnd('process-dapp.apply')
       if (applyResponse == null) {
@@ -881,6 +882,7 @@ class TransactionQueue {
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.txId}`, `preApplyTransaction ${timestamp} `)
     if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction ${timestamp}`)
 
+    this.txDebugMarkEndTime(queueEntry, 'preApplyTransaction')
     return {
       applied: true,
       passed: passedApply,
@@ -1440,6 +1442,8 @@ class TransactionQueue {
         involvedWrites: {},
         txDebug: {
           enqueueHrTime: process.hrtime(),
+          startTime: {},
+          endTime: {},
           duration: {},
         },
         executionGroupMap: new Map(),
@@ -1454,6 +1458,7 @@ class TransactionQueue {
         acceptConfirmOrChallenge: true,
         accountDataSet: false,
       } // age comes from timestamp
+      this.txDebugMarkStartTime(txQueueEntry, 'total_queue_time')
 
       // todo faster hash lookup for this maybe?
       const entry = this.getQueueEntrySafe(acceptedTx.txId) // , acceptedTx.timestamp)
@@ -1824,6 +1829,8 @@ class TransactionQueue {
   }
 
   async queueEntryPrePush(txQueueEntry: QueueEntry): Promise<void> {
+    this.profiler.profileSectionStart('queueEntryPrePush')
+    this.profiler.scopedProfileSectionStart('queueEntryPrePush')
     // Pre fetch immutable read account data for this TX
     if (
       this.config.features.enableRIAccountsCache &&
@@ -1852,6 +1859,8 @@ class TransactionQueue {
         }
       }
     }
+    this.profiler.scopedProfileSectionEnd('queueEntryPrePush')
+    this.profiler.profileSectionStart('queueEntryPrePush')
   }
 
   /***
@@ -2190,7 +2199,7 @@ class TransactionQueue {
 
       //give up and wait for receipt
       queueEntry.waitForReceiptOnly = true
-      queueEntry.state = 'consensing'
+      this.updateTxState(queueEntry, 'consensing')
     }
   }
 
@@ -2540,6 +2549,9 @@ class TransactionQueue {
       for (const node of homeNode.nodeThatStoreOurParitionFull) {
         // not iterable!
         uniqueNodes[node.id] = node
+        if (node.id === Self.id)
+          if (logFlags.verbose)
+            /* prettier-ignore */ this.mainLogger.debug(`queueEntryGetTransactionGroup tx ${queueEntry.logID} our node coverage key ${key}`)
       }
 
       const scratch1 = {}
@@ -3585,6 +3597,10 @@ class TransactionQueue {
             continue
           }
           const filterdCorrespondingAccNodes = filteredNodes
+          const filterNodesIpPort = filterdCorrespondingAccNodes.map(
+            (node) => node.externalIp + ':' + node.externalPort
+          )
+          /* prettier-ignore */ if (logFlags.error) this.mainLogger.debug('tellcorrernodingnodesfinaldata', queueEntry.logID, ` : filterValidNodesForInternalMessage ${filterNodesIpPort} for accounts: ${utils.stringifyReduce(message.stateList)}`)
           this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
           totalShares++
         }
@@ -3658,6 +3674,7 @@ class TransactionQueue {
    * @param {number} currentIndex
    */
   removeFromQueue(queueEntry: QueueEntry, currentIndex: number): void {
+    this.txDebugMarkEndTime(queueEntry, 'total_queue_time')
     queueEntry.txDebug.dequeueHrTime = process.hrtime(queueEntry.txDebug.enqueueHrTime)
     queueEntry.txDebug.duration['queue_sit_time'] = queueEntry.txDebug.dequeueHrTime[1] / 1000000
     this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx.txId)
@@ -3849,7 +3866,7 @@ class TransactionQueue {
           if (age > timeM) {
             /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld2', `${utils.makeShortHash(txQueueEntry.acceptedTx.txId)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
             txQueueEntry.waitForReceiptOnly = true
-            txQueueEntry.state = 'consensing'
+            this.updateTxState(txQueueEntry, 'consensing')
           }
 
           // do not injest tranactions that are long expired. there could be 10k+ of them if we are restarting the processing queue
@@ -4037,7 +4054,7 @@ class TransactionQueue {
             //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
             //   /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> M3 * 50. SyncedTX Timed out. didSync == true. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
-            //   queueEntry.state = 'expired'
+            //   this.updateTxState(queueEntry, 'expired')
             //   this.removeFromQueue(queueEntry, currentIndex)
             //   continue
             // }
@@ -4101,7 +4118,7 @@ class TransactionQueue {
                       /* prettier-ignore */ nestedCountersInstance.countEvent('txMissingReceipt', `Wait for reciept only: txAge > timeM2.5. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
                       queueEntry.waitForReceiptOnly = true
                       queueEntry.m2TimeoutReached = true
-                      queueEntry.state = 'consensing'
+                      this.updateTxState(queueEntry, 'consensing')
                       continue
                     }
                   }
@@ -4134,7 +4151,7 @@ class TransactionQueue {
                     /* prettier-ignore */ nestedCountersInstance.countEvent('txMissingReceipt', `txAge > timeM3 => ask for receipt now. state:${queueEntry.state} globalMod:${queueEntry.globalModification} seen:${seen}`)
                     queueEntry.waitForReceiptOnly = true
                     queueEntry.m2TimeoutReached = true
-                    queueEntry.state = 'consensing'
+                    this.updateTxState(queueEntry, 'consensing')
                     continue
                   }
                 }
@@ -4310,7 +4327,7 @@ class TransactionQueue {
               nestedCountersInstance.countEvent('sync', 'syncing state needs bump')
 
               queueEntry.waitForReceiptOnly = true
-              queueEntry.state = 'consensing'
+              this.updateTxState(queueEntry, 'consensing')
             }
 
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
@@ -4320,7 +4337,7 @@ class TransactionQueue {
             // We wait in the aging phase, and mark accounts as seen to prevent a TX that is after this from using or changing data
             // on the accounts in this TX
             // note that code much earlier in the loop rejects any queueEntries younger than time M
-            queueEntry.state = 'processing'
+            this.updateTxState(queueEntry, 'processing')
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           }
           if (queueEntry.state === 'processing') {
@@ -4369,7 +4386,7 @@ class TransactionQueue {
 
                 queueEntry.executionDebug.process1 = 'tell fail'
               } finally {
-                queueEntry.state = 'awaiting data'
+                this.updateTxState(queueEntry, 'awaiting data')
 
                 //if we are not going to execute the TX go strait to consensing
                 if (
@@ -4379,7 +4396,7 @@ class TransactionQueue {
                 ) {
                   //is there a way to preemptively forward data without there being tons of repair..
                   /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`processAcceptedTxQueue2 isInExecutionHome === false. set state = 'await final data' tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp}`)
-                  queueEntry.state = 'await final data'
+                  this.updateTxState(queueEntry, 'await final data')
                 }
               }
               queueEntry.executionDebug.processElapsed = shardusGetTime() - time
@@ -4424,7 +4441,7 @@ class TransactionQueue {
                 /* prettier-ignore */ nestedCountersInstance.countEvent('processing', `awaiting data txAge > m2.5 set to consensing hasAll:${queueEntry.hasAll} hasReceivedApplyReceipt:${hasReceivedApplyReceipt}`)
 
                 queueEntry.waitForReceiptOnly = true
-                queueEntry.state = 'consensing'
+                this.updateTxState(queueEntry, 'consensing')
                 continue
               }
             }
@@ -4501,7 +4518,7 @@ class TransactionQueue {
                   //have not changed after our TX timestamp
                   const accountsValid = this.checkAccountTimestamps(queueEntry)
                   if (accountsValid === false) {
-                    queueEntry.state = 'consensing'
+                    this.updateTxState(queueEntry, 'consensing')
                     queueEntry.preApplyTXResult = {
                       applied: false,
                       passed: false,
@@ -4554,7 +4571,7 @@ class TransactionQueue {
                   queueEntry.executionDebug.txResult = txResult
 
                   if (txResult != null && txResult.applied === true) {
-                    queueEntry.state = 'consensing'
+                    this.updateTxState(queueEntry, 'consensing')
 
                     queueEntry.preApplyTXResult = txResult
 
@@ -4581,7 +4598,7 @@ class TransactionQueue {
 
                       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 noConsensus : ${queueEntry.logID} `)
 
-                      queueEntry.state = 'commiting'
+                      this.updateTxState(queueEntry, 'commiting')
 
                       queueEntry.hasValidFinalData = true
                       // TODO Global receipts?  do we want them?
@@ -4609,7 +4626,7 @@ class TransactionQueue {
                     /* prettier-ignore */ nestedCountersInstance.countEvent('processing', `txResult apply error. applied: ${txResult?.applied}`)
                     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`processAcceptedTxQueue2 txResult problem txid:${queueEntry.logID} res: ${utils.stringifyReduce(txResult)} `)
                     queueEntry.waitForReceiptOnly = true
-                    queueEntry.state = 'consensing'
+                    this.updateTxState(queueEntry, 'consensing')
                     //TODO: need to flag this case so that it does not artificially increase the network load
                   }
                 } catch (ex) {
@@ -4738,7 +4755,7 @@ class TransactionQueue {
                     this.stateManager.getReceiptVote(queueEntry).cant_apply === false &&
                     this.stateManager.getReceiptResult(queueEntry) === true
                   ) {
-                    queueEntry.state = 'commiting'
+                    this.updateTxState(queueEntry, 'commiting')
                     queueEntry.hasValidFinalData = true
                     finishedConsensing = true
                   } else {
@@ -4746,7 +4763,7 @@ class TransactionQueue {
                     // we are finished since there is nothing to apply
                     // this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
                     this.removeFromQueue(queueEntry, currentIndex)
-                    queueEntry.state = 'fail'
+                    this.updateTxState(queueEntry, 'fail')
                     continue
                   }
 
@@ -4792,7 +4809,7 @@ class TransactionQueue {
                       this.stateManager.getReceiptVote(queueEntry).cant_apply === false &&
                       this.stateManager.getReceiptResult(queueEntry) === true
                     ) {
-                      queueEntry.state = 'commiting'
+                      this.updateTxState(queueEntry, 'commiting')
                       queueEntry.hasValidFinalData = true
                       finishedConsensing = true
                     } else {
@@ -4800,7 +4817,7 @@ class TransactionQueue {
                       // we are finished since there is nothing to apply
                       //this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
                       this.removeFromQueue(queueEntry, currentIndex)
-                      queueEntry.state = 'fail'
+                      this.updateTxState(queueEntry, 'fail')
                       continue
                     }
 
@@ -4820,7 +4837,7 @@ class TransactionQueue {
                 if (didNotMatchReceipt === true) {
                   nestedCountersInstance.countEvent('stateManager', 'didNotMatchReceipt')
                   if (queueEntry.debugFail_failNoRepair) {
-                    queueEntry.state = 'fail'
+                    this.updateTxState(queueEntry, 'fail')
                     this.removeFromQueue(queueEntry, currentIndex)
                     nestedCountersInstance.countEvent('stateManager', 'debugFail_failNoRepair')
                     this.statemanager_fatal(
@@ -4839,7 +4856,7 @@ class TransactionQueue {
                     // need to start repair process and wait
                     //await note: it is best to not await this.  it should be an async operation.
                     this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
-                    queueEntry.state = 'await repair'
+                    this.updateTxState(queueEntry, 'await repair')
                     continue
                   } else {
                     // We got a reciept, but the consensus is that this TX was not applied.
@@ -4851,7 +4868,7 @@ class TransactionQueue {
                         `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
                     )
                     this.removeFromQueue(queueEntry, currentIndex)
-                    queueEntry.state = 'fail'
+                    this.updateTxState(queueEntry, 'fail')
                     continue
                   }
                 }
@@ -4867,10 +4884,10 @@ class TransactionQueue {
             if (queueEntry.repairFinished === true) {
               /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} txAge:${txAge} `)
               if (queueEntry.appliedReceiptForRepair.result === true) {
-                queueEntry.state = 'pass'
+                this.updateTxState(queueEntry, 'pass')
               } else {
                 // technically should never get here, because we dont need to repair to a receipt when the network did not apply the TX
-                queueEntry.state = 'fail'
+                this.updateTxState(queueEntry, 'fail')
               }
               // most remove from queue at the end because it compacts the queue entry
               this.removeFromQueue(queueEntry, currentIndex)
@@ -4940,7 +4957,7 @@ class TransactionQueue {
 
                 if (failed === true) {
                   this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
-                  queueEntry.state = 'await repair'
+                  this.updateTxState(queueEntry, 'await repair')
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_failed', `${shortID}`, `qId: ${queueEntry.entryID} skipped:${skipped}`)
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_failed : ${queueEntry.logID} `)
                   continue
@@ -4997,13 +5014,19 @@ class TransactionQueue {
                     queueEntry.recievedAppliedReceipt?.result === true ||
                     queueEntry.recievedAppliedReceipt2?.result === true
                   ) {
-                    queueEntry.state = 'pass'
+                    this.updateTxState(queueEntry, 'pass')
                   } else {
                     /* prettier-ignore */
                     if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_fail : ${queueEntry.logID} no receivedAppliedRecipt or recievedAppliedReceipt2`);
-                    queueEntry.state = 'fail'
+                    this.updateTxState(queueEntry, 'fail')
                   }
                   this.removeFromQueue(queueEntry, currentIndex)
+                } else {
+                  if (failed) nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData failed')
+                  if (incomplete) {
+                    nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData incomplete')
+                    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData incomplete : ${queueEntry.logID}, waiting queueEntry.debug.waitingOn`)
+                  }
                 }
               }
             }
@@ -5031,7 +5054,7 @@ class TransactionQueue {
               // }
 
               if (queueEntry.debugFail_failNoRepair) {
-                queueEntry.state = 'fail'
+                this.updateTxState(queueEntry, 'fail')
                 this.removeFromQueue(queueEntry, currentIndex)
                 nestedCountersInstance.countEvent('stateManager', 'debugFail_failNoRepair')
                 this.statemanager_fatal(
@@ -5150,29 +5173,29 @@ class TransactionQueue {
                 if (queueEntry.noConsensus === true) {
                   // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
                   if (queueEntry.preApplyTXResult.passed === true) {
-                    queueEntry.state = 'pass'
+                    this.updateTxState(queueEntry, 'pass')
                   } else {
-                    queueEntry.state = 'fail'
+                    this.updateTxState(queueEntry, 'fail')
                   }
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : noConsensus:${queueEntry.state} ${queueEntry.logID} `)
                 } else if (queueEntry.appliedReceipt2 != null) {
                   // the final state of the queue entry will be pass or fail based on the receipt
                   if (queueEntry.appliedReceipt2.result === true) {
-                    queueEntry.state = 'pass'
+                    this.updateTxState(queueEntry, 'pass')
                   } else {
-                    queueEntry.state = 'fail'
+                    this.updateTxState(queueEntry, 'fail')
                   }
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : Recpt:${queueEntry.state} ${queueEntry.logID} `)
                 } else if (queueEntry.recievedAppliedReceipt2 != null) {
                   // the final state of the queue entry will be pass or fail based on the receipt
                   if (queueEntry.recievedAppliedReceipt2.result === true) {
-                    queueEntry.state = 'pass'
+                    this.updateTxState(queueEntry, 'pass')
                   } else {
-                    queueEntry.state = 'fail'
+                    this.updateTxState(queueEntry, 'fail')
                   }
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : recvRecpt:${queueEntry.state} ${queueEntry.logID} `)
                 } else {
-                  queueEntry.state = 'fail'
+                  this.updateTxState(queueEntry, 'fail')
                   /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`processAcceptedTxQueue2 commiting finished : no receipt ${queueEntry.logID} `)
                 }
 
@@ -5291,7 +5314,7 @@ class TransactionQueue {
 
   private setTXExpired(queueEntry: QueueEntry, currentIndex: number, message: string): void {
     /* prettier-ignore */ if (logFlags.verbose || this.stateManager.consensusLog) this.mainLogger.debug(`setTXExpired tx:${queueEntry.logID} ${message}  ts:${queueEntry.acceptedTx.timestamp} debug:${utils.stringifyReduce(queueEntry.debug)}`)
-    queueEntry.state = 'expired'
+    this.updateTxState(queueEntry, 'expired')
     this.removeFromQueue(queueEntry, currentIndex)
 
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'txExpired', `tx: ${this.app.getSimpleTxDebugValue(queueEntry.acceptedTx?.data)}` )
@@ -5518,13 +5541,19 @@ class TransactionQueue {
       //normal blocking for read write
       for (const id of queueEntry.shardusMemoryPatternSets.rw) {
         if (this.queueWrites.has(id)) {
+          nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen rw queue_write')
+          nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen rw queue_write ${id}`)
           return true
         }
         if (this.queueReadWritesOld.has(id)) {
+          nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen rw old queue_write')
+          nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen rw old queue_write ${id}`)
           return true
         }
         //also blocked by upstream reads
         if (this.queueReads.has(id)) {
+          nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen rw queue_read')
+          nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen rw queue_read ${id}`)
           return true
         }
       }
@@ -5533,9 +5562,13 @@ class TransactionQueue {
       for (const id of queueEntry.shardusMemoryPatternSets.wo) {
         //also blocked by upstream reads
         if (this.queueReads.has(id)) {
+          nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen wo queue_read')
+          nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen wo queue_read ${id}`)
           return true
         }
         if (this.queueReadWritesOld.has(id)) {
+          nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen wo queue_read_write_old')
+          nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen wo queue_read_write_old ${id}`)
           return true
         }
       }
@@ -5555,9 +5588,11 @@ class TransactionQueue {
       //read only blocks for upstream writes
       for (const id of queueEntry.shardusMemoryPatternSets.ro) {
         if (this.queueWrites.has(id)) {
+          nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen ro queue_write')
           return true
         }
         if (this.queueReadWritesOld.has(id)) {
+          nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen ro queue_read_write_old')
           return true
         }
         //note blocked by upstream reads, because this read only operation
@@ -6083,6 +6118,31 @@ class TransactionQueue {
           delete this.debugLastAwaitedAppCallStack[label]
         }
       }
+    }
+  }
+  updateTxState(queueEntry: QueueEntry, nextState: string): void {
+    const currentState = queueEntry.state
+    this.txDebugMarkEndTime(queueEntry, currentState)
+    queueEntry.state = nextState
+    this.txDebugMarkStartTime(queueEntry, nextState)
+  }
+  txDebugMarkStartTime(queueEntry: QueueEntry, state: string): void {
+    if (queueEntry.txDebug.startTime[state] == null) {
+      queueEntry.txDebug.startTime[state] = process.hrtime()
+    }
+  }
+  txDebugMarkEndTime(queueEntry: QueueEntry, state: string): void {
+    if (queueEntry.txDebug.startTime[state]) {
+      const endTime = process.hrtime(queueEntry.txDebug.startTime[state])
+      queueEntry.txDebug.endTime[state] = endTime
+
+      const durationInNanoseconds = endTime[0] * 1e9 + endTime[1]
+      const durationInMilliseconds = durationInNanoseconds / 1e6
+
+      queueEntry.txDebug.duration[state] = durationInMilliseconds
+
+      delete queueEntry.txDebug.startTime[state]
+      delete queueEntry.txDebug.endTime[state]
     }
   }
   clearDebugAwaitStrings(): void {
