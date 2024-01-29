@@ -129,6 +129,7 @@ class Profiler {
       // hit "perf" endpoint to clear perf stats
       this.printAndClearReport()
       this.clearScopedTimes()
+      Context.stateManager.transactionQueue.clearTxDebugStatList()
 
       if (this.statisticsInstance) this.statisticsInstance.clearRing('txProcessed')
 
@@ -211,6 +212,11 @@ class Profiler {
       res.write(`${shardusGetTime()}\n`)
       nestedCountersInstance.printArrayReport(arrayReport, res, 0)
       res.write(`\n===========================\n`)
+
+      // write "counts" results
+      res.write(`\n=> PRINT TX DURATIONS\n`)
+      const printTxResult = Context.stateManager.transactionQueue.printTxDebug()
+      res.write(printTxResult)
 
       res.end()
     })

@@ -58,7 +58,9 @@ interface Receipt {
 }
 
 const txStatBucketSize = {
-  default: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 10000],
+  default: [
+    1, 2, 4, 8, 16, 30, 60, 125, 250, 500, 1000, 2000, 4000, 8000, 10000, 20000, 30000, 60000, 100000,
+  ],
 }
 
 export enum DebugComplete {
@@ -1068,10 +1070,7 @@ class TransactionQueue {
         filter[key] = 1
       }
 
-      const startTime = process.hrtime()
       this.profiler.scopedProfileSectionStart('commit_setAccount')
-      const endTime = process.hrtime(startTime)
-      queueEntry.txDebug.duration['commit_setAccount'] = endTime[1] / 1000000
       /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.setAccount')
       // wrappedStates are side effected for now
       savedSomething = await this.stateManager.setAccount(
@@ -1459,6 +1458,7 @@ class TransactionQueue {
         accountDataSet: false,
       } // age comes from timestamp
       this.txDebugMarkStartTime(txQueueEntry, 'total_queue_time')
+      this.txDebugMarkStartTime(txQueueEntry, 'aging')
 
       // todo faster hash lookup for this maybe?
       const entry = this.getQueueEntrySafe(acceptedTx.txId) // , acceptedTx.timestamp)
@@ -3622,6 +3622,20 @@ class TransactionQueue {
     const collector = {}
     const totalTxCount = this.txDebugStatList.length
 
+    const indexes = [
+      'aging',
+      'processing',
+      'awaiting data',
+      'preApplyTransaction',
+      'consensing',
+      'commiting',
+      'await final data',
+      'expired',
+      'total_queue_time',
+      'pass',
+      'fail',
+    ]
+
     /* eslint-disable security/detect-object-injection */
     for (const txStat of this.txDebugStatList) {
       for (const key in txStat.duration) {
@@ -3640,11 +3654,14 @@ class TransactionQueue {
         }
       }
     }
+    const sortedCollector = {}
+    for (const key of indexes) {
+      sortedCollector[key] = { ...collector[key] }
+    }
     /* eslint-enable security/detect-object-injection */
-
     const lines = []
     lines.push(`=> Total Transactions: ${totalTxCount}`)
-    for (const [key, collectorForThisKey] of Object.entries(collector)) {
+    for (const [key, collectorForThisKey] of Object.entries(sortedCollector)) {
       lines.push(`\n => Tx ${key}: \n`)
       for (let i = 0; i < Object.keys(collectorForThisKey).length; i++) {
         // eslint-disable-next-line security/detect-object-injection
@@ -3674,9 +3691,13 @@ class TransactionQueue {
    * @param {number} currentIndex
    */
   removeFromQueue(queueEntry: QueueEntry, currentIndex: number): void {
-    this.txDebugMarkEndTime(queueEntry, 'total_queue_time')
-    queueEntry.txDebug.dequeueHrTime = process.hrtime(queueEntry.txDebug.enqueueHrTime)
-    queueEntry.txDebug.duration['queue_sit_time'] = queueEntry.txDebug.dequeueHrTime[1] / 1000000
+    // end all the pending txDebug timers
+    for (const key in queueEntry.txDebug.startTime) {
+      if (queueEntry.txDebug.startTime[key] != null) {
+        this.txDebugMarkEndTime(queueEntry, key)
+      }
+    }
+    // this.txDebugMarkEndTime(queueEntry, 'total_queue_time')
     this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx.txId)
     if (queueEntry.txDebug) this.dumpTxDebugToStatList(queueEntry)
     this._transactionQueue.splice(currentIndex, 1)
@@ -4355,7 +4376,9 @@ class TransactionQueue {
 
                 if (this.executeInOneShard === true) {
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodes(queueEntry)')
+                  profilerInstance.scopedProfileSectionStart(`scoped-tellCorrespondingNodes`)
                   await this.tellCorrespondingNodes(queueEntry)
+                  profilerInstance.scopedProfileSectionEnd(`scoped-tellCorrespondingNodes`)
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodes(queueEntry)', DebugComplete.Completed)
                 } else {
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodesOld(queueEntry)')
@@ -4762,8 +4785,8 @@ class TransactionQueue {
                     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                     // we are finished since there is nothing to apply
                     // this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
-                    this.removeFromQueue(queueEntry, currentIndex)
                     this.updateTxState(queueEntry, 'fail')
+                    this.removeFromQueue(queueEntry, currentIndex)
                     continue
                   }
 
