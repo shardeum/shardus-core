@@ -34,6 +34,13 @@ import { networkMode } from '../p2p/Modes'
 import ArchiverSyncTracker from './ArchiverSyncTracker'
 import { getArchiversList } from '../p2p/Archivers'
 import * as http from '../http'
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
+import { getAccountDataByListRespSerialized, serializeGetAccountDataByListRespSerialized } from '../types/GetAccountDataByListResp'
+import { InternalBinaryHandler } from '../types/Handler'
+import { Route } from '@shardus/types/build/src/p2p/P2PTypes'
+import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
+import { deserializeGetAccountDataByListReq, serializeGetAccountDataByListReq } from '../types/GetAccountDataByListReq'
 
 const REDUNDANCY = 3
 
@@ -414,6 +421,65 @@ class AccountSync {
         this.profiler.scopedProfileSectionEnd('get_account_data_by_list', responseSize)
       }
     )
+
+    const getAccDataByListBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name:  InternalRouteEnum.binary_get_account_data_by_list,
+      handler: async (payload, respond, header, sign) => {
+        this.profiler.scopedProfileSectionStart('binary_get_account_data_by_list')
+
+        let ourLockID = -1
+        try {
+          let accountData = null
+          const reqStream = VectorBufferStream.fromBuffer(payload)
+          const reqType = reqStream.readUInt16()
+          if (reqType !== TypeIdentifierEnum.cGetAccountDataByListReq) {
+            respond({accountData}, serializeGetAccountDataByListRespSerialized)
+            return 
+            // safe to return here, before the fifo lock
+          }
+          const readableReq = deserializeGetAccountDataByListReq(reqStream)
+
+          const result = {} as getAccountDataByListRespSerialized
+
+          ourLockID = await this.stateManager.fifoLock('accountModification')
+          accountData = await this.app.getAccountDataByList(readableReq.accountIds)
+
+
+          // mutation of dataRef reflects in accountData
+          for (let dataRef of accountData) {
+
+            // this need to be implemented in dapp
+            dataRef.data = this.app.binarySerializeObject(
+              Shardus.AppObjEnum.AccountData,
+              dataRef.data,
+            )
+            if (dataRef.syncData) {
+              // this need to be implemented in dapp
+              dataRef.syncData = this.app.binarySerializeObject(
+                Shardus.AppObjEnum.SyncData,
+                dataRef.syncData,
+              )
+            }
+          }
+
+          //PERF Disiable this in production or performance testing.
+          // this.stateManager.testAccountDataWrapped(accountData)
+          result.accountData = accountData
+          respond(result, serializeGetAccountDataByListRespSerialized)
+        } catch(e){
+          respond({accountData: null}, serializeGetAccountDataByListRespSerialized)
+        }finally {
+          this.stateManager.fifoUnlock('accountModification', ourLockID)
+          this.profiler.scopedProfileSectionEnd('binary_get_account_data_by_list')
+        }
+      }
+    }
+
+    this.p2p.registerInternalBinary(
+      getAccDataByListBinaryHandler.name,
+      getAccDataByListBinaryHandler.handler
+    )
+
 
     Context.network.registerExternalGet('sync-statement', isDebugModeMiddleware, (_req, res) => {
       res.write(`${utils.stringifyReduce(this.syncStatement)}\n`)

@@ -54,6 +54,7 @@ export const requestSerializer = <T>(
   return wrappedReqStream
 }
 
+// this function pop the first 2 bytes of the stream and check if it matches the typeId
 export const getStreamWithTypeCheck = (
   payload: Buffer,
   typeId: number,

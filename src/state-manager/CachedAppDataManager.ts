@@ -1,10 +1,18 @@
 import { StateManager as StateManagerTypes } from '@shardus/types'
+import { Route } from '@shardus/types/build/src/p2p/P2PTypes'
 import { Logger as Log4jsLogger } from 'log4js'
 import StateManager from '.'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import * as Shardus from '../shardus/shardus-types'
+import { AppObjEnum } from '../shardus/shardus-types'
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
+import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
+import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
+import { InternalBinaryHandler } from '../types/Handler'
+import { getStreamWithTypeCheck, requestErrorHandler, verificationDataCombiner } from '../types/Helpers'
+import { deserializeSendCachedAppDataReq, SendCachedAppDataReq, serializeSendCachedAppDataReq } from '../types/SendCachedAppDataReq'
 import * as utils from '../utils'
 import { reversed } from '../utils'
 import Profiler, { profilerInstance } from '../utils/profiler'
@@ -73,6 +81,9 @@ class CachedAppDataManager {
     this.p2p.registerInternal('send_cachedAppData', async (payload: CacheAppDataResponse) => {
       profilerInstance.scopedProfileSectionStart('send_cachedAppData')
       try {
+        const dummy = payload.cachedAppData as any
+        console.log(`send_cachedAppData`, dummy.appData.data.receipt);
+        console.log(`send_cachedAppData full payload`, JSON.stringify(payload));
         const cachedAppData = payload.cachedAppData
         const existingCachedAppData = this.getCachedItem(payload.topic, cachedAppData.dataID)
         if (existingCachedAppData) {
@@ -87,6 +98,65 @@ class CachedAppDataManager {
         profilerInstance.scopedProfileSectionEnd('send_cachedAppData')
       }
     })
+
+    // serialized handler
+    const send_cacheAppDataBinarySerializedHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_send_cachedAppData,
+      handler: (payload, response, header, sign) => {
+        profilerInstance.scopedProfileSectionStart('send_cachedAppData2')
+
+        const errorHandler = (
+          errorType: RequestErrorEnum,
+          opts?: { customErrorLog?: string; customCounterSuffix?: string }
+        ): void => requestErrorHandler(InternalRouteEnum.binary_send_cachedAppData, errorType, header, opts)
+
+        try{
+
+          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cSendCachedAppDataReq)
+
+          if(!requestStream) return errorHandler(RequestErrorEnum.InvalidRequest)
+
+          const req = deserializeSendCachedAppDataReq(requestStream)
+          const appDeserializedData = this.stateManager.app.binaryDeserializeObject(
+            AppObjEnum.CachedAppData,
+            req.cachedAppData.appData 
+          )
+          const cachedAppData: CachedAppData = {
+            dataID: req.cachedAppData.dataID,
+            appData: appDeserializedData,
+            cycle: req.cachedAppData.cycle,
+          }
+
+
+          //are we(this node) the one that belong to this cache?
+          // const homeNodeForThisDataID = ShardFunctions.findHomeNode(
+          //   this.stateManager.currentCycleShardData.shardGlobals,
+          //   cachedAppData.dataID,
+          //   this.stateManager.currentCycleShardData.parititionShardDataMap
+          // )
+
+          // if (homeNodeForThisDataID.node.id !== this.stateManager.currentCycleShardData.ourNode.id) {
+          //   return errorHandler(RequestErrorEnum.InvalidRequest)
+          // }
+
+
+          if (cachedAppData == null) {
+            return errorHandler(RequestErrorEnum.InvalidRequest)
+          }
+
+          const existingCachedAppData = this.getCachedItem(req.topic, cachedAppData.dataID)
+          if (existingCachedAppData) {
+            console.log(`We have already processed this cached data`, cachedAppData)
+            return
+          }
+          this.insertCachedItem(req.topic, cachedAppData.dataID, cachedAppData.appData, cachedAppData.cycle)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('send_cachedAppData2')
+        }
+      }
+    }
+
+    this.p2p.registerInternal(InternalRouteEnum.binary_send_cachedAppData,send_cacheAppDataBinarySerializedHandler)
 
     this.p2p.registerInternal('get_cached_app_data', async (payload: CacheAppDataRequest, respond: (arg0: CachedAppData) => Promise<void>) => {
       profilerInstance.scopedProfileSectionStart('get_cached_app_data')
@@ -377,8 +447,33 @@ class CachedAppDataManager {
             }
             const filteredCorrespondingAccNodes = filteredNodes
 
+            if(this.config.p2p.useBinarySerializedEndpoints){
+              const appSerializedAppData = this.stateManager.app.binarySerializeObject(
+                AppObjEnum.CachedAppData, 
+                message.cachedAppData.appData
+              )
+              const sendCacheAppDataReq: SendCachedAppDataReq = {
+                topic,
+                cachedAppData: {
+                  dataID: message.cachedAppData.dataID,
+                  appData: appSerializedAppData,
+                  cycle: message.cachedAppData.cycle
+                }
+              }
+              this.p2p.tellBinary<SendCachedAppDataReq>(
+                filteredCorrespondingAccNodes, 
+                InternalRouteEnum.binary_send_cachedAppData, 
+                sendCacheAppDataReq, 
+                serializeSendCachedAppDataReq,
+                {}
+              )
+              return
+
+            }
+
             // TODO Perf: need a tellMany enhancement.  that will minimize signing and stringify required!
             this.p2p.tell(filteredCorrespondingAccNodes, 'send_cachedAppData', message)
+
           }
         }
       }

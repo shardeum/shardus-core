@@ -46,6 +46,7 @@ import * as Self from './Self'
 import { robustQuery } from './Utils'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { SQLDataTypes } from '../storage/utils/schemaDefintions'
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 
 /** STATE */
 
@@ -92,7 +93,7 @@ const failExternalRoute: P2P.P2PTypes.Route<Handler> = {
 //   the exiting node can know that some other nodes have
 //   received the message and will send it to other nodes
 const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
-  name: internalRouteName,
+  name: InternalRouteEnum.apoptosize,
   handler: (payload, response, header, sign) => {
     profilerInstance.scopedProfileSectionStart('apoptosize')
     try {

@@ -7,10 +7,14 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import AccountSync from './AccountSync'
 import { logFlags } from '../logger'
 import { errorToStringFull } from '../utils'
-import { P2PModuleContext as P2P } from '../p2p/Context'
+import { P2PModuleContext as P2P, stateManager } from '../p2p/Context'
 
 import DataSourceHelper from './DataSourceHelper'
 import { shardusGetTime } from '../network'
+import { GetAccountDataByListReq, serializeGetAccountDataByListReq } from '../types/GetAccountDataByListReq'
+import { deserializeGetAccountDataByListRespSerialized, getAccountDataByListRespSerialized } from '../types/GetAccountDataByListResp'
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
+import { AppObjEnum } from '../shardus/shardus-types'
 
 // Not sure where to put this interface yet. I guess maybe to @shardus/types? or to state-manager-types?
 // Keeping it here for now. can move it later.
@@ -324,11 +328,44 @@ export default class NodeSyncTracker implements SyncTrackerInterface {
 
           //Get accounts.
           const message = { accountIds: remainingAccountsToSync }
-          const result = await this.p2p.ask(
-            this.dataSourceHelper.dataSourceNode,
-            'get_account_data_by_list',
-            message
-          )
+          let result = {
+            accountData: null,
+          }
+          if(stateManager.config.p2p.useBinarySerializedEndpoints){
+            const serialized_res = await this.p2p.askBinary<
+              GetAccountDataByListReq,
+              getAccountDataByListRespSerialized
+            >(
+              this.dataSourceHelper.dataSourceNode,
+              InternalRouteEnum.binary_get_account_data_by_list,
+              message,
+              serializeGetAccountDataByListReq,
+              deserializeGetAccountDataByListRespSerialized,
+              {}
+            )
+            if(serialized_res && serialized_res.accountData){
+              for (let accountDataRef of serialized_res.accountData) {
+                  accountDataRef.data = stateManager.app.binaryDeserializeObject(
+                    AppObjEnum.AccountData,
+                    accountDataRef.data
+                  )
+                  if(accountDataRef.syncData){
+                    accountDataRef.syncData = stateManager.app.binaryDeserializeObject(
+                      AppObjEnum.SyncData,
+                      accountDataRef.syncData
+                    )
+                  }
+              }
+              result = serialized_res
+            }
+          }
+          else{
+            result = await this.p2p.ask(
+              this.dataSourceHelper.dataSourceNode,
+              'get_account_data_by_list',
+              message
+            )
+          }
 
           if (result == null) {
             /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result == null')

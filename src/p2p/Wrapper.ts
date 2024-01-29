@@ -36,6 +36,17 @@ export class P2P extends EventEmitter {
     tracker?: string,
     extraTime?: number
   ) => Promise<any>
+  askBinary: <TReq, TRes>(
+    node: ShardusTypes.Node,
+    route: string,
+    message: TReq,
+    reqSerializerFunc: (stream: VectorBufferStream, obj: TReq, root?: boolean) => void,
+    respDeserializerFunc: (stream: VectorBufferStream, root?: boolean) => TRes,
+    appHeader: AppHeader,
+    tracker?: string,
+    logged?: boolean,
+    extraTime?: number
+  ) => Promise<TRes>
   tell: (nodes: any, route: any, message: any, logged?: boolean, tracker?: string) => Promise<number>
   tellBinary: <TReq>(
     nodes: ShardusTypes.Node[],
@@ -74,6 +85,7 @@ export class P2P extends EventEmitter {
     this.unregisterGossipHandler = Comms.unregisterGossipHandler
     this.unregisterInternal = Comms.unregisterInternal
     this.ask = Comms.ask
+    this.askBinary = Comms.askBinary
     this.tell = Comms.tell
     this.tellBinary = Comms.tellBinary
     this.sendGossipIn = Comms.sendGossip
