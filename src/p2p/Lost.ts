@@ -57,7 +57,7 @@ type ScheduledRemoveNodeByApp = ScheduledRemoveByApp<P2P.NodeListTypes.Node>
 /** STATE */
 
 // [TODO] - This enables the /kill /killother debug route and should be set to false after testing
-const allowKillRoute = true
+const allowKillRoute = false
 
 let p2pLogger
 let useProxyForDownCheck = true
