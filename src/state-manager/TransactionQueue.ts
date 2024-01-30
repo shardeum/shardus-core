@@ -5058,7 +5058,7 @@ class TransactionQueue {
 
                     const txAge = shardusGetTime() - queueEntry.acceptedTx.timestamp
                     if (txAge > timeM2 && !queueEntry.queryingFinalData) {
-                      this.requestFinalData(queueEntry, missingAccounts)
+                      // this.requestFinalData(queueEntry, missingAccounts)
                     }
                   }
                 }
