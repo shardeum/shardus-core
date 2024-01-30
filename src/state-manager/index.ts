@@ -22,6 +22,7 @@ import { potentiallyRemoved, activeByIdOrder, byIdOrder } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as NodeList from '../p2p/NodeList'
 import * as CycleChain from '../p2p/CycleChain'
+import * as Comms from '../p2p/Comms'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import PartitionStats from './PartitionStats'
 import AccountCache from './AccountCache'
@@ -1443,7 +1444,7 @@ class StateManager {
       }
     )
 
-    this.p2p.registerInternal(
+    Comms.registerInternal(
       'request_tx_and_state',
       async (
         payload: { txid: string; accountIds: string[] },
