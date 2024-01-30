@@ -1446,7 +1446,7 @@ class StateManager {
     this.p2p.registerInternal(
       'request_tx_and_state',
       async (
-        payload: { txid: string },
+        payload: { txid: string; accountIds: string[] },
         respond: (arg0: RequestTxResp) => Promise<number>,
         _sender: unknown,
         _tracker: string,
@@ -1455,15 +1455,17 @@ class StateManager {
         profilerInstance.scopedProfileSectionStart('request_tx_and_state', false, msgSize)
         let responseSize = cUninitializedSize
         try {
-          const response: RequestTxResp = {
+          let response: RequestTxResp = {
             stateList: [],
-            beforeHashes: {},
+            account_state_hash_before: {},
+            account_state_hash_after: {},
             note: '',
             success: false,
-            originalData: {},
+            // originalData: {},
           }
 
           const txid = payload.txid
+          const requestedAccountIds = payload.accountIds
 
           let queueEntry = this.transactionQueue.getQueueEntrySafe(txid)
           if (queueEntry == null) {
@@ -1476,12 +1478,26 @@ class StateManager {
             }`
 
             if (logFlags.error) this.mainLogger.error(`request_tx_and_state ${response.note}`)
-
             await respond(response)
             return
           }
 
-          response.acceptedTX = queueEntry.acceptedTx
+          if (queueEntry.isInExecutionHome === false) {
+            response.note = `request_tx_and_state not in execution group: ${utils.stringifyReduce(txid)}`
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(response.note)
+            await respond(response)
+            return
+          }
+
+          let receipt2 = this.getReceipt2(queueEntry)
+          if (receipt2 == null) {
+            response.note = `request_tx_and_state does not have valid receipt2: ${utils.stringifyReduce(
+              txid
+            )}`
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(response.note)
+            await respond(response)
+            return
+          }
 
           let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
 
@@ -1503,19 +1519,19 @@ class StateManager {
           //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
 
           if (wrappedStates != null) {
-            for (const [key, accountData] of Object.entries(wrappedStates)) {
-              if (accountData) {
-                //include the before hash
+            for (let i = 0; i < receipt2.appliedVote.account_id.length; i++) {
+              let key = receipt2.appliedVote.account_id[i]
+              let accountData = wrappedStates[key]
+              if (accountData && requestedAccountIds.includes(key)) {
                 // eslint-disable-next-line security/detect-object-injection
-                response.beforeHashes[key] = queueEntry.beforeHashes[key]
-                //include the data
+                response.account_state_hash_before[key] = receipt2.appliedVote.account_state_hash_before[i]
+                response.account_state_hash_after[key] = receipt2.appliedVote.account_state_hash_after[i]
                 response.stateList.push(accountData)
               }
             }
           }
-
-          response.originalData = queueEntry.originalData
           response.success = true
+          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state success: ${queueEntry.logID}  ${response.stateList.length}  ${utils.stringify(response)}`)
           responseSize = await respond(response)
         } finally {
           profilerInstance.scopedProfileSectionEnd('request_tx_and_state', responseSize)

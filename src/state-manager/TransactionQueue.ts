@@ -10,8 +10,9 @@ import { potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import * as utils from '../utils'
-import * as Self from '../p2p/Self'
 import { errorToStringFull, inRangeOfCurrentTime, stringify, withTimeout, XOR } from '../utils'
+import * as Self from '../p2p/Self'
+import * as Comms from '../p2p/Comms'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions'
@@ -1008,38 +1009,6 @@ class TransactionQueue {
         //looks like this next line could be wiping out state from just above that used accountWrites
         //we have a task to refactor his code that needs to happen for executeInOneShard to work
         wrappedStates = {}
-
-        // Check if we received all data correctly
-        if (
-          queueEntry.collectedFinalData === undefined ||
-          Object.keys(queueEntry.collectedFinalData).length === 0
-        ) {
-          // We have not received the data to be commited from the execution group
-          this.mainLogger.debug(
-            'commitConsensedTransaction: We have not received the data to be commited from the execution group. Using fallback'
-          )
-
-          // Find nodes to ask data from
-          // Do we ask for all states from a single node or do we ask the home node for each state?
-          // For now asking a single node from execution group for all states
-          const nodeToAsk = queueEntry.executionGroup?.[0]
-
-          if (!nodeToAsk) {
-            throw new Error('commitConsensedTransaction: could not find node from execution group')
-          }
-
-          const response = await this.p2p.ask(nodeToAsk, 'request_tx_and_state')
-          for (const data of response.stateList) {
-            if (data == null) {
-              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`commitConsensedTransaction data == null`)
-              continue
-            }
-            if (queueEntry.collectedFinalData[data.accountId] == null) {
-              queueEntry.collectedFinalData[data.accountId] = data
-              /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('commitConsensedTransaction', `${queueEntry.logID}`, `commitConsensedTransaction addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
-            }
-          }
-        }
 
         /* eslint-disable security/detect-object-injection */
         for (const key of Object.keys(queueEntry.collectedFinalData)) {
@@ -2233,6 +2202,8 @@ class TransactionQueue {
       //give up and wait for receipt
       queueEntry.waitForReceiptOnly = true
       this.updateTxState(queueEntry, 'consensing')
+      if (logFlags.debug)
+        this.mainLogger.debug(`queueEntryRequestMissingData failed to get all data for: ${queueEntry.logID}`)
     }
   }
 
@@ -4977,6 +4948,7 @@ class TransactionQueue {
                 let failed = false
                 let incomplete = false
                 let skipped = 0
+                const missingAccounts = []
                 const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
                   this.stateManager.currentCycleShardData.nodeShardData
 
@@ -4998,9 +4970,10 @@ class TransactionQueue {
                   if (wrappedAccount == null) {
                     incomplete = true
                     queueEntry.debug.waitingOn = accountID
-                    break
+                    missingAccounts.push(accountID)
+                    // break
                   }
-                  if (wrappedAccount.stateId != accountHash) {
+                  if (wrappedAccount && wrappedAccount.stateId != accountHash) {
                     if (logFlags.debug)
                       this.mainLogger.debug(
                         `shrd_awaitFinalData_failed : ${queueEntry.logID} wrappedAccount.stateId != accountHash`
@@ -5079,9 +5052,14 @@ class TransactionQueue {
                   this.removeFromQueue(queueEntry, currentIndex)
                 } else {
                   if (failed) nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData failed')
-                  if (incomplete) {
+                  if (incomplete && missingAccounts.length > 0) {
                     nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData incomplete')
-                    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData incomplete : ${queueEntry.logID}, waiting queueEntry.debug.waitingOn`)
+                    // /* prettier-ignore */ if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData incomplete : ${queueEntry.logID}, waiting queueEntry.debug.waitingOn`)
+
+                    const txAge = shardusGetTime() - queueEntry.acceptedTx.timestamp
+                    if (txAge > timeM2 && !queueEntry.queryingFinalData) {
+                      this.requestFinalData(queueEntry, missingAccounts)
+                    }
                   }
                 }
               }
@@ -5481,6 +5459,46 @@ class TransactionQueue {
 
   getReceiptsToForward(): ArchiverReceipt[] {
     return [...this.forwardedReceiptsByTimestamp.values()]
+  }
+
+  async requestFinalData(queueEntry: QueueEntry, accountIds: string[]) {
+    const index = Math.floor(Math.random() * queueEntry.executionGroup.length)
+    const nodeToAsk = queueEntry.executionGroup[index] as Shardus.Node
+    if (!nodeToAsk) {
+      throw new Error('requestFinalData: could not find node from execution group')
+    }
+    queueEntry.queryingFinalData = true
+    profilerInstance.profileSectionStart('requestFinalData')
+    try {
+      const message = { txid: queueEntry.acceptedTx.txId, accountIds }
+
+      if (logFlags.verbose)
+        this.mainLogger.debug(
+          `requestFinalData: txid: ${queueEntry.acceptedTx.txId} accountIds: ${accountIds}`
+        )
+
+      const response = await Comms.ask(nodeToAsk, 'request_tx_and_state', message)
+      for (const data of response.stateList) {
+        if (data == null) {
+          /* prettier-ignore */
+          if (logFlags.error && logFlags.verbose) this.mainLogger.error(`requestFinalData data == null for tx ${queueEntry.logID}`);
+          continue
+        }
+        if (queueEntry.collectedFinalData[data.accountId] == null) {
+          // todo: check the state hashes and verify
+          queueEntry.collectedFinalData[data.accountId] = data
+          nestedCountersInstance.countEvent('stateManager', 'requestFinalDataSuccess')
+          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} success accountId: ${data.accountId} stateId: ${data.stateId}`);
+        }
+      }
+    } catch (e) {
+      nestedCountersInstance.countEvent('stateManager', 'requestFinalDataError')
+      if (logFlags.error)
+        this.mainLogger.error(`requestFinalData: txid: ${queueEntry.logID} error: ${e.message}`)
+    } finally {
+      // queueEntry.queryingFinalData = false
+      profilerInstance.profileSectionEnd('requestFinalData')
+    }
   }
 
   resetReceiptsToForward(): void {
