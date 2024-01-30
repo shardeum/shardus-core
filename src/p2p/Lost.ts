@@ -42,6 +42,7 @@ import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { LostReportReq, deserializeLostReportReq, serializeLostReportReq } from '../types/LostReportReq'
+import { isDebugModeMiddlewareHigh } from '../network/debugMiddleware'
 
 /** TYPES */
 
@@ -94,9 +95,18 @@ export declare type SignedPingMessage = PingMessage & SignedObject
 
 /** ROUTES */
 
-const killExternalRoute: P2P.P2PTypes.Route<Handler> = {
+interface RouteWithAuthHandler {
+  authHandler: Handler
+}
+
+type RouteHandlerWithAuthHandler<T> = P2P.P2PTypes.Route<T> & RouteWithAuthHandler
+
+/** ROUTES */
+
+const killExternalRoute: RouteHandlerWithAuthHandler<Handler> = {
   method: 'GET',
   name: 'kill',
+  authHandler: isDebugModeMiddlewareHigh,
   handler: (_req, res) => {
     if (allowKillRoute) {
       res.send(safeStringify({ status: 'left the network without telling any peers' }))
@@ -107,9 +117,10 @@ const killExternalRoute: P2P.P2PTypes.Route<Handler> = {
   },
 }
 
-const killOtherExternalRoute: P2P.P2PTypes.Route<Handler> = {
+const killOtherExternalRoute: RouteHandlerWithAuthHandler<Handler> = {
   method: 'GET',
   name: 'killother',
+  authHandler: isDebugModeMiddlewareHigh,
   handler: (_req, res) => {
     if (allowKillRoute) {
       res.send(safeStringify({ status: 'killing another node' }))
@@ -219,7 +230,7 @@ export function init() {
   for (const route of routes.external) {
     // [TODO] - Add Comms.registerExternalGet and Post that pass through to network.*
     //          so that we can always just use Comms.* instead of network.*
-    network._registerExternal(route.method, route.name, route.handler)
+    network._registerExternal(route.method, route.name, route.authHandler, route.handler)
   }
   for (const route of routes.internal) {
     Comms.registerInternal(route.name, route.handler)
