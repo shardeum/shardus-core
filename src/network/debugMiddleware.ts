@@ -34,9 +34,11 @@ function handleDebugAuth(_req, res, next, authLevel) {
         }
         //reguire a larger counter than before. This prevents replay attacks
         if (parseInt(sigObj.count) > lastCounter) {
-          if (Context.crypto.verify(sigObj, ownerPk)) {
+          let verified = Context.crypto.verify(sigObj, ownerPk)
+          if (verified === true) {
             lastCounter = parseInt(sigObj.count) // Update counter
-            if (ensureKeySecurity(ownerPk, authLevel)) {
+            const authorized = ensureKeySecurity(ownerPk, authLevel)
+            if (authorized) {
               next()
               return
             } else {
