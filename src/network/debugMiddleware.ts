@@ -7,20 +7,6 @@ let lastCounter = 0
 // This function is used to check if the request is authorized to access the debug endpoint
 function handleDebugAuth(_req, res, next, authLevel) {
   try {
-    //auth with by checking a password against a hash
-    if (_req.query.auth != null) {
-      const obj = { key: _req.query.auth }
-      const hashedAuth = Context.crypto.hash(obj)
-      const hashedDevKey = getHashedDevKey()
-      // can get a hash back if no key is set
-      if (hashedDevKey === '') {
-        return res.json({ hashedAuth })
-      }
-      if (hashedAuth === hashedDevKey) {
-        next()
-        return
-      }
-    }
     //auth with a signature
     if (_req.query.sig != null && _req.query.sig_counter != null) {
       const devPublicKeys = getDevPublicKeys() // This should return list of public keys
