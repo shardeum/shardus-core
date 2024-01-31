@@ -1157,7 +1157,7 @@ class Shardus extends EventEmitter {
       // Give the dapp an opportunity to do some up front work and generate
       // appData metadata for the applied TX
       const preCrackSuccess = await this.app.txPreCrackData(tx, appData)
-      if (preCrackSuccess === false) {
+      if (this.config.stateManager.checkPrecrackStatus === true && preCrackSuccess === false) {
         return {
           success: false,
           reason: `PreCrack has failed. Rejecting the tx.`,

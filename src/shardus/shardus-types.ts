@@ -1035,6 +1035,8 @@ export interface ServerConfiguration {
     useNewPOQ: boolean
     // whether the node should verify its data against the network before challenging
     integrityCheckBeforeChallenge: boolean
+    // Should the protocol consier a precrack failure as a failed transaction
+    checkPrecrackStatus: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
