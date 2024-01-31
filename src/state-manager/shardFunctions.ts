@@ -460,6 +460,7 @@ class ShardFunctions {
     } else {
       //this is way too slow
       nodeShardData.ourNodeIndex = activeNodes.findIndex((_node) => {
+        //have seen a null node here but it makes no sense
         return _node.id === node.id
       })
       //find closest index if our node is not in the active list.  Not sure this is valid
@@ -1200,7 +1201,10 @@ class ShardFunctions {
     return result
   }
 
-  static getPartitionRangeFromRadix(shardGlobals: ShardGlobals, radix: string): { low: number; high: number } {
+  static getPartitionRangeFromRadix(
+    shardGlobals: ShardGlobals,
+    radix: string
+  ): { low: number; high: number } {
     const filledAddress = radix + '0'.repeat(64 - radix.length)
     const partition = ShardFunctions.addressToPartition(shardGlobals, filledAddress)
 

@@ -15,11 +15,13 @@ import * as Comms from '../Comms'
 import * as Context from '../Context'
 import * as NodeList from '../NodeList'
 import { LostArchiverRecord, lostArchiversMap } from './state'
-import { info, warn } from './logging'
+import { info, warn, error } from './logging'
 import { id } from '../Self'
 import { binarySearch } from '../../utils/functions/arrays'
 import { activeByIdOrder } from '../NodeList'
 import { inspect } from 'util'
+import { formatErrorMessage } from '../../utils'
+import { nestedCountersInstance } from '../..'
 
 /** Lost Archivers Functions */
 
@@ -124,16 +126,20 @@ export async function investigateArchiver(
  * @returns The node ID of the investigator for that specific record
  */
 export function getInvestigator(target: publicKey, marker: CycleMarker): Node {
-  // TODO: Implement hashing target + marker and returning node from Nodelist with id closest to hash
+  // Implement hashing target + marker and returning node from Nodelist with id closest to hash
   // This is to ensure that the investigator node is chosen in a deterministic manner
-  const obj = { id, marker }
+  const obj = { target, marker }
   const near = Context.crypto.hash(obj)
   let idx = binarySearch(activeByIdOrder, near, (i, r) => i.localeCompare(r.id))
   if (idx < 0) idx = (-1 - idx) % activeByIdOrder.length
   // eslint-disable-next-line security/detect-object-injection
-  if (activeByIdOrder[idx].id === id) idx = (idx + 1) % activeByIdOrder.length // skip to next node if the selected node is target
+  const foundNode = activeByIdOrder[idx]
   // eslint-disable-next-line security/detect-object-injection
-  return activeByIdOrder[idx]
+  if (foundNode == null) {
+    throw new Error(`activeByIdOrder idx:${idx} length: ${activeByIdOrder.length}`)
+  }
+  if (foundNode.id === id) idx = (idx + 1) % activeByIdOrder.length // skip to next node if the selected node is target
+  return foundNode
 }
 
 /**
@@ -142,28 +148,32 @@ export function getInvestigator(target: publicKey, marker: CycleMarker): Node {
  */
 export function informInvestigator(target: publicKey): void {
   // This is to initiate the investigation process
+  try {
+    // Compute investigator based off of hash(target + cycle marker)
+    const cycle = CycleChain.getCurrentCycleMarker()
+    const investigator = getInvestigator(target, cycle)
+    // Don't send yourself an InvestigateArchiverMsg
+    if (id === investigator.id) {
+      info(`informInvestigator: investigator is self, not sending InvestigateArchiverMsg`)
+      return
+    }
 
-  // Compute investigator based off of hash(target + cycle marker)
-  const cycle = CycleChain.getCurrentCycleMarker()
-  const investigator = getInvestigator(target, cycle)
-  // Don't send yourself an InvestigateArchiverMsg
-  if (id === investigator.id) {
-    info(`informInvestigator: investigator is self, not sending InvestigateArchiverMsg`)
-    return
+    // Form msg
+    const investigateMsg: SignedObject<InvestigateArchiverMsg> = Context.crypto.sign({
+      type: 'investigate',
+      target,
+      investigator: investigator.id,
+      sender: id,
+      cycle,
+    })
+
+    // Send message to investigator
+    info(`informInvestigator: sending InvestigateArchiverMsg: ${inspect(investigateMsg)}`)
+    Comms.tell([investigator], 'lost-archiver-investigate', investigateMsg)
+  } catch (ex) {
+    nestedCountersInstance.countEvent('p2p', `informInvestigator error ${shardusGetTime()}`)
+    error('informInvestigator: ' + formatErrorMessage(ex))
   }
-
-  // Form msg
-  const investigateMsg: SignedObject<InvestigateArchiverMsg> = Context.crypto.sign({
-    type: 'investigate',
-    target,
-    investigator: investigator.id,
-    sender: id,
-    cycle,
-  })
-
-  // Send message to investigator
-  info(`informInvestigator: sending InvestigateArchiverMsg: ${inspect(investigateMsg)}`)
-  Comms.tell([investigator], 'lost-archiver-investigate', investigateMsg)
 }
 
 /**
@@ -280,7 +290,9 @@ export function errorForArchiverUpMsg(msg: SignedObject<ArchiverUpMsg> | null): 
  * @param msg - The ArchiverUpMsg to check
  * @returns null if there are no errors, and a string describing the error otherwise
  */
-export function errorForArchiverRefutesLostMsg(msg: SignedObject<ArchiverRefutesLostMsg> | null): string | null {
+export function errorForArchiverRefutesLostMsg(
+  msg: SignedObject<ArchiverRefutesLostMsg> | null
+): string | null {
   if (msg == null) return 'null message'
   if (msg.sign == null) return 'no signature'
   const missing = missingProperties(msg, 'archiver cycle')
@@ -311,4 +323,7 @@ function _errorForInvestigateArchiverMsg(msg: InvestigateArchiverMsg | null): st
   if (missing.length) return `missing properties: ${missing.join(', ')}`
   if (msg.type !== 'investigate') return `invalid type: ${msg.type}`
   return null
+}
+function shardusGetTime() {
+  throw new Error('Function not implemented.')
 }

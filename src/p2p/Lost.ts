@@ -637,50 +637,55 @@ export function scheduleLostReport(target: P2P.NodeListTypes.Node, reason: strin
  * @returns
  */
 function reportLost(target, reason: string, requestId: string) {
-  info(`Reporting lost for ${target.id}, requestId: ${requestId}.`)
-  info(`Target node details for requestId: ${requestId}: ${logNode(target)}`)
-  if (target.id === Self.id) {
-    nestedCountersInstance.countEvent('p2p', 'reportLost skip: self')
-    return // don't report self
-  }
-  if (stopReporting[target.id]) {
-    nestedCountersInstance.countEvent('p2p', 'reportLost skip: already stopped reporting')
-    return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
-  }
-  if (nodes.get(target.id)?.status === 'syncing') {
-    nestedCountersInstance.countEvent('p2p', 'reportLost skip: node syncing')
-    return // don't report syncing nodes
-  }
-  // we set isDown cache to the cycle number here; to speed up deciding if a node is down
-  isDown[target.id] = currentCycle
-  const key = `${target.id}-${currentCycle}`
-  const lostRec = lostReported.get(key)
-  if (lostRec) return // we have already seen this node for this cycle
-  let obj = { target: target.id, status: 'reported', cycle: currentCycle }
-  let lostCycle = currentCycle
-  let checkerNodes = getMultipleCheckerNodes(target.id, lostCycle, Self.id)
-  for (let checker of checkerNodes) {
-    // const checker = getCheckerNode(target.id, currentCycle)
-    if (checker.id === Self.id && activeByIdOrder.length >= 3) return // we cannot be reporter and checker if there is 3 or more nodes in the network
-    let report: P2P.LostTypes.LostReport = {
-      target: target.id,
-      checker: checker.id,
-      reporter: Self.id,
-      cycle: currentCycle,
+  try {
+    info(`Reporting lost for ${target.id}, requestId: ${requestId}.`)
+    info(`Target node details for requestId: ${requestId}: ${logNode(target)}`)
+    if (target.id === Self.id) {
+      nestedCountersInstance.countEvent('p2p', 'reportLost skip: self')
+      return // don't report self
     }
-    // [TODO] - remove the following line after testing killother
-    if (allowKillRoute && reason === 'killother') report.killother = true
-    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, reporter: ${Self.ip}:${Self.port} id: ${Self.id}`)
-    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, checker: ${checker.internalIp}:${checker.internalPort} node details: ${logNode(checker)}`)
-    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, target: ${target.internalIp}:${target.internalPort} cycle: ${report.cycle} node details: ${logNode(target)}`)
-    /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${JSON.stringify(report)}`)
+    if (stopReporting[target.id]) {
+      nestedCountersInstance.countEvent('p2p', 'reportLost skip: already stopped reporting')
+      return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
+    }
+    if (nodes.get(target.id)?.status === 'syncing') {
+      nestedCountersInstance.countEvent('p2p', 'reportLost skip: node syncing')
+      return // don't report syncing nodes
+    }
+    // we set isDown cache to the cycle number here; to speed up deciding if a node is down
+    isDown[target.id] = currentCycle
+    const key = `${target.id}-${currentCycle}`
+    const lostRec = lostReported.get(key)
+    if (lostRec) return // we have already seen this node for this cycle
+    let obj = { target: target.id, status: 'reported', cycle: currentCycle }
+    let lostCycle = currentCycle
+    let checkerNodes = getMultipleCheckerNodes(target.id, lostCycle, Self.id)
+    for (let checker of checkerNodes) {
+      // const checker = getCheckerNode(target.id, currentCycle)
+      if (checker.id === Self.id && activeByIdOrder.length >= 3) return // we cannot be reporter and checker if there is 3 or more nodes in the network
+      let report: P2P.LostTypes.LostReport = {
+        target: target.id,
+        checker: checker.id,
+        reporter: Self.id,
+        cycle: currentCycle,
+      }
+      // [TODO] - remove the following line after testing killother
+      if (allowKillRoute && reason === 'killother') report.killother = true
+      /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, reporter: ${Self.ip}:${Self.port} id: ${Self.id}`)
+      /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, checker: ${checker.internalIp}:${checker.internalPort} node details: ${logNode(checker)}`)
+      /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, target: ${target.internalIp}:${target.internalPort} cycle: ${report.cycle} node details: ${logNode(target)}`)
+      /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${JSON.stringify(report)}`)
 
-    const msgCopy = JSON.parse(shardusCrypto.stringify(report))
-    msgCopy.timestamp = shardusGetTime()
-    msgCopy.requestId = requestId
-    report = crypto.sign(msgCopy)
-    lostReported.set(key, report)
-    Comms.tell([checker], 'lost-report', report)
+      const msgCopy = JSON.parse(shardusCrypto.stringify(report))
+      msgCopy.timestamp = shardusGetTime()
+      msgCopy.requestId = requestId
+      report = crypto.sign(msgCopy)
+      lostReported.set(key, report)
+      Comms.tell([checker], 'lost-report', report)
+    }
+  } catch (ex) {
+    nestedCountersInstance.countEvent('p2p', `reportLost error ${shardusGetTime()}`)
+    error('reportLost: ' + utils.formatErrorMessage(ex))
   }
 }
 
@@ -744,7 +749,11 @@ function getCheckerNode(id, cycle) {
   let idx = binarySearch(activeByIdOrder, near, compareNodes)
   const oidx = idx
   if (idx < 0) idx = (-1 - idx) % activeByIdOrder.length
-  if (activeByIdOrder[idx].id === id) idx = (idx + 1) % activeByIdOrder.length // skip to next node if the selected node is target
+  const foundNode = activeByIdOrder[idx]
+  if (foundNode == null) {
+    throw new Error(`activeByIdOrder idx:${idx} length: ${activeByIdOrder.length}`)
+  }
+  if (foundNode.id === id) idx = (idx + 1) % activeByIdOrder.length // skip to next node if the selected node is target
   info(`in getCheckerNode oidx:${oidx} idx:${idx} near:${near}  cycle:${cycle}  id:${id}`)
   info(`${JSON.stringify(activeByIdOrder.map((n) => n.id))}`)
   return activeByIdOrder[idx]
@@ -831,16 +840,21 @@ function checkReport(report, expectCycle) {
   if (!nodes.has(report.target)) return [false, 'target not in network']
   if (!nodes.has(report.reporter)) return [false, 'reporter not in network']
   if (!nodes.has(report.checker)) return [false, 'checker not in network']
-  let checkerNodes = getMultipleCheckerNodes(report.target, report.cycle, report.reporter)
-  let checkNodeIds = checkerNodes.map((node) => node.id)
-  if (!checkNodeIds.includes(report.checker)) {
-    error(`checkReport: report.checker ${report.checker} is not one of the valid checkers ${checkNodeIds}`)
-    return [
-      false,
-      `report.checker ${report.checker} is not part of eligible checkers: ${utils.stringifyReduce(
-        checkNodeIds
-      )}`,
-    ]
+  try {
+    let checkerNodes = getMultipleCheckerNodes(report.target, report.cycle, report.reporter)
+    let checkNodeIds = checkerNodes.map((node) => node.id)
+    if (!checkNodeIds.includes(report.checker)) {
+      error(`checkReport: report.checker ${report.checker} is not one of the valid checkers ${checkNodeIds}`)
+      return [
+        false,
+        `report.checker ${report.checker} is not part of eligible checkers: ${utils.stringifyReduce(
+          checkNodeIds
+        )}`,
+      ]
+    }
+  } catch (ex) {
+    error('checkReport: ' + utils.formatErrorMessage(ex))
+    return [false, `checker node look up fail ${report.checker}`] // we should be the checker based on our own calculations
   }
   if (!crypto.verify(report, nodes.get(report.reporter).publicKey)) return [false, 'bad sign from reporter'] // the report should be properly signed
   return [true, '']

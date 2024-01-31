@@ -63,13 +63,13 @@ export function syncV2(activeNodes: P2P.SyncTypes.ActiveNode[]): ResultAsync<voi
             )
           }
 
-          NodeList.reset()
+          NodeList.reset('syncV2')
 
           // log the counts of the nodes, archivers, and standby nodes
           /* prettier-ignore */ if (logFlags.important_as_fatal) console.log( `syncV2: nodes: ${validatorList.length}, archivers: ${archiverList.length}, standby nodes: ${standbyNodeList.length}` )
 
           // add validators
-          NodeList.addNodes(validatorList)
+          NodeList.addNodes(validatorList, 'syncV2')
 
           // add archivers
           for (const archiver of archiverList) {

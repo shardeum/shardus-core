@@ -90,7 +90,7 @@ export function init() {
 export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
   // Flush existing cycles/nodes
   CycleChain.reset()
-  NodeList.reset()
+  NodeList.reset('sync')
 
   nestedCountersInstance.countEvent('p2p', `sync-start`)
 
@@ -379,7 +379,10 @@ function applyNodeListChange(
   raiseEvents: boolean,
   cycle: P2P.CycleCreatorTypes.CycleRecord | null
 ) {
-  NodeList.addNodes(change.added.map((joined) => NodeList.createNode(joined)))
+  NodeList.addNodes(
+    change.added.map((joined) => NodeList.createNode(joined)),
+    'applyNodeListChange'
+  )
   NodeList.updateNodes(change.updated, raiseEvents, cycle)
   if (change.removed[0] !== 'all') NodeList.removeNodes(change.removed, raiseEvents, cycle)
 }
