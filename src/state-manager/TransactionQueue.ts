@@ -5505,7 +5505,7 @@ class TransactionQueue {
           if (queueEntry.collectedFinalData[data.accountId] == null) {
             // todo: check the state hashes and verify
             queueEntry.collectedFinalData[data.accountId] = data
-            nestedCountersInstance.countEvent('stateManager', 'requestFinalDataSuccess')
+            nestedCountersInstance.countEvent('stateManager', `requestFinalDataSuccess retry: ${count}`)
             success = true
             /* prettier-ignore */
             if (logFlags.verbose) this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} success accountId: ${data.accountId} stateId: ${data.stateId}`);
