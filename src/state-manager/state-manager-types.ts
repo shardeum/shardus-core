@@ -108,6 +108,7 @@ export type QueueEntry = {
   robustAccountDataPromises?: { [key: string]: Promise<Shardus.WrappedData> }
   queryingRobustVote?: boolean
   queryingRobustConfirmOrChallenge?: boolean
+  queryingRobustAccountData?: boolean
   queryingFinalData?: boolean
 
   gossipedReceipt: boolean

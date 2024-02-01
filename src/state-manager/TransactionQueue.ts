@@ -3318,14 +3318,24 @@ class TransactionQueue {
 
             // for each remote node lets save it's id
             for (const index of indicies) {
-              const node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+              const targetNode = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
               //only send data to the execution group
               if (queueEntry.executionGroupMap.has(remoteHomeNode.node.id) === false) {
                 continue
               }
-              if (node != null && node.id !== ourNodeData.node.id) {
-                nodesToSendTo[node.id] = node
-                consensusNodeIds.push(node.id)
+
+              if (targetNode != null && targetNode.id !== ourNodeData.node.id) {
+                const isRemoteNodePartOfLocalConsensusGroup =
+                  localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === targetNode.id)
+                if (isRemoteNodePartOfLocalConsensusGroup) {
+                  // skip data share to nodes that are part of key's consensus group
+                  nestedCountersInstance.countEvent(
+                    'tellCorrespondingNodes',
+                    'skipDataShareToExeNodesThatArePartOfKeyConsensusGroup'
+                  )
+                }
+                nodesToSendTo[targetNode.id] = targetNode
+                consensusNodeIds.push(targetNode.id)
               }
             }
             for (const index of edgeIndicies) {
@@ -3341,14 +3351,23 @@ class TransactionQueue {
             }
 
             for (const index of patchIndicies) {
-              const node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+              const targetNode = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
               //only send data to the execution group
               if (queueEntry.executionGroupMap.has(remoteHomeNode.node.id) === false) {
                 continue
               }
-              if (node != null && node.id !== ourNodeData.node.id) {
-                nodesToSendTo[node.id] = node
-                //edgeNodeIds.push(node.id)
+              if (targetNode != null && targetNode.id !== ourNodeData.node.id) {
+                const isRemoteNodePartOfLocalConsensusGroup =
+                  localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === targetNode.id)
+                if (isRemoteNodePartOfLocalConsensusGroup) {
+                  // skip data share to nodes that are part of key's consensus group
+                  nestedCountersInstance.countEvent(
+                    'tellCorrespondingNodes',
+                    'skipDataShareToExeNodesThatArePartOfKeyConsensusGroup'
+                  )
+                }
+                nodesToSendTo[targetNode.id] = targetNode
+                //edgeNodeIds.push(targetNode.id)
               }
             }
 
@@ -5476,8 +5495,9 @@ class TransactionQueue {
     const indexes = selectIndexesWithOffeset(queueEntry.executionGroup.length, 3, offset)
     let success = false
     let count = 0
+    const maxRetry = 1
 
-    while (success === false && count < 3) {
+    while (success === false && count < maxRetry) {
       count++
       try {
         const randomExeNode = queueEntry.executionGroup[count - 1]
