@@ -22,6 +22,7 @@ import {
   isDebugModeMiddlewareHigh,
   isDebugModeMiddlewareLow,
   isDebugModeMiddlewareMedium,
+  isDebugModeMiddlewareMultiSig,
 } from '../network/debugMiddleware'
 import { apoptosizeSelf, isApopMarkedNode } from '../p2p/Apoptosis'
 import * as Archivers from '../p2p/Archivers'
@@ -2572,7 +2573,11 @@ class Shardus extends EventEmitter {
   patchObject(existingObject: any, changeObj: any, appData: any) {
     for (const [key, value] of Object.entries(changeObj)) {
       if (existingObject[key] != null) {
-        if (typeof value === 'object') {
+        /* handle dev key rotation where both keys and values are required */
+        if (key === 'devPublicKeys') {
+          existingObject[key] = value
+          this.mainLogger.info(`patched ${key} to ${value}`)
+        } else if (typeof value === 'object') {
           this.patchObject(existingObject[key], value, appData)
         } else {
           existingObject[key] = value
@@ -2633,6 +2638,10 @@ class Shardus extends EventEmitter {
   }
   getDebugModeMiddlewareHigh() {
     return isDebugModeMiddlewareHigh
+  }
+
+  getDebugModeMiddlewareMultiSig() {
+    return isDebugModeMiddlewareMultiSig
   }
 
   shardus_fatal(key, log, log2 = null) {
