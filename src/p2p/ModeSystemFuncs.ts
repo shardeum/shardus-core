@@ -211,7 +211,7 @@ export function getExpiredRemovedV2(
 
   const active = NodeList.activeByIdOrder.length
 
-  let expireTimestamp = (start - config.p2p.nodeExpiryAge) * 1000
+  let expireTimestamp = start - config.p2p.nodeExpiryAge
   if (expireTimestamp < 0) expireTimestamp = 0
 
   // initialize the max amount to remove to our config value
