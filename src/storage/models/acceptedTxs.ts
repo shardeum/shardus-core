@@ -1,12 +1,12 @@
-import * as Sequelize from 'sequelize'
+import { SQLDataTypes } from '../utils/schemaDefintions'
 
 const acceptedTx = [
   'acceptedTxs',
   {
-    txId: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
-    timestamp: { type: Sequelize.BIGINT, allowNull: false },
-    data: { type: Sequelize.JSON, allowNull: false },
-    keys: { type: Sequelize.JSON, allowNull: false },
+    txId: { type: SQLDataTypes.STRING, allowNull: false, primaryKey: true },
+    timestamp: { type: SQLDataTypes.BIGINT, allowNull: false },
+    data: { type: SQLDataTypes.JSON, allowNull: false },
+    keys: { type: SQLDataTypes.JSON, allowNull: false },
   },
 ]
 

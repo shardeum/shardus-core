@@ -1,13 +1,13 @@
-import * as Sequelize from 'sequelize'
+import { SQLDataTypes } from '../utils/schemaDefintions'
 
 const accountStates = [
   'accountStates',
   {
-    accountId: { type: Sequelize.STRING, allowNull: false, unique: 'compositeIndex' },
-    txId: { type: Sequelize.STRING, allowNull: false },
-    txTimestamp: { type: Sequelize.BIGINT, allowNull: false, unique: 'compositeIndex' },
-    stateBefore: { type: Sequelize.STRING, allowNull: false },
-    stateAfter: { type: Sequelize.STRING, allowNull: false },
+    accountId: { type: SQLDataTypes.STRING, allowNull: false, unique: 'compositeIndex' },
+    txId: { type: SQLDataTypes.STRING, allowNull: false },
+    txTimestamp: { type: SQLDataTypes.BIGINT, allowNull: false, unique: 'compositeIndex' },
+    stateBefore: { type: SQLDataTypes.STRING, allowNull: false },
+    stateAfter: { type: SQLDataTypes.STRING, allowNull: false },
   },
 ]
 

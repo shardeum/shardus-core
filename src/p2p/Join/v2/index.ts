@@ -16,7 +16,6 @@ import { ResultAsync } from 'neverthrow'
 import { reset as resetAcceptance } from './acceptance'
 import { stringifyReduce } from '../../../utils/functions/stringifyReduce'
 import { logFlags } from '../../../logger'
-import { Json } from 'sequelize/dist/lib/utils'
 
 const clone = rfdc()
 

@@ -1,7 +1,6 @@
 import Log4js from 'log4js'
 // const fs = require('fs')
 // const path = require('path')
-import { ColumnDescription, Op } from 'sequelize'
 import Logger, { logFlags } from '../logger'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
@@ -9,13 +8,14 @@ import Profiler from '../utils/profiler'
 import * as ShardusTypes from './../shardus/shardus-types'
 import models from './models'
 // const utils = require('../utils')
-// const SequelizeStorage = require('./sequelizeStorage')
 import Sqlite3Storage from './sqlite3storage'
 // const BetterSqlite3Storage = require('./betterSqlite3storage')
 
 import P2PApoptosis = require('../p2p/Apoptosis')
 
 import { config } from '../p2p/Context'
+import { ColumnDescription } from './utils/schemaDefintions'
+import { Op } from './utils/sqlOpertors'
 
 /** A type alias to avoid both `any` and having to spell this type out any time
  * we want to use it. */

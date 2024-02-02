@@ -5,14 +5,12 @@ import * as Shardus from '../shardus/shardus-types'
 import Profiler from '../utils/profiler'
 import fs from 'fs'
 import path from 'path'
-import * as Sequelize from 'sequelize'
 import * as utils from '../utils'
 import Logger, { logFlags } from '../logger'
 import { GenericObject, ModelAttributes, ModelData, OperationOptions, ParamEntry } from '.'
-import { Database } from 'better-sqlite3';
-import { ColumnDescription } from 'sequelize'
-
-const Op = Sequelize.Op
+import { Database } from 'better-sqlite3'
+import { ColumnDescription, SQLDataTypes } from './utils/schemaDefintions'
+import { Op } from './utils/sqlOpertors'
 
 interface BetterSqlite3Storage {
   baseDir: string
@@ -53,12 +51,12 @@ class BetterSqlite3Storage {
     const tableName = modelName
 
     const modelData: ModelData = {
-        tableName,
-        columns: [],
-        columnsString: '',
-        substitutionString: '',
-        isColumnJSON: {},
-        JSONkeys: []
+      tableName,
+      columns: [],
+      columnsString: '',
+      substitutionString: '',
+      isColumnJSON: {},
+      JSONkeys: [],
     }
     for (const key in modelAttributes) {
       if (Object.prototype.hasOwnProperty.call(modelAttributes, key)) {
@@ -66,11 +64,11 @@ class BetterSqlite3Storage {
         // eslint-disable-next-line security/detect-object-injection
         const value = modelAttributes[key]
 
-        let type: string | ColumnDescription  = value.type
+        let type: string | ColumnDescription = value.type
         if (!type) {
           type = value
         }
-        if (type.toString() === Sequelize.JSON.toString()) {
+        if (type.toString() === SQLDataTypes.JSON.toString()) {
           // eslint-disable-next-line security/detect-object-injection
           modelData.isColumnJSON[key] = true
           modelData.JSONkeys.push(key)
@@ -173,7 +171,12 @@ class BetterSqlite3Storage {
     return await this.all<T>(queryString, valueArray)
   }
 
-  _update(table: ModelData, values: GenericObject, where: GenericObject, opts: OperationOptions): Promise<unknown> {
+  _update(
+    table: ModelData,
+    values: GenericObject,
+    where: GenericObject,
+    opts: OperationOptions
+  ): Promise<unknown> {
     let queryString = table.updateString
 
     const valueParams = this.params2Array(values, table)
@@ -275,7 +278,10 @@ class BetterSqlite3Storage {
     return paramsArray
   }
 
-  paramsToWhereStringAndValues(paramsArray: ParamEntry[]): { whereString: string; whereValueArray: unknown[] } {
+  paramsToWhereStringAndValues(paramsArray: ParamEntry[]): {
+    whereString: string
+    whereValueArray: unknown[]
+  } {
     let whereValueArray = []
     let whereString = ''
     for (let i = 0; i < paramsArray.length; i++) {
@@ -293,7 +299,10 @@ class BetterSqlite3Storage {
     return { whereString, whereValueArray }
   }
 
-  paramsToAssignmentStringAndValues(paramsArray: ParamEntry[]): { resultString: string; valueArray: unknown[] } {
+  paramsToAssignmentStringAndValues(paramsArray: ParamEntry[]): {
+    resultString: string
+    valueArray: unknown[]
+  } {
     let valueArray = []
     let resultString = ''
     for (let i = 0; i < paramsArray.length; i++) {

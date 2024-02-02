@@ -1,11 +1,11 @@
-import * as Sequelize from 'sequelize'
+import { SQLDataTypes } from '../utils/schemaDefintions'
 
 const summary = [
   'summary',
   {
-    partitionId: { type: Sequelize.STRING, allowNull: false, unique: 'compositeIndex' },
-    cycleNumber: { type: Sequelize.STRING, allowNull: false, unique: 'compositeIndex' },
-    hash: { type: Sequelize.STRING, allowNull: false },
+    partitionId: { type: SQLDataTypes.STRING, allowNull: false, unique: 'compositeIndex' },
+    cycleNumber: { type: SQLDataTypes.STRING, allowNull: false, unique: 'compositeIndex' },
+    hash: { type: SQLDataTypes.STRING, allowNull: false },
   },
 ]
 

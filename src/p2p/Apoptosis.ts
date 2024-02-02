@@ -20,7 +20,6 @@ of a particular node, the node is removed from the node list.
 */
 import { P2P } from '@shardus/types'
 import { Handler } from 'express'
-import * as Sequelize from 'sequelize'
 import { isDebugMode } from '../debug'
 import { logFlags } from '../logger'
 import {
@@ -46,6 +45,7 @@ import { activeByIdOrder, byIdOrder, byPubKey, nodes } from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
+import { SQLDataTypes } from '../storage/utils/schemaDefintions'
 
 /** STATE */
 
@@ -443,5 +443,5 @@ function error(...msg) {
 export const addCycleFieldQuery = `ALTER TABLE cycles ADD ${cycleDataName} JSON NULL`
 
 export const sequelizeCycleFieldModel = {
-  [cycleDataName]: { type: Sequelize.JSON, allowNull: true },
+  [cycleDataName]: { type: SQLDataTypes.JSON, allowNull: true },
 }

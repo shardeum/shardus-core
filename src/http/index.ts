@@ -1,6 +1,5 @@
 import { parse as parseUrl } from 'url'
 import got from 'got'
-import { Json } from 'sequelize/dist/lib/utils'
 import { logFlags } from '../logger'
 import { stringifyReduceLimit } from '../utils'
 

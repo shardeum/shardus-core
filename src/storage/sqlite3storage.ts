@@ -3,7 +3,6 @@ import { stringify } from '../utils'
 import fs from 'fs'
 import Log4js from 'log4js'
 import path from 'path'
-import * as Sequelize from 'sequelize'
 import * as Shardus from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import * as utils from '../utils'
@@ -11,13 +10,12 @@ import Profiler from '../utils/profiler'
 import { config } from '../p2p/Context'
 import Logger, { logFlags } from '../logger'
 
-const Op = Sequelize.Op
-
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const sqlite3 = require('sqlite3').verbose()
 import { Database } from 'sqlite3'
-import { ColumnDescription } from 'sequelize'
 import { GenericObject, ModelAttributes, ModelData, OperationOptions, ParamEntry } from '.'
+import { ColumnDescription, SQLDataTypes } from './utils/schemaDefintions'
+import { Op } from './utils/sqlOpertors'
 
 interface Sqlite3Storage {
   baseDir: string
@@ -81,7 +79,7 @@ class Sqlite3Storage {
           type = value
           // if (logFlags.console) console.log(' TYPE MISSING!!!! ' + key)
         }
-        if (type.toString() === Sequelize.JSON.toString()) {
+        if (type.toString() === SQLDataTypes.JSON.toString()) {
           // eslint-disable-next-line security/detect-object-injection
           modelData.isColumnJSON[key] = true
           modelData.JSONkeys.push(key)

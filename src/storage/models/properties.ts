@@ -1,10 +1,10 @@
-import * as Sequelize from 'sequelize'
+import { SQLDataTypes } from '../utils/schemaDefintions'
 
 const properties = [
   'properties',
   {
-    key: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
-    value: Sequelize.JSON,
+    key: { type: SQLDataTypes.STRING, allowNull: false, primaryKey: true },
+    value: SQLDataTypes.JSON,
   },
 ]
 

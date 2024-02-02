@@ -1,14 +1,14 @@
-import * as Sequelize from 'sequelize'
+import { SQLDataTypes } from '../utils/schemaDefintions'
 
 const network = [
   'network',
   {
     cycleNumber: {
-      type: Sequelize.STRING,
+      type: SQLDataTypes.STRING,
       allowNull: false,
       unique: 'compositeIndex',
     },
-    hash: { type: Sequelize.STRING, allowNull: false },
+    hash: { type: SQLDataTypes.STRING, allowNull: false },
   },
 ]
 
