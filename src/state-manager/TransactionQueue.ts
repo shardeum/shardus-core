@@ -261,6 +261,7 @@ class TransactionQueue {
           if (queueEntry == null) {
             //In the past we would enqueue the TX, expecially if syncing but that has been removed.
             //The normal mechanism of sharing TXs is good enough.
+            nestedCountersInstance.countEvent('processing', 'broadcast_state_noQueueEntry')
             return
           }
           // add the data in
@@ -1838,8 +1839,8 @@ class TransactionQueue {
   }
 
   async queueEntryPrePush(txQueueEntry: QueueEntry): Promise<void> {
-    this.profiler.profileSectionStart('queueEntryPrePush')
-    this.profiler.scopedProfileSectionStart('queueEntryPrePush')
+    this.profiler.profileSectionStart('queueEntryPrePush', true)
+    this.profiler.scopedProfileSectionStart('queueEntryPrePush', true)
     // Pre fetch immutable read account data for this TX
     if (
       this.config.features.enableRIAccountsCache &&
@@ -1869,7 +1870,7 @@ class TransactionQueue {
       }
     }
     this.profiler.scopedProfileSectionEnd('queueEntryPrePush')
-    this.profiler.profileSectionStart('queueEntryPrePush')
+    this.profiler.profileSectionStart('queueEntryPrePush', true)
   }
 
   /***
@@ -1947,6 +1948,7 @@ class TransactionQueue {
         )}`
       )
     }
+    profilerInstance.profileSectionStart('queueEntryAddData', true)
     queueEntry.collectedData[data.accountId] = data
     queueEntry.dataCollected++
 
@@ -1965,6 +1967,7 @@ class TransactionQueue {
     }
 
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_addData', `${queueEntry.logID}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
+    profilerInstance.profileSectionStart('queueEntryAddData', true)
   }
 
   /**
@@ -3325,28 +3328,41 @@ class TransactionQueue {
               }
 
               if (targetNode != null && targetNode.id !== ourNodeData.node.id) {
-                const isRemoteNodePartOfLocalConsensusGroup =
-                  localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === targetNode.id)
-                if (isRemoteNodePartOfLocalConsensusGroup) {
-                  // skip data share to nodes that are part of key's consensus group
-                  nestedCountersInstance.countEvent(
-                    'tellCorrespondingNodes',
-                    'skipDataShareToExeNodesThatArePartOfKeyConsensusGroup'
-                  )
-                }
+                // const indexOfRemoteNodeInLocalConsensusGroup =
+                //   localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === targetNode.id)
+                // if (indexOfRemoteNodeInLocalConsensusGroup !== -1) {
+                //   // skip data share to nodes that are part of key's consensus group
+                //   nestedCountersInstance.countEvent(
+                //     'tellCorrespondingNodes',
+                //     'skipDataShareToExeNodesThatArePartOfKeyConsensusGroup' +
+                //       `index: ${indexOfRemoteNodeInLocalConsensusGroup}`
+                //   )
+                //   continue
+                // }
                 nodesToSendTo[targetNode.id] = targetNode
                 consensusNodeIds.push(targetNode.id)
               }
             }
             for (const index of edgeIndicies) {
-              const node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+              const targetNode = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
               //only send data to the execution group
               if (queueEntry.executionGroupMap.has(remoteHomeNode.node.id) === false) {
                 continue
               }
-              if (node != null && node.id !== ourNodeData.node.id) {
-                nodesToSendTo[node.id] = node
-                edgeNodeIds.push(node.id)
+              if (targetNode != null && targetNode.id !== ourNodeData.node.id) {
+                // const indexOfRemoteNodeInLocalConsensusGroup =
+                //   localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === targetNode.id)
+                // if (indexOfRemoteNodeInLocalConsensusGroup !== -1) {
+                //   // skip data share to nodes that are part of key's consensus group
+                //   nestedCountersInstance.countEvent(
+                //     'tellCorrespondingNodes',
+                //     'skipDataShareToExeNodesThatArePartOfKeyConsensusGroup' +
+                //       `index: ${indexOfRemoteNodeInLocalConsensusGroup}`
+                //   )
+                //   continue
+                // }
+                nodesToSendTo[targetNode.id] = targetNode
+                edgeNodeIds.push(targetNode.id)
               }
             }
 
@@ -3357,15 +3373,15 @@ class TransactionQueue {
                 continue
               }
               if (targetNode != null && targetNode.id !== ourNodeData.node.id) {
-                const isRemoteNodePartOfLocalConsensusGroup =
-                  localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === targetNode.id)
-                if (isRemoteNodePartOfLocalConsensusGroup) {
-                  // skip data share to nodes that are part of key's consensus group
-                  nestedCountersInstance.countEvent(
-                    'tellCorrespondingNodes',
-                    'skipDataShareToExeNodesThatArePartOfKeyConsensusGroup'
-                  )
-                }
+                // const isRemoteNodePartOfLocalConsensusGroup =
+                //   localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === targetNode.id)
+                // if (isRemoteNodePartOfLocalConsensusGroup) {
+                //   // skip data share to nodes that are part of key's consensus group
+                //   nestedCountersInstance.countEvent(
+                //     'tellCorrespondingNodes',
+                //     'skipDataShareToExeNodesThatArePartOfKeyConsensusGroup'
+                //   )
+                // }
                 nodesToSendTo[targetNode.id] = targetNode
                 //edgeNodeIds.push(targetNode.id)
               }
@@ -3447,6 +3463,7 @@ class TransactionQueue {
    * @returns
    */
   async tellCorrespondingNodesFinalData(queueEntry: QueueEntry): Promise<void> {
+    profilerInstance.profileSectionStart('tellCorrespondingNodesFinalData', true)
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData - start: ${queueEntry.logID}`)
 
     if (this.stateManager.currentCycleShardData == null) {
@@ -3637,7 +3654,9 @@ class TransactionQueue {
       }
     }
 
+    nestedCountersInstance.countEvent('tellCorrespondingNodesFinalData', 'totalShares', totalShares)
     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodesFinalData - end: ${queueEntry.logID} totalShares:${totalShares}`)
+    profilerInstance.profileSectionEnd('tellCorrespondingNodesFinalData', true)
   }
 
   dumpTxDebugToStatList(queueEntry: QueueEntry): void {
@@ -4436,6 +4455,7 @@ class TransactionQueue {
                     ' at ' +
                     ex.stack
                 )
+                nestedCountersInstance.countEvent(`processing`, `tellCorrespondingNodes fail`)
 
                 queueEntry.executionDebug.process1 = 'tell fail'
               } finally {
@@ -4471,6 +4491,7 @@ class TransactionQueue {
                 //need to review this in context of sharding
                 /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} isBlocked:${isBlocked}`)
                 const missingAccounts = this.queueEntryListMissingData(queueEntry)
+                nestedCountersInstance.countEvent('txExpired', `missing accounts: ${missingAccounts.length}`)
                 if (logFlags.playback) {
                   this.logger.playbackLogNote(
                     'txExpired>M2.5',
@@ -4789,7 +4810,7 @@ class TransactionQueue {
                       // Broadcast the receipt, only if we made one (try produce can early out if we received one)
                       const awaitStart = shardusGetTime()
                       /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()' )
-                      await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
+                      this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
                       /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()', DebugComplete.Completed )
 
                       this.updateSimpleStatsObject(
@@ -5082,10 +5103,10 @@ class TransactionQueue {
                     nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData incomplete')
                     // /* prettier-ignore */ if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData incomplete : ${queueEntry.logID}, waiting queueEntry.debug.waitingOn`)
 
-                    const txAge = shardusGetTime() - queueEntry.acceptedTx.timestamp
-                    if (txAge > timeM2_5 && !queueEntry.queryingFinalData) {
-                      this.requestFinalData(queueEntry, missingAccounts)
-                    }
+                    // const txAge = shardusGetTime() - queueEntry.acceptedTx.timestamp
+                    // if (txAge > timeM2_5 && !queueEntry.queryingFinalData) {
+                    //   this.requestFinalData(queueEntry, missingAccounts)
+                    // }
                   }
                 }
               }
@@ -5654,19 +5675,19 @@ class TransactionQueue {
       //normal blocking for read write
       for (const id of queueEntry.shardusMemoryPatternSets.rw) {
         if (this.queueWrites.has(id)) {
-          nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen rw queue_write')
-          nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen rw queue_write ${id}`)
+          // nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen rw queue_write')
+          // nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen rw queue_write ${id}`)
           return true
         }
         if (this.queueReadWritesOld.has(id)) {
-          nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen rw old queue_write')
-          nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen rw old queue_write ${id}`)
+          // nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen rw old queue_write')
+          // nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen rw old queue_write ${id}`)
           return true
         }
         //also blocked by upstream reads
         if (this.queueReads.has(id)) {
-          nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen rw queue_read')
-          nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen rw queue_read ${id}`)
+          // nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen rw queue_read')
+          // nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen rw queue_read ${id}`)
           return true
         }
       }
@@ -5675,13 +5696,13 @@ class TransactionQueue {
       for (const id of queueEntry.shardusMemoryPatternSets.wo) {
         //also blocked by upstream reads
         if (this.queueReads.has(id)) {
-          nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen wo queue_read')
-          nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen wo queue_read ${id}`)
+          // nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen wo queue_read')
+          // nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen wo queue_read ${id}`)
           return true
         }
         if (this.queueReadWritesOld.has(id)) {
-          nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen wo queue_read_write_old')
-          nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen wo queue_read_write_old ${id}`)
+          // nestedCountersInstance.countEvent('stateManager', 'shrd_accountSeen wo queue_read_write_old')
+          // nestedCountersInstance.countEvent('stateManager', `shrd_accountSeen wo queue_read_write_old ${id}`)
           return true
         }
       }

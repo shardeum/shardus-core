@@ -829,6 +829,8 @@ export interface ServerConfiguration {
     rotationMaxRemovePercent: number
     /** The max number of nodes added to `activated` list in cycleRecord each cycle */
     allowActivePerCycle: number
+    useProxyForDownCheck: boolean
+    numCheckerNodes: number
   }
   /** Server IP configuration */
   ip?: {

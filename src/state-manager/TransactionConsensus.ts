@@ -215,7 +215,7 @@ class TransactionConsenus {
       'get_confirm_or_challenge',
       async (payload: AppliedVoteQuery, respond: (arg0: ConfirmOrChallengeQuery) => unknown) => {
         nestedCountersInstance.countEvent('consensus', 'get_confirm_or_challenge')
-        this.profiler.scopedProfileSectionStart('get_confirm_or_challenge', true)
+        this.profiler.scopedProfileSectionStart('get_confirm_or_challenge handler', true)
         try {
           const { txId } = payload
           let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId)
@@ -265,8 +265,7 @@ class TransactionConsenus {
         } catch (e) {
           if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge error ${e.message}`)
         } finally {
-          this.profiler.scopedProfileSectionEnd('get_confirm_or_challenge')
-          this.profiler.profileSectionEnd('get_confirm_or_challenge', true)
+          this.profiler.scopedProfileSectionEnd('get_confirm_or_challenge handler')
         }
       }
     )
@@ -305,7 +304,7 @@ class TransactionConsenus {
       'gossip-applied-vote',
       async (payload: AppliedVote, sender: string, tracker: string) => {
         nestedCountersInstance.countEvent('consensus', 'gossip-applied-vote')
-        profilerInstance.scopedProfileSectionStart('gossip-applied-vote', true)
+        profilerInstance.scopedProfileSectionStart('gossip-applied-vote handler', true)
         try {
           const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
           if (queueEntry == null) {
@@ -335,7 +334,7 @@ class TransactionConsenus {
             }
           }
         } finally {
-          profilerInstance.scopedProfileSectionEnd('gossip-applied-vote')
+          profilerInstance.scopedProfileSectionEnd('gossip-applied-vote handler')
         }
       }
     )
@@ -737,7 +736,7 @@ class TransactionConsenus {
    * gossip the appliedReceipt to the transaction group
    * @param queueEntry
    */
-  async shareAppliedReceipt(queueEntry: QueueEntry): Promise<void> {
+  shareAppliedReceipt(queueEntry: QueueEntry): void {
     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
 
     if (queueEntry.appliedReceipt2 == null) {
@@ -1407,7 +1406,7 @@ class TransactionConsenus {
   }
 
   async robustQueryBestReceipt(queueEntry: QueueEntry): Promise<AppliedReceipt2> {
-    this.profiler.profileSectionStart('robustQueryBestReceipt')
+    this.profiler.profileSectionStart('robustQueryBestReceipt', true)
     this.profiler.scopedProfileSectionStart('robustQueryBestReceipt')
     try {
       const queryFn = async (node: Shardus.Node): Promise<RequestReceiptForTxResp> => {
@@ -1487,12 +1486,12 @@ class TransactionConsenus {
       this.mainLogger.error(`robustQueryBestReceipt: ${queueEntry.logID} error: ${e.message}`)
     } finally {
       this.profiler.scopedProfileSectionEnd('robustQueryBestReceipt')
-      this.profiler.profileSectionEnd('robustQueryBestReceipt')
+      this.profiler.profileSectionEnd('robustQueryBestReceipt', true)
     }
   }
 
   async robustQueryBestVote(queueEntry: QueueEntry): Promise<AppliedVote> {
-    profilerInstance.profileSectionStart('robustQueryBestVote')
+    profilerInstance.profileSectionStart('robustQueryBestVote', true)
     profilerInstance.scopedProfileSectionStart('robustQueryBestVote')
     try {
       queueEntry.queryingRobustVote = true
@@ -1532,12 +1531,12 @@ class TransactionConsenus {
     } finally {
       queueEntry.queryingRobustVote = false
       profilerInstance.scopedProfileSectionEnd('robustQueryBestVote')
-      profilerInstance.profileSectionEnd('robustQueryBestVote')
+      profilerInstance.profileSectionEnd('robustQueryBestVote', true)
     }
   }
 
   async robustQueryConfirmOrChallenge(queueEntry: QueueEntry): Promise<ConfirmOrChallengeQueryResponse> {
-    profilerInstance.profileSectionStart('robustQueryConfirmOrChallenge')
+    profilerInstance.profileSectionStart('robustQueryConfirmOrChallenge', true)
     profilerInstance.scopedProfileSectionStart('robustQueryConfirmOrChallenge')
     try {
       if (this.stateManager.consensusLog) {
@@ -1605,7 +1604,7 @@ class TransactionConsenus {
     } finally {
       queueEntry.queryingRobustConfirmOrChallenge = false
       profilerInstance.scopedProfileSectionEnd('robustQueryConfirmOrChallenge')
-      profilerInstance.profileSectionEnd('robustQueryConfirmOrChallenge')
+      profilerInstance.profileSectionEnd('robustQueryConfirmOrChallenge', true)
     }
   }
 
@@ -1613,7 +1612,6 @@ class TransactionConsenus {
     consensNodes: Shardus.Node[],
     accountId: string
   ): Promise<Shardus.WrappedData> {
-    profilerInstance.profileSectionStart('robustQueryAccountData')
     const queryFn = async (node: Shardus.Node): Promise<GetAccountData3Resp> => {
       const ip = node.externalIp
       const port = node.externalPort
@@ -1645,10 +1643,8 @@ class TransactionConsenus {
     const { topResult: response } = await robustQuery(consensNodes, queryFn, eqFn, redundancy, false)
     if (response && response.data) {
       const accountData = response.data.wrappedAccounts[0]
-      profilerInstance.profileSectionEnd('robustQueryAccountData')
       return accountData
     }
-    profilerInstance.profileSectionEnd('robustQueryAccountData')
   }
 
   async confirmOrChallenge(queueEntry: QueueEntry): Promise<void> {
@@ -1934,7 +1930,6 @@ class TransactionConsenus {
   }
 
   async checkAccountIntegrity(queueEntry: QueueEntry): Promise<boolean> {
-    this.profiler.profileSectionStart('checkAccountIntegrity')
     this.profiler.scopedProfileSectionStart('checkAccountIntegrity')
     queueEntry.queryingRobustAccountData = true
     let success = true
@@ -1994,7 +1989,6 @@ class TransactionConsenus {
       nestedCountersInstance.countEvent('checkAccountIntegrity', 'robustAccountDataPromises empty')
     }
     this.profiler.scopedProfileSectionEnd('checkAccountIntegrity')
-    this.profiler.profileSectionEnd('checkAccountIntegrity')
     queueEntry.queryingRobustAccountData = false
     return success
   }
@@ -2013,7 +2007,7 @@ class TransactionConsenus {
       //we are not in the execution home, so we can't create or share a vote
       return
     }
-    this.profiler.profileSectionStart('createAndShareVote')
+    this.profiler.profileSectionStart('createAndShareVote', true)
 
     try {
       const ourNodeId = Self.id
@@ -2215,9 +2209,7 @@ class TransactionConsenus {
           // Gossip the vote to the entire consensus group
           Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4)
         } else {
-          this.profiler.profileSectionStart('createAndShareVote-tell')
           this.p2p.tell(filteredConsensusGroup, 'spread_appliedVoteHash', appliedVoteHash)
-          this.profiler.profileSectionEnd('createAndShareVote-tell')
         }
       } else {
         nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote fail, no consensus group')
@@ -2225,7 +2217,7 @@ class TransactionConsenus {
     } catch (e) {
       this.mainLogger.error(`createAndShareVote: error ${e.message}`)
     } finally {
-      this.profiler.profileSectionEnd('createAndShareVote')
+      this.profiler.profileSectionEnd('createAndShareVote', true)
     }
   }
 

@@ -60,7 +60,6 @@ type ScheduledRemoveNodeByApp = ScheduledRemoveByApp<P2P.NodeListTypes.Node>
 const allowKillRoute = false
 
 let p2pLogger
-let useProxyForDownCheck = true
 
 let lostReported = new Map<string, P2P.LostTypes.LostReport>()
 let receivedLostRecordMap = new Map<string, Map<string, P2P.LostTypes.LostRecord>>()
@@ -707,7 +706,7 @@ function getMultipleCheckerNodes(
   let key = crypto.hash(obj)
   const firstFourBytesOfMarker = key.slice(0, 8)
   const offset = parseInt(firstFourBytesOfMarker, 16)
-  let pickedIndexes = utils.getIndexesPicked(activeByIdOrder.length, 3, offset)
+  let pickedIndexes = utils.getIndexesPicked(activeByIdOrder.length, config.p2p.numCheckerNodes, offset)
   for (let i = 0; i < pickedIndexes.length; i++) {
     let pickedIndex = pickedIndexes[i]
     if (activeByIdOrder[pickedIndex].id === reporter) {
@@ -1006,7 +1005,7 @@ async function isDownCheck(node) {
   info(`Checking internal connection for ${node.id}, cycle: ${currentCycle}`)
 
   try {
-    if (useProxyForDownCheck) {
+    if (config.p2p.useProxyForDownCheck) {
       //using the 'apoptosize' route to check if the node is up.
       let obj = { counter: currentCycle, checker: Self.id, target: node.id, timestamp: shardusGetTime() }
       let hash = crypto.hash(obj)

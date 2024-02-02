@@ -118,6 +118,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     rotationMaxAddPercent: 0.1,
     rotationMaxRemovePercent: 0.05,
     allowActivePerCycle: 7,
+    useProxyForDownCheck: false,
+    numCheckerNodes: 1,
   },
   ip: {
     externalIp: '0.0.0.0',
