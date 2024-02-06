@@ -301,7 +301,8 @@ export function getExpiredRemovedV2(
     if (node.status === 'syncing') continue
 
     // once we've hit the first node that's not expired, stop counting
-    if (node.joinRequestTimestamp > expireTimestamp) break
+    // updated to use activeTimestamp as this is when the node has gone active for us
+    if (node.activeTimestamp > expireTimestamp) break
 
     // otherwise, count this node as expired
     expired++
