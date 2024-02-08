@@ -45,6 +45,8 @@ import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { deserializeGetAccountDataByListReq } from '../types/GetAccountDataByListReq'
 import { getStreamWithTypeCheck } from '../types/Helpers'
+import { GetAccountData3RespSerialized, serializeGetAccountData3Resp } from '../types/GetAccountData3Resp'
+import { deserializeGetAccountData3Req } from '../types/GetAccountData3Req'
 
 const REDUNDANCY = 3
 
@@ -392,6 +394,54 @@ class AccountSync {
         this.profiler.scopedProfileSectionEnd('get_account_data3', responseSize)
       }
     )
+
+    const getAccData3BinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_get_account_data3,
+      handler: async (payload, respond, header, sign) => {
+        this.profiler.scopedProfileSectionStart(InternalRouteEnum.binary_get_account_data3, false, payload.length)
+
+        const result = {} as GetAccountData3RespSerialized
+        let ourLockID = -1
+        try{
+          const reqStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAccountData3Req)
+          if (!reqStream) {
+            result.errors.push("Payload type mismatch")
+          }
+          const readableReq = deserializeGetAccountData3Req(reqStream)
+          let accountData = null
+          ourLockID = await this.stateManager.fifoLock('accountModification')
+          accountData = await this.stateManager.getAccountDataByRangeSmart(
+            readableReq.accountStart,
+            readableReq.accountEnd,
+            readableReq.tsStart,
+            readableReq.maxRecords,
+            readableReq.offset,
+            readableReq.accountOffset
+          ) 
+
+          for (let wrappedDataRef of accountData.wrappedAccounts) {
+            wrappedDataRef.data = this.app.binarySerializeObject(Shardus.AppObjEnum.AppData, wrappedDataRef.data)
+          }
+          for (let wrappedDataRef of accountData.wrappedAccounts2) {
+            wrappedDataRef.data = this.app.binarySerializeObject(Shardus.AppObjEnum.AppData, wrappedDataRef.data)
+          }
+
+          result.data = accountData 
+          respond(result, serializeGetAccountData3Resp)
+        }catch(e){
+          result.errors.push(errorToStringFull(e))
+          if(result.errors.length > 0){
+            this.mainLogger.error(`get_account_data3: request validation errors: ${result.errors}`)
+            respond(result, serializeGetAccountData3Resp)
+          }
+        }finally{
+          this.profiler.scopedProfileSectionEnd(InternalRouteEnum.binary_get_account_data3)
+          this.stateManager.fifoUnlock('accountModification', ourLockID)
+        }
+      }
+    }
+
+    this.p2p.registerInternalBinary(getAccData3BinaryHandler.name, getAccData3BinaryHandler.handler)
 
     // /get_account_data_by_list (Acc_ids)
     // Acc_ids - array of accounts to get

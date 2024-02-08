@@ -116,7 +116,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     lostArchiversCyclesToWait: 3,
     standbyListFastHash: false, //todo set to false and migrate
     networkBaselineEnabled: false, // feature flag to enable use of baselineNodes that's new threshold for the safety, restore, and recovery modes instead of minNodes
-    useBinarySerializedEndpoints: false,
+    useBinarySerializedEndpoints: true,
     rotationCountMultiply: 1,
     rotationCountAdd: 0,
     rotationPercentActive: 0.001, //rotate 0.1% of active nodes per cycle when in a steady processing state

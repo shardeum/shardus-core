@@ -2,7 +2,7 @@ import * as Shardus from '../shardus/shardus-types'
 import { StateManager as StateManagerTypes } from '@shardus/types'
 import * as utils from '../utils'
 
-import { SimpleRange, GlobalAccountReportResp, GetAccountData3Resp, QueueEntry } from './state-manager-types'
+import { SimpleRange, GlobalAccountReportResp, GetAccountData3Resp, QueueEntry, GetAccountData3Req } from './state-manager-types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import AccountSync from './AccountSync'
 import { logFlags } from '../logger'
@@ -18,6 +18,8 @@ import {
 } from '../types/GetAccountDataByListResp'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { AppObjEnum } from '../shardus/shardus-types'
+import { serializeGetAccountData3Req } from '../types/GetAccountData3Req'
+import { deserializeGetAccountData3Resp, GetAccountData3RespSerialized } from '../types/GetAccountData3Resp'
 
 // Not sure where to put this interface yet. I guess maybe to @shardus/types? or to state-manager-types?
 // Keeping it here for now. can move it later.
@@ -580,14 +582,37 @@ export default class NodeSyncTracker implements SyncTrackerInterface {
 
       let r: GetAccountData3Resp | boolean
       try {
-        r = await this.p2p.ask(
-          this.dataSourceHelper.dataSourceNode,
-          'get_account_data3',
-          message,
-          false,
-          '',
-          5000 + moreAskTime
-        ) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+        if(stateManager.config.p2p.useBinarySerializedEndpoints) {
+          const rBin = await this.p2p.askBinary<GetAccountData3Req, GetAccountData3RespSerialized>(
+            this.dataSourceHelper.dataSourceNode,
+            InternalRouteEnum.binary_get_account_data3,
+            message,
+            serializeGetAccountData3Req,
+            deserializeGetAccountData3Resp,
+            {},
+            '',
+            false,
+            5000 + moreAskTime,
+          ) as GetAccountData3RespSerialized
+          if ((rBin.errors.length === 0 || !rBin.errors) && rBin.data) {
+            for (const accountDataRef of rBin.data.wrappedAccounts) {
+              accountDataRef.data = stateManager.app.binaryDeserializeObject(AppObjEnum.AppData, accountDataRef.data)
+            }
+            for (const accountDataRef of rBin.data.wrappedAccounts2) {
+              accountDataRef.data = stateManager.app.binaryDeserializeObject(AppObjEnum.AppData, accountDataRef.data)
+            }
+            r = rBin as GetAccountData3Resp
+          }
+        } else {
+          r = await this.p2p.ask(
+            this.dataSourceHelper.dataSourceNode,
+            'get_account_data3',
+            message,
+            false,
+            '',
+            5000 + moreAskTime
+          ) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+        }
       } catch (ex) {
         /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncAccountData2`, `syncAccountData2 retries:${askRetriesLeft} ask: ` + errorToStringFull(ex) )
         //wait 5 sec
