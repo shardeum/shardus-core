@@ -78,9 +78,9 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
           let addRem = target - (active + syncing)
           /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("addRem ", addRem)
           if (addRem > 0) {
-            if (addRem > active * 0.1) {
+            if (addRem > active * config.p2p.rotationMaxAddPercent) {
               // limit nodes added to 10% of active; we are here because many were lost
-              addRem = ~~(active * 0.1)
+              addRem = ~~(active * config.p2p.rotationMaxAddPercent)
               if (addRem === 0) {
                 addRem = 1
               }
@@ -88,40 +88,77 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
 
             add = Math.ceil(addRem)
             remove = 0
+
+            /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `calculateToAcceptV2 c:${prevRecord.counter} active !== ~~target, addRem > 0 add: ${add}, remove: ${remove}`)
             return { add, remove }
           }
           if (addRem < 0) {
-            addRem = active - target // only remove the active nodes more than target
-            /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`addRem in processing: ${addRem}`)
-            if (addRem > active * 0.05) {
+            //Note that we got here earlier because syncing nodes were "counting against us"
+            //now we will look at addRem where syncing nodes are not considered
+            let toRemove = active - target // only remove the active nodes more than target
+            /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`addRem in processing: ${toRemove}`)
+            if (toRemove > active * config.p2p.rotationMaxRemovePercent) {
               // limit nodes removed to 5% of active; this should not happen
-              console.log('unexpected addRem > 5% of active', addRem, active, target, desired)
-              addRem = ~~(active * 0.05)
-              if (addRem === 0) {
-                addRem = 1
+              console.log('unexpected addRem > 5% of active', toRemove, active, target, desired)
+              //~~ truncate the value of rnum i.e. fast Math.floor()
+              toRemove = ~~(active * config.p2p.rotationMaxRemovePercent)
+              if (toRemove === 0) {
+                toRemove = 1
               }
             }
-            if (addRem > 0) {
-              if (addRem > active * 0.05) {
-                // don't ever remove more than 10% of active per cycle
-                addRem = active * 0.05
+            //keep in mind that we use (active - target), so this value means we have too many nodes more than target
+            if (toRemove > 0) {
+              if (toRemove > active * config.p2p.rotationMaxRemovePercent) {
+                // don't ever remove more than 5% of active per cycle
+                toRemove = active * config.p2p.rotationMaxRemovePercent
               }
-              if (addRem < 1) {
-                addRem = 1
+              if (toRemove < 1) {
+                toRemove = 1
               }
               add = 0
-              remove = Math.ceil(addRem)
+              remove = Math.ceil(toRemove)
+              /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `calculateToAcceptV2 c:${prevRecord.counter} active !== ~~target, addRem < 0 (remove) add: ${add}, remove: ${remove}`)
               return { add, remove }
+            } else {
+              //this is a case where syncing nodes are counting against us and we need to take a careful look to allow
+              //some nodes to sync and go active  (can look at median time )
+
+              // for now we will use an approximation that we want to rotate one per cycle
+              // consier this a stand in for the 0.1% of active, but rounded up... i.e   1 for 1-1999 node networks
+              const desiredRotationPerCycle = 1
+              //const estimatedCyclesToSyncAndGoActive = 5
+
+              //we can make a max syncing number that is based on our rotation rate desires and average syncing times
+              //const maxSyncing = estimatedCyclesToSyncAndGoActive * desiredRotationPerCycle
+
+              //for now max syncing can be based on our fudge factors
+              const maxSyncing =
+                desiredRotationPerCycle * config.p2p.rotationCountMultiply + config.p2p.rotationCountAdd + 1
+              //note added +1 at the end so we can always buffere at least one syncing node if we hit this case
+
+              if (syncing < maxSyncing) {
+                //test code to see if we can manipulate a network to rotate at a better rate.
+                // addRem = config.p2p.rotationCountMultiply * addRem
+                // addRem = config.p2p.rotationCountAdd + addRem
+
+                add = maxSyncing - syncing
+
+                /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `calculateToAcceptV2 c:${prevRecord.counter} active !== ~~target, addRem < 0 (not-remove) add: ${add}, remove: ${remove}`)
+                return { add, remove }
+              }
             }
           }
         } else if (config.p2p.maxRotatedPerCycle !== 0) {
+          //This essentially active === target and we have a non zero maxRotatedPerCycle
           /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("entered rotation")
           let rnum = config.p2p.maxRotatedPerCycle // num to rotate per cycle; can be less than 1; like 0.5 for every other cycle; -1 for auto
           if (rnum < 0) {
             // rotate all nodes in 1000 cycles
-            rnum = active * 0.001
+            rnum = active * config.p2p.rotationPercentActive
           }
           if (rnum < 1) {
+            //This is supposed to be true rnum % of the time, that does not work
+            //the math is wrong.  fortunately we can avoid this if maxRotatedPerCycle >= 1
             if (prevRecord.counter % (1 / rnum) === 0) {
               // rotate every few cycles if less than 1000 nodes
               rnum = 1
@@ -130,17 +167,25 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
             }
           }
           if (rnum > 0) {
-            if (rnum > active * 0.001) {
-              rnum = ~~(active * 0.001)
+            if (rnum > active * config.p2p.rotationPercentActive) {
+              //~~ truncate the value of rnum i.e. fast Math.floor()
+              rnum = ~~(active * config.p2p.rotationPercentActive)
               if (rnum < 1) {
                 rnum = 1
               }
             }
+
+            //test code to see if we can manipulate a network to rotate at a better rate.
+            rnum = config.p2p.rotationCountMultiply * rnum
+            rnum = config.p2p.rotationCountAdd + rnum
+
             /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("rnum: ", rnum)
             /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("setting add to rnum")
             add = Math.ceil(rnum)
             remove = 0
           }
+
+          /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `calculateToAcceptV2 c:${prevRecord.counter} config.p2p.maxRotatedPerCycle !== 0 add: ${add}, remove: ${remove}`)
           /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`add: ${add}, remove: ${remove}`)
           return { add, remove }
         }
