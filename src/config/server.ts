@@ -223,7 +223,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     minRequiredChallenges: 3,
     useNewPOQ: false,
     integrityCheckBeforeChallenge: true,
-    checkPrecrackStatus: false,
+    checkPrecrackStatus: true,
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,
