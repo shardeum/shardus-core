@@ -1,3 +1,5 @@
+import { isObject } from './checkTypes'
+
 const objToString = Object.prototype.toString
 const objKeys =
   Object.keys ||
@@ -194,4 +196,51 @@ export function cryptoStringify(val: unknown, isArrayProp = false): string {
     return '' + returnVal
   }
   return ''
+}
+
+// Encodes buffer as base64 strings
+export function SerializeToJsonString(obj: unknown): string {
+  return stringify(obj, { bufferEncoding: 'base64' })
+}
+
+// Decodes base64 strings to buffer
+export function DeSerializeFromJsonString<T>(jsonString: string): T {
+  return JSON.parse(jsonString, base64BufferReviver) as T
+}
+
+function isHexStringWithoutPrefix(value: string, length?: number): boolean {
+  if (value && typeof value === 'string' && value.indexOf('0x') >= 0) return false // do not convert strings with 0x
+  // prefix
+  if (typeof value !== 'string' || !value.match(/^[0-9A-Fa-f]*$/)) return false
+
+  if (typeof length !== 'undefined' && length > 0 && value.length !== 2 + 2 * length) return false
+
+  return true
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function GetBufferFromField(input: any, encoding?: 'base64' | 'hex'): Buffer {
+  switch (encoding) {
+    case 'base64':
+      return Buffer.from(input.data, 'base64')
+    default:
+      return Buffer.from(input)
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function base64BufferReviver(key: string, value: any): any {
+  const originalObject = value
+  if (
+    isObject(originalObject) &&
+    Object.prototype.hasOwnProperty.call(originalObject, 'dataType') &&
+    originalObject.dataType &&
+    originalObject.dataType == 'bh'
+  ) {
+    return new Uint8Array(GetBufferFromField(originalObject, 'base64'))
+  } else if (value && isHexStringWithoutPrefix(value) && value.length !== 42 && value.length !== 64) {
+    return BigInt('0x' + value)
+  } else {
+    return value
+  }
 }

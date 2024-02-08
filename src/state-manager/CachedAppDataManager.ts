@@ -12,7 +12,11 @@ import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { InternalBinaryHandler } from '../types/Handler'
 import { getStreamWithTypeCheck, requestErrorHandler, verificationDataCombiner } from '../types/Helpers'
-import { deserializeSendCachedAppDataReq, SendCachedAppDataReq, serializeSendCachedAppDataReq } from '../types/SendCachedAppDataReq'
+import {
+  deserializeSendCachedAppDataReq,
+  SendCachedAppDataReq,
+  serializeSendCachedAppDataReq,
+} from '../types/SendCachedAppDataReq'
 import * as utils from '../utils'
 import { reversed } from '../utils'
 import Profiler, { profilerInstance } from '../utils/profiler'
@@ -25,6 +29,7 @@ import {
   QueueEntry,
   StringNodeObjectMap,
 } from './state-manager-types'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 class CachedAppDataManager {
   app: Shardus.App
@@ -81,9 +86,7 @@ class CachedAppDataManager {
     this.p2p.registerInternal('send_cachedAppData', async (payload: CacheAppDataResponse) => {
       profilerInstance.scopedProfileSectionStart('send_cachedAppData')
       try {
-        const dummy = payload.cachedAppData as any
-        console.log(`send_cachedAppData`, dummy.appData.data.receipt);
-        console.log(`send_cachedAppData full payload`, JSON.stringify(payload));
+        /* prettier-ignore */ if (logFlags.net_trace && logFlags.console) console.log(`send_cachedAppData full payload`, utils.SerializeToJsonString(payload));
         const cachedAppData = payload.cachedAppData
         const existingCachedAppData = this.getCachedItem(payload.topic, cachedAppData.dataID)
         if (existingCachedAppData) {
@@ -99,46 +102,36 @@ class CachedAppDataManager {
       }
     })
 
-    // serialized handler
     const send_cacheAppDataBinarySerializedHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_send_cachedAppData,
       handler: (payload, response, header, sign) => {
-        profilerInstance.scopedProfileSectionStart('send_cachedAppData2')
+        profilerInstance.scopedProfileSectionStart(
+          InternalRouteEnum.binary_send_cachedAppData,
+          false,
+          payload.length
+        )
+        nestedCountersInstance.countEvent('internal', InternalRouteEnum.binary_send_cachedAppData)
 
         const errorHandler = (
           errorType: RequestErrorEnum,
           opts?: { customErrorLog?: string; customCounterSuffix?: string }
         ): void => requestErrorHandler(InternalRouteEnum.binary_send_cachedAppData, errorType, header, opts)
 
-        try{
-
+        try {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cSendCachedAppDataReq)
 
-          if(!requestStream) return errorHandler(RequestErrorEnum.InvalidRequest)
+          if (!requestStream) return errorHandler(RequestErrorEnum.InvalidRequest)
 
           const req = deserializeSendCachedAppDataReq(requestStream)
           const appDeserializedData = this.stateManager.app.binaryDeserializeObject(
             AppObjEnum.CachedAppData,
-            req.cachedAppData.appData 
+            req.cachedAppData.appData
           )
           const cachedAppData: CachedAppData = {
             dataID: req.cachedAppData.dataID,
             appData: appDeserializedData,
             cycle: req.cachedAppData.cycle,
           }
-
-
-          //are we(this node) the one that belong to this cache?
-          // const homeNodeForThisDataID = ShardFunctions.findHomeNode(
-          //   this.stateManager.currentCycleShardData.shardGlobals,
-          //   cachedAppData.dataID,
-          //   this.stateManager.currentCycleShardData.parititionShardDataMap
-          // )
-
-          // if (homeNodeForThisDataID.node.id !== this.stateManager.currentCycleShardData.ourNode.id) {
-          //   return errorHandler(RequestErrorEnum.InvalidRequest)
-          // }
-
 
           if (cachedAppData == null) {
             return errorHandler(RequestErrorEnum.InvalidRequest)
@@ -151,30 +144,36 @@ class CachedAppDataManager {
           }
           this.insertCachedItem(req.topic, cachedAppData.dataID, cachedAppData.appData, cachedAppData.cycle)
         } finally {
-          profilerInstance.scopedProfileSectionEnd('send_cachedAppData2')
+          profilerInstance.scopedProfileSectionEnd(InternalRouteEnum.binary_send_cachedAppData)
         }
-      }
+      },
     }
 
-    this.p2p.registerInternal(InternalRouteEnum.binary_send_cachedAppData,send_cacheAppDataBinarySerializedHandler)
+    this.p2p.registerInternal(
+      InternalRouteEnum.binary_send_cachedAppData,
+      send_cacheAppDataBinarySerializedHandler
+    )
 
-    this.p2p.registerInternal('get_cached_app_data', async (payload: CacheAppDataRequest, respond: (arg0: CachedAppData) => Promise<void>) => {
-      profilerInstance.scopedProfileSectionStart('get_cached_app_data')
-      try {
-        const { topic, dataId } = payload
-        const foundCachedAppData = this.getCachedItem(topic, dataId)
-        if (foundCachedAppData == null) {
-          this.mainLogger.error(`Cannot find cached data for topic: ${topic}, dataId: ${dataId}`)
+    this.p2p.registerInternal(
+      'get_cached_app_data',
+      async (payload: CacheAppDataRequest, respond: (arg0: CachedAppData) => Promise<void>) => {
+        profilerInstance.scopedProfileSectionStart('get_cached_app_data')
+        try {
+          const { topic, dataId } = payload
+          const foundCachedAppData = this.getCachedItem(topic, dataId)
+          if (foundCachedAppData == null) {
+            this.mainLogger.error(`Cannot find cached data for topic: ${topic}, dataId: ${dataId}`)
+          }
+          await respond(foundCachedAppData)
+          profilerInstance.scopedProfileSectionEnd('get_cached_app_data')
+          return
+        } catch (e) {
+          this.mainLogger.error(`Error while processing get_cachedAppData`, e)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('get_cached_app_data')
         }
-        await respond(foundCachedAppData)
-        profilerInstance.scopedProfileSectionEnd('get_cached_app_data')
-        return
-      } catch (e) {
-        this.mainLogger.error(`Error while processing get_cachedAppData`, e)
-      } finally {
-        profilerInstance.scopedProfileSectionEnd('get_cached_app_data')
       }
-    })
+    )
   }
 
   registerTopic(topic: string, maxCycleAge: number, maxCacheElements: number): boolean {
@@ -447,9 +446,9 @@ class CachedAppDataManager {
             }
             const filteredCorrespondingAccNodes = filteredNodes
 
-            if(this.config.p2p.useBinarySerializedEndpoints){
+            if (this.config.p2p.useBinarySerializedEndpoints) {
               const appSerializedAppData = this.stateManager.app.binarySerializeObject(
-                AppObjEnum.CachedAppData, 
+                AppObjEnum.CachedAppData,
                 message.cachedAppData.appData
               )
               const sendCacheAppDataReq: SendCachedAppDataReq = {
@@ -457,23 +456,21 @@ class CachedAppDataManager {
                 cachedAppData: {
                   dataID: message.cachedAppData.dataID,
                   appData: appSerializedAppData,
-                  cycle: message.cachedAppData.cycle
-                }
+                  cycle: message.cachedAppData.cycle,
+                },
               }
               this.p2p.tellBinary<SendCachedAppDataReq>(
-                filteredCorrespondingAccNodes, 
-                InternalRouteEnum.binary_send_cachedAppData, 
-                sendCacheAppDataReq, 
+                filteredCorrespondingAccNodes,
+                InternalRouteEnum.binary_send_cachedAppData,
+                sendCacheAppDataReq,
                 serializeSendCachedAppDataReq,
                 {}
               )
               return
-
             }
 
             // TODO Perf: need a tellMany enhancement.  that will minimize signing and stringify required!
             this.p2p.tell(filteredCorrespondingAccNodes, 'send_cachedAppData', message)
-
           }
         }
       }
@@ -550,7 +547,6 @@ class CachedAppDataManager {
       // we are local!
       cachedAppData = this.getCachedItem(topic, dataId)
       if (cachedAppData != null) {
-
         return cachedAppData
       }
     }

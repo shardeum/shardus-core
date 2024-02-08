@@ -2,33 +2,33 @@ import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { CachedAppData, deserializeCachedAppData, serializeCachedAppData } from './CachedAppData'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
+const cSendCachedAppDataReqVersion = 1
+
 export type SendCachedAppDataReq = {
   topic: string
-  cachedAppData: CachedAppData 
+  cachedAppData: CachedAppData
 }
 
-export function serializeSendCachedAppDataReq (
-  stream: VectorBufferStream, 
+export function serializeSendCachedAppDataReq(
+  stream: VectorBufferStream,
   obj: SendCachedAppDataReq,
   root = false
 ): void {
-  if(root) {
+  if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cSendCachedAppDataReq)
   }
+  stream.writeUInt16(cSendCachedAppDataReqVersion)
   stream.writeString(obj.topic)
   serializeCachedAppData(stream, obj.cachedAppData)
 }
 
-export function deserializeSendCachedAppDataReq(
-  stream: VectorBufferStream,
-): SendCachedAppDataReq {
-  const topic = stream.readString()
-  const cachedAppData = deserializeCachedAppData(stream)
+export function deserializeSendCachedAppDataReq(stream: VectorBufferStream): SendCachedAppDataReq {
+  const version = stream.readUInt16()
+  if (version > cSendCachedAppDataReqVersion) {
+    throw new Error('Unsupported version')
+  }
   return {
-    topic,
-    cachedAppData
+    topic: stream.readString(),
+    cachedAppData: deserializeCachedAppData(stream),
   }
 }
-
-
-

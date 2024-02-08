@@ -60,6 +60,11 @@ import { getStreamWithTypeCheck, requestErrorHandler, verificationDataCombiner }
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
+import {
+  BroadcastFinalStateReq,
+  deserializeBroadcastFinalStateReq,
+  serializeBroadcastFinalStateReq,
+} from '../types/BroadcastFinalStateReq'
 
 interface Receipt {
   tx: AcceptedTx
@@ -283,7 +288,7 @@ class TransactionQueue {
       handler: (payload, response, header, sign) => {
         const route = InternalRouteEnum.binary_broadcast_state
         nestedCountersInstance.countEvent('internal', route)
-        profilerInstance.scopedProfileSectionStart(route, true, payload.length)
+        profilerInstance.scopedProfileSectionStart(route, false, payload.length)
         const errorHandler = (
           errorType: RequestErrorEnum,
           opts?: { customErrorLog?: string; customCounterSuffix?: string }
@@ -401,6 +406,75 @@ class TransactionQueue {
         }
       }
     )
+
+    const broadcastFinalStateRoute: P2PTypes.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_broadcast_finalstate,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      handler: (payload, response, header, sign) => {
+        const route = InternalRouteEnum.binary_broadcast_finalstate
+        nestedCountersInstance.countEvent('internal', route)
+        profilerInstance.scopedProfileSectionStart(route, false, payload.length)
+        const errorHandler = (
+          errorType: RequestErrorEnum,
+          opts?: { customErrorLog?: string; customCounterSuffix?: string }
+        ): void => requestErrorHandler(route, errorType, header, opts)
+
+        try {
+          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cBroadcastFinalStateReq)
+          if (!requestStream) {
+            return errorHandler(RequestErrorEnum.InvalidRequest)
+          }
+
+          // verification data checks
+          if (header.verification_data == null) {
+            return errorHandler(RequestErrorEnum.MissingVerificationData)
+          }
+          const verificationDataParts = header.verification_data.split(':')
+          if (verificationDataParts.length !== 2) {
+            return errorHandler(RequestErrorEnum.InvalidVerificationData)
+          }
+          const [vTxId, vStateSize] = verificationDataParts
+          const queueEntry = this.getQueueEntrySafe(vTxId)
+          if (queueEntry == null) {
+            /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`${route} cant find queueEntry for: ${utils.makeShortHash(vTxId)}`)
+            return errorHandler(RequestErrorEnum.InvalidVerificationData)
+          }
+
+          // deserialization
+          const req = deserializeBroadcastFinalStateReq(requestStream)
+          if (req.txid !== vTxId) {
+            return errorHandler(RequestErrorEnum.InvalidVerificationData)
+          }
+
+          if (req.stateList.length !== parseInt(vStateSize)) {
+            return errorHandler(RequestErrorEnum.InvalidVerificationData)
+          }
+
+          /* prettier-ignore */ if (logFlags.verbose && logFlags.console) console.log(`${route}: txId: ${req.txid} stateSize: ${req.stateList.length}`)
+
+          // business logic
+          for (const state of req.stateList) {
+            if (state == null) {
+              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`${route} data == null`)
+              continue
+            }
+            if (queueEntry.collectedFinalData[state.accountId] == null) {
+              const wrappedResponse = state as Shardus.WrappedResponse
+              wrappedResponse.data = this.stateManager.app.binaryDeserializeObject(
+                AppObjEnum.AppData,
+                state.data
+              )
+              queueEntry.collectedFinalData[state.accountId] = wrappedResponse
+              /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote(route, `${queueEntry.logID}`, `${route} addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(state.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
+            }
+          }
+        } finally {
+          profilerInstance.scopedProfileSectionEnd(route, payload.length)
+        }
+      },
+    }
+
+    this.p2p.registerInternalBinary(broadcastFinalStateRoute.name, broadcastFinalStateRoute.handler)
 
     this.p2p.registerInternal(
       'spread_tx_to_group_syncing',
@@ -3616,11 +3690,45 @@ class TransactionQueue {
             continue
           }
           const filterdCorrespondingAccNodes = filteredNodes
+          if (this.config.p2p.useBinarySerializedEndpoints) {
+            // convert legacy message to binary supported type
+            const request: BroadcastFinalStateReq = {
+              txid: message.txid,
+              stateList: [],
+            }
+            for (const state of message.stateList) {
+              const serializedStateData = this.stateManager.app.binarySerializeObject(
+                AppObjEnum.AppData,
+                state.data
+              )
+              request.stateList.push({
+                accountCreated: state.accountCreated,
+                isPartial: state.isPartial,
+                accountId: state.accountId,
+                stateId: state.stateId,
+                data: serializedStateData,
+                timestamp: state.timestamp,
+              })
+            }
+            this.p2p.tellBinary<BroadcastFinalStateReq>(
+              filterdCorrespondingAccNodes,
+              InternalRouteEnum.binary_broadcast_finalstate,
+              request,
+              serializeBroadcastFinalStateReq,
+              {
+                verification_data: verificationDataCombiner(
+                  message.txid,
+                  message.stateList.length.toString()
+                ),
+              }
+            )
+          } else {
           const filterNodesIpPort = filterdCorrespondingAccNodes.map(
             (node) => node.externalIp + ':' + node.externalPort
-          )
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.debug('tellcorrernodingnodesfinaldata', queueEntry.logID, ` : filterValidNodesForInternalMessage ${filterNodesIpPort} for accounts: ${utils.stringifyReduce(message.stateList)}`)
-          this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
+	  
+            this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
+          }
           totalShares++
         }
       }

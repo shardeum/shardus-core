@@ -1,56 +1,54 @@
-import Shardus from "../shardus";
-import { VectorBufferStream } from "../utils/serialization/VectorBufferStream";
-import { TypeIdentifierEnum } from "./enum/TypeIdentifierEnum";
-import { deserializeWrappedDataFromQueue, serializeWrappedDataFromQueue, WrappedDataFromQueueSerialized } from "./WrappedDataFromQueue";
+import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import {
+  deserializeWrappedDataFromQueue,
+  serializeWrappedDataFromQueue,
+  WrappedDataFromQueueBinary,
+} from './WrappedDataFromQueue'
 
-const cGetAccountDataWithQueueHintsRespVersion = 1;
+const cGetAccountDataWithQueueHintsRespVersion = 1
 
-export type GetAccountDataWithQueueHintsRespSerialized = {
-  accountData: WrappedDataFromQueueSerialized[] | null;
+export type GetAccountDataWithQueueHintsRespBinary = {
+  accountData: WrappedDataFromQueueBinary[] | null
 }
 
 export function serializeGetAccountDataWithQueueHintsResp(
-  stream: VectorBufferStream, 
-  obj: GetAccountDataWithQueueHintsRespSerialized,
+  stream: VectorBufferStream,
+  obj: GetAccountDataWithQueueHintsRespBinary,
   root = false
 ): void {
-
   if (root) {
-    stream.writeUInt16(TypeIdentifierEnum.cGetAccountDataWithQueueHintsResp);
+    stream.writeUInt16(TypeIdentifierEnum.cGetAccountDataWithQueueHintsResp)
   }
-
-  stream.writeUInt8(cGetAccountDataWithQueueHintsRespVersion);
-
-  if (obj.accountData === null) {
-    stream.writeUInt8(0); // null
+  stream.writeUInt16(cGetAccountDataWithQueueHintsRespVersion)
+  if (obj.accountData !== null) {
+    stream.writeUInt8(1)
+    stream.writeUInt16(obj.accountData.length)
+    for (const item of obj.accountData) {
+      serializeWrappedDataFromQueue(stream, item)
+    }
   } else {
-    stream.writeUInt8(1); // not null
-    stream.writeUInt32(obj.accountData.length || 0);
-    for (let i = 0; i < obj.accountData.length; i++) {
-      serializeWrappedDataFromQueue(stream, obj.accountData[i]);
-    };
+    stream.writeUInt8(0)
   }
-
 }
 
 export function deserializeGetAccountDataWithQueueHintsResp(
-  stream: VectorBufferStream,
-): GetAccountDataWithQueueHintsRespSerialized {
-  const obj: GetAccountDataWithQueueHintsRespSerialized = {
-    accountData: null,
-  };
-  const cGetAccountDataWithQueueHintsRespVersion = stream.readUInt8();
-  if (cGetAccountDataWithQueueHintsRespVersion !== 1) {
-    throw new Error(`Expected version 1. Actual version: ${cGetAccountDataWithQueueHintsRespVersion}`);
+  stream: VectorBufferStream
+): GetAccountDataWithQueueHintsRespBinary {
+  const version = stream.readUInt16()
+  if (version > cGetAccountDataWithQueueHintsRespVersion) {
+    throw new Error('Unsupported version')
   }
-  const accountDataNull = stream.readUInt8() === 0;
-  if (!accountDataNull) {
-    const accountDataLength = stream.readUInt32();
-    obj.accountData = [];
-    for (let i = 0; i < accountDataLength; i++) {
-      obj.accountData.push(deserializeWrappedDataFromQueue(stream));
-    };
+  const accountDataPresent = stream.readUInt8()
+  let accountData = null
+  if (accountDataPresent === 1) {
+    const length = stream.readUInt16()
+    accountData = []
+    for (let i = 0; i < length; i++) {
+      accountData.push(deserializeWrappedDataFromQueue(stream)) // Deserialize each WrappedDataFromQueueBinary
+    }
   }
-  return obj;
+  return {
+    accountData,
+  }
 }
-

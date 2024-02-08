@@ -3,6 +3,7 @@ export enum TypeIdentifierEnum {
   cApoptosisProposalResp,
   cWrappedReq,
   cWrappedResp,
+  cWrappedDataResponse,
   cWrappedData,
   cBroadcastStateReq,
   cSendCachedAppDataReq,
@@ -14,5 +15,5 @@ export enum TypeIdentifierEnum {
   cGetAccountQueueCountResp,
   cGetAccountDataByListReq,
   cGetAccountDataByListResp,
-  cWrappedDataSyncSerialized,
+  cBroadcastFinalStateReq,
 }

@@ -1,83 +1,70 @@
-import { VectorBufferStream } from "../utils/serialization/VectorBufferStream";
-import { TypeIdentifierEnum } from "./enum/TypeIdentifierEnum";
+import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
-export type GetAccountQueueCountRespSerialized = {
-  counts: number[]
-  committingAppData: Buffer[]
-  accounts: Buffer[]
-} | false;
+export type GetAccountQueueCountResp =
+  | {
+      counts: number[]
+      committingAppData: Buffer[]
+      accounts: Buffer[]
+    }
+  | false
 
-export const cGetAccountQueueCountRespVersion = 1;
+export const cGetAccountQueueCountRespVersion = 1
 
 export function serializeGetAccountQueueCountResp(
-  stream: VectorBufferStream, 
-  obj: GetAccountQueueCountRespSerialized,
+  stream: VectorBufferStream,
+  obj: GetAccountQueueCountResp,
   root = false
 ): void {
-  
-    if (root) {
-      stream.writeUInt16(TypeIdentifierEnum.cGetAccountQueueCountResp);
-    }
+  if (root) {
+    stream.writeUInt16(TypeIdentifierEnum.cGetAccountQueueCountResp)
+  }
+  stream.writeUInt16(cGetAccountQueueCountRespVersion)
+  if (obj === false) {
+    stream.writeUInt8(0)
+  } else {
+    stream.writeUInt8(1)
+    stream.writeUInt16(obj.counts.length)
+    obj.counts.forEach((count) => stream.writeUInt32(count))
+    stream.writeUInt16(obj.committingAppData.length)
+    obj.committingAppData.forEach((data) => stream.writeBuffer(data))
+    stream.writeUInt16(obj.accounts.length)
+    obj.accounts.forEach((account) => stream.writeBuffer(account))
+  }
 
-
-    stream.writeUInt8(cGetAccountQueueCountRespVersion);
-
-    stream.writeUInt8(obj ? 1 : 0);
-
-    if (!obj) {
-      return;
-    }
-
-    stream.writeUInt32(obj.counts.length || 0 );
-    for (let i = 0; i < obj.counts.length; i++) {
-      stream.writeUInt32(obj.counts[i]);
-    };
-    stream.writeUInt32(obj.committingAppData.length || 0 );
-    for (let i = 0; i < obj.committingAppData.length; i++) {
-      stream.writeBuffer(obj.committingAppData[i]);
-    };
-    stream.writeUInt32(obj.accounts.length || 0 );
-    for (let i = 0; i < obj.accounts.length; i++) {
-      stream.writeBuffer(obj.accounts[i]);
-    };
-
+  if (root) {
+    stream.writeUInt16(TypeIdentifierEnum.cGetAccountQueueCountResp)
+  }
 }
 
-export function deserializeGetAccountQueueCountResp(
-  stream: VectorBufferStream
-): GetAccountQueueCountRespSerialized {
-
-  const obj: GetAccountQueueCountRespSerialized = {
-    counts: [],
-    committingAppData: [],
-    accounts: [],
-  };
-
-  const version = stream.readUInt8();
-  if (version !== cGetAccountQueueCountRespVersion) {
-    throw new Error(
-      `GetAccountQueueCountResp version mismatch, expected: ${cGetAccountQueueCountRespVersion} got: ${version}`
-    );
+export function deserializeGetAccountQueueCountResp(stream: VectorBufferStream): GetAccountQueueCountResp {
+  const version = stream.readUInt16()
+  if (version > cGetAccountQueueCountRespVersion) {
+    throw new Error('Unsupported version')
   }
-
-  const hasValue = stream.readUInt8();
-  if (!hasValue) {
-    return false;
+  const typeIndicator = stream.readUInt8()
+  if (typeIndicator === 0) {
+    return false
+  } else {
+    const countsLength = stream.readUInt16()
+    const counts = []
+    for (let i = 0; i < countsLength; i++) {
+      counts.push(stream.readUInt32())
+    }
+    const committingAppDataLength = stream.readUInt16()
+    const committingAppData = []
+    for (let i = 0; i < committingAppDataLength; i++) {
+      committingAppData.push(stream.readBuffer())
+    }
+    const accountsLength = stream.readUInt16()
+    const accounts = []
+    for (let i = 0; i < accountsLength; i++) {
+      accounts.push(stream.readBuffer())
+    }
+    return {
+      counts,
+      committingAppData,
+      accounts,
+    }
   }
-
-  const countCount = stream.readUInt32();
-  for (let i = 0; i < countCount; i++) {
-    obj.counts.push(stream.readUInt32());
-  }
-  const committingAppDataCount = stream.readUInt32();
-  for (let i = 0; i < committingAppDataCount; i++) {
-    obj.committingAppData.push(stream.readBuffer());
-  }
-  const accountsCount = stream.readUInt32();
-  for (let i = 0; i < accountsCount; i++) {
-    obj.accounts.push(stream.readBuffer());
-  }
-
-  return obj;
-
 }

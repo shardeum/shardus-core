@@ -6,28 +6,28 @@ import {
 } from './WrappedDataResponse'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
-export const cBroadcastStateReqVersion = 1
+export const cBroadcastFinalStateReqVersion = 1
 
-export interface BroadcastStateReq {
+export interface BroadcastFinalStateReq {
   txid: string
   stateList: WrappedDataResponse[]
 }
 
-export function serializeBroadcastStateReq(
+export function serializeBroadcastFinalStateReq(
   stream: VectorBufferStream,
-  obj: BroadcastStateReq,
+  obj: BroadcastFinalStateReq,
   root = false
 ): void {
   if (root) {
-    stream.writeUInt16(TypeIdentifierEnum.cBroadcastStateReq)
+    stream.writeUInt16(TypeIdentifierEnum.cBroadcastFinalStateReq)
   }
-  stream.writeUInt16(cBroadcastStateReqVersion)
+  stream.writeUInt16(cBroadcastFinalStateReqVersion)
   stream.writeString(obj.txid)
   stream.writeUInt16(obj.stateList.length) // Serialize array length
   obj.stateList.forEach((item) => serializeWrappedDataResponse(stream, item)) // Serialize each item
 }
 
-export function deserializeBroadcastStateReq(stream: VectorBufferStream): BroadcastStateReq {
+export function deserializeBroadcastFinalStateReq(stream: VectorBufferStream): BroadcastFinalStateReq {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const version = stream.readUInt16()
   const txid = stream.readString()

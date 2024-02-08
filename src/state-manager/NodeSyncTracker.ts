@@ -12,7 +12,10 @@ import { P2PModuleContext as P2P, stateManager } from '../p2p/Context'
 import DataSourceHelper from './DataSourceHelper'
 import { shardusGetTime } from '../network'
 import { GetAccountDataByListReq, serializeGetAccountDataByListReq } from '../types/GetAccountDataByListReq'
-import { deserializeGetAccountDataByListRespSerialized, getAccountDataByListRespSerialized } from '../types/GetAccountDataByListResp'
+import {
+  deserializeGetAccountDataByListResp,
+  GetAccountDataByListResp,
+} from '../types/GetAccountDataByListResp'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { AppObjEnum } from '../shardus/shardus-types'
 
@@ -331,35 +334,28 @@ export default class NodeSyncTracker implements SyncTrackerInterface {
           let result = {
             accountData: null,
           }
-          if(stateManager.config.p2p.useBinarySerializedEndpoints){
+          if (stateManager.config.p2p.useBinarySerializedEndpoints) {
             const serialized_res = await this.p2p.askBinary<
               GetAccountDataByListReq,
-              getAccountDataByListRespSerialized
+              GetAccountDataByListResp
             >(
               this.dataSourceHelper.dataSourceNode,
               InternalRouteEnum.binary_get_account_data_by_list,
               message,
               serializeGetAccountDataByListReq,
-              deserializeGetAccountDataByListRespSerialized,
+              deserializeGetAccountDataByListResp,
               {}
             )
-            if(serialized_res && serialized_res.accountData){
-              for (let accountDataRef of serialized_res.accountData) {
-                  accountDataRef.data = stateManager.app.binaryDeserializeObject(
-                    AppObjEnum.AccountData,
-                    accountDataRef.data
-                  )
-                  if(accountDataRef.syncData){
-                    accountDataRef.syncData = stateManager.app.binaryDeserializeObject(
-                      AppObjEnum.SyncData,
-                      accountDataRef.syncData
-                    )
-                  }
+            if (serialized_res && serialized_res.accountData) {
+              for (const accountDataRef of serialized_res.accountData) {
+                accountDataRef.data = stateManager.app.binaryDeserializeObject(
+                  AppObjEnum.AppData,
+                  accountDataRef.data
+                )
               }
               result = serialized_res
             }
-          }
-          else{
+          } else {
             result = await this.p2p.ask(
               this.dataSourceHelper.dataSourceNode,
               'get_account_data_by_list',

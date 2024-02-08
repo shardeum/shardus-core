@@ -18,7 +18,7 @@ export const responseSerializer = <T>(
   const resp: WrappedResp = {
     payload: serializedPayload.getBuffer(),
   }
-  const wrappedRespStream = new VectorBufferStream(4 + resp.payload.length * 4)
+  const wrappedRespStream = new VectorBufferStream(4 + resp.payload.length)
   serializeWrappedResp(wrappedRespStream, resp, true)
   return wrappedRespStream
 }
@@ -49,7 +49,7 @@ export const requestSerializer = <T>(
   const req: WrappedReq = {
     payload: serializedPayload.getBuffer(),
   }
-  const wrappedReqStream = new VectorBufferStream(4 + req.payload.length * 4)
+  const wrappedReqStream = new VectorBufferStream(4 + req.payload.length)
   serializeWrappedReq(wrappedReqStream, req, true)
   return wrappedReqStream
 }
