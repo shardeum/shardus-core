@@ -68,6 +68,11 @@ let state = P2P.P2PTypes.NodeStatus.INITIALIZING
 
 let firstTimeJoiningLoop = true
 
+const idErrorMessage = `id did not match the cycle record info`
+
+const nodeMatch = (node) =>
+    node.externalIp === network.ipInfo.externalIp && node.externalPort === network.ipInfo.externalPort
+
 /** ROUTES */
 
 /** FUNCTIONS */
@@ -135,7 +140,7 @@ export function startupV2(): Promise<boolean> {
 
         nestedCountersInstance.countEvent('p2p', 'joined')
         // Sync cycle chain from network
-        await syncCycleChain()
+        await syncCycleChain(id)
 
         // Enable internal routes
         Comms.setAcceptInternal(true)
@@ -153,6 +158,12 @@ export function startupV2(): Promise<boolean> {
         // Break loop
         return resolve(true)
       } catch (err) {
+        if (err.message === idErrorMessage) {
+          nestedCountersInstance.countEvent('p2p', idErrorMessage)
+          /* prettier-ignore */ if (logFlags.important_as_fatal) console.log(`startupV2 ${idErrorMessage}`)
+          console.log(`self:startupV2.  ${idErrorMessage}.`)
+          emitter.emit('invoke-exit', `id did not match`, getCallstack(), idErrorMessage, true)
+        }
         // Log syncing error and abort startup
         /* prettier-ignore */ if (logFlags.important_as_fatal) console.log('error in startupV2 > enterSyncingState: ', utils.formatErrorMessage(err))
         /* prettier-ignore */ if (logFlags.important_as_fatal) warn('Error while syncing to network:')
@@ -657,7 +668,7 @@ async function joinNetworkV2(activeNodes): Promise<void> {
 //   }
 // }
 
-async function syncCycleChain(): Promise<void> {
+async function syncCycleChain(selfId: string): Promise<void> {
   // You're already synced if you're first
   if (isFirst) return
   let synced = false
@@ -668,9 +679,7 @@ async function syncCycleChain(): Promise<void> {
       const activeNodes = await contactArchiver()
 
       // Remove yourself from activeNodes if you are present in them
-      const ourIdx = activeNodes.findIndex(
-        (node) => node.ip === network.ipInfo.externalIp && node.port === network.ipInfo.externalPort
-      )
+      const ourIdx = activeNodes.findIndex(nodeMatch)
       if (ourIdx > -1) {
         activeNodes.splice(ourIdx, 1)
       }
@@ -698,6 +707,36 @@ async function syncCycleChain(): Promise<void> {
       await utils.sleep(2000)
     }
   }
+
+  //check if the id matches the cycle record info
+  await checkNodeId(nodeMatch, selfId)
+}
+
+async function checkNodeId(nodeMatch: (node: any) => boolean, selfId: string) {
+  const newestCycle = CycleChain.getNewest()
+
+  let node = newestCycle.joinedConsensors.find(nodeMatch)
+
+  // for nodes joining the network in some cases the correct cycle to check is the previous one that is not in the cycle chain of the node
+  // query the archiver for the latest cycles if we can't find the node in the current cycle
+  if (!node) {
+    //check the latest 4 cycles from the archiver
+    if (logFlags.p2pNonFatal) info('Getting latest cycles from archiver check node id')
+    const latestCycles = await getLatestCyclesFromArchiver(4)
+    for (const cycle of latestCycles) {
+      node = cycle.joinedConsensors.find(nodeMatch)
+      if (node) {
+        break
+      }
+    }
+  }
+
+  if (!node || node.id !== selfId) {
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `syncCycleChain: ${idErrorMessage}`)
+    throw new Error(idErrorMessage)
+  }
+
+  if (logFlags.p2pNonFatal) info('Node passed id check')
 }
 
 async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
@@ -866,6 +905,26 @@ export async function getFullNodesFromArchiver(
   const fullNodeList = fullNodeListResult.value
   if (logFlags.p2pNonFatal) info(`Got signed full node list: ${JSON.stringify(fullNodeList)}`)
   return fullNodeList
+}
+
+
+export async function getLatestCyclesFromArchiver(
+  cycleCounter: number,
+  archiver: P2P.SyncTypes.ActiveNode = Context.config.p2p.existingArchivers[0]
+): Promise<P2P.CycleCreatorTypes.CycleData[]> {
+  const endpoint = `cycleinfo/${cycleCounter}`
+
+  const cyclesListResult: Result<
+    SignedObject<{ cycleInfo: P2P.CycleCreatorTypes.CycleData[] }>,
+    Error
+  > = await Archivers.getFromArchiver(archiver, endpoint)
+
+  if (cyclesListResult.isErr()) {
+    const nodeListUrl = `http://${archiver.ip}:${archiver.port}/${endpoint}`
+    throw Error(`Fatal: Could not get latest cycles from ${nodeListUrl}: ` + cyclesListResult.error.message)
+  }
+
+  return cyclesListResult.value.cycleInfo
 }
 
 //todo should move to p2p types
