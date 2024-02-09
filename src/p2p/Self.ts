@@ -28,6 +28,8 @@ import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
 import { Result } from 'neverthrow'
 const deepCopy = rfdc()
 import { isServiceMode } from '../debug'
+import { insertSyncStarted } from './Join/v2/syncStarted'
+// import * as http from '../http'
 
 /** STATE */
 
@@ -131,6 +133,49 @@ export function startupV2(): Promise<boolean> {
         // set status SYNCING
         updateNodeState(P2P.P2PTypes.NodeStatus.SYNCING)
 
+        /*
+        * robust query to get cycle number in case we want to send gossip before p2p sync
+        *
+        * 
+        if (!isFirst) {
+          // do robust query to get cycle number
+          let newestCycleNumber = null
+          const MAX_TRIES = 5
+          let gotCycleNumber = false
+          let currentTry = 0
+          const archiver = getRandomAvailableArchiver()
+          while (currentTry < MAX_TRIES && !gotCycleNumber) {
+            try {
+              const activeNodesResult = await getActiveNodesFromArchiver(archiver)
+              if (!activeNodesResult) {
+                throw Error(`couldn't get active nodes`)
+              }
+              const activeNodes = activeNodesResult.nodeList
+              const node1 = utils.getRandom(activeNodes, 1)[0]
+              const node2 = utils.getRandom(activeNodes, 1)[0]
+              const node3 = utils.getRandom(activeNodes, 1)[0]
+              const cycleNumber1 = await http.get(`${node1.ip}:${node1.port}/cyclenumber`)
+              const cycleNumber2 = await http.get(`${node2.ip}:${node2.port}/cyclenumber`)
+              const cycleNumber3 = await http.get(`${node3.ip}:${node3.port}/cyclenumber`)
+              if (cycleNumber1 === cycleNumber2 && cycleNumber2 === cycleNumber3) {
+                gotCycleNumber = true
+                newestCycleNumber = cycleNumber1
+              }
+              currentTry++
+            } catch (e) {
+              throw Error(`submitSyncStarted: Error in try ${currentTry} posting syncStarted request: ${e}`)
+            }
+          }
+
+          let payload = {
+            nodeId: id,
+            cycleNumber: newestCycleNumber,
+          }
+          payload = Context.crypto.sign(payload)
+          submitSyncStarted(payload)
+        }
+        */
+
         p2pSyncStart = shardusGetTime()
 
         if (logFlags.p2pNonFatal) info('Emitting `joined` event.')
@@ -141,6 +186,23 @@ export function startupV2(): Promise<boolean> {
         nestedCountersInstance.countEvent('p2p', 'joined')
         // Sync cycle chain from network
         await syncCycleChain(id)
+
+
+        let payload = {
+          nodeId: id,
+          cycleNumber: CycleChain.getNewest()?.counter,
+        }
+        payload = Context.crypto.sign(payload)
+        // send a sync-started message to the network if you are not the first node
+        if (isFirst) {
+          nestedCountersInstance.countEvent('p2p', `adding sync-started message for first node`)
+          /* prettier-ignore */ if (logFlags.verbose) console.log(`adding sync-started message for first node`)
+          insertSyncStarted(id)
+        } else {
+          nestedCountersInstance.countEvent('p2p', `sending sync-started gossip to network`)
+          /* prettier-ignore */ if (logFlags.verbose) console.log(`sending sync-started gossip to network`)
+          Comms.sendGossip('gossip-sync-started', payload)
+        }
 
         // Enable internal routes
         Comms.setAcceptInternal(true)
@@ -271,9 +333,11 @@ export function startupV2(): Promise<boolean> {
           }
           // Call scheduler after 5 cycles... does this mean it may be 5 cycles before we realized we were
           // accepted to go active?
+          // Looks like that is the worst case
+          //
           attemptJoiningTimer = setTimeout(() => {
             attemptJoining()
-          }, 5 * cycleDuration * 1000)
+          }, 2 * cycleDuration * 1000)
           attemptJoiningRunning = false
           return
         }

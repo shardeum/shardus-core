@@ -652,6 +652,10 @@ function reportLost(target, reason: string, requestId: string) {
       nestedCountersInstance.countEvent('p2p', 'reportLost skip: node syncing')
       return // don't report syncing nodes
     }
+    if (nodes.get(target.id)?.status === 'selected') {
+      nestedCountersInstance.countEvent('p2p', 'reportLost skip: node selected')
+      return // don't report selected nodes
+    }
     // we set isDown cache to the cycle number here; to speed up deciding if a node is down
     isDown[target.id] = currentCycle
     const key = `${target.id}-${currentCycle}`

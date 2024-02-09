@@ -30,6 +30,7 @@ export let activeByIdOrder: P2P.NodeListTypes.Node[]
 export let syncingByIdOrder: P2P.NodeListTypes.Node[]
 export let activeOthersByIdOrder: P2P.NodeListTypes.Node[]
 export let potentiallyRemoved: Set<P2P.NodeListTypes.Node['id']>
+export let selectedById: Map<P2P.NodeListTypes.Node['id'], number>
 
 const VERBOSE = false // Use to dump complete NodeList and CycleChain data
 
@@ -76,6 +77,7 @@ export function reset(caller: string) {
   syncingByIdOrder = []
   activeOthersByIdOrder = []
   potentiallyRemoved = new Set()
+  selectedById = new Map()
 }
 
 export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
@@ -106,6 +108,12 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
   if (node.id !== id) {
     insertSorted(othersByIdOrder, node, propComparator('id'))
   }
+
+  // If selected, insert into selectedByIdOrder
+  if (node.status === P2P.P2PTypes.NodeStatus.SELECTED) {
+    selectedById.set(node.id, node.counterRefreshed)
+  }
+
   // If syncing, insert sorted by id into syncingByIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.SYNCING) {
     insertSorted(syncingByIdOrder, node, propComparator('id'))
@@ -128,6 +136,10 @@ export function addNodes(newNodes: P2P.NodeListTypes.Node[], caller: string) {
   for (const node of newNodes) {
     addNode(node, caller)
   }
+}
+
+export function removeSelectedNode(id: string) {
+  selectedById.delete(id)
 }
 
 export function removeSyncingNode(id: string) {
@@ -175,6 +187,7 @@ export function removeNode(
   byIpPort.delete(ipPort(node.internalIp, node.internalPort))
   byPubKey.delete(node.publicKey)
   nodes.delete(id)
+  selectedById.delete(id)
 
   Comms.evictCachedSockets([node])
 
@@ -232,6 +245,11 @@ export function updateNode(
     // Update node properties
     for (const key of Object.keys(update)) {
       node[key] = update[key]
+      // add node to syncing list if its status is changed to syncing
+      if (update[key] === P2P.P2PTypes.NodeStatus.SYNCING) {
+        insertSorted(syncingByIdOrder, node, propComparator('id'))
+        removeSelectedNode(node.id) 
+      }
     }
     //test if this node is in the active list already.  if it is not, then we can add it
     let idx = binarySearch(activeByIdOrder, { id: node.id }, propComparator('id'))
@@ -279,7 +297,7 @@ export function createNode(joined: P2P.JoinTypes.JoinedConsensor) {
   const node: P2P.NodeListTypes.Node = {
     ...joined,
     curvePublicKey: crypto.convertPublicKeyToCurve(joined.publicKey),
-    status: P2P.P2PTypes.NodeStatus.SYNCING,
+    status: P2P.P2PTypes.NodeStatus.SELECTED,
   }
 
   return node

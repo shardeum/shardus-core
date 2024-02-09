@@ -30,6 +30,7 @@ import { deleteStandbyNode, drainNewUnjoinRequests } from './v2/unjoin'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { updateNodeState } from '../Self'
 import { HTTPError } from 'got'
+import { drainLostAfterSelectionNodes, drainSyncStarted, nodesYetToStartSyncing, lostAfterSelection } from './v2/syncStarted'
 
 /** STATE */
 
@@ -219,9 +220,11 @@ export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
 }
 
 export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
-  record.syncing = NodeList.byJoinOrder.length - NodeList.activeByIdOrder.length
+  record.syncing = NodeList.byJoinOrder.length - (NodeList.activeByIdOrder.length + NodeList.selectedById.size)
   record.standbyAdd = []
   record.standbyRemove = []
+  record.startedSyncing = []
+  record.lostAfterSelection = []
 
   if (config.p2p.useJoinProtocolV2) {
     // for join v2, add new standby nodes to the standbyAdd field ...
@@ -234,12 +237,24 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       record.standbyRemove.push(publicKey)
     }
 
+    for (const nodeId of drainSyncStarted()) {
+      record.startedSyncing.push(nodeId)
+    }
+
+    record.syncing += record.startedSyncing.length
+    
+    // these nodes are being repeated in lost and apop
+    for (const nodeId of drainLostAfterSelectionNodes()) {
+      record.lostAfterSelection.push(nodeId)
+    }
+
     let standbyRemoved_Age = 0
     //let standbyRemoved_joined = 0
     let standbyRemoved_App = 0
     let skipped = 0
     const standbyList = getLastHashedStandbyList()
     const standbyListMap = getStandbyNodesInfoMap()
+
     if (config.p2p.standbyAgeScrub) {
       // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles
       for (const joinRequest of standbyList) {
@@ -309,7 +324,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       record.joinedConsensors.push({ ...nodeInfo, cycleJoined, counterRefreshed, id })
     }
 
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `standbyRemved_Age: ${standbyRemoved_Age} standbyRemoved_App: ${standbyRemoved_App}` )
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `standbyRemoved_Age: ${standbyRemoved_Age} standbyRemoved_App: ${standbyRemoved_App}` )
 
     record.joinedConsensors.sort()
   } else {
@@ -341,11 +356,34 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   if (added.length > 0) {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList( Array.from(getStandbyNodesInfoMap().values()), `join.parseRecord: standby-map ${record.counter} some activated:${record.counter}` )
   }
+  
+  const updated: P2P.NodeListTypes.Update[] = []
+
+  for (const nodeId of record.startedSyncing) {
+    if (NodeList.selectedById.has(nodeId)) {
+      updated.push({
+        id: nodeId,
+        status: P2P.P2PTypes.NodeStatus.SYNCING
+      })
+    }
+  }
+
+  const addedIds = added.map((node) => node.id)
+
+  for (const [nodeId, cycleNumber] of NodeList.selectedById) {
+    if (addedIds.includes(nodeId)) {
+      // do nothing. the node was just added and isn't in the nodelist yet
+    } else if (record.counter > cycleNumber + 3) {
+      nestedCountersInstance.countEvent('p2p', `failed to send sync-started`)
+      /* prettier-ignore */ if (logFlags.verbose) console.log(`Failed to send sync-started`)
+      lostAfterSelection.push(nodeId)
+    }
+  }
 
   return {
     added,
-    removed: [],
-    updated: [],
+    removed: [...lostAfterSelection],
+    updated,
   }
 }
 
