@@ -2034,9 +2034,9 @@ class StateManager {
   }
 
   async getLocalOrRemoteAccountQueueCount(address: string): Promise<QueueCountsResult> {
-    let count: number
-    let committingAppData: unknown
-    let account: unknown
+    let count: number = -1
+    let committingAppData: unknown = undefined
+    let account: unknown = undefined
     if (this.currentCycleShardData == null) {
       await this.waitForShardData()
     }
@@ -2179,7 +2179,9 @@ class StateManager {
 
     // hack to say we have all the data
     if (!isServiceMode())
-      if (this.currentCycleShardData.nodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius) {
+      if (
+        this.currentCycleShardData.nodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius
+      ) {
         accountIsRemote = false
       }
     if (forceLocalGlobalLookup) {
