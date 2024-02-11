@@ -30,6 +30,7 @@ const deepCopy = rfdc()
 import { isServiceMode } from '../debug'
 import { insertSyncStarted } from './Join/v2/syncStarted'
 // import * as http from '../http'
+import {insertNodeIntoReadyList} from '../p2p/Join/v2/syncFinished'
 
 /** STATE */
 
@@ -211,6 +212,20 @@ export function startupV2(): Promise<boolean> {
         await CycleCreator.startCycles()
         p2pSyncEnd = shardusGetTime()
         p2pJoinTime = (p2pSyncEnd - p2pSyncStart) / 1000
+        // send a sync-finished message to the network if you are the first node when promised is resoolved from CycleCreator.startCycles()
+        if (isFirst) {
+          insertNodeIntoReadyList(id)
+          nestedCountersInstance.countEvent('p2p', `adding sync-finished message for first node`)
+          /* prettier-ignore */ if (logFlags.verbose) console.log(`adding sync-finished message for first node`)
+        } else {
+          //Payload that is gossiped after node has synced
+          let readyPayload = {
+            nodeId: id,
+            cycleNumber: CycleChain.getNewest()?.counter,
+          }
+          readyPayload = Context.crypto.sign(readyPayload)
+          Comms.sendGossip('gossip-sync-finished', readyPayload)
+        }
 
         nestedCountersInstance.countEvent('p2p', `sync time ${p2pJoinTime} seconds`)
 
@@ -1024,6 +1039,7 @@ export function getThisNodeInfo(): {
   joinRequestTimestamp: number
   activeTimestamp: number
   syncingTimestamp: number
+  readyTimestamp: number
 } {
   const { externalIp, externalPort, internalIp, internalPort } = network.ipInfo
   const publicKey = Context.crypto.getPublicKey()
@@ -1032,6 +1048,7 @@ export function getThisNodeInfo(): {
   const joinRequestTimestamp = utils.getTime('s')
   const activeTimestamp = 0
   const syncingTimestamp = 0
+  const readyTimestamp = 0
   const nodeInfo = {
     publicKey,
     externalIp,
@@ -1042,6 +1059,7 @@ export function getThisNodeInfo(): {
     joinRequestTimestamp,
     activeTimestamp,
     syncingTimestamp,
+    readyTimestamp,
   }
   if (logFlags.p2pNonFatal) info(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
   return nodeInfo

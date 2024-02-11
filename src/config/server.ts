@@ -117,6 +117,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     rotationPercentActive: 0.001, //rotate 0.1% of active nodes per cycle when in a steady processing state
     rotationMaxAddPercent: 0.1,
     rotationMaxRemovePercent: 0.05,
+    allowActivePerCycle: 7,
   },
   ip: {
     externalIp: '0.0.0.0',

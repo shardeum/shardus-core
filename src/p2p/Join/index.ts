@@ -31,6 +31,7 @@ import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { updateNodeState } from '../Self'
 import { HTTPError } from 'got'
 import { drainLostAfterSelectionNodes, drainSyncStarted, nodesYetToStartSyncing, lostAfterSelection } from './v2/syncStarted'
+import { drainFinishedSyncingRequest } from './v2/syncFinished'
 
 /** STATE */
 
@@ -225,6 +226,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
   record.standbyRemove = []
   record.startedSyncing = []
   record.lostAfterSelection = []
+  record.finishedSyncing = []
 
   if (config.p2p.useJoinProtocolV2) {
     // for join v2, add new standby nodes to the standbyAdd field ...
@@ -246,6 +248,10 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     // these nodes are being repeated in lost and apop
     for (const nodeId of drainLostAfterSelectionNodes()) {
       record.lostAfterSelection.push(nodeId)
+    }
+    // add node id from newSyncFinishedNodes to the finishedSyncing list to update readyByTimeAndIdOrder when parsed
+    for (const nodeId of drainFinishedSyncingRequest()) {
+      record.finishedSyncing.push(nodeId)
     }
 
     let standbyRemoved_Age = 0
@@ -343,6 +349,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   const added = record.joinedConsensors
+  const finishedSyncing = record.finishedSyncing
 
   for (const node of added) {
     node.syncingTimestamp = record.start
@@ -378,6 +385,20 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
       /* prettier-ignore */ if (logFlags.verbose) console.log(`Failed to send sync-started`)
       lostAfterSelection.push(nodeId)
     }
+  }
+
+  if (finishedSyncing.includes(Self.id)) {
+    Self.updateNodeState(P2P.P2PTypes.NodeStatus.READY)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:parseRecord node-selcted cycle: ${record.counter} updated self to ready`)
+  }
+  // TODO: [] (BUI) okay to use record.start instead of cycle.start? had problem for first node with cycle.start
+  //const cycle = this.p2p.state.getLastCycle()
+  for (const node of finishedSyncing) {
+    updated.push({
+      id: node,
+      status: P2P.P2PTypes.NodeStatus.READY,
+      readyTimestamp: record.start,
+    })
   }
 
   return {

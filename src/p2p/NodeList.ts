@@ -28,6 +28,7 @@ export let byIdOrder: P2P.NodeListTypes.Node[]
 export let othersByIdOrder: P2P.NodeListTypes.Node[] // used by sendGossipIn
 export let activeByIdOrder: P2P.NodeListTypes.Node[]
 export let syncingByIdOrder: P2P.NodeListTypes.Node[]
+export let readyByTimeAndIdOrder: P2P.NodeListTypes.Node[]
 export let activeOthersByIdOrder: P2P.NodeListTypes.Node[]
 export let potentiallyRemoved: Set<P2P.NodeListTypes.Node['id']>
 export let selectedById: Map<P2P.NodeListTypes.Node['id'], number>
@@ -46,6 +47,7 @@ export function init() {
       const networkStats = {
         active: activeByIdOrder.length,
         syncing: syncingByIdOrder.length,
+        ready: readyByTimeAndIdOrder.length,
         standby: Join.getNodeRequestingJoin().length,
         desired: CycleChain.newest.desired,
       }
@@ -75,6 +77,7 @@ export function reset(caller: string) {
   othersByIdOrder = []
   activeByIdOrder = []
   syncingByIdOrder = []
+  readyByTimeAndIdOrder = []
   activeOthersByIdOrder = []
   potentiallyRemoved = new Set()
   selectedById = new Map()
@@ -119,6 +122,11 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
     insertSorted(syncingByIdOrder, node, propComparator('id'))
   }
 
+  // If node is READY status, insert sorted by readyTimestamp and id to tiebreak into readyByTimeAndIdOrder
+  if (node.status === P2P.P2PTypes.NodeStatus.READY) {
+    insertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
+  }
+
   // If active, insert sorted by id into activeByIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
     insertSorted(activeByIdOrder, node, propComparator('id'))
@@ -130,6 +138,7 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
 
     // remove active node from syncing list
     removeSyncingNode(node.id)
+    removeReadyNode(node.id)
   }
 }
 export function addNodes(newNodes: P2P.NodeListTypes.Node[], caller: string) {
@@ -146,6 +155,12 @@ export function removeSyncingNode(id: string) {
   const idx = binarySearch(syncingByIdOrder, { id }, propComparator('id'))
   /* prettier-ignore */ if (logFlags.verbose) console.log('Removing syncing node', id, idx)
   if (idx >= 0) syncingByIdOrder.splice(idx, 1)
+}
+
+export function removeReadyNode(id: string) {
+  const idx = binarySearch(readyByTimeAndIdOrder, { id }, propComparator('id'))
+  /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('Removing synced node', id, idx)
+  if (idx >= 0) readyByTimeAndIdOrder.splice(idx, 1)
 }
 
 export function removeNode(
@@ -178,6 +193,9 @@ export function removeNode(
   idx = binarySearch(syncingByIdOrder, { id }, propComparator('id'))
   if (idx >= 0) syncingByIdOrder.splice(idx, 1)
 
+  idx = binarySearch(readyByTimeAndIdOrder, { id }, propComparator('id'))
+  if (idx >= 0) readyByTimeAndIdOrder.splice(idx, 1)
+
   const joinRequestTimestamp = nodes.get(id).joinRequestTimestamp
   idx = binarySearch(byJoinOrder, { joinRequestTimestamp, id }, propComparator2('joinRequestTimestamp', 'id'))
   if (idx >= 0) byJoinOrder.splice(idx, 1)
@@ -188,6 +206,7 @@ export function removeNode(
   byPubKey.delete(node.publicKey)
   nodes.delete(id)
   selectedById.delete(id)
+  //readyByTimeAndIdOrder = readyByTimeAndIdOrder.filter((node) => node.id !== id)
 
   Comms.evictCachedSockets([node])
 
@@ -250,6 +269,9 @@ export function updateNode(
         insertSorted(syncingByIdOrder, node, propComparator('id'))
         removeSelectedNode(node.id) 
       }
+      if (update[key] === P2P.P2PTypes.NodeStatus.READY) {
+        insertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
+      }
     }
     //test if this node is in the active list already.  if it is not, then we can add it
     let idx = binarySearch(activeByIdOrder, { id: node.id }, propComparator('id'))
@@ -264,6 +286,7 @@ export function updateNode(
         // remove active node from syncing list
         /* prettier-ignore */ if (logFlags.verbose) console.log('updateNode: removing active node from syncing list')
         removeSyncingNode(node.id)
+        removeReadyNode(node.id)
 
         if (raiseEvents) {
           const emitParams: Omit<ShardusEvent, 'type'> = {

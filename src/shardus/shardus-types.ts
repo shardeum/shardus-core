@@ -827,6 +827,8 @@ export interface ServerConfiguration {
     rotationMaxAddPercent: number
     /** not an actual percent but 0-1 value or multiplication */
     rotationMaxRemovePercent: number
+    /** The max number of nodes added to `activated` list in cycleRecord each cycle */
+    allowActivePerCycle: number
   }
   /** Server IP configuration */
   ip?: {

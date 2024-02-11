@@ -25,6 +25,7 @@ import { profilerInstance } from '../../utils/profiler'
 import * as acceptance from './v2/acceptance'
 import { attempt } from '../Utils'
 import { getStandbyNodesInfoMap, saveJoinRequest, isOnStandbyList } from './v2'
+import { addFinishedSyncing } from './v2/syncFinished'
 import { processNewUnjoinRequest, UnjoinRequest } from './v2/unjoin'
 import { isActive } from '../Self'
 import { logFlags } from '../../logger'
@@ -421,12 +422,36 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<SyncStarted, P2P.NodeLi
   }
 }
 
+/**
+ * Handler for syncing finished gossip. Gossip coming from Join Protocol v2 in `enterSyncingState()` of startupV2 in Self.ts and the function below. 
+ */
+const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.FinishedSyncingRequest, P2P.NodeListTypes.Node['id']> = (
+  payload: P2P.JoinTypes.FinishedSyncingRequest,
+  sender: P2P.NodeListTypes.Node['id'],
+  tracker: string
+) => {
+  profilerInstance.scopedProfileSectionStart('gossip-sync-finished')
+  try {
+    // Do not forward gossip after quarter 2
+    if (CycleCreator.currentQuarter >= 3) return
+    // Validate payload in addFinishedSyncing
+    if (addFinishedSyncing(payload).success) {
+      Comms.sendGossip('gossip-sync-finished', payload, tracker, sender, NodeList.byIdOrder, false)
+    } else {
+      /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('gossipSyncFinishedRoute: addFinishedSyncing failed')
+    }
+  } finally {
+    profilerInstance.scopedProfileSectionEnd('gossip-sync-finished')
+  }
+}
+
 export const routes = {
   external: [cycleMarkerRoute, joinRoute, joinedRoute, joinedV2Route, acceptedRoute, unjoinRoute],
   gossip: {
     'gossip-join': gossipJoinRoute,
     'gossip-valid-join-requests': gossipValidJoinRequests,
     'gossip-unjoin': gossipUnjoinRequests,
-    'gossip-sync-started': gossipSyncStartedRoute
+    'gossip-sync-started': gossipSyncStartedRoute,
+    'gossip-sync-finished': gossipSyncFinishedRoute,
   },
 }

@@ -408,6 +408,7 @@ export function updateRecord(
   // remove activated nodes from syncing by id order
   for (const nodeId of record.activated) {
     NodeList.removeSyncingNode(nodeId)
+    NodeList.removeReadyNode(nodeId)
   }
 
   if (config.p2p.detectLostSyncing) {

@@ -55,6 +55,7 @@ const cycles = [
     removedArchivers: { type: SQLDataTypes.TEXT, allowNull: false },
     startedSyncing: { type: SQLDataTypes.TEXT, allowNull: false },
     lostAfterSelection: { type: SQLDataTypes.TEXT, allowNull: false },
+    finishedSyncing: { type: SQLDataTypes.TEXT, allowNull: false },
     ...P2PApoptosis.sequelizeCycleFieldModel,
   },
 ]
