@@ -265,9 +265,11 @@ export class NetworkClass extends EventEmitter {
   ) {
     const data = { route, payload: message }
     const promises = []
+    const ports = []
+    const addresses = []
+    const requestId = generateUUID()
     for (const node of nodes) {
       /* prettier-ignore */ if (logFlags.playback && alreadyLogged === false) this.logger.playbackLog('self', node, 'InternalTellBinary', route, trackerId, message)
-      const requestId = generateUUID()
       /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`tellBinary: initiating tell request with requestId: ${requestId}`)
       /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`tellBinary: requestId: ${requestId}, node: ${utils.logNode(node)}`)
       /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`tellBinary: route: ${route}, message: ${message} requestId: ${requestId}`)
@@ -281,11 +283,14 @@ export class NetworkClass extends EventEmitter {
       })
       promises.push(promise)
     }
+
     try {
-      await Promise.all(promises)
+      await this.sn.multiSendWithHeader(ports, addresses, data, appHeader);
     } catch (err) {
-      nestedCountersInstance.countEvent('network', `error-tellBinary ${route}`)
-      /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tellBinary-promise) on ${route}: ${formatErrorMessage(err)}`)
+      let errorGroup = ('' + err).slice(0, 20)
+      nestedCountersInstance.countEvent('network', `error2-tellBinary ${route}`)
+      this.emit('error', nodes, requestId, 'tellBinary', errorGroup, route)
+      /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tellBinary) on ${route}: ${formatErrorMessage(err)}`)
     }
   }
 
