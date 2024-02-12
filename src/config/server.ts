@@ -124,6 +124,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     allowActivePerCycle: 7,
     useProxyForDownCheck: false,
     numCheckerNodes: 1,
+    attemptJoiningWaitMultiplier: 2,
+    cyclesToWaitForSyncStarted: 3,
   },
   ip: {
     externalIp: '0.0.0.0',

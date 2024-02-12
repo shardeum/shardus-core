@@ -46,7 +46,7 @@ export function insertSyncStarted(nodeId: string): void {
 
 export function addSyncStarted(syncStarted: SyncStarted): SyncStartedRequestResponse {
   // lookup node by id in payload and use pubkey and compare to sig.owner
-  const publicKeysMatch = ((NodeList.byIdOrder.find((node) => node.id === syncStarted.nodeId))?.publicKey || crypto.keypair.publicKey) === syncStarted.sign.owner
+  const publicKeysMatch = ((NodeList.byIdOrder.find((node) => node.id === syncStarted.nodeId))?.publicKey) === syncStarted.sign.owner
   if (!publicKeysMatch) {
     return {
       success: false,
@@ -85,7 +85,7 @@ export function addSyncStarted(syncStarted: SyncStarted): SyncStartedRequestResp
 
   return {
     success: true,
-    reason: '',
+    reason: 'passed all checks and verification',
     fatal: false,
   }
 }

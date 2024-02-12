@@ -380,7 +380,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   for (const [nodeId, cycleNumber] of NodeList.selectedById) {
     if (addedIds.includes(nodeId)) {
       // do nothing. the node was just added and isn't in the nodelist yet
-    } else if (record.counter > cycleNumber + 3) {
+    } else if (record.counter > cycleNumber + config.p2p.cyclesToWaitForSyncStarted) {
       nestedCountersInstance.countEvent('p2p', `failed to send sync-started`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`Failed to send sync-started`)
       lostAfterSelection.push(nodeId)

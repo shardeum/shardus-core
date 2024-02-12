@@ -839,6 +839,10 @@ export interface ServerConfiguration {
     allowActivePerCycle: number
     useProxyForDownCheck: boolean
     numCheckerNodes: number
+    /** The multiplier of how many cycles to before attempting to join the network again */
+    attemptJoiningWaitMultiplier: number
+    /** The number of cycles to wait for a selected node to send sync-started gossip before removing it */
+    cyclesToWaitForSyncStarted: number
   }
   /** Server IP configuration */
   ip?: {

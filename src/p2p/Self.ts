@@ -352,7 +352,7 @@ export function startupV2(): Promise<boolean> {
           //
           attemptJoiningTimer = setTimeout(() => {
             attemptJoining()
-          }, 2 * cycleDuration * 1000)
+          }, Context.config.p2p.attemptJoiningWaitMultiplier * cycleDuration * 1000)
           attemptJoiningRunning = false
           return
         }
