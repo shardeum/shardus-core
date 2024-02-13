@@ -158,7 +158,13 @@ export function removeSyncingNode(id: string) {
 }
 
 export function removeReadyNode(id: string) {
-  const idx = binarySearch(readyByTimeAndIdOrder, { id }, propComparator('id'))
+  let idx = -1
+  for (let i = 0; i < readyByTimeAndIdOrder.length; i++) {
+    if (readyByTimeAndIdOrder[i].id === id) {
+      idx = i
+      break
+    }
+  }
   /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('Removing synced node', id, idx)
   if (idx >= 0) readyByTimeAndIdOrder.splice(idx, 1)
 }
@@ -271,6 +277,7 @@ export function updateNode(
       }
       if (update[key] === P2P.P2PTypes.NodeStatus.READY) {
         insertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
+        removeSyncingNode(node.id)
       }
     }
     //test if this node is in the active list already.  if it is not, then we can add it
@@ -283,9 +290,9 @@ export function updateNode(
         if (node.id !== id) {
           insertSorted(activeOthersByIdOrder, node, propComparator('id'))
         }
-        // remove active node from syncing list
-        /* prettier-ignore */ if (logFlags.verbose) console.log('updateNode: removing active node from syncing list')
-        removeSyncingNode(node.id)
+        // remove active node from ready list
+        /* prettier-ignore */ if (logFlags.verbose) console.log('updateNode: removing active node from ready list')
+        //removeSyncingNode(node.id)
         removeReadyNode(node.id)
 
         if (raiseEvents) {

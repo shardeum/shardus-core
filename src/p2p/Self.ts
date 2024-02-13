@@ -593,7 +593,7 @@ export function updateNodeState(updatedState: NodeStatus, because = ''): void {
     isoDateTime: new Date().toISOString(),
     uptime: utils.readableDuration(startTimestamp),
     newestCycleCounter: (CycleChain.getNewest() && CycleChain.getNewest().counter) || null,
-    quarter: CycleCreator.currentCycle, //should this be current quarter?
+    quarter: CycleCreator.currentQuarter, //should this be current quarter?
     because: because,
   }
 

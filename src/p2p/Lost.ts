@@ -406,10 +406,13 @@ export function updateRecord(
     seen[request.target] = true
   }
   // remove activated nodes from syncing by id order
+  /*
+  we already remove from nodelist in updateNode, so this is redundant
   for (const nodeId of record.activated) {
     NodeList.removeSyncingNode(nodeId)
     NodeList.removeReadyNode(nodeId)
   }
+  */
 
   if (config.p2p.detectLostSyncing) {
     const syncingNodes = NodeList.syncingByIdOrder

@@ -643,10 +643,8 @@ class Shardus extends EventEmitter {
     Self.emitter.on('initialized', async () => {
       // If network is in safety mode
       const newest = CycleChain.getNewest()
-      if (newest && newest.safetyMode === true) {
-        // Use snapshot to put old app data into state-manager then go active
-        await Snapshot.safetySync()
-      } else if (newest && (newest.mode === 'restart' || newest.mode === 'recovery')) {
+      // changed from using safetyMode to mode
+      if (newest && (newest.mode === 'restart' || newest.mode === 'recovery')) {
         // Stay in syncing mode and let other nodes join
         Self.setp2pIgnoreJoinRequests(false)
         console.log('p2pIgnoreJoinRequests = false')
