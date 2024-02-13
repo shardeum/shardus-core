@@ -221,7 +221,7 @@ export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
 }
 
 export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
-  record.syncing = NodeList.byJoinOrder.length - (NodeList.activeByIdOrder.length + NodeList.selectedById.size)
+  record.syncing = NodeList.syncingByIdOrder.length
   record.standbyAdd = []
   record.standbyRemove = []
   record.startedSyncing = []
