@@ -94,15 +94,19 @@ export function insertNodeIntoReadyList(nodeId: string): void {
 }
 
 /**
- * Checks if a node is among the first N nodes in the pre-sorted ready list.
- * `readyByTimeAndIdOrder` is sorted by readyTimestamp, with ID as a tiebreaker.
+ * Determines if a node is among the first N nodes in the pre-sorted list `readyByTimeAndIdOrder` when in 'processing' mode,
+ * or within the entire list in other modes. The list is sorted by `readyTimestamp`, with `ID` as a tiebreaker.
  *
  * @param nodeId The ID of the node to check.
- * @returns True if the node is among the first N ready nodes, false otherwise.
+ * @returns True if the node is among the first N ready nodes in 'processing' mode or in the entire list in other modes, false otherwise.
  */
 export function isNodeSelectedReadyList(nodeId: string): boolean {
-  // Directly check if nodeId is among the first N nodes in the pre-sorted list
-  return NodeList.readyByTimeAndIdOrder
-    .slice(0, config.p2p.allowActivePerCycle)
-    .some((readyNode) => readyNode.id === nodeId)
+  const mode = CycleChain.getNewest().mode
+  // Adjust the list based on the mode
+  const listToCheck = mode === 'processing' 
+    ? NodeList.readyByTimeAndIdOrder.slice(0, config.p2p.allowActivePerCycle)
+    : NodeList.readyByTimeAndIdOrder;
+
+  // Check if nodeId is in listToCheck
+  return listToCheck.some((readyNode) => readyNode.id === nodeId)
 }
