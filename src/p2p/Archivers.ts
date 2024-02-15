@@ -1175,10 +1175,11 @@ export function getLastHashedArchiverList(): P2P.ArchiversTypes.JoinedArchiver[]
 export function getFromArchiver<R>(
   archiver: ActiveNode,
   endpoint: string,
-  failureReportMessage?: string
+  failureReportMessage?: string,
+  timeout?: number
 ): ResultAsync<R, Error> {
   return ResultAsync.fromPromise(
-    http.get(`http://${archiver.ip}:${archiver.port}/${endpoint}`),
+    http.get(`http://${archiver.ip}:${archiver.port}/${endpoint}`, false, timeout ?? 1000),
     (e: Error) => {
       warn(`${archiver.ip}:${archiver.port} is unreachable`)
       reportLostArchiver(

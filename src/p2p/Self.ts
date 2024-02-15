@@ -30,7 +30,7 @@ const deepCopy = rfdc()
 import { isServiceMode } from '../debug'
 import { insertSyncStarted } from './Join/v2/syncStarted'
 // import * as http from '../http'
-import {insertNodeIntoReadyList} from '../p2p/Join/v2/syncFinished'
+import { insertNodeIntoReadyList } from '../p2p/Join/v2/syncFinished'
 
 /** STATE */
 
@@ -74,7 +74,7 @@ let firstTimeJoiningLoop = true
 const idErrorMessage = `id did not match the cycle record info`
 
 const nodeMatch = (node) =>
-    node.externalIp === network.ipInfo.externalIp && node.externalPort === network.ipInfo.externalPort
+  node.externalIp === network.ipInfo.externalIp && node.externalPort === network.ipInfo.externalPort
 
 /** ROUTES */
 
@@ -187,7 +187,6 @@ export function startupV2(): Promise<boolean> {
         nestedCountersInstance.countEvent('p2p', 'joined')
         // Sync cycle chain from network
         await syncCycleChain(id)
-
 
         let payload = {
           nodeId: id,
@@ -977,7 +976,7 @@ export async function getFullNodesFromArchiver(
     const nodeListUrl = `http://${archiver.ip}:${archiver.port}/full-nodelist`
     throw Error(
       `Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` +
-      fullNodeListResult.error.message
+        fullNodeListResult.error.message
     )
   }
 
@@ -985,7 +984,6 @@ export async function getFullNodesFromArchiver(
   if (logFlags.p2pNonFatal) info(`Got signed full node list: ${JSON.stringify(fullNodeList)}`)
   return fullNodeList
 }
-
 
 export async function getLatestCyclesFromArchiver(
   cycleCounter: number,
@@ -996,7 +994,7 @@ export async function getLatestCyclesFromArchiver(
   const cyclesListResult: Result<
     SignedObject<{ cycleInfo: P2P.CycleCreatorTypes.CycleData[] }>,
     Error
-  > = await Archivers.getFromArchiver(archiver, endpoint)
+  > = await Archivers.getFromArchiver(archiver, endpoint, undefined, 10000)
 
   if (cyclesListResult.isErr()) {
     const nodeListUrl = `http://${archiver.ip}:${archiver.port}/${endpoint}`
@@ -1012,8 +1010,8 @@ export type NodeInfo = {
   publicKey: string
   curvePublicKey: string
 } & network.IPInfo & {
-  status: P2P.P2PTypes.NodeStatus
-}
+    status: P2P.P2PTypes.NodeStatus
+  }
 
 export function getPublicNodeInfo(reportIntermediateStatus = false): NodeInfo {
   const publicKey = Context.crypto.getPublicKey()
