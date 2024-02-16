@@ -1602,7 +1602,7 @@ class StateManager {
       'get_account_data_with_queue_hints',
       async (
         payload: { accountIds: string[] },
-        respond: (arg0: GetAccountDataWithQueueHintsResp) => Promise<number>,
+        respond: (arg0: GetAccountDataWithQueueHintsResp | false) => Promise<number>,
         _sender: unknown,
         _tracker: string,
         msgSize: number
@@ -1633,10 +1633,14 @@ class StateManager {
             }
           }
           //PERF Disiable this in production or performance testing. / this works due to inheritance
+          //this can throw an error an result in a non response
           this.testAccountDataWrapped(accountData)
           // we cast up the array return type because we have attached the seenInQueue memeber to the data.
           result.accountData = accountData as Shardus.WrappedDataFromQueue[]
           responseSize = await respond(result)
+        } catch(ex) {
+          //we dont want to delay. let the asking node know qukcly so it can try again
+          responseSize = await respond(false)
         } finally {
           profilerInstance.scopedProfileSectionEnd('get_account_data_with_queue_hints', responseSize)
         }
@@ -2211,13 +2215,23 @@ class StateManager {
         throw new Error(`getLocalOrRemoteAccount: no consensus node found`)
       }
 
-      // Node Precheck!
-      if (
-        this.isNodeValidForInternalMessage(randomConsensusNode.id, 'getLocalOrRemoteAccount', true, true) ===
-        false
-      ) {
-        /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'getLocalOrRemoteAccount: isNodeValidForInternalMessage failed, no retry')
-        return null
+      const preCheckLimit = 5
+      for(let i=0;i< preCheckLimit; i++){
+        // Node Precheck!.  this check our internal records to find a good node to talk to.
+        // it is worth it to look through the list if needed. 
+        if (
+          this.isNodeValidForInternalMessage(randomConsensusNode.id, 'getLocalOrRemoteAccount', true, true) ===
+          false
+        ) {
+          //we got to the end of our tries?
+          if(i >= preCheckLimit-1){
+            /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'getLocalOrRemoteAccount: isNodeValidForInternalMessage failed, no retry')
+            //return null   ....better to throw an error 
+            throw new Error(`getLocalOrRemoteAccount: no consensus nodes worth asking`)
+          }
+        } else {
+          break
+        }
       }
 
       const message = { accountIds: [address] }
@@ -2228,6 +2242,7 @@ class StateManager {
       )
       if (r === false) {
         if (logFlags.error) this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount r === false')
+        throw new Error(`getLocalOrRemoteAccount: remote node had an exception`)
       }
 
       const result = r as GetAccountDataWithQueueHintsResp
@@ -2238,6 +2253,8 @@ class StateManager {
         }
         return wrappedAccount
       } else {
+        //these cases probably should throw an error to, but dont wont to over prescribe the format yet
+        //if the remote node has a major breakdown it should return false
         if (result == null) {
           /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data: result == null')
         } else if (result.accountData == null) {
@@ -2264,6 +2281,8 @@ class StateManager {
           wrappedAccount = expandedRef
         }
       } else {
+        //this should probably throw as we expect a [] for the real empty case
+        //avoiding too many changes
         if (logFlags.verbose) this.getAccountFailDump(address, 'getAccountDataByList() returned null')
         return null
       }
