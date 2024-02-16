@@ -2163,7 +2163,8 @@ class StateManager {
     address: string,
     opts: {
       useRICache: boolean // enables the RI cache. enable only for immutable data
-    } = { useRICache: false }
+      canThrowException?: boolean
+    } = { useRICache: false, canThrowException: false }
   ): Promise<Shardus.WrappedDataFromQueue | null> {
     let wrappedAccount: Shardus.WrappedDataFromQueue | null = null
     if (!isServiceMode()) {
@@ -2224,10 +2225,12 @@ class StateManager {
           false
         ) {
           //we got to the end of our tries?
-          if(i >= preCheckLimit-1){
+          if (i >= preCheckLimit - 1) {
             /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'getLocalOrRemoteAccount: isNodeValidForInternalMessage failed, no retry')
-            //return null   ....better to throw an error 
-            throw new Error(`getLocalOrRemoteAccount: no consensus nodes worth asking`)
+            //return null   ....better to throw an error
+            if (opts.canThrowException)
+              throw new Error(`getLocalOrRemoteAccount: no consensus nodes worth asking`)
+            else return null
           }
         } else {
           break
@@ -2242,7 +2245,7 @@ class StateManager {
       )
       if (r === false) {
         if (logFlags.error) this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount r === false')
-        throw new Error(`getLocalOrRemoteAccount: remote node had an exception`)
+        if (opts.canThrowException) throw new Error(`getLocalOrRemoteAccount: remote node had an exception`)
       }
 
       const result = r as GetAccountDataWithQueueHintsResp

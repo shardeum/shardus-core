@@ -1642,7 +1642,8 @@ class Shardus extends EventEmitter {
     address,
     opts: {
       useRICache: boolean // enables the RI cache. enable only for immutable data
-    } = { useRICache: false }
+      canThrowException?: boolean
+    } = { useRICache: false, canThrowException: false }
   ) {
     if (this.p2p.allowTransactions() || isServiceMode()) {
       return this.stateManager.getLocalOrRemoteAccount(address, opts)
