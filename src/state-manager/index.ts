@@ -2211,15 +2211,15 @@ class StateManager {
     }
 
     if (accountIsRemote) {
-      const randomConsensusNode = this.transactionQueue.getRandomConsensusNodeForAccount(address)
-      if (randomConsensusNode == null) {
-        throw new Error(`getLocalOrRemoteAccount: no consensus node found`)
-      }
-      console.log(`asking node ${randomConsensusNode.externalPort} for local or remote account`)
+      let randomConsensusNode: P2PTypes.NodeListTypes.Node
       const preCheckLimit = 5
-      for(let i=0;i< preCheckLimit; i++){
+      for(let i=0;i< preCheckLimit; i++) {
+        randomConsensusNode = this.transactionQueue.getRandomConsensusNodeForAccount(address)
+        if (randomConsensusNode == null) {
+          throw new Error(`getLocalOrRemoteAccount: no consensus node found`)
+        }
         // Node Precheck!.  this check our internal records to find a good node to talk to.
-        // it is worth it to look through the list if needed. 
+        // it is worth it to look through the list if needed.
         if (
           this.isNodeValidForInternalMessage(randomConsensusNode.id, 'getLocalOrRemoteAccount', true, true) ===
           false
