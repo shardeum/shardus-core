@@ -2,8 +2,10 @@ import { isDebugMode, getHashedDevKey, getDevPublicKeys, ensureKeySecurity } fro
 import * as Context from '../p2p/Context'
 import * as crypto from '@shardus/crypto-utils'
 import { DevSecurityLevel } from '../shardus/shardus-types'
+import SERVER_CONFIG from '../config/server'
 
 let lastCounter = 0
+let multiSigLstCounter = 0
 
 // This function is used to check if the request is authorized to access the debug endpoint
 function handleDebugAuth(_req, res, next, authLevel) {
@@ -42,7 +44,7 @@ function handleDebugAuth(_req, res, next, authLevel) {
         }
       }
     }
-  } catch (error) {}
+  } catch (error) { }
   return res.status(401).json({
     status: 401,
     message: 'Unauthorized!',
@@ -60,14 +62,23 @@ function handleMultiDebugAuth(_req, res, next) {
       const parsedSignatures = JSON.parse(_req.query.sig)
 
       // Verify the signatures against the proposal
-      let allSignaturesValid = true
+      let allSignaturesValid = false
       let signatureValid = false
 
+      const minApprovals = Math.max(2, SERVER_CONFIG.debug.minApprovalsMultiAuth)
+
+      if (parsedProposal.noOfApprovals < minApprovals) {
+        return res.status(401).json({
+          status: 401,
+          message: 'Unauthorized!',
+        })
+      }
       // Require a larger counter than before. This prevents replay attacks
       if (
-        parseInt(_req.query.sig_counter) > lastCounter &&
+        parseInt(_req.query.sig_counter) > multiSigLstCounter &&
         parsedSignatures.length >= parsedProposal.noOfApprovals
       ) {
+        let validSignaturesCount = 0;
         for (let i = 0; i < parsedSignatures.length; i++) {
           // Check each signature against all public keys
           for (const publicKey of Object.keys(devPublicKeys)) {
@@ -76,13 +87,15 @@ function handleMultiDebugAuth(_req, res, next) {
               const clearanceLevels = { low: 1, medium: 2, high: 3 } // Enum for security levels
               const proposalClearanceLevel = clearanceLevels[parsedProposal.securityClearance.toLowerCase()]
               const authorized = ensureKeySecurity(publicKey, proposalClearanceLevel) // Check if the approver is authorized to access the endpoint
-              if (!authorized) {
+              if (authorized) {
+                validSignaturesCount++; // Increment only if signature is valid and authorized
+                break; // Break if a valid and authorized signature is found
+              } else {
                 return res.status(401).json({
                   status: 401,
                   message: 'Unauthorized!',
-                })
+                });
               }
-              break // Break if a valid signature is found
             }
           }
           if (!signatureValid) {
@@ -91,8 +104,12 @@ function handleMultiDebugAuth(_req, res, next) {
             break // Break the loop if an invalid signature is found
           }
         }
+        // Set allSignaturesValid to true only if all signatures are valid and authorized
+        allSignaturesValid = validSignaturesCount >= parsedProposal.noOfApprovals;
+
         // If all signatures are valid, proceed with the next middleware
         if (allSignaturesValid) {
+          multiSigLstCounter = parseInt(_req.query.sig_counter)
           next()
         } else {
           return res.status(401).json({
@@ -101,7 +118,7 @@ function handleMultiDebugAuth(_req, res, next) {
           })
         }
       } else {
-        console.log('Counter is not larger than last counter', _req.query.sig_counter, lastCounter)
+        console.log('Counter is not larger than last counter', _req.query.sig_counter, multiSigLstCounter)
       }
     }
   } catch (error) {

@@ -173,6 +173,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     oldPartitionSystem: false,
     dumpAccountReportFromSQL: false,
     profiler: false,
+    minApprovalsMultiAuth: 3,
     robustQueryDebug: false,
     forwardTXToSyncingNeighbors: false,
     recordAcceptedTx: false,
