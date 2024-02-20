@@ -183,6 +183,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     produceBadChallenge: false,
     debugNTPErrorWindowMs: 200,
     enableScopedProfiling: true,
+    enableCycleRecordDebugTool: false,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {

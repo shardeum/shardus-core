@@ -963,6 +963,8 @@ export interface ServerConfiguration {
     debugNTPErrorWindowMs: number
     /**  Flag to enable detail scoped profiling **/
     enableScopedProfiling: boolean
+    /**  Flag to enable writing cycle records to text file for debugging **/
+    enableCycleRecordDebugTool: boolean,
   }
   /** Options for the statistics module */
   statistics?: {

@@ -25,10 +25,13 @@ import * as JoinV2 from './Join/v2'
 import { deleteStandbyNode } from './Join/v2/unjoin'
 import { logFlags } from '../logger'
 import { currentQuarter } from './CycleCreator'
+import fs from 'fs'
+import path from 'path'
 
 /** STATE */
 
 let p2pLogger: Logger
+const filePath = path.join(process.cwd(), 'data-logs', 'cycleRecords2.txt');
 
 /** ROUTES */
 
@@ -310,6 +313,20 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
     // for join v2, also get the standby node list hash
     if (config.p2p.useJoinProtocolV2) {
       cycle.standbyNodeListHash = JoinV2.computeNewStandbyListHash()
+    }
+  }
+
+  if (config.debug.enableCycleRecordDebugTool) {
+    if (Self.isActive) {
+      const cycleData = JSON.stringify({
+        cycleNumber: cycle.counter,
+        cycleRecord: cycle,
+      }) + '\n'
+      fs.appendFile(filePath, cycleData, err => {
+        if (err) {
+          console.error('Error appending to file:', err);
+        }
+      });
     }
   }
 

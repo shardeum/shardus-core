@@ -27,6 +27,8 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { randomBytes } from '@shardus/crypto-utils'
 import { digestCycle, syncNewCycles } from './Sync'
 import { shardusGetTime } from '../network'
+import fs from 'fs'
+import path from 'path'
 
 /** CONSTANTS */
 
@@ -50,6 +52,8 @@ type submoduleTypes =
   | typeof LostArchivers
 
 /** STATE */
+
+const filePath = path.join(process.cwd(), 'data-logs', 'cycleRecords1.txt');
 
 let modeModuleMigrationApplied = false
 export let hasAlreadyEnteredProcessing = false
@@ -501,6 +505,19 @@ async function runQ3() {
   // Get txs and create this cycle's record, marker, and cert
   txs = collectCycleTxs()
   ;({ record, marker, cert } = makeCycleData(txs, CycleChain.newest))
+  if (config.debug.enableCycleRecordDebugTool) {
+    if (currentQuarter === 3 && Self.isActive) {
+      const cycleData = JSON.stringify({
+        cycleNumber: record.counter,
+        cycleRecord: record,
+      }) + '\n'
+      fs.appendFile(filePath, cycleData, err => {
+        if (err) {
+          console.error('Error appending to file:', err);
+        }
+      });
+    }
+  }
 
   /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("cycle record: ", record)
 
