@@ -19,7 +19,6 @@ import { calculateToAcceptV2 } from '../ModeSystemFuncs'
 import { routes } from './routes'
 import {
   debugDumpJoinRequestList,
-  drainKeepInStandbyRequests,
   drainNewJoinRequests,
   getLastHashedStandbyList,
   getStandbyNodesInfoMap,
@@ -29,22 +28,26 @@ import {
 import { err, ok, Result } from 'neverthrow'
 import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
 import { deleteStandbyNode, drainNewUnjoinRequests } from './v2/unjoin'
-import { JoinRequest, KeepInStandby } from '@shardus/types/build/src/p2p/JoinTypes'
+import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { updateNodeState } from '../Self'
 import { HTTPError } from 'got'
-import { drainLostAfterSelectionNodes, drainSyncStarted, nodesYetToStartSyncing, lostAfterSelection } from './v2/syncStarted'
+import { drainLostAfterSelectionNodes, drainSyncStarted, lostAfterSelection } from './v2/syncStarted'
 import { drainFinishedSyncingRequest } from './v2/syncFinished'
+import { getLastCycleStandbyRefreshRequest, resetLastCycleStandbyRefreshRequests, drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
+import rfdc from 'rfdc'
 
 /** STATE */
 
 let p2pLogger: Logger
 let mainLogger: Logger
+const clone = rfdc()
 
 let requests: P2P.JoinTypes.JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
 
-let keepInStandbyCollector: Map<string,KeepInStandby>
-let localStandbyCheckerJobs: Set<string>
+// whats this for? I was just going to use newStandbyRefreshRequests
+//let keepInStandbyCollector: Map<string,KeepInStandby>
+//let localStandbyCheckerJobs: Set<string>
 
 let lastLoggedCycle = 0
 
@@ -85,7 +88,7 @@ export function init(): void {
 export function reset(): void {
   requests = []
   seen = new Set()
-  keepInStandbyCollector = new Map()
+  //keepInStandbyCollector = new Map()
 }
 
 export function getNodeRequestingJoin(): P2P.P2PTypes.P2PNode[] {
@@ -192,10 +195,10 @@ export function getTxs(): P2P.JoinTypes.Txs {
   // Omar - maybe we don't have to make a copy
   // [IMPORTANT] Must return a copy to avoid mutation
   const requestsCopy = deepmerge({}, requests)
-  const keepInStandbyCopy = [...Object.values(keepInStandbyCollector)]
+  //const keepInStandbyCopy = [...Object.values(keepInStandbyCollector)]
   return {
     join: requestsCopy,
-    keepInStandby : keepInStandbyCopy
+    //keepInStandby : keepInStandbyCopy
   }
 }
 
@@ -224,7 +227,7 @@ export function validateRecordTypes(rec: P2P.JoinTypes.Record): string {
 export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
   // TODO drop any invalid join requests. NOTE: this has never been implemented
   // yet, so this task is not a side effect of any work on join v2.
-  return { join: txs.join, keepInStandby: txs.keepInStandby }
+  return { join: txs.join }
 }
 
 export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
@@ -234,6 +237,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
   record.startedSyncing = []
   record.lostAfterSelection = []
   record.finishedSyncing = []
+  record.standbyRefresh = []
 
   if (config.p2p.useJoinProtocolV2) {
     // for join v2, add new standby nodes to the standbyAdd field ...
@@ -264,7 +268,9 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     // drain our list of standby refresh TXs to the list 
     // not sure full network gossip is the way to go here...
     // what about TX sharing in cycle process?
-    for (const standbyRefresh of drainKeepInStandbyRequests()) {
+    // the standby nodes would use a tell to get an active node to submit the tx?
+    // only the node that the refresh request was posted to would have the tx?
+    for (const standbyRefresh of drainNewStandbyRefreshRequests()) {
       record.standbyRefresh.push(standbyRefresh.publicKey)
     }
     
@@ -278,6 +284,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     if (config.p2p.standbyAgeScrub) {
       // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles
       for (const joinRequest of standbyList) {
+        /*
         const maxAge = record.duration * config.p2p.standbyListCyclesTTL
         const key = joinRequest.nodeInfo.publicKey
         let lastStandbyTimerRefresh = joinRequest.nodeInfo.joinRequestTimestamp
@@ -293,6 +300,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
             continue
           }
 
+          // is this done? what else is needed?
           //TODO deterministic selection of a node to query if the standby node is up
           //this checked response will become a cycle TX for the next cycle.
           
@@ -306,13 +314,35 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
             localStandbyCheckerJobs.add(key)
           }
 
+          // should be in parseRecord then
           //WE only set this map when digesting the cycle record if this node did a proper refresh action
           //use this cycle start time as an updated time in the mapp of standby nodes refresh 
           //standbyNodesRefresh.set(key, record.start)
         }
+        */
+        const lastRefreshed = joinRequest.nodeInfo.refreshedCounter
+        if (record.counter - lastRefreshed >= config.p2p.standbyListCyclesTTL) {
+          if (standbyListMap.has(joinRequest.nodeInfo.publicKey) === false) {
+            skipped++
+            continue
+          }
+          if (record.standbyRefresh.includes(joinRequest.nodeInfo.publicKey)) {
+            skipped++
+            continue
+          }
+          record.standbyRemove.push(joinRequest.nodeInfo.publicKey)
+          nestedCountersInstance.countEvent('p2p', `removed standby node that did not refresh`)
+          /* prettier-ignore */ if (logFlags.verbose) console.log(`removed standby node that did not refresh`)
+          // this is a relic from the old code, but I suppose we can leave it in as an upper limit per cycle
+          standbyRemoved_Age++
+          if (standbyRemoved_Age >= config.p2p.standbyListMaxRemoveTTL) {
+            break
+          }
+        }
       }
     }
 
+    /*
     if (config.p2p.standbyAgeScrub) {
       // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles
       for (const joinRequest of standbyList) {
@@ -336,6 +366,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
         }
       }
     }
+    */
     if (config.p2p.standbyVersionScrub) {
       for (const joinRequest of standbyList) {
         const key = joinRequest.nodeInfo.publicKey
@@ -436,10 +467,11 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   for (const [nodeId, cycleNumber] of NodeList.selectedById) {
     if (addedIds.includes(nodeId)) {
       // do nothing. the node was just added and isn't in the nodelist yet
+      continue
     } else if (record.counter > cycleNumber + config.p2p.cyclesToWaitForSyncStarted) {
-      nestedCountersInstance.countEvent('p2p', `failed to send sync-started`)
-      /* prettier-ignore */ if (logFlags.verbose) console.log(`Failed to send sync-started`)
       lostAfterSelection.push(nodeId)
+      nestedCountersInstance.countEvent('p2p', `added node to lostAfterSelection`)
+      /* prettier-ignore */ if (logFlags.verbose) console.log(`added node to lostAfterSelection`)
     }
   }
 
@@ -456,6 +488,24 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
       readyTimestamp: record.start,
     })
   }
+
+  const standbyMap = getStandbyNodesInfoMap()
+
+  for (const refreshedPubKey of record.standbyRefresh) {
+    if (standbyMap.has(refreshedPubKey) === false) continue
+
+    const refreshedStandbyInfo = standbyMap.get(refreshedPubKey)
+    if (getLastCycleStandbyRefreshRequest(refreshedPubKey)) {
+      if (typeof getLastCycleStandbyRefreshRequest(refreshedPubKey)?.cycleNumber === 'number')
+        refreshedStandbyInfo.nodeInfo.refreshedCounter = getLastCycleStandbyRefreshRequest(refreshedPubKey)?.cycleNumber
+    } else {
+      // this will be needed when a syncing node just goes active and so lastCycleStandbyRefreshRequests
+      // is empty. record.counter - 1 is a generous estimate
+      refreshedStandbyInfo.nodeInfo.refreshedCounter = record.counter - 1
+    }
+  }
+  
+  resetLastCycleStandbyRefreshRequests()
 
   return {
     added,
@@ -477,10 +527,12 @@ export function queueRequest(): void {
 /** Module Functions */
 
 export async function createJoinRequest(
-  cycleMarker: string
+  cycleRecord: P2P.CycleCreatorTypes.CycleRecord
 ): Promise<P2P.JoinTypes.JoinRequest & P2P.P2PTypes.SignedObject> {
+  const cycleMarker = cycleRecord.previous ?? '0'.repeat(64)
   // Build and return a join request
   const nodeInfo = Self.getThisNodeInfo()
+  nodeInfo.refreshedCounter = cycleRecord.counter ?? 0
   // TO-DO: Think about if the selection number still needs to be signed
   const proofOfWork = {
     compute: await crypto.getComputeProofOfWork(cycleMarker, config.p2p.difficulty),
@@ -518,9 +570,6 @@ export interface JoinRequestResponse {
   /** Whether the join request could not be accepted due to some error, usually in validating a join request. TODO: consider renaming to `invalid`? */
   fatal: boolean
 }
-
-
-
 
 /**
  * Processes a join request by validating the joining node's information,
@@ -571,6 +620,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
 
 export async function firstJoin(): Promise<string> {
   let marker: string
+  let record
   if (CycleChain.newest) {
     // TODO: add extra check if newest.mode === 'shutdown' later after shutdown is implemented
     // If there is a cycle provided by the archiver, use it
@@ -578,9 +628,11 @@ export async function firstJoin(): Promise<string> {
   } else {
     // Create join request from 000... cycle marker
     const zeroMarker = '0'.repeat(64)
+    const zeroRecord = {}
     marker = zeroMarker
+    record = zeroRecord
   }
-  const request = await createJoinRequest(marker)
+  const request = await createJoinRequest(record)
   // Add own join request
   utils.insertSorted(requests, request)
   if (config.p2p.useJoinProtocolV2) {

@@ -845,6 +845,8 @@ export interface ServerConfiguration {
     attemptJoiningWaitMultiplier: number
     /** The number of cycles to wait for a selected node to send sync-started gossip before removing it */
     cyclesToWaitForSyncStarted: number
+    /** The number of cycles before standbyListCyclesTTL a standby node should send a refresh message */
+    cyclesToRefreshEarly: number
   }
   /** Server IP configuration */
   ip?: {

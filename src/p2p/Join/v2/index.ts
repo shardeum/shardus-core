@@ -35,7 +35,6 @@ export const standbyNodesRefresh: Map<publickey, number> = new Map()
  * digestion. appetizing!
  */
 let newJoinRequests: JoinRequest[] = []
-let newStandbyRefreshRequests: Map<publickey, KeepInStandby> = new Map()
 
 export function init(): void {
   console.log('initializing join protocol v2')
@@ -102,40 +101,6 @@ export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = f
   newJoinRequests.push(joinRequest)
 }
 
-//KeepInStandby
-export interface StanbyRefreshRequestResponse {
-  
-  success: boolean
- 
-  reason: string
-
-  fatal: boolean
-}
-
-export function addStandbyRefresh(keepInStandbyRequest: P2P.JoinTypes.KeepInStandby): StanbyRefreshRequestResponse {
-  
-  //validate keepInStandbyRequest
-
-
-  //add it to TXs
-  if(newStandbyRefreshRequests.has(keepInStandbyRequest.publicKey) === true){
-    return {
-      success: false,
-      reason: '',
-      fatal: false,
-    }
-  }
-
-  newStandbyRefreshRequests.set(keepInStandbyRequest.publicKey, keepInStandbyRequest)
-
-  return {
-    success: true,
-    reason: '',
-    fatal: false,
-  }
-  
-}
-
 /**
  * Returns the list of new standby join requests and empties the list.
  */
@@ -143,16 +108,6 @@ export function drainNewJoinRequests(): JoinRequest[] {
   if (logFlags.verbose) console.log('draining new standby info:', newJoinRequests)
   const tmp = newJoinRequests
   newJoinRequests = []
-  return tmp
-}
-
-/**
- * Returns the list of new KeepInStandby requests and empties the list.
- */
-export function drainKeepInStandbyRequests(): KeepInStandby[] {
-  if (logFlags.verbose) console.log('draining new KeepInStandby info:', newJoinRequests)
-  const tmp = Array.from(newStandbyRefreshRequests.values())
-  newStandbyRefreshRequests = new Map()
   return tmp
 }
 
@@ -197,6 +152,7 @@ export function computeNewStandbyListHash(): hexstring {
     //this field must be udpated as it is used by other functions
     lastHashedList = clone(getSortedStandbyJoinRequests())
     //sort hashes by value.  could sort by ID, but this is a bit faster
+
     const hashes = Array.from(standbyNodesInfoHashes.values())
     hashes.sort()
     const hash = crypto.hash(hashes)
@@ -237,6 +193,58 @@ export function getLastHashedStandbyList(): JoinRequest[] {
 export function getStandbyNodesInfoMap(): Map<publickey, JoinRequest> {
   if (logFlags.verbose) console.log('getting standby nodes info map')
   return standbyNodesInfo
+}
+
+export function updateStandbyRefreshCounter(updatedJoinRequest: JoinRequest): void {
+  const originalJoinRequest = standbyNodesInfo.get(updatedJoinRequest.nodeInfo.publicKey)
+
+  // TODO: Ask pod1 if we need to updated lastHashedList here
+
+  if (areJoinRequestsIdenticalExceptRefreshCounter(originalJoinRequest, updatedJoinRequest)) {
+    if (standbyNodesRefresh.has(updatedJoinRequest.nodeInfo.publicKey))
+      standbyNodesInfo.set(updatedJoinRequest.nodeInfo.publicKey, updatedJoinRequest)
+    if (standbyNodesInfoHashes.has(updatedJoinRequest.nodeInfo.publicKey))
+      standbyNodesInfoHashes.set(updatedJoinRequest.nodeInfo.publicKey, crypto.hash(updatedJoinRequest))
+  } else {
+    console.error('Trying to update Join request fields other than refreshedCounter. Ignoring the update.')
+  }
+}
+
+function areJoinRequestsIdenticalExceptRefreshCounter(original: JoinRequest, updated: JoinRequest): boolean {
+  // Clone the objects to avoid mutating the original ones
+  const originalCopy = JSON.parse(JSON.stringify(original));
+  const updatedCopy = JSON.parse(JSON.stringify(updated));
+
+  delete originalCopy.refreshedCounter
+  delete updatedCopy.refreshedCounter
+
+  // Compare the two objects without the refreshedCounter field
+  return deepEqual(originalCopy, updatedCopy);
+}
+
+function deepEqual(obj1, obj2): boolean {
+  if (obj1 === obj2) {
+      return true; // Identical references or primitive values
+  }
+
+  if (typeof obj1 !== 'object' || obj1 === null || typeof obj2 !== 'object' || obj2 === null) {
+      return false; // One of them is not an object or is null
+  }
+
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+
+  if (keys1.length !== keys2.length) {
+      return false; // Different number of properties
+  }
+
+  for (const key of keys1) {
+      if (!keys2.includes(key) || !deepEqual(obj1[key], obj2[key])) {
+          return false; // Different keys or values
+      }
+  }
+
+  return true; // Everything matched
 }
 
 export function isOnStandbyList(publicKey: string): boolean {

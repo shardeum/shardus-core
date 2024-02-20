@@ -100,7 +100,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     useNetworkModes: true,
     useJoinProtocolV2: true,
     randomJoinRequestWait: 2000, //todo set this to 1000 before release
-    standbyListCyclesTTL: 120, //todo release should be > 1000
+    standbyListCyclesTTL: 10, //todo release should be > 1000
     standbyListMaxRemoveTTL: 100, //todo set this be 100 for production
     standbyListMaxRemoveApp: 100, //todo set this be 100 for production
     standbyAgeScrub: true,
@@ -127,6 +127,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     numCheckerNodes: 1,
     attemptJoiningWaitMultiplier: 2,
     cyclesToWaitForSyncStarted: 3,
+    cyclesToRefreshEarly: 4
   },
   ip: {
     externalIp: '0.0.0.0',

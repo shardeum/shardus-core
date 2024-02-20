@@ -54,6 +54,7 @@ export function addSyncStarted(syncStarted: SyncStarted): SyncStartedRequestResp
       fatal: false,
     }
   }
+
   // cycle number check
   const cycleNumber = CycleChain.getNewest().counter
   if (cycleNumber !== syncStarted.cycleNumber) {
@@ -85,7 +86,7 @@ export function addSyncStarted(syncStarted: SyncStarted): SyncStartedRequestResp
 
   return {
     success: true,
-    reason: 'passed all checks and verification',
+    reason: 'syncStarted passed all checks and verification',
     fatal: false,
   }
 }

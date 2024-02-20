@@ -158,6 +158,7 @@ class Storage {
           '`startedSyncing` TEXT NOT NULL',
           '`lostAfterSelection` TEXT NOT NULL',
           '`finishedSyncing` TEXT NOT NULL',
+          '`standbyRefresh` TEXT NOT NULL',
         ].join(', ') +
         ')'
     )

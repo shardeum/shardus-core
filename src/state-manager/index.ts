@@ -2215,7 +2215,7 @@ class StateManager {
       if (randomConsensusNode == null) {
         throw new Error(`getLocalOrRemoteAccount: no consensus node found`)
       }
-
+      console.log(`asking node ${randomConsensusNode.externalPort} for local or remote account`)
       const preCheckLimit = 5
       for(let i=0;i< preCheckLimit; i++){
         // Node Precheck!.  this check our internal records to find a good node to talk to.

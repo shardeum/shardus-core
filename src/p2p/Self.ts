@@ -31,6 +31,8 @@ import { isServiceMode } from '../debug'
 import { insertSyncStarted } from './Join/v2/syncStarted'
 // import * as http from '../http'
 import { insertNodeIntoReadyList } from '../p2p/Join/v2/syncFinished'
+import { getStandbyNodesInfoMap } from './Join/v2'
+import { submitStandbyRefresh } from './Join/v2/standbyRefresh'
 
 /** STATE */
 
@@ -70,11 +72,14 @@ let mode = null
 let state = P2P.P2PTypes.NodeStatus.INITIALIZING
 
 let firstTimeJoiningLoop = true
+let isFirstRefresh = true
 
 const idErrorMessage = `id did not match the cycle record info`
 
 const nodeMatch = (node) =>
   node.externalIp === network.ipInfo.externalIp && node.externalPort === network.ipInfo.externalPort
+
+let joinRequestCopy = null
 
 /** ROUTES */
 
@@ -342,9 +347,30 @@ export function startupV2(): Promise<boolean> {
         // Note that attemptJoining isn't just to get on the standby list, but also
         // we will be checking above to see when our node is selected to go active
         if (resp?.isOnStandbyList === true) {
+
           if (state !== P2P.P2PTypes.NodeStatus.STANDBY) {
             updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
           }
+
+          // TODO: add refreshed check + send gossip here
+          const p2pConfig = Context.config.p2p
+          if (joinRequestCopy) {
+            const lastRefreshed = joinRequestCopy.nodeInfo.refreshedCounter
+            if (latestCycle.counter >= (lastRefreshed + p2pConfig.standbyListCyclesTTL - (isFirstRefresh ? p2pConfig.cyclesToRefreshEarly : 0))) {
+              isFirstRefresh = false
+              // update the standbyRefreshTimestamp
+              joinRequestCopy.nodeInfo.refreshedCounter = latestCycle.counter
+
+              let payload = {
+                publicKey: publicKey,
+                cycleNumber: latestCycle.counter
+              }
+              payload = Context.crypto.sign(payload)
+              submitStandbyRefresh(payload)
+              nestedCountersInstance.countEvent('p2p', `submitted KeepInStandby request`)
+            }
+          }   
+          
           // Call scheduler after 5 cycles... does this mean it may be 5 cycles before we realized we were
           // accepted to go active?
           // Looks like that is the worst case
@@ -616,7 +642,8 @@ async function joinNetworkV2(activeNodes): Promise<void> {
   }
 
   // Create join request from latest cycle
-  const request = await Join.createJoinRequest(latestCycle.previous)
+  const request = await Join.createJoinRequest(latestCycle)
+  joinRequestCopy = request
 
   //we can't use allowBogon lag yet because its value is detected later.
   //it is possible to throw out any invalid IPs at this point
@@ -1027,18 +1054,7 @@ function getNodeStatus(pubKey: string, reportIntermediateStatus = false): P2P.P2
   return reportIntermediateStatus ? state : null
 }
 
-export function getThisNodeInfo(): {
-  publicKey: string
-  externalIp: string
-  externalPort: number
-  internalIp: string
-  internalPort: number
-  address: string
-  joinRequestTimestamp: number
-  activeTimestamp: number
-  syncingTimestamp: number
-  readyTimestamp: number
-} {
+export function getThisNodeInfo(): P2P.P2PTypes.P2PNode {
   const { externalIp, externalPort, internalIp, internalPort } = network.ipInfo
   const publicKey = Context.crypto.getPublicKey()
   // TODO: Change this to actual selectable address

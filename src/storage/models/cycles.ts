@@ -56,6 +56,7 @@ const cycles = [
     startedSyncing: { type: SQLDataTypes.TEXT, allowNull: false },
     lostAfterSelection: { type: SQLDataTypes.TEXT, allowNull: false },
     finishedSyncing: { type: SQLDataTypes.TEXT, allowNull: false },
+    standbyRefresh: { type: SQLDataTypes.TEXT, allowNull: false },
     ...P2PApoptosis.sequelizeCycleFieldModel,
   },
 ]

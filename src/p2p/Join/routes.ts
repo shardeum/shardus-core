@@ -10,7 +10,6 @@ import { Handler } from 'express'
 import { P2P } from '@shardus/types'
 import {
   addJoinRequest,
-  addStandbyRefresh,
   computeSelectionNum,
   getAllowBogon,
   setAllowBogon,
@@ -32,6 +31,7 @@ import { isActive } from '../Self'
 import { logFlags } from '../../logger'
 import { SyncStarted } from '@shardus/types/build/src/p2p/JoinTypes'
 import { addSyncStarted } from './v2/syncStarted'
+import { addStandbyRefresh } from './v2/standbyRefresh'
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
@@ -220,6 +220,19 @@ const syncStartedRoute: P2P.P2PTypes.Route<Handler> = {
   },
 }
 */
+const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
+  method: 'POST',
+  name: 'standby-refresh',
+  handler: (req, res) => {
+    const standbyRefreshRequest = req.body
+    const processResult = addStandbyRefresh(standbyRefreshRequest)
+    if (processResult.success === false) {
+      return res.status(500).send(processResult.reason)
+    }
+    Comms.sendGossip('gossip-standby-refresh', standbyRefreshRequest, '', null, NodeList.byIdOrder, true)
+    return res.status(200).send()
+  },
+}
 
 const joinedV2Route: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
@@ -409,6 +422,10 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<SyncStarted, P2P.NodeLi
   nestedCountersInstance.countEvent('p2p', `received gossip-sync-started`)
   /* prettier-ignore */ if (logFlags.verbose) console.log(`received gossip-sync-started`)
   try {
+    if(!payload) {
+      warn('No payload provided for the `SyncStarted` request.')
+      return
+    }
     // Do not forward gossip after quarter 2
     if (CycleCreator.currentQuarter >= 3) return
 
@@ -454,16 +471,23 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.KeepInStand
   tracker
 ) => {
   profilerInstance.scopedProfileSectionStart('gossip-standby-refresh')
+  nestedCountersInstance.countEvent('p2p', `received gossip-standby-refresh`)
+  /* prettier-ignore */ if (logFlags.verbose) console.log(`received gossip-standby-refresh`)
   try {
     //if (logFlags.p2pNonFatal) info(`Got scale request: ${JSON.stringify(payload)}`)
     if (!payload) {
-      warn('No payload provided for the `scaling` request.')
+      warn('No payload provided for the `KeepInStandby` request.')
       return
     }
+    if (CycleCreator.currentQuarter >= 3) return
 
     const added = addStandbyRefresh(payload)
-    if (!added) return
-    Comms.sendGossip('gossip-standby-refresh', payload, tracker, sender, NodeList.byIdOrder, false, 2)
+    nestedCountersInstance.countEvent('p2p', `standby-refresh validation success: ${added.success}`)
+    /* prettier-ignore */ if (logFlags.verbose) console.log(`standby-refresh validation success: ${added.success}`)
+    if (!added.success) nestedCountersInstance.countEvent('p2p', `standby-refresh failure reason: ${added.reason}`)
+    /* prettier-ignore */ if (logFlags.verbose && !added.success) console.log(`standby-refresh validation reason: ${added.reason}`)
+    if (added.success)
+      Comms.sendGossip('gossip-standby-refresh', payload, tracker, sender, NodeList.byIdOrder, false)
   } finally {
     profilerInstance.scopedProfileSectionEnd('gossip-standby-refresh')
   }
@@ -471,7 +495,7 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.KeepInStand
 
 
 export const routes = {
-  external: [cycleMarkerRoute, joinRoute, joinedRoute, joinedV2Route, acceptedRoute, unjoinRoute],
+  external: [cycleMarkerRoute, joinRoute, joinedRoute, joinedV2Route, acceptedRoute, unjoinRoute, standbyRefreshRoute],
   gossip: {
     'gossip-join': gossipJoinRoute,
     'gossip-valid-join-requests': gossipValidJoinRequests,
