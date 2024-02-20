@@ -3,7 +3,7 @@ import * as Context from '../p2p/Context'
 import * as crypto from '@shardus/crypto-utils'
 import { DevSecurityLevel } from '../shardus/shardus-types'
 
-const MAX_COUNTER_INCREMENT = 5
+const MAX_COUNTER_BUFFER_MILLISECONDS = 60000
 let lastCounter = 0
 
 // This function is used to check if the request is authorized to access the debug endpoint
@@ -21,11 +21,11 @@ function handleDebugAuth(_req, res, next, authLevel) {
           sign: { owner: ownerPk, sig: requestSig },
         }
         //reguire a larger counter than before. This prevents replay attacks
-        const newCounter = parseInt(sigObj.count)
-        if (newCounter > lastCounter && newCounter <= lastCounter + MAX_COUNTER_INCREMENT) {
+        const currentCounter = parseInt(sigObj.count)
+        const currentTime = new Date().getTime()
+        if (currentTime <= currentCounter + MAX_COUNTER_BUFFER_MILLISECONDS) {
           let verified = Context.crypto.verify(sigObj, ownerPk)
           if (verified === true) {
-            lastCounter = newCounter // Update counter
             const authorized = ensureKeySecurity(ownerPk, authLevel)
             if (authorized) {
               next()
@@ -37,14 +37,10 @@ function handleDebugAuth(_req, res, next, authLevel) {
               })
             }
           } else {
-            console.log('Signature is not correct', sigObj, lastCounter)
+            console.log('Signature is not correct', sigObj, currentCounter)
           }
         } else {
-          console.log(
-            'Counter is not larger than last counter, or counter is too large',
-            sigObj.count,
-            lastCounter
-          )
+          console.log('Counter is more than 1 minute old. Counter: ', sigObj, currentCounter)
         }
       }
     }
