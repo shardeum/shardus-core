@@ -131,6 +131,7 @@ class Storage {
           '`duration` BIGINT NOT NULL',
           '`active` BIGINT NOT NULL',
           '`syncing` BIGINT NOT NULL',
+          '`standby` BIGINT NOT NULL',
           '`desired` BIGINT NOT NULL',
           '`expired` BIGINT NOT NULL',
           '`joined` JSON NOT NULL',

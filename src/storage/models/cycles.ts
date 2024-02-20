@@ -29,6 +29,7 @@ const cycles = [
     maxSyncTime: { type: SQLDataTypes.BIGINT, allowNull: true },
     active: { type: SQLDataTypes.BIGINT, allowNull: false },
     syncing: { type: SQLDataTypes.BIGINT, allowNull: false },
+    standby: { type: SQLDataTypes.BIGINT, allowNull: false },
     desired: { type: SQLDataTypes.BIGINT, allowNull: false },
     expired: { type: SQLDataTypes.BIGINT, allowNull: false },
     joined: { type: SQLDataTypes.JSON, allowNull: false },
