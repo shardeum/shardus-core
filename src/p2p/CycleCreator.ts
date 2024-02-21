@@ -583,7 +583,7 @@ async function runQ3() {
   txs = collectCycleTxs()
   ;({ record, marker, cert } = makeCycleData(txs, CycleChain.newest))
 
-  if (config.debug.enableCycleRecordDebugTool) {
+  if (config.debug.enableCycleRecordDebugTool || config.debug.localEnableCycleRecordDebugTool) {
     if (currentQuarter === 3 && Self.isActive) {
       const cycleData =
         utils.safeStringify({

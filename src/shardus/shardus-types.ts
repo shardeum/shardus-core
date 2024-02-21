@@ -1051,6 +1051,8 @@ export interface ServerConfiguration {
     forcedExpiration: boolean
     /** chance to ignore a request to submit a standby refresh request on behalf of a standby node */
     ignoreStandbyRefreshChance: number
+    /** Flag to enable/disable enableCycleRecordTool and download files written by it **/
+    localEnableCycleRecordDebugTool: boolean
   }
   /** Options for the statistics module */
   statistics?: {

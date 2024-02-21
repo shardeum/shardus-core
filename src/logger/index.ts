@@ -2,6 +2,7 @@ import log4js from 'log4js'
 import { existsSync, mkdirSync } from 'fs'
 import * as utils from '../utils'
 import os from 'os'
+const fs = require('fs')
 import * as http from '../http'
 import * as Shardus from '../shardus/shardus-types'
 import { profilerInstance } from '../utils/profiler'
@@ -10,10 +11,15 @@ const { stringify } = require('../utils')
 const log4jsExtend = require('log4js-extend')
 import got from 'got'
 import { parse as parseUrl } from 'url'
-import { isDebugModeMiddleware, isDebugModeMiddlewareLow, isDebugModeMiddlewareMedium } from '../network/debugMiddleware'
+import {
+  isDebugModeMiddleware,
+  isDebugModeMiddlewareLow,
+  isDebugModeMiddlewareMedium,
+} from '../network/debugMiddleware'
 import { isDebugMode } from '../debug'
 import { shardusGetTime } from '../network'
-
+import { config } from '../p2p/Context'
+import path from 'path'
 interface Logger {
   baseDir: string
   config: Shardus.StrictLogsConfiguration
@@ -137,6 +143,9 @@ export let logFlags: LogFlags = {
   shardedCache: false,
   lost: false,
 }
+
+const filePath1 = path.join(process.cwd(), 'data-logs', 'cycleRecords1.txt')
+const filePath2 = path.join(process.cwd(), 'data-logs', 'cycleRecords2.txt')
 
 class Logger {
   backupLogFlags: LogFlags
@@ -420,6 +429,62 @@ class Logger {
       }
       res.end()
     })
+    Context.network.registerExternalGet('debug-cycle-recording-enable',isDebugModeMiddlewareMedium, (req, res) => {
+        const enable = req.query.enable;
+        config.debug.localEnableCycleRecordDebugTool = enable;
+        res.write(`localEnableCycleRecordDebugTool = ${config.debug.localEnableCycleRecordDebugTool}`)
+        res.end()
+      }
+    )
+    Context.network.registerExternalGet('debug-cycle-recoding-clear',isDebugModeMiddlewareMedium, (req, res) => {
+        fs.unlink(filePath1, (err) => {
+          if (err) {
+            console.error(`Failed to delete ${filePath1}: ${err.message}`)
+          } else {
+            console.log(`${filePath1} was deleted successfully.`)
+          }
+
+          // Attempt to delete the second file after the first completion
+          fs.unlink(filePath2, (err) => {
+            if (err) {
+              console.error(`Failed to delete ${filePath2}: ${err.message}`)
+            } else {
+              console.log(`${filePath2} was deleted successfully.`)
+            }
+            // End the response after attempting to delete both files
+            res.end('Cycle recording data cleared.')
+          })
+        })
+      }
+    )
+    Context.network.registerExternalGet('debug-cycle-recording-download',isDebugModeMiddlewareMedium, (req, res) => {
+        // Use async read for non-blocking operation
+        fs.readFile(filePath1, 'utf8', (err1, data1) => {
+          if (err1) {
+            // Handle error (e.g., file not found)
+            console.error('Error reading file 1:', err1)
+            res.status(500).send('Error reading file 1')
+            return
+          }
+
+          fs.readFile(filePath2, 'utf8', (err2, data2) => {
+            if (err2) {
+              // Handle error
+              console.error('Error reading file 2:', err2)
+              res.status(500).send('Error reading file 2')
+              return
+            }
+
+            // Concatenate data with skipping two lines in between
+            const combinedData = data1 + '\n\n' + data2
+
+            // Return combined data
+            res.setHeader('Content-Type', 'text/plain')
+            res.send(combinedData)
+          })
+        })
+      }
+    )
   }
 
   _containsProtocol(url: string) {
