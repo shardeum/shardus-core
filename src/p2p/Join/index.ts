@@ -393,6 +393,9 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     record.standbyAdd.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
     record.standbyRemove.sort()
     record.standbyRefresh.sort()
+    if(config.p2p.sortSyncFinished) {
+      record.finishedSyncing.sort()
+    }
 
     //let standbyActivated = false
 

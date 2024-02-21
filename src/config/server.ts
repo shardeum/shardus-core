@@ -127,7 +127,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     numCheckerNodes: 1,
     attemptJoiningWaitMultiplier: 2,
     cyclesToWaitForSyncStarted: 3,
-    cyclesToRefreshEarly: 4
+    cyclesToRefreshEarly: 4,
+    sortSyncFinished: false
   },
   ip: {
     externalIp: '0.0.0.0',

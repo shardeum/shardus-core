@@ -847,6 +847,8 @@ export interface ServerConfiguration {
     cyclesToWaitForSyncStarted: number
     /** The number of cycles before standbyListCyclesTTL a standby node should send a refresh message */
     cyclesToRefreshEarly: number
+    /** Sort record.finishedSyning in updateRecord of Join/index.ts */
+    sortSyncFinished: boolean
   }
   /** Server IP configuration */
   ip?: {
