@@ -133,7 +133,7 @@ export class P2P extends EventEmitter {
     const activePromise = new Promise<void>((resolve, reject) => {
       Self.emitter.on('active', () => resolve())
     })
-    Active.requestActive()
+    //Active.requestActive()
     console.log('return goActive promise...')
     return activePromise
   }

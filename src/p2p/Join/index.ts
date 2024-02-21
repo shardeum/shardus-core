@@ -393,9 +393,13 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     record.standbyAdd.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
     record.standbyRemove.sort()
     record.standbyRefresh.sort()
+<<<<<<< HEAD
     if(config.p2p.sortSyncFinished) {
       record.finishedSyncing.sort()
     }
+=======
+    record.finishedSyncing.sort()
+>>>>>>> 02615f9c (fix 2 OOS issues)
 
     //let standbyActivated = false
 

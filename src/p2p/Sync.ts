@@ -319,6 +319,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
   if (config.debug.enableCycleRecordDebugTool) {
     if (Self.isActive) {
       const cycleData = JSON.stringify({
+        port: Self.port,
         cycleNumber: cycle.counter,
         cycleRecord: cycle,
       }) + '\n'

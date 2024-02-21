@@ -5,6 +5,7 @@ import * as CycleChain from '../../CycleChain'
 import { crypto } from '../../Context'
 import { nestedCountersInstance } from '../../../utils/nestedCounters'
 import { config } from '../../Context'
+import { P2P } from '@shardus/types'
 
 //** List of synced nodes */
 export let newSyncFinishedNodes: string[] = []
@@ -109,4 +110,12 @@ export function isNodeSelectedReadyList(nodeId: string): boolean {
 
   // Check if nodeId is in listToCheck
   return listToCheck.some((readyNode) => readyNode.id === nodeId)
+}
+
+export function selectNodesFromReadyList(mode: string): P2P.NodeListTypes.Node[] {
+  if (mode === 'processing') {
+    return NodeList.readyByTimeAndIdOrder.slice(0, config.p2p.allowActivePerCycle)
+  } else{
+    return NodeList.readyByTimeAndIdOrder
+  }
 }

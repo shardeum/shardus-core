@@ -13,7 +13,7 @@ import { profilerInstance } from '../utils/profiler'
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getSortedStandbyJoinRequests } from './Join/v2'
-import { isNodeSelectedReadyList } from './Join/v2/syncFinished'
+import { selectNodesFromReadyList } from './Join/v2/syncFinished'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 let syncTimes = []
@@ -151,20 +151,28 @@ export function updateRecord(
   const activated = []
   const activatedPublicKeys = []
 
-  for (const request of txs.active) {
-    const publicKey = request.sign.owner
-    const node = NodeList.byPubKey.get(publicKey)
-    // Check if the node is the onReadyList and one of N of oldest node on the list
-    const isNodeSelected = isNodeSelectedReadyList(node?.id)
-    if (isNodeSelected) {
+  if (NodeList.readyByTimeAndIdOrder.length > 0) {
+    const selectedNodes = selectNodesFromReadyList(_prev.mode)
+    for (const node of selectedNodes) {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:updateRecord node added to activated`)
       activated.push(node.id)
-      activatedPublicKeys.push(node.publicKey)
-    } else {
-      /* prettier-ignore */ if(logFlags.important_as_error) warn(`active:updateRecord: node not found or not ready: ${publicKey}`)
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:updateRecord node not found or not ready`)
     }
   }
+
+  // for (const request of txs.active) {
+  //   const publicKey = request.sign.owner
+  //   const node = NodeList.byPubKey.get(publicKey)
+  //   // Check if the node is the onReadyList and one of N of oldest node on the list
+  //   const isNodeSelected = isNodeSelectedReadyList(node?.id)
+  //   if (isNodeSelected) {
+  //     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:updateRecord node added to activated`)
+  //     activated.push(node.id)
+  //     activatedPublicKeys.push(node.publicKey)
+  //   } else {
+  //     /* prettier-ignore */ if(logFlags.important_as_error) warn(`active:updateRecord: node not found or not ready: ${publicKey}`)
+  //     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:updateRecord node not found or not ready`)
+  //   }
+  // }
 
   record.active = active
   record.activated = activated.sort()
