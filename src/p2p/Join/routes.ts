@@ -225,10 +225,23 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'standby-refresh',
   handler: (req, res) => {
     const standbyRefreshRequest = req.body
-    const processResult = addStandbyRefresh(standbyRefreshRequest)
-    if (processResult.success === false) {
-      return res.status(500).send(processResult.reason)
+
+    let err = utils.validateTypes(req, { body: 'o' })
+    if (err) {
+      warn('/standby-refresh bad req ' + err)
+      res.json()
     }
+    err = utils.validateTypes(standbyRefreshRequest, { publicKey: 's', cycleNumber: 'n', sign: 'o' })
+    if (err) {
+      warn('/standby-refresh bad standby refresh request ' + err)
+      res.json()
+    }
+
+    const addStandbyRefreshResult = addStandbyRefresh(standbyRefreshRequest)
+    if (addStandbyRefreshResult.success === false) {
+      return res.status(500).send(addStandbyRefreshResult.reason)
+    }
+
     Comms.sendGossip('gossip-standby-refresh', standbyRefreshRequest, '', null, NodeList.byIdOrder, true)
     return res.status(200).send()
   },
