@@ -201,7 +201,7 @@ export interface App {
    * @param tx
    * @param appData
    */
-  txPreCrackData(tx: OpaqueTransaction, appData: any): Promise<boolean> // Promise<any>
+  txPreCrackData(tx: OpaqueTransaction, appData: any): Promise<{ status: boolean; reason: string }> // Promise<any>
 
   // DEPRECATED . This was previously a deep validate for buisness logic but it is up to the dapp to handle this as part of apply
   validateTransaction?: (...data: any) => any

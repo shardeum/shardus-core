@@ -1154,11 +1154,11 @@ class Shardus extends EventEmitter {
 
       // Give the dapp an opportunity to do some up front work and generate
       // appData metadata for the applied TX
-      const preCrackSuccess = await this.app.txPreCrackData(tx, appData)
+      const { status: preCrackSuccess, reason } = await this.app.txPreCrackData(tx, appData)
       if (this.config.stateManager.checkPrecrackStatus === true && preCrackSuccess === false) {
         return {
           success: false,
-          reason: `PreCrack has failed. Rejecting the tx.`,
+          reason: `PreCrack has failed. ${reason}`,
           status: 500,
         }
       }
@@ -1932,15 +1932,18 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.txPreCrackData === 'function') {
-        applicationInterfaceImpl.txPreCrackData = async (tx, appData): Promise<boolean> => {
+        applicationInterfaceImpl.txPreCrackData = async (
+          tx,
+          appData
+        ): Promise<{ status: boolean; reason: string }> => {
           this.profiler.scopedProfileSectionStart('process-dapp.txPreCrackData', false)
-          let success = await application.txPreCrackData(tx, appData)
+          let { status: success, reason } = await application.txPreCrackData(tx, appData)
           this.profiler.scopedProfileSectionEnd('process-dapp.txPreCrackData')
-          return success
+          return { status: success, reason }
         }
       } else {
         applicationInterfaceImpl.txPreCrackData = async function () {
-          return true
+          return { status: true, reason: '' }
         }
       }
 
