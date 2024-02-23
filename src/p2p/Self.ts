@@ -75,6 +75,7 @@ let state = P2P.P2PTypes.NodeStatus.INITIALIZING
 
 let firstTimeJoiningLoop = true
 let isFirstRefresh = true
+let cyclesElapsedSinceRefresh = 0
 
 const idErrorMessage = `id did not match the cycle record info`
 
@@ -369,36 +370,28 @@ export function startupV2(): Promise<boolean> {
             }
           }  
           */
-          let cyclesElapsedSinceRefresh = 0
+        
           if (isFirstRefresh) {
-            if (latestCycle.counter >= joinRequestCounter - Context.config.p2p.cyclesToRefreshEarly) {
+            if (latestCycle.counter >= joinRequestCounter + Context.config.p2p.standbyListCyclesTTL - Context.config.p2p.cyclesToRefreshEarly) {
               isFirstRefresh = false
 
-              let payload = {
-                publicKey: publicKey,
-                cycleNumber: latestCycle.counter
-              }
-              payload = Context.crypto.sign(payload)
+              submitStandbyRefresh(publicKey, latestCycle.counter)
 
-              submitStandbyRefresh(payload)
               nestedCountersInstance.countEvent('p2p', `submitted KeepInStandby request`)
+              /* prettier-ignore */ if (logFlags.verbose) console.log(`submitted KeepInStandby request`)
 
-              cyclesElapsedSinceRefresh += 2
+              cyclesElapsedSinceRefresh = 0
             }
-          } else if (cyclesElapsedSinceRefresh >= Context.config.p2p.cyclesToRefreshEarly) {
-            let payload = {
-              publicKey: publicKey,
-              cycleNumber: latestCycle.counter
-            }
-            payload = Context.crypto.sign(payload)
-
-            submitStandbyRefresh(payload)
+          } else if (cyclesElapsedSinceRefresh >= Context.config.p2p.standbyListCyclesTTL) {
+            submitStandbyRefresh(publicKey, latestCycle.counter)
+            
             nestedCountersInstance.countEvent('p2p', `submitted KeepInStandby request`)
+            /* prettier-ignore */ if (logFlags.verbose) console.log(`submitted KeepInStandby request`)
 
             cyclesElapsedSinceRefresh = 0
-          } else {
-            cyclesElapsedSinceRefresh += 2
           }
+
+          cyclesElapsedSinceRefresh += Context.config.p2p.attemptJoiningWaitMultiplier
           
           // Call scheduler after 5 cycles... does this mean it may be 5 cycles before we realized we were
           // accepted to go active?
