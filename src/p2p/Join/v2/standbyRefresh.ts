@@ -10,11 +10,11 @@ import { crypto } from '../../Context'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import rfdc from 'rfdc'
 
-const clone = rfdc()
+//const clone = rfdc()
 
 type publickey = JoinRequest['nodeInfo']['publicKey']
 let newStandbyRefreshRequests: Map<publickey, KeepInStandby> = new Map()
-let lastCycleStandbyRefreshRequests: Map<publickey, KeepInStandby> = new Map()
+//let lastCycleStandbyRefreshRequests: Map<publickey, KeepInStandby> = new Map()
 
 export async function submitStandbyRefresh(payload: KeepInStandby): Promise<Result<void, Error>> {
   const archiver = getRandomAvailableArchiver()
@@ -91,12 +91,13 @@ export function addStandbyRefresh(keepInStandbyRequest: KeepInStandby): StanbyRe
 
 export function drainNewStandbyRefreshRequests(): KeepInStandby[] {
   if (logFlags.verbose) console.log('draining new KeepInStandby info:', newStandbyRefreshRequests)
-  lastCycleStandbyRefreshRequests = deepCloneMap(newStandbyRefreshRequests)
+  //lastCycleStandbyRefreshRequests = deepCloneMap(newStandbyRefreshRequests)
   const tmp = Array.from(newStandbyRefreshRequests.values())
   newStandbyRefreshRequests = new Map()
   return tmp
 }
 
+/*
 export function getLastCycleStandbyRefreshRequest(publicKey: publickey): KeepInStandby {
   return lastCycleStandbyRefreshRequests.get(publicKey)
 }
@@ -114,3 +115,4 @@ function deepCloneMap(originalMap: Map<any, any>): Map<any, any> {
   });
   return clonedMap;
 }
+*/

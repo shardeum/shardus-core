@@ -33,7 +33,8 @@ import { updateNodeState } from '../Self'
 import { HTTPError } from 'got'
 import { drainLostAfterSelectionNodes, drainSyncStarted, lostAfterSelection } from './v2/syncStarted'
 import { drainFinishedSyncingRequest } from './v2/syncFinished'
-import { getLastCycleStandbyRefreshRequest, resetLastCycleStandbyRefreshRequests, drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
+//import { getLastCycleStandbyRefreshRequest, resetLastCycleStandbyRefreshRequests, drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
+import { drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
 import rfdc from 'rfdc'
 
 /** STATE */
@@ -499,6 +500,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
   const standbyMap = getStandbyNodesInfoMap()
 
+  /*
   for (const refreshedPubKey of record.standbyRefresh) {
     if (standbyMap.has(refreshedPubKey) === false) continue
 
@@ -514,6 +516,13 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   }
   
   resetLastCycleStandbyRefreshRequests()
+  */
+  for (const refreshedPubKey of record.standbyRefresh) {
+    if (standbyMap.has(refreshedPubKey) === false) continue
+    const refreshedStandbyInfo = standbyMap.get(refreshedPubKey)
+    
+    refreshedStandbyInfo.nodeInfo.refreshedCounter = record.counter
+  }
 
   return {
     added,
