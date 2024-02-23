@@ -16,7 +16,7 @@ type publickey = JoinRequest['nodeInfo']['publicKey']
 let newStandbyRefreshRequests: Map<publickey, KeepInStandby> = new Map()
 //let lastCycleStandbyRefreshRequests: Map<publickey, KeepInStandby> = new Map()
 
-export async function submitStandbyRefresh(payload: KeepInStandby): Promise<Result<void, Error>> {
+export async function submitStandbyRefresh(publicKey: string, cycleNumber: number): Promise<Result<void, Error>> {
   const archiver = getRandomAvailableArchiver()
   try {
     const activeNodesResult = await getActiveNodesFromArchiver(archiver)
@@ -25,6 +25,13 @@ export async function submitStandbyRefresh(payload: KeepInStandby): Promise<Resu
     }
     const activeNodes = activeNodesResult.value
     const node = utils.getRandom(activeNodes.nodeList, 1)[0]
+
+    let payload = {
+      publicKey: publicKey,
+      cycleNumber: cycleNumber
+    }
+    payload = crypto.sign(payload)
+
     await http.post(`${node.ip}:${node.port}/standby-refresh`, payload)
     return ok(void 0)
   } catch (e) {
@@ -33,13 +40,13 @@ export async function submitStandbyRefresh(payload: KeepInStandby): Promise<Resu
 }
 
 //KeepInStandby
-export interface StanbyRefreshRequestResponse {
+export interface StandbyRefreshRequestResponse {
   success: boolean
   reason: string
   fatal: boolean
 }
 
-export function addStandbyRefresh(keepInStandbyRequest: KeepInStandby): StanbyRefreshRequestResponse {
+export function addStandbyRefresh(keepInStandbyRequest: KeepInStandby): StandbyRefreshRequestResponse {
   // validate keepInStandbyRequest
   if (getStandbyNodesInfoMap().has(keepInStandbyRequest.publicKey) === false) {
     return {
