@@ -29,7 +29,7 @@ import { Result } from 'neverthrow'
 const deepCopy = rfdc()
 import { isServiceMode } from '../debug'
 import { insertSyncStarted } from './Join/v2/syncStarted'
-// import * as http from '../http'
+import * as http from '../http'
 import { insertNodeIntoReadyList } from '../p2p/Join/v2/syncFinished'
 import { getStandbyNodesInfoMap } from './Join/v2'
 import { submitStandbyRefresh } from './Join/v2/standbyRefresh'
@@ -136,51 +136,47 @@ export function startupV2(): Promise<boolean> {
     // Function to set node's status to SYNCING, perform sync functions, and finish startup
     const enterSyncingState = async (): Promise<void> => {
       try {
-        // set status SYNCING
-        updateNodeState(P2P.P2PTypes.NodeStatus.SYNCING)
+        // set status SELECTED?
+        updateNodeState(P2P.P2PTypes.NodeStatus.SELECTED)
 
-        /*
-        * robust query to get cycle number in case we want to send gossip before p2p sync
-        *
-        * 
-        if (!isFirst) {
-          // do robust query to get cycle number
-          let newestCycleNumber = null
-          const MAX_TRIES = 5
-          let gotCycleNumber = false
-          let currentTry = 0
-          const archiver = getRandomAvailableArchiver()
-          while (currentTry < MAX_TRIES && !gotCycleNumber) {
-            try {
-              const activeNodesResult = await getActiveNodesFromArchiver(archiver)
-              if (!activeNodesResult) {
-                throw Error(`couldn't get active nodes`)
-              }
-              const activeNodes = activeNodesResult.nodeList
-              const node1 = utils.getRandom(activeNodes, 1)[0]
-              const node2 = utils.getRandom(activeNodes, 1)[0]
-              const node3 = utils.getRandom(activeNodes, 1)[0]
-              const cycleNumber1 = await http.get(`${node1.ip}:${node1.port}/cyclenumber`)
-              const cycleNumber2 = await http.get(`${node2.ip}:${node2.port}/cyclenumber`)
-              const cycleNumber3 = await http.get(`${node3.ip}:${node3.port}/cyclenumber`)
-              if (cycleNumber1 === cycleNumber2 && cycleNumber2 === cycleNumber3) {
-                gotCycleNumber = true
-                newestCycleNumber = cycleNumber1
-              }
-              currentTry++
-            } catch (e) {
-              throw Error(`submitSyncStarted: Error in try ${currentTry} posting syncStarted request: ${e}`)
-            }
-          }
+        
+        //robust query to get cycle number in case we want to send gossip before p2p sync
+        // if (!isFirst) {
+        //   // do robust query to get cycle number
+        //   let robustCycleNumber = null
+        //   const MAX_TRIES = 5
+        //   let gotCycleNumber = false
+        //   let currentTry = 0
+        //   const archiver = getRandomAvailableArchiver()
+        //   while (currentTry < MAX_TRIES && !gotCycleNumber) {
+        //     try {
+        //       const activeNodesResult = await getActiveNodesFromArchiver(archiver)
+        //       if (!activeNodesResult) {
+        //         throw Error(`couldn't get active nodes`)
+        //       }
+        //       const activeNodes = activeNodesResult.nodeList
+        //       for (let i = 0; i < 3; i++) {
+        //         const node = utils.getRandom(activeNodes, 1)[0]
+        //         const cycleNumber = await http.get(`${node.ip}:${node.port}/cyclenumber`)
+        //         // do some checking
+        //       }
+        //       if (gotCycleNumber) break
+        //       else robustCycleNumber = null
+        //       currentTry++
+        //     } catch (e) {
+        //       throw Error(`submitSyncStarted: Error in try ${currentTry} posting syncStarted request: ` + e)
+        //     }
+        //   }
 
-          let payload = {
-            nodeId: id,
-            cycleNumber: newestCycleNumber,
-          }
-          payload = Context.crypto.sign(payload)
-          submitSyncStarted(payload)
-        }
-        */
+        //   if (robustCycleNumber) {
+        //     let payload = {
+        //       nodeId: id,
+        //       cycleNumber: robustCycleNumber,
+        //     }
+        //     payload = Context.crypto.sign(payload)
+        //     submitSyncStarted(payload)
+        //   }
+        // }
 
         p2pSyncStart = shardusGetTime()
 
@@ -272,6 +268,8 @@ export function startupV2(): Promise<boolean> {
 
       try {
         // Get active nodes from Archiver
+
+        // this name is confusing, as the node is not actually active yet
         const activeNodes = await contactArchiver()
 
         // Determine if you're the first node
@@ -987,7 +985,6 @@ async function getActiveNodesFromArchiver(
 
   const seedListSigned = seedListResult.value
   if (logFlags.p2pNonFatal) info(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
-
   return seedListSigned
 }
 

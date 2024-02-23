@@ -419,7 +419,7 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
       // using minNodes here since target is what will be used to get into processing mode
       targetCount = config.p2p.minNodes
     } else if (prevRecord.mode === 'restart') {
-      // In restart mode, all the nodes remain in 'syncing' mode until the desired number of nodes are reached
+      // In restart mode, all the nodes remain in 'selected?' mode until the desired number of nodes are reached
       /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in restart")
       if (syncing < desired) {
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: entered syncing < desired")
