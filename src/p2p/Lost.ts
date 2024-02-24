@@ -318,7 +318,7 @@ export function getTxs(): P2P.LostTypes.Txs {
         downRecord = record
       }
     }
-    if (downMsgCount >= 3) {
+    if (downMsgCount >= config.p2p.numCheckerNodes) {
       lostTxs.push(downRecord.message)
       seen[downRecord.target] = true
       info(`Adding lost record for ${downRecord.target} to lostTxs`)
