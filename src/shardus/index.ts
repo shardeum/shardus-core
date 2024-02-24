@@ -63,6 +63,8 @@ import { networkMode, isInternalTxAllowed } from '../p2p/Modes'
 import { lostArchiversMap } from '../p2p/LostArchivers/state'
 import getCallstack from '../utils/getCallstack'
 import * as crypto from '@shardus/crypto-utils'
+import * as Comms from './../p2p/Comms'
+import { insertSyncFinished } from '../p2p/Join/v2/syncFinished'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -673,8 +675,14 @@ class Shardus extends EventEmitter {
       // After restoring state data, set syncing flags to true and go active
       await this.stateManager.startCatchUpQueue()
       console.log('syncAppData - startCatchUpQueue')
-      await this.p2p.goActive()
-      console.log('syncAppData - goActive')
+      //await this.p2p.goActive()
+      //console.log('syncAppData - goActive')
+      let readyPayload = {
+        nodeId: Self.id,
+        cycleNumber: CycleChain.getNewest()?.counter,
+      }
+      readyPayload = Context.crypto.sign(readyPayload)
+      Comms.sendGossip('gossip-sync-finished', readyPayload)
       this.stateManager.appFinishedSyncing = true
       this.stateManager.startProcessingCycleSummaries()
     })
@@ -974,7 +982,13 @@ class Shardus extends EventEmitter {
    */
   async syncAppData() {
     if (!this.app) {
-      await this.p2p.goActive()
+      //await this.p2p.
+      let readyPayload = {
+        nodeId: Self.id,
+        cycleNumber: CycleChain.getNewest()?.counter,
+      }
+      readyPayload = Context.crypto.sign(readyPayload)
+      Comms.sendGossip('gossip-sync-finished', readyPayload)
       if (this.stateManager) {
         this.stateManager.appFinishedSyncing = true
       }
@@ -994,8 +1008,10 @@ class Shardus extends EventEmitter {
     // if (this.stateManager) await this.stateManager.accountSync.syncStateDataFast(3) // fast mode
     if (this.p2p.isFirstSeed) {
       console.log('syncAppData - isFirstSeed')
-      await this.p2p.goActive()
-      console.log('syncAppData - goActive')
+      //await this.p2p.goActive()
+      //console.log('syncAppData - goActive')
+      insertSyncFinished(Self.id)
+      console.log('syncAppData - insertSyncFinished')
       await this.stateManager.waitForShardCalcs()
       await this.app.sync()
       console.log('syncAppData - sync')
@@ -1009,8 +1025,15 @@ class Shardus extends EventEmitter {
       console.log('syncAppData - sync')
       Self.setp2pIgnoreJoinRequests(false)
       console.log('p2pIgnoreJoinRequests = false')
-      await this.p2p.goActive()
-      console.log('syncAppData - goActive')
+      //await this.p2p.goActive()
+      //console.log('syncAppData - goActive')
+      let readyPayload = {
+        nodeId: Self.id,
+        cycleNumber: CycleChain.getNewest()?.counter,
+      }
+      readyPayload = Context.crypto.sign(readyPayload)
+      Comms.sendGossip('gossip-sync-finished', readyPayload)
+      console.log('syncAppData - gossip-sync-finished')
       this.stateManager.appFinishedSyncing = true
     }
     // Set network joinable to true

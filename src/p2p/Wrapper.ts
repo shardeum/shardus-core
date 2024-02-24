@@ -128,15 +128,15 @@ export class P2P extends EventEmitter {
   }
   */
 
-  goActive() {
-    nestedCountersInstance.countEvent('p2p', 'goActive')
-    const activePromise = new Promise<void>((resolve, reject) => {
-      Self.emitter.on('active', () => resolve())
-    })
-    //Active.requestActive()
-    console.log('return goActive promise...')
-    return activePromise
-  }
+  // goActive() {
+  //   nestedCountersInstance.countEvent('p2p', 'goActive')
+  //   const activePromise = new Promise<void>((resolve, reject) => {
+  //     Self.emitter.on('active', () => resolve())
+  //   })
+  //   //Active.requestActive()
+  //   console.log('return goActive promise...')
+  //   return activePromise
+  // }
 
   getLatestCycles(amount) {
     if (CycleChain.cycles.length < amount) {

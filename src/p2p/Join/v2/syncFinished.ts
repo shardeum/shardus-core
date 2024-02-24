@@ -89,9 +89,9 @@ export function drainFinishedSyncingRequest(): string[] {
 /**
  * Insert a node into newSyncFinishedNodes list
  */
-export function insertNodeIntoReadyList(nodeId: string): void {
+export function insertSyncFinished(nodeId: string): void {
   newSyncFinishedNodes.push(nodeId)
-  /* prettier-ignore */ console.log(`insertNodeIntoReadyList(): Node added to newSyncFinishedNodes list`)
+  /* prettier-ignore */ console.log(`insertSyncFinished(): Node added to newSyncFinishedNodes list`)
 }
 
 /**

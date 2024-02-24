@@ -30,7 +30,7 @@ const deepCopy = rfdc()
 import { isServiceMode } from '../debug'
 import { insertSyncStarted } from './Join/v2/syncStarted'
 import * as http from '../http'
-import { insertNodeIntoReadyList } from '../p2p/Join/v2/syncFinished'
+import { insertSyncFinished } from '../p2p/Join/v2/syncFinished'
 import { getStandbyNodesInfoMap } from './Join/v2'
 import { submitStandbyRefresh } from './Join/v2/standbyRefresh'
 
@@ -213,19 +213,19 @@ export function startupV2(): Promise<boolean> {
         p2pSyncEnd = shardusGetTime()
         p2pJoinTime = (p2pSyncEnd - p2pSyncStart) / 1000
         // send a sync-finished message to the network if you are the first node when promised is resoolved from CycleCreator.startCycles()
-        if (isFirst) {
-          insertNodeIntoReadyList(id)
-          nestedCountersInstance.countEvent('p2p', `adding sync-finished message for first node`)
-          /* prettier-ignore */ if (logFlags.verbose) console.log(`adding sync-finished message for first node`)
-        } else {
-          //Payload that is gossiped after node has synced
-          let readyPayload = {
-            nodeId: id,
-            cycleNumber: CycleChain.getNewest()?.counter,
-          }
-          readyPayload = Context.crypto.sign(readyPayload)
-          Comms.sendGossip('gossip-sync-finished', readyPayload)
-        }
+        // if (isFirst) {
+        //   insertSyncFinished(id)
+        //   nestedCountersInstance.countEvent('p2p', `adding sync-finished message for first node`)
+        //   /* prettier-ignore */ if (logFlags.verbose) console.log(`adding sync-finished message for first node`)
+        // } else {
+        //   //Payload that is gossiped after node has synced
+        //   let readyPayload = {
+        //     nodeId: id,
+        //     cycleNumber: CycleChain.getNewest()?.counter,
+        //   }
+        //   readyPayload = Context.crypto.sign(readyPayload)
+        //   Comms.sendGossip('gossip-sync-finished', readyPayload)
+        // }
 
         nestedCountersInstance.countEvent('p2p', `sync time ${p2pJoinTime} seconds`)
 
