@@ -505,9 +505,11 @@ async function runQ3() {
   // Get txs and create this cycle's record, marker, and cert
   txs = collectCycleTxs()
   ;({ record, marker, cert } = makeCycleData(txs, CycleChain.newest))
+  
   if (config.debug.enableCycleRecordDebugTool) {
     if (currentQuarter === 3 && Self.isActive) {
       const cycleData = JSON.stringify({
+        port: Self.port,
         cycleNumber: record.counter,
         cycleRecord: record,
       }) + '\n'
