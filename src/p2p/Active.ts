@@ -156,6 +156,7 @@ export function updateRecord(
     for (const node of selectedNodes) {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:updateRecord node added to activated`)
       activated.push(node.id)
+      activatedPublicKeys.push(node.publicKey)
     }
   }
 
