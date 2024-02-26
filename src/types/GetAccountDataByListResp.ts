@@ -16,7 +16,7 @@ export function serializeGetAccountDataByListResp(
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cGetAccountDataByListResp)
   }
-  stream.writeUInt16(cGetAccountDataByListRespVersion)
+  stream.writeUInt8(cGetAccountDataByListRespVersion)
   if (obj.accountData !== null) {
     stream.writeUInt8(1)
     stream.writeUInt16(obj.accountData.length)
@@ -29,9 +29,9 @@ export function serializeGetAccountDataByListResp(
 }
 
 export function deserializeGetAccountDataByListResp(stream: VectorBufferStream): GetAccountDataByListResp {
-  const version = stream.readUInt16()
+  const version = stream.readUInt8()
   if (version > cGetAccountDataByListRespVersion) {
-    throw new Error('Unsupported version')
+    throw new Error('GetAccountDataByListResp version mismatch')
   }
   const accountDataPresent = stream.readUInt8()
   let accountData = null

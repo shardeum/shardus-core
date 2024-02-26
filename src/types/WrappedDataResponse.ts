@@ -17,15 +17,17 @@ export function serializeWrappedDataResponse(
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cWrappedDataResponse)
   }
-  stream.writeUInt16(cWrappedDataResponseVersion)
+  stream.writeUInt8(cWrappedDataResponseVersion)
   serializeWrappedData(stream, obj)
   stream.writeUInt8(obj.accountCreated ? 1 : 0)
   stream.writeUInt8(obj.isPartial ? 1 : 0)
 }
 
 export function deserializeWrappedDataResponse(stream: VectorBufferStream): WrappedDataResponse {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const version = stream.readUInt16()
+  const version = stream.readUInt8()
+  if (version > cWrappedDataResponseVersion) {
+    throw new Error('WrappedDataResponse version mismatch')
+  }
   const wrappedData = deserializeWrappedData(stream)
   return {
     ...wrappedData,

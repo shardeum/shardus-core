@@ -18,7 +18,7 @@ export const responseSerializer = <T>(
   const resp: WrappedResp = {
     payload: serializedPayload.getBuffer(),
   }
-  const wrappedRespStream = new VectorBufferStream(4 + resp.payload.length)
+  const wrappedRespStream = new VectorBufferStream(3 + resp.payload.length)
   serializeWrappedResp(wrappedRespStream, resp, true)
   return wrappedRespStream
 }
@@ -49,7 +49,7 @@ export const requestSerializer = <T>(
   const req: WrappedReq = {
     payload: serializedPayload.getBuffer(),
   }
-  const wrappedReqStream = new VectorBufferStream(4 + req.payload.length)
+  const wrappedReqStream = new VectorBufferStream(3 + req.payload.length)
   serializeWrappedReq(wrappedReqStream, req, true)
   return wrappedReqStream
 }
@@ -63,7 +63,7 @@ export const getStreamWithTypeCheck = (
   const requestStream = VectorBufferStream.fromBuffer(payload)
   const requestType = requestStream.readUInt16()
   if (requestType !== typeId) {
-    /* prettier-ignore */ if (logFlags.error && logFlags.console) console.log(`Invalid request stream: expected: ${typeId} actual: ${requestType}. ${customErrorLog ? customErrorLog : ''}`)
+    /* prettier-ignore */ console.log(`Invalid request stream: expected: ${typeId} actual: ${requestType}. ${customErrorLog ? customErrorLog : ''}`)
     return null
   }
   return requestStream

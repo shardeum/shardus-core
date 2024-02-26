@@ -15,7 +15,7 @@ export function serializeGetAccountQueueCountReq(
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cGetAccountQueueCountReq)
   }
-  stream.writeUInt16(cGetAccountQueueCountReqVersion)
+  stream.writeUInt8(cGetAccountQueueCountReqVersion)
   stream.writeUInt32(obj.accountIds.length)
   for (const accountId of obj.accountIds) {
     stream.writeString(accountId)
@@ -23,9 +23,9 @@ export function serializeGetAccountQueueCountReq(
 }
 
 export function deserializeGetAccountQueueCountReq(stream: VectorBufferStream): GetAccountQueueCountReq {
-  const version = stream.readUInt16()
+  const version = stream.readUInt8()
   if (version > cGetAccountQueueCountReqVersion) {
-    throw new Error('Unsupported version')
+    throw new Error('GetAccountQueueCountReq version mismatch')
   }
   const length = stream.readUInt32()
   const accountIds = []

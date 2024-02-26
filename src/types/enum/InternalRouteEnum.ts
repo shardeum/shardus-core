@@ -6,5 +6,8 @@ export enum InternalRouteEnum {
   binary_get_account_queue_count = 'binary/get_account_queue_count', // ask
   binary_get_account_data_by_list = 'binary/get_account_data_by_list', // ask
   binary_broadcast_finalstate = 'binary/broadcast_finalstate', // tell
-  binary_get_account_data3 = 'binary/get_account_data3', // ask
+  binary_get_account_data = 'binary/get_account_data', // ask
+  binary_sync_trie_hashes = 'binary/sync_trie_hashes', // tell
+  binary_compare_cert = 'binary/compare_cert', // ask
+  binary_get_tx_timestamp = 'binary/get_tx_timestamp', // ask
 }

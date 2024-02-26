@@ -15,7 +15,7 @@ export function serializeGetAccountDataByListReq(
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cGetAccountDataByListReq)
   }
-  stream.writeUInt16(cGetAccountDataByListReqVersion)
+  stream.writeUInt8(cGetAccountDataByListReqVersion)
   stream.writeUInt32(obj.accountIds.length)
   for (const accountId of obj.accountIds) {
     stream.writeString(accountId)
@@ -23,9 +23,9 @@ export function serializeGetAccountDataByListReq(
 }
 
 export function deserializeGetAccountDataByListReq(stream: VectorBufferStream): GetAccountDataByListReq {
-  const version = stream.readUInt16()
+  const version = stream.readUInt8()
   if (version > cGetAccountDataByListReqVersion) {
-    throw new Error('Unsupported version')
+    throw new Error('GetAccountDataByListReq version mismatch')
   }
   const length = stream.readUInt32()
   const accountIds = []

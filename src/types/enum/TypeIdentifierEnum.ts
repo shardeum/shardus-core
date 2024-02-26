@@ -16,6 +16,11 @@ export enum TypeIdentifierEnum {
   cGetAccountDataByListReq,
   cGetAccountDataByListResp,
   cBroadcastFinalStateReq,
-  cGetAccountData3Req,
-  cGetAccountData3Resp,
+  cGetAccountDataReq,
+  cGetAccountDataResp,
+  cSyncTrieHashesReq,
+  cCompareCertReq,
+  cCompareCertResp,
+  cGetTxTimestampReq,
+  cGetTxTimestampResp,
 }

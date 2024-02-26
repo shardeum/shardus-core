@@ -11,13 +11,15 @@ export function serializeWrappedReq(stream: VectorBufferStream, obj: WrappedReq,
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cWrappedReq)
   }
-  stream.writeUInt16(cWrappedReqVersion)
+  stream.writeUInt8(cWrappedReqVersion)
   stream.writeBuffer(obj.payload)
 }
 
 export function deserializeWrappedReq(stream: VectorBufferStream): WrappedReq {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const version = stream.readUInt16()
+  const version = stream.readUInt8()
+  if (version > cWrappedReqVersion) {
+    throw new Error('WrappedReq version mismatch')
+  }
   const payload = stream.readBuffer()
 
   const obj: WrappedReq = {

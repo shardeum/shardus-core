@@ -30,6 +30,7 @@ import {
   StringNodeObjectMap,
 } from './state-manager-types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { CachedAppDataSerializable } from '../types/CachedAppData'
 
 class CachedAppDataManager {
   app: Shardus.App
@@ -104,18 +105,15 @@ class CachedAppDataManager {
 
     const send_cacheAppDataBinarySerializedHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_send_cachedAppData,
-      handler: (payload, response, header, sign) => {
-        profilerInstance.scopedProfileSectionStart(
-          InternalRouteEnum.binary_send_cachedAppData,
-          false,
-          payload.length
-        )
-        nestedCountersInstance.countEvent('internal', InternalRouteEnum.binary_send_cachedAppData)
+      handler: (payload, respond, header, sign) => {
+        const route = InternalRouteEnum.binary_send_cachedAppData
+        profilerInstance.scopedProfileSectionStart(route, false, payload.length)
+        nestedCountersInstance.countEvent('internal', route)
 
         const errorHandler = (
           errorType: RequestErrorEnum,
           opts?: { customErrorLog?: string; customCounterSuffix?: string }
-        ): void => requestErrorHandler(InternalRouteEnum.binary_send_cachedAppData, errorType, header, opts)
+        ): void => requestErrorHandler(route, errorType, header, opts)
 
         try {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cSendCachedAppDataReq)
@@ -123,15 +121,7 @@ class CachedAppDataManager {
           if (!requestStream) return errorHandler(RequestErrorEnum.InvalidRequest)
 
           const req = deserializeSendCachedAppDataReq(requestStream)
-          const appDeserializedData = this.stateManager.app.binaryDeserializeObject(
-            AppObjEnum.CachedAppData,
-            req.cachedAppData.appData
-          )
-          const cachedAppData: CachedAppData = {
-            dataID: req.cachedAppData.dataID,
-            appData: appDeserializedData,
-            cycle: req.cachedAppData.cycle,
-          }
+          const cachedAppData: CachedAppDataSerializable = req.cachedAppData
 
           if (cachedAppData == null) {
             return errorHandler(RequestErrorEnum.InvalidRequest)
@@ -143,8 +133,11 @@ class CachedAppDataManager {
             return
           }
           this.insertCachedItem(req.topic, cachedAppData.dataID, cachedAppData.appData, cachedAppData.cycle)
+        } catch (e) {
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
         } finally {
-          profilerInstance.scopedProfileSectionEnd(InternalRouteEnum.binary_send_cachedAppData)
+          profilerInstance.scopedProfileSectionEnd(route)
         }
       },
     }
@@ -447,15 +440,11 @@ class CachedAppDataManager {
             const filteredCorrespondingAccNodes = filteredNodes
 
             if (this.config.p2p.useBinarySerializedEndpoints) {
-              const appSerializedAppData = this.stateManager.app.binarySerializeObject(
-                AppObjEnum.CachedAppData,
-                message.cachedAppData.appData
-              )
               const sendCacheAppDataReq: SendCachedAppDataReq = {
                 topic,
                 cachedAppData: {
                   dataID: message.cachedAppData.dataID,
-                  appData: appSerializedAppData,
+                  appData: message.cachedAppData.appData,
                   cycle: message.cachedAppData.cycle,
                 },
               }

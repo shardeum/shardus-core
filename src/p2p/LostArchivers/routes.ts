@@ -142,7 +142,9 @@ const investigateLostArchiverRoute: Route<InternalHandler<SignedObject<Investiga
     if (!sender) throw new Error(`investigateLostArchiverRoute: missing sender`)
     const error = funcs.errorForInvestigateArchiverMsg(payload)
     if (error)
-      throw new Error(`investigateLostArchiverRoute: invalid payload error: ${error}, payload: ${inspect(payload)}`)
+      throw new Error(
+        `investigateLostArchiverRoute: invalid payload error: ${error}, payload: ${inspect(payload)}`
+      )
 
     if (id !== payload.investigator) {
       logging.info(`investigateLostArchiverRoute: not the investigator. returning`)
@@ -194,7 +196,7 @@ const reportFakeLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
     logging.warn('/report-fake-lost-archiver: reporting fake lost archiver')
     // the archiver can be specified with an optional 'publicKey' or 'publickey' query param
     // otherwise a random one is chosen
-    let publicKey: string | null = typeof(req.query.publicKey) === 'string' ? req.query.publicKey : null
+    let publicKey: string | null = typeof req.query.publicKey === 'string' ? req.query.publicKey : null
     if (publicKey == null) publicKey = req.body.publickey // lowercase k
     const pick = publicKey ? 'specified' : 'random'
     const archiver = publicKey ? getArchiverWithPublicKey(publicKey) : getRandomAvailableArchiver()

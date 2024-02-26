@@ -27,8 +27,16 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { randomBytes } from '@shardus/crypto-utils'
 import { digestCycle, syncNewCycles } from './Sync'
 import { shardusGetTime } from '../network'
+import { InternalBinaryHandler } from '../types/Handler'
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
+import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
+import { CompareCertRespSerializable, deserializeCompareCertResp, serializeCompareCertResp } from '../types/CompareCertResp'
+import { CompareCertReqSerializable, deserializeCompareCertReq, serializeCompareCertReq } from '../types/CompareCertReq'
+import { verifyPayload } from '../types/ajv/Helpers'
 import fs from 'fs'
 import path from 'path'
+import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
+import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 
 /** CONSTANTS */
 
@@ -139,7 +147,7 @@ const compareCertRoute: P2P.P2PTypes.InternalHandler<
   P2P.NodeListTypes.Node['id']
 > = async (payload, respond, sender) => {
   profilerInstance.scopedProfileSectionStart('compareCert')
-  await respond(compareCycleCertEndpoint(payload, sender))
+  await respond(compareCycleCertEndpoint(payload, sender, 'compareCycleCertEndpoint'))
   profilerInstance.scopedProfileSectionEnd('compareCert')
 }
 
@@ -151,6 +159,52 @@ const gossipCertRoute: P2P.P2PTypes.GossipHandler<CompareCertReq, P2P.NodeListTy
   gossipHandlerCycleCert(payload, sender, tracker)
 }
 
+const compareCertBinaryHandler: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
+  name: InternalRouteEnum.binary_compare_cert,
+  handler: async (payload, respond, header, sign) => {
+    const route = InternalRouteEnum.binary_compare_cert
+    nestedCountersInstance.countEvent('internal', route)
+    profilerInstance.scopedProfileSectionStart(route)
+    const errorHandler = (
+      errorType: RequestErrorEnum,
+      opts?: { customErrorLog?: string; customCounterSuffix?: string }
+    ): void => requestErrorHandler(route, errorType, header, opts)
+
+    try {
+      let resp: CompareCertRespSerializable = { certs: [], record: null }
+
+      const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cCompareCertReq)
+      if (!requestStream) {
+        return errorHandler(RequestErrorEnum.InvalidRequest)
+      }
+
+      const req: CompareCertReq = deserializeCompareCertReq(requestStream)
+
+      const errors = verifyPayload('CompareCertReq', req)
+      if (errors && errors.length > 0) {
+        p2pLogger.error(`compareCert: request validation errors: ${errors}`)
+        respond(resp, serializeCompareCertResp)
+      }
+
+      const compareCertReq: CompareCertReq = {
+        certs: req.certs,
+        record: req.record,
+      }
+
+      resp = compareCycleCertEndpoint(compareCertReq, header.sender_id, 'compareCycleCertBinaryEndpoint')
+
+      respond(resp, serializeCompareCertResp)
+    } catch (errors) {
+      nestedCountersInstance.countEvent('internal', `${route}-exception`)
+      p2pLogger.error(`${route}: Exception executing request: ${errorToStringFull(errors)}`)
+      respond({ certs: [], record: null }, serializeCompareCertResp)
+    } finally {
+      profilerInstance.scopedProfileSectionEnd(route)
+    }
+  },
+}
+
+
 const routes = {
   internal: {
     'compare-cert': compareCertRoute,
@@ -158,6 +212,9 @@ const routes = {
   gossip: {
     'gossip-cert': gossipCertRoute,
   },
+  internal2: {
+    [compareCertBinaryHandler.name]: compareCertBinaryHandler,
+  }
 }
 
 /** CONTROL FUNCTIONS */
@@ -180,6 +237,9 @@ export function init() {
   }
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
+  }
+  for (const [name, handler] of Object.entries(routes.internal2)) {
+    Comms.registerInternalBinary(name, handler.handler)
   }
 }
 
@@ -1057,20 +1117,20 @@ function improveBestCert(inpCerts: P2P.CycleCreatorTypes.CycleCert[], inpRecord)
   return improved
 }
 
-function compareCycleCertEndpoint(inp: CompareCertReq, sender) {
+function compareCycleCertEndpoint(inp: CompareCertReq, sender, endpoint_tag: string) {
   if (bestMarker === undefined) {
     // This should almost never happen since we generate and gossip our
     //   cert at the begining of Q3 and don't start comparing certs until
     //   the begining of Q4.
-    warn('compareCycleCertEndpoint - bestMarker is undefined')
+    warn(`${endpoint_tag} - bestMarker is undefined`)
     return { certs: [], record: record } // receiving node will igore our response
   }
 
-  if (!validateCertsRecordTypes(inp, 'compareCycleCertEndpoint')) {
+  if (!validateCertsRecordTypes(inp, endpoint_tag)) {
     return { certs: bestCycleCert.get(bestMarker), record: bestRecord }
   }
   const { certs: inpCerts, record: inpRecord } = inp
-  if (!validateCerts(inpCerts, inpRecord, sender, 'compareCycleCertEndpoint')) {
+  if (!validateCerts(inpCerts, inpRecord, sender, endpoint_tag)) {
     return { certs: bestCycleCert.get(bestMarker), record: bestRecord }
   }
   const inpMarker = inpCerts[0].marker
@@ -1087,9 +1147,22 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
       certs: bestCycleCert.get(bestMarker),
       record: bestRecord,
     }
-    const resp: CompareCertRes = await Comms.ask(node, 'compare-cert', req) // NEED to set the route string
+
+    let resp: CompareCertRes
+    if (config.p2p.useBinarySerializedEndpoints) {
+      let reqSerialized = req as CompareCertReqSerializable
+      resp = await Comms.askBinary<CompareCertReqSerializable, CompareCertRespSerializable>(
+        node,
+        InternalRouteEnum.binary_compare_cert,
+        reqSerialized,
+        serializeCompareCertReq,
+        deserializeCompareCertResp,
+        {}
+      )
+    } else {
+      resp = await Comms.ask(node, 'compare-cert', req)
+    }
     if (!validateCertsRecordTypes(resp, 'compareCycleCert')) return [null, node]
-    // [TODO] - submodules need to validate their part of the record
     if (!(resp && resp.certs && resp.certs[0].marker && resp.record)) {
       throw new Error('compareCycleCert: Invalid query response')
     }

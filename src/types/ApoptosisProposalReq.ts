@@ -19,14 +19,16 @@ export function serializeApoptosisProposalReq(
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cApoptosisProposalReq)
   }
-  stream.writeUInt16(cApoptosisProposalReqVersion)
+  stream.writeUInt8(cApoptosisProposalReqVersion)
   stream.writeString(obj.id)
   stream.writeUInt32(obj.when)
 }
 
 export function deserializeApoptosisProposalReq(stream: VectorBufferStream): ApoptosisProposalReq {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const version = stream.readUInt16()
+  const version = stream.readUInt8()
+  if (version > cApoptosisProposalReqVersion) {
+    throw new Error('ApoptosisProposalReq version mismatch')
+  }
   const id = stream.readString()
   const when = stream.readUInt32()
 

@@ -208,7 +208,7 @@ export function DeSerializeFromJsonString<T>(jsonString: string): T {
   return JSON.parse(jsonString, base64BufferReviver) as T
 }
 
-function isHexStringWithoutPrefix(value: string, length?: number): boolean {
+function shouldReviveAsBigInt(value: string, length?: number): boolean {
   if (value && typeof value === 'string' && value.indexOf('0x') >= 0) return false // do not convert strings with 0x
   // prefix
   if (typeof value !== 'string' || !value.match(/^[0-9A-Fa-f]*$/)) return false
@@ -238,7 +238,7 @@ function base64BufferReviver(key: string, value: any): any {
     originalObject.dataType == 'bh'
   ) {
     return new Uint8Array(GetBufferFromField(originalObject, 'base64'))
-  } else if (value && isHexStringWithoutPrefix(value) && value.length !== 42 && value.length !== 64) {
+  } else if (value && shouldReviveAsBigInt(value) && value.length !== 42 && value.length !== 64) {
     return BigInt('0x' + value)
   } else {
     return value

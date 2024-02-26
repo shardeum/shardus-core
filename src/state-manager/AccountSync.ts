@@ -45,8 +45,8 @@ import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { deserializeGetAccountDataByListReq } from '../types/GetAccountDataByListReq'
 import { getStreamWithTypeCheck } from '../types/Helpers'
-import { GetAccountData3RespSerialized, serializeGetAccountData3Resp } from '../types/GetAccountData3Resp'
-import { deserializeGetAccountData3Req } from '../types/GetAccountData3Req'
+import { GetAccountDataRespSerializable, serializeGetAccountDataResp } from '../types/GetAccountDataResp'
+import { deserializeGetAccountDataReq, verifyGetAccountDataReq } from '../types/GetAccountDataReq'
 
 const REDUNDANCY = 3
 
@@ -395,53 +395,66 @@ class AccountSync {
       }
     )
 
-    const getAccData3BinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
-      name: InternalRouteEnum.binary_get_account_data3,
+    const getAccDataBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_get_account_data,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       handler: async (payload, respond, header, sign) => {
-        this.profiler.scopedProfileSectionStart(InternalRouteEnum.binary_get_account_data3, false, payload.length)
+        const route = InternalRouteEnum.binary_get_account_data
+        nestedCountersInstance.countEvent('internal', route)
+        this.profiler.scopedProfileSectionStart(route, false, payload.length)
 
-        const result = {} as GetAccountData3RespSerialized
-        let ourLockID = -1
-        try{
-          const reqStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAccountData3Req)
+        const result = {
+          data: null,
+          errors: [],
+        } as GetAccountDataRespSerializable
+        try {
+          const reqStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAccountDataReq)
           if (!reqStream) {
-            result.errors.push("Payload type mismatch")
+            nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
+            result.errors.push(`invalid request payload`)
+            respond(result, serializeGetAccountDataResp)
+            return
           }
-          const readableReq = deserializeGetAccountData3Req(reqStream)
+          const readableReq = deserializeGetAccountDataReq(reqStream)
+
+          // validate the request
+          const valid = verifyGetAccountDataReq(readableReq)
+          if (valid === false) {
+            nestedCountersInstance.countEvent('internal', `${route}-invalid_account_ids`)
+            result.errors.push(`request validation failed`)
+            respond(result, serializeGetAccountDataResp)
+            return
+          }
+
           let accountData = null
-          ourLockID = await this.stateManager.fifoLock('accountModification')
-          accountData = await this.stateManager.getAccountDataByRangeSmart(
-            readableReq.accountStart,
-            readableReq.accountEnd,
-            readableReq.tsStart,
-            readableReq.maxRecords,
-            readableReq.offset,
-            readableReq.accountOffset
-          ) 
-
-          for (let wrappedDataRef of accountData.wrappedAccounts) {
-            wrappedDataRef.data = this.app.binarySerializeObject(Shardus.AppObjEnum.AppData, wrappedDataRef.data)
-          }
-          for (let wrappedDataRef of accountData.wrappedAccounts2) {
-            wrappedDataRef.data = this.app.binarySerializeObject(Shardus.AppObjEnum.AppData, wrappedDataRef.data)
+          let ourLockID = -1
+          try {
+            ourLockID = await this.stateManager.fifoLock('accountModification')
+            accountData = await this.stateManager.getAccountDataByRangeSmart(
+              readableReq.accountStart,
+              readableReq.accountEnd,
+              readableReq.tsStart,
+              readableReq.maxRecords,
+              readableReq.offset,
+              readableReq.accountOffset
+            )
+          } finally {
+            this.stateManager.fifoUnlock('accountModification', ourLockID)
           }
 
-          result.data = accountData 
-          respond(result, serializeGetAccountData3Resp)
-        }catch(e){
-          result.errors.push(errorToStringFull(e))
-          if(result.errors.length > 0){
-            this.mainLogger.error(`get_account_data3: request validation errors: ${result.errors}`)
-            respond(result, serializeGetAccountData3Resp)
-          }
-        }finally{
-          this.profiler.scopedProfileSectionEnd(InternalRouteEnum.binary_get_account_data3)
-          this.stateManager.fifoUnlock('accountModification', ourLockID)
+          result.data = accountData
+          respond(result, serializeGetAccountDataResp)
+        } catch (e) {
+          result.errors.push(`${route} internal error`)
+          this.mainLogger.error(`${route}: request validation errors: ${errorToStringFull(e)}`)
+          respond(result, serializeGetAccountDataResp)
+        } finally {
+          this.profiler.scopedProfileSectionEnd(route)
         }
-      }
+      },
     }
 
-    this.p2p.registerInternalBinary(getAccData3BinaryHandler.name, getAccData3BinaryHandler.handler)
+    this.p2p.registerInternalBinary(getAccDataBinaryHandler.name, getAccDataBinaryHandler.handler)
 
     // /get_account_data_by_list (Acc_ids)
     // Acc_ids - array of accounts to get
@@ -480,16 +493,24 @@ class AccountSync {
       name: InternalRouteEnum.binary_get_account_data_by_list,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       handler: async (payload, respond, header, sign) => {
-        this.profiler.scopedProfileSectionStart('binary_get_account_data_by_list', false, payload.length)
+        const route = InternalRouteEnum.binary_get_account_data_by_list
+        this.profiler.scopedProfileSectionStart(route, false, payload.length)
+        nestedCountersInstance.countEvent('internal', route)
         let ourLockID = -1
         let accountData = null
         try {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAccountDataByListReq)
           if (!requestStream) {
+            nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
             respond({ accountData }, serializeGetAccountDataByListResp)
             return
           }
           const readableReq = deserializeGetAccountDataByListReq(requestStream)
+          if (utils.isValidShardusAddress(readableReq.accountIds) === false) {
+            nestedCountersInstance.countEvent('internal', `${route}-invalid_account_ids`)
+            respond({ accountData }, serializeGetAccountDataByListResp)
+            return
+          }
 
           const result = {} as GetAccountDataByListResp
 
@@ -500,18 +521,16 @@ class AccountSync {
             this.stateManager.fifoUnlock('accountModification', ourLockID)
           }
 
-          for (const dataRef of accountData) {
-            dataRef.data = this.app.binarySerializeObject(Shardus.AppObjEnum.AppData, dataRef.data)
-          }
-
           //PERF Disable this in production or performance testing.
           this.stateManager.testAccountDataWrapped(accountData)
           result.accountData = accountData
-          await respond(result, serializeGetAccountDataByListResp)
+          respond(result, serializeGetAccountDataByListResp)
         } catch (e) {
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          this.mainLogger.error(`${route}: Exception executing request: ${errorToStringFull(e)}`)
           respond({ accountData: null }, serializeGetAccountDataByListResp)
         } finally {
-          this.profiler.scopedProfileSectionEnd('binary_get_account_data_by_list')
+          this.profiler.scopedProfileSectionEnd(route)
         }
       },
     }

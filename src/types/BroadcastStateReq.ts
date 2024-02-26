@@ -21,15 +21,17 @@ export function serializeBroadcastStateReq(
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cBroadcastStateReq)
   }
-  stream.writeUInt16(cBroadcastStateReqVersion)
+  stream.writeUInt8(cBroadcastStateReqVersion)
   stream.writeString(obj.txid)
   stream.writeUInt16(obj.stateList.length) // Serialize array length
   obj.stateList.forEach((item) => serializeWrappedDataResponse(stream, item)) // Serialize each item
 }
 
 export function deserializeBroadcastStateReq(stream: VectorBufferStream): BroadcastStateReq {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const version = stream.readUInt16()
+  const version = stream.readUInt8()
+  if (version > cBroadcastStateReqVersion) {
+    throw new Error('BroadcastStateReq version mismatch')
+  }
   const txid = stream.readString()
   const stateListLength = stream.readUInt16()
   const stateList = Array.from({ length: stateListLength }, () => deserializeWrappedDataResponse(stream))
