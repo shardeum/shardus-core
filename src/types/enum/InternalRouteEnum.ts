@@ -10,4 +10,5 @@ export enum InternalRouteEnum {
   binary_sync_trie_hashes = 'binary/sync_trie_hashes', // tell
   binary_compare_cert = 'binary/compare_cert', // ask
   binary_get_tx_timestamp = 'binary/get_tx_timestamp', // ask
+  binary_get_trie_hashes = 'binary/get_trie_hashes', // ask
 }

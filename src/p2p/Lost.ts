@@ -33,6 +33,9 @@ import { ApoptosisProposalResp, deserializeApoptosisProposalResp } from '../type
 import { ApoptosisProposalReq, serializeApoptosisProposalReq } from '../types/ApoptosisProposalReq'
 import { ShardusEvent, Node } from '../shardus/shardus-types'
 import { HashTrieReq, ProxyRequest, ProxyResponse } from '../state-manager/state-manager-types'
+import { GetTrieHashesRequest, serializeGetTrieHashesReq } from '../types/GetTrieHashesReq'
+import { GetTrieHashesResponse, deserializeGetTrieHashesResp } from '../types/GetTrieHashesResp'
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 
 /** TYPES */
 
@@ -239,7 +242,20 @@ export function init() {
           await respond(proxyRes)
           return
         }
-        let res = await Comms.ask(targetNode, payload.route, payload.message)
+        let res = null
+        if (payload.route === 'get_trie_hashes' && this.p2p.useBinarySerializedEndpoints) {
+          nestedCountersInstance.countEvent('p2p', 'getTrieHashesBinary', 1)
+          res = await Comms.askBinary<GetTrieHashesRequest, GetTrieHashesResponse>(
+            targetNode,
+            InternalRouteEnum.binary_get_trie_hashes,
+            payload.message,
+            serializeGetTrieHashesReq,
+            deserializeGetTrieHashesResp,
+            {}
+          )
+        } else {
+          res = await Comms.ask(targetNode, payload.route, payload.message)
+        }
         proxyRes = {
           success: true,
           response: res,

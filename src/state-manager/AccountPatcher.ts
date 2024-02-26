@@ -50,6 +50,16 @@ import {
   deserializeSyncTrieHashesReq,
   serializeSyncTrieHashesReq,
 } from '../types/SyncTrieHashesReq'
+import {
+  GetTrieHashesResponse,
+  serializeGetTrieHashesResp,
+  deserializeGetTrieHashesResp,
+} from '../types/GetTrieHashesResp'
+import {
+  GetTrieHashesRequest,
+  deserializeGetTrieHashesReq,
+  serializeGetTrieHashesReq,
+} from '../types/GetTrieHashesReq'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
@@ -274,6 +284,56 @@ class AccountPatcher {
         profilerInstance.scopedProfileSectionEnd('get_trie_hashes', respondSize)
       }
     )
+
+    const getTrieHashesBinary: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_get_trie_hashes,
+      handler: async (payloadBuffer, respond, header, sign) => {
+        const route = InternalRouteEnum.binary_get_trie_hashes
+        nestedCountersInstance.countEvent('internal', route)
+        this.profiler.scopedProfileSectionStart(route, false, payloadBuffer.length)
+        const result = { nodeHashes: [] } as GetTrieHashesResponse
+        try {
+          const requestStream = getStreamWithTypeCheck(payloadBuffer, TypeIdentifierEnum.cGetTrieHashesReq)
+          if (!requestStream) {
+            respond(result, serializeGetTrieHashesResp)
+            return
+          }
+          const readableReq = deserializeGetTrieHashesReq(requestStream)
+          let responseCount = 0
+          if (!Self.isFailed) {
+            for (const radix of readableReq.radixList) {
+              const level = radix.length
+              const layerMap = this.shardTrie.layerMaps[level]
+              if (layerMap == null) {
+                nestedCountersInstance.countEvent('accountPatcher', `get_trie_hashes badrange:${level}`)
+                break
+              }
+              const hashTrieNode = layerMap.get(radix)
+              if (hashTrieNode != null) {
+                for (const childTreeNode of hashTrieNode.children) {
+                  if (childTreeNode != null) {
+                    result.nodeHashes.push({ radix: childTreeNode.radix, hash: childTreeNode.hash })
+                    responseCount++
+                  }
+                }
+              }
+            }
+            if (responseCount > 0) {
+              /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_hashes c:${this.stateManager.currentCycleShardData.cycleNumber}`, responseCount)
+            }
+          }
+          respond(result, serializeGetTrieHashesResp)
+        } catch (e) {
+          // Error handling
+          console.error(`Error in getTrieHashesBinary handler: ${e.message}`)
+          respond({ nodeHashes: null }, serializeGetTrieHashesResp)
+        } finally {
+          this.profiler.scopedProfileSectionEnd(route)
+        }
+      },
+    }
+
+    this.p2p.registerInternalBinary(getTrieHashesBinary.name, getTrieHashesBinary.handler)
 
     this.p2p.registerInternal(
       'sync_trie_hashes',
@@ -1645,7 +1705,19 @@ class AccountPatcher {
     const promises = []
     for (const [key, value] of requestMap) {
       try {
-        const promise = this.p2p.ask(key, 'get_trie_hashes', value)
+        let promise
+        if (this.stateManager.config.p2p.useBinarySerializedEndpoints) {
+          promise = await this.p2p.askBinary<GetTrieHashesRequest, GetTrieHashesResponse>(
+            key,
+            InternalRouteEnum.binary_get_trie_hashes,
+            value,
+            serializeGetTrieHashesReq,
+            deserializeGetTrieHashesResp,
+            {}
+          )
+        } else {
+          promise = this.p2p.ask(key, 'get_trie_hashes', value)
+        }
         promises.push(promise)
       } catch (error) {
         this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + errorToStringFull(error))

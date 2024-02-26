@@ -23,4 +23,6 @@ export enum TypeIdentifierEnum {
   cCompareCertResp,
   cGetTxTimestampReq,
   cGetTxTimestampResp,
+  cGetTrieHashesReq,
+  cGetTrieHashesResp,
 }
