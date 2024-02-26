@@ -38,7 +38,7 @@ export async function submitUnjoin(): Promise<Result<void, Error>> {
     await http.post(`${node.ip}:${node.port}/unjoin`, unjoinRequest)
     return ok(void 0)
   } catch (e) {
-    return err(new Error(`submitUnjoin: Error posting unjoin request: ${e}`))
+    throw new Error(`submitUnjoin: Error posting unjoin request: ${e}`)
   }
 }
 
