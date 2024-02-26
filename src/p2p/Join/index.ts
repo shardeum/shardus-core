@@ -635,17 +635,18 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequ
 
 export async function firstJoin(): Promise<string> {
   let marker: string
-  let record
+  let record: P2P.CycleCreatorTypes.CycleRecord
   if (CycleChain.newest) {
     // TODO: add extra check if newest.mode === 'shutdown' later after shutdown is implemented
     // If there is a cycle provided by the archiver, use it
     marker = CycleChain.newest['marker']
+    record = CycleChain.newest
   } else {
     // Create join request from 000... cycle marker
     const zeroMarker = '0'.repeat(64)
     const zeroRecord = {}
     marker = zeroMarker
-    record = zeroRecord
+    record = zeroRecord as P2P.CycleCreatorTypes.CycleRecord
   }
   const request = await createJoinRequest(record)
   // Add own join request
