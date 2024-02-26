@@ -749,6 +749,8 @@ export interface ServerConfiguration {
     uniqueRemovedIds: boolean
     /** Unique Ids between Apop and Removed Nodes ( Fix for collision because of the apop nodes that are due to lost ) */
     uniqueRemovedIdsUpdate: boolean
+    /** Unique Ids between Apop and Lost Nodes */
+    uniqueLostIdsUpdate: boolean
     /** Use LRU cache for socket connection mgmt in shardus/net. Default: false */
     useLruCacheForSocketMgmt: boolean
     /** LRU cache size for socket connection mgmt in shardus/net. Is used only if `useLruCacheForSocketMgmt` is set to `true`. Default: 1000 */

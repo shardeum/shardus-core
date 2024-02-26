@@ -483,6 +483,11 @@ export function updateRecord(
       const nodesInRemoved = apop.filter((id) => record.removed.includes(id))
       record.removed = record.removed.filter((id) => !nodesInRemoved.includes(id))
     }
+    // If the apop nodes are in the lost record also, clear them from the lost record
+    if (config.p2p.uniqueLostIdsUpdate) {
+      const nodesInLost = apop.filter((id) => record.lost.includes(id))
+      record.lost = record.lost.filter((id) => !nodesInLost.includes(id))
+    }
     record.apoptosized = [...apop, ...apopSyncing, ...record.apoptosized].sort()
   }
 }
