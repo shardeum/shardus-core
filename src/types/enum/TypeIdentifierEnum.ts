@@ -25,4 +25,6 @@ export enum TypeIdentifierEnum {
   cGetTxTimestampResp,
   cGetTrieHashesReq,
   cGetTrieHashesResp,
+  cGetAccountDataByHashesReq,
+  cGetAccountDataByHashesResp,
 }
