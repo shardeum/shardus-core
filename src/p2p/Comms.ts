@@ -16,6 +16,7 @@ import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
+import * as CycleChain from './CycleChain'
 
 /** ROUTES */
 
@@ -609,6 +610,9 @@ function isNodeValidForInternalMessage(
   checkForNodeLost = true,
   checkIsUpRecent = true
 ): boolean {
+
+  if (shouldIgnoreDownChecks()) return true
+
   const logErrors = logFlags.debug
   if (node == null) {
     if (logErrors)
@@ -617,7 +621,7 @@ function isNodeValidForInternalMessage(
     return false
   }
   const nodeStatus = node.status
-  if (!Self.isRestartNetwork && (nodeStatus != 'active' || NodeList.potentiallyRemoved.has(node.id))) {
+  if (nodeStatus != 'active' || NodeList.potentiallyRemoved.has(node.id)) {
     if (logErrors)
       if (logFlags.error)
         /* prettier-ignore */ error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(node.id)} ${debugMsg}`)
@@ -658,6 +662,17 @@ function isNodeValidForInternalMessage(
   }
 
   return true
+}
+
+function shouldIgnoreDownChecks() {
+  const newestCycle = CycleChain.newest
+  if (newestCycle) {
+    if (newestCycle.mode === 'processing') return false
+    if (Self.isRestartNetwork || newestCycle.mode === 'recovery' || newestCycle.mode === 'restart' || newestCycle.mode === 'restore') {
+      return true
+    }
+  }
+  return false
 }
 
 /**
