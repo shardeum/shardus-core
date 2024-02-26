@@ -650,6 +650,7 @@ class Shardus extends EventEmitter {
         // Stay in syncing mode and let other nodes join
         Self.setp2pIgnoreJoinRequests(false)
         console.log('p2pIgnoreJoinRequests = false')
+        nestedCountersInstance.countEvent('restore', `intialized: ${newest.mode}. ${shardusGetTime()}`)
       } else {
         // not doing a safety sync
         // todo hook this up later cant deal with it now.
@@ -661,20 +662,26 @@ class Shardus extends EventEmitter {
     Self.emitter.on('restore', async (cycleNumber: number) => {
       console.log('restore mode triggered on cycle', cycleNumber)
       this.logger.playbackLogState('restore', '', `Restore mode triggered on cycle ${cycleNumber}`)
+
+      nestedCountersInstance.countEvent('restore', `restore event: entered. seen on cycle:${cycleNumber} ${shardusGetTime()}`)
       await this.stateManager.waitForShardCalcs()
+      nestedCountersInstance.countEvent('restore', `restore event: got shard calcs. ${shardusGetTime()}`)
       // Start restoring state data
       try {
         this.stateManager.renewState()
         await this.stateManager.accountSync.initialSyncMain(3)
         console.log('syncAppData - initialSyncMain finished')
+        nestedCountersInstance.countEvent('restore', `restore event: syncAppData finished. ${shardusGetTime()}`)
       } catch (err) {
         console.log(utils.formatErrorMessage(err))
         apoptosizeSelf(`initialSyncMain-failed: ${err?.message}`)
+        nestedCountersInstance.countEvent('restore', `restore event: fail and apop self. ${shardusGetTime()}`)
         return
       }
       // After restoring state data, set syncing flags to true and go active
       await this.stateManager.startCatchUpQueue()
       console.log('syncAppData - startCatchUpQueue')
+      nestedCountersInstance.countEvent('restore', `restore event: finished startCatchUpQueue. ${shardusGetTime()}`)
       //await this.p2p.goActive()
       //console.log('syncAppData - goActive')
       let readyPayload = {
@@ -683,6 +690,8 @@ class Shardus extends EventEmitter {
       }
       readyPayload = Context.crypto.sign(readyPayload)
       Comms.sendGossip('gossip-sync-finished', readyPayload)
+
+      nestedCountersInstance.countEvent('restore', `restore event: sendGossip gossip-sync-finished ${shardusGetTime()}`)
       this.stateManager.appFinishedSyncing = true
       this.stateManager.startProcessingCycleSummaries()
     })
