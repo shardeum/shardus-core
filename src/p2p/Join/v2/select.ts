@@ -26,8 +26,8 @@ const NUM_NOTIFYING_NODES = 5
  * skipped.
  */
 export function executeNodeSelection(): void {
-  // Only if the node is active or if it is the first node in the restart mode network
-  if (Self.isActive || (!Self.isActive && Self.isFirst && Self.isRestartNetwork)) {
+  // Only if the node is active or if the network is in restart mode
+  if (Self.isActive || (!Self.isActive && Self.isRestartNetwork)) {
     const { add } = calculateToAcceptV2(CycleChain.newest)
     /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`selecting ${add} nodes to accept`)
     selectNodes(add)
@@ -77,7 +77,7 @@ export function selectNodes(maxAllowed: number): void {
   /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console)
   console.log('Input parameters to selectIndexesWithOffset - Max allowed:', maxAllowed, 'Offset:', offset, 'Array Size: ',objs.length);
 
-  if(maxAllowed > objs.length){
+  if (maxAllowed > objs.length){
     /* prettier-ignore */ nestedCountersInstance.countEvent('joinV2', `selectNodes: capping maxAllowed ${maxAllowed} to ${objs.length}`)
     maxAllowed = objs.length
   }

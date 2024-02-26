@@ -140,7 +140,6 @@ export function startupV2(): Promise<boolean> {
         // set status SELECTED?
         updateNodeState(P2P.P2PTypes.NodeStatus.SELECTED)
 
-        
         //robust query to get cycle number in case we want to send gossip before p2p sync
         // if (!isFirst) {
         //   // do robust query to get cycle number
@@ -199,6 +198,7 @@ export function startupV2(): Promise<boolean> {
         if (isFirst) {
           nestedCountersInstance.countEvent('p2p', `adding sync-started message for first node`)
           /* prettier-ignore */ if (logFlags.verbose) console.log(`adding sync-started message for first node`)
+          console.log('isFirst', id, 'NodeList.selectedById', NodeList.selectedById)
           insertSyncStarted(id)
         } else {
           nestedCountersInstance.countEvent('p2p', `sending sync-started gossip to network`)
@@ -346,7 +346,6 @@ export function startupV2(): Promise<boolean> {
         // Note that attemptJoining isn't just to get on the standby list, but also
         // we will be checking above to see when our node is selected to go active
         if (resp?.isOnStandbyList === true) {
-
           if (state !== P2P.P2PTypes.NodeStatus.STANDBY) {
             updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
           }
@@ -370,9 +369,14 @@ export function startupV2(): Promise<boolean> {
             }
           }  
           */
-        
+
           if (isFirstRefresh) {
-            if (latestCycle.counter >= joinRequestCounter + Context.config.p2p.standbyListCyclesTTL - Context.config.p2p.cyclesToRefreshEarly) {
+            if (
+              latestCycle.counter >=
+              joinRequestCounter +
+                Context.config.p2p.standbyListCyclesTTL -
+                Context.config.p2p.cyclesToRefreshEarly
+            ) {
               isFirstRefresh = false
 
               submitStandbyRefresh(publicKey, latestCycle.counter)
@@ -384,7 +388,7 @@ export function startupV2(): Promise<boolean> {
             }
           } else if (cyclesElapsedSinceRefresh >= Context.config.p2p.standbyListCyclesTTL) {
             submitStandbyRefresh(publicKey, latestCycle.counter)
-            
+
             nestedCountersInstance.countEvent('p2p', `submitted KeepInStandby request`)
             /* prettier-ignore */ if (logFlags.verbose) console.log(`submitted KeepInStandby request`)
 
@@ -392,7 +396,7 @@ export function startupV2(): Promise<boolean> {
           }
 
           cyclesElapsedSinceRefresh += Context.config.p2p.attemptJoiningWaitMultiplier
-          
+
           // Call scheduler after 5 cycles... does this mean it may be 5 cycles before we realized we were
           // accepted to go active?
           // Looks like that is the worst case
@@ -928,7 +932,7 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
     restartCycleRecord.desired = Context.config.p2p.minNodes
     restartCycleRecord.duration = Context.config.p2p.cycleDuration
     CycleChain.prepend(restartCycleRecord)
-    isRestartNetwork = true
+    setRestartNetwork(true)
     if (Context.config.p2p.experimentalSnapshot && Context.config.features.archiverDataSubscriptionsUpdate) {
       const firstNodeDataRequest = {
         dataRequestCycle: activeNodesSigned.dataRequestCycle as number,
@@ -1125,6 +1129,11 @@ export function setIsFirst(val: boolean): void {
 
 export function getIsFirst(): boolean {
   return isFirst
+}
+
+export function setRestartNetwork(val: boolean): void {
+  info(`setRestartNetwork: ${val}`)
+  isRestartNetwork = val
 }
 
 function acceptedTrigger(): Promise<void> {

@@ -116,8 +116,8 @@ export function calculateToAccept(): number {
     CycleChain.newest.safetyMode === true
       ? CycleChain.newest.safetyNum
       : Math.floor(
-        config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor * CycleCreator.scaleFactorSyncBoost
-      )
+          config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor * CycleCreator.scaleFactorSyncBoost
+        )
 
   //The first batch of nodes to join the network after the seed node server can join at a higher rate if firstCycleJoin is set.
   //This first batch will sync the full data range from the seed node, which should be very little data.
@@ -174,19 +174,19 @@ export function calculateToAccept(): number {
     lastLoggedCycle = cycle
     info(
       'scale dump:' +
-      JSON.stringify({
-        cycle,
-        scaleFactor: CycleCreator.scaleFactor,
-        needed,
-        desired,
-        active,
-        syncing,
-        canSync,
-        syncMax,
-        maxJoin,
-        expired,
-        scaleFactorSyncBoost: CycleCreator.scaleFactorSyncBoost,
-      })
+        JSON.stringify({
+          cycle,
+          scaleFactor: CycleCreator.scaleFactor,
+          needed,
+          desired,
+          active,
+          syncing,
+          canSync,
+          syncMax,
+          maxJoin,
+          expired,
+          scaleFactorSyncBoost: CycleCreator.scaleFactorSyncBoost,
+        })
     )
   }
   return needed
@@ -256,7 +256,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     }
 
     record.syncing += record.startedSyncing.length
-    
+
     // these nodes are being repeated in lost and apop
     for (const nodeId of drainLostAfterSelectionNodes()) {
       record.lostAfterSelection.push(nodeId)
@@ -266,7 +266,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       record.finishedSyncing.push(nodeId)
     }
 
-    // drain our list of standby refresh TXs to the list 
+    // drain our list of standby refresh TXs to the list
     // not sure full network gossip is the way to go here...
     // what about TX sharing in cycle process?
     // the standby nodes would use a tell to get an active node to submit the tx?
@@ -274,7 +274,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     for (const standbyRefresh of drainNewStandbyRefreshRequests()) {
       record.standbyRefresh.push(standbyRefresh.publicKey)
     }
-    
+
     let standbyRemoved_Age = 0
     //let standbyRemoved_joined = 0
     let standbyRemoved_App = 0
@@ -454,7 +454,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   }
 
   // update self status?
-  
+
   const updated: P2P.NodeListTypes.Update[] = []
 
   if (record.startedSyncing.includes(Self.id)) {
@@ -466,7 +466,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
     if (NodeList.selectedById.has(nodeId)) {
       updated.push({
         id: nodeId,
-        status: P2P.P2PTypes.NodeStatus.SYNCING
+        status: P2P.P2PTypes.NodeStatus.SYNCING,
       })
     }
   }
@@ -520,7 +520,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   for (const refreshedPubKey of record.standbyRefresh) {
     if (standbyMap.has(refreshedPubKey) === false) continue
     const refreshedStandbyInfo = standbyMap.get(refreshedPubKey)
-    
+
     refreshedStandbyInfo.nodeInfo.refreshedCounter = record.counter
   }
 
@@ -600,8 +600,8 @@ export interface JoinRequestResponse {
  * @param {P2P.JoinTypes.JoinRequest} joinRequest - The request object containing information about the joining node.
  * @returns {JoinRequestResponse} The result of the join request, with details about acceptance or rejection.
  * @throws {Error} Throws an error if the validation of the join request fails.
- * 
- * 
+ *
+ *
  */
 export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse {
   if (Self.p2pIgnoreJoinRequests === true) {
@@ -639,7 +639,7 @@ export async function firstJoin(): Promise<string> {
   if (CycleChain.newest) {
     // TODO: add extra check if newest.mode === 'shutdown' later after shutdown is implemented
     // If there is a cycle provided by the archiver, use it
-    marker = CycleChain.newest['marker']
+    marker = CycleChain.newest['previous']
     record = CycleChain.newest
   } else {
     // Create join request from 000... cycle marker

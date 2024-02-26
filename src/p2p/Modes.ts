@@ -154,7 +154,11 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   if ((networkMode === 'restart' || networkMode === 'recovery') && record.mode === 'restore') {
     Self.emitter.emit('restore', record.counter)
   }
+  if (networkMode === 'restore' && record.mode === 'processing') {
+    Self.setRestartNetwork(false)
+  }
   networkMode = record.mode
+  if (networkMode === 'restart' && !Self.isRestartNetwork) Self.setRestartNetwork(true)
   return {
     added: [],
     removed: [],

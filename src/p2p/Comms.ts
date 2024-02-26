@@ -613,14 +613,14 @@ function isNodeValidForInternalMessage(
   if (node == null) {
     if (logErrors)
       if (logFlags.error)
-        /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(node.id)} ${debugMsg}`)
+        /* prettier-ignore */ error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(node.id)} ${debugMsg}`)
     return false
   }
   const nodeStatus = node.status
-  if (nodeStatus != 'active' || NodeList.potentiallyRemoved.has(node.id)) {
+  if (!Self.isRestartNetwork && (nodeStatus != 'active' || NodeList.potentiallyRemoved.has(node.id))) {
     if (logErrors)
       if (logFlags.error)
-        /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(node.id)} ${debugMsg}`)
+        /* prettier-ignore */ error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(node.id)} ${debugMsg}`)
     return false
   }
 
@@ -632,7 +632,7 @@ function isNodeValidForInternalMessage(
       return true
     } else {
       // if (logErrors)
-      //   this.mainLogger.debug(
+      //   error(
       //     `isNodeUpRecentOverride: ${age} upRecent = false. no recent TX, but this is not a fail conditions`
       //   )
       // return false //not a fail conditions
@@ -644,7 +644,7 @@ function isNodeValidForInternalMessage(
     if (down === true) {
       if (logErrors)
         if (logFlags.error)
-          /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(node.id)} ${debugMsg}`)
+          /* prettier-ignore */ error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(node.id)} ${debugMsg}`)
       return false
     }
   }
@@ -652,7 +652,7 @@ function isNodeValidForInternalMessage(
     if (isNodeLost(node.id) === true) {
       if (logErrors)
         if (logFlags.error)
-          /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(node.id)} ${debugMsg}`)
+          /* prettier-ignore */ error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(node.id)} ${debugMsg}`)
       return false
     }
   }

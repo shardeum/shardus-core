@@ -3562,7 +3562,7 @@ class StateManager {
       return false
     }
     const nodeStatus = node.status
-    if (nodeStatus != 'active' || potentiallyRemoved.has(node.id)) {
+    if ((!Self.isRestartNetwork && nodeStatus != 'active') || potentiallyRemoved.has(node.id)) {
       if (logErrors)
         if (logFlags.error)
           /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
