@@ -692,11 +692,11 @@ class Shardus extends EventEmitter {
       console.log('time in cycle ', timeInCycle)
       if (CycleChain.getNewest() && timeInCycle > CycleChain.getNewest()?.duration / 4) {
         console.log('inside wait for q1 in sync-finished')
-        nestedCountersInstance.countEvent('p2p', 'quarter >= 3. Waiting until Q1 of next cycle to send sync-started gossip')
-        /* prettier-ignore */ if (logFlags.verbose) console.log('quarter >= 3. Waiting until Q1 of next cycle to send sync-started gossip')
+        nestedCountersInstance.countEvent('p2p', 'quarter > 1. Waiting until Q1 of next cycle to send sync-started gossip')
+        /* prettier-ignore */ if (logFlags.verbose) console.log('quarter > 1. Waiting until Q1 of next cycle to send sync-started gossip')
 
         // +5 is an arbitrary number I added so we wait 5s into q1 to send gossip
-        await new Promise(resolve => setTimeout(resolve, (CycleChain.getNewest()?.duration - timeInCycle + 5) * 1000));
+        await new Promise(resolve => setTimeout(resolve, (CycleChain.getNewest()?.duration - timeInCycle + Context.config.p2p.cycleGossipDelayBuffer) * 1000));
       }
       let readyPayload = {
         nodeId: Self.id,
@@ -1035,6 +1035,8 @@ class Shardus extends EventEmitter {
       console.log('syncAppData - isFirstSeed')
       //await this.p2p.goActive()
       //console.log('syncAppData - goActive')
+      // we don't have a delay here as there's practically no time between sync-started and sync-finished for the first node
+      // since we already wait fro sync-finished, its very unlikely we'll be in the wrong quarter
       insertSyncFinished(Self.id)
       console.log('syncAppData - insertSyncFinished')
       await this.stateManager.waitForShardCalcs()
@@ -1053,18 +1055,18 @@ class Shardus extends EventEmitter {
       //await this.p2p.goActive()
       //console.log('syncAppData - goActive')
 
-      // if quarter >= 3 , wait till next cycle's q1 to send sync-finished gossip
+      // if quarter > 1 , wait till next cycle's q1 to send sync-finished gossip
       const currentTime = shardusGetTime()
 
       const timeInCycle = currentTime/1000 - (CycleChain.getNewest()?.start + CycleChain.getNewest()?.duration)
       console.log('time in cycle ', timeInCycle)
-      if (CycleChain.getNewest() && timeInCycle > CycleChain.getNewest()?.duration / 2) {
+      if (CycleChain.getNewest() && timeInCycle > CycleChain.getNewest()?.duration / 4) {
         console.log('inside wait for q1 in sync-finished')
-        nestedCountersInstance.countEvent('p2p', 'quarter >= 3. Waiting until Q1 of next cycle to send sync-started gossip')
-        /* prettier-ignore */ if (logFlags.verbose) console.log('quarter >= 3. Waiting until Q1 of next cycle to send sync-started gossip')
+        nestedCountersInstance.countEvent('p2p', 'quarter > 1. Waiting until Q1 of next cycle to send sync-started gossip')
+        /* prettier-ignore */ if (logFlags.verbose) console.log('quarter > 1. Waiting until Q1 of next cycle to send sync-started gossip')
 
         // +5 is an arbitrary number I added so we wait 5s into q1 to send gossip
-        await new Promise(resolve => setTimeout(resolve, (CycleChain.getNewest()?.duration - timeInCycle + 5) * 1000));
+        await new Promise(resolve => setTimeout(resolve, (CycleChain.getNewest()?.duration - timeInCycle + Context.config.p2p.cycleGossipDelayBuffer) * 1000));
       }
       let readyPayload = {
         nodeId: Self.id,

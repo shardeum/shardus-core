@@ -849,6 +849,8 @@ export interface ServerConfiguration {
     cyclesToRefreshEarly: number
     /** Sort record.finishedSyning in updateRecord of Join/index.ts */
     sortSyncFinished: boolean
+    /** wait X seconds before sending gossip so that slight time variations across the network are less likely to have a boundary condition where some nodes are in a different quarter */
+    cycleGossipDelayBuffer: number
   }
   /** Server IP configuration */
   ip?: {

@@ -191,18 +191,18 @@ export function startupV2(): Promise<boolean> {
         // Sync cycle chain from network
         await syncCycleChain(id)
 
-        // if syncCycleChain takes really long time and its not q2 anymore, wait till next cycle's q1 to send sync-started gossi[]
+        // if syncCycleChain takes really long time and its not q1 anymore, wait till next cycle's q1 to send sync-started gossi[]
         const currentTime = shardusGetTime()
 
         const timeInCycle = currentTime/1000 - (CycleChain.getNewest()?.start + CycleChain.getNewest()?.duration)
         console.log('time in cycle ', timeInCycle)
-        if (CycleChain.getNewest() && timeInCycle > CycleChain.getNewest()?.duration / 2) {
+        if (CycleChain.getNewest() && timeInCycle > CycleChain.getNewest()?.duration / 4) {
           console.log('inside wait for q1 in sync-started')
-          nestedCountersInstance.countEvent('p2p', 'quarter >= 3. Waiting until Q1 of next cycle to send sync-started gossip')
-          /* prettier-ignore */ if (logFlags.verbose) console.log('quarter >= 3. Waiting until Q1 of next cycle to send sync-started gossip')
+          nestedCountersInstance.countEvent('p2p', 'quarter > 1. Waiting until Q1 of next cycle to send sync-started gossip')
+          /* prettier-ignore */ if (logFlags.verbose) console.log('quarter > 1. Waiting until Q1 of next cycle to send sync-started gossip')
 
           // +5 is an arbitrary number I added so we wait 5s into q1 to send gossip
-          await new Promise(resolve => setTimeout(resolve, (CycleChain.getNewest()?.duration - timeInCycle + 5) * 1000));
+          await new Promise(resolve => setTimeout(resolve, (CycleChain.getNewest()?.duration - timeInCycle + Context.config.p2p.cycleGossipDelayBuffer) * 1000));
         }
 
         let payload = {
