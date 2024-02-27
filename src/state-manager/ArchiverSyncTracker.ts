@@ -582,8 +582,10 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
         if (result.error === 'Archiver is busy serving other validators at the moment!') {
           receivedBusyMessageTimes++
           retryWithNextArchiver('archiver success:false', 'Archiver is busy serving other validators')
+          /* prettier-ignore */ nestedCountersInstance.countEvent(`archiver_sync`, `archiver is busy`)
         } else {
           retryWithNextArchiver('archiver success:false', result.error)
+          /* prettier-ignore */ nestedCountersInstance.countEvent(`archiver_sync`, `archiver is other error: ${result.error}`)
         }
         continue
       }
