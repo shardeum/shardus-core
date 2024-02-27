@@ -32,7 +32,7 @@ import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { updateNodeState } from '../Self'
 import { HTTPError } from 'got'
 import { drainLostAfterSelectionNodes, drainSyncStarted, lostAfterSelection } from './v2/syncStarted'
-import { drainFinishedSyncingRequest } from './v2/syncFinished'
+import { drainFinishedSyncingRequest, newSyncFinishedNodes } from './v2/syncFinished'
 //import { getLastCycleStandbyRefreshRequest, resetLastCycleStandbyRefreshRequests, drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
 import { drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
 import rfdc from 'rfdc'
@@ -261,6 +261,9 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     for (const nodeId of drainLostAfterSelectionNodes()) {
       record.lostAfterSelection.push(nodeId)
     }
+
+    console.log('newSyncFinished nodes ', newSyncFinishedNodes)
+
     // add node id from newSyncFinishedNodes to the finishedSyncing list to update readyByTimeAndIdOrder when parsed
     for (const nodeId of drainFinishedSyncingRequest()) {
       console.log(`drainFinishedSyncingRequest: ${nodeId}`)

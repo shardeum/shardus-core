@@ -670,7 +670,7 @@ class Shardus extends EventEmitter {
       try {
         this.stateManager.renewState()
         await this.stateManager.accountSync.initialSyncMain(3)
-        console.log('syncAppData - initialSyncMain finished')
+        console.log('restore - initialSyncMain finished')
         nestedCountersInstance.countEvent('restore', `restore event: syncAppData finished. ${shardusGetTime()}`)
       } catch (err) {
         console.log(utils.formatErrorMessage(err))
@@ -680,7 +680,7 @@ class Shardus extends EventEmitter {
       }
       // After restoring state data, set syncing flags to true and go active
       await this.stateManager.startCatchUpQueue()
-      console.log('syncAppData - startCatchUpQueue')
+      console.log('restore - startCatchUpQueue')
       nestedCountersInstance.countEvent('restore', `restore event: finished startCatchUpQueue. ${shardusGetTime()}`)
       //await this.p2p.goActive()
       //console.log('syncAppData - goActive')
@@ -689,6 +689,8 @@ class Shardus extends EventEmitter {
         cycleNumber: CycleChain.getNewest()?.counter,
       }
       readyPayload = Context.crypto.sign(readyPayload)
+      console.log('restore - sent gossip sync-finished')
+      insertSyncFinished(Self.id)
       Comms.sendGossip('gossip-sync-finished', readyPayload)
 
       nestedCountersInstance.countEvent('restore', `restore event: sendGossip gossip-sync-finished ${shardusGetTime()}`)

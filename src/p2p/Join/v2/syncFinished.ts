@@ -22,6 +22,11 @@ export interface FinishedSyncingRequestResponse {
 export function addFinishedSyncing(
   finishedSyncRequest: FinishedSyncingRequest
 ): FinishedSyncingRequestResponse {
+
+  let nodePort
+  const node = NodeList.byIdOrder.find(node => node.id === finishedSyncRequest.nodeId)
+  if (node) nodePort = node.externalPort
+
   // validate
   // lookup node by id in payload and use pubkey and compare to sig.owner
   const publicKeysMatch =
@@ -67,6 +72,7 @@ export function addFinishedSyncing(
   }
 
   console.log(`addFinishedSyncing: ${finishedSyncRequest.nodeId}`)
+  console.log(`pushing ${nodePort} to newSyncFinished`)
   newSyncFinishedNodes.push(finishedSyncRequest.nodeId)
   /* prettier-ignore */ nestedCountersInstance.countEvent('syncFinished.ts', `addFinishedSyncing(): success` )
   return {
