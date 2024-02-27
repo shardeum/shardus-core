@@ -23,7 +23,7 @@ import {
   getLastHashedStandbyList,
   getStandbyNodesInfoMap,
   saveJoinRequest,
-  standbyNodesRefresh,
+  standbyNodesInfoHashes,
 } from './v2'
 import { err, ok, Result } from 'neverthrow'
 import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
@@ -527,6 +527,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
     const refreshedStandbyInfo = standbyMap.get(refreshedPubKey)
 
     refreshedStandbyInfo.nodeInfo.refreshedCounter = record.counter
+    standbyNodesInfoHashes.set(refreshedPubKey, crypto.hash(refreshedStandbyInfo))
   }
 
   return {
