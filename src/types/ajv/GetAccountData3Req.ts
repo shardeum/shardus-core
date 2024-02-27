@@ -1,6 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
 
-// Defining the AJV schema for GetAccountData3Req
 const schemaGetAccountData3Req = {
   type: 'object',
   properties: {

@@ -1961,6 +1961,7 @@ class StateManager {
     this.p2p.unregisterInternal(InternalRouteEnum.binary_sync_trie_hashes)
     this.p2p.unregisterInternal(InternalRouteEnum.binary_compare_cert)
     this.p2p.unregisterInternal(InternalRouteEnum.binary_get_trie_hashes)
+    this.p2p.unregisterInternal(InternalRouteEnum.binary_spread_tx_to_group_syncing)
   }
 
   // //////////////////////////////////////////////////////////////////////////

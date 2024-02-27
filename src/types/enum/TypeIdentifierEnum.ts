@@ -27,4 +27,5 @@ export enum TypeIdentifierEnum {
   cGetTrieHashesResp,
   cGetAccountDataByHashesReq,
   cGetAccountDataByHashesResp,
+  cSpreadTxToGroupSyncingReq,
 }
