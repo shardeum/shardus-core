@@ -463,14 +463,13 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
   sender: P2P.NodeListTypes.Node['id'],
   tracker: string
 ) => {
-  // let nodePort
-  // const node = NodeList.byIdOrder.find(node => node.id === payload.nodeId)
-  // if (node) nodePort = node.externalPort
-  // console.log(`recieved gossip from ${nodePort}`)
   profilerInstance.scopedProfileSectionStart('gossip-sync-finished')
   try {
     // Do not forward gossip after quarter 2
-    if (CycleCreator.currentQuarter >= 3) return
+    if (CycleCreator.currentQuarter >= 3) {
+      /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('gossipSyncFinished rejected: due to currentQuarter >= 3', payload.nodeId, CycleCreator.currentQuarter)
+      return
+    }
 
     /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('gossipSyncFinishedRoute: after quarter check')
 

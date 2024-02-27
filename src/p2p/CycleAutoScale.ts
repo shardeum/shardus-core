@@ -423,7 +423,7 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
       /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in restart")
       if (syncing < desired) {
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: entered syncing < desired")
-        let add = ~~(0.2 * syncing) // Add 20% more nodes on each cycle
+        let add = ~~(0.5 * syncing) // Add 50% more nodes on each cycle
         if (add < 7) {
           add = 7
         }
