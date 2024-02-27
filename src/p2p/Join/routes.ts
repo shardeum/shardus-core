@@ -481,7 +481,7 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
     if (addFinishedSyncingResult.success) {
       Comms.sendGossip('gossip-sync-finished', payload, tracker, sender, NodeList.byIdOrder, false)
     } else {
-      /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('gossipSyncFinishedRoute: addFinishedSyncing failed')
+      /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`gossipSyncFinishedRoute: addFinishedSyncing failed: ${addFinishedSyncingResult.reason} fatal:${addFinishedSyncingResult.fatal} node:${payload.nodeId} cycle:${payload.cycleNumber}`)
     }
   } finally {
     profilerInstance.scopedProfileSectionEnd('gossip-sync-finished')
