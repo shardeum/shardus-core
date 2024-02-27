@@ -79,6 +79,7 @@ import { Logger as Log4jsLogger } from 'log4js'
 import { timingSafeEqual } from 'crypto'
 import { shardusGetTime } from '../network'
 import { isServiceMode } from '../debug'
+import { modeAllowsValidNodeChecks } from '../p2p/Comms'
 
 export type Callback = (...args: unknown[]) => void
 
@@ -1638,7 +1639,7 @@ class StateManager {
           // we cast up the array return type because we have attached the seenInQueue memeber to the data.
           result.accountData = accountData as Shardus.WrappedDataFromQueue[]
           responseSize = await respond(result)
-        } catch(ex) {
+        } catch (ex) {
           //we dont want to delay. let the asking node know qukcly so it can try again
           responseSize = await respond(false)
         } finally {
@@ -2213,7 +2214,7 @@ class StateManager {
     if (accountIsRemote) {
       let randomConsensusNode: P2PTypes.NodeListTypes.Node
       const preCheckLimit = 5
-      for(let i=0;i< preCheckLimit; i++) {
+      for (let i = 0; i < preCheckLimit; i++) {
         randomConsensusNode = this.transactionQueue.getRandomConsensusNodeForAccount(address)
         if (randomConsensusNode == null) {
           throw new Error(`getLocalOrRemoteAccount: no consensus node found`)
@@ -2221,8 +2222,12 @@ class StateManager {
         // Node Precheck!.  this check our internal records to find a good node to talk to.
         // it is worth it to look through the list if needed.
         if (
-          this.isNodeValidForInternalMessage(randomConsensusNode.id, 'getLocalOrRemoteAccount', true, true) ===
-          false
+          this.isNodeValidForInternalMessage(
+            randomConsensusNode.id,
+            'getLocalOrRemoteAccount',
+            true,
+            true
+          ) === false
         ) {
           //we got to the end of our tries?
           if (i >= preCheckLimit - 1) {
@@ -3561,8 +3566,15 @@ class StateManager {
           /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
       return false
     }
+
+    // Some modes are not compatible with doing a valid node check for outgoing messages
+    // if that is the case just return true and allow the message
+    if (modeAllowsValidNodeChecks() === false) {
+      return true
+    }
+
     const nodeStatus = node.status
-    if ((!Self.isRestartNetwork && nodeStatus != 'active') || potentiallyRemoved.has(node.id)) {
+    if (nodeStatus != 'active' || potentiallyRemoved.has(node.id)) {
       if (logErrors)
         if (logFlags.error)
           /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)

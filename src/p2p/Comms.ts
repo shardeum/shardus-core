@@ -610,9 +610,6 @@ function isNodeValidForInternalMessage(
   checkForNodeLost = true,
   checkIsUpRecent = true
 ): boolean {
-
-  if (shouldIgnoreDownChecks()) return true
-
   const logErrors = logFlags.debug
   if (node == null) {
     if (logErrors)
@@ -620,7 +617,26 @@ function isNodeValidForInternalMessage(
         /* prettier-ignore */ error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(node.id)} ${debugMsg}`)
     return false
   }
+
+  // Some modes are not compatible with doing a valid node check for outgoing messages
+  // if that is the case just return true and allow the message
+  if (modeAllowsValidNodeChecks() === false) {
+    return true
+  }
+
   const nodeStatus = node.status
+
+  // need to consider if these statuses should be allowed for internal messages by this function!
+  // maybe we are doing ourselves a favor by filtering these out.
+  // SELECTED = "selected",
+  // SYNCING = "syncing",
+  // READY = "ready",
+
+  // this could cause different cycle records based on potentiallyRemoved
+  // we should create a new if check called checkPotentiallyRemoved and review
+  // each calling site (or site that calls the gossip, yay more parameters)
+
+  // Also may add a flag to change if we also allow other statuses
   if (nodeStatus != 'active' || NodeList.potentiallyRemoved.has(node.id)) {
     if (logErrors)
       if (logFlags.error)
@@ -664,15 +680,32 @@ function isNodeValidForInternalMessage(
   return true
 }
 
-function shouldIgnoreDownChecks() {
+/**
+ * Are we in a mode that should be doing additional "validNode" checks
+ * before sending an outgoing message
+ * @returns
+ */
+export function modeAllowsValidNodeChecks() {
   const newestCycle = CycleChain.newest
   if (newestCycle) {
-    if (newestCycle.mode === 'processing') return false
-    if (Self.isRestartNetwork || newestCycle.mode === 'recovery' || newestCycle.mode === 'restart' || newestCycle.mode === 'restore') {
+    if (newestCycle.mode === 'processing') {
       return true
     }
+    if (newestCycle.mode === 'forming') {
+      return true
+    }
+    // really important to not run these extra checks in the following modes as they can break if they ignore
+    // sending gossipe.  the valid node tests may also not have the correct logic to work with these modes
+    if (
+      Self.isRestartNetwork ||
+      newestCycle.mode === 'recovery' ||
+      newestCycle.mode === 'restart' ||
+      newestCycle.mode === 'restore'
+    ) {
+      return false
+    }
   }
-  return false
+  return true
 }
 
 /**
