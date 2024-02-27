@@ -185,13 +185,30 @@ export function startupV2(): Promise<boolean> {
         // Should fire after being accepted into the network
         emitter.emit('joined', id, publicKey)
 
+        console.log('node id: ', id)
+
         nestedCountersInstance.countEvent('p2p', 'joined')
         // Sync cycle chain from network
         await syncCycleChain(id)
 
+        // if syncCycleChain takes really long time and its not q1 anymore, wait till next cycle's q1 to send sync-started gossi[]
+        const newestCycle = CycleChain.getNewest()
+        const currentTime = shardusGetTime()
+
+        const timeInCycle = currentTime/1000 - (newestCycle?.start + newestCycle?.duration)
+        console.log('time in cycle ', timeInCycle)
+        if (newestCycle && timeInCycle > newestCycle?.duration / 4) {
+          console.log('inside wait for q1 in sync-started')
+          nestedCountersInstance.countEvent('p2p', 'not in Q1 anymore. Waiting until Q1 of next cycle to send sync-started gossip')
+          /* prettier-ignore */ if (logFlags.verbose) console.log('not in Q1 anymore. Waiting until Q1 of next cycle to send sync-started gossip')
+
+          // +5 is an arbitrary number I added so we wait 5s into q1 to send gossip
+          await new Promise(resolve => setTimeout(resolve, newestCycle?.duration - timeInCycle + 5));
+        }
+
         let payload = {
           nodeId: id,
-          cycleNumber: CycleChain.getNewest()?.counter,
+          cycleNumber: newestCycle?.counter,
         }
         payload = Context.crypto.sign(payload)
         // send a sync-started message to the network if you are not the first node
@@ -843,7 +860,7 @@ async function syncCycleChain(selfId: string): Promise<void> {
   await checkNodeId(nodeMatch, selfId)
 }
 
-async function checkNodeId(nodeMatch: (node: any) => boolean, selfId: string) {
+async function checkNodeId(nodeMatch: (node: any) => boolean, selfId: string): Promise<void> {
   const newestCycle = CycleChain.getNewest()
 
   let node = newestCycle.joinedConsensors.find(nodeMatch)
