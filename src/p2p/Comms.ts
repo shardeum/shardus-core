@@ -725,7 +725,10 @@ export async function sendGossip(
   // [TODO] Don't copy the node list once sorted lists are passed in
   const nodes = [...inpNodes]
 
-  if (nodes.length === 0) return
+  if (nodes.length === 0) {
+    /* prettier-ignore */ nestedCountersInstance.countEvent( 'gossip-filter', `no recipients for ${type}` )
+    return
+  }
 
   if (tracker === '') {
     tracker = createGossipTracker()
@@ -806,6 +809,7 @@ export async function sendGossip(
 
     // Filter recipients to only include those that are valid
     if (config.p2p.preGossipNodeCheck) {
+      const oldCount = recipients.length
       recipients = recipients.filter((node) => {
         if (
           isNodeValidForInternalMessage(
@@ -818,13 +822,17 @@ export async function sendGossip(
         ) {
           return true
         } else {
-          nestedCountersInstance.countEvent('p2p-skip-send', 'skipping gossip')
-          nestedCountersInstance.countEvent(
-            'p2p-skip-send',
-            `skipping gossip ${node.internalIp}:${node.externalPort}`
-          )
+          /* prettier-ignore */ nestedCountersInstance.countEvent('p2p-skip-send', 'skipping gossip')
+          /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p-skip-send', `skipping gossip ${node.internalIp}:${node.externalPort}` )
         }
       })
+      const newCount = recipients.length
+      if (oldCount != newCount) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('gossip-filter', `filter ${type} oldCount ${oldCount} newCount${newCount}`)
+      }
+      if (oldCount > 0 && newCount === 0) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent( 'gossip-filter', `all recipients removed from ${type} oldCount ${oldCount}` )
+      }
     }
 
     msgSize = await tell(recipients, 'gossip', gossipPayload, true, tracker, type)

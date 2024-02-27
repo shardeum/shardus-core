@@ -1133,6 +1133,7 @@ export function getIsFirst(): boolean {
 
 export function setRestartNetwork(val: boolean): void {
   info(`setRestartNetwork: ${val}`)
+  nestedCountersInstance.countEvent('restore', `setRestartNetwork: ${val} ${shardusGetTime()}`)
   isRestartNetwork = val
 }
 
