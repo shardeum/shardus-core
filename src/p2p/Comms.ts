@@ -721,7 +721,7 @@ export async function sendGossip(
   isOrigin = false,
   factor = -1
 ) {
-  console.log('entered sendGossip gossiping ', type)
+  //console.log('entered sendGossip gossiping ', type)
   let msgSize = cUninitializedSize
   // [TODO] Don't copy the node list once sorted lists are passed in
   const nodes = [...inpNodes]
@@ -753,12 +753,12 @@ export async function sendGossip(
   // nodes.sort((first, second) => first.id.localeCompare(second.id, 'en', { sensitivity: 'variant' }))
   nodes.sort(sortByID)
   const nodeIdxs = new Array(nodes.length).fill(0).map((curr, idx) => idx) // [TODO]  - we need to make sure that we never iterate, or copy the full nodes list. Assume it could be a million nodes.
-  console.log('nodeIdxs ', nodeIdxs)
+  //console.log('nodeIdxs ', nodeIdxs)
   // Find out your own index in the nodes array
   const myIdx = nodes.findIndex((node) => node.id === Self.id)
-  console.log('myIdx ', myIdx)
+  //console.log('myIdx ', myIdx)
   if (myIdx < 0) {
-    console.log(`Failed to sendGossip. Could not find self in nodes array ${type}`)
+    //console.log(`Failed to sendGossip. Could not find self in nodes array ${type}`)
     // throw new Error('Could not find self in nodes array')
     error(`Failed to sendGossip. Could not find self in nodes array ${type}`)
     return msgSize
@@ -777,7 +777,7 @@ export async function sendGossip(
     if (originNode) originIdx = nodes.findIndex((node) => node.id === originNode.id)
   }
 
-  console.log('originIdx ', originIdx)
+  //console.log('originIdx ', originIdx)
 
   if (originIdx !== undefined && originIdx >= 0) {
     // If it is protocol tx signed by a node in the network
@@ -787,7 +787,7 @@ export async function sendGossip(
     recipientIdxs = utils.getLinearGossipList(nodeIdxs.length, gossipFactor, myIdx, isOrigin)
   }
 
-  console.log('recipientIdxs ', recipientIdxs)
+  //console.log('recipientIdxs ', recipientIdxs)
 
   // Map back recipient idxs to node objects
   let recipients: P2P.NodeListTypes.Node[] = recipientIdxs.map((idx) => nodes[idx])
@@ -795,7 +795,7 @@ export async function sendGossip(
     recipients = utils.removeNodesByID(recipients, [sender])
   }
   try {
-    console.log('entered try')
+    //console.log('entered try')
     if (logFlags.verbose && logFlags.p2pNonFatal) {
       info(
         `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
@@ -816,8 +816,8 @@ export async function sendGossip(
       /* prettier-ignore */ nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `sendGossip ${type} recipients: ${recipients.length}`)
     }
 
-    console.log('recipients before filter')
-    recipients.forEach(node => console.log(node.externalPort))
+    //console.log('recipients before filter')
+    //recipients.forEach(node => console.log(node.externalPort))
 
     // Filter recipients to only include those that are valid
     if (config.p2p.preGossipNodeCheck) {
@@ -847,12 +847,12 @@ export async function sendGossip(
       }
     }
 
-    console.log('recipients after filter')
-    recipients.forEach(node => console.log(node.externalPort))
+    //console.log('recipients after filter')
+    //recipients.forEach(node => console.log(node.externalPort))
 
     msgSize = await tell(recipients, 'gossip', gossipPayload, true, tracker, type)
   } catch (ex) {
-    console.log('entered catch ', ex)
+    //console.log('entered catch ', ex)
     if (logFlags.verbose) {
       error(`Failed to sendGossip(${type}, ${utils.stringifyReduce(payload)}) Exception => ${ex}`)
     }

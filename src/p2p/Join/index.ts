@@ -262,11 +262,11 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       record.lostAfterSelection.push(nodeId)
     }
 
-    console.log('newSyncFinished nodes ', newSyncFinishedNodes)
+    /* prettier-ignore */ if (logFlags.verbose) console.log('newSyncFinished nodes ', newSyncFinishedNodes)
 
     // add node id from newSyncFinishedNodes to the finishedSyncing list to update readyByTimeAndIdOrder when parsed
     for (const nodeId of drainFinishedSyncingRequest()) {
-      console.log(`drainFinishedSyncingRequest: ${nodeId}`)
+      /* prettier-ignore */ if (logFlags.verbose) console.log(`drainFinishedSyncingRequest: ${nodeId}`)
       record.finishedSyncing.push(nodeId)
     }
 
@@ -495,7 +495,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   // TODO: [] (BUI) okay to use record.start instead of cycle.start? had problem for first node with cycle.start
   //const cycle = this.p2p.state.getLastCycle()
   for (const node of finishedSyncing) {
-    console.log(`parseRecord:FinishedSyncing: ${node}`)
+    /* prettier-ignore */ if (logFlags.verbose) console.log(`parseRecord:FinishedSyncing: ${node}`)
     updated.push({
       id: node,
       status: P2P.P2PTypes.NodeStatus.READY,

@@ -6,6 +6,7 @@ import { crypto } from '../../Context'
 import { nestedCountersInstance } from '../../../utils/nestedCounters'
 import { config } from '../../Context'
 import { P2P } from '@shardus/types'
+import { logFlags } from '../../../logger'
 
 //** List of synced nodes */
 export let newSyncFinishedNodes: string[] = []
@@ -23,15 +24,10 @@ export function addFinishedSyncing(
   finishedSyncRequest: FinishedSyncingRequest
 ): FinishedSyncingRequestResponse {
 
-  let nodePort
-  const node = NodeList.byIdOrder.find(node => node.id === finishedSyncRequest.nodeId)
-  if (node) nodePort = node.externalPort
-
+  const node = NodeList.byIdOrder.find((node) => node.id === finishedSyncRequest.nodeId)
   // validate
   // lookup node by id in payload and use pubkey and compare to sig.owner
-  const publicKeysMatch =
-    (NodeList.byIdOrder.find((node) => node.id === finishedSyncRequest.nodeId)?.publicKey ||
-      crypto.keypair.publicKey) === finishedSyncRequest.sign.owner
+  const publicKeysMatch = (node?.publicKey || crypto.keypair.publicKey) === finishedSyncRequest.sign.owner
   if (!publicKeysMatch) {
     /* prettier-ignore */ nestedCountersInstance.countEvent('syncFinished.ts', `addFinishedSyncing(): publicKeysMatch failed` )
     return {
@@ -71,8 +67,7 @@ export function addFinishedSyncing(
     }
   }
 
-  console.log(`addFinishedSyncing: ${finishedSyncRequest.nodeId}`)
-  console.log(`pushing ${nodePort} to newSyncFinished`)
+  /* prettier-ignore */ if (logFlags.verbose) console.log(`addFinishedSyncing: ${finishedSyncRequest.nodeId} port:${node?.externalPort}`)
   newSyncFinishedNodes.push(finishedSyncRequest.nodeId)
   /* prettier-ignore */ nestedCountersInstance.countEvent('syncFinished.ts', `addFinishedSyncing(): success` )
   return {
@@ -99,7 +94,7 @@ export function drainFinishedSyncingRequest(): string[] {
 export function insertSyncFinished(nodeId: string): void {
   console.log(`insertSyncFinished: ${nodeId}`)
   newSyncFinishedNodes.push(nodeId)
-  /* prettier-ignore */ console.log(`insertSyncFinished(): Node added to newSyncFinishedNodes list`)
+  /* prettier-ignore */ if (logFlags.verbose) console.log(`insertSyncFinished(): Node added to newSyncFinishedNodes list`)
 }
 
 /**
