@@ -693,11 +693,11 @@ class Shardus extends EventEmitter {
       console.log('time in cycle ', timeInCycle)
       if (newestCycle && timeInCycle > newestCycle?.duration / 4) {
         console.log('inside wait for q1 in sync-finished')
-        nestedCountersInstance.countEvent('p2p', 'not in Q1 anymore. Waiting until Q1 of next cycle to send sync-started gossip')
-        /* prettier-ignore */ if (logFlags.verbose) console.log('not in Q1 anymore. Waiting until Q1 of next cycle to send sync-started gossip')
+        nestedCountersInstance.countEvent('p2p', 'quarter >= 3. Waiting until Q1 of next cycle to send sync-started gossip')
+        /* prettier-ignore */ if (logFlags.verbose) console.log('quarter >= 3. Waiting until Q1 of next cycle to send sync-started gossip')
 
         // +5 is an arbitrary number I added so we wait 5s into q1 to send gossip
-        await new Promise(resolve => setTimeout(resolve, newestCycle?.duration - timeInCycle + 5));
+        await new Promise(resolve => setTimeout(resolve, (newestCycle?.duration - timeInCycle + 5) * 1000));
       }
       let readyPayload = {
         nodeId: Self.id,
@@ -1053,20 +1053,20 @@ class Shardus extends EventEmitter {
       console.log('p2pIgnoreJoinRequests = false')
       //await this.p2p.goActive()
       //console.log('syncAppData - goActive')
-      
-      // if we are not in q1 anymore, wait till next cycle's q1 to send sync-finished gossip
+
+      // if quarter >= 3 , wait till next cycle's q1 to send sync-finished gossip
       const newestCycle = CycleChain.getNewest()
       const currentTime = shardusGetTime()
 
       const timeInCycle = currentTime/1000 - (newestCycle?.start + newestCycle?.duration)
       console.log('time in cycle ', timeInCycle)
-      if (newestCycle && timeInCycle > newestCycle?.duration / 4) {
+      if (newestCycle && timeInCycle > newestCycle?.duration / 2) {
         console.log('inside wait for q1 in sync-finished')
-        nestedCountersInstance.countEvent('p2p', 'not in Q1 anymore. Waiting until Q1 of next cycle to send sync-started gossip')
-        /* prettier-ignore */ if (logFlags.verbose) console.log('not in Q1 anymore. Waiting until Q1 of next cycle to send sync-started gossip')
+        nestedCountersInstance.countEvent('p2p', 'quarter >= 3. Waiting until Q1 of next cycle to send sync-started gossip')
+        /* prettier-ignore */ if (logFlags.verbose) console.log('quarter >= 3. Waiting until Q1 of next cycle to send sync-started gossip')
 
         // +5 is an arbitrary number I added so we wait 5s into q1 to send gossip
-        await new Promise(resolve => setTimeout(resolve, newestCycle?.duration - timeInCycle + 5));
+        await new Promise(resolve => setTimeout(resolve, (newestCycle?.duration - timeInCycle + 5) * 1000));
       }
       let readyPayload = {
         nodeId: Self.id,
