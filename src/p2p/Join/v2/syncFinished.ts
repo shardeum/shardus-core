@@ -66,6 +66,7 @@ export function addFinishedSyncing(
     }
   }
 
+  console.log(`addFinishedSyncing: ${finishedSyncRequest.nodeId}`)
   newSyncFinishedNodes.push(finishedSyncRequest.nodeId)
   /* prettier-ignore */ nestedCountersInstance.countEvent('syncFinished.ts', `addFinishedSyncing(): success` )
   return {
@@ -90,6 +91,7 @@ export function drainFinishedSyncingRequest(): string[] {
  * Insert a node into newSyncFinishedNodes list
  */
 export function insertSyncFinished(nodeId: string): void {
+  console.log(`insertSyncFinished: ${nodeId}`)
   newSyncFinishedNodes.push(nodeId)
   /* prettier-ignore */ console.log(`insertSyncFinished(): Node added to newSyncFinishedNodes list`)
 }
