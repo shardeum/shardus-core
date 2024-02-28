@@ -106,7 +106,18 @@ import {
   GetAccountQueueCountReq,
   serializeGetAccountQueueCountReq,
 } from '../types/GetAccountQueueCountReq'
-import { getStreamWithTypeCheck } from '../types/Helpers'
+import {
+  RequestStateForTxPostReq,
+  serializeRequestStateForTxPostReq,
+  deserializeRequestStateForTxPostReq,
+} from '../types/RequestStateForTxPostReq'
+import {
+  RequestStateForTxPostResp,
+  serializeRequestStateForTxPostResp,
+  deserializeRequestStateForTxPostResp,
+} from '../types/RequestStateForTxPostResp'
+import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
+import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 
 export type Callback = (...args: unknown[]) => void
 
@@ -1473,6 +1484,109 @@ class StateManager {
       }
     )
 
+    const requestStateForTxPostBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_request_state_for_tx_post,
+      handler: async (payload, respond, header, sign) => {
+        const route = InternalRouteEnum.binary_request_state_for_tx_post
+        profilerInstance.scopedProfileSectionStart(route, false, payload.length)
+        nestedCountersInstance.countEvent('internal', route)
+        const errorHandler = (
+          errorType: RequestErrorEnum,
+          opts?: { customErrorLog?: string; customCounterSuffix?: string }
+        ): void => requestErrorHandler(route, errorType, header, opts)
+
+        try {
+          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cRequestStateForTxPostReq)
+          if (!requestStream) {
+            return errorHandler(RequestErrorEnum.InvalidRequest)
+          }
+
+          const req = deserializeRequestStateForTxPostReq(requestStream)
+          const response: RequestStateForTxPostResp = {
+            stateList: [],
+            beforeHashes: {},
+            note: '',
+            success: false,
+          }
+          // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
+          let queueEntry = this.transactionQueue.getQueueEntrySafe(req.txid)
+          if (queueEntry == null) {
+            queueEntry = this.transactionQueue.getQueueEntryArchived(req.txid, route)
+          }
+
+          if (queueEntry == null) {
+            response.note = `failed to find queue entry: ${utils.stringifyReduce(req.txid)} ${
+              req.timestamp
+            } dbg:${this.debugTXHistory[utils.stringifyReduce(req.txid)]}`
+            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', `${route} cant find queue entry`)
+            return respond(response, serializeRequestStateForTxPostResp)
+          }
+
+          if (queueEntry.hasValidFinalData === false) {
+            response.note = `has queue entry but not final data: ${utils.stringifyReduce(req.txid)} ${
+              req.timestamp
+            } dbg:${this.debugTXHistory[utils.stringifyReduce(req.txid)]}`
+
+            if (logFlags.error && logFlags.verbose) this.mainLogger.error(response.note)
+            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', `${route} hasValidFinalData==false, tx state: ${queueEntry.state}`)
+            return respond(response, serializeRequestStateForTxPostResp)
+          }
+
+          let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
+          const applyResponse = queueEntry?.preApplyTXResult.applyResponse
+          if (
+            applyResponse != null &&
+            applyResponse.accountWrites != null &&
+            applyResponse.accountWrites.length > 0
+          ) {
+            const writtenAccountsMap: WrappedResponses = {}
+            for (const writtenAccount of applyResponse.accountWrites) {
+              writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+            }
+            wrappedStates = writtenAccountsMap
+            /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_state_for_tx_post applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}`)
+          }
+
+          if (wrappedStates != null) {
+            for (const [key, accountData] of Object.entries(wrappedStates)) {
+              if (req.key !== accountData.accountId) {
+                continue // Not this account.
+              }
+
+              if (accountData.stateId != req.hash) {
+                response.note = `failed accountData.stateId != req.hash txid: ${utils.makeShortHash(
+                  req.txid
+                )} hash:${utils.makeShortHash(accountData.stateId)}`
+                /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', `${route} failed accountData.stateId != req.hash txid`)
+                return respond(response, serializeRequestStateForTxPostResp)
+              }
+              if (accountData) {
+                response.beforeHashes[key] = queueEntry.beforeHashes[key]
+                response.stateList.push(accountData)
+              }
+            }
+          }
+          nestedCountersInstance.countEvent('stateManager', `${route} success`)
+          response.success = true
+          return respond(response, serializeRequestStateForTxPostResp)
+        } catch (e) {
+          if (logFlags.error) this.mainLogger.error(`${route} error: ${utils.errorToStringFull(e)}`)
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          respond(
+            { stateList: [], beforeHashes: {}, note: '', success: false },
+            serializeRequestStateForTxPostResp
+          )
+        } finally {
+          profilerInstance.scopedProfileSectionEnd(route, payload.length)
+        }
+      },
+    }
+
+    this.p2p.registerInternalBinary(
+      requestStateForTxPostBinaryHandler.name,
+      requestStateForTxPostBinaryHandler.handler
+    )
+
     Comms.registerInternal(
       'request_tx_and_state',
       async (
@@ -1962,6 +2076,7 @@ class StateManager {
     this.p2p.unregisterInternal(InternalRouteEnum.binary_compare_cert)
     this.p2p.unregisterInternal(InternalRouteEnum.binary_get_trie_hashes)
     this.p2p.unregisterInternal(InternalRouteEnum.binary_spread_tx_to_group_syncing)
+    this.p2p.unregisterInternal(InternalRouteEnum.binary_request_state_for_tx_post)
   }
 
   // //////////////////////////////////////////////////////////////////////////

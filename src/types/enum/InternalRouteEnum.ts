@@ -12,5 +12,6 @@ export enum InternalRouteEnum {
   binary_get_tx_timestamp = 'binary/get_tx_timestamp', // ask
   binary_get_trie_hashes = 'binary/get_trie_hashes', // ask
   binary_get_account_data_by_hashes = 'binary/get_account_data_by_hashes', // ask
-  binary_spread_tx_to_group_syncing = 'binary/spread_tx_to_group_syncing' // tell
+  binary_spread_tx_to_group_syncing = 'binary/spread_tx_to_group_syncing', // tell
+  binary_request_state_for_tx_post = 'binary/request_state_for_tx_post', // ask
 }

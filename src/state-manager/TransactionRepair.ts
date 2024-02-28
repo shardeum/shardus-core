@@ -12,6 +12,9 @@ import StateManager from '.'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { QueueEntry, AppliedVote, AccountHashCache, RequestStateForTxResp } from './state-manager-types'
 import { Logger as log4jsLogger } from 'log4js'
+import { RequestStateForTxPostReq, serializeRequestStateForTxPostReq } from '../types/RequestStateForTxPostReq'
+import { RequestStateForTxPostResp, deserializeRequestStateForTxPostResp } from '../types/RequestStateForTxPostResp'
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 
 class TransactionRepair {
   app: Shardus.App
@@ -544,8 +547,20 @@ class TransactionRepair {
                   txid: queueEntry.acceptedTx.txId,
                   timestamp: queueEntry.acceptedTx.timestamp,
                 }
-                result = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
 
+                if(this.config.p2p.useBinarySerializedEndpoints){
+                  const request = message as RequestStateForTxPostReq 
+                  result = await this.p2p.askBinary<RequestStateForTxPostReq, RequestStateForTxPostResp>(
+                    node,
+                    InternalRouteEnum.binary_request_state_for_tx_post,
+                    request,
+                    serializeRequestStateForTxPostReq,
+                    deserializeRequestStateForTxPostResp,
+                    {}
+                  )
+                } else {
+                  result = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
+                }
                 if (result == null) {
                   if (logFlags.verbose) {
                     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post result == null tx:${txLogID}  acc:${shortKey}`)

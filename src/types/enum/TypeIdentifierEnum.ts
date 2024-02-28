@@ -28,4 +28,6 @@ export enum TypeIdentifierEnum {
   cGetAccountDataByHashesReq,
   cGetAccountDataByHashesResp,
   cSpreadTxToGroupSyncingReq,
+  cRequestStateForTxPostReq,
+  cRequestStateForTxPostResp,
 }
