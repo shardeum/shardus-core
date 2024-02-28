@@ -220,5 +220,5 @@ export function enterRestore(totalNodeCount: number): boolean {
   const threshold = Context.config.p2p.networkBaselineEnabled
     ? Context.config.p2p.baselineNodes
     : Context.config.p2p.minNodes
-  return totalNodeCount >= threshold
+  return totalNodeCount >= threshold + config.p2p.extraNodesToAddInRestart
 }

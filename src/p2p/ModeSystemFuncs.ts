@@ -60,7 +60,7 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
         }
       }
     } else if (prevRecord.mode === 'restart') {
-      if (syncing < desired) {
+      if (syncing < desired + config.p2p.extraNodesToAddInRestart) {
         const addRem = target - syncing
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`under restart active != desired; addRem: ${addRem}`)
         if (addRem > 0) {
