@@ -572,9 +572,9 @@ export async function getActiveNodesFromArchiver(
     // transform the error if we get one
     nestedCountersInstance.countRareEvent(
       'archiver_nodelist',
-      'Could not get seed list from seed node server'
+      'Could not get seed list from seed node server 2 '
     )
     const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
-    return Error(`Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
+    return Error(`Could not get seed list from seed node server 2 ${nodeListUrl}: ` + e.message)
   })
 }

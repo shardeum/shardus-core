@@ -33,6 +33,7 @@ import * as http from '../http'
 import { insertSyncFinished } from '../p2p/Join/v2/syncFinished'
 import { getStandbyNodesInfoMap } from './Join/v2'
 import { submitStandbyRefresh } from './Join/v2/standbyRefresh'
+import { getNumArchivers } from './Archivers'
 
 /** STATE */
 
@@ -286,8 +287,11 @@ export function startupV2(): Promise<boolean> {
       try {
         // Get active nodes from Archiver
 
+        info(`startupV2: attemptJoining enter`)
         // this name is confusing, as the node is not actually active yet
         const activeNodes = await contactArchiver()
+
+        info(`startupV2: got active nodes: ${activeNodes.length}`)
 
         // Determine if you're the first node
         if (utils.isUndefined(isFirst)) {
@@ -318,6 +322,9 @@ export function startupV2(): Promise<boolean> {
 
         // Query network for node status
         const resp = await Join.fetchJoinedV2(activeNodes)
+
+        info(`startupV2: resp ${JSON.stringify(resp)}`)
+        nestedCountersInstance.countEvent('p2p', `fetchJoinedV2: isOnStandbyList: ${resp.isOnStandbyList} id: ${resp.id}`)
 
         // note the list below is in priority order of what operation is the most important
         // mainly this matters on something like our node being selected to join but also on the
@@ -362,6 +369,8 @@ export function startupV2(): Promise<boolean> {
         // Note that attemptJoining isn't just to get on the standby list, but also
         // we will be checking above to see when our node is selected to go active
         if (resp?.isOnStandbyList === true) {
+          //nestedCountersInstance.countEvent('p2p', 'startupV2: on standby list')
+
           if (state !== P2P.P2PTypes.NodeStatus.STANDBY) {
             updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
           }
@@ -394,7 +403,7 @@ export function startupV2(): Promise<boolean> {
                 Context.config.p2p.cyclesToRefreshEarly
             ) {
               isFirstRefresh = false
-
+              //info(`startupV2: submitStandbyRefresh first ${latestCycle.counter}`)
               submitStandbyRefresh(publicKey, latestCycle.counter)
 
               nestedCountersInstance.countEvent('p2p', `submitted KeepInStandby request`)
@@ -403,6 +412,7 @@ export function startupV2(): Promise<boolean> {
               cyclesElapsedSinceRefresh = 0
             }
           } else if (cyclesElapsedSinceRefresh >= Context.config.p2p.standbyListCyclesTTL) {
+            //info(`startupV2: submitStandbyRefresh ${latestCycle.counter}`)
             submitStandbyRefresh(publicKey, latestCycle.counter)
 
             nestedCountersInstance.countEvent('p2p', `submitted KeepInStandby request`)
@@ -672,15 +682,28 @@ export function updateNodeState(updatedState: NodeStatus, because = ''): void {
 }
 
 async function joinNetworkV2(activeNodes): Promise<void> {
+  info(`joinNetworkV2: enter`)
+  /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `joinNetworkV2:enter`)
   // Get latest cycle record from active nodes
   const latestCycle = await Sync.getNewestCycle(activeNodes)
   mode = latestCycle.mode || null
+
+  info(`joinNetworkV2: got latest cycle :${mode}`)
   const publicKey = Context.crypto.getPublicKey()
-  const isReadyToJoin = await Context.shardus.app.isReadyToJoin(latestCycle, publicKey, activeNodes, mode)
-  if (!isReadyToJoin) {
-    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `joinNetworkV2:isReadyToJoin:false`)
-    // Wait for Context.config.p2p.cycleDuration and try again
-    throw new Error('Node not ready to join')
+
+  try{
+    const isReadyToJoin = await Context.shardus.app.isReadyToJoin(latestCycle, publicKey, activeNodes, mode)
+    if (!isReadyToJoin) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `joinNetworkV2:isReadyToJoin:false`)
+      // Wait for Context.config.p2p.cycleDuration and try again
+      throw new Error('Node not ready to join')
+    } else {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `joinNetworkV2:isReadyToJoin:true`)
+    }    
+  } catch(ex){
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `joinNetworkV2:isReadyToJoin:crashed: ${ex?.message}`)
+    warn(`joinNetworkV2: isReadyToJoin crashed :${utils.formatErrorMessage(ex)}`)
+    return 
   }
 
   // Create join request from latest cycle
@@ -713,6 +736,7 @@ async function joinNetworkV2(activeNodes): Promise<void> {
   /* prettier-ignore */ if (logFlags.important_as_fatal) info(`Waiting ${untilQ1} + ${offsetTime} ms for Q1 before sending join...`)
   await utils.sleep(untilQ1 + offsetTime) // Not too early
 
+  info(`joinNetworkV2: submitJoinV2`)
   // send join request
   await Join.submitJoinV2(activeNodes, request)
 }
@@ -893,11 +917,18 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
   let archiver: P2P.SyncTypes.ActiveNode
   let activeNodesSigned: P2P.P2PTypes.SignedObject<SeedNodesList>
 
+
+  info(`contactArchiver: enter archivers:${getNumArchivers()}`)
+
   while (retry > 0) {
     try {
       archiver = getRandomAvailableArchiver()
-      if (!failArchivers.includes(archiver.ip + ':' + archiver.port))
-        failArchivers.push(archiver.ip + ':' + archiver.port)
+      info(`contactArchiver: communicate with:${archiver?.ip}`)
+
+      if (!failArchivers.includes(archiver.ip + ':' + archiver.port)){
+        failArchivers.push(archiver.ip + ':' + archiver.port)        
+      }
+
       activeNodesSigned = await getActiveNodesFromArchiver(archiver)
       if (
         activeNodesSigned == null ||
@@ -913,6 +944,7 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
       }
       break // To stop this loop if it gets the response without failing
     } catch (e) {
+      info(`contactArchiver: failed ${archiver.ip} ${utils.formatErrorMessage(e)} retry:${retry}`)
       if (retry === 1) {
         throw Error(
           `Could not get seed list from seed node server ${failArchivers} after ${maxRetries} retries:`
@@ -921,6 +953,10 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
     }
     retry--
   }
+
+  info(`contactArchiver: passed ${archiver.ip} retry:${retry}`)
+
+  info(`contactArchiver: activeNodesSigned:${JSON.stringify(activeNodesSigned?.joinRequest)} restartCycleRecord:${JSON.stringify(activeNodesSigned?.restartCycleRecord)}`)
 
   const joinRequest: P2P.ArchiversTypes.Request | undefined = activeNodesSigned.joinRequest as
     | P2P.ArchiversTypes.Request
@@ -1022,8 +1058,8 @@ async function getActiveNodesFromArchiver(
   if (seedListResult.isErr()) {
     const e = seedListResult.error
     const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
-    /* prettier-ignore */ nestedCountersInstance.countRareEvent('archiver_nodelist', 'Could not get seed list from seed node server')
-    /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
+    /* prettier-ignore */ nestedCountersInstance.countRareEvent('archiver_nodelist', 'Could not get seed list from seed node server 1')
+    /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Could not get seed list from seed node server 1 ${nodeListUrl}: ` + e.message)
     throw Error(e.message)
   }
 
