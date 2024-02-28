@@ -421,15 +421,15 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
     } else if (prevRecord.mode === 'restart') {
       // In restart mode, all the nodes remain in 'selected?' mode until the desired number of nodes are reached
       /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in restart")
-      if (syncing < desired) {
+      if (syncing < desired + config.p2p.extraNodesToAddInRestart) {
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: entered syncing < desired")
         let add = ~~(0.5 * syncing) // Add 50% more nodes on each cycle
         if (add < 7) {
           add = 7
         }
         targetCount = syncing + add
-        if (targetCount > desired) {
-          targetCount = desired
+        if (targetCount > desired + config.p2p.extraNodesToAddInRestart) {
+          targetCount = desired + config.p2p.extraNodesToAddInRestart
         }
       }
     } else if (prevRecord.mode === 'shutdown') targetCount = 7
