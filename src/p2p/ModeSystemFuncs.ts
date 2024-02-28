@@ -61,7 +61,7 @@ export function calculateToAcceptV2(prevRecord: P2P.CycleCreatorTypes.CycleRecor
       }
     } else if (prevRecord.mode === 'restart') {
       if (syncing < desired + config.p2p.extraNodesToAddInRestart) {
-        const addRem = target - syncing
+        const addRem = target + config.p2p.extraNodesToAddInRestart - syncing
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log(`under restart active != desired; addRem: ${addRem}`)
         if (addRem > 0) {
           add = Math.ceil(addRem)
