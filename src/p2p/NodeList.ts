@@ -165,7 +165,7 @@ export function removeReadyNode(id: string) {
       break
     }
   }
-  /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('Removing synced node', id, idx)
+  /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('Removing ready node', id, idx)
   if (idx >= 0) readyByTimeAndIdOrder.splice(idx, 1)
 }
 
@@ -199,8 +199,12 @@ export function removeNode(
   idx = binarySearch(syncingByIdOrder, { id }, propComparator('id'))
   if (idx >= 0) syncingByIdOrder.splice(idx, 1)
 
-  idx = binarySearch(readyByTimeAndIdOrder, { id }, propComparator('id'))
-  if (idx >= 0) readyByTimeAndIdOrder.splice(idx, 1)
+  if (config.p2p.hardenNewSyncingProtocol) {
+    removeReadyNode(id)
+  } else {
+    idx = binarySearch(readyByTimeAndIdOrder, { id }, propComparator('id'))
+    if (idx >= 0) readyByTimeAndIdOrder.splice(idx, 1)
+  }
 
   const joinRequestTimestamp = nodes.get(id).joinRequestTimestamp
   idx = binarySearch(byJoinOrder, { joinRequestTimestamp, id }, propComparator2('joinRequestTimestamp', 'id'))
@@ -277,6 +281,9 @@ export function updateNode(
       }
       if (update[key] === P2P.P2PTypes.NodeStatus.READY) {
         insertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
+        if (config.p2p.hardenNewSyncingProtocol) {
+          if (selectedById.has(node.id)) removeSelectedNode(node.id) // in case we missed the sync-started gossip
+        }
         removeSyncingNode(node.id)
       }
     }
@@ -286,13 +293,12 @@ export function updateNode(
       // Add the node to active arrays, if needed
       if (update.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
         insertSorted(activeByIdOrder, node, propComparator('id'))
-        // Don't add yourself to
+        // Don't add yourself to activeOthersByIdOrder
         if (node.id !== id) {
           insertSorted(activeOthersByIdOrder, node, propComparator('id'))
         }
         // remove active node from ready list
         /* prettier-ignore */ if (logFlags.verbose) console.log('updateNode: removing active node from ready list')
-        //removeSyncingNode(node.id)
         removeReadyNode(node.id)
 
         if (raiseEvents) {

@@ -134,7 +134,7 @@ export function isNodeSelectedReadyList(nodeId: string): boolean {
 export function selectNodesFromReadyList(mode: string): P2P.NodeListTypes.Node[] {
   if (mode === 'processing') {
     return NodeList.readyByTimeAndIdOrder.slice(0, config.p2p.allowActivePerCycle)
-  } else{
+  } else {
     return NodeList.readyByTimeAndIdOrder
   }
 }

@@ -130,7 +130,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     cyclesToRefreshEarly: 4,
     sortSyncFinished: false,
     cycleGossipDelayBuffer: 5,
-    extraNodesToAddInRestart: 5
+    extraNodesToAddInRestart: 5,
+    hardenNewSyncingProtocol: false,
   },
   ip: {
     externalIp: '0.0.0.0',

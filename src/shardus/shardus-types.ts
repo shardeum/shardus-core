@@ -853,6 +853,8 @@ export interface ServerConfiguration {
     cycleGossipDelayBuffer: number
     /** we will add minNodes + this value nodes to eh network in restart mode */
     extraNodesToAddInRestart: number
+    /** use the changes to make sync-started & sync-finsihed more robust + remvoe nodes from ready list properly */
+    hardenNewSyncingProtocol: boolean
   }
   /** Server IP configuration */
   ip?: {

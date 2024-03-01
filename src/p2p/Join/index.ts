@@ -260,6 +260,8 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     // these nodes are being repeated in lost and apop
     for (const nodeId of drainLostAfterSelectionNodes()) {
       record.lostAfterSelection.push(nodeId)
+      nestedCountersInstance.countEvent('p2p', `added node to lostAfterSelection`)
+      /* prettier-ignore */ if (logFlags.verbose) console.log(`added node to lostAfterSelection`)
     }
 
     /* prettier-ignore */ if (logFlags.verbose) console.log('newSyncFinished nodes ', newSyncFinishedNodes)
@@ -442,6 +444,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   const added = record.joinedConsensors
+  const removed = []
   const finishedSyncing = record.finishedSyncing
 
   for (const node of added) {
@@ -472,19 +475,6 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
         id: nodeId,
         status: P2P.P2PTypes.NodeStatus.SYNCING,
       })
-    }
-  }
-
-  const addedIds = added.map((node) => node.id)
-
-  for (const [nodeId, cycleNumber] of NodeList.selectedById) {
-    if (addedIds.includes(nodeId)) {
-      // do nothing. the node was just added and isn't in the nodelist yet
-      continue
-    } else if (record.counter > cycleNumber + config.p2p.cyclesToWaitForSyncStarted) {
-      lostAfterSelection.push(nodeId)
-      nestedCountersInstance.countEvent('p2p', `added node to lostAfterSelection`)
-      /* prettier-ignore */ if (logFlags.verbose) console.log(`added node to lostAfterSelection`)
     }
   }
 
@@ -530,10 +520,53 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
     standbyNodesInfoHashes.set(refreshedPubKey, crypto.hash(refreshedStandbyInfo))
   }
 
-  return {
-    added,
-    removed: [...lostAfterSelection],
-    updated,
+  const addedIds = added.map((node) => node.id)
+
+  if (config.p2p.hardenNewSyncingProtocol) {
+    for (const [nodeId, cycleNumber] of NodeList.selectedById) {
+      if (addedIds.includes(nodeId)) {
+        // this if condition seems like its a relic of an old way I was implementing this
+        // dont't want to remove it in the middle of a release, but we probably should later
+        //
+        // do nothing. the node was just added and isn't in the nodelist yet
+        continue
+      } else if (record.counter > cycleNumber + config.p2p.cyclesToWaitForSyncStarted) {
+        // if the node has just appeared in startedSyncing or finishedSyncing, do nothing
+        if (record.startedSyncing.includes(nodeId)) continue
+        if (record.finishedSyncing.includes(nodeId)) continue
+
+        // add node to lostAfterSelection to be added to the cycle record next cycle
+        lostAfterSelection.push(nodeId)
+      }
+    }
+
+    // add nodes to be removed if they appear in lostAfterSelection
+    for (const nodeId of record.lostAfterSelection) {
+      removed.push(nodeId)
+    }
+
+    return {
+      added,
+      removed,
+      updated,
+    }
+  } else {
+    for (const [nodeId, cycleNumber] of NodeList.selectedById) {
+      if (addedIds.includes(nodeId)) {
+        // do nothing. the node was just added and isn't in the nodelist yet
+        continue
+      } else if (record.counter > cycleNumber + config.p2p.cyclesToWaitForSyncStarted) {
+        lostAfterSelection.push(nodeId)
+        nestedCountersInstance.countEvent('p2p', `added node to lostAfterSelection`)
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`added node to lostAfterSelection`)
+      }
+    }
+
+    return {
+      added,
+      removed: [...lostAfterSelection],
+      updated,
+    }
   }
 }
 
