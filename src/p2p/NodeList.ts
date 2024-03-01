@@ -315,6 +315,7 @@ export function updateNode(
     }
   }
 }
+
 export function updateNodes(
   updates: P2P.NodeListTypes.Update[],
   raiseEvents: boolean,

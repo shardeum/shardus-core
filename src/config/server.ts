@@ -128,10 +128,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     attemptJoiningWaitMultiplier: 2,
     cyclesToWaitForSyncStarted: 3,
     cyclesToRefreshEarly: 4,
-    sortSyncFinished: false,
-    cycleGossipDelayBuffer: 5,
     extraNodesToAddInRestart: 5,
-    hardenNewSyncingProtocol: false,
+    secondsToCheckForQ1: 3000 // 3 seconds in ms
   },
   ip: {
     externalIp: '0.0.0.0',

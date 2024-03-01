@@ -847,14 +847,10 @@ export interface ServerConfiguration {
     cyclesToWaitForSyncStarted: number
     /** The number of cycles before standbyListCyclesTTL a standby node should send a refresh message */
     cyclesToRefreshEarly: number
-    /** Sort record.finishedSyning in updateRecord of Join/index.ts */
-    sortSyncFinished: boolean
-    /** wait X seconds before sending gossip so that slight time variations across the network are less likely to have a boundary condition where some nodes are in a different quarter */
-    cycleGossipDelayBuffer: number
-    /** we will add minNodes + this value nodes to eh network in restart mode */
+    /** we will add minNodes + this value nodes to the network in restart mode */
     extraNodesToAddInRestart: number
-    /** use the changes to make sync-started & sync-finsihed more robust + remvoe nodes from ready list properly */
-    hardenNewSyncingProtocol: boolean
+    /** In waitForQ1, we check every secondsToCheckForQ1 number of seconds to see if we are not in Q1 */
+    secondsToCheckForQ1: number
   }
   /** Server IP configuration */
   ip?: {

@@ -65,6 +65,8 @@ import getCallstack from '../utils/getCallstack'
 import * as crypto from '@shardus/crypto-utils'
 import * as Comms from './../p2p/Comms'
 import { insertSyncFinished } from '../p2p/Join/v2/syncFinished'
+import { waitForQ1 } from '../p2p/Self'
+import { currentQuarter } from '../p2p/CycleCreator'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -686,18 +688,15 @@ class Shardus extends EventEmitter {
       //console.log('syncAppData - goActive')
 
       // if we are not in q1 anymore, wait till next cycle's q1 to send sync-finished gossip
-      const currentTime = shardusGetTime()
+      if (currentQuarter > 1) {
+        nestedCountersInstance.countEvent('restore', `sync-finished-restore: not in Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished-restore: not is Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
 
-      const timeInCycle = currentTime/1000 - (CycleChain.getNewest()?.start + CycleChain.getNewest()?.duration)
-      console.log('time in cycle ', timeInCycle)
-      if (CycleChain.getNewest() && timeInCycle > CycleChain.getNewest()?.duration / 4) {
-        console.log('inside wait for q1 in sync-finished')
-        nestedCountersInstance.countEvent('p2p', 'quarter > 1. Waiting until Q1 of next cycle to send sync-started gossip')
-        /* prettier-ignore */ if (logFlags.verbose) console.log('quarter > 1. Waiting until Q1 of next cycle to send sync-started gossip')
-
-        // +5 is an arbitrary number I added so we wait 5s into q1 to send gossip
-        await new Promise(resolve => setTimeout(resolve, (CycleChain.getNewest()?.duration - timeInCycle + Context.config.p2p.cycleGossipDelayBuffer) * 1000));
+        await waitForQ1()
+        nestedCountersInstance.countEvent('restore', `sync-finished-restore: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished-restore: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
       }
+
       let readyPayload = {
         nodeId: Self.id,
         cycleNumber: CycleChain.getNewest()?.counter,
@@ -1056,18 +1055,15 @@ class Shardus extends EventEmitter {
       //console.log('syncAppData - goActive')
 
       // if quarter > 1 , wait till next cycle's q1 to send sync-finished gossip
-      const currentTime = shardusGetTime()
+      if (currentQuarter > 1) {
+        nestedCountersInstance.countEvent('p2p', `sync-finished: not in Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished: not is Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
 
-      const timeInCycle = currentTime/1000 - (CycleChain.getNewest()?.start + CycleChain.getNewest()?.duration)
-      console.log('time in cycle ', timeInCycle)
-      if (CycleChain.getNewest() && timeInCycle > CycleChain.getNewest()?.duration / 4) {
-        console.log('inside wait for q1 in sync-finished')
-        nestedCountersInstance.countEvent('p2p', 'quarter > 1. Waiting until Q1 of next cycle to send sync-started gossip')
-        /* prettier-ignore */ if (logFlags.verbose) console.log('quarter > 1. Waiting until Q1 of next cycle to send sync-started gossip')
-
-        // +5 is an arbitrary number I added so we wait 5s into q1 to send gossip
-        await new Promise(resolve => setTimeout(resolve, (CycleChain.getNewest()?.duration - timeInCycle + Context.config.p2p.cycleGossipDelayBuffer) * 1000));
+        await waitForQ1()
+        nestedCountersInstance.countEvent('p2p', `sync-finished: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
       }
+
       let readyPayload = {
         nodeId: Self.id,
         cycleNumber: CycleChain.getNewest()?.counter,
