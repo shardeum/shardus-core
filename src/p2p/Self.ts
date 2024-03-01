@@ -197,8 +197,9 @@ export function startupV2(): Promise<boolean> {
           /* prettier-ignore */ if (logFlags.verbose) console.log(`not is Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
           waited = true
         }
-        
-        await waitForQ1SendRequests()
+        if(isFirst === false){
+          await waitForQ1SendRequests()          
+        }
 
         if(waited) {
           nestedCountersInstance.countEvent('p2p', `in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
