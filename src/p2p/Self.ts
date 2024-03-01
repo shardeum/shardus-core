@@ -197,7 +197,7 @@ export function startupV2(): Promise<boolean> {
           /* prettier-ignore */ if (logFlags.verbose) console.log(`not is Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
           waited = true
         }
-        if(isFirst === false){
+        if(currentQuarter > 0){
           await waitForQ1SendRequests()          
         }
 

@@ -65,7 +65,7 @@ import getCallstack from '../utils/getCallstack'
 import * as crypto from '@shardus/crypto-utils'
 import * as Comms from './../p2p/Comms'
 import { insertSyncFinished } from '../p2p/Join/v2/syncFinished'
-import { waitForQ1SendRequests } from '../p2p/Self'
+import { isFirst, waitForQ1SendRequests } from '../p2p/Self'
 import { currentQuarter } from '../p2p/CycleCreator'
 
 // the following can be removed now since we are not using the old p2p code
@@ -694,8 +694,9 @@ class Shardus extends EventEmitter {
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished-restore: not is Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
         waited = true
       }
-      await waitForQ1SendRequests()
-
+      if(currentQuarter > 0){
+        await waitForQ1SendRequests()
+      }
       if (waited) {
         nestedCountersInstance.countEvent('restore', `sync-finished-restore: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished-restore: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
@@ -1065,8 +1066,9 @@ class Shardus extends EventEmitter {
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished: not is Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
         waited = true
       }
-
-      await waitForQ1SendRequests()
+      if(currentQuarter > 0){
+        await waitForQ1SendRequests()
+      }
       if (waited) {
         nestedCountersInstance.countEvent('p2p', `sync-finished: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
