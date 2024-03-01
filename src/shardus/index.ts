@@ -65,7 +65,7 @@ import getCallstack from '../utils/getCallstack'
 import * as crypto from '@shardus/crypto-utils'
 import * as Comms from './../p2p/Comms'
 import { insertSyncFinished } from '../p2p/Join/v2/syncFinished'
-import { waitForQ1 } from '../p2p/Self'
+import { waitForQ1SendRequests } from '../p2p/Self'
 import { currentQuarter } from '../p2p/CycleCreator'
 
 // the following can be removed now since we are not using the old p2p code
@@ -687,12 +687,16 @@ class Shardus extends EventEmitter {
       //await this.p2p.goActive()
       //console.log('syncAppData - goActive')
 
+      let waited = false
       // if we are not in q1 anymore, wait till next cycle's q1 to send sync-finished gossip
       if (currentQuarter > 1) {
         nestedCountersInstance.countEvent('restore', `sync-finished-restore: not in Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished-restore: not is Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
+        waited = true
+      }
+      await waitForQ1SendRequests()
 
-        await waitForQ1()
+      if (waited) {
         nestedCountersInstance.countEvent('restore', `sync-finished-restore: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished-restore: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
       }
@@ -1054,12 +1058,16 @@ class Shardus extends EventEmitter {
       //await this.p2p.goActive()
       //console.log('syncAppData - goActive')
 
+      let waited = false
       // if quarter > 1 , wait till next cycle's q1 to send sync-finished gossip
       if (currentQuarter > 1) {
         nestedCountersInstance.countEvent('p2p', `sync-finished: not in Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished: not is Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
+        waited = true
+      }
 
-        await waitForQ1()
+      await waitForQ1SendRequests()
+      if (waited) {
         nestedCountersInstance.countEvent('p2p', `sync-finished: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
       }

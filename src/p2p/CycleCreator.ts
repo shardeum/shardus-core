@@ -81,6 +81,7 @@ export let submodules: submoduleTypes[] = [
 export let currentQuarter = -1 // means we have not started creating cycles
 export let currentCycle = 0
 export let nextQ1Start = 0
+export let q1SendRequests = false // if we are in q1 this lets us know if we can send requests also
 
 export let scaleFactor: number = 1
 export let scaleFactorSyncBoost: number = 1
@@ -425,6 +426,7 @@ async function cycleCreator() {
  * Handles cycle record creation tasks for quarter 1
  */
 async function runQ1() {
+  q1SendRequests = false
   currentQuarter = 1
   Self.emitter.emit('cycle_q1_start')
   profilerInstance.profileSectionStart('CycleCreator-runQ1')
@@ -438,6 +440,10 @@ async function runQ1() {
   //we sleep for 1/8 of the quarter duration before we send messages to improve tolerance of
   //what cycle nodes think they are in
   await utils.sleep(quarterDuration * config.p2p.q1DelayPercent)
+
+  //set this to true to allow other code that may be waiting for a safe time to send Q1 gossip
+  //to proceed
+  q1SendRequests = true
 
   // Tell submodules to sign and send their requests
   if (logFlags.p2pNonFatal) info('Triggering submodules to send requests...')

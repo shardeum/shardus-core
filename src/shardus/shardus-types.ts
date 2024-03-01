@@ -851,6 +851,8 @@ export interface ServerConfiguration {
     extraNodesToAddInRestart: number
     /** In waitForQ1, we check every secondsToCheckForQ1 number of seconds to see if we are not in Q1 */
     secondsToCheckForQ1: number
+    /** hardenNewSyncingProtocol upgrades to syncing protocol */
+    hardenNewSyncingProtocol: boolean
   }
   /** Server IP configuration */
   ip?: {

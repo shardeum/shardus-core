@@ -11,7 +11,7 @@ import * as Archivers from './Archivers'
 import * as Comms from './Comms'
 import * as Context from './Context'
 import * as CycleCreator from './CycleCreator'
-import { calcIncomingTimes } from './CycleCreator'
+import { calcIncomingTimes, q1SendRequests } from './CycleCreator'
 import * as GlobalAccounts from './GlobalAccounts'
 import * as Join from './Join'
 import * as JoinV2 from './Join/v2'
@@ -190,12 +190,17 @@ export function startupV2(): Promise<boolean> {
         // Sync cycle chain from network
         await syncCycleChain(id)
 
+        let waited = false
         // if syncCycleChain takes really long time and its not q1 anymore, wait till next cycle's q1 to send sync-started gossip
         if (currentQuarter > 1) {
           nestedCountersInstance.countEvent('p2p', `not in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
           /* prettier-ignore */ if (logFlags.verbose) console.log(`not is Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
+          waited = true
+        }
+        
+        await waitForQ1SendRequests()
 
-          await waitForQ1()
+        if(waited) {
           nestedCountersInstance.countEvent('p2p', `in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
           /* prettier-ignore */ if (logFlags.verbose) console.log(`in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
         }
@@ -1191,10 +1196,18 @@ function acceptedTrigger(): Promise<void> {
   })
 }
 
-export function waitForQ1(): Promise<void> {
+/**
+ * Wait for currentQuarter to equal 1 and q1SendRequests to be true
+ * 
+ * q1SendRequests is a flag that has a slight delay at the start of q1 to make sure 
+ * that requests are not impacted by timestamp variation which could cause half of the network
+ * to think it is still Q4
+ * @returns 
+ */
+export function waitForQ1SendRequests(): Promise<void> {
   return new Promise(resolve => {
     const intervalId = setInterval(() => {
-      if (currentQuarter === 1) {
+      if (currentQuarter === 1 && q1SendRequests === true) {
         clearInterval(intervalId);
         resolve();
       }
