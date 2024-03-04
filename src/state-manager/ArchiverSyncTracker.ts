@@ -291,7 +291,7 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
             const dataSourceArchiver = this.archiverDataSourceHelper.dataSourceArchiver
             const accountDataByListArchiverUrl = `http://${dataSourceArchiver.ip}:${dataSourceArchiver.port}/get_account_data_by_list_archiver`
             try {
-              const result = await http.post(accountDataByListArchiverUrl, payload, false, 5000)
+              const result = await http.post(accountDataByListArchiverUrl, payload, false, 10000)
               console.log('getAccountDataByListFromArchiver result', result)
               return result
             } catch (error) {
@@ -522,7 +522,7 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
       //       //since we are restarting, give the node we are asking a break
       //       await utils.sleep(2000)
       //       //give even more timeout time.
-      //       moreAskTime = 5000
+      //       moreAskTime = 10000
       //       restartListRetriesLeft--
       //       totalRestartList++
       //     } else {
@@ -547,7 +547,7 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
         const dataSourceArchiver = this.archiverDataSourceHelper.dataSourceArchiver
         const accountDataArchiverUrl = `http://${dataSourceArchiver.ip}:${dataSourceArchiver.port}/get_account_data_archiver`
         try {
-          const result = await http.post(accountDataArchiverUrl, payload, false, 5000 + moreAskTime)
+          const result = await http.post(accountDataArchiverUrl, payload, false, 10000 + moreAskTime)
           console.log('getAccountDataFromArchiver result', result)
           return result
         } catch (error) {
