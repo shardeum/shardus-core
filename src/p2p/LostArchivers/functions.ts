@@ -22,6 +22,7 @@ import { activeByIdOrder } from '../NodeList'
 import { inspect } from 'util'
 import { formatErrorMessage } from '../../utils'
 import { nestedCountersInstance } from '../..'
+import { shardusGetTime } from '../../network'
 
 /** Lost Archivers Functions */
 
@@ -323,7 +324,4 @@ function _errorForInvestigateArchiverMsg(msg: InvestigateArchiverMsg | null): st
   if (missing.length) return `missing properties: ${missing.join(', ')}`
   if (msg.type !== 'investigate') return `invalid type: ${msg.type}`
   return null
-}
-function shardusGetTime() {
-  throw new Error('Function not implemented.')
 }
