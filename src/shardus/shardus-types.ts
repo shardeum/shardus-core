@@ -887,6 +887,8 @@ export interface ServerConfiguration {
     requestStateForTxPostBinary: boolean
     broadcastStateBinary: boolean
     broadcastFinalStateBinary: boolean
+    /** mode to force network into. can be cleared.*/
+    forcedMode?: string
   }
   /** Server IP configuration */
   ip?: {

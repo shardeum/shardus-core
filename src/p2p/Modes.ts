@@ -6,6 +6,8 @@ import * as Self from './Self'
 import { validateTypes } from '../utils'
 import { hasAlreadyEnteredProcessing } from './CycleCreator'
 import * as NodeList from './NodeList'
+import { nestedCountersInstance } from '../utils/nestedCounters'
+import { logFlags } from '../logger'
 
 /** STATE */
 
@@ -75,7 +77,31 @@ export function updateRecord(
 ): void {
   const active = NodeList.activeByIdOrder.length
 
-  const { initShutdown } = Context.config.p2p
+  const { initShutdown, forcedMode } = Context.config.p2p
+
+  // Check for forcedMode and apply it directly if present
+  // for forcedMode v1 just allowing safety mode
+  const validModes: P2P.ModesTypes.Record['mode'][] = [
+    //'forming',
+    //'processing',
+    'safety',
+    //'recovery',
+    //'restart',
+    //'restore',
+  ]
+
+  if (forcedMode && forcedMode !== '') {
+    if (validModes.includes(forcedMode as P2P.ModesTypes.Record['mode'])) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('P2P: forcedMode', forcedMode)
+      /* prettier-ignore */ if(logFlags.verbose) console.log('P2P: Modes: Forced mode to:', forcedMode)
+      record.mode = forcedMode as P2P.ModesTypes.Record['mode']
+    } else {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('P2P: forcedMode:invalid', forcedMode)
+      /* prettier-ignore */ if(logFlags.verbose) console.log('P2P: Modes: Invalid forced mode:', forcedMode)
+    }
+    return
+  }
+
   // If Shutdown mode in triggered from Admin/DAO tx
   if (initShutdown) {
     record.mode = 'shutdown'
