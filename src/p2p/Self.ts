@@ -289,7 +289,7 @@ export function startupV2(): Promise<boolean> {
 
         info(`startupV2: attemptJoining enter`)
         // this name is confusing, as the node is not actually active yet
-        const activeNodes = await contactArchiver()
+        const activeNodes = await contactArchiver('startupV2:attemptJoining')
 
         info(`startupV2: got active nodes: ${activeNodes.length}`)
 
@@ -847,7 +847,7 @@ async function syncCycleChain(selfId: string): Promise<void> {
     // Once joined, sync to the network
     try {
       if (logFlags.p2pNonFatal) info('Getting activeNodes from archiver to sync to network...')
-      const activeNodes = await contactArchiver()
+      const activeNodes = await contactArchiver('syncCycleChain')
 
       // Remove yourself from activeNodes if you are present in them
       const ourIdx = activeNodes.findIndex(nodeMatch)
@@ -910,18 +910,18 @@ async function checkNodeId(nodeMatch: (node: any) => boolean, selfId: string): P
   if (logFlags.p2pNonFatal) info('Node passed id check')
 }
 
-async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
+async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
   const maxRetries = 10
   let retry = maxRetries
   const failArchivers: string[] = []
   let archiver: P2P.SyncTypes.ActiveNode
   let activeNodesSigned: P2P.P2PTypes.SignedObject<SeedNodesList>
 
-
   info(`contactArchiver: enter archivers:${getNumArchivers()}`)
 
   while (retry > 0) {
     try {
+      retry--
       archiver = getRandomAvailableArchiver()
       info(`contactArchiver: communicate with:${archiver?.ip}`)
 
@@ -934,16 +934,29 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
         activeNodesSigned == null ||
         activeNodesSigned.nodeList == null ||
         activeNodesSigned.nodeList.length === 0
-      )
+      ) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: no nodes in nodelist yet. ${dbgContex}`, 1)
+        info(`contactArchiver: no nodes in nodelist yet, or seedlist null ${JSON.stringify(activeNodesSigned)}`)
+        await utils.sleep(1000) // no nodes in nodelist yet so please take a breather. would be smarter to ask each archiver only once but 
+                                // but do not want to refactor that much right now
+        if (retry === 1) {
+          /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: no nodes in nodelist yet out of retries. ${dbgContex}`, 1)
+          throw Error(
+            `contactArchiver: nodelist null or empty after ${maxRetries} retries:`
+          )
+        }
         continue
+      }
       if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
-        info(`Got signed seed list: ${JSON.stringify(activeNodesSigned)}`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: verify failed. ${dbgContex}`, 1)
+        info(`contactArchiver:  seedlist failed verification ${JSON.stringify(activeNodesSigned)}`)
         throw Error(
           `Fatal: _getSeedNodes seed list was not signed by archiver!. Archiver: ${archiver.ip}:${archiver.port}, signature: ${activeNodesSigned.sign}`
         )
       }
       break // To stop this loop if it gets the response without failing
     } catch (e) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: out of retries. ${dbgContex}`, 1)
       info(`contactArchiver: failed ${archiver.ip} ${utils.formatErrorMessage(e)} retry:${retry}`)
       if (retry === 1) {
         throw Error(
@@ -951,7 +964,8 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
         )
       }
     }
-    retry--
+    //move retry-- to top so that we dont retry forever!
+    //retry--
   }
 
   info(`contactArchiver: passed ${archiver.ip} retry:${retry}`)
@@ -973,6 +987,7 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
       Archivers.addDataRecipient(joinRequest.nodeInfo, firstNodeDataRequest)
       // Using this flag due to isFirst check is not working as expected yet in the first consensor-archiver connection establishment
       allowConnectionToFirstNode = true
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: got valid nodelist ${dbgContex} joinRequest count:${activeNodesSigned.nodeList.length}`, 1)
       return activeNodesSigned.nodeList
     }
   }
@@ -1000,6 +1015,7 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
       }
       // Using this flag due to isFirst check is not working as expected yet in the first consensor-archiver connection establishment
       allowConnectionToFirstNode = true
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: got valid nodelist ${dbgContex} restartCycleRecord count:${activeNodesSigned.nodeList.length}`, 1)
       return activeNodesSigned.nodeList
     }
   }
@@ -1016,6 +1032,7 @@ async function contactArchiver(): Promise<P2P.P2PTypes.Node[]> {
   if (joinRequest && dataRequest.length > 0) {
     Archivers.addDataRecipient(joinRequest.nodeInfo, dataRequest)
   }
+  /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: got valid nodelist ${dbgContex}  joinRequest:${joinRequest!=null} restartCycleRecord:${restartCycleRecord!=null} count:${activeNodesSigned.nodeList.length} `, 1)
   return activeNodesSigned.nodeList
 }
 
