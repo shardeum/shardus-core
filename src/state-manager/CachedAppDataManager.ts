@@ -31,6 +31,16 @@ import {
 } from './state-manager-types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { CachedAppDataSerializable } from '../types/CachedAppData'
+import {
+  GetCachedAppDataReq,
+  deserializeGetCachedAppDataReq,
+  serializeGetCachedAppDataReq,
+} from '../types/GetCachedAppDataReq'
+import {
+  GetCachedAppDataResp,
+  deserializeGetCachedAppDataResp,
+  serializeGetCachedAppDataResp,
+} from '../types/GetCachedAppDataResp'
 
 class CachedAppDataManager {
   app: Shardus.App
@@ -167,6 +177,44 @@ class CachedAppDataManager {
         }
       }
     )
+
+    const getCachedAppDataBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_get_cached_app_data,
+      handler: async (payloadBuffer, respond, header, sign) => {
+        const route = InternalRouteEnum.binary_get_cached_app_data
+        profilerInstance.scopedProfileSectionStart(route, false, payloadBuffer.length)
+        nestedCountersInstance.countEvent('internal', route)
+        const response = {
+          cachedAppData: null,
+        } as GetCachedAppDataResp
+
+        try {
+          const requestStream = getStreamWithTypeCheck(payloadBuffer, TypeIdentifierEnum.cGetCachedAppDataReq)
+          if (!requestStream) {
+            nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
+            this.mainLogger.error(`Invalid input stream for ${route}`)
+            respond(response, serializeGetCachedAppDataResp)
+          }
+          const readableReq = deserializeGetCachedAppDataReq(requestStream)
+          const foundCachedAppData = this.getCachedItem(readableReq.topic, readableReq.dataId)
+          response.cachedAppData = foundCachedAppData
+          if (foundCachedAppData == null) {
+            this.mainLogger.error(
+              `Cannot find cached data for topic: ${readableReq.topic}, dataId: ${readableReq.dataId}`
+            )
+          }
+          respond(response, serializeGetCachedAppDataResp)
+        } catch (e) {
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          this.mainLogger.error(`Error in getCachedAppDataBinray Handler ${e.message}`)
+          respond(response, serializeGetCachedAppDataResp)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd(route, payloadBuffer.length)
+        }
+      },
+    }
+
+    this.p2p.registerInternalBinary(getCachedAppDataBinaryHandler.name, getCachedAppDataBinaryHandler.handler)
   }
 
   registerTopic(topic: string, maxCycleAge: number, maxCacheElements: number): boolean {
@@ -516,11 +564,21 @@ class CachedAppDataManager {
       }
 
       const message = { topic, dataId }
-      const r: CachedAppData | boolean = await this.p2p.ask(
-        randomConsensusNode,
-        'get_cached_app_data',
-        message
-      )
+      let r: CachedAppData | boolean
+      if (this.config.p2p.useBinarySerializedEndpoints) {
+        const resp = await this.p2p.askBinary<GetCachedAppDataReq, GetCachedAppDataResp>(
+          randomConsensusNode,
+          InternalRouteEnum.binary_get_cached_app_data,
+          message,
+          serializeGetCachedAppDataReq,
+          deserializeGetCachedAppDataResp,
+          {}
+        )
+        r = resp?.cachedAppData
+      } else {
+        r = await this.p2p.ask(randomConsensusNode, 'get_cached_app_data', message)
+      }
+
       if (r === false) {
         if (logFlags.error) this.mainLogger.error('ASK FAIL getLocalOrRemoteCachedAppData r === false')
       }

@@ -20,4 +20,5 @@ export enum InternalRouteEnum {
   binary_get_confirm_or_challenge = 'binary/get_confirm_or_challenge', // ask
   binary_sign_app_data = 'binary/sign_app_data', // ask
   binary_get_trie_account_hashes = 'binary/get_trie_account_hashes', // ask
+  binary_get_cached_app_data = 'binary/get_cached_app_data', // ask
 }
