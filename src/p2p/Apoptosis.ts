@@ -57,7 +57,6 @@ export const cycleUpdatesName = 'apoptosis'
 export const nodeDownString = 'node is down'
 export const nodeNotDownString = 'node is not down'
 
-const internalRouteName = 'apoptosize'
 const gossipRouteName = 'apoptosis'
 
 let p2pLogger
@@ -198,7 +197,7 @@ const apoptosisGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ApoptosisTypes.Signed
 const routes = {
   external: [stopExternalRoute, failExternalRoute],
   internal: [],
-  internal2: [apoptosisInternalRoute],
+  internalBinary: [apoptosisInternalRoute],
   gossip: {
     //    'gossip-join': gossipJoinRoute,
     [gossipRouteName]: apoptosisGossipRoute,
@@ -222,7 +221,7 @@ export function init() {
   for (const route of routes.internal) {
     Comms.registerInternal(route.name, route.handler)
   }
-  for (const route of routes.internal2) {
+  for (const route of routes.internalBinary) {
     Comms.registerInternalBinary(route.name, route.handler)
   }
   for (const [name, handler] of Object.entries(routes.gossip)) {
@@ -318,7 +317,7 @@ export async function apoptosizeSelf(message: string) {
   }
   await Comms.tellBinary<ApoptosisProposalReq>(
     activeNodes,
-    internalRouteName,
+    InternalRouteEnum.apoptosize,
     apopProposalReq,
     serializeApoptosisProposalReq,
     {}
@@ -330,7 +329,7 @@ export async function apoptosizeSelf(message: string) {
     try {
       const res = Comms.askBinary<ApoptosisProposalReq, ApoptosisProposalResp>(
         node,
-        internalRouteName,
+        InternalRouteEnum.apoptosize,
         apopProposalReq,
         serializeApoptosisProposalReq,
         deserializeApoptosisProposalResp,
