@@ -59,6 +59,24 @@ import {
   SpreadAppliedVoteHashReq,
   serializeSpreadAppliedVoteHashReq,
 } from '../types/SpreadAppliedVoteHashReq'
+import{
+  GetAccountDataRespSerializable,
+  deserializeGetAccountDataResp,
+  serializeGetAccountDataResp,
+} from '../types/GetAccountDataResp'
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
+import { Route } from '@shardus/types/build/src/p2p/P2PTypes'
+import { InternalBinaryHandler } from '../types/Handler'
+import {
+  GetConfirmOrChallengeReq,
+  deserializeGetConfirmOrChallengeReq,
+  serializeGetConfirmOrChallengeReq,
+} from '../types/GetConfirmOrChallengeReq'
+import {
+  GetConfirmOrChallengeResp,
+  deserializeGetConfirmOrChallengeResp,
+  serializeGetConfirmOrChallengeResp,
+} from '../types/GetConfirmOrChallengeResp'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -340,6 +358,70 @@ class TransactionConsenus {
           this.profiler.scopedProfileSectionEnd('get_confirm_or_challenge handler')
         }
       }
+    )
+
+    const getChallengeOrConfirmBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_get_confirm_or_challenge,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      handler: async (payload, respond, header, sign) => {
+        const route = InternalRouteEnum.binary_get_confirm_or_challenge
+        nestedCountersInstance.countEvent('internal', route)
+        this.profiler.scopedProfileSectionStart(route, true, payload.length)
+        const confirmOrChallengeResult: ConfirmOrChallengeQueryResponse = {
+          txId: '',
+          appliedVoteHash: '',
+          result: null,
+          uniqueCount: 0,
+        }
+        try {
+          const reqStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetConfirmOrChallengeReq)
+          if (!reqStream) {
+            nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
+            respond(confirmOrChallengeResult, serializeGetConfirmOrChallengeResp)
+            return
+          }
+          const request = deserializeGetConfirmOrChallengeReq(reqStream)
+          const { txId } = request
+          let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId)
+          if (queueEntry == null) {
+            // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
+            queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, route)
+          }
+          if (queueEntry == null) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no queue entry for ${txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txId)]}`)
+            return
+          }
+          if (queueEntry.receivedBestConfirmation == null && queueEntry.receivedBestChallenge == null) {
+            nestedCountersInstance.countEvent(
+              'consensus',
+              'get_confirm_or_challenge no confirmation or challenge'
+            )
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no confirmation or challenge for ${queueEntry.logID}, bestVote: ${JSON.stringify(queueEntry.receivedBestVote)},  bestConfirmation: ${JSON.stringify(queueEntry.receivedBestConfirmation)}`)
+            return
+          }
+          confirmOrChallengeResult.txId = txId
+          confirmOrChallengeResult.appliedVoteHash = queueEntry.receivedBestVoteHash
+            ? queueEntry.receivedBestVoteHash
+            : this.calculateVoteHash(queueEntry.receivedBestVote)
+          confirmOrChallengeResult.result = queueEntry.receivedBestChallenge
+            ? queueEntry.receivedBestChallenge
+            : queueEntry.receivedBestConfirmation
+          confirmOrChallengeResult.uniqueCount = queueEntry.receivedBestChallenge
+            ? queueEntry.uniqueChallengesCount
+            : 1
+          respond(confirmOrChallengeResult, serializeGetConfirmOrChallengeResp)
+        } catch (e) {
+          // Error handling
+          if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge error ${e.message}`)
+        } finally {
+          this.profiler.scopedProfileSectionEnd(route)
+        }
+      },
+    }
+
+    this.p2p.registerInternalBinary(
+      getChallengeOrConfirmBinaryHandler.name,
+      getChallengeOrConfirmBinaryHandler.handler
     )
 
     this.p2p.registerInternal(
@@ -1636,13 +1718,18 @@ class TransactionConsenus {
       }
       queueEntry.queryingRobustConfirmOrChallenge = true
       const queryFn = async (node: Shardus.Node): Promise<ConfirmOrChallengeQueryResponse> => {
-        const ip = node.externalIp
-        const port = node.externalPort
-        // the queryFunction must return null if the given node is our own
-        if (ip === Self.ip && port === Self.port) return null
-        const queryData: ConfirmOrChallengeQuery = { txId: queueEntry.acceptedTx.txId }
-        const result = await Comms.ask(node, 'get_confirm_or_challenge', queryData)
-        return result
+        if (node.externalIp === Self.ip && node.externalPort === Self.port) return null
+        const queryData = { txId: queueEntry.acceptedTx.txId }
+        return this.config.p2p.useBinarySerializedEndpoints
+          ? await Comms.askBinary<GetConfirmOrChallengeReq, GetConfirmOrChallengeResp>(
+              node,
+              InternalRouteEnum.binary_get_confirm_or_challenge,
+              queryData,
+              serializeGetConfirmOrChallengeReq,
+              deserializeGetConfirmOrChallengeResp,
+              {}
+            )
+          : await Comms.ask(node, 'get_confirm_or_challenge', queryData)
       }
       const eqFn = (
         item1: ConfirmOrChallengeQueryResponse,

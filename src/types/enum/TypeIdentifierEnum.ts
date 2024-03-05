@@ -34,4 +34,6 @@ export enum TypeIdentifierEnum {
   cSpreadAppliedVoteHash,
   cGlobalAccountReportReq,
   cGlobalAccountReportResp,
+  cGetConfirmOrChallengeReq,
+  cGetConfirmOrChallengeResp,
 }

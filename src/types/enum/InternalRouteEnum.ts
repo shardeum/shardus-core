@@ -17,4 +17,5 @@ export enum InternalRouteEnum {
   binary_make_receipt = 'binary/make_receipt', // tell
   binary_spread_appliedVoteHash = 'binary/spread_applied_vote_hash', // tell
   binary_get_globalaccountreport = 'binary/get_globalaccountreport', // ask
+  binary_get_confirm_or_challenge = 'binary/get_confirm_or_challenge', // ask
 }
