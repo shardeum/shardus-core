@@ -30,4 +30,5 @@ export enum TypeIdentifierEnum {
   cSpreadTxToGroupSyncingReq,
   cRequestStateForTxPostReq,
   cRequestStateForTxPostResp,
+  cMakeReceiptReq,
 }

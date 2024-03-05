@@ -15,6 +15,13 @@ import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import { OpaqueTransaction } from '../shardus/shardus-types'
 import { shardusGetTime } from '../network'
+import { InternalBinaryHandler } from '../types/Handler'
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
+import { nestedCountersInstance } from '../utils/nestedCounters'
+import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
+import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
+import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
+import { MakeReceiptReq, deserializeMakeReceiptReq, serializeMakeReceiptReq } from '../types/MakeReceipReq'
 
 /** ROUTES */
 // [TODO] - need to add validattion of types to the routes
@@ -29,6 +36,35 @@ const makeReceiptRoute: P2P.P2PTypes.Route<
       makeReceipt(payload, sender)
     } finally {
       profilerInstance.scopedProfileSectionEnd('make-receipt')
+    }
+  },
+}
+
+const makeReceiptBinaryHandler: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
+  name: InternalRouteEnum.binary_make_receipt,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  handler: async (payload, respond, header, sign) => {
+    const route = InternalRouteEnum.binary_make_receipt
+    nestedCountersInstance.countEvent('internal', route)
+    profilerInstance.scopedProfileSectionStart(route)
+    const errorHandler = (
+      errorType: RequestErrorEnum,
+      opts?: { customErrorLog?: string; customCounterSuffix?: string }
+    ): void => requestErrorHandler(route, errorType, header, opts)
+    try {
+      const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cMakeReceiptReq)
+      if (!requestStream) {
+        return errorHandler(RequestErrorEnum.InvalidRequest)
+      }
+      const req: MakeReceiptReq = deserializeMakeReceiptReq(requestStream)
+      makeReceipt(req, header.sender_id)
+    } catch (e) {
+      nestedCountersInstance.countEvent('internal', `${route}-exception`)
+      Context.logger
+        .getLogger('p2p')
+        .error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+    } finally {
+      profilerInstance.scopedProfileSectionEnd(route)
     }
   },
 }
@@ -62,6 +98,7 @@ const trackers = new Map<P2P.GlobalAccountsTypes.TxHash, P2P.GlobalAccountsTypes
 export function init() {
   // Register routes
   Comms.registerInternal(makeReceiptRoute.name, makeReceiptRoute.handler)
+  Comms.registerInternalBinary(makeReceiptBinaryHandler.name, makeReceiptBinaryHandler.handler)
   Comms.registerGossipHandler(setGlobalGossipRoute.name, setGlobalGossipRoute.handler)
 }
 
@@ -141,7 +178,18 @@ export function setGlobal(address, value, when, source) {
   makeReceipt(signedTx, Self.id) // Need this because internalRoute handler ignores messages from ourselves
   /** [TODO] [AS] Replace with Comms.tell */
   // p2p.tell(consensusGroup, 'make-receipt', signedTx)
-  Comms.tell(consensusGroup, 'make-receipt', signedTx)
+  if (Context.config.p2p.useBinarySerializedEndpoints) {
+    const request = signedTx as MakeReceiptReq
+    Comms.tellBinary<MakeReceiptReq>(
+      consensusGroup,
+      InternalRouteEnum.binary_make_receipt,
+      request,
+      serializeMakeReceiptReq,
+      {}
+    )
+  } else {
+    Comms.tell(consensusGroup, 'make-receipt', signedTx)
+  }
 }
 
 export function createMakeReceiptHandle(txHash: string) {

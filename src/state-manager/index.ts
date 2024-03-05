@@ -2077,6 +2077,7 @@ class StateManager {
     this.p2p.unregisterInternal(InternalRouteEnum.binary_get_trie_hashes)
     this.p2p.unregisterInternal(InternalRouteEnum.binary_spread_tx_to_group_syncing)
     this.p2p.unregisterInternal(InternalRouteEnum.binary_request_state_for_tx_post)
+    this.p2p.unregisterInternal(InternalRouteEnum.binary_make_receipt)
   }
 
   // //////////////////////////////////////////////////////////////////////////
