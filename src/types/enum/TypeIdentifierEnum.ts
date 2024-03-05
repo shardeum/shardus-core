@@ -38,4 +38,7 @@ export enum TypeIdentifierEnum {
   cGetConfirmOrChallengeResp,
   cSignAppDataReq,
   cSignAppDataResp,
+  cGetAccountTrieHashesReq,
+  cGetAccountTrieHashesResp,
+  cRadixAndChildHashes,
 }

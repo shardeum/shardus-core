@@ -74,6 +74,16 @@ import { WrappedData } from '../types/WrappedData'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
+import {
+  GetTrieAccountHashesReq,
+  deserializeGetTrieAccountHashesReq,
+  serializeGetTrieAccountHashesReq,
+} from '../types/GetTrieAccountHashesReq'
+import {
+  GetTrieAccountHashesResp,
+  deserializeGetTrieAccountHashesResp,
+  serializeGetTrieAccountHashesResp,
+} from '../types/GetTrieAccountHashesResp'
 
 type Line = {
   raw: string
@@ -553,6 +563,70 @@ class AccountPatcher {
         const respondSize = await respond(result)
         profilerInstance.scopedProfileSectionEnd('get_trie_accountHashes', respondSize)
       }
+    )
+
+    const getTrieAccountHashesBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_get_trie_account_hashes,
+      handler: (payload, respond, header, sign) => {
+        profilerInstance.scopedProfileSectionStart(
+          InternalRouteEnum.binary_get_trie_account_hashes,
+          false,
+          payload.length
+        )
+        const result = {
+          nodeChildHashes: [],
+          stats: { matched: 0, visisted: 0, empty: 0, childCount: 0 },
+        } as HashTrieAccountsResp
+        try {
+          const stream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAccountTrieHashesReq)
+          const req = deserializeGetTrieAccountHashesReq(stream)
+          const radixList = req.radixList
+          const patcherMaxChildHashResponses = this.config.stateManager.patcherMaxChildHashResponses
+          for (const radix of radixList) {
+            result.stats.visisted++
+            const level = radix.length
+            const layerMap = this.shardTrie.layerMaps[level] // eslint-disable-line security/detect-object-injection
+            if (layerMap == null) {
+              /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_accountHashes badrange:${level}`)
+              break
+            }
+
+            const hashTrieNode = layerMap.get(radix)
+            if (hashTrieNode != null && hashTrieNode.accounts != null) {
+              result.stats.matched++
+              const childAccounts = []
+              result.nodeChildHashes.push({ radix, childAccounts })
+              for (const account of hashTrieNode.accounts) {
+                childAccounts.push({ accountID: account.accountID, hash: account.hash })
+                result.stats.childCount++
+              }
+              if (hashTrieNode.accounts.length === 0) {
+                result.stats.empty++
+              }
+            }
+
+            //some protection on how many responses we can send
+            if (result.stats.childCount > patcherMaxChildHashResponses) {
+              break
+            }
+          }
+
+          /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `binary_get_trie_accountHashes c:${this.stateManager.currentCycleShardData.cycleNumber}`, result.stats.childCount)
+          respond(result, serializeGetTrieAccountHashesResp)
+        } catch (e) {
+          this.statemanager_fatal(
+            'binary_get_trie_accountHashes-failed',
+            'binary_get_trie_accountHashes:' + e.name + ': ' + e.message + ' at ' + e.stack
+          )
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('binary_get_trie_accountHashes')
+        }
+      },
+    }
+
+    this.p2p.registerInternalBinary(
+      getTrieAccountHashesBinaryHandler.name,
+      getTrieAccountHashesBinaryHandler.handler
     )
 
     this.p2p.registerInternal(
@@ -1923,7 +1997,19 @@ class AccountPatcher {
     const promises = []
     for (const [key, value] of requestMap) {
       try {
-        const promise = this.p2p.ask(key, 'get_trie_accountHashes', value)
+        let promise
+        if (this.stateManager.config.p2p.useBinarySerializedEndpoints) {
+          promise = this.p2p.askBinary<GetTrieAccountHashesReq, GetTrieAccountHashesResp>(
+            key,
+            InternalRouteEnum.binary_get_trie_account_hashes,
+            value,
+            serializeGetTrieAccountHashesReq,
+            deserializeGetTrieAccountHashesResp,
+            {}
+          )
+        } else {
+          promise = this.p2p.ask(key, 'get_trie_accountHashes', value)
+        }
         promises.push(promise)
       } catch (error) {
         this.statemanager_fatal(

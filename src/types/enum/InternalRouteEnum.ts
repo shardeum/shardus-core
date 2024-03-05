@@ -18,5 +18,6 @@ export enum InternalRouteEnum {
   binary_spread_appliedVoteHash = 'binary/spread_applied_vote_hash', // tell
   binary_get_globalaccountreport = 'binary/get_globalaccountreport', // ask
   binary_get_confirm_or_challenge = 'binary/get_confirm_or_challenge', // ask
-  binary_sign_app_data = 'binary/sign_app_data' // ask
+  binary_sign_app_data = 'binary/sign_app_data', // ask
+  binary_get_trie_account_hashes = 'binary/get_trie_account_hashes', // ask
 }
