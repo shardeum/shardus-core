@@ -429,14 +429,24 @@ class Logger {
       }
       res.end()
     })
-    Context.network.registerExternalGet('debug-cycle-recording-enable',isDebugModeMiddlewareMedium, (req, res) => {
-        const enable = req.query.enable;
-        config.debug.localEnableCycleRecordDebugTool = enable;
+    Context.network.registerExternalGet(
+      'debug-cycle-recording-enable',
+      isDebugModeMiddlewareMedium,
+      (req, res) => {
+        const enable = req.query.enable
+        if (enable === 'true') {
+          config.debug.localEnableCycleRecordDebugTool = true
+        } else if (enable === 'false') {
+          config.debug.localEnableCycleRecordDebugTool = false
+        }
         res.write(`localEnableCycleRecordDebugTool = ${config.debug.localEnableCycleRecordDebugTool}`)
         res.end()
       }
     )
-    Context.network.registerExternalGet('debug-cycle-recoding-clear',isDebugModeMiddlewareMedium, (req, res) => {
+    Context.network.registerExternalGet(
+      'debug-cycle-recoding-clear',
+      isDebugModeMiddlewareMedium,
+      (req, res) => {
         fs.unlink(filePath1, (err) => {
           if (err) {
             console.error(`Failed to delete ${filePath1}: ${err.message}`)
@@ -457,7 +467,10 @@ class Logger {
         })
       }
     )
-    Context.network.registerExternalGet('debug-cycle-recording-download',isDebugModeMiddlewareMedium, (req, res) => {
+    Context.network.registerExternalGet(
+      'debug-cycle-recording-download',
+      isDebugModeMiddlewareMedium,
+      (req, res) => {
         // Use async read for non-blocking operation
         fs.readFile(filePath1, 'utf8', (err1, data1) => {
           if (err1) {
