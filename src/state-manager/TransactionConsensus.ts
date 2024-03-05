@@ -2007,6 +2007,11 @@ class TransactionConsenus {
       //we are not in the execution home, so we can't create or share a vote
       return
     }
+    if (Context.config.debug.forcedExpiration) {
+      // we are in forced expiration mode, so we can't create or share a vote
+      nestedCountersInstance.countEvent('transactionConsensus', 'forcedExpiration')
+      return
+    }
     this.profiler.profileSectionStart('createAndShareVote', true)
 
     try {

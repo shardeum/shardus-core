@@ -971,6 +971,8 @@ export interface ServerConfiguration {
     enableScopedProfiling: boolean
     /**  Flag to enable writing cycle records to text file for debugging **/
     enableCycleRecordDebugTool: boolean,
+    /**  Flag to force a tx to expire **/
+    forcedExpiration: boolean
   }
   /** Options for the statistics module */
   statistics?: {
