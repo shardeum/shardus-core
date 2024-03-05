@@ -32,4 +32,6 @@ export enum TypeIdentifierEnum {
   cRequestStateForTxPostResp,
   cMakeReceiptReq,
   cSpreadAppliedVoteHash,
+  cGlobalAccountReportReq,
+  cGlobalAccountReportResp,
 }

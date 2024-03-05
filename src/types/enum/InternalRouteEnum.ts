@@ -16,4 +16,5 @@ export enum InternalRouteEnum {
   binary_request_state_for_tx_post = 'binary/request_state_for_tx_post', // ask
   binary_make_receipt = 'binary/make_receipt', // tell
   binary_spread_appliedVoteHash = 'binary/spread_applied_vote_hash', // tell
+  binary_get_globalaccountreport = 'binary/get_globalaccountreport', // ask
 }
