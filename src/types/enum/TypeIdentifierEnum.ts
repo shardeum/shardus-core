@@ -31,4 +31,5 @@ export enum TypeIdentifierEnum {
   cRequestStateForTxPostReq,
   cRequestStateForTxPostResp,
   cMakeReceiptReq,
+  cSpreadAppliedVoteHash,
 }

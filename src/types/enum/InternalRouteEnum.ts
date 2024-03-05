@@ -15,4 +15,5 @@ export enum InternalRouteEnum {
   binary_spread_tx_to_group_syncing = 'binary/spread_tx_to_group_syncing', // tell
   binary_request_state_for_tx_post = 'binary/request_state_for_tx_post', // ask
   binary_make_receipt = 'binary/make_receipt', // tell
+  binary_spread_appliedVoteHash = 'binary/spread_applied_vote_hash', // tell
 }
