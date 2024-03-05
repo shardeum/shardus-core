@@ -59,14 +59,6 @@ import {
   SpreadAppliedVoteHashReq,
   serializeSpreadAppliedVoteHashReq,
 } from '../types/SpreadAppliedVoteHashReq'
-import{
-  GetAccountDataRespSerializable,
-  deserializeGetAccountDataResp,
-  serializeGetAccountDataResp,
-} from '../types/GetAccountDataResp'
-import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
-import { Route } from '@shardus/types/build/src/p2p/P2PTypes'
-import { InternalBinaryHandler } from '../types/Handler'
 import {
   GetConfirmOrChallengeReq,
   deserializeGetConfirmOrChallengeReq,
