@@ -1,4 +1,4 @@
-import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
+import { NodeStatus, Route } from '@shardus/types/build/src/p2p/P2PTypes'
 import { RemoveCertificate } from '@shardus/types/build/src/p2p/LostTypes'
 import { EventEmitter } from 'events'
 import { Handler } from 'express'
@@ -67,6 +67,17 @@ import * as Comms from './../p2p/Comms'
 import { insertSyncFinished } from '../p2p/Join/v2/syncFinished'
 import { isFirst, waitForQ1SendRequests } from '../p2p/Self'
 import { currentQuarter } from '../p2p/CycleCreator'
+import { InternalBinaryHandler } from '../types/Handler'
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
+import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
+import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
+import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
+import { SignAppDataReq, deserializeSignAppDataReq, serializeSignAppDataReq } from '../types/SignAppDataReq'
+import {
+  SignAppDataResp,
+  deserializeSignAppDataResp,
+  serializeSignAppDataResp,
+} from '../types/SignAppDataResp'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -2499,6 +2510,44 @@ class Shardus extends EventEmitter {
       }
     )
 
+    const signAppDataBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_sign_app_data,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      handler: async (payload, respond, header, sign) => {
+        const route = InternalRouteEnum.binary_sign_app_data
+        nestedCountersInstance.countEvent('internal', route)
+        this.profiler.scopedProfileSectionStart(route)
+        const errorHandler = (
+          errorType: RequestErrorEnum,
+          opts?: { customErrorLog?: string; customCounterSuffix?: string }
+        ): void => requestErrorHandler(route, errorType, header, opts)
+        try {
+          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cSignAppDataReq)
+          if (!requestStream) {
+            return errorHandler(RequestErrorEnum.InvalidRequest)
+          }
+
+          const request: SignAppDataReq = deserializeSignAppDataReq(requestStream)
+          const { type, nodesToSign, hash, appData } = request
+          const { success, signature } = await this.app.signAppData?.(
+            type,
+            hash,
+            Number(nodesToSign),
+            appData
+          )
+          const response = { success: success, signature: signature } as SignAppDataResp
+          respond(response, serializeSignAppDataResp)
+        } catch (err) {
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(err)}`)
+        } finally {
+          this.profiler.scopedProfileSectionEnd(route)
+        }
+      },
+    }
+
+    this.p2p.registerInternalBinary(signAppDataBinaryHandler.name, signAppDataBinaryHandler.handler)
+
     // FOR internal testing. NEEDS to be removed for security purposes
     this.network.registerExternalPost('testGlobalAccountTX', isDebugModeMiddleware, async (req, res) => {
       try {
@@ -2757,12 +2806,28 @@ class Shardus extends EventEmitter {
     if (filterNodeIds.length > 0) {
       const groupPromiseResp = await groupResolvePromises(
         closestNodes.map((node) => {
-          return this.p2p.ask(node, 'sign-app-data', {
-            type,
-            hash,
-            nodesToSign,
-            appData,
-          })
+          if (this.config.p2p.useBinarySerializedEndpoints) {
+            const request: SignAppDataReq = {
+              type,
+              hash,
+              nodesToSign,
+              appData,
+            }
+            return this.p2p.askBinary<SignAppDataReq, SignAppDataResp>(
+              node,
+              InternalRouteEnum.binary_sign_app_data,
+              request,
+              serializeSignAppDataReq,
+              deserializeSignAppDataResp,
+              {}
+            )
+          } else
+            return this.p2p.ask(node, 'sign-app-data', {
+              type,
+              hash,
+              nodesToSign,
+              appData,
+            })
         }),
         (res) => {
           if (res.success) return true

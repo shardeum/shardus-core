@@ -2118,6 +2118,7 @@ class StateManager {
     this.p2p.unregisterInternal(InternalRouteEnum.binary_make_receipt)
     this.p2p.unregisterInternal(InternalRouteEnum.binary_get_globalaccountreport)
     this.p2p.unregisterInternal(InternalRouteEnum.binary_get_confirm_or_challenge)
+    this.p2p.unregisterInternal(InternalRouteEnum.binary_sign_app_data)
   }
 
   // //////////////////////////////////////////////////////////////////////////

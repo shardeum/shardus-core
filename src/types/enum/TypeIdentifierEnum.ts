@@ -36,4 +36,6 @@ export enum TypeIdentifierEnum {
   cGlobalAccountReportResp,
   cGetConfirmOrChallengeReq,
   cGetConfirmOrChallengeResp,
+  cSignAppDataReq,
+  cSignAppDataResp,
 }
