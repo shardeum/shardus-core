@@ -21,4 +21,5 @@ export enum InternalRouteEnum {
   binary_sign_app_data = 'binary/sign_app_data', // ask
   binary_get_trie_account_hashes = 'binary/get_trie_account_hashes', // ask
   binary_get_cached_app_data = 'binary/get_cached_app_data', // ask
+  binary_request_tx_and_state = 'binary/request_tx_and_state', //ask
 }

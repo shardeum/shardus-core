@@ -43,4 +43,6 @@ export enum TypeIdentifierEnum {
   cRadixAndChildHashes,
   cGetCachedAppDataReq,
   cGetCachedAppDataResp,
+  cRequestTxAndStateReq,
+  cRequestTxAndStateResp,
 }

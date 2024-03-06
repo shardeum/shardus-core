@@ -55,7 +55,6 @@ import {
   deserializeBroadcastStateReq,
   serializeBroadcastStateReq,
 } from '../types/BroadcastStateReq'
-import { AppObjEnum } from '../types/enum/AppObjEnum'
 import {
   getStreamWithTypeCheck,
   requestErrorHandler,
@@ -76,6 +75,8 @@ import {
   deserializeSpreadTxToGroupSyncingReq,
   serializeSpreadTxToGroupSyncingReq,
 } from '../types/SpreadTxToGroupSyncingReq'
+import { RequestTxAndStateReq, serializeRequestTxAndStateReq } from '../types/RequestTxAndStateReq'
+import { RequestTxAndStateResp, deserializeRequestTxAndStateResp } from '../types/RequestTxAndStateResp'
 
 interface Receipt {
   tx: AcceptedTx
@@ -5696,7 +5697,19 @@ class TransactionQueue {
             )}, retry: ${count} asking node: ${nodeToAsk.id}`
           )
 
-        const response = await Comms.ask(nodeToAsk, 'request_tx_and_state', message)
+        let response
+        if (this.config.p2p.useBinarySerializedEndpoints) {
+          const requestMessage = message as RequestTxAndStateReq
+          response = await Comms.askBinary<RequestTxAndStateReq, RequestTxAndStateResp>(
+            nodeToAsk,
+            InternalRouteEnum.binary_request_tx_and_state,
+            requestMessage,
+            serializeRequestTxAndStateReq,
+            deserializeRequestTxAndStateResp,
+            {}
+          )
+        } else response = await Comms.ask(nodeToAsk, 'request_tx_and_state', message)
+
         for (const data of response.stateList) {
           if (data == null) {
             /* prettier-ignore */
