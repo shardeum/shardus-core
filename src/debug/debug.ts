@@ -1,8 +1,10 @@
 import path from 'path'
 import { NetworkClass } from '../network'
+import * as Context from '../p2p/Context'
 import zlib from 'zlib'
 import Trie from 'trie-prefix-tree'
 import { isDebugModeMiddleware, isDebugModeMiddlewareMedium } from '../network/debugMiddleware'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 const tar = require('tar-fs')
 
 interface Debug {
@@ -69,6 +71,16 @@ class Debug {
       try {
         const delay = req.query.delay && typeof req.query.delay === "string" ? parseInt(req.query.delay) * 1000 : 120 * 1000
         this.network.setDebugNetworkDelay(delay)
+      } catch (e) {
+        return res.send({ success: false, error: e.message })
+      }
+      return res.send({ success: true })
+    })
+    this.network.registerExternalGet('debug-forcedExpiration', isDebugModeMiddleware, (req, res) => {
+      try {
+        const forcedExpiration = req.query.forcedExpiration && typeof req.query.forcedExpiration === "string" ? req.query.forcedExpiration === 'true' : false
+        Context.config.debug.forcedExpiration = forcedExpiration
+        nestedCountersInstance.countEvent('debug', `forcedExpiration set to ${forcedExpiration}`)
       } catch (e) {
         return res.send({ success: false, error: e.message })
       }
