@@ -5397,6 +5397,7 @@ class TransactionQueue {
     /* prettier-ignore */ if (logFlags.verbose || this.stateManager.consensusLog) this.mainLogger.debug(`setTXExpired tx:${queueEntry.logID} ${message}  ts:${queueEntry.acceptedTx.timestamp} debug:${utils.stringifyReduce(queueEntry.debug)}`)
     this.updateTxState(queueEntry, 'expired')
     this.removeFromQueue(queueEntry, currentIndex)
+    this.app.transactionReceiptFail(queueEntry.acceptedTx.data, queueEntry.collectedData, queueEntry.preApplyTXResult?.applyResponse)
 
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'txExpired', `tx: ${this.app.getSimpleTxDebugValue(queueEntry.acceptedTx?.data)}` )
 
