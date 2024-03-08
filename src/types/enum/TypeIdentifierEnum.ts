@@ -50,4 +50,8 @@ export enum TypeIdentifierEnum {
   cRequestStateForTxResp,
   cRequestReceiptForTxReq,
   cRequestReceiptForTxResp,
+  cGetAppliedVoteReq,
+  cSign,
+  cAppliedVote,
+  cGetAppliedVoteResp,
 }

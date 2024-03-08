@@ -38,7 +38,11 @@ import { robustQuery } from '../p2p/Utils'
 import { SignedObject } from '@shardus/crypto-utils'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { GetAccountDataReqSerializable, serializeGetAccountDataReq } from '../types/GetAccountDataReq'
-import { GetAccountDataRespSerializable, deserializeGetAccountDataResp } from '../types/GetAccountDataResp'
+import {
+  GetAccountDataRespSerializable,
+  deserializeGetAccountDataResp,
+  serializeGetAccountDataResp,
+} from '../types/GetAccountDataResp'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { InternalBinaryHandler } from '../types/Handler'
 import { Route } from '@shardus/types/build/src/p2p/P2PTypes'
@@ -69,6 +73,12 @@ import {
   deserializeGetConfirmOrChallengeResp,
   serializeGetConfirmOrChallengeResp,
 } from '../types/GetConfirmOrChallengeResp'
+import {
+  GetAppliedVoteReq,
+  deserializeGetAppliedVoteReq,
+  serializeGetAppliedVoteReq,
+} from '../types/GetAppliedVoteReq'
+import { GetAppliedVoteResp, deserializeGetAppliedVoteResp } from '../types/GetAppliedVoteResp'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -445,6 +455,73 @@ class TransactionConsenus {
         await respond(appliedVote)
       }
     )
+
+    const GetAppliedVoteBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_get_applied_vote,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      handler: async (payload, respond, header, sign) => {
+        const route = InternalRouteEnum.binary_get_applied_vote
+        nestedCountersInstance.countEvent('internal', route)
+        this.profiler.scopedProfileSectionStart(route, false, payload.length)
+        const errorHandler = (
+          errorType: RequestErrorEnum,
+          opts?: { customErrorLog?: string; customCounterSuffix?: string }
+        ): void => requestErrorHandler(route, errorType, header, opts)
+
+        try {
+          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAppliedVoteReq)
+          if (!requestStream) {
+            errorHandler(RequestErrorEnum.InvalidRequestType)
+            return respond({}, serializeGetAccountDataResp)
+          }
+
+          // verification data checks
+          if (header.verification_data == null) {
+            errorHandler(RequestErrorEnum.MissingVerificationData)
+            return respond({}, serializeGetAccountDataResp)
+          }
+
+          const txId = header.verification_data
+          let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId)
+          if (queueEntry == null) {
+            // check the archived queue entries
+            queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, route)
+          }
+
+          if (queueEntry == null) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`${route} no queue entry for ${txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txId)]}`)
+            errorHandler(RequestErrorEnum.InvalidRequest)
+            return respond({}, serializeGetAccountDataResp)
+          }
+
+          const req = deserializeGetAppliedVoteReq(requestStream)
+          if (req.txId !== txId) {
+            errorHandler(RequestErrorEnum.InvalidPayload, { customErrorLog: 'txId mismatch' })
+            return respond({}, serializeGetAccountDataResp)
+          }
+
+          if (queueEntry.receivedBestVote == null) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`${route} no receivedBestVote for ${req.txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(req.txId)]}`)
+            return respond({}, serializeGetAccountDataResp)
+          }
+          const appliedVote: GetAppliedVoteResp = {
+            txId,
+            appliedVote: queueEntry.receivedBestVote,
+            appliedVoteHash: queueEntry.receivedBestVoteHash
+              ? queueEntry.receivedBestVoteHash
+              : this.calculateVoteHash(queueEntry.receivedBestVote),
+          }
+          respond(appliedVote, serializeGetAccountDataResp)
+        } catch (e) {
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+        } finally {
+          this.profiler.scopedProfileSectionEnd(route)
+        }
+      },
+    }
+
+    Comms.registerInternalBinary(GetAppliedVoteBinaryHandler.name, GetAppliedVoteBinaryHandler.handler)
 
     Comms.registerGossipHandler(
       'gossip-applied-vote',
@@ -1668,6 +1745,20 @@ class TransactionConsenus {
         // the queryFunction must return null if the given node is our own
         if (ip === Self.ip && port === Self.port) return null
         const queryData: AppliedVoteQuery = { txId: queueEntry.acceptedTx.txId }
+        if (this.config.p2p.useBinarySerializedEndpoints) {
+          const req = queryData as GetAppliedVoteReq
+          const rBin = await Comms.askBinary<GetAppliedVoteReq, GetAppliedVoteResp>(
+            node,
+            InternalRouteEnum.binary_get_applied_vote,
+            req,
+            serializeGetAppliedVoteReq,
+            deserializeGetAppliedVoteResp,
+            {
+              verification_data: `${queryData.txId}`,
+            }
+          )
+          return rBin
+        }
         return await Comms.ask(node, 'get_applied_vote', queryData)
       }
       const eqFn = (item1: AppliedVoteQueryResponse, item2: AppliedVoteQueryResponse): boolean => {

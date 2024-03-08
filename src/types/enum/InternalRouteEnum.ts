@@ -25,4 +25,5 @@ export enum InternalRouteEnum {
   binary_lost_archiver_investigate = 'binary/lost_archiver_investigate', // tell
   binary_request_state_for_tx = 'binary/request_state_for_tx', // ask
   binary_request_receipt_for_tx = 'binary/request_receipt_for_tx', // ask
+  binary_get_applied_vote = 'binary/get_applied_vote', // ask
 }
