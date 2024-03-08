@@ -23,6 +23,12 @@ import { inspect } from 'util'
 import { formatErrorMessage } from '../../utils'
 import { nestedCountersInstance } from '../..'
 import { shardusGetTime } from '../../network'
+import {
+  LostArchiverInvestigateReq,
+  serializeLostArchiverInvestigateReq,
+} from '../../types/LostArchiverInvestigateReq'
+import { InternalRouteEnum } from '../../types/enum/InternalRouteEnum'
+import { tellBinary } from '../Comms'
 
 /** Lost Archivers Functions */
 
@@ -170,7 +176,18 @@ export function informInvestigator(target: publicKey): void {
 
     // Send message to investigator
     info(`informInvestigator: sending InvestigateArchiverMsg: ${inspect(investigateMsg)}`)
-    Comms.tell([investigator], 'lost-archiver-investigate', investigateMsg)
+    if (this.config.p2p.useBinarySerializedEndpoints) {
+      Comms.tellBinary<LostArchiverInvestigateReq>(
+        [investigator],
+        InternalRouteEnum.binary_broadcast_state,
+        investigateMsg,
+        serializeLostArchiverInvestigateReq,
+        {}
+      )
+    } else {
+      Comms.tell([investigator], 'lost-archiver-investigate', investigateMsg)
+    }
+    
   } catch (ex) {
     nestedCountersInstance.countEvent('p2p', `informInvestigator error ${shardusGetTime()}`)
     error('informInvestigator: ' + formatErrorMessage(ex))
