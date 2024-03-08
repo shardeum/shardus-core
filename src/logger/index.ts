@@ -444,7 +444,7 @@ class Logger {
       }
     )
     Context.network.registerExternalGet(
-      'debug-cycle-recoding-clear',
+      'debug-cycle-recording-clear',
       isDebugModeMiddlewareMedium,
       (req, res) => {
         fs.unlink(filePath1, (err) => {
@@ -472,29 +472,17 @@ class Logger {
       isDebugModeMiddlewareMedium,
       (req, res) => {
         // Use async read for non-blocking operation
-        fs.readFile(filePath1, 'utf8', (err1, data1) => {
-          if (err1) {
+        fs.readFile(filePath1, 'utf8', (err, data) => {
+          if (err) {
             // Handle error (e.g., file not found)
-            console.error('Error reading file 1:', err1)
-            res.status(500).send('Error reading file 1')
+            console.error('Error reading file:', err)
+            res.status(500).send('Error reading file')
             return
           }
 
-          fs.readFile(filePath2, 'utf8', (err2, data2) => {
-            if (err2) {
-              // Handle error
-              console.error('Error reading file 2:', err2)
-              res.status(500).send('Error reading file 2')
-              return
-            }
-
-            // Concatenate data with skipping two lines in between
-            const combinedData = data1 + '\n\n' + data2
-
-            // Return combined data
-            res.setHeader('Content-Type', 'text/plain')
-            res.send(combinedData)
-          })
+          // Return data from filePath1 only
+          res.setHeader('Content-Type', 'text/plain')
+          res.send(data)
         })
       }
     )
