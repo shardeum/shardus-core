@@ -116,6 +116,11 @@ import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { deserializeSpreadAppliedVoteHashReq } from '../types/SpreadAppliedVoteHashReq'
 import { RequestTxAndStateReq, deserializeRequestTxAndStateReq } from '../types/RequestTxAndStateReq'
 import { serializeRequestTxAndStateResp } from '../types/RequestTxAndStateResp'
+import {
+  RequestReceiptForTxRespSerialized,
+  serializeRequestReceiptForTxResp,
+} from '../types/RequestReceiptForTxResp'
+import { deserializeRequestReceiptForTxReq } from '../types/RequestReceiptForTxReq'
 
 export type Callback = (...args: unknown[]) => void
 
@@ -1382,6 +1387,53 @@ class StateManager {
           profilerInstance.scopedProfileSectionEnd('request_receipt_for_tx', responseSize)
         }
       }
+    )
+
+    const requestReceiptForTxBinaryHandler: P2PTypes.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_request_receipt_for_tx,
+      handler: (payload, respond) => {
+        const route = InternalRouteEnum.binary_request_receipt_for_tx
+        profilerInstance.scopedProfileSectionStart(route, false, payload.length)
+        nestedCountersInstance.countEvent('stateManager', route)
+
+        const response: RequestReceiptForTxRespSerialized = { receipt: null, note: '', success: false }
+        try {
+          const req = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cRequestReceiptForTxReq)
+          const deserialized = deserializeRequestReceiptForTxReq(req)
+          let queueEntry = this.transactionQueue.getQueueEntrySafe(deserialized.txid)
+          if (queueEntry == null) {
+            queueEntry = this.transactionQueue.getQueueEntryArchived(deserialized.txid, route)
+          }
+
+          if (queueEntry == null) {
+            response.note = `failed to find queue entry: ${utils.stringifyReduce(deserialized.txid)}  ${
+              deserialized.timestamp
+            } dbg:${this.debugTXHistory[utils.stringifyReduce(deserialized.txid)]}`
+            respond(response, serializeRequestReceiptForTxResp)
+            return
+          }
+
+          response.receipt = this.getReceipt2(queueEntry)
+          if (response.receipt != null) {
+            response.success = true
+          } else {
+            response.note = `found queueEntry but no receipt: ${utils.stringifyReduce(deserialized.txid)} ${
+              deserialized.txid
+            }  ${deserialized.timestamp}`
+          }
+          respond(response, serializeRequestReceiptForTxResp)
+        } catch (e) {
+          this.mainLogger.error(`${route} error: ${e.message}`)
+          this.mainLogger.error(e.stack)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd(route)
+        }
+      },
+    }
+
+    this.p2p.registerInternalBinary(
+      requestReceiptForTxBinaryHandler.name,
+      requestReceiptForTxBinaryHandler.handler
     )
 
     this.p2p.registerInternal(

@@ -23,4 +23,6 @@ export enum InternalRouteEnum {
   binary_get_cached_app_data = 'binary/get_cached_app_data', // ask
   binary_request_tx_and_state = 'binary/request_tx_and_state', //ask
   binary_lost_archiver_investigate = 'binary/lost_archiver_investigate', // tell
+  binary_request_state_for_tx = 'binary/request_state_for_tx', // ask
+  binary_request_receipt_for_tx = 'binary/request_receipt_for_tx', // ask
 }

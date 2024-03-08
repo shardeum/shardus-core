@@ -46,4 +46,8 @@ export enum TypeIdentifierEnum {
   cRequestTxAndStateReq,
   cRequestTxAndStateResp,
   cLostArchiverInvestigateReq,
+  cRequestStateForTxReq,
+  cRequestStateForTxResp,
+  cRequestReceiptForTxReq,
+  cRequestReceiptForTxResp,
 }

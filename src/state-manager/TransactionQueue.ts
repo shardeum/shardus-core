@@ -77,6 +77,20 @@ import {
 } from '../types/SpreadTxToGroupSyncingReq'
 import { RequestTxAndStateReq, serializeRequestTxAndStateReq } from '../types/RequestTxAndStateReq'
 import { RequestTxAndStateResp, deserializeRequestTxAndStateResp } from '../types/RequestTxAndStateResp'
+import { deserializeRequestStateForTxReq, serializeRequestStateForTxReq } from '../types/RequestStateForTxReq'
+import {
+  deserializeRequestStateForTxResp,
+  RequestStateForTxRespSerialized,
+  serializeRequestStateForTxResp,
+} from '../types/RequestStateForTxResp'
+import {
+  deserializeRequestReceiptForTxResp,
+  RequestReceiptForTxRespSerialized,
+} from '../types/RequestReceiptForTxResp'
+import {
+  RequestReceiptForTxReqSerialized,
+  serializeRequestReceiptForTxReq,
+} from '../types/RequestReceiptForTxReq'
 
 interface Receipt {
   tx: AcceptedTx
@@ -643,6 +657,65 @@ class TransactionQueue {
         }
       }
     )
+
+    const requestStateForTxRoute: P2PTypes.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_request_state_for_tx,
+      handler: (payload, respond) => {
+        const route = InternalRouteEnum.binary_request_state_for_tx
+        profilerInstance.scopedProfileSectionStart(route)
+        nestedCountersInstance.countEvent('internal', route)
+        try {
+          const response: RequestStateForTxRespSerialized = {
+            stateList: [],
+            beforeHashes: {},
+            note: '',
+            success: false,
+          }
+          const responseStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cRequestStateForTxReq)
+          if (!responseStream) {
+            throw new Error('Cannot get vector buffer stream from payload')
+          }
+          const req = deserializeRequestStateForTxReq(responseStream)
+          if (req.txid == null) {
+            throw new Error('Txid is null')
+          }
+          let queueEntry = this.getQueueEntrySafe(req.txid)
+          if (queueEntry == null) {
+            queueEntry = this.getQueueEntryArchived(req.txid, InternalRouteEnum.binary_request_state_for_tx)
+          }
+
+          if (queueEntry == null) {
+            response.note = `failed to find queue entry: ${utils.stringifyReduce(req.txid)}  ${
+              req.timestamp
+            } dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(req.txid)]}`
+            respond(response, serializeRequestStateForTxResp)
+            // if a node cant get data it will have to get repaired by the patcher since we can only keep stuff en the archive queue for so long
+            // due to memory concerns
+            return
+          }
+
+          for (const key of req.keys) {
+            // eslint-disable-next-line security/detect-object-injection
+            const data = queueEntry.originalData[key] // collectedData
+            if (data) {
+              response.stateList.push(data)
+            }
+          }
+          response.success = true
+          respond(response, serializeRequestStateForTxResp)
+        } catch (e) {
+          this.mainLogger.error(
+            `${
+              InternalRouteEnum.binary_request_state_for_tx
+            }: Exception executing request: ${errorToStringFull(e)}`
+          )
+        } finally {
+          profilerInstance.scopedProfileSectionEnd(InternalRouteEnum.binary_request_state_for_tx)
+        }
+      },
+    }
+
+    this.p2p.registerInternalBinary(requestStateForTxRoute.name, requestStateForTxRoute.handler)
 
     networkContext.registerExternalPost('get-tx-receipt', async (req, res) => {
       let result: { success: boolean; receipt?: ArchiverReceipt | AppliedReceipt2; reason?: string }
@@ -2299,7 +2372,19 @@ class TransactionQueue {
             txid: queueEntry.acceptedTx.txId,
             timestamp: queueEntry.acceptedTx.timestamp,
           }
-          const result: RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx', message)
+          let result
+          if (this.config.p2p.useBinarySerializedEndpoints) {
+            result = (await this.p2p.askBinary<RequestStateForTxReq, RequestStateForTxRespSerialized>(
+              node,
+              InternalRouteEnum.binary_request_state_for_tx,
+              message,
+              serializeRequestStateForTxReq,
+              deserializeRequestStateForTxResp,
+              {}
+            )) as RequestStateForTxRespSerialized
+          } else {
+            result = (await this.p2p.ask(node, 'request_state_for_tx', message)) as RequestStateForTxResp
+          }
 
           if (result == null) {
             if (logFlags.verbose) {
@@ -2451,7 +2536,22 @@ class TransactionQueue {
         }
 
         const message = { txid: queueEntry.acceptedTx.txId, timestamp: queueEntry.acceptedTx.timestamp }
-        const result: RequestReceiptForTxResp = await this.p2p.ask(node, 'request_receipt_for_tx', message) // not sure if we should await this.
+        let result = null
+        if (this.stateManager.config.p2p.useBinarySerializedEndpoints) {
+          result = await this.p2p.askBinary<
+            RequestReceiptForTxReqSerialized,
+            RequestReceiptForTxRespSerialized
+          >(
+            node,
+            InternalRouteEnum.binary_request_receipt_for_tx,
+            message,
+            serializeRequestReceiptForTxReq,
+            deserializeRequestReceiptForTxResp,
+            {}
+          )
+        } else {
+          result = await this.p2p.ask(node, 'request_receipt_for_tx', message) // not sure if we should await this.
+        }
 
         if (result == null) {
           if (logFlags.verbose) {
