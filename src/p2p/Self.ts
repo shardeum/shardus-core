@@ -206,22 +206,7 @@ export function startupV2(): Promise<boolean> {
           /* prettier-ignore */ if (logFlags.verbose) console.log(`in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
         }
 
-        let payload = {
-          nodeId: id,
-          cycleNumber: CycleChain.getNewest()?.counter,
-        }
-        payload = Context.crypto.sign(payload)
-        // send a sync-started message to the network if you are not the first node
-        if (isFirst) {
-          nestedCountersInstance.countEvent('p2p', `adding sync-started message for first node`)
-          /* prettier-ignore */ if (logFlags.verbose) console.log(`adding sync-started message for first node`)
-          console.log('isFirst', id, 'NodeList.selectedById', NodeList.selectedById)
-          insertSyncStarted(id)
-        } else {
-          nestedCountersInstance.countEvent('p2p', `sending sync-started gossip to network`)
-          /* prettier-ignore */ if (logFlags.verbose) console.log(`sending sync-started gossip to network`)
-          Comms.sendGossip('gossip-sync-started', payload)
-        }
+        Join.queueStartedSyncingRequest(id)
 
         // Enable internal routes
         Comms.setAcceptInternal(true)
@@ -230,20 +215,6 @@ export function startupV2(): Promise<boolean> {
         await CycleCreator.startCycles()
         p2pSyncEnd = shardusGetTime()
         p2pJoinTime = (p2pSyncEnd - p2pSyncStart) / 1000
-        // send a sync-finished message to the network if you are the first node when promised is resoolved from CycleCreator.startCycles()
-        // if (isFirst) {
-        //   insertSyncFinished(id)
-        //   nestedCountersInstance.countEvent('p2p', `adding sync-finished message for first node`)
-        //   /* prettier-ignore */ if (logFlags.verbose) console.log(`adding sync-finished message for first node`)
-        // } else {
-        //   //Payload that is gossiped after node has synced
-        //   let readyPayload = {
-        //     nodeId: id,
-        //     cycleNumber: CycleChain.getNewest()?.counter,
-        //   }
-        //   readyPayload = Context.crypto.sign(readyPayload)
-        //   Comms.sendGossip('gossip-sync-finished', readyPayload)
-        // }
 
         nestedCountersInstance.countEvent('p2p', `sync time ${p2pJoinTime} seconds`)
 

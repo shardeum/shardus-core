@@ -81,6 +81,7 @@ import {
 import { safeStringify } from '../utils'
 import { isNodeInRotationBounds } from '../p2p/Utils'
 import ShardFunctions from '../state-manager/shardFunctions'
+import { queueFinishedSyncingRequest } from '../p2p/Join'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -709,47 +710,12 @@ class Shardus extends EventEmitter {
       // After restoring state data, set syncing flags to true and go active
       await this.stateManager.startCatchUpQueue()
       console.log('restore - startCatchUpQueue')
-      nestedCountersInstance.countEvent(
-        'restore',
-        `restore event: finished startCatchUpQueue. ${shardusGetTime()}`
-      )
-      //await this.p2p.goActive()
-      //console.log('syncAppData - goActive')
+      nestedCountersInstance.countEvent('restore', `restore event: finished startCatchUpQueue. ${shardusGetTime()}`)
 
-      let waited = false
-      // if we are not in q1 anymore, wait till next cycle's q1 to send sync-finished gossip
-      if (currentQuarter > 1) {
-        nestedCountersInstance.countEvent(
-          'restore',
-          `sync-finished-restore: not in Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`
-        )
-        /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished-restore: not is Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
-        waited = true
-      }
-      if (currentQuarter > 0) {
-        await waitForQ1SendRequests()
-      }
-      if (waited) {
-        nestedCountersInstance.countEvent(
-          'restore',
-          `sync-finished-restore: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`
-        )
-        /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished-restore: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
-      }
+      queueFinishedSyncingRequest(Self.id)
+      console.log('syncAppData - queueFinishedSyncingRequest')
+      nestedCountersInstance.countEvent('restore', `restore event: queue finished-syncing-request ${shardusGetTime()}`)
 
-      let readyPayload = {
-        nodeId: Self.id,
-        cycleNumber: CycleChain.getNewest()?.counter,
-      }
-      readyPayload = Context.crypto.sign(readyPayload)
-      console.log('restore - sent gossip sync-finished')
-      insertSyncFinished(Self.id)
-      Comms.sendGossip('gossip-sync-finished', readyPayload)
-
-      nestedCountersInstance.countEvent(
-        'restore',
-        `restore event: sendGossip gossip-sync-finished ${shardusGetTime()}`
-      )
       this.stateManager.appFinishedSyncing = true
       this.stateManager.startProcessingCycleSummaries()
     })
@@ -1196,12 +1162,12 @@ class Shardus extends EventEmitter {
     // if (this.stateManager) await this.stateManager.accountSync.syncStateDataFast(3) // fast mode
     if (this.p2p.isFirstSeed) {
       console.log('syncAppData - isFirstSeed')
-      //await this.p2p.goActive()
-      //console.log('syncAppData - goActive')
+      // the following comment of delay is probably not relavent now as we are using cycle txs
       // we don't have a delay here as there's practically no time between sync-started and sync-finished for the first node
       // since we already wait fro sync-finished, its very unlikely we'll be in the wrong quarter
-      insertSyncFinished(Self.id)
-      console.log('syncAppData - insertSyncFinished')
+      queueFinishedSyncingRequest(Self.id)
+      console.log('syncAppData - queueFinishedSyncingRequest')
+      nestedCountersInstance.countEvent('p2p', `queue finished-syncing-request ${shardusGetTime()}`)
       await this.stateManager.waitForShardCalcs()
       await this.app.sync()
       console.log('syncAppData - sync')
@@ -1215,38 +1181,10 @@ class Shardus extends EventEmitter {
       console.log('syncAppData - sync')
       Self.setp2pIgnoreJoinRequests(false)
       console.log('p2pIgnoreJoinRequests = false')
-      //await this.p2p.goActive()
-      //console.log('syncAppData - goActive')
 
-      let waited = false
-      // if quarter > 1 , wait till next cycle's q1 to send sync-finished gossip
-      if (currentQuarter > 1) {
-        nestedCountersInstance.countEvent(
-          'p2p',
-          `sync-finished: not in Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`
-        )
-        /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished: not is Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
-        waited = true
-      }
-      if (currentQuarter > 0) {
-        await waitForQ1SendRequests()
-      }
-      if (waited) {
-        nestedCountersInstance.countEvent(
-          'p2p',
-          `sync-finished: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`
-        )
-        /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
-      }
-
-      let readyPayload = {
-        nodeId: Self.id,
-        cycleNumber: CycleChain.getNewest()?.counter,
-      }
-      readyPayload = Context.crypto.sign(readyPayload)
-      Comms.sendGossip('gossip-sync-finished', readyPayload)
-      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: inital gossip send. id: ${Self.id}. tInC: ${shardusGetTime() - CycleCreator?.currentStart}`)
-      console.log('syncAppData - gossip-sync-finished')
+      queueFinishedSyncingRequest(Self.id)
+      console.log('syncAppData - queueFinishedSyncingRequest')
+      nestedCountersInstance.countEvent('p2p', `queue finished-syncing-request ${shardusGetTime()}`)
       this.stateManager.appFinishedSyncing = true
     }
     // Set network joinable to true
