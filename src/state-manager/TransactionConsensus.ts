@@ -78,7 +78,7 @@ import {
   deserializeGetAppliedVoteReq,
   serializeGetAppliedVoteReq,
 } from '../types/GetAppliedVoteReq'
-import { GetAppliedVoteResp, deserializeGetAppliedVoteResp } from '../types/GetAppliedVoteResp'
+import { GetAppliedVoteResp, deserializeGetAppliedVoteResp, serializeGetAppliedVoteResp } from '../types/GetAppliedVoteResp'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -472,13 +472,13 @@ class TransactionConsenus {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAppliedVoteReq)
           if (!requestStream) {
             errorHandler(RequestErrorEnum.InvalidRequestType)
-            return respond({}, serializeGetAccountDataResp)
+            return respond({}, serializeGetAppliedVoteResp)
           }
 
           // verification data checks
           if (header.verification_data == null) {
             errorHandler(RequestErrorEnum.MissingVerificationData)
-            return respond({}, serializeGetAccountDataResp)
+            return respond({}, serializeGetAppliedVoteResp)
           }
 
           const txId = header.verification_data
@@ -491,18 +491,18 @@ class TransactionConsenus {
           if (queueEntry == null) {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`${route} no queue entry for ${txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txId)]}`)
             errorHandler(RequestErrorEnum.InvalidRequest)
-            return respond({}, serializeGetAccountDataResp)
+            return respond({}, serializeGetAppliedVoteResp)
           }
 
           const req = deserializeGetAppliedVoteReq(requestStream)
           if (req.txId !== txId) {
             errorHandler(RequestErrorEnum.InvalidPayload, { customErrorLog: 'txId mismatch' })
-            return respond({}, serializeGetAccountDataResp)
+            return respond({}, serializeGetAppliedVoteResp)
           }
 
           if (queueEntry.receivedBestVote == null) {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`${route} no receivedBestVote for ${req.txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(req.txId)]}`)
-            return respond({}, serializeGetAccountDataResp)
+            return respond({}, serializeGetAppliedVoteResp)
           }
           const appliedVote: GetAppliedVoteResp = {
             txId,
@@ -511,7 +511,7 @@ class TransactionConsenus {
               ? queueEntry.receivedBestVoteHash
               : this.calculateVoteHash(queueEntry.receivedBestVote),
           }
-          respond(appliedVote, serializeGetAccountDataResp)
+          respond(appliedVote, serializeGetAppliedVoteResp)
         } catch (e) {
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
           this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)

@@ -187,7 +187,16 @@ export function stringify(val: unknown, options: StringifierOptions = defaultStr
   if (returnVal !== undefined) {
     return '' + returnVal
   }
-  return ''
+}
+
+// json string validation function
+export function isValidJSON(jsonString: string): boolean {
+  try {
+    JSON.parse(jsonString)
+    return true // Valid JSON string
+  } catch (e) {
+    return false // Invalid JSON string
+  }
 }
 
 export function cryptoStringify(val: unknown, isArrayProp = false): string {

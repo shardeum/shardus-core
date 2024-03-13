@@ -183,7 +183,7 @@ const compareCertBinaryHandler: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>
       const errors = verifyPayload('CompareCertReq', req)
       if (errors && errors.length > 0) {
         p2pLogger.error(`compareCert: request validation errors: ${errors}`)
-        respond(resp, serializeCompareCertResp)
+        respond({ certs: bestCycleCert.get(bestMarker), record: bestRecord }, serializeCompareCertResp)
       }
 
       const compareCertReq: CompareCertReq = {
