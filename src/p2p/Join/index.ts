@@ -31,8 +31,8 @@ import { deleteStandbyNode, drainNewUnjoinRequests } from './v2/unjoin'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { updateNodeState } from '../Self'
 import { HTTPError } from 'got'
-import { drainLostAfterSelectionNodes, drainSyncStarted, lostAfterSelection } from './v2/syncStarted'
-import { drainFinishedSyncingRequest, newSyncFinishedNodes } from './v2/syncFinished'
+import { drainLostAfterSelectionNodes, drainSyncStarted, lostAfterSelection, insertSyncStarted, addSyncStarted } from './v2/syncStarted'
+import { addFinishedSyncing, drainFinishedSyncingRequest, newSyncFinishedNodes } from './v2/syncFinished'
 //import { getLastCycleStandbyRefreshRequest, resetLastCycleStandbyRefreshRequests, drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
 import { drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
 import rfdc from 'rfdc'
@@ -46,6 +46,9 @@ const clone = rfdc()
 
 let requests: P2P.JoinTypes.JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
+let queuedStartedSyncingId: string
+let queuedFinishedSyncingId: string
+let queuedStandbyRefreshPubKey: string
 
 // whats this for? I was just going to use newStandbyRefreshRequests
 //let keepInStandbyCollector: Map<string,KeepInStandby>
@@ -200,7 +203,9 @@ export function getTxs(): P2P.JoinTypes.Txs {
   //const keepInStandbyCopy = [...Object.values(keepInStandbyCollector)]
   return {
     join: requestsCopy,
-    //keepInStandby : keepInStandbyCopy
+    startedSyncing: [],
+    finishedSyncing: [],
+    standbyRefresh: []
   }
 }
 
@@ -229,7 +234,7 @@ export function validateRecordTypes(rec: P2P.JoinTypes.Record): string {
 export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
   // TODO drop any invalid join requests. NOTE: this has never been implemented
   // yet, so this task is not a side effect of any work on join v2.
-  return { join: txs.join }
+  return { join: txs.join, startedSyncing: [], finishedSyncing: [], standbyRefresh: [] }
 }
 
 export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
@@ -287,11 +292,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     let standbyRemoved_App = 0
     let skipped = 0
     const standbyListMap = getStandbyNodesInfoMap()
-<<<<<<< HEAD
     const standbyList = getLastHashedStandbyList()
-=======
-    const standbyList = Array.from(standbyListMap.values())
->>>>>>> 4976943c (fix for refreshed nodes being removed)
 
     if (config.p2p.standbyAgeScrub) {
       // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles
@@ -608,12 +609,56 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
 /** Not used by Join */
 export function sendRequests(): void {
+  if (queuedStartedSyncingId) {
+    const syncStartedTx: P2P.JoinTypes.StartedSyncingRequest = crypto.sign({
+      nodeId: queuedStartedSyncingId,
+      cycleNumber: CycleChain.newest.counter,
+    })
+    queuedStartedSyncingId = undefined
+
+    if(addSyncStarted(syncStartedTx).success === true) {
+      nestedCountersInstance.countEvent('p2p', `sending sync-started gossip to network`)
+      /* prettier-ignore */ if (logFlags.verbose) console.log(`sending sync-started gossip to network`)
+      Comms.sendGossip('gossip-sync-started', syncStartedTx, '', null, NodeList.byIdOrder, true)
+    } else {
+      nestedCountersInstance.countEvent('p2p', `join:sendRequests failed to add our own sync-started message`)
+      /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequestsfailed to add our own sync-started message`)
+    }
+  }
+  if (queuedFinishedSyncingId) {
+    const syncFinishedTx: P2P.JoinTypes.FinishedSyncingRequest = crypto.sign({
+      nodeId: queuedFinishedSyncingId,
+      cycleNumber: CycleChain.newest.counter,
+    })
+    queuedFinishedSyncingId = undefined
+
+    if (addFinishedSyncing(syncFinishedTx).success === true) {
+      nestedCountersInstance.countEvent('p2p', `sending sync-finished gossip to network`)
+      /* prettier-ignore */ if (logFlags.verbose) console.log(`sending sync-finished gossip to network`)
+      Comms.sendGossip('gossip-sync-finished', syncFinishedTx, '', null, NodeList.byIdOrder, true)
+    } else {
+      nestedCountersInstance.countEvent('p2p', `join:sendRequests failed to add our own sync-finished message`)
+      /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequests failed to add our own sync-finished message`)
+    }
+  }
   return
 }
 
 /** Not used by Join */
 export function queueRequest(): void {
   return
+}
+
+export function queueStartedSyncingRequest(nodeId: string): void {
+  queuedStartedSyncingId = nodeId
+}
+
+export function queueFinishedSyncingRequest(nodeId: string): void {
+  queuedFinishedSyncingId = nodeId
+}
+
+export function queueStandbyRefreshRequest(publicKey: string): void {
+  queuedStandbyRefreshPubKey = publicKey
 }
 
 /** Module Functions */

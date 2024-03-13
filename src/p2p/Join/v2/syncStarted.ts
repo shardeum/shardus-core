@@ -1,6 +1,6 @@
 import { logFlags } from '../../../logger'
 import * as NodeList from '../../NodeList'
-import { SyncStarted } from '@shardus/types/build/src/p2p/JoinTypes'
+import { StartedSyncingRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import * as CycleChain from '../../CycleChain'
 import { crypto } from '../../Context'
@@ -44,7 +44,7 @@ export function insertSyncStarted(nodeId: string): void {
   newSyncStarted.push(nodeId)
 }
 
-export function addSyncStarted(syncStarted: SyncStarted): SyncStartedRequestResponse {
+export function addSyncStarted(syncStarted: StartedSyncingRequest): SyncStartedRequestResponse {
   // lookup node by id in payload and use pubkey and compare to sig.owner
   const publicKeysMatch = ((NodeList.byIdOrder.find((node) => node.id === syncStarted.nodeId))?.publicKey) === syncStarted.sign.owner
   if (!publicKeysMatch) {
