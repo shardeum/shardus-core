@@ -97,7 +97,7 @@ export function addSyncStarted(syncStarted: StartedSyncingRequest): SyncStartedR
  */
 export function drainSyncStarted(): string[] {
   if (currentQuarter === 3) {
-    if (logFlags.verbose) console.log('draining new KeepInStandby info:', newSyncStarted)
+    if (logFlags.verbose) console.log('draining new syncStarted info:', newSyncStarted)
     const tmp = newSyncStarted
     newSyncStarted = []
     return tmp.sort()
