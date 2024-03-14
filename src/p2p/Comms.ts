@@ -26,6 +26,7 @@ import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { InternalError, ResponseError, serializeResponseError } from '../types/ResponseError'
 import { Utils } from '@shardus/types'
+import { nodeListFromStates } from './Join'
 
 /** ROUTES */
 
