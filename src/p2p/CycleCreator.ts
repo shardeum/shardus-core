@@ -337,7 +337,7 @@ async function cycleCreator() {
 
     // We are not always making it to this point. every 60s:
     // Print combined cycle log entry
-    cycleLogger.info(CycleChain.getDebug() + NodeList.getDebug())
+    /* prettier-ignore */ if (logFlags.verbose) cycleLogger.info(CycleChain.getDebug() + NodeList.getDebug())
 
     /* prettier-ignore */ if (logFlags.verbose) info(`cc: recorded to cycle.log ${callTag}`)
 
