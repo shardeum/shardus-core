@@ -524,7 +524,7 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
   }
 }
 
-const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.KeepInStandby, P2P.NodeListTypes.Node['id']> = async (
+const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.StandbyRefreshRequest, P2P.NodeListTypes.Node['id']> = async (
   payload,
   sender,
   tracker
@@ -535,7 +535,7 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.KeepInStand
   try {
     //if (logFlags.p2pNonFatal) info(`Got scale request: ${JSON.stringify(payload)}`)
     if (!payload) {
-      warn('No payload provided for the `KeepInStandby` request.')
+      warn('No payload provided for the `StandbyRefreshRequest` request.')
       return
     }
     if (CycleCreator.currentQuarter >= 3) return

@@ -3,7 +3,7 @@ import * as utils from '../../../utils'
 import * as http from '../../../http'
 import { ok, Result } from 'neverthrow'
 import { logFlags } from '../../../logger'
-import { JoinRequest, KeepInStandby } from '@shardus/types/build/src/p2p/JoinTypes'
+import { JoinRequest, StandbyRefreshRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { getStandbyNodesInfoMap } from './index'
 import * as CycleChain from '../../CycleChain'
 import { crypto } from '../../Context'
@@ -14,8 +14,7 @@ import rfdc from 'rfdc'
 //const clone = rfdc()
 
 type publickey = JoinRequest['nodeInfo']['publicKey']
-let newStandbyRefreshRequests: Map<publickey, KeepInStandby> = new Map()
-//let lastCycleStandbyRefreshRequests: Map<publickey, KeepInStandby> = new Map()
+let newStandbyRefreshRequests: Map<publickey, StandbyRefreshRequest> = new Map()
 
 export async function submitStandbyRefresh(publicKey: string, cycleNumber: number): Promise<Result<void, Error>> {
   const archiver = getRandomAvailableArchiver()
@@ -64,14 +63,13 @@ export async function submitStandbyRefresh(publicKey: string, cycleNumber: numbe
   }
 }
 
-//KeepInStandby
 export interface StandbyRefreshRequestResponse {
   success: boolean
   reason: string
   fatal: boolean
 }
 
-export function addStandbyRefresh(keepInStandbyRequest: KeepInStandby): StandbyRefreshRequestResponse {
+export function addStandbyRefresh(keepInStandbyRequest: StandbyRefreshRequest): StandbyRefreshRequestResponse {
   // validate keepInStandbyRequest
   if (getStandbyNodesInfoMap().has(keepInStandbyRequest.publicKey) === false) {
     return {
@@ -86,7 +84,7 @@ export function addStandbyRefresh(keepInStandbyRequest: KeepInStandby): StandbyR
   if (cycleNumber !== keepInStandbyRequest.cycleNumber) {
     return {
       success: false,
-      reason: 'cycle number in keepInStandby request does not match current cycle number',
+      reason: 'cycle number in StandbyRefreshRequest request does not match current cycle number',
       fatal: false,
     }
   }
@@ -118,33 +116,12 @@ export function addStandbyRefresh(keepInStandbyRequest: KeepInStandby): StandbyR
 }
 
 /**
- * Returns the list of new KeepInStandby requests and empties the list.
+ * Returns the list of new StandbyRefreshRequest requests and empties the list.
  */
 
-export function drainNewStandbyRefreshRequests(): KeepInStandby[] {
-  if (logFlags.verbose) console.log('draining new KeepInStandby info:', newStandbyRefreshRequests)
-  //lastCycleStandbyRefreshRequests = deepCloneMap(newStandbyRefreshRequests)
+export function drainNewStandbyRefreshRequests(): StandbyRefreshRequest[] {
+  if (logFlags.verbose) console.log('draining new StandbyRefreshRequest info:', newStandbyRefreshRequests)
   const tmp = Array.from(newStandbyRefreshRequests.values())
   newStandbyRefreshRequests = new Map()
   return tmp
 }
-
-/*
-export function getLastCycleStandbyRefreshRequest(publicKey: publickey): KeepInStandby {
-  return lastCycleStandbyRefreshRequests.get(publicKey)
-}
-
-export function resetLastCycleStandbyRefreshRequests(): void {
-  lastCycleStandbyRefreshRequests = new Map()
-}
-
-function deepCloneMap(originalMap: Map<any, any>): Map<any, any> {
-  const clonedMap = new Map();
-  originalMap.forEach((value, key) => {
-    const clonedKey = clone(key); // Clone the key
-    const clonedValue = clone(value); // Clone the value
-    clonedMap.set(clonedKey, clonedValue);
-  });
-  return clonedMap;
-}
-*/

@@ -349,26 +349,6 @@ export function startupV2(): Promise<boolean> {
             updateNodeState(P2P.P2PTypes.NodeStatus.STANDBY)
           }
 
-          /*
-          const p2pConfig = Context.config.p2p
-          if (joinRequestCopy) {
-            const lastRefreshed = joinRequestCopy.nodeInfo.refreshedCounter
-            if (latestCycle.counter >= (lastRefreshed + p2pConfig.standbyListCyclesTTL - (isFirstRefresh ? p2pConfig.cyclesToRefreshEarly : 0))) {
-              isFirstRefresh = false
-              // update the standbyRefreshTimestamp
-              joinRequestCopy.nodeInfo.refreshedCounter = latestCycle.counter
-
-              let payload = {
-                publicKey: publicKey,
-                cycleNumber: latestCycle.counter
-              }
-              payload = Context.crypto.sign(payload)
-              submitStandbyRefresh(payload)
-              nestedCountersInstance.countEvent('p2p', `submitted KeepInStandby request`)
-            }
-          }  
-          */
-
           if (isFirstRefresh) {
             if (
               latestCycle.counter >=
@@ -380,8 +360,8 @@ export function startupV2(): Promise<boolean> {
               //info(`startupV2: submitStandbyRefresh first ${latestCycle.counter}`)
               submitStandbyRefresh(publicKey, latestCycle.counter)
 
-              nestedCountersInstance.countEvent('p2p', `submitted KeepInStandby request`)
-              /* prettier-ignore */ if (logFlags.verbose) console.log(`submitted KeepInStandby request`)
+              nestedCountersInstance.countEvent('p2p', `submitted StandbyRefreshRequest request`)
+              /* prettier-ignore */ if (logFlags.verbose) console.log(`submitted StandbyRefreshRequest request`)
 
               cyclesElapsedSinceRefresh = 0
             }
@@ -389,8 +369,8 @@ export function startupV2(): Promise<boolean> {
             //info(`startupV2: submitStandbyRefresh ${latestCycle.counter}`)
             submitStandbyRefresh(publicKey, latestCycle.counter)
 
-            nestedCountersInstance.countEvent('p2p', `submitted KeepInStandby request`)
-            /* prettier-ignore */ if (logFlags.verbose) console.log(`submitted KeepInStandby request`)
+            nestedCountersInstance.countEvent('p2p', `submitted StandbyRefreshRequest request`)
+            /* prettier-ignore */ if (logFlags.verbose) console.log(`submitted StandbyRefreshRequest request`)
 
             cyclesElapsedSinceRefresh = 0
           }
