@@ -51,7 +51,7 @@ let queuedFinishedSyncingId: string
 let queuedStandbyRefreshPubKey: string
 
 // whats this for? I was just going to use newStandbyRefreshRequests
-//let keepInStandbyCollector: Map<string,KeepInStandby>
+//let keepInStandbyCollector: Map<string, StandbyRefreshRequest>
 //let localStandbyCheckerJobs: Set<string>
 
 let lastLoggedCycle = 0
