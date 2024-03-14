@@ -34,6 +34,7 @@ import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
 import { Result, ResultAsync } from 'neverthrow'
 import { Utils } from '@shardus/types'
 import { arch } from 'os'
+import { checkGossipPayload } from '../utils/GossipValidation'
 
 const clone = rfdc()
 
@@ -930,6 +931,17 @@ export function registerRoutes() {
   Comms.registerGossipHandler('joinarchiver', async (payload, sender, tracker) => {
     profilerInstance.scopedProfileSectionStart('joinarchiver')
     try {
+      if (
+        !checkGossipPayload(
+          payload,
+          { nodeInfo: 'o', requestType: 's', requestTimestamp: 'n', sign: 'o' },
+          'joinarchiver',
+          sender
+        )
+      ) {
+        return
+      }
+
       if (logFlags.console) console.log('Join request gossip received:', payload)
       const accepted = await addArchiverJoinRequest(payload, tracker, false)
       if (logFlags.console) {

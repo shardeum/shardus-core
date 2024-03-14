@@ -17,6 +17,7 @@ import { selectNodesFromReadyList } from './Join/v2/syncFinished'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { Utils } from '@shardus/types'
 import { nodeListFromStates } from "./Join";
+import { checkGossipPayload } from '../utils/GossipValidation'
 
 let syncTimes = []
 let lastCheckedCycleForSyncTimes = 0
@@ -30,40 +31,14 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
   profilerInstance.scopedProfileSectionStart('gossip-active', true)
   try {
     if (logFlags.p2pNonFatal) info(`Got active request: ${Utils.safeStringify(payload)}`)
-    let err = ''
-    err = validateTypes(payload, {
-      nodeId: 's',
-      status: 's',
-      timestamp: 'n',
-      sign: 'o',
-    })
-    if (err) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-active: bad input ' + err)
-      return
-    }
-    err = validateTypes(payload.sign, { owner: 's', sig: 's' })
-    if (err) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-active: bad input sign ' + err)
+    // Ignore gossip outside of Q1 and Q2 and check if the payload structure is valid
+    // If the sender is the original sender check if in Q1 to accept the request
+    if (
+      !checkGossipPayload(payload, { nodeId: 's', status: 's', timestamp: 'n', sign: 'o' }, 'gossip-active', sender)
+    ) {
       return
     }
 
-    const signer = NodeList.byPubKey.get(payload.sign.owner)
-    if (!signer) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-active: Got active request from unknown node')
-    }
-    const isOrig = signer.id === sender
-
-    // Only accept original txs in quarter 1
-    if (isOrig && CycleCreator.currentQuarter > 1) {
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:gossip-active CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
-      return
-    }
-
-    // Do not forward gossip after quarter 2
-    if (!isOrig && CycleCreator.currentQuarter > 2) {
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:gossip-active CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
-      return
-    }
 
     if (addActiveTx(payload)) {
       Comms.sendGossip(
