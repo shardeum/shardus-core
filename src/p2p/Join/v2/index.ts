@@ -4,7 +4,7 @@
  */
 
 import { P2P, hexstring } from '@shardus/types'
-import { JoinRequest, KeepInStandby } from '@shardus/types/build/src/p2p/JoinTypes'
+import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { config, crypto, shardus } from '../../Context'
 import * as CycleChain from '../../CycleChain'
 import * as Self from '../../Self'
