@@ -133,7 +133,6 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     secondsToCheckForQ1: 1000, // 1 seconds in ms
     hardenNewSyncingProtocol: true,
     removeLostSyncingNodeFromList: false,
-    sortSyncFinished: false,
   },
   ip: {
     externalIp: '0.0.0.0',
