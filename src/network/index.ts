@@ -231,6 +231,10 @@ export class NetworkClass extends EventEmitter {
     if (message.tracker) {
       id = message.tracker
     }
+    if (!nodes || nodes.length == 0) {
+      /* prettier-ignore */ if (logFlags.net_verbose) console.log("returning tell because the node list is empty for route:" , route)
+      return
+    }
     for (const node of nodes) {
       /* prettier-ignore */ if (logFlags.playback && alreadyLogged === false) this.logger.playbackLog('self', node, 'InternalTell', route, id, message)
       const requestId = generateUUID()
@@ -269,6 +273,10 @@ export class NetworkClass extends EventEmitter {
     const ports = []
     const addresses = []
     const requestId = generateUUID()
+    if (!nodes || nodes.length == 0) {
+      /* prettier-ignore */ if (logFlags.net_verbose) console.log("returning tell because the node list is empty for route:" , route)
+      return
+    }
     for (const node of nodes) {
       /* prettier-ignore */ if (logFlags.playback && alreadyLogged === false) this.logger.playbackLog('self', node, 'InternalTellBinary', route, trackerId, message)
       /* prettier-ignore */ if (logFlags.net_verbose) this.mainLogger.info(`tellBinary: initiating tell request with requestId: ${requestId}`)
