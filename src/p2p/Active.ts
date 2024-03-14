@@ -28,6 +28,10 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
 ) => {
   profilerInstance.scopedProfileSectionStart('gossip-active', true)
   try {
+    if (!payload) {
+      /* prettier-ignore */ if (logFlags.error) warn('gossip-active: missing payload')
+      return
+    }
     if (logFlags.p2pNonFatal) info(`Got active request: ${JSON.stringify(payload)}`)
     let err = ''
     err = validateTypes(payload, {
