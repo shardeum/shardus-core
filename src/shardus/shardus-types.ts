@@ -853,6 +853,8 @@ export interface ServerConfiguration {
     secondsToCheckForQ1: number
     /** hardenNewSyncingProtocol upgrades to syncing protocol */
     hardenNewSyncingProtocol: boolean
+    /** whether node shuld remove a lost syncing node from its syncing list */
+    removeLostSyncingNodeFromList: boolean
   }
   /** Server IP configuration */
   ip?: {

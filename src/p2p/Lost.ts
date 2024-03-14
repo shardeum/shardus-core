@@ -428,7 +428,7 @@ export function updateRecord(
         /* prettier-ignore */ nestedCountersInstance.countRareEvent('lost', 'sync timeout ' + `${utils.stringifyReduce(syncingNode.id)} ${syncTime} > ${record.maxSyncTime}`)
         lostSyncingNodeIds.push(syncingNode.id)
         NodeList.emitSyncTimeoutEvent(syncingNode, record)
-        NodeList.removeSyncingNode(syncingNode.id)
+        if (config.p2p.removeLostSyncingNodeFromList) NodeList.removeSyncingNode(syncingNode.id)
       }
     }
   }
