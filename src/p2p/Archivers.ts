@@ -926,6 +926,58 @@ export function registerRoutes() {
   Comms.registerGossipHandler('joinarchiver', async (payload, sender, tracker) => {
     profilerInstance.scopedProfileSectionStart('joinarchiver')
     try {
+      // Ignore gossip outside of Q1 and Q2
+      if (![1, 2].includes(CycleCreator.currentQuarter)) {
+        if (logFlags.error) warn('joinarchiver: not in Q1 or Q2')
+        return
+      }
+
+      // Check if payload/argument present
+      if (!payload) {
+        if (logFlags.error) warn('joinarchiver: missing payload')
+        return
+      }
+
+      // Validate Types
+      let err = validateTypes(payload, {
+        nodeInfo: 'o', 
+        requestType: 's',
+        requestTimestamp: 'n',
+        sign: 'o',
+      })
+      if (err) {
+        warn('joinarchiver: bad input ' + err)
+        return
+      }
+
+      // Validate Payload.sign Structure
+      err = validateTypes(payload.sign, { owner: 's', sig: 's' })
+      if (err) {
+        warn('joinarchiver: bad input sign ' + err)
+        return
+      }
+
+      // Check Signer Known
+      const signer = NodeList.byPubKey.get(payload.sign.owner)
+      if (!signer) {
+        warn('joinarchiver: Got join request from unknown node')
+        return
+      }
+
+      // // Verify Sender as Original Signer
+      // const isOrig = signer.id === sender
+      // if (!isOrig) {
+      //   warn('joinarchiver: Sender is not the original signer')
+      //   return
+      // }
+
+      // // Check Quarter for Original Requests
+      // // Assuming you only want to accept original requests in Q1
+      // if (isOrig && CycleCreator.currentQuarter > 1) {
+      //   warn('joinarchiver: Rejecting original request outside of Q1')
+      //   return
+      // }
+
       if (logFlags.console) console.log('Join request gossip received:', payload)
       const accepted = await addArchiverJoinRequest(payload, tracker, false)
       if (logFlags.console) {
