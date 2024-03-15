@@ -321,9 +321,10 @@ export function getTxs(): P2P.LostTypes.Txs {
     if (downMsgCount >= config.p2p.numCheckerNodes) {
       lostTxs.push(downRecord.message)
       seen[downRecord.target] = true
-      info(`Adding lost record for ${downRecord.target} to lostTxs`)
+      if (logFlags.verbose) info(`Adding lost record for ${downRecord.target} to lostTxs`)
     } else {
-      info(`Not enough down messages to be considered lost: ${JSON.stringify(downRecord)}`)
+      if (logFlags.verbose)
+        info(`Not enough down messages to be considered lost: ${JSON.stringify(downRecord)}`)
     }
   }
 
@@ -332,7 +333,7 @@ export function getTxs(): P2P.LostTypes.Txs {
     let { target, cycle, status } = upGossipMsg
     if (cycle == currentCycle) {
       refutedTxs.push(upGossipMsg)
-      info(`Adding up gossip message for ${target} to refutedTxs`)
+      if (logFlags.verbose) info(`Adding up gossip message for ${target} to refutedTxs`)
     }
   }
   seen = {}
@@ -420,10 +421,12 @@ export function updateRecord(
       const syncTime = now - syncingNode.syncingTimestamp
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log('syncTime vs maxSyncTime', syncTime, record.maxSyncTime)
       if (record.maxSyncTime && syncTime > record.maxSyncTime) {
-        info(`Syncing time for node ${syncingNode.id}`, syncTime)
-        info(`Max sync time from record`, record.maxSyncTime)
-        info(`Sync time is longer than max sync time. Reporting as lost`)
-        info('adding node to lost syncing list', syncingNode.id, `${syncTime} > ${record.maxSyncTime}`)
+        if (logFlags.verbose) {
+          info(`Syncing time for node ${syncingNode.id}`, syncTime)
+          info(`Max sync time from record`, record.maxSyncTime)
+          info(`Sync time is longer than max sync time. Reporting as lost`)
+          info('adding node to lost syncing list', syncingNode.id, `${syncTime} > ${record.maxSyncTime}`)
+        }
         //todo remove this later after we feel good about the system.. it wont really be that rare, so we dont want to swamp rare counters
         /* prettier-ignore */ nestedCountersInstance.countRareEvent('lost', 'sync timeout ' + `${utils.stringifyReduce(syncingNode.id)} ${syncTime} > ${record.maxSyncTime}`)
         lostSyncingNodeIds.push(syncingNode.id)
@@ -527,7 +530,7 @@ export function sendRequests() {
   if (config.p2p.aggregateLostReportsTillQ1) {
     scheduledForLostReport.forEach((value: ScheduledLostNodeReport, key: string) => {
       if (value.scheduledInCycle < currentCycle - config.p2p.delayLostReportByNumOfCycles) {
-        /* prettier-ignore */ info(`Reporting lost: requestId: ${value.requestId}, scheduled in cycle: ${value.scheduledInCycle}, reporting in cycle ${currentCycle}, originally reported at ${value.timestamp}`)
+        /* prettier-ignore */ if (logFlags.verbose) info(`Reporting lost: requestId: ${value.requestId}, scheduled in cycle: ${value.scheduledInCycle}, reporting in cycle ${currentCycle}, originally reported at ${value.timestamp}`)
         reportLost(value.targetNode, value.reason, value.requestId)
         scheduledForLostReport.delete(key)
       }
@@ -596,7 +599,7 @@ async function killSelf(message: string) {
 
 async function killOther() {
   const requestId = generateUUID()
-  info(`Explicitly injecting reportLost, requestId: ${requestId}`)
+  if (logFlags.verbose) info(`Explicitly injecting reportLost, requestId: ${requestId}`)
   let target = activeByIdOrder[0]
   if (target.id === Self.id) target = activeByIdOrder[1]
   scheduleLostReport(target, 'killother', requestId)
@@ -605,9 +608,11 @@ async function killOther() {
 export function scheduleLostReport(target: P2P.NodeListTypes.Node, reason: string, requestId: string) {
   if (!config.p2p.aggregateLostReportsTillQ1) return reportLost(target, reason, requestId)
   if (requestId.length == 0) requestId = generateUUID()
-  info(`Scheduling lost report for ${target.id}, requestId: ${requestId}.`)
-  info(`Target node details for requestId: ${requestId}: ${logNode(target)}`)
-  info(`Scheduled lost report in ${currentCycle} for requestId: ${requestId}.`)
+  if (logFlags.verbose) {
+    info(`Scheduling lost report for ${target.id}, requestId: ${requestId}.`)
+    info(`Target node details for requestId: ${requestId}: ${logNode(target)}`)
+    info(`Scheduled lost report in ${currentCycle} for requestId: ${requestId}.`)
+  }
 
   const key = `${target.id}-${currentCycle}`
 
@@ -642,8 +647,8 @@ export function scheduleLostReport(target: P2P.NodeListTypes.Node, reason: strin
  */
 function reportLost(target, reason: string, requestId: string) {
   try {
-    info(`Reporting lost for ${target.id}, requestId: ${requestId}.`)
-    info(`Target node details for requestId: ${requestId}: ${logNode(target)}`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`Reporting lost for ${target.id}, requestId: ${requestId}.`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`Target node details for requestId: ${requestId}: ${logNode(target)}`)
     if (target.id === Self.id) {
       nestedCountersInstance.countEvent('p2p', 'reportLost skip: self')
       return // don't report self
@@ -679,10 +684,12 @@ function reportLost(target, reason: string, requestId: string) {
       }
       // [TODO] - remove the following line after testing killother
       if (allowKillRoute && reason === 'killother') report.killother = true
-      /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, reporter: ${Self.ip}:${Self.port} id: ${Self.id}`)
-      /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, checker: ${checker.internalIp}:${checker.internalPort} node details: ${logNode(checker)}`)
-      /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, target: ${target.internalIp}:${target.internalPort} cycle: ${report.cycle} node details: ${logNode(target)}`)
-      /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${JSON.stringify(report)}`)
+      if (logFlags.verbose) {
+        /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, reporter: ${Self.ip}:${Self.port} id: ${Self.id}`)
+        /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, checker: ${checker.internalIp}:${checker.internalPort} node details: ${logNode(checker)}`)
+        /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, target: ${target.internalIp}:${target.internalPort} cycle: ${report.cycle} node details: ${logNode(target)}`)
+        /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${JSON.stringify(report)}`)
+      }
 
       const msgCopy = JSON.parse(shardusCrypto.stringify(report))
       msgCopy.timestamp = shardusGetTime()
@@ -725,16 +732,17 @@ function getMultipleCheckerNodes(
     checkerNodes.set(activeByIdOrder[pickedIndex].id, activeByIdOrder[pickedIndex])
   }
   let selectedNodes = [...checkerNodes.values()]
-  info(
-    `in getMultipleCheckerNodes checkerNodes for target: ${target}, reporter: ${reporter}, cycle: ${lostCycle}: ${JSON.stringify(
-      selectedNodes
-    )}`
-  )
+  if (logFlags.verbose)
+    info(
+      `in getMultipleCheckerNodes checkerNodes for target: ${target}, reporter: ${reporter}, cycle: ${lostCycle}: ${JSON.stringify(
+        selectedNodes
+      )}`
+    )
   return selectedNodes
 }
 
 function removeByApp(target: P2P.NodeListTypes.Node, certificate: P2P.LostTypes.RemoveCertificate) {
-  info(`Gossip remove for ${target}`)
+  if (logFlags.verbose) info(`Gossip remove for ${target}`)
   if (target.id === Self.id) {
     nestedCountersInstance.countEvent('p2p', 'removeByApp skip: self')
     return // don't report self
@@ -762,8 +770,10 @@ function getCheckerNode(id, cycle) {
     throw new Error(`activeByIdOrder idx:${idx} length: ${activeByIdOrder.length}`)
   }
   if (foundNode.id === id) idx = (idx + 1) % activeByIdOrder.length // skip to next node if the selected node is target
-  info(`in getCheckerNode oidx:${oidx} idx:${idx} near:${near}  cycle:${cycle}  id:${id}`)
-  info(`${JSON.stringify(activeByIdOrder.map((n) => n.id))}`)
+  if (logFlags.verbose) {
+    info(`in getCheckerNode oidx:${oidx} idx:${idx} near:${near}  cycle:${cycle}  id:${id}`)
+    info(`${JSON.stringify(activeByIdOrder.map((n) => n.id))}`)
+  }
   return activeByIdOrder[idx]
 }
 
@@ -771,12 +781,12 @@ async function lostReportHandler(payload, response, sender) {
   profilerInstance.scopedProfileSectionStart('lost-report')
   try {
     let requestId = generateUUID()
-    /* prettier-ignore */ info(`Got investigate request requestId: ${requestId}, req: ${JSON.stringify(payload)} from ${logNode(sender)}`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`Got investigate request requestId: ${requestId}, req: ${JSON.stringify(payload)} from ${logNode(sender)}`)
     let err = ''
     // for request tracing
     err = validateTypes(payload, { timestamp: 'n', requestId: 's' })
     if (!err) {
-      /* prettier-ignore */ info(`Lost report tracing, requestId: ${payload.requestId}, timestamp: ${payload.timestamp}, sender: ${logNode(sender)}`)
+      /* prettier-ignore */ if (logFlags.verbose) info(`Lost report tracing, requestId: ${payload.requestId}, timestamp: ${payload.timestamp}, sender: ${logNode(sender)}`)
       requestId = payload.requestId
     }
     err = validateTypes(payload, { target: 's', reporter: 's', checker: 's', cycle: 'n', sign: 'o' })
@@ -813,13 +823,14 @@ async function lostReportHandler(payload, response, sender) {
       return
     }
     let result = await isDownCache(nodes.get(payload.target), requestId)
-    /* prettier-ignore */ info(`isDownCache for requestId: ${requestId}, result ${result}`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`isDownCache for requestId: ${requestId}, result ${result}`)
     if (allowKillRoute && payload.killother) result = 'down'
     if (record.status === 'checking') record.status = result
-    info(
-      `Status after checking for node ${payload.target} payload cycle: ${payload.cycle}, currentCycle: ${currentCycle} is ` +
-        record.status
-    )
+    if (logFlags.verbose)
+      info(
+        `Status after checking for node ${payload.target} payload cycle: ${payload.cycle}, currentCycle: ${currentCycle} is ` +
+          record.status
+      )
     if (!checkedLostRecordMap.has(key)) {
       checkedLostRecordMap.set(key, record)
     }
@@ -889,17 +900,18 @@ async function isDownCache(node, requestId: string) {
   if (config.p2p.isDownCacheEnabled) {
     if (isDown[id]) {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-skipped-down', 1)
-      info(`node with id ${node.id} found in isDown for requestId: ${requestId}`)
+      if (logFlags.verbose) info(`node with id ${node.id} found in isDown for requestId: ${requestId}`)
       return 'down'
     }
     if (isUp[id]) {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-skipped-up', 1)
-      info(`node with id ${node.id} found in isUp for requestId: ${requestId}`)
+      if (logFlags.verbose) info(`node with id ${node.id} found in isUp for requestId: ${requestId}`)
       return 'up'
     }
   }
   const status = await isDownCheck(node)
-  info(`isDownCheck for requestId: ${requestId} on node with id ${node.id} is ${status}`)
+  if (logFlags.verbose)
+    info(`isDownCheck for requestId: ${requestId} on node with id ${node.id} is ${status}`)
   if (status === 'down') {
     isDown[id] = currentCycle
   } else {
@@ -1003,7 +1015,7 @@ function pruneStopReporting() {
 async function isDownCheck(node) {
   // Check the internal route
   // The timeout for this is controled by the network.timeout paramater in server.json
-  info(`Checking internal connection for ${node.id}, cycle: ${currentCycle}`)
+  if (logFlags.verbose) info(`Checking internal connection for ${node.id}, cycle: ${currentCycle}`)
 
   try {
     if (config.p2p.useProxyForDownCheck) {
@@ -1077,7 +1089,7 @@ async function isDownCheck(node) {
   //Note 20230630:  the code below here has not likely had any coverage for a few years due to an upstream issue
 
   if (node.externalIp === node.internalIp) return 'up'
-  info(`Checking external connection for ${node.id}`)
+  if (logFlags.verbose) info(`Checking external connection for ${node.id}`)
   // Check the external route if ip is different than internal
   const queryExt = async (node) => {
     const ip = node.ip ? node.ip : node.externalIp
@@ -1100,7 +1112,7 @@ async function isDownCheck(node) {
 }
 
 function downGossipHandler(payload: P2P.LostTypes.SignedDownGossipMessage, sender, tracker) {
-  info(`Got downGossip: ${JSON.stringify(payload)}`)
+  if (logFlags.verbose) info(`Got downGossip: ${JSON.stringify(payload)}`)
   let err = ''
   err = validateTypes(payload, { cycle: 'n', report: 'o', status: 's', sign: 'o' })
   if (err) {
@@ -1191,7 +1203,7 @@ function checkDownMsg(payload: P2P.LostTypes.SignedDownGossipMessage, expectedCy
 }
 
 function upGossipHandler(payload, sender, tracker) {
-  info(`Got upGossip: ${JSON.stringify(payload)}`)
+  if (logFlags.verbose) info(`Got upGossip: ${JSON.stringify(payload)}`)
   let err = ''
   err = validateTypes(payload, { cycle: 'n', target: 's', status: 's', sign: 'o' })
   if (err) {
