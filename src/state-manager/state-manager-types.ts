@@ -1068,7 +1068,7 @@ export type HashTrieSyncConsensus = {
         }
       >
       bestHash: string
-      numberOfBestVotes: number
+      bestVotes: number
     }
   >
 
