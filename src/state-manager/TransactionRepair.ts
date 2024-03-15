@@ -136,6 +136,7 @@ class TransactionRepair {
         }
       } = {}
       const appliedVote = queueEntry.appliedReceiptForRepair2.appliedVote
+      const receivedReceipt = queueEntry.appliedReceiptForRepair2
 
       const voters = queueEntry.appliedReceiptForRepair2.signatures
       //shuffle the array
@@ -271,7 +272,7 @@ class TransactionRepair {
         let coveredKey = false
         const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(key)
         const shortKey = utils.stringifyReduce(key)
-        let eligibleNodeIds = new Set<string>()
+        const eligibleNodeIdMap: any = {}
         if (this.stateManager.transactionQueue.useNewPOQ === false) {
           for (let i = 0; i < voters.length; i++) {
             const voter = voters[i]
@@ -279,21 +280,31 @@ class TransactionRepair {
             if (node == null) {
               continue
             }
-            eligibleNodeIds.add(node.id)
+            eligibleNodeIdMap[node.id] = true
           }
         } else {
-          eligibleNodeIds = queueEntry.eligibleNodeIdsToVote
+          // loop through topConfirmations and add to eligibleNodeIdMap
+          for (const nodeId of queueEntry.topConfirmations) {
+            eligibleNodeIdMap[nodeId] = true
+          }
+          eligibleNodeIdMap[receivedReceipt.confirmOrChallenge.nodeId] = true
+          eligibleNodeIdMap[receivedReceipt.appliedVote.node_id] = true
         }
+        const eligibleNodeIds = new Set(Object.keys(eligibleNodeIdMap))
+        this.mainLogger.debug(`repairToMatchReceipt: ${txLogID} eligibleNodeIds ${eligibleNodeIds.size} && eligibleNodeIdMap ${Object.keys(eligibleNodeIdMap).length}`)
+
+        nestedCountersInstance.countEvent('repair1', `eligibleNodeIds: ${eligibleNodeIds.size}`)
+
         //It modifying global.
         for (const node_id of eligibleNodeIds) {
           /* eslint-disable security/detect-object-injection */
           stats.rLoop2++
           for (let j = 0; j < appliedVote.account_id.length; j++) {
             stats.rLoop3++
-            const id = appliedVote.account_id[j]
+            const accountId = appliedVote.account_id[j]
             const hash = appliedVote.account_state_hash_after[j]
-            if (id === key && hash != null) {
-              if (upToDateAccounts[id] === true) {
+            if (accountId === key && hash != null) {
+              if (upToDateAccounts[accountId] === true) {
                 continue
               }
 
@@ -301,7 +312,7 @@ class TransactionRepair {
               if (hashObj != null) {
                 // eslint-disable-next-line security/detect-possible-timing-attacks
                 if (hashObj.h === hash) {
-                  upToDateAccounts[id] = true
+                  upToDateAccounts[accountId] = true
                   stats.numUpToDateAccounts++
                   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `account ${shortKey} already up to date our: cached:${utils.stringifyReduce(hashObj)}`)
                   break
@@ -334,11 +345,18 @@ class TransactionRepair {
                 /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `node_id != this.stateManager.currentCycleShardData.ourNode.id ${utils.stringifyReduce(node_id)} our: ${utils.stringifyReduce(this.stateManager.currentCycleShardData.ourNode.id)} acc:${shortKey}`)
                 continue
               }
+
               if (this.stateManager.currentCycleShardData.nodeShardDataMap.has(node_id) === false) {
                 //node is not listed as available in the lattest node shard data map
                 /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `this.stateManager.currentCycleShardData.nodeShardDataMap.has(node_id) === false ${utils.stringifyReduce(node_id)}  acc:${shortKey}`)
                 continue
               }
+              // if (node_id !== receivedReceipt.appliedVote.node_id && node_id !== receivedReceipt.confirmOrChallenge.nodeId) {
+              //   //dont reference our own node, should not happen anyway
+              //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `node_id is neither a voted node nor confirmation node ${utils.stringifyReduce(node_id)} our: ${utils.stringifyReduce(this.stateManager.currentCycleShardData.ourNode.id)} acc:${shortKey}`)
+              //   nestedCountersInstance.countEvent('repair1', 'skip account repair, not a voted or confirmation node')
+              //   continue
+              // }
               const nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData =
                 this.stateManager.currentCycleShardData.nodeShardDataMap.get(node_id)
 
@@ -353,7 +371,7 @@ class TransactionRepair {
                 // if the account is not global check if it is in range.
                 if (
                   isGlobal === false &&
-                  ShardFunctions.testAddressInRange(id, nodeShardInfo.storedPartitions) == false
+                  ShardFunctions.testAddressInRange(accountId, nodeShardInfo.storedPartitions) == false
                 ) {
                   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `address not in range ${utils.stringifyReduce(nodeShardInfo.storedPartitions)}  acc:${shortKey}`)
                   stats.rangeErr++
@@ -365,10 +383,11 @@ class TransactionRepair {
                 appliedVote,
                 voteIndex: j,
                 accountHash: hash,
-                accountId: id,
+                accountId: accountId,
                 nodeShardInfo,
                 alternates: [],
               }
+              this.mainLogger.debug(`repairToMatchReceipt: ${txLogID} node_id ${node_id} is selected as source node. ${utils.stringifyReduce(receivedReceipt)}`)
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${txLogID}`, `setting key ${utils.stringifyReduce(key)} ${utils.stringifyReduce(objectToSet)}  acc:${shortKey}`)
               // eslint-disable-next-line security/detect-object-injection
               requestObjects[key] = objectToSet
@@ -449,6 +468,7 @@ class TransactionRepair {
                       `repairToMatchReceipt_3`,
                       `ASK FAIL repairToMatchReceipt FAILED out of attempts   tx:${txLogID}  acc:${shortKey}`
                     )
+                    nestedCountersInstance.countEvent('repair1', 'failed out of attempts')
                     return
                   }
                 }

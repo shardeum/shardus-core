@@ -110,6 +110,8 @@ export type QueueEntry = {
   queryingRobustConfirmOrChallenge?: boolean
   queryingRobustAccountData?: boolean
   queryingFinalData?: boolean
+  topConfirmations: Set<string>
+  topVoters: Set<string>
 
   gossipedReceipt: boolean
   gossipedVote: boolean
@@ -1066,7 +1068,7 @@ export type HashTrieSyncConsensus = {
         }
       >
       bestHash: string
-      bestVotes: number
+      numberOfBestVotes: number
     }
   >
 

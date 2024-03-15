@@ -4,7 +4,7 @@ import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import * as Apoptosis from '../p2p/Apoptosis'
 import * as Archivers from '../p2p/Archivers'
-import { P2PModuleContext as P2P, network as networkContext } from '../p2p/Context'
+import { P2PModuleContext as P2P, network as networkContext, config as configContext } from '../p2p/Context'
 import * as CycleChain from '../p2p/CycleChain'
 import { nodes, potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
@@ -942,6 +942,7 @@ class TransactionQueue {
         /* prettier-ignore */ this.mainLogger.debug(`commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
         /* prettier-ignore */ this.mainLogger.debug( `commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}` )
         /* prettier-ignore */ this.mainLogger.debug( `commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}` )
+        /* prettier-ignore */ this.mainLogger.debug(`commitConsensedTransaction  preApplyResponse: ${utils.stringifyReduce(queueEntry.preApplyTXResult.applyResponse)}`)
         /* prettier-ignore */ this.mainLogger.debug(`commitConsensedTransaction  queueEntry: ${utils.stringifyReduce(queueEntry)}`)
       }
       // TODO ARCH REVIEW:  review use of fifo lock of accountModification and account keys. (more notes in tryPreApplyTransaction() above )
@@ -1466,6 +1467,8 @@ class TransactionQueue {
         acceptVoteMessage: true,
         acceptConfirmOrChallenge: true,
         accountDataSet: false,
+        topConfirmations: new Set(),
+        topVoters: new Set()
       } // age comes from timestamp
       this.txDebugMarkStartTime(txQueueEntry, 'total_queue_time')
       this.txDebugMarkStartTime(txQueueEntry, 'aging')
@@ -3885,9 +3888,12 @@ class TransactionQueue {
       const localRestartCounter = this.queueRestartCounter
 
       const timeM = this.stateManager.queueSitTime
-      const timeM2 = timeM * 4
-      const timeM2_5 = timeM * 5
-      const timeM3 = timeM * 6
+      const timeM2 = timeM * 2 // 12s
+      const timeM2_5 = timeM * 2.25 // 13.5s
+      const timeM3 = timeM * 2.5 // 15s
+      // const timeM2 = timeM * 4 // 24s
+      // const timeM2_5 = timeM * 5 // 30s
+      // const timeM3 = timeM * 6 // 36s
       let currentTime = shardusGetTime()
 
       const app = this.app
@@ -4736,8 +4742,15 @@ class TransactionQueue {
               let result: AppliedReceipt
 
               if (this.useNewPOQ) {
-                // if we are in execution group, try to "confirm" or "challenge" the highest ranked vote
-                this.stateManager.transactionConsensus.confirmOrChallenge(queueEntry)
+                if (queueEntry.isInExecutionHome) {
+                  // if we are in execution group, try to "confirm" or "challenge" the highest ranked vote
+                  this.stateManager.transactionConsensus.confirmOrChallenge(queueEntry)
+                } else {
+                  if (!queueEntry.completedConfirmedOrChallenge) {
+                    if (this.stateManager.consensusLog) this.mainLogger.debug(`confirmOrChallenge: ${queueEntry.logID} not in execution home. Set completedConfirmedOrChallenge: true`)
+                    queueEntry.completedConfirmedOrChallenge = true // we don't need to confirm or challenge
+                  }
+                }
 
                 // try to produce a receipt
                 /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
@@ -4805,23 +4818,7 @@ class TransactionQueue {
                   const shouldSendReceipt = true
                   // shouldSendReceipt = queueEntry.recievedAppliedReceipt == null
 
-                  if (shouldSendReceipt) {
-                    if (queueEntry.appliedReceipt2) {
-                      // Broadcast the receipt, only if we made one (try produce can early out if we received one)
-                      const awaitStart = shardusGetTime()
-                      /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()' )
-                      this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
-                      /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()', DebugComplete.Completed )
 
-                      this.updateSimpleStatsObject(
-                        processStats.awaitStats,
-                        'shareAppliedReceipt',
-                        shardusGetTime() - awaitStart
-                      )
-                    }
-                  } else {
-                    // no need to share a receipt
-                  }
 
                   //todo check cant_apply flag to make sure a vote can form with it!
                   //also check if failed votes will work...?
@@ -4832,6 +4829,24 @@ class TransactionQueue {
                     this.updateTxState(queueEntry, 'commiting')
                     queueEntry.hasValidFinalData = true
                     finishedConsensing = true
+
+                    if (shouldSendReceipt) {
+                      if (queueEntry.appliedReceipt2) {
+                        // Broadcast the receipt, only if we made one (try produce can early out if we received one)
+                        const awaitStart = shardusGetTime()
+                        /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()' )
+                        this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
+                        /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()', DebugComplete.Completed )
+
+                        this.updateSimpleStatsObject(
+                          processStats.awaitStats,
+                          'shareAppliedReceipt',
+                          shardusGetTime() - awaitStart
+                        )
+                      }
+                    } else {
+                      // no need to share a receipt
+                    }
                   } else {
                     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                     // we are finished since there is nothing to apply
@@ -5412,6 +5427,9 @@ class TransactionQueue {
         //todo any limits to how many repairs at once to allow?
         this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
       }
+    } else {
+      nestedCountersInstance.countEvent('repair1', 'setTXExpired: no receipt to repair')
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`setTXExpired. no receipt to repair ${queueEntry.logID}`)
     }
   }
 

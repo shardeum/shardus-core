@@ -448,7 +448,7 @@ class TransactionConsenus {
         tracker: string,
         msgSize: number
       ) => {
-        nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2')
+        nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 handler')
         profilerInstance.scopedProfileSectionStart('spread_appliedReceipt2', false, msgSize)
         const respondSize = cUninitializedSize
         try {
@@ -615,7 +615,7 @@ class TransactionConsenus {
     Comms.registerGossipHandler(
       'spread_confirmOrChallenge',
       (payload: ConfirmOrChallengeMessage, msgSize: number) => {
-        nestedCountersInstance.countEvent('consensus', 'spread_confirmOrChallenge')
+        nestedCountersInstance.countEvent('consensus', 'spread_confirmOrChallenge handler')
         profilerInstance.scopedProfileSectionStart('spread_confirmOrChallenge', false, msgSize)
         try {
           const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.appliedVote?.txid) // , payload.timestamp)
@@ -1072,7 +1072,8 @@ class TransactionConsenus {
           }
         }
       } else {
-        if (queueEntry.completedConfirmedOrChallenge === false) {
+        if (queueEntry.completedConfirmedOrChallenge === false && queueEntry.isInExecutionHome) {
+          if (this.stateManager.consensusLog) this.mainLogger.info(`tryProduceReceipt ${queueEntry.logID} completedConfirmedOrChallenge === false and isInExecutionHome`)
           nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt still in confirm/challenge stage')
           return
         }
@@ -1649,10 +1650,7 @@ class TransactionConsenus {
 
   async confirmOrChallenge(queueEntry: QueueEntry): Promise<void> {
     try {
-      if (queueEntry.isInExecutionHome === false) {
-        nestedCountersInstance.countEvent('confirmOrChallenge', 'not in execution home')
-        return
-      }
+
       if (queueEntry.ourVote == null) {
         nestedCountersInstance.countEvent('confirmOrChallenge', 'ourVote == null')
         return
@@ -1774,38 +1772,38 @@ class TransactionConsenus {
           // queueEntry.eligibleNodesToConfirm is sorted highest to lowest rank
           const confirmNodeIds = Array.from(queueEntry.eligibleNodeIdsToConfirm).reverse()
           const ourRankIndex = confirmNodeIds.indexOf(Self.id)
-          let delayBeforeConfirm = ourRankIndex * 50 // 50ms
-
-          if (delayBeforeConfirm > 500) delayBeforeConfirm = 500 // we don't want to wait too long
-
-          if (delayBeforeConfirm > 0) {
-            await utils.sleep(delayBeforeConfirm)
-
-            // Compare our rank with received rank before sharing our confirmation
-            if (
-              queueEntry.receivedBestConfirmedNode &&
-              queueEntry.receivedBestConfirmedNode.rank < queueEntry.ourNodeRank
-            ) {
-              nestedCountersInstance.countEvent(
-                'confirmOrChallenge',
-                `isReceivedBetterConfirmation after ${delayBeforeConfirm}ms delay: true`
-              )
-              if (logFlags.debug)
-                this.mainLogger.debug(
-                  `confirmOrChallenge: ${
-                    queueEntry.logID
-                  } received better confirmation before we share ours, receivedBestConfirmation: ${utils.stringifyReduce(
-                    queueEntry.receivedBestConfirmation
-                  )}`
-                )
-              queueEntry.completedConfirmedOrChallenge = true
-              return
-            }
-            nestedCountersInstance.countEvent(
-              'confirmOrChallenge',
-              `isReceivedBetterConfirmation after ${delayBeforeConfirm}ms delay: false`
-            )
-          }
+          // let delayBeforeConfirm = ourRankIndex * 50 // 50ms
+          //
+          // if (delayBeforeConfirm > 500) delayBeforeConfirm = 500 // we don't want to wait too long
+          //
+          // if (delayBeforeConfirm > 0) {
+          //   await utils.sleep(delayBeforeConfirm)
+          //
+          //   // Compare our rank with received rank before sharing our confirmation
+          //   if (
+          //     queueEntry.receivedBestConfirmedNode &&
+          //     queueEntry.receivedBestConfirmedNode.rank < queueEntry.ourNodeRank
+          //   ) {
+          //     nestedCountersInstance.countEvent(
+          //       'confirmOrChallenge',
+          //       `isReceivedBetterConfirmation after ${delayBeforeConfirm}ms delay: true`
+          //     )
+          //     if (logFlags.debug)
+          //       this.mainLogger.debug(
+          //         `confirmOrChallenge: ${
+          //           queueEntry.logID
+          //         } received better confirmation before we share ours, receivedBestConfirmation: ${utils.stringifyReduce(
+          //           queueEntry.receivedBestConfirmation
+          //         )}`
+          //       )
+          //     queueEntry.completedConfirmedOrChallenge = true
+          //     return
+          //   }
+          //   nestedCountersInstance.countEvent(
+          //     'confirmOrChallenge',
+          //     `isReceivedBetterConfirmation after ${delayBeforeConfirm}ms delay: false`
+          //   )
+          // }
           this.confirmVoteAndShare(queueEntry)
         } else if (eligibleToConfirm === false && queueEntry.ourVoteHash === finalVoteHash) {
           // we are not eligible to confirm
@@ -2008,9 +2006,13 @@ class TransactionConsenus {
       return
     }
     if (Context.config.debug.forcedExpiration) {
-      // we are in forced expiration mode, so we can't create or share a vote
-      nestedCountersInstance.countEvent('transactionConsensus', 'forcedExpiration')
-      return
+      // only expired 70% of the execution group
+      if (Math.random() < 0.7) {
+        // we are in forced expiration mode, so we can't create or share a vote
+        nestedCountersInstance.countEvent('transactionConsensus', 'forcedExpiration')
+        return
+      }
+      console.log(`allowing vote creation for ${queueEntry.acceptedTx.txId} in forcedExpiration mode`)
     }
     this.profiler.profileSectionStart('createAndShareVote', true)
 
@@ -2174,32 +2176,32 @@ class TransactionConsenus {
         }
       }
 
-      let consensusGroup = []
+      let gossipGroup = []
       if (
         this.stateManager.transactionQueue.executeInOneShard === true &&
         this.stateManager.transactionQueue.useNewPOQ === false
       ) {
         //only share with the exection group
-        consensusGroup = queueEntry.executionGroup
+        gossipGroup = queueEntry.executionGroup
       } else {
         //sharing with the entire transaction group actually..
-        consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+        gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
       }
 
-      if (consensusGroup.length >= 1) {
+      if (gossipGroup.length >= 1) {
         this.stateManager.debugNodeGroup(
           queueEntry.acceptedTx.txId,
           queueEntry.acceptedTx.timestamp,
           `share tx vote to neighbors`,
-          consensusGroup
+          gossipGroup
         )
 
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)}`)
-        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)} `)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${gossipGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)}`)
+        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${gossipGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)} `)
 
         // Filter nodes before we send tell()
         const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
-          consensusGroup,
+          gossipGroup,
           'createAndShareVote',
           true,
           true
@@ -2330,6 +2332,9 @@ class TransactionConsenus {
     if (confirmOrChallenge.message === 'confirm') {
       let isBetterThanCurrentConfirmation
       let receivedConfirmedNode: Shardus.NodeWithRank
+
+      queueEntry.topConfirmations.add(confirmOrChallenge.nodeId)
+      this.mainLogger.info(`tryAppendMessage: ${queueEntry.logID} current topConfirmations: ${queueEntry.topConfirmations.size}`)
 
       if (!queueEntry.receivedBestConfirmation) isBetterThanCurrentConfirmation = true
       else if (queueEntry.receivedBestConfirmation.nodeId === confirmOrChallenge.nodeId)
@@ -2503,6 +2508,7 @@ class TransactionConsenus {
       const isVoteValid = true
       if (!isVoteValid) return
 
+      queueEntry.topVoters.add(vote.node_id)
       // we will mark the last received vote timestamp
       const now = shardusGetTime()
       queueEntry.lastVoteReceivedTimestamp = now

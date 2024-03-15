@@ -1384,14 +1384,14 @@ class StateManager {
             return
           }
 
-          if (queueEntry.hasValidFinalData === false) {
-            response.note = `has queue entry but not final data: ${utils.stringifyReduce(payload.txid)}  ${
-              payload.timestamp
-            } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', `request_state_for_tx_post hasValidFinalData==false, tx state: ${queueEntry.state}`)
-            await respond(response)
-            return
-          }
+          // if (queueEntry.hasValidFinalData === false) {
+          //   response.note = `has queue entry but not final data: ${utils.stringifyReduce(payload.txid)}  ${
+          //     payload.timestamp
+          //   } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+          //   /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', `request_state_for_tx_post hasValidFinalData==false, tx state: ${queueEntry.state}`)
+          //   await respond(response)
+          //   return
+          // }
 
           let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
 
