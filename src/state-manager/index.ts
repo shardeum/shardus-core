@@ -2725,18 +2725,27 @@ class StateManager {
       let r: GetAccountDataWithQueueHintsResp
 
       if (this.config.p2p.useBinarySerializedEndpoints) {
-        const serialized_res = await this.p2p.askBinary<
-          GetAccountDataWithQueueHintsReqSerializable,
-          GetAccountDataWithQueueHintsRespSerializable
-        >(
-          randomConsensusNode,
-          InternalRouteEnum.binary_get_account_data_with_queue_hints,
-          message,
-          serializeGetAccountDataWithQueueHintsReq,
-          deserializeGetAccountDataWithQueueHintsResp,
-          {}
-        )
-        r = serialized_res as GetAccountDataWithQueueHintsResp
+        try{
+          const serialized_res = await this.p2p.askBinary<
+            GetAccountDataWithQueueHintsReqSerializable,
+            GetAccountDataWithQueueHintsRespSerializable
+          >(
+            randomConsensusNode,
+            InternalRouteEnum.binary_get_account_data_with_queue_hints,
+            message,
+            serializeGetAccountDataWithQueueHintsReq,
+            deserializeGetAccountDataWithQueueHintsResp,
+            {}
+          )
+          r = serialized_res as GetAccountDataWithQueueHintsResp
+        } catch (er){
+          if (logFlags.verbose) this.mainLogger.error('askBinary', er)
+          if (opts.canThrowException) {
+            throw er
+          } else {
+            nestedCountersInstance.countEvent('getLocalOrRemoteAccount', `askBinary ex: ${er?.message}`)
+          }
+        }
       } else {
         r = await this.p2p.ask(randomConsensusNode, 'get_account_data_with_queue_hints', message)
       }
