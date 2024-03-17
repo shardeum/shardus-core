@@ -572,11 +572,11 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
       } catch (err: unknown) {
         if (err instanceof Error) {
           error(
-            `registerInternalBinary: reponseHeaders: ${responseHeaders}, respondWrapped: ${err.message}`,
+            `registerInternalBinary: responseHeaders: ${JSON.stringify(responseHeaders)}, respondWrapped: ${err.message}`,
             err.stack
           )
         } else {
-          error(`registerInternalBinary: reponseHeaders: ${responseHeaders}, respondWrapped: ${err}`)
+          error(`registerInternalBinary: responseHeaders: ${JSON.stringify(responseHeaders)}, respondWrapped: ${err}`)
         }
         return 0
       }
