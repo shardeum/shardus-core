@@ -1143,18 +1143,23 @@ class Shardus extends EventEmitter {
    * Returns an object that tells whether a tx was successful or not and the reason why via the
    * validateTxnFields application SDK function.
    * Throws an error if an application was not provided to shardus.
-   *
+   * 
+   * @param tx the TX format is not known to shardus core and can be any object
+   * @param set this is an old feaure that can be used by the first node in the network to inject TXs early. candidate for deprecation
+   * @param global this is used for injecting a tx that changes a global account completely different consensus is used for these.  see src/p2p/GlobalAccounts.ts
+   * @param inputAppData optional opaque app data that can be passed in.  this is forwared to the dapp when precrack is called.
+   * @returns 
    * {
    *   success: boolean,
    *   reason: string,
    *   staus: number
    * }
-   *
    */
   async put(
     tx: ShardusTypes.OpaqueTransaction,
     set = false,
-    global = false
+    global = false,
+    inputAppData = null
   ): Promise<{ success: boolean; reason: string; status: number }> {
     const noConsensus = set || global
 
@@ -1215,7 +1220,9 @@ class Shardus extends EventEmitter {
       // Perform basic validation of the transaction fields
       if (logFlags.verbose) this.mainLogger.debug('Performing initial validation of the transaction')
 
-      let appData: any = {}
+      // inputAppData is a new concept that allows the JSON RPC Server to pass in a TX as well as additional
+      // metadata for the dapp.  This data is then passed into precrack to be used for whatever calculations are needed
+      let appData: any = inputAppData ?? {}
 
       const internalTx = this.app.isInternalTx(tx)
       if (internalTx && !isInternalTxAllowed()) {
