@@ -559,15 +559,27 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
       serializerFunc: (stream: VectorBufferStream, obj, root?: boolean) => void,
       responseHeaders: AppHeader = {}
     ) => {
-      const wrappedRespStream = responseSerializer(response, serializerFunc)
-      responseHeaders.sender_id = Self.id
-      responseHeaders.tracker_id = header.tracker_id
-      /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternalBinary: wrapped response to send back: ${wrappedRespStream.getBuffer()} size: ${wrappedRespStream.getBufferLength()}`)
-      if (route !== 'gossip') {
-        /* prettier-ignore */ if (logFlags.playback) logger.playbackLog(header.sender_id, 'self', 'InternalRecvResp', route, header.tracker_id, response)
+      try {
+        const wrappedRespStream = responseSerializer(response, serializerFunc)
+        responseHeaders.sender_id = Self.id
+        responseHeaders.tracker_id = header.tracker_id
+        /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternalBinary: wrapped response to send back: ${wrappedRespStream.getBuffer()} size: ${wrappedRespStream.getBufferLength()}`)
+        if (route !== 'gossip') {
+          /* prettier-ignore */ if (logFlags.playback) logger.playbackLog(header.sender_id, 'self', 'InternalRecvResp', route, header.tracker_id, response)
+        }
+        await respond(wrappedRespStream.getBuffer(), responseHeaders)
+        return wrappedRespStream.getBufferLength()
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          error(
+            `registerInternalBinary: reponseHeaders: ${responseHeaders}, respondWrapped: ${err.message}`,
+            err.stack
+          )
+        } else {
+          error(`registerInternalBinary: reponseHeaders: ${responseHeaders}, respondWrapped: ${err}`)
+        }
+        return 0
       }
-      await respond(wrappedRespStream.getBuffer(), responseHeaders)
-      return wrappedRespStream.getBufferLength()
     }
     /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) console.log('header:', header)
     /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternalBinary: request info: route: ${route} header: ${JSON.stringify(header)} sign: ${JSON.stringify(sign)}`)
