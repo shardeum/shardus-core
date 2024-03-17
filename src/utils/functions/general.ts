@@ -473,9 +473,10 @@ export function selectIndexesWithOffeset(arraySize: number, numberToPick: number
 /**
  * Try to print a variety of possible erros for debug purposes
  * @param err
+ * @param printStack
  * @returns
  */
-export function formatErrorMessage(err: unknown): string {
+export function formatErrorMessage(err: unknown, printStack: boolean = true): string {
   let errMsg = 'An error occurred'
 
   if (typeof err === 'string') {
@@ -483,7 +484,7 @@ export function formatErrorMessage(err: unknown): string {
   } else if (err instanceof Error) {
     errMsg = err.message
 
-    if (err.stack) {
+    if (printStack && err.stack) {
       errMsg += ` \nStack trace:\n${err.stack}`
     }
   } else if (typeof err === 'object' && err !== null) {

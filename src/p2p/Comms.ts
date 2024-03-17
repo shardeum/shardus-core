@@ -570,14 +570,8 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
         await respond(wrappedRespStream.getBuffer(), responseHeaders)
         return wrappedRespStream.getBufferLength()
       } catch (err: unknown) {
-        if (err instanceof Error) {
-          error(
-            `registerInternalBinary: responseHeaders: ${JSON.stringify(responseHeaders)}, respondWrapped: ${err.message}`,
-            err.stack
-          )
-        } else {
-          error(`registerInternalBinary: responseHeaders: ${JSON.stringify(responseHeaders)}, respondWrapped: ${err}`)
-        }
+        /* prettier-ignore */ error(`registerInternalBinary: responseHeaders: ${JSON.stringify(responseHeaders)}, Error:  ${utils.formatErrorMessage(err)}`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('registerInternalBinary', `respondWrapped error`)
         return 0
       }
     }
