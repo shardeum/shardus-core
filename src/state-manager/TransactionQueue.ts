@@ -3901,12 +3901,7 @@ class TransactionQueue {
       // process any new queue entries that were added to the temporary list
       if (this.pendingTransactionQueue.length > 0) {
         for (const txQueueEntry of this.pendingTransactionQueue) {
-          if (this.txWillChangeLocalData(txQueueEntry) === true) {
-            nestedCountersInstance.countEvent('stateManager', 'processAcceptedTxQueue injest: kept TX')
-          } else {
-            nestedCountersInstance.countEvent('stateManager', 'processAcceptedTxQueue injest: discard TX')
-            continue
-          }
+          nestedCountersInstance.countEvent('stateManager', 'processAcceptedTxQueue injest: kept TX')
 
           const timestamp = txQueueEntry.txKeys.timestamp
           const acceptedTx = txQueueEntry.acceptedTx
@@ -5875,6 +5870,7 @@ class TransactionQueue {
   /**
    * txWillChangeLocalData
    * This is a just in time check to see if a TX will modify any local accounts managed by this node.
+   * Not longer used. candidate for deprecation, but this may be useful in some logging/analysis later
    *
    * @param queueEntry
    */

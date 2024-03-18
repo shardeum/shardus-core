@@ -1837,21 +1837,7 @@ class StateManager {
 
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('_firstTimeQueueAwait', `this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue._transactionQueue.length} this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue._transactionQueue.length}`)
 
-    // process and keep only TXs that will change local data.
-    const newList = []
-    if (this.transactionQueue.pendingTransactionQueue.length > 0) {
-      for (const txQueueEntry of this.transactionQueue.pendingTransactionQueue) {
-        if (this.transactionQueue.txWillChangeLocalData(txQueueEntry) === true) {
-          newList.push(txQueueEntry)
-          nestedCountersInstance.countEvent('stateManager', '_firstTimeQueueAwait kept TX')
-          this.accountSync.syncStatement.nonDiscardedTXs++
-        } else {
-          nestedCountersInstance.countEvent('stateManager', '_firstTimeQueueAwait discard TX')
-          this.accountSync.syncStatement.discardedTXs++
-        }
-      }
-    }
-    this.transactionQueue.pendingTransactionQueue = newList
+    this.accountSync.syncStatement.nonDiscardedTXs = this.transactionQueue.pendingTransactionQueue.length
 
     await this.transactionQueue.processTransactions(true)
 
