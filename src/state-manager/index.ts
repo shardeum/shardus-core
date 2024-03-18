@@ -2265,25 +2265,9 @@ class StateManager {
     this.p2p.unregisterInternal('get_trie_accountHashes')
     this.p2p.unregisterInternal('get_account_data_by_hashes')
 
-    this.p2p.unregisterInternal(InternalRouteEnum.apoptosize)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_broadcast_state)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_send_cachedAppData)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_get_account_data_with_queue_hints)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_get_account_queue_count)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_get_account_data_by_list)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_broadcast_finalstate)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_get_account_data)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_sync_trie_hashes)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_compare_cert)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_get_trie_hashes)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_spread_tx_to_group_syncing)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_request_state_for_tx_post)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_make_receipt)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_get_globalaccountreport)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_get_confirm_or_challenge)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_sign_app_data)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_get_cached_app_data)
-    this.p2p.unregisterInternal(InternalRouteEnum.binary_request_tx_and_state)
+    for (const binary_endpoint of Object.values(InternalRouteEnum)){
+    this.p2p.unregisterInternal(binary_endpoint)
+    }
   }
 
   // //////////////////////////////////////////////////////////////////////////
