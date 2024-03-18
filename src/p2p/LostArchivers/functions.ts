@@ -176,7 +176,7 @@ export function informInvestigator(target: publicKey): void {
 
     // Send message to investigator
     info(`informInvestigator: sending InvestigateArchiverMsg: ${inspect(investigateMsg)}`)
-    if (this.config.p2p.useBinarySerializedEndpoints) {
+    if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.lostArchiverInvestigateBinary) {
       Comms.tellBinary<LostArchiverInvestigateReq>(
         [investigator],
         InternalRouteEnum.binary_broadcast_state,

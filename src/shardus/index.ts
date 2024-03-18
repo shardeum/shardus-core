@@ -2806,7 +2806,7 @@ class Shardus extends EventEmitter {
     if (filterNodeIds.length > 0) {
       const groupPromiseResp = await groupResolvePromises(
         closestNodes.map((node) => {
-          if (this.config.p2p.useBinarySerializedEndpoints) {
+          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.signAppDataBinary) {
             const request: SignAppDataReq = {
               type,
               hash,

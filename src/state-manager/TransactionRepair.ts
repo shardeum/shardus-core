@@ -548,8 +548,11 @@ class TransactionRepair {
                   timestamp: queueEntry.acceptedTx.timestamp,
                 }
 
-                if(this.config.p2p.useBinarySerializedEndpoints){
-                  const request = message as RequestStateForTxPostReq 
+                if (
+                  this.config.p2p.useBinarySerializedEndpoints &&
+                  this.config.p2p.requestStateForTxPostBinary
+                ) {
+                  const request = message as RequestStateForTxPostReq
                   result = await this.p2p.askBinary<RequestStateForTxPostReq, RequestStateForTxPostResp>(
                     node,
                     InternalRouteEnum.binary_request_state_for_tx_post,

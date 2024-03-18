@@ -856,6 +856,33 @@ export interface ServerConfiguration {
     hardenNewSyncingProtocol: boolean
     /** whether node shuld remove a lost syncing node from its syncing list */
     removeLostSyncingNodeFromList: boolean
+    /** Enable binary serilization by specific endpoint */
+    compareCertBinary: boolean
+    makeReceiptBinary: boolean
+    lostArchiverInvestigateBinary: boolean
+    signAppDataBinary: boolean
+    sendCachedAppDataBinary: boolean
+    syncTrieHashesBinary: boolean
+    getTrieHashesBinary: boolean
+    getTrieAccountHashesBinary: boolean
+    getAccountDataBinary: boolean
+    getAccountDataByHashBinary: boolean
+    getAccountDataByListBinary: boolean
+    getGloablAccountReportBinary: boolean
+    getCachedAppDataBinary: boolean
+    getAccountQueueCountBinary: boolean
+    getAccountDataWithQueueHintsBinary: boolean
+    getTxTimestampBinary: boolean
+    getAppliedVoteBinary: boolean
+    getConfirmOrChallengeBinary: boolean
+    spreadAppliedVoteHashBinary: boolean
+    spreadTxToGroupSyncingBinary: boolean
+    requestStateForTxBinary: boolean
+    requestReceiptForTxBinary: boolean
+    requestTxAndStateBinary: boolean
+    requestStateForTxPostBinary: boolean
+    broadcastStateBinary: boolean
+    broadcastFinalStateBinary: boolean
   }
   /** Server IP configuration */
   ip?: {
@@ -975,7 +1002,7 @@ export interface ServerConfiguration {
     /**  Flag to enable detail scoped profiling **/
     enableScopedProfiling: boolean
     /**  Flag to enable writing cycle records to text file for debugging **/
-    enableCycleRecordDebugTool: boolean,
+    enableCycleRecordDebugTool: boolean
     /**  Flag to force a tx to expire **/
     forcedExpiration: boolean
   }

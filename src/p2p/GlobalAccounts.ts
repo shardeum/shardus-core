@@ -178,7 +178,7 @@ export function setGlobal(address, value, when, source) {
   makeReceipt(signedTx, Self.id) // Need this because internalRoute handler ignores messages from ourselves
   /** [TODO] [AS] Replace with Comms.tell */
   // p2p.tell(consensusGroup, 'make-receipt', signedTx)
-  if (Context.config.p2p.useBinarySerializedEndpoints) {
+  if (Context.config.p2p.useBinarySerializedEndpoints && Context.config.p2p.makeReceiptBinary) {
     const request = signedTx as MakeReceiptReq
     Comms.tellBinary<MakeReceiptReq>(
       consensusGroup,

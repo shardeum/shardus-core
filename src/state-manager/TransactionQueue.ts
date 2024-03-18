@@ -1986,7 +1986,10 @@ class TransactionQueue {
                       this.stateManager.currentCycleShardData.syncingNeighborsTxGroup
                     )
                     //this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
-                    if (this.stateManager.config.p2p.useBinarySerializedEndpoints) {
+                    if (
+                      this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+                      this.stateManager.config.p2p.spreadTxToGroupSyncingBinary
+                    ) {
                       const request = acceptedTx as SpreadTxToGroupSyncingReq
                       this.p2p.tellBinary<SpreadTxToGroupSyncingReq>(
                         this.stateManager.currentCycleShardData.syncingNeighborsTxGroup,
@@ -2373,7 +2376,7 @@ class TransactionQueue {
             timestamp: queueEntry.acceptedTx.timestamp,
           }
           let result
-          if (this.config.p2p.useBinarySerializedEndpoints) {
+          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestStateForTxBinary) {
             result = (await this.p2p.askBinary<RequestStateForTxReq, RequestStateForTxRespSerialized>(
               node,
               InternalRouteEnum.binary_request_state_for_tx,
@@ -2537,7 +2540,10 @@ class TransactionQueue {
 
         const message = { txid: queueEntry.acceptedTx.txId, timestamp: queueEntry.acceptedTx.timestamp }
         let result = null
-        if (this.stateManager.config.p2p.useBinarySerializedEndpoints) {
+        if (
+          this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+          this.stateManager.config.p2p.requestReceiptForTxBinary
+        ) {
           result = await this.p2p.askBinary<
             RequestReceiptForTxReqSerialized,
             RequestReceiptForTxRespSerialized
@@ -3351,7 +3357,7 @@ class TransactionQueue {
     nodes: Shardus.Node[],
     message: { stateList: Shardus.WrappedResponse[]; txid: string }
   ): Promise<void> {
-    if (this.config.p2p.useBinarySerializedEndpoints) {
+    if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastStateBinary) {
       // convert legacy message to binary supported type
       const request = message as BroadcastStateReq
       this.p2p.tellBinary<BroadcastStateReq>(
@@ -3844,7 +3850,7 @@ class TransactionQueue {
             (node) => node.externalIp + ':' + node.externalPort
           )
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.debug('tellcorrernodingnodesfinaldata', queueEntry.logID, ` : filterValidNodesForInternalMessage ${filterNodesIpPort} for accounts: ${utils.stringifyReduce(message.stateList)}`)
-          if (this.config.p2p.useBinarySerializedEndpoints) {
+          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastFinalStateBinary) {
             // convert legacy message to binary supported type
             const request = message as BroadcastFinalStateReq
             this.p2p.tellBinary<BroadcastFinalStateReq>(
@@ -5798,7 +5804,7 @@ class TransactionQueue {
           )
 
         let response
-        if (this.config.p2p.useBinarySerializedEndpoints) {
+        if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestTxAndStateBinary) {
           const requestMessage = message as RequestTxAndStateReq
           response = await Comms.askBinary<RequestTxAndStateReq, RequestTxAndStateResp>(
             nodeToAsk,

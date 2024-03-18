@@ -934,7 +934,7 @@ class TransactionConsenus {
     } else {
       let timestampReceipt
 
-      if (this.config.p2p.useBinarySerializedEndpoints) {
+      if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getTxTimestampBinary) {
         const serialized_res = await this.p2p.askBinary<getTxTimestampReq, getTxTimestampResp>(
           homeNode.node,
           InternalRouteEnum.binary_get_tx_timestamp,
@@ -1745,7 +1745,7 @@ class TransactionConsenus {
         // the queryFunction must return null if the given node is our own
         if (ip === Self.ip && port === Self.port) return null
         const queryData: AppliedVoteQuery = { txId: queueEntry.acceptedTx.txId }
-        if (this.config.p2p.useBinarySerializedEndpoints) {
+        if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAppliedVoteBinary) {
           const req = queryData as GetAppliedVoteReq
           const rBin = await Comms.askBinary<GetAppliedVoteReq, GetAppliedVoteResp>(
             node,
@@ -1803,7 +1803,7 @@ class TransactionConsenus {
       const queryFn = async (node: Shardus.Node): Promise<ConfirmOrChallengeQueryResponse> => {
         if (node.externalIp === Self.ip && node.externalPort === Self.port) return null
         const queryData = { txId: queueEntry.acceptedTx.txId }
-        return this.config.p2p.useBinarySerializedEndpoints
+        return this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getConfirmOrChallengeBinary
           ? await Comms.askBinary<GetConfirmOrChallengeReq, GetConfirmOrChallengeResp>(
               node,
               InternalRouteEnum.binary_get_confirm_or_challenge,
@@ -1889,7 +1889,7 @@ class TransactionConsenus {
         accountOffset: '',
       }
       let result
-      if (this.config.p2p.useBinarySerializedEndpoints) {
+      if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountDataBinary) {
         const req = message as GetAccountDataReqSerializable
         const rBin = await Comms.askBinary<GetAccountDataReqSerializable, GetAccountDataRespSerializable>(
           node,
@@ -2502,7 +2502,7 @@ class TransactionConsenus {
           Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4)
         } else {
           this.profiler.profileSectionStart('createAndShareVote-tell')
-          if (this.config.p2p.useBinarySerializedEndpoints) {
+          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.spreadAppliedVoteHashBinary) {
             const request = appliedVoteHash as AppliedVoteHash
             this.p2p.tellBinary<SpreadAppliedVoteHashReq>(
               filteredConsensusGroup,

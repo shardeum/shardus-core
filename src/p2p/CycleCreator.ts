@@ -1149,7 +1149,7 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
     }
 
     let resp: CompareCertRes
-    if (config.p2p.useBinarySerializedEndpoints) {
+    if (config.p2p.useBinarySerializedEndpoints && config.p2p.compareCertBinary) {
       let reqSerialized = req as CompareCertReqSerializable
       resp = await Comms.askBinary<CompareCertReqSerializable, CompareCertRespSerializable>(
         node,

@@ -487,7 +487,7 @@ class CachedAppDataManager {
             }
             const filteredCorrespondingAccNodes = filteredNodes
 
-            if (this.config.p2p.useBinarySerializedEndpoints) {
+            if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.sendCachedAppDataBinary) {
               const sendCacheAppDataReq: SendCachedAppDataReq = {
                 topic,
                 cachedAppData: {
@@ -565,7 +565,7 @@ class CachedAppDataManager {
 
       const message = { topic, dataId }
       let r: CachedAppData | boolean
-      if (this.config.p2p.useBinarySerializedEndpoints) {
+      if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getCachedAppDataBinary) {
         const resp = await this.p2p.askBinary<GetCachedAppDataReq, GetCachedAppDataResp>(
           randomConsensusNode,
           InternalRouteEnum.binary_get_cached_app_data,

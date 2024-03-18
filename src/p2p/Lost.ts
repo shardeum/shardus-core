@@ -243,7 +243,11 @@ export function init() {
           return
         }
         let res = null
-        if (payload.route === 'get_trie_hashes' && this.p2p.useBinarySerializedEndpoints) {
+        if (
+          payload.route === 'get_trie_hashes' &&
+          this.p2p.useBinarySerializedEndpoints &&
+          this.p2p.getTrieHashesBinary
+        ) {
           nestedCountersInstance.countEvent('p2p', 'getTrieHashesBinary', 1)
           res = await Comms.askBinary<GetTrieHashesRequest, GetTrieHashesResponse>(
             targetNode,

@@ -1050,7 +1050,10 @@ class AccountSync {
       // Various failure cases will alter the returned result so that it is tallied in a more orderly way.
       // The random numbers were kept to prevent the hash of results from being equal, but now custom equalFn takes care of this concern
       let result
-      if (this.stateManager.config.p2p.useBinarySerializedEndpoints) {
+      if (
+        this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+        this.stateManager.config.p2p.getGloablAccountReportBinary
+      ) {
         const request = {} as GlobalAccountReportReqSerializable
         result = await this.p2p.askBinary<
           GlobalAccountReportReqSerializable,

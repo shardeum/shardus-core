@@ -1903,7 +1903,10 @@ class AccountPatcher {
     for (const [key, value] of requestMap) {
       try {
         let promise
-        if (this.stateManager.config.p2p.useBinarySerializedEndpoints) {
+        if (
+          this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+          this.stateManager.config.p2p.getTrieHashesBinary
+        ) {
           promise = await this.p2p.askBinary<GetTrieHashesRequest, GetTrieHashesResponse>(
             key,
             InternalRouteEnum.binary_get_trie_hashes,
@@ -1998,7 +2001,10 @@ class AccountPatcher {
     for (const [key, value] of requestMap) {
       try {
         let promise
-        if (this.stateManager.config.p2p.useBinarySerializedEndpoints) {
+        if (
+          this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+          this.stateManager.config.p2p.getTrieAccountHashesBinary
+        ) {
           promise = this.p2p.askBinary<GetTrieAccountHashesReq, GetTrieAccountHashesResp>(
             key,
             InternalRouteEnum.binary_get_trie_account_hashes,
@@ -2586,7 +2592,10 @@ class AccountPatcher {
 
     //send the messages we have built up.  (parallel waiting with promise.all)
     const promises = []
-    if (this.stateManager.config.p2p.useBinarySerializedEndpoints) {
+    if (
+      this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+      this.stateManager.config.p2p.syncTrieHashesBinary
+    ) {
       for (const messageEntry of messageToNodeMap.values()) {
         const syncTrieHashesRequest: SyncTrieHashesRequest = {
           cycle,
@@ -3153,7 +3162,10 @@ class AccountPatcher {
           ) {
             requestEntry.request.accounts = allAccounts.slice(offset, offset + accountPerRequest)
             let promise = null
-            if (this.stateManager.config.p2p.useBinarySerializedEndpoints) {
+            if (
+              this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+              this.stateManager.config.p2p.getAccountDataByHashBinary
+            ) {
               promise = this.p2p.askBinary<GetAccountDataByHashesReq, GetAccountDataByHashesResp>(
                 requestEntry.node,
                 InternalRouteEnum.binary_get_account_data_by_hashes,
@@ -3177,7 +3189,10 @@ class AccountPatcher {
           //would it be better to resync if we have a high number of errors?  not easy to answer this.
         } else {
           let promise = null
-          if (this.stateManager.config.p2p.useBinarySerializedEndpoints) {
+          if (
+            this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+            this.stateManager.config.p2p.getAccountDataByHashBinary
+          ) {
             promise = this.p2p.askBinary<GetAccountDataByHashesReq, GetAccountDataByHashesResp>(
               requestEntry.node,
               InternalRouteEnum.binary_get_account_data_by_hashes,

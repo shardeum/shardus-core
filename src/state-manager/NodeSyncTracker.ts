@@ -340,7 +340,10 @@ export default class NodeSyncTracker implements SyncTrackerInterface {
           //Get accounts.
           const message = { accountIds: remainingAccountsToSync }
           let result
-          if (stateManager.config.p2p.useBinarySerializedEndpoints) {
+          if (
+            stateManager.config.p2p.useBinarySerializedEndpoints &&
+            stateManager.config.p2p.getAccountDataByListBinary
+          ) {
             result = await this.p2p.askBinary<GetAccountDataByListReq, GetAccountDataByListResp>(
               this.dataSourceHelper.dataSourceNode,
               InternalRouteEnum.binary_get_account_data_by_list,
@@ -574,7 +577,10 @@ export default class NodeSyncTracker implements SyncTrackerInterface {
 
       let r: GetAccountData3Resp | boolean
       try {
-        if (stateManager.config.p2p.useBinarySerializedEndpoints) {
+        if (
+          stateManager.config.p2p.useBinarySerializedEndpoints &&
+          stateManager.config.p2p.getAccountDataBinary
+        ) {
           const rBin = await this.p2p.askBinary<
             GetAccountDataReqSerializable,
             GetAccountDataRespSerializable
