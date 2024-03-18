@@ -241,6 +241,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     useNewPOQ: false,
     integrityCheckBeforeChallenge: true,
     checkPrecrackStatus: true,
+    noVoteSeenExpirationTime: 10000,
+    voteSeenExpirationTime: 20000
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

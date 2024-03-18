@@ -1088,6 +1088,10 @@ export interface ServerConfiguration {
     integrityCheckBeforeChallenge: boolean
     // Should the protocol consier a precrack failure as a failed transaction
     checkPrecrackStatus: boolean
+    // extra time for tx group node when they have not seen a vote yet
+    noVoteSeenExpirationTime: number
+    // extra time for tx group nodes that seen a vote
+    voteSeenExpirationTime: number
   }
   /** Options for sharding calculations */
   sharding?: {

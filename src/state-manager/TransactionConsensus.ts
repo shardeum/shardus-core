@@ -497,7 +497,7 @@ class TransactionConsenus {
 
           const receiptNotNull = receivedAppliedReceipt2 != null
 
-          if (queueEntry.state === 'expired') {
+          if (queueEntry.state === 'expired' || queueEntry.state === 'almostExpired') {
             //have we tried to repair this yet?
             const startRepair = queueEntry.repairStarted === false
             /* prettier-ignore */
@@ -793,6 +793,7 @@ class TransactionConsenus {
       const payload = queueEntry.appliedReceipt2
       //let payload = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
       this.p2p.sendGossipIn('spread_appliedReceipt2', payload, '', sender, gossipGroup, true)
+      if (logFlags.debug) this.mainLogger.debug(`shareAppliedReceipt ${queueEntry.logID} sent gossip`)
     }
   }
 
@@ -1649,10 +1650,10 @@ class TransactionConsenus {
   }
 
   async confirmOrChallenge(queueEntry: QueueEntry): Promise<void> {
+    if (this.stateManager.consensusLog) this.mainLogger.debug(`confirmOrChallenge: ${queueEntry.logID} isInExecutionHome: ${queueEntry.isInExecutionHome} completedConfirmedOrChallenge: ${queueEntry.completedConfirmedOrChallenge}`)
     try {
-
-      if (queueEntry.ourVote == null) {
-        nestedCountersInstance.countEvent('confirmOrChallenge', 'ourVote == null')
+      if (queueEntry.ourVote == null && queueEntry.isInExecutionHome) {
+        nestedCountersInstance.countEvent('confirmOrChallenge', 'ourVote == null and isInExecutionHome')
         return
       }
       if (queueEntry.completedConfirmedOrChallenge) {
@@ -1752,9 +1753,9 @@ class TransactionConsenus {
             )
           }
         }
-        const shouldChallenge = queueEntry.ourVoteHash !== finalVoteHash
+        const shouldChallenge = queueEntry.ourVoteHash != null && queueEntry.ourVoteHash !== finalVoteHash
 
-        if (logFlags.debug)
+        if (this.stateManager.consensusLog)
           this.mainLogger.debug(
             `confirmOrChallenge: ${queueEntry.logID} isInExecutionSet: ${queueEntry.isInExecutionHome}, eligibleToConfirm: ${eligibleToConfirm}, shouldChallenge: ${shouldChallenge}`
           )
@@ -1805,8 +1806,9 @@ class TransactionConsenus {
           //   )
           // }
           this.confirmVoteAndShare(queueEntry)
-        } else if (eligibleToConfirm === false && queueEntry.ourVoteHash === finalVoteHash) {
+        } else if (eligibleToConfirm === false) {
           // we are not eligible to confirm
+          if (this.stateManager.consensusLog) this.mainLogger.debug(`confirmOrChallenge: ${queueEntry.logID} not eligible to confirm. set completedConfirmedOrChallenge to true`)
           queueEntry.completedConfirmedOrChallenge = true
         }
       } else {
@@ -1849,6 +1851,7 @@ class TransactionConsenus {
       this.tryAppendMessage(queueEntry, signedConfirmMessage)
       queueEntry.gossipedConfirmOrChallenge = true
       queueEntry.completedConfirmedOrChallenge = true
+      if (this.stateManager.consensusLog) this.mainLogger.debug(`completedConfirmOrChallenge: ${queueEntry.logID}`)
     } catch (e) {
       this.mainLogger.error(`confirmVoteAndShare: ${queueEntry.logID} error: ${e.message}`)
     } finally {
@@ -2014,6 +2017,11 @@ class TransactionConsenus {
       }
       console.log(`allowing vote creation for ${queueEntry.acceptedTx.txId} in forcedExpiration mode`)
     }
+    if (queueEntry.almostExpired) {
+      if (logFlags.debug) this.mainLogger.debug(`createAndShareVote: ${queueEntry.logID} almostExpired`)
+      nestedCountersInstance.countEvent('transactionConsensus', 'almostExpired')
+      return
+    }
     this.profiler.profileSectionStart('createAndShareVote', true)
 
     try {
@@ -2141,7 +2149,7 @@ class TransactionConsenus {
           return
         }
         const ourRankIndex = Array.from(queueEntry.eligibleNodeIdsToVote).indexOf(ourNodeId)
-        let delayBeforeVote = ourRankIndex * 50 // 100ms
+        let delayBeforeVote = ourRankIndex * 2
 
         if (delayBeforeVote > 500) {
           delayBeforeVote = 500
@@ -2161,6 +2169,7 @@ class TransactionConsenus {
           }
 
           if (isReceivedBetterVote) {
+            if (this.stateManager.consensusLog) this.mainLogger.debug(`createAndShareVote received better vote`)
             nestedCountersInstance.countEvent(
               'transactionConsensus',
               'createAndShareVote isReceivedBetterVote: true'

@@ -112,6 +112,7 @@ export type QueueEntry = {
   queryingFinalData?: boolean
   topConfirmations: Set<string>
   topVoters: Set<string>
+  almostExpired?: boolean
 
   gossipedReceipt: boolean
   gossipedVote: boolean
