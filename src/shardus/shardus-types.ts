@@ -680,6 +680,10 @@ export interface ServerConfiguration {
     minNodes?: number
     /** The maxNodes parameter is an Integer specifying the maximum number of nodes that can be active in the network at once. */
     maxNodes?: number
+    /** should the maxStandbyCount limit be enforced*/
+    enableMaxStandbyCount: boolean
+    /** The mamaxStandbyCount  parameter is an Integer specifying the maximum number of standby nodes that can be in the network**/
+    maxStandbyCount: number
     /** The seedNodeOffset parameter is an Integer specifying the number of seedNodes to remove when producing the seedList */
     seedNodeOffset?: number
     /** The nodeExpiryAge parameter is an Integer specifying the amount of time (in seconds) before a node can be in the network before getting rotated out. */

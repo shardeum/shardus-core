@@ -392,6 +392,37 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
         }
       }
 
+      if (config.p2p.enableMaxStandbyCount) {
+        // Calculate the effective standby list size after planned removals
+        const effectiveStandbyListSize = standbyList.length - record.standbyRemove.length
+
+        // Check if the effective size exceeds the maximum allowed size
+        if (effectiveStandbyListSize > config.p2p.maxStandbyCount) {
+          // Calculate the number of nodes to remove to meet the size limit
+          const nodesToRemoveCount = effectiveStandbyListSize - config.p2p.maxStandbyCount
+
+          /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `join:updateRecord cycle number: ${record.counter} removing ${nodesToRemoveCount} from standby list reason: standby node list size above maxStandbyCount of ${config.p2p.maxStandbyCount}` )
+
+          // Convert record.standbyRemove array to a Set for faster lookup
+          const standbyRemoveSet = new Set(record.standbyRemove)
+          let removeCount = 0
+
+          // Select the most recent nodes for removal
+          for (let i = standbyList.length - 1; i >= 0 && removeCount < nodesToRemoveCount; i--) {
+            const node = standbyList[i]
+
+            // check if the node is not already marked for removal
+            if (!standbyRemoveSet.has(node.nodeInfo.publicKey)) {
+              // If not, mark the node for removal
+              record.standbyRemove.push(node.nodeInfo.publicKey) // You might maintain this as an array for other uses
+              standbyRemoveSet.add(node.nodeInfo.publicKey) // Also add to the set for consistent and quick lookups
+              removeCount++
+            }
+          }
+        }
+      }
+      
+      
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${standbyRemoved_Age}  removed list: ${record.standbyRemove} ` )
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList(standbyList, `join.updateRecord: last-hashed ${record.counter}`)
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList( Array.from(getStandbyNodesInfoMap().values()), `join.updateRecord: standby-map ${record.counter}` )

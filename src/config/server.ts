@@ -52,6 +52,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     minNodesPerctToAllowExitOnException: 0.66,
     baselineNodes: 15, // config used for new threshold for entering recovery, restore, and safety. Should be equivalient to minNodes on network startup
     minNodes: 15,
+    enableMaxStandbyCount: true,
+    maxStandbyCount: 30000,
     maxNodes: 30,
     seedNodeOffset: 4,
     nodeExpiryAge: 30,

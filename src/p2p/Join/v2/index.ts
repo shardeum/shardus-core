@@ -117,6 +117,11 @@ export function addStandbyJoinRequests(nodes: JoinRequest[], logErrors = false):
   if (logFlags.verbose) console.log('adding standby nodes:', nodes)
   //TODO proper input validation
   for (const joinRequest of nodes) {
+    if (getStandbyNodesInfoMap().size >= config.p2p.maxStandbyCount) {
+      /* prettier-ignore */ if (logErrors && logFlags.important_as_fatal) console.error('standby nodes list is max capacity reached. Cannot add more nodes.')
+      return;
+    }
+
     if (joinRequest == null) {
       /* prettier-ignore */ if (logErrors && logFlags.important_as_fatal) console.error('null node in standby list')
       continue
