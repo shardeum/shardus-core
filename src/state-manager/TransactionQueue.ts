@@ -5284,15 +5284,30 @@ class TransactionQueue {
                     break
                   }
                 }
+
+                if (incomplete && missingAccounts.length > 0) {
+                  nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData incomplete')
+                  // /* prettier-ignore */ if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData incomplete : ${queueEntry.logID}, waiting queueEntry.debug.waitingOn`)
+
+                  // In the past we would ask for final data again if enough time ges by.  This is currently disabled
+                  // const txAge = shardusGetTime() - queueEntry.acceptedTx.timestamp
+                  // if (txAge > timeM2_5 && !queueEntry.queryingFinalData) {
+                  //   this.requestFinalData(queueEntry, missingAccounts)
+                  // }
+                }
+
                 /* eslint-enable security/detect-object-injection */
 
                 if (failed === true) {
+                  nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData failed')
                   this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
                   this.updateTxState(queueEntry, 'await repair')
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_failed', `${shortID}`, `qId: ${queueEntry.entryID} skipped:${skipped}`)
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_failed : ${queueEntry.logID} `)
                   continue
                 }
+
+                // This is the case where awaiting final data has succeeded. Store the final data and remove TX from the queue
                 if (failed === false && incomplete === false) {
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_passed', `${shortID}`, `qId: ${queueEntry.entryID} skipped:${skipped}`)
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_passed : ${queueEntry.logID} skipped:${skipped}`)
@@ -5353,18 +5368,7 @@ class TransactionQueue {
                     this.updateTxState(queueEntry, 'fail')
                   }
                   this.removeFromQueue(queueEntry, currentIndex)
-                } else {
-                  if (failed) nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData failed')
-                  if (incomplete && missingAccounts.length > 0) {
-                    nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData incomplete')
-                    // /* prettier-ignore */ if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData incomplete : ${queueEntry.logID}, waiting ${queueEntry.debug.waitingOn}`)
-
-                    // const txAge = shardusGetTime() - queueEntry.acceptedTx.timestamp
-                    // if (txAge > 2 * timeM3 && !queueEntry.queryingFinalData) {
-                    //   this.requestFinalData(queueEntry, missingAccounts)
-                    // }
-                  }
-                }
+                } 
               }
             }
           }
