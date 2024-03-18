@@ -1915,8 +1915,8 @@ class TransactionQueue {
           if (globalModification === false && isGlobalAcc === false) {
             txQueueEntry.uniqueWritableKeys.push(key)
           }
-          txQueueEntry.uniqueWritableKeys.sort() //need this list to be deterministic!
         }
+        txQueueEntry.uniqueWritableKeys.sort() //need this list to be deterministic!
 
         if (txQueueEntry.hasShardInfo) {
           const transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
