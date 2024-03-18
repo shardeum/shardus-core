@@ -9,14 +9,12 @@ import * as CycleChain from '../../CycleChain'
 import { crypto } from '../../Context'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import { config } from '../../Context'
-import rfdc from 'rfdc'
-
-//const clone = rfdc()
+import { P2P } from '@shardus/types'
 
 type publickey = JoinRequest['nodeInfo']['publicKey']
 let newStandbyRefreshRequests: Map<publickey, StandbyRefreshRequest> = new Map()
 
-export async function submitStandbyRefresh(publicKey: string, cycleNumber: number): Promise<Result<void, Error>> {
+export async function submitStandbyRefresh(publicKey: string): Promise<Result<void, Error>> {
   const archiver = getRandomAvailableArchiver()
   try {
     const activeNodesResult = await getActiveNodesFromArchiver(archiver);
@@ -24,13 +22,6 @@ export async function submitStandbyRefresh(publicKey: string, cycleNumber: numbe
       throw Error(`couldn't get active nodes: ${activeNodesResult.error}`);
     }
     const activeNodes = activeNodesResult.value;
-
-    let payload = {
-      publicKey: publicKey,
-      cycleNumber: cycleNumber,
-    };
-    payload = crypto.sign(payload);
-
     const maxRetries = 3;
     let attempts = 0;
     const queriedNodesPKs = []
@@ -46,8 +37,10 @@ export async function submitStandbyRefresh(publicKey: string, cycleNumber: numbe
         } while(queriedNodesPKs.includes(node.publicKey));
         queriedNodesPKs.push(node.publicKey);
 
-        await http.post(`${node.ip}:${node.port}/standby-refresh`, payload);
-        return ok(void 0); // Success, exit the function
+        console.log('submitStandbyRefresh: sending standby refresh request to', node)
+        await http.post(`${node.ip}:${node.port}/standby-refresh`, { publicKey })
+        console.log('submitStandbyRefresh: standby refresh request sent')
+        return ok(void 0)
       } catch (e) {
         console.error(`Attempt ${attempts + 1} failed: ${e}`);
         attempts++;
@@ -71,11 +64,16 @@ export interface StandbyRefreshRequestResponse {
 
 export function addStandbyRefresh(keepInStandbyRequest: StandbyRefreshRequest): StandbyRefreshRequestResponse {
   // validate keepInStandbyRequest
-  if (getStandbyNodesInfoMap().has(keepInStandbyRequest.publicKey) === false) {
+  console.log('standbyNodes')
+  console.log(getStandbyNodesInfoMap().keys())
+  console.log('keepInStandbyRequest.publicKey')
+  console.log(keepInStandbyRequest.publicKey)
+  console.log('result: ', getStandbyNodesInfoMap().has(keepInStandbyRequest.publicKey))
+  if (!getStandbyNodesInfoMap().has(keepInStandbyRequest.publicKey)) {
     return {
       success: false,
       reason: 'Node not found in standby list',
-      fatal: true,
+      fatal: false,
     }
   }
 

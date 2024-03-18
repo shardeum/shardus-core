@@ -343,6 +343,7 @@ export function startupV2(): Promise<boolean> {
         // Note that attemptJoining isn't just to get on the standby list, but also
         // we will be checking above to see when our node is selected to go active
         if (resp?.isOnStandbyList === true) {
+          console.log(`cycle number: ${latestCycle.counter}`)
           //nestedCountersInstance.countEvent('p2p', 'startupV2: on standby list')
 
           if (state !== P2P.P2PTypes.NodeStatus.STANDBY) {
@@ -358,16 +359,18 @@ export function startupV2(): Promise<boolean> {
             ) {
               isFirstRefresh = false
               //info(`startupV2: submitStandbyRefresh first ${latestCycle.counter}`)
-              submitStandbyRefresh(publicKey, latestCycle.counter)
+              submitStandbyRefresh(publicKey)
 
-              nestedCountersInstance.countEvent('p2p', `submitted StandbyRefreshRequest request`)
-              /* prettier-ignore */ if (logFlags.verbose) console.log(`submitted StandbyRefreshRequest request`)
+              nestedCountersInstance.countEvent('p2p', `submitted StandbyRefreshRequest request - first time`)
+              console.log(`submitted StandbyRefreshRequest request - first time`)
+              console.log(`publickey: ${publicKey}`)
+              /* prettier-ignore */ if (logFlags.verbose) console.log(`submitted StandbyRefreshRequest request - first time`)
 
               cyclesElapsedSinceRefresh = 0
             }
           } else if (cyclesElapsedSinceRefresh >= Context.config.p2p.standbyListCyclesTTL) {
             //info(`startupV2: submitStandbyRefresh ${latestCycle.counter}`)
-            submitStandbyRefresh(publicKey, latestCycle.counter)
+            submitStandbyRefresh(publicKey)
 
             nestedCountersInstance.countEvent('p2p', `submitted StandbyRefreshRequest request`)
             /* prettier-ignore */ if (logFlags.verbose) console.log(`submitted StandbyRefreshRequest request`)
