@@ -34,7 +34,7 @@ import { HTTPError } from 'got'
 import { drainLostAfterSelectionNodes, drainSyncStarted, lostAfterSelection, insertSyncStarted, addSyncStarted } from './v2/syncStarted'
 import { addFinishedSyncing, drainFinishedSyncingRequest, newSyncFinishedNodes } from './v2/syncFinished'
 //import { getLastCycleStandbyRefreshRequest, resetLastCycleStandbyRefreshRequests, drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
-import { drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
+import { drainNewStandbyRefreshRequests, addStandbyRefresh } from './v2/standbyRefresh'
 import rfdc from 'rfdc'
 import { Utils } from '@shardus/types'
 
@@ -48,7 +48,7 @@ let requests: P2P.JoinTypes.JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
 let queuedStartedSyncingId: string
 let queuedFinishedSyncingId: string
-let queuedStandbyRefreshPubKey: string
+let queuedStandbyRefreshPubKeys: string[] = []
 
 // whats this for? I was just going to use newStandbyRefreshRequests
 //let keepInStandbyCollector: Map<string, StandbyRefreshRequest>
@@ -238,6 +238,9 @@ export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
 }
 
 export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
+
+  console.log(`cycle: ${record.counter} join:updateRecord`)
+
   record.syncing = NodeList.syncingByIdOrder.length
   record.standbyAdd = []
   record.standbyRemove = []
@@ -641,6 +644,27 @@ export function sendRequests(): void {
       /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequests failed to add our own sync-finished message`)
     }
   }
+  if (queuedStandbyRefreshPubKeys?.length > 0) {
+    console.log('sending refresh for ', queuedStandbyRefreshPubKeys)
+    for (const standbyRefreshPubKey of queuedStandbyRefreshPubKeys) {
+      const standbyRefreshTx: P2P.JoinTypes.StandbyRefreshRequest = crypto.sign({
+        publicKey: standbyRefreshPubKey,
+        cycleNumber: CycleChain.newest.counter,
+      })
+
+      const standbyRefreshResult = addStandbyRefresh(standbyRefreshTx)
+      if (standbyRefreshResult.success === true) {
+        nestedCountersInstance.countEvent('p2p', `sending standby-refresh gossip to network`)
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`sending standby-refresh gossip to network`)
+        Comms.sendGossip('gossip-standby-refresh', standbyRefreshTx, '', null, NodeList.byIdOrder, true)
+      } else {
+        console.log('standby-refresh result', standbyRefreshResult)
+        nestedCountersInstance.countEvent('p2p', `join:sendRequests failed to add our own standby-refresh message`)
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequests failed to add our own standby-refresh message`)
+      }
+    }
+    queuedStandbyRefreshPubKeys = []
+  }
   return
 }
 
@@ -658,7 +682,7 @@ export function queueFinishedSyncingRequest(nodeId: string): void {
 }
 
 export function queueStandbyRefreshRequest(publicKey: string): void {
-  queuedStandbyRefreshPubKey = publicKey
+  queuedStandbyRefreshPubKeys.push(publicKey)
 }
 
 /** Module Functions */

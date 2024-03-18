@@ -16,6 +16,7 @@ import {
   validateJoinRequest,
   verifyJoinRequestSignature,
   warn,
+  queueStandbyRefreshRequest
 } from '.'
 import { config } from '../Context'
 import { isBogonIP } from '../../utils/functions/checkIP'
@@ -240,27 +241,21 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
       }
     }
 
-    const standbyRefreshRequest = req.body
+    const standbyRefreshPubKey = req.body.publicKey
 
     let err = utils.validateTypes(req, { body: 'o' })
     if (err) {
       warn('/standby-refresh bad req ' + err)
-      // use res.send({ }) if returning an object
-      res.json()
+      res.status(400).send()
     }
-    err = utils.validateTypes(standbyRefreshRequest, { publicKey: 's', cycleNumber: 'n', sign: 'o' })
+    err = utils.validateTypes(standbyRefreshPubKey, { publicKey: 's' })
     if (err) {
-      warn('/standby-refresh bad standby refresh request ' + err)
-      // use res.send({ }) if returning an object
-      res.json()
+      warn('/standby-refresh bad standby refresh param ' + err)
+      res.status(400).send()
     }
 
-    const addStandbyRefreshResult = addStandbyRefresh(standbyRefreshRequest)
-    if (addStandbyRefreshResult.success === false) {
-      return res.status(500).send(addStandbyRefreshResult.reason)
-    }
-
-    Comms.sendGossip('gossip-standby-refresh', standbyRefreshRequest, '', null, NodeList.byIdOrder, true)
+    console.log('before queue')
+    queueStandbyRefreshRequest(standbyRefreshPubKey)
     return res.status(200).send()
   },
 }
