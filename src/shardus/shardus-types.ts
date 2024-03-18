@@ -1092,6 +1092,8 @@ export interface ServerConfiguration {
     noVoteSeenExpirationTime: number
     // extra time for tx group nodes that seen a vote
     voteSeenExpirationTime: number
+    // percentage of execution group which will share the vote
+    voterPercentage: number
   }
   /** Options for sharding calculations */
   sharding?: {

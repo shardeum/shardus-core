@@ -1579,7 +1579,7 @@ class TransactionQueue {
           }
 
           const minNodesToVote = 3
-          const voterPercentage = 1 // all execution nodes will vote
+          const voterPercentage = configContext.stateManager.voterPercentage
           const numberOfVoters = Math.max(
             minNodesToVote,
             Math.floor(txQueueEntry.executionGroup.length * voterPercentage)
