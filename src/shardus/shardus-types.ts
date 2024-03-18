@@ -827,7 +827,7 @@ export interface ServerConfiguration {
     /** networkBaselineEnabled is a boolean that enables the use of the new config `baselineNodes` which is used as the new threshold for safety, recovery, and restore modes. */
     networkBaselineEnabled: boolean
     useBinarySerializedEndpoints: boolean
-    useMultiSend: boolean
+    useCombinedTellBinary: boolean
     /** in rotaiton mode, use this multiplier to change the amount we want to add*/
     rotationCountMultiply: number
     /** in roation mode use this value to change the amount of nodes to add, by adding this amount to the near final calculation*/
