@@ -37,9 +37,7 @@ export async function submitStandbyRefresh(publicKey: string): Promise<Result<vo
         } while(queriedNodesPKs.includes(node.publicKey));
         queriedNodesPKs.push(node.publicKey);
 
-        console.log('submitStandbyRefresh: sending standby refresh request to', node)
         await http.post(`${node.ip}:${node.port}/standby-refresh`, { publicKey })
-        console.log('submitStandbyRefresh: standby refresh request sent')
         return ok(void 0)
       } catch (e) {
         console.error(`Attempt ${attempts + 1} failed: ${e}`);
@@ -64,11 +62,6 @@ export interface StandbyRefreshRequestResponse {
 
 export function addStandbyRefresh(keepInStandbyRequest: StandbyRefreshRequest): StandbyRefreshRequestResponse {
   // validate keepInStandbyRequest
-  console.log('standbyNodes keys:')
-  console.log(getStandbyNodesInfoMap().keys())
-  console.log('keepInStandbyRequest')
-  console.log(keepInStandbyRequest)
-  console.log('result: ', getStandbyNodesInfoMap().has(keepInStandbyRequest.publicKey))
   if (!getStandbyNodesInfoMap().has(keepInStandbyRequest.publicKey)) {
     return {
       success: false,
