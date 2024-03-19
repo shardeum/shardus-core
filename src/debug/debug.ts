@@ -6,6 +6,7 @@ import Trie from 'trie-prefix-tree'
 import { isDebugModeMiddleware, isDebugModeMiddlewareMedium } from '../network/debugMiddleware'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 const tar = require('tar-fs')
+const fs = require('fs')
 
 interface Debug {
   baseDir: string
@@ -67,6 +68,32 @@ class Debug {
       res.set('content-type', 'application/gzip')
       archive.pipe(gzip).pipe(res)
     })
+    this.network.registerExternalGet('debug-logfile', isDebugModeMiddlewareMedium, (req, res) => {
+      const requestedFile = req.query.file
+      if (typeof requestedFile !== 'string' || !requestedFile) {
+        return res.send({ success: false, error: 'Invalid file parameter' })
+      }
+
+      const logsAbsolutePath = Object.keys(this.files).find((key) => this.files[key] === './logs')
+      if (!logsAbsolutePath) {
+        return res.send({ success: false, error: 'Logs directory not found' })
+      }
+
+      const filePath = path.join(logsAbsolutePath, requestedFile)
+      if (!filePath.startsWith(logsAbsolutePath)) {
+        return res.send({ success: false, error: 'File not found' })
+      }
+
+      res.set('Content-Disposition', `attachment; filename="${requestedFile}"`)
+      res.set('Content-Type', 'text/plain')
+
+      const fileStream = fs.createReadStream(filePath)
+      fileStream.on('error', (error) => {
+        return res.send({ success: false, error: 'Error reading the file' })
+      })
+      fileStream.pipe(res)
+    })
+
     this.network.registerExternalGet('debug-network-delay', isDebugModeMiddleware, (req, res) => {
       try {
         const delay = req.query.delay && typeof req.query.delay === "string" ? parseInt(req.query.delay) * 1000 : 120 * 1000
