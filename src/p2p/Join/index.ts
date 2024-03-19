@@ -237,9 +237,6 @@ export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
 }
 
 export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
-
-  console.log(`cycle: ${record.counter} join:updateRecord`)
-
   record.syncing = NodeList.syncingByIdOrder.length
   record.standbyAdd = []
   record.standbyRemove = []
@@ -534,23 +531,6 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
   const standbyMap = getStandbyNodesInfoMap()
 
-  /*
-  for (const refreshedPubKey of record.standbyRefresh) {
-    if (standbyMap.has(refreshedPubKey) === false) continue
-
-    const refreshedStandbyInfo = standbyMap.get(refreshedPubKey)
-    if (getLastCycleStandbyRefreshRequest(refreshedPubKey)) {
-      if (typeof getLastCycleStandbyRefreshRequest(refreshedPubKey)?.cycleNumber === 'number')
-        refreshedStandbyInfo.nodeInfo.refreshedCounter = getLastCycleStandbyRefreshRequest(refreshedPubKey)?.cycleNumber
-    } else {
-      // this will be needed when a syncing node just goes active and so lastCycleStandbyRefreshRequests
-      // is empty. record.counter - 1 is a generous estimate
-      refreshedStandbyInfo.nodeInfo.refreshedCounter = record.counter - 1
-    }
-  }
-  
-  resetLastCycleStandbyRefreshRequests()
-  */
   for (const refreshedPubKey of record.standbyRefresh) {
     if (standbyMap.has(refreshedPubKey) === false) continue
     const refreshedStandbyInfo = standbyMap.get(refreshedPubKey)
@@ -644,15 +624,11 @@ export function sendRequests(): void {
     }
   }
   if (queuedStandbyRefreshPubKeys?.length > 0) {
-    console.log('sending refresh for ', queuedStandbyRefreshPubKeys)
     for (const standbyRefreshPubKey of queuedStandbyRefreshPubKeys) {
       const standbyRefreshTx: P2P.JoinTypes.StandbyRefreshRequest = crypto.sign({
         publicKey: standbyRefreshPubKey,
         cycleNumber: CycleChain.newest.counter,
       })
-
-      console.log('pubkey', standbyRefreshPubKey)
-      console.log('standby refresh tx', standbyRefreshTx)
 
       const standbyRefreshResult = addStandbyRefresh(standbyRefreshTx)
       if (standbyRefreshResult.success === true) {
@@ -660,7 +636,6 @@ export function sendRequests(): void {
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sending standby-refresh gossip to network`)
         Comms.sendGossip('gossip-standby-refresh', standbyRefreshTx, '', null, NodeList.byIdOrder, true)
       } else {
-        console.log('standby-refresh result', standbyRefreshResult)
         nestedCountersInstance.countEvent('p2p', `join:sendRequests failed to add our own standby-refresh message`)
         /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequests failed to add our own standby-refresh message`)
       }
