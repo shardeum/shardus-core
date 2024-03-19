@@ -91,7 +91,6 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
   const signer = NodeList.byPubKey.get(signerPublicKey)
   if (!signer) {
     logging.warn(`lostArchiverUpGossip: Signer with public key ${signerPublicKey} is not known`)
-    return
   }
   const isOrig = signer.id === sender // Adjust this line based on your actual data structure
 
@@ -157,6 +156,14 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
   if (!payload) { logging.warn(`lostArchiverDownGossip: missing payload`); return }
   if (!sender) { logging.warn(`lostArchiverDownGossip: missing sender`); return }
   if (!tracker) { logging.warn(`lostArchiverDownGossip: missing tracker`); return }
+  // if (!payload) throw new Error(`lostArchiverDownGossip: missing payload`)
+  // if (!sender) throw new Error(`lostArchiverDownGossip: missing sender`)
+  // if (!tracker) throw new Error(`lostArchiverDownGossip: missing tracker`)
+  // const error = funcs.errorForArchiverDownMsg(payload)
+  // if (error) {
+  //   logging.warn(`lostArchiverDownGossip: invalid payload error: ${error}, payload: ${inspect(payload)}`)
+  //   return
+  // }
 
   // Validate payload structure and types
   let err = validateTypes(payload, {
@@ -184,16 +191,17 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
   const signer = NodeList.byPubKey.get(payload.sign.owner)
   if (!signer) {
     logging.warn('lostArchiverDownGossip: Got down message from unknown node')
-    return
   }
 
-  // Verify Sender as Original Signer
-  const isOrig = signer.id === sender
-  if (!isOrig) {
-    logging.warn('lostArchiverDownGossip: Sender is not the original signer')
-    return
-  }
+  // TODO:[] BUI - commmented out since sender will be gone so won't get the gossip, correct
+  // // Verify Sender as Original Signer
+  // const isOrig = signer.id === sender
+  // if (!isOrig) {
+  //   logging.warn('lostArchiverDownGossip: Sender is not the original signer')
+  //   return
+  // }
 
+  // TODO:[] BUI - double check this logic
   // Only accept original txs in quarter 1
   if (isOrig && currentQuarter > 1) {
     logging.warn(`lostArchiverDownGossip: Rejecting message as it's not Q1 and sender is original signer`)
