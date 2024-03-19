@@ -928,13 +928,13 @@ export function registerRoutes() {
     try {
       // Ignore gossip outside of Q1 and Q2
       if (![1, 2].includes(CycleCreator.currentQuarter)) {
-        if (logFlags.error) warn('joinarchiver: not in Q1 or Q2')
+        if (logFlags.error) warn('joinarchiver-reject: not in Q1 or Q2')
         return
       }
 
       // Check if payload/argument present
       if (!payload) {
-        if (logFlags.error) warn('joinarchiver: missing payload')
+        if (logFlags.error) warn('joinarchiver-reject: missing payload')
         return
       }
 
@@ -946,33 +946,31 @@ export function registerRoutes() {
         sign: 'o',
       })
       if (err) {
-        warn('joinarchiver: bad input ' + err)
+        warn('joinarchiver-reject: bad input ' + err)
         return
       }
 
       // Validate Payload.sign Structure
       err = validateTypes(payload.sign, { owner: 's', sig: 's' })
       if (err) {
-        warn('joinarchiver: bad input sign ' + err)
+        warn('joinarchiver-reject: bad input sign ' + err)
         return
       }
 
       // Check Signer Known
       const signer = NodeList.byPubKey.get(payload.sign.owner)
       if (!signer) {
-        warn('joinarchiver: Got join request from unknown node')
-        return
+        /* prettier-ignore */ if (logFlags.error) warn('joinarchiver-reject: Got join request from unknown node')
       }
 
       // Verify Sender as Original Signer
       const isOrig = signer.id === sender
       if (!isOrig) {
-        warn('joinarchiver: Sender is not the original signer')
+        warn('joinarchiver-reject: Sender is not the original signer')
         return
       }
 
-      // Check Quarter for Original Requests
-      // Assuming you only want to accept original requests in Q1
+      // Check Quarter for Original Requests and only want to accept original requests in Q1
       if (isOrig && CycleCreator.currentQuarter > 1) {
         warn('joinarchiver: Rejecting original request outside of Q1')
         return
@@ -980,7 +978,7 @@ export function registerRoutes() {
 
       // Do not forward gossip after quarter 2
       if (!isOrig && CycleCreator.currentQuarter > 2) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:gossip-active CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `joinarchiver-reject: CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
         return
       }
 
