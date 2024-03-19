@@ -940,7 +940,7 @@ export function registerRoutes() {
 
       // Validate Types
       let err = validateTypes(payload, {
-        nodeInfo: 'o', 
+        nodeInfo: 'o',
         requestType: 's',
         requestTimestamp: 'n',
         sign: 'o',
@@ -964,19 +964,25 @@ export function registerRoutes() {
         return
       }
 
-      // // Verify Sender as Original Signer
-      // const isOrig = signer.id === sender
-      // if (!isOrig) {
-      //   warn('joinarchiver: Sender is not the original signer')
-      //   return
-      // }
+      // Verify Sender as Original Signer
+      const isOrig = signer.id === sender
+      if (!isOrig) {
+        warn('joinarchiver: Sender is not the original signer')
+        return
+      }
 
-      // // Check Quarter for Original Requests
-      // // Assuming you only want to accept original requests in Q1
-      // if (isOrig && CycleCreator.currentQuarter > 1) {
-      //   warn('joinarchiver: Rejecting original request outside of Q1')
-      //   return
-      // }
+      // Check Quarter for Original Requests
+      // Assuming you only want to accept original requests in Q1
+      if (isOrig && CycleCreator.currentQuarter > 1) {
+        warn('joinarchiver: Rejecting original request outside of Q1')
+        return
+      }
+
+      // Do not forward gossip after quarter 2
+      if (!isOrig && CycleCreator.currentQuarter > 2) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:gossip-active CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
+        return
+      }
 
       if (logFlags.console) console.log('Join request gossip received:', payload)
       const accepted = await addArchiverJoinRequest(payload, tracker, false)
