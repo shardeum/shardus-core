@@ -2149,7 +2149,7 @@ class TransactionConsenus {
           return
         }
         const ourRankIndex = Array.from(queueEntry.eligibleNodeIdsToVote).indexOf(ourNodeId)
-        let delayBeforeVote = ourRankIndex * 2
+        let delayBeforeVote = ourRankIndex * 10 // 10ms x rank index
 
         if (delayBeforeVote > 500) {
           delayBeforeVote = 500

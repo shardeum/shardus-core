@@ -3326,22 +3326,11 @@ class TransactionQueue {
             for (const index of indicies) {
               const targetNode = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
               //only send data to the execution group
-              if (queueEntry.executionGroupMap.has(remoteHomeNode.node.id) === false) {
+              if (queueEntry.executionGroupMap.has(targetNode.id) === false) {
                 continue
               }
 
               if (targetNode != null && targetNode.id !== ourNodeData.node.id) {
-                // const indexOfRemoteNodeInLocalConsensusGroup =
-                //   localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === targetNode.id)
-                // if (indexOfRemoteNodeInLocalConsensusGroup !== -1) {
-                //   // skip data share to nodes that are part of key's consensus group
-                //   nestedCountersInstance.countEvent(
-                //     'tellCorrespondingNodes',
-                //     'skipDataShareToExeNodesThatArePartOfKeyConsensusGroup' +
-                //       `index: ${indexOfRemoteNodeInLocalConsensusGroup}`
-                //   )
-                //   continue
-                // }
                 nodesToSendTo[targetNode.id] = targetNode
                 consensusNodeIds.push(targetNode.id)
               }
@@ -3353,17 +3342,6 @@ class TransactionQueue {
                 continue
               }
               if (targetNode != null && targetNode.id !== ourNodeData.node.id) {
-                // const indexOfRemoteNodeInLocalConsensusGroup =
-                //   localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === targetNode.id)
-                // if (indexOfRemoteNodeInLocalConsensusGroup !== -1) {
-                //   // skip data share to nodes that are part of key's consensus group
-                //   nestedCountersInstance.countEvent(
-                //     'tellCorrespondingNodes',
-                //     'skipDataShareToExeNodesThatArePartOfKeyConsensusGroup' +
-                //       `index: ${indexOfRemoteNodeInLocalConsensusGroup}`
-                //   )
-                //   continue
-                // }
                 nodesToSendTo[targetNode.id] = targetNode
                 edgeNodeIds.push(targetNode.id)
               }
@@ -3376,15 +3354,6 @@ class TransactionQueue {
                 continue
               }
               if (targetNode != null && targetNode.id !== ourNodeData.node.id) {
-                // const isRemoteNodePartOfLocalConsensusGroup =
-                //   localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === targetNode.id)
-                // if (isRemoteNodePartOfLocalConsensusGroup) {
-                //   // skip data share to nodes that are part of key's consensus group
-                //   nestedCountersInstance.countEvent(
-                //     'tellCorrespondingNodes',
-                //     'skipDataShareToExeNodesThatArePartOfKeyConsensusGroup'
-                //   )
-                // }
                 nodesToSendTo[targetNode.id] = targetNode
                 //edgeNodeIds.push(targetNode.id)
               }
@@ -3936,6 +3905,7 @@ class TransactionQueue {
           }
           if (age > timeM) {
             /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld2', `${utils.makeShortHash(txQueueEntry.acceptedTx.txId)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
+            nestedCountersInstance.countEvent('processing', 'txExpired1 > M. waitForReceiptOnly')
             txQueueEntry.waitForReceiptOnly = true
             this.updateTxState(txQueueEntry, 'consensing')
           }
