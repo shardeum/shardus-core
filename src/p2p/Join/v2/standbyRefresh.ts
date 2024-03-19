@@ -60,9 +60,9 @@ export interface StandbyRefreshRequestResponse {
   fatal: boolean
 }
 
-export function addStandbyRefresh(keepInStandbyRequest: StandbyRefreshRequest): StandbyRefreshRequestResponse {
+export function addStandbyRefresh(standbyRefreshRequest: StandbyRefreshRequest): StandbyRefreshRequestResponse {
   // validate keepInStandbyRequest
-  if (!getStandbyNodesInfoMap().has(keepInStandbyRequest.publicKey)) {
+  if (!getStandbyNodesInfoMap().has(standbyRefreshRequest.publicKey)) {
     return {
       success: false,
       reason: 'Node not found in standby list',
@@ -72,7 +72,7 @@ export function addStandbyRefresh(keepInStandbyRequest: StandbyRefreshRequest): 
 
   // cycle number check
   const cycleNumber = CycleChain.getNewest().counter
-  if (cycleNumber !== keepInStandbyRequest.cycleNumber) {
+  if (cycleNumber !== standbyRefreshRequest.cycleNumber) {
     return {
       success: false,
       reason: 'cycle number in StandbyRefreshRequest request does not match current cycle number',
@@ -81,7 +81,7 @@ export function addStandbyRefresh(keepInStandbyRequest: StandbyRefreshRequest): 
   }
 
   //add it to TXs
-  if (newStandbyRefreshRequests.has(keepInStandbyRequest.publicKey) === true) {
+  if (newStandbyRefreshRequests.has(standbyRefreshRequest.publicKey) === true) {
     return {
       success: false,
       reason: 'Node already in standby refresh list',
@@ -89,7 +89,7 @@ export function addStandbyRefresh(keepInStandbyRequest: StandbyRefreshRequest): 
     }
   }
 
-  if (!crypto.verify(keepInStandbyRequest as unknown as SignedObject, keepInStandbyRequest.sign.owner)) {
+  if (!crypto.verify(standbyRefreshRequest as unknown as SignedObject, standbyRefreshRequest.sign.owner)) {
     return {
       success: false,
       reason: 'verification of syncStarted request failed',
@@ -97,11 +97,11 @@ export function addStandbyRefresh(keepInStandbyRequest: StandbyRefreshRequest): 
     }
   }
 
-  newStandbyRefreshRequests.set(keepInStandbyRequest.publicKey, keepInStandbyRequest)
+  newStandbyRefreshRequests.set(standbyRefreshRequest.publicKey, standbyRefreshRequest)
 
   return {
     success: true,
-    reason: 'keepInStandbyRequest passed all checks and verification',
+    reason: 'standbyRefreshRequest passed all checks and verification',
     fatal: false,
   }
 }
