@@ -404,8 +404,8 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
 
       // Further validation for the 'sign' object structure if needed
       err = utils.validateTypes(payload.sign, {
-        owner: 's', 
-        sig: 's', 
+        owner: 's',
+        sig: 's',
       })
 
       if (err) {
@@ -422,6 +422,12 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
       // Only accept original txs in quarter 1
       if (isOrig && CycleCreator.currentQuarter > 1) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `gossip-join-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
+        return
+      }
+
+      // Do not forward gossip after quarter 2
+      if (!isOrig && CycleCreator.currentQuarter > 2) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `gossip-join-reject: CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
         return
       }
 
@@ -451,32 +457,32 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
     return
   }
 
-    // Validate payload structure and types
-    let err = utils.validateTypes(payload, {
-      nodeInfo: 'o', 
-      selectionNum: 's', 
-      cycleMarker: 's', 
-      proofOfWork: 's', 
-      version: 's', 
-      sign: 'o', 
-      appJoinData: '?', 
-    })
-  
-    if (err) {
-      /* prettier-ignore */ if (logFlags.error) warn(`join-gossip-reject: bad input ${err}`)
-      return
-    }
-  
-    // Further validation for the 'sign' object structure
-    err = utils.validateTypes(payload.sign, {
-      owner: 's', 
-      sig: 's', 
-    })
-  
-    if (err) {
-      /* prettier-ignore */ if (logFlags.error) warn(`join-gossip-reject: bad input sign ${err}`)
-      return
-    }
+  // Validate payload structure and types
+  let err = utils.validateTypes(payload, {
+    nodeInfo: 'o',
+    selectionNum: 's',
+    cycleMarker: 's',
+    proofOfWork: 's',
+    version: 's',
+    sign: 'o',
+    appJoinData: '?',
+  })
+
+  if (err) {
+    /* prettier-ignore */ if (logFlags.error) warn(`join-gossip-reject: bad input ${err}`)
+    return
+  }
+
+  // Further validation for the 'sign' object structure
+  err = utils.validateTypes(payload.sign, {
+    owner: 's',
+    sig: 's',
+  })
+
+  if (err) {
+    /* prettier-ignore */ if (logFlags.error) warn(`join-gossip-reject: bad input sign ${err}`)
+    return
+  }
 
   const signer = NodeList.byPubKey.get(payload.sign.owner)
   if (!signer) {
@@ -488,6 +494,12 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
   // Only accept original txs in quarter 1
   if (isOrig && CycleCreator.currentQuarter > 1) {
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-gossip-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
+    return
+  }
+
+  // Do not forward gossip after quarter 2
+  if (!isOrig && CycleCreator.currentQuarter > 2) {
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-gossip-reject: CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
     return
   }
 
@@ -551,8 +563,8 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeLi
 
   // Further validation for the 'sign' object structure
   err = utils.validateTypes(payload.sign, {
-    owner: 's', 
-    sig: 's', 
+    owner: 's',
+    sig: 's',
   })
 
   if (err) {
@@ -571,6 +583,12 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeLi
   // Only accept original txs in quarter 1
   if (isOrig && CycleCreator.currentQuarter > 1) {
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `gossip-unjoin-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
+    return
+  }
+
+  // Do not forward gossip after quarter 2
+  if (!isOrig && CycleCreator.currentQuarter > 2) {
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `gossip-unjoin-reject: CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
     return
   }
 
@@ -610,11 +628,18 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<SyncStarted, P2P.NodeLi
       return
     }
 
+    // Do not forward gossip after quarter 2
+    if (!isOrig && CycleCreator.currentQuarter > 2) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `sync-started-reject: CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
+      return
+    }
+
     //  Validate of payload is done in addSyncStarted
     const addSyncStartedResult = addSyncStarted(payload)
-    nestedCountersInstance.countEvent('p2p', `sync-started validation success: ${addSyncStartedResult.success}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `sync-started validation success: ${addSyncStartedResult.success}`)
     /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-started validation success: ${addSyncStartedResult.success}`)
-    if (!addSyncStartedResult.success) nestedCountersInstance.countEvent('p2p', `sync-started failure reason: ${addSyncStartedResult.reason}`)
+    /* prettier-ignore */ if (!addSyncStartedResult.success)
+nestedCountersInstance.countEvent('p2p', `sync-started failure reason: ${addSyncStartedResult.reason}`)
     /* prettier-ignore */ if (logFlags.verbose && !addSyncStartedResult.success) console.log(`sync-started validation reason: ${addSyncStartedResult.reason}`)
     if (addSyncStartedResult.success)
       Comms.sendGossip('gossip-sync-started', payload, tracker, sender, NodeList.byIdOrder, false)
@@ -765,11 +790,16 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.KeepInStand
       return
     }
 
+    // Do not forward gossip after quarter 2
+    if (!isOrig && CycleCreator.currentQuarter > 2) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `standby-refresh-reject: CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
+      return
+    }
+
     const added = addStandbyRefresh(payload)
-    nestedCountersInstance.countEvent('p2p', `standby-refresh validation success: ${added.success}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `standby-refresh validation success: ${added.success}`)
     /* prettier-ignore */ if (logFlags.verbose) console.log(`standby-refresh validation success: ${added.success}`)
-    if (!added.success)
-      nestedCountersInstance.countEvent('p2p', `standby-refresh failure reason: ${added.reason}`)
+    /* prettier-ignore */ if (!added.success) nestedCountersInstance.countEvent('p2p', `standby-refresh failure reason: ${added.reason}`)
     /* prettier-ignore */ if (logFlags.verbose && !added.success) console.log(`standby-refresh validation reason: ${added.reason}`)
     if (added.success)
       Comms.sendGossip('gossip-standby-refresh', payload, tracker, sender, NodeList.byIdOrder, false)
