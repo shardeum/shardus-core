@@ -652,6 +652,9 @@ export function sendRequests(): void {
         cycleNumber: CycleChain.newest.counter,
       })
 
+      console.log('pubkey', standbyRefreshPubKey)
+      console.log('standby refresh tx', standbyRefreshTx)
+
       const standbyRefreshResult = addStandbyRefresh(standbyRefreshTx)
       if (standbyRefreshResult.success === true) {
         nestedCountersInstance.countEvent('p2p', `sending standby-refresh gossip to network`)

@@ -64,10 +64,10 @@ export interface StandbyRefreshRequestResponse {
 
 export function addStandbyRefresh(keepInStandbyRequest: StandbyRefreshRequest): StandbyRefreshRequestResponse {
   // validate keepInStandbyRequest
-  console.log('standbyNodes')
+  console.log('standbyNodes keys:')
   console.log(getStandbyNodesInfoMap().keys())
-  console.log('keepInStandbyRequest.publicKey')
-  console.log(keepInStandbyRequest.publicKey)
+  console.log('keepInStandbyRequest')
+  console.log(keepInStandbyRequest)
   console.log('result: ', getStandbyNodesInfoMap().has(keepInStandbyRequest.publicKey))
   if (!getStandbyNodesInfoMap().has(keepInStandbyRequest.publicKey)) {
     return {
