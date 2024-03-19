@@ -254,7 +254,6 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
       res.status(400).send()
     }
 
-    console.log('before queue')
     queueStandbyRefreshRequest(standbyRefreshPubKey)
     return res.status(200).send()
   },

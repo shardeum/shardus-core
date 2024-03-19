@@ -185,8 +185,6 @@ export function startupV2(): Promise<boolean> {
         // Should fire after being accepted into the network
         emitter.emit('joined', id, publicKey)
 
-        console.log('node id: ', id)
-
         nestedCountersInstance.countEvent('p2p', 'joined')
         // Sync cycle chain from network
         await syncCycleChain(id)
@@ -344,7 +342,6 @@ export function startupV2(): Promise<boolean> {
         // Note that attemptJoining isn't just to get on the standby list, but also
         // we will be checking above to see when our node is selected to go active
         if (resp?.isOnStandbyList === true) {
-          console.log(`cycle number: ${latestCycle.counter}`)
           //nestedCountersInstance.countEvent('p2p', 'startupV2: on standby list')
 
           if (state !== P2P.P2PTypes.NodeStatus.STANDBY) {
@@ -362,8 +359,6 @@ export function startupV2(): Promise<boolean> {
               submitStandbyRefresh(publicKey)
 
               nestedCountersInstance.countEvent('p2p', `submitted StandbyRefreshRequest request - first time`)
-              console.log(`submitted StandbyRefreshRequest request - first time`)
-              console.log(`publickey: ${publicKey}`)
               /* prettier-ignore */ if (logFlags.verbose) console.log(`submitted StandbyRefreshRequest request - first time`)
 
               cyclesElapsedSinceRefresh = 0
