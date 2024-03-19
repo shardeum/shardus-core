@@ -138,7 +138,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     lostArchiverInvestigateBinary: true,
     signAppDataBinary: true,
     sendCachedAppDataBinary: true,
-    syncTrieHashesBinary: false,
+    syncTrieHashesBinary: true, //should be ok with latest fixes  SHM-4280
     getTrieHashesBinary: true,
     getTrieAccountHashesBinary: true,
     getAccountDataBinary: true,
@@ -149,14 +149,14 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     getAccountQueueCountBinary: true,
     getAccountDataWithQueueHintsBinary: true,
     getTxTimestampBinary: true,
-    getAppliedVoteBinary: false,
+    getAppliedVoteBinary: false,   //disabled due to SHM-4286
     getConfirmOrChallengeBinary: true,
     spreadAppliedVoteHashBinary: true,
     spreadTxToGroupSyncingBinary: true,
     broadcastStateBinary: true,
-    broadcastFinalStateBinary: false,
+    broadcastFinalStateBinary: true, //should be ok with latest fixes SHM-4282
     requestTxAndStateBinary: true,
-    requestStateForTxPostBinary: true,
+    requestStateForTxPostBinary: false, //disabled because unhandled rejection SHM-4299
     requestStateForTxBinary: true,
     requestReceiptForTxBinary: true,
   },
