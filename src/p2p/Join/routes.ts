@@ -248,9 +248,9 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
       warn('/standby-refresh bad req ' + err)
       res.status(400).send()
     }
-    err = utils.validateTypes(standbyRefreshPubKey, { publicKey: 's' })
+    err = typeof standbyRefreshPubKey === 'string' ? '' : 'standbyRefreshPubKey is not a string'
     if (err) {
-      warn('/standby-refresh bad standby refresh param ' + err)
+      warn('/standby-refresh bad standby refresh public key ' + err)
       res.status(400).send()
     }
 
