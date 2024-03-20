@@ -290,7 +290,9 @@ class TransactionRepair {
           eligibleNodeIdMap[receivedReceipt.confirmOrChallenge.nodeId] = true
           eligibleNodeIdMap[receivedReceipt.appliedVote.node_id] = true
         }
-        const eligibleNodeIds = new Set(Object.keys(eligibleNodeIdMap))
+        const eligibleNodeIdsArray = Object.keys(eligibleNodeIdMap)
+        utils.shuffleArray(eligibleNodeIdsArray)
+        const eligibleNodeIds = new Set(eligibleNodeIdsArray)
         this.mainLogger.debug(`repairToMatchReceipt: ${txLogID} eligibleNodeIds ${eligibleNodeIds.size} && eligibleNodeIdMap ${Object.keys(eligibleNodeIdMap).length}`)
 
         nestedCountersInstance.countEvent('repair1', `eligibleNodeIds: ${eligibleNodeIds.size}`)
