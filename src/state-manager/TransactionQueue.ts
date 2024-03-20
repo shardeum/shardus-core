@@ -289,6 +289,7 @@ class TransactionQueue {
 
           // make sure we have it
           const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+          //It is okay to ignore this transaction if the txId is not found in the queue.
           if (queueEntry == null) {
             //In the past we would enqueue the TX, expecially if syncing but that has been removed.
             //The normal mechanism of sharing TXs is good enough.
@@ -336,6 +337,7 @@ class TransactionQueue {
           }
           const [vTxId, vStateSize, vStateAddress] = verificationDataParts
           const queueEntry = this.getQueueEntrySafe(vTxId)
+          //It is okay to ignore this transaction if the txId is not found in the queue.
           if (queueEntry == null) {
             /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`${route} cant find queueEntry for: ${utils.makeShortHash(vTxId)}`)
             return errorHandler(RequestErrorEnum.InvalidVerificationData, {
@@ -404,9 +406,11 @@ class TransactionQueue {
         try {
           // make sure we have it
           const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+          //It is okay to ignore this transaction if the txId is not found in the queue.
           if (queueEntry == null) {
             //In the past we would enqueue the TX, expecially if syncing but that has been removed.
             //The normal mechanism of sharing TXs is good enough.
+            nestedCountersInstance.countEvent('processing', 'broadcast_finalstate_noQueueEntry')
             return
           }
           if (logFlags.debug)
@@ -462,6 +466,7 @@ class TransactionQueue {
           }
           const [vTxId, vStateSize] = verificationDataParts
           const queueEntry = this.getQueueEntrySafe(vTxId)
+          //It is okay to ignore this transaction if the txId is not found in the queue.
           if (queueEntry == null) {
             /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`${route} cant find queueEntry for: ${utils.makeShortHash(vTxId)}`)
             return errorHandler(RequestErrorEnum.InvalidVerificationData, {
@@ -5368,7 +5373,7 @@ class TransactionQueue {
                     this.updateTxState(queueEntry, 'fail')
                   }
                   this.removeFromQueue(queueEntry, currentIndex)
-                } 
+                }
               }
             }
           }
