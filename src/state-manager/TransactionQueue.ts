@@ -3857,12 +3857,12 @@ class TransactionQueue {
       const localRestartCounter = this.queueRestartCounter
 
       const timeM = this.stateManager.queueSitTime
-      const timeM2 = timeM * 2 // 12s
-      const timeM2_5 = timeM * 2.25 // 13.5s
-      const timeM3 = timeM * 2.5 // 15s
-      // const timeM2 = timeM * 4 // 24s
-      // const timeM2_5 = timeM * 5 // 30s
-      // const timeM3 = timeM * 6 // 36s
+      // const timeM2 = timeM * 2 // 12s
+      // const timeM2_5 = timeM * 2.25 // 13.5s
+      // const timeM3 = timeM * 2.5 // 15s
+      const timeM2 = timeM * 2
+      const timeM2_5 = timeM * 2.5
+      const timeM3 = timeM * 3
       let currentTime = shardusGetTime()
 
       const app = this.app
