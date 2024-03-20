@@ -23,7 +23,7 @@ export const serializeGetAccountDataByHashesResp = (
   root = false
 ): void => {
   if (root) {
-    stream.writeUInt32(TypeIdentifierEnum.cGetAccountDataByHashesResp)
+    stream.writeUInt16(TypeIdentifierEnum.cGetAccountDataByHashesResp)
   }
 
   stream.writeUInt8(cGetAccountDataByHashesRespVersion)
@@ -49,7 +49,7 @@ export const deserializeGetAccountDataByHashesResp = (
   const version = stream.readUInt8()
   if (version !== cGetAccountDataByHashesRespVersion) {
     throw new Error(
-      `GetAccountDataByHashesRespDeserializer expected version cGetAccountDataByHashesRespVersion, got ${version}`
+      `GetAccountDataByHashesRespDeserializer expected version ${cGetAccountDataByHashesRespVersion}, got ${version}`
     )
   }
   const result: GetAccountDataByHashesResp = {

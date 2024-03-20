@@ -19,7 +19,7 @@ export const serializeGetAccountDataByHashesReq = (
   root = false
 ): void => {
   if (root) {
-    stream.writeUInt32(TypeIdentifierEnum.cGetAccountDataByHashesReq)
+    stream.writeUInt16(TypeIdentifierEnum.cGetAccountDataByHashesReq)
   }
 
   stream.writeUInt8(cGetAccountDataByHashesReqVersion)
@@ -39,7 +39,7 @@ export const deserializeGetAccountDataByHashesReq = (
   const version = stream.readUInt8()
   if (version !== cGetAccountDataByHashesReqVersion) {
     throw new Error(
-      `GetAccountDataByHashesReqDeserializer expected version cGetAccountDataByHashesReqVersion, got ${version}`
+      `GetAccountDataByHashesReqDeserializer expected version ${cGetAccountDataByHashesReqVersion}, got ${version}`
     )
   }
   const cycleNumber = Number(stream.readBigUInt64())
