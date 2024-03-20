@@ -152,9 +152,9 @@ class CachedAppDataManager {
       },
     }
 
-    this.p2p.registerInternal(
-      InternalRouteEnum.binary_send_cachedAppData,
-      send_cacheAppDataBinarySerializedHandler
+    this.p2p.registerInternalBinary(
+      send_cacheAppDataBinarySerializedHandler.name,
+      send_cacheAppDataBinarySerializedHandler.handler
     )
 
     this.p2p.registerInternal(
