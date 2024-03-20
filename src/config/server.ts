@@ -243,6 +243,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     checkPrecrackStatus: true,
     noVoteSeenExpirationTime: 10000,
     voteSeenExpirationTime: 20000,
+    confirmationSeenExpirationTime: 30000,
     voterPercentage: 0.1
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },

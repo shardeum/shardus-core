@@ -589,6 +589,12 @@ class TransactionRepair {
                     }
                   }
 
+                  if (data.stateId !== requestObject.accountHash) {
+                    nestedCountersInstance.countEvent('repair1', 'skip account repair 3, stateId mismatch')
+                    /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt: ${txLogID} data.stateId !== requestObject.accountHash  tx:${txLogID}  acc:${shortKey} data.stateId:${data.stateId}, requestObj.accountHash: ${requestObject.accountHash}`)
+                    continue
+                  }
+
                   //Commit the data
                   const dataToSet = [data]
                   const failedHashes = await this.stateManager.checkAndSetAccountData(

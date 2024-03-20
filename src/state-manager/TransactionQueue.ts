@@ -4237,19 +4237,25 @@ class TransactionQueue {
               }
             }
           }
+          const hasSeenVote = queueEntry.receivedBestVote != null
+          const hasSeenConfirmation = queueEntry.receivedBestConfirmation != null
 
           // seen vote but we are past timeM3 + voteSeenExpirationTime
-          if (txAge > timeM3 + configContext.stateManager.voteSeenExpirationTime && queueEntry.receivedBestVote) {
-            const appliedReceipt2 = this.stateManager.getReceipt2(queueEntry)
-            this.mainLogger.error(`txAge > timeM3 + voteSeenExpirationTime general case has vote but fail to generate receipt`)
+          if (txAge > timeM3 + configContext.stateManager.confirmationSeenExpirationTime && hasSeenVote && hasSeenConfirmation) {
+            this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + confirmSeenExpirationTime general case has' +
+              ' vote and confirmation but fail' +
+              ' to' +
+              ' commit the tx')
+            continue
+          } else if (txAge > timeM3 + configContext.stateManager.voteSeenExpirationTime && hasSeenVote && !hasSeenConfirmation) {
+            this.mainLogger.error(`${queueEntry.logID} txAge > timeM3 + voteSeenExpirationTime general case has vote but fail to generate receipt`)
             this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + voteSeenExpirationTime general case has vote but fail' +
               ' to' +
-              ' generate' +
-              ' receipt')
+              ' commit the tx')
             continue
-          } else if (txAge > timeM3 + configContext.stateManager.noVoteSeenExpirationTime && queueEntry.receivedBestVote == null) {
+          } else if (txAge > timeM3 + configContext.stateManager.noVoteSeenExpirationTime && !hasSeenVote) {
             // seen no vote but past timeM3 + noVoteSeenExpirationTime
-            this.mainLogger.error(`txAge > timeM3 + noVoteSeenExpirationTime general case. no vote seen`)
+            this.mainLogger.error(`${queueEntry.logID} txAge > timeM3 + noVoteSeenExpirationTime general case. no vote seen`)
             this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + noVoteSeenExpirationTime general case. no vote seen')
             continue
           }
@@ -4792,6 +4798,10 @@ class TransactionQueue {
                 }
                 const isReceiptMatchPreApply =  this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, result)
 
+                if (logFlags.debug || this.stateManager.consensusLog) {
+                  this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isReceiptMatchPreApply : ${queueEntry.logID} ${isReceiptMatchPreApply}`)
+                }
+
                 if (isReceiptMatchPreApply && queueEntry.isInExecutionHome) {
                   nestedCountersInstance.countEvent('consensus', 'hasAppliedReceiptMatchingPreApply: true')
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
@@ -4853,7 +4863,7 @@ class TransactionQueue {
                   }
                   //continue
                 } else {
-                  nestedCountersInstance.countEvent('consensus', 'hasAppliedReceiptMatchingPreApply: false')
+                  nestedCountersInstance.countEvent('consensus', `hasAppliedReceiptMatchingPreApply: false, isInExecutionHome: ${queueEntry.isInExecutionHome}`)
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                   didNotMatchReceipt = true
                   queueEntry.appliedReceiptForRepair = result
@@ -5092,7 +5102,7 @@ class TransactionQueue {
                     this.updateTxState(queueEntry, 'pass')
                   } else {
                     /* prettier-ignore */
-                    if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_fail : ${queueEntry.logID} no receivedAppliedRecipt or recievedAppliedReceipt2`);
+                    if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_fail : ${queueEntry.logID} no receivedAppliedRecipt or recievedAppliedReceipt2. appliedReceipt2: ${utils.stringifyReduce(queueEntry.appliedReceipt2)}`);
                     this.updateTxState(queueEntry, 'fail')
                   }
                   this.removeFromQueue(queueEntry, currentIndex)
@@ -5100,7 +5110,7 @@ class TransactionQueue {
                   if (failed) nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData failed')
                   if (incomplete && missingAccounts.length > 0) {
                     nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData incomplete')
-                    // /* prettier-ignore */ if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData incomplete : ${queueEntry.logID}, waiting queueEntry.debug.waitingOn`)
+                    // /* prettier-ignore */ if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData incomplete : ${queueEntry.logID}, waiting ${queueEntry.debug.waitingOn}`)
 
                     // const txAge = shardusGetTime() - queueEntry.acceptedTx.timestamp
                     // if (txAge > 2 * timeM3 && !queueEntry.queryingFinalData) {
@@ -5404,7 +5414,7 @@ class TransactionQueue {
     //If so, then just go into async receipt repair mode for the TX AFTER it has been expired and removed from the queue
     if (queueEntry.appliedReceiptFinal2 != null) {
       const startRepair = queueEntry.repairStarted === false
-      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`setTXExpired. start repair:${startRepair}. update ${queueEntry.logID}`)
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`setTXExpired. ${queueEntry.logID} start repair:${startRepair}. update `)
       if (startRepair) {
         nestedCountersInstance.countEvent('repair1', 'setTXExpired: start repair')
         queueEntry.appliedReceiptForRepair2 = queueEntry.appliedReceiptFinal2
