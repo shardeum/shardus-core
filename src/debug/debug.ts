@@ -74,17 +74,19 @@ class Debug {
         return res.send({ success: false, error: 'Invalid file parameter' })
       }
 
+      const normalizedFile = path.normalize(requestedFile).replace(/^(\.\.[/\\])+/, '')
+
       const logsAbsolutePath = Object.keys(this.files).find((key) => this.files[key] === './logs')
       if (!logsAbsolutePath) {
         return res.send({ success: false, error: 'Logs directory not found' })
       }
 
-      const filePath = path.join(logsAbsolutePath, requestedFile)
+      const filePath = path.join(logsAbsolutePath, normalizedFile)
       if (!filePath.startsWith(logsAbsolutePath)) {
         return res.send({ success: false, error: 'File not found' })
       }
 
-      res.set('Content-Disposition', `attachment; filename="${requestedFile}"`)
+      res.set('Content-Disposition', `attachment; filename="${path.basename(normalizedFile)}"`)
       res.set('Content-Type', 'text/plain')
 
       const fileStream = fs.createReadStream(filePath)
@@ -93,7 +95,6 @@ class Debug {
       })
       fileStream.pipe(res)
     })
-
     this.network.registerExternalGet('debug-network-delay', isDebugModeMiddleware, (req, res) => {
       try {
         const delay = req.query.delay && typeof req.query.delay === "string" ? parseInt(req.query.delay) * 1000 : 120 * 1000
