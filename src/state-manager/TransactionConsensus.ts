@@ -316,10 +316,11 @@ class TransactionConsenus {
             queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
               txId,
               'get_confirm_or_challenge'
-            )
+              ) 
           }
 
           if (queueEntry == null) {
+            /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug('get_confirm_or_challenge: queueEntry not found in getQueueEntrySafe or getQueueEntryArchived for txId: ', txId)
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no queue entry for ${payload.txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txId)]}`)
             return
           }
