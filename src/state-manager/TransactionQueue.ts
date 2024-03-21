@@ -765,7 +765,7 @@ class TransactionQueue {
             result = { success: false, reason: 'Invalid Signature.' }
           }
         }
-        res.json(result)
+        res.json(JSON.parse(utils.cryptoStringify(result)))
       } catch (e) {
         console.log('Error caught in /get-tx-receipt: ', e)
         res.json((result = { success: false, reason: e }))
@@ -5701,6 +5701,7 @@ class TransactionQueue {
     // const txResultFullHash = this.crypto.hash(obj)
     // const txIdShort = utils.short(txHash)
     // const txResult = utils.short(txResultFullHash)
+    if (queueEntry.preApplyTXResult == null) return {} as ArchiverReceipt
 
     const accountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
     const beforeAccountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
