@@ -675,18 +675,16 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
       return
     }
 
-    // Further validation for the 'sign' object structure if present
-    if (payload.sign) {
-      err = utils.validateTypes(payload.sign, {
-        owner: 's',
-        sig: 's',
-      })
+    err = utils.validateTypes(payload.sign, {
+      owner: 's',
+      sig: 's',
+    })
 
-      if (err) {
-        /* prettier-ignore */ if (logFlags.error) warn(`gossipSyncFinishedRoute: bad input sign ${err}`)
-        return
-      }
+    if (err) {
+      /* prettier-ignore */ if (logFlags.error) warn(`gossipSyncFinishedRoute: bad input sign ${err}`)
+      return
     }
+
 
     const signer = NodeList.byPubKey.get(payload.sign.owner)
     if (!signer) {
@@ -751,18 +749,16 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.KeepInStand
       return
     }
 
-    // Further validation for the 'sign' object structure if present
-    if (payload.sign) {
-      err = utils.validateTypes(payload.sign, {
-        owner: 's',
-        sig: 's',
-      })
+    err = utils.validateTypes(payload.sign, {
+      owner: 's',
+      sig: 's',
+    })
 
-      if (err) {
-        /* prettier-ignore */ if (logFlags.error) warn(`gossipStandbyRefresh: bad input sign ${err}`)
-        return
-      }
+    if (err) {
+      /* prettier-ignore */ if (logFlags.error) warn(`gossipStandbyRefresh: bad input sign ${err}`)
+      return
     }
+    
 
     // TODO: [] BUI - commented out since the signer isn't part of network and wouldn't be found on the NodeList and wouldn't be gossiping to standby nodes, correct?
     // also sig validation is done in addStandbyRefresh
