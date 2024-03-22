@@ -760,20 +760,19 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.KeepInStand
     }
     
 
-    // TODO: [] BUI - commented out since the signer isn't part of network and wouldn't be found on the NodeList and wouldn't be gossiping to standby nodes, correct?
-    // also sig validation is done in addStandbyRefresh
-    // const signer = NodeList.byPubKey.get(payload.sign.owner)
-    // if (!signer) {
-    //   /* prettier-ignore */ if (logFlags.error) warn('standby-refresh-reject: Got standby-refresh from unknown node')
-    // }
+    // Verify Sender as Original Signer
+    const signer = NodeList.byPubKey.get(payload.sign.owner)
+    if (!signer) {
+      /* prettier-ignore */ if (logFlags.error) warn('standby-refresh-reject: Got standby-refresh from unknown node')
+    }
 
-    // const isOrig = signer.id === sender
+    const isOrig = signer.id === sender
 
-    // // Only accept original txs in quarter 1
-    // if (isOrig && CycleCreator.currentQuarter > 1) {
-    //   /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `standby-refresh-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
-    //   return
-    // }
+    // Only accept original txs in quarter 1
+    if (isOrig && CycleCreator.currentQuarter > 1) {
+      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `standby-refresh-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
+      return
+    }
 
     const added = addStandbyRefresh(payload)
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `standby-refresh validation success: ${added.success}`)
