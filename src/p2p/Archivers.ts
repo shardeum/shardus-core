@@ -975,13 +975,6 @@ export function registerRoutes() {
         warn('joinarchiver: Rejecting original request outside of Q1')
         return
       }
-
-      // Do not forward gossip after quarter 2
-      if (!isOrig && CycleCreator.currentQuarter > 2) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `joinarchiver-reject: CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
-        return
-      }
-
       if (logFlags.console) console.log('Join request gossip received:', payload)
       const accepted = await addArchiverJoinRequest(payload, tracker, false)
       if (logFlags.console) {

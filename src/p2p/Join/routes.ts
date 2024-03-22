@@ -419,12 +419,6 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
         return
       }
 
-      // Do not forward gossip after quarter 2
-      if (!isOrig && CycleCreator.currentQuarter > 2) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `gossip-join-reject: CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
-        return
-      }
-
       //  Validate of payload is done in addJoinRequest
       if (addJoinRequest(payload).success)
         Comms.sendGossip('gossip-join', payload, tracker, sender, NodeList.byIdOrder, false)
@@ -579,12 +573,6 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeLi
     return
   }
 
-  // Do not forward gossip after quarter 2
-  if (!isOrig && CycleCreator.currentQuarter > 2) {
-    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `gossip-unjoin-reject: CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
-    return
-  }
-
   const processResult = processNewUnjoinRequest(payload)
   if (processResult.isErr()) {
     warn(`gossip-unjoin failed to process unjoin request: ${processResult.error}`)
@@ -709,12 +697,6 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
       return
     }
 
-    // Do not forward gossip after quarter 2
-    if (!isOrig && CycleCreator.currentQuarter > 2) {
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `gossipSyncFinished rejected: CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
-      return
-    }
-
     /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('gossipSyncFinishedRoute: after quarter check')
 
     // Validate payload in addFinishedSyncing
@@ -788,12 +770,6 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.StandbyRefr
     // // Only accept original txs in quarter 1
     // if (isOrig && CycleCreator.currentQuarter > 1) {
     //   /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `standby-refresh-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
-    //   return
-    // }
-
-    // // Do not forward gossip after quarter 2
-    // if (!isOrig && CycleCreator.currentQuarter > 2) {
-    //   /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `standby-refresh-reject: CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
     //   return
     // }
 
