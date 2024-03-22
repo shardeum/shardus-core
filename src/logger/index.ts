@@ -97,7 +97,9 @@ export type LogFlags = {
   dapp_verbose: boolean //the dapp using this library will read this flag and log more info if true
   profiling_verbose: boolean
 
-  aalg: boolean //logging for a dapp feature
+  aalg:boolean //details on automatic access list generation
+  shardedCache: boolean //details on the sharded cache
+
 }
 
 export let logFlags: LogFlags = {
@@ -130,6 +132,7 @@ export let logFlags: LogFlags = {
   profiling_verbose: false,
 
   aalg: false,
+  shardedCache: false
 }
 
 class Logger {
@@ -338,6 +341,10 @@ class Logger {
     logFlags.important_as_error = true
 
     logFlags.playback = false
+
+    //temp debug
+    // logFlags.aalg = true
+    // logFlags.shardedCache = true
   }
 
   setDefaultFlags() {
@@ -353,6 +360,8 @@ class Logger {
 
     logFlags.important_as_fatal = true
     logFlags.important_as_error = true
+
+
   }
 
   setFlagByName(name: string, value: boolean) {
