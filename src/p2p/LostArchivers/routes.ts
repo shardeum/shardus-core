@@ -193,13 +193,12 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
     logging.warn('lostArchiverDownGossip: Got down message from unknown node')
   }
 
-  // TODO:[] BUI - commmented out since sender will be gone so won't get the gossip, correct
-  // // Verify Sender as Original Signer
-  // const isOrig = signer.id === sender
-  // if (!isOrig) {
-  //   logging.warn('lostArchiverDownGossip: Sender is not the original signer')
-  //   return
-  // }
+  // Verify Sender as Original Signer
+  const isOrig = signer.id === sender
+  if (!isOrig) {
+    logging.warn('lostArchiverDownGossip: Sender is not the original signer')
+    return
+  }
 
   // TODO:[] BUI - double check this logic
   // Only accept original txs in quarter 1
