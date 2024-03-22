@@ -67,12 +67,6 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
       return
     }
 
-    // Do not forward gossip after quarter 2
-    if (!isOrig && CycleCreator.currentQuarter > 2) {
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:gossip-active CycleCreator.currentQuarter > 2 ${CycleCreator.currentQuarter}`)
-      return
-    }
-
     if (addActiveTx(payload)) {
       Comms.sendGossip('gossip-active', payload, tracker, sender, NodeList.byIdOrder, false)
     }
