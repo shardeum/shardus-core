@@ -173,6 +173,13 @@ export class NetworkClass extends EventEmitter {
             this.mainLogger.debug('Received response data without any specified route', payload)
           return
         }
+
+        if(!route && data.error) {
+          if (logFlags.debug)
+            this.mainLogger.debug('Received a hang prevention dummy payload')
+          return;
+        }
+
         if (!route) {
           /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug( 'Network: ' + `Unable to read request, payload of received message: ${JSON.stringify(data)}` )
           throw new Error('Unable to read request, no route specified.')
