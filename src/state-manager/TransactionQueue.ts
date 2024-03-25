@@ -1670,8 +1670,8 @@ class TransactionQueue {
           startTime: {},
           endTime: {},
           duration: {},
-          startTimestamp: {},
-          endTimestamp: {},
+          startTimestamp: 0,
+          endTimestamp: 0,
         },
         executionGroupMap: new Map(),
         txSieveTime: 0,
@@ -3910,7 +3910,7 @@ class TransactionQueue {
     }
     let resultStr = ''
     for (const key in txStat.duration) {
-      resultStr += `${key}: start:${txStat.startTimestamp[key]} end:${txStat.endTimestamp[key]} ${txStat.duration[key]} ms\n`
+      resultStr += `${key}: start:${txStat.startTimestamp} end:${txStat.endTimestamp} ${txStat.duration[key]} ms\n`
     }
     return resultStr
   }
