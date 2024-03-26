@@ -138,8 +138,17 @@ class TransactionRepair {
           alternates: string[]
         }
       } = {}
-      const appliedVote = queueEntry.appliedReceiptForRepair2.appliedVote
-      const receivedReceipt = queueEntry.appliedReceiptForRepair2
+      
+      const receivedReceipt = queueEntry?.appliedReceiptForRepair2
+      if(!receivedReceipt) {
+        nestedCountersInstance.countEvent('repair1', 'receivedReceipt is falsy')
+        return
+      }
+      const appliedVote = queueEntry?.appliedReceiptForRepair2?.appliedVote
+      if(!appliedVote) {
+        nestedCountersInstance.countEvent('repair1', 'appliedvote is falsy')
+        return
+      }
 
       const voters = queueEntry.appliedReceiptForRepair2.signatures
       //shuffle the array
