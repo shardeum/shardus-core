@@ -1857,6 +1857,7 @@ class StateManager {
         try {
           const queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
           if (queueEntry == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'spread_appliedVote_no_queue_entry')
             return
           }
           const newVote = payload as AppliedVote
@@ -1885,6 +1886,7 @@ class StateManager {
         try {
           const queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
           if (queueEntry == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'spread_appliedVoteHash_no_queue_entry')
             return
           }
           const collectedVoteHash = payload as AppliedVoteHash
@@ -1921,6 +1923,7 @@ class StateManager {
           const req = deserializeSpreadAppliedVoteHashReq(requestStream)
           const queueEntry = this.transactionQueue.getQueueEntrySafe(req.txid)
           if (queueEntry == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('internal', `${route}-no_queue_entry`)
             return
           }
           const collectedVoteHash = req as AppliedVoteHash
