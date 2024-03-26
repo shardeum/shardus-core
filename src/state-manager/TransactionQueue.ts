@@ -3574,11 +3574,11 @@ class TransactionQueue {
             }
             for (const index of edgeIndicies) {
               const targetNode = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-              //only send data to the execution group
-              if (queueEntry.executionGroupMap.has(targetNode.id) === false) {
-                continue
-              }
               if (targetNode != null && targetNode.id !== ourNodeData.node.id) {
+                //only send data to the execution group
+                if (queueEntry.executionGroupMap.has(targetNode.id) === false) {
+                  continue
+                }
                 nodesToSendTo[targetNode.id] = targetNode
                 edgeNodeIds.push(targetNode.id)
               }
