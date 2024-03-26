@@ -14,6 +14,7 @@ import { lostArchiversMap } from './state'
 import { ArchiverDownMsg, ArchiverUpMsg } from '@shardus/types/build/src/p2p/LostArchiverTypes'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import { inspect } from 'util'
+import { logFlags } from '../../logger'
 
 /** CycleCreator Functions */
 
@@ -119,11 +120,21 @@ export function updateRecord(
 
   // add all txs.lostArchivers publicKeys to record.lostArchivers
   for (const tx of txs.lostArchivers) {
-    insertSorted(lostArchivers, tx.investigateMsg.target)
+    const target = tx.investigateMsg?.target
+    if(target) {
+      insertSorted(lostArchivers, target)
+    } else {
+      /* prettier-ignore */ if (logFlags.debug) console.log(`publicKey undefined for tx: ${JSON.stringify(tx)} in lostArchivers`)
+    }
   }
   // add all txs.refutedArchivers publicKeys to record.refutedArchivers
   for (const tx of txs.refutedArchivers) {
-    insertSorted(refutedArchivers, tx.downMsg.investigateMsg.target)
+    const target = tx.downMsg?.investigateMsg?.target
+    if(target) {
+      insertSorted(refutedArchivers, target)
+    } else {
+      /* prettier-ignore */ if (logFlags.debug) console.log(`publicKey undefined for tx: ${JSON.stringify(tx)} in refutedArchivers`)
+    }
   }
 
   // loop through prev.lostArchivers
