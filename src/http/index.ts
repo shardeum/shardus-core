@@ -24,7 +24,6 @@ async function _get(host, logIndex, timeout = 1000) {
     const res = await got.get(host, {
       timeout: timeout, //  Omar - setting this to 1 sec
       retry: 0, // Omar - setting this to 0.
-      json: true,
     })
     return { ...res, body: safeParser(safeStringify(res.body)) }
   } catch (error) {
@@ -61,7 +60,7 @@ async function get<T>(url: string, getResponseObj = false, timeout = 1000): Prom
     //@ts-ignore
     return res
   }
-  return res.body
+  return JSON.parse(res.body)
 }
 
 async function _post(host, payload, logIndex, timeout = 1000) {
@@ -69,7 +68,6 @@ async function _post(host, payload, logIndex, timeout = 1000) {
     const res = await got.post(host, {
       timeout: timeout, // Omar - set this to 1 sec
       retry: 0, // Omar - set this to 0
-      json: true,
       body: payload,
     })
 
@@ -106,7 +104,7 @@ async function post(givenHost, body, getResponseObj = false, timeout = 1000) {
   }
 
   if (getResponseObj) return res
-  return res.body
+  return JSON.parse(res.body)
 }
 
 function logError(method: string, error: any, host: any, logIndex: any) {
