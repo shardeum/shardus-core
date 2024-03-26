@@ -2131,8 +2131,8 @@ class TransactionQueue {
     if (queueEntry === undefined) {
       queueEntry = this.pendingTransactionQueueByID.get(txid)
       if (queueEntry === undefined) {
-        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`getQueueEntrySafe: No entry for ${txid}. Returning null.`)
-        nestedCountersInstance.countEvent('getQueueEntrySafe', 'notFound')
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`getQueueEntrySafe failed to find: ${utils.stringifyReduce(txid)}`)
+        nestedCountersInstance.countEvent('getQueueEntrySafe', 'failed to find returning null')
         return null
       }
     }
