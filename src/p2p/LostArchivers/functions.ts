@@ -266,6 +266,8 @@ function missingProperties(obj: object, keys: string | string[]): string[] {
   const missing = []
   for (const key of keys) {
     if (!(key in obj)) missing.push(key)
+    // eslint-disable-next-line security/detect-object-injection
+    if (obj[key] === undefined) missing.push(key)
   }
   return missing
 }
