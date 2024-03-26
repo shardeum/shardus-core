@@ -92,7 +92,7 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
   if (!signer) {
     logging.warn(`lostArchiverUpGossip: Signer with public key ${signerPublicKey} is not known`)
   }
-  const isOrig = signer.id === sender // Adjust this line based on your actual data structure
+  const isOrig = signer.id === sender 
 
   // Only accept original messages in quarter 1
   if (isOrig && currentQuarter > 1) {
