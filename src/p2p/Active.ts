@@ -218,7 +218,7 @@ export function updateRecord(
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Sync time records sorted', syncTimes.length, JSON.stringify(syncTimes))
 
     if (CycleChain.newest) {
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Median sync time at cycle ${cycleCounter} is ${medianSyncTime} s.`)
     }
     let maxSyncTime = medianSyncTime ? medianSyncTime * 2 : 0
 
@@ -229,7 +229,7 @@ export function updateRecord(
     // record.maxSyncTime = Math.min(config.p2p.maxSyncTimeFloor, maxSyncTime)
 
     //higher pri on this log so we can analyze it and correct as needed
-    /* prettier-ignore */ if (logFlags.important_as_error) info(`maxSyncTime ${CycleChain.newest.counter} is ${maxSyncTime} medianSyncTime*2: ${medianSyncTime}`)
+    /* prettier-ignore */ if (logFlags.important_as_error) info(`maxSyncTime ${cycleCounter} is ${maxSyncTime} medianSyncTime*2: ${medianSyncTime}`)
   } catch (e) {
     record.maxSyncTime = config.p2p.maxSyncTimeFloor
     /* prettier-ignore */ if (logFlags.error) error(`calculateMaxSyncTime: Unable to calculate max sync time`, e)
