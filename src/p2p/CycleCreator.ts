@@ -184,6 +184,8 @@ const compareCertBinaryHandler: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>
       if (errors && errors.length > 0) {
         p2pLogger.error(`compareCert: request validation errors: ${errors}`)
         respond({ certs: bestCycleCert.get(bestMarker), record: bestRecord }, serializeCompareCertResp)
+        profilerInstance.scopedProfileSectionEnd(route)
+        return;
       }
 
       const compareCertReq: CompareCertReq = {
