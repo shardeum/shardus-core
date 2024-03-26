@@ -745,6 +745,7 @@ class TransactionQueue {
           const isValidSignature = this.crypto.verify(req.body, sign.owner)
           if (isValidSignature) {
             if (this.archivedQueueEntriesByID.has(txId)) {
+              if (logFlags.verbose) console.log('get-tx-receipt: ', txId, 'archived')
               const queueEntry = this.archivedQueueEntriesByID.get(txId)
               if (full_receipt) {
                 const fullReceipt: ArchiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
@@ -753,6 +754,7 @@ class TransactionQueue {
                 result = { success: true, receipt: this.stateManager.getReceipt2(queueEntry) }
               }
             } else if (!full_receipt && this._transactionQueueByID.get(txId)?.state === 'commiting') {
+              if (logFlags.verbose) console.log('get-tx-receipt: ', txId, 'commiting')
               result = {
                 success: true,
                 receipt: this.stateManager.getReceipt2(this._transactionQueueByID.get(txId)),
@@ -5494,7 +5496,7 @@ class TransactionQueue {
 
                 // console.log('Can Commit TX', queueEntry.acceptedTx.txId, queueEntry)
 
-                if (this.config.p2p.experimentalSnapshot) this.addReceiptToForward(queueEntry)
+                if (this.config.p2p.experimentalSnapshot) this.addReceiptToForward(queueEntry, 'commit')
                 // console.log('commit commit', queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
 
                 if (hasReceiptFail) {
@@ -5775,7 +5777,8 @@ class TransactionQueue {
     Archivers.instantForwardOriginalTxData(originalTxData)
   }
 
-  addReceiptToForward(queueEntry: QueueEntry): void {
+  addReceiptToForward(queueEntry: QueueEntry, debugString = ''): void {
+    if(logFlags.verbose) console.log('addReceiptToForward', queueEntry.acceptedTx.txId, debugString)
     const archiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
     Archivers.instantForwardReceipts([archiverReceipt])
     this.receiptsForwardedTimestamp = shardusGetTime()

@@ -239,6 +239,7 @@ function GetBufferFromField(input: any, encoding?: 'base64' | 'hex'): Buffer {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function base64BufferReviver(key: string, value: any): any {
+  if (key === 'sig') return value
   const originalObject = value
   if (
     isObject(originalObject) &&

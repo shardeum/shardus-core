@@ -848,7 +848,7 @@ class TransactionRepair {
                 queueEntry.ourVoteHash === this.crypto.hash(queueEntry.appliedReceiptForRepair2.appliedVote)
               ) {
                 if (this.config.p2p.experimentalSnapshot)
-                  this.stateManager.transactionQueue.addReceiptToForward(queueEntry)
+                  this.stateManager.transactionQueue.addReceiptToForward(queueEntry, 'repair')
               }
           }
         }
