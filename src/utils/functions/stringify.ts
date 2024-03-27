@@ -267,6 +267,6 @@ export function logSafeStringify(value: unknown): string {
     return JSON.stringify(value, bigIntReplacer)
   } catch (error) {
     nestedCountersInstance.countEvent('stringify', 'logSafeStringify: error: failed to stringify value')
-    return null
+    return '{ error: "cannot stringify" }'
   }
 }
