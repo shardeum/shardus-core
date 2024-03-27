@@ -5493,11 +5493,9 @@ class TransactionQueue {
                   this.profiler.profileSectionEnd('commit')
                   //}
                 }
-
-                // console.log('Can Commit TX', queueEntry.acceptedTx.txId, queueEntry)
-
+                if (logFlags.verbose)
+                  console.log('commit commit', queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
                 if (this.config.p2p.experimentalSnapshot) this.addReceiptToForward(queueEntry, 'commit')
-                // console.log('commit commit', queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
 
                 if (hasReceiptFail) {
                   // endpoint to allow dapp to execute something that depends on a transaction failing
@@ -5765,7 +5763,8 @@ class TransactionQueue {
   }
 
   addOriginalTxDataToForward(queueEntry: QueueEntry): void {
-    /* prettier-ignore */ if (logFlags.verbose) console.log('originalTxData', queueEntry.acceptedTx.txId)
+    if (logFlags.verbose)
+      console.log('originalTxData', queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
     const { acceptedTx } = queueEntry
     const originalTxData = {
       txId: acceptedTx.txId,
@@ -5778,7 +5777,13 @@ class TransactionQueue {
   }
 
   addReceiptToForward(queueEntry: QueueEntry, debugString = ''): void {
-    if(logFlags.verbose) console.log('addReceiptToForward', queueEntry.acceptedTx.txId, debugString)
+    if (logFlags.verbose)
+      console.log(
+        'addReceiptToForward',
+        queueEntry.acceptedTx.txId,
+        queueEntry.acceptedTx.timestamp,
+        debugString
+      )
     const archiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
     Archivers.instantForwardReceipts([archiverReceipt])
     this.receiptsForwardedTimestamp = shardusGetTime()
