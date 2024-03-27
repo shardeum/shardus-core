@@ -895,6 +895,8 @@ export interface ServerConfiguration {
     rotationEdgeToAvoid: number
     /** mode to force network into. can be cleared.*/
     forcedMode?: string
+    /** Number of seconds to wait before shutting down after discovering we are a zombie node */
+    delayZombieRestartSec: number
   }
   /** Server IP configuration */
   ip?: {

@@ -164,6 +164,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     requestReceiptForTxBinary: true,
     rotationEdgeToAvoid: 2,
     forcedMode: '',
+    delayZombieRestartSec: 180,
   },
   ip: {
     externalIp: '0.0.0.0',

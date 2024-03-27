@@ -339,20 +339,23 @@ export function startupV2(): Promise<boolean> {
           if (firstTimeJoiningLoop === true) {
             isFailed = true
 
-            /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `detected self as zombie ${latestCycle.counter}`, 1)
+            /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `detected self as zombie ${latestCycle.counter} waiting ${Context.config.p2p.delayZombieRestartSec} before exiting`, 1)
 
-            //TODO in the future if we are more confident in our ablility to shut down the node from functioning
-            // we could have a shutdown wait. (but there is a lot of surface area)
-            // the other method would be to request to be shut down but that is tricky and may not be possible
-            // in all cases  i.e. our key changed
-            const message = `node detected as zombie node, please wait a few minutes before restart`
-            emitter.emit(
-              'invoke-exit',
-              `node restarted ungracefully, needs to restart`,
-              getCallstack(),
-              message,
-              false //force shutdown for now in a way that requires the user to restart again
-            )
+            utils.sleep(Context.config.p2p.delayZombieRestartSec).then(() => {  //give the network a chance to see we are not active
+              //TODO in the future if we are more confident in our ablility to shut down the node from functioning
+              // we could have a shutdown wait. (but there is a lot of surface area)
+              // the other method would be to request to be shut down but that is tricky and may not be possible
+              // in all cases  i.e. our key changed
+              const message = `node detected as zombie node, waited ${Context.config.p2p.delayZombieRestartSec} minutes before restart`
+              emitter.emit(
+                'invoke-exit',
+                `node restarted ungracefully, needs to restart`,
+                getCallstack(),
+                message,
+                false //force shutdown for now in a way that requires the user to restart again
+              )
+            }) 
+
             attemptJoiningRunning = false
             return
           }
