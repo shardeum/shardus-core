@@ -576,11 +576,12 @@ async function runQ3() {
   
   if (config.debug.enableCycleRecordDebugTool) {
     if (currentQuarter === 3 && Self.isActive) {
-      const cycleData = JSON.stringify({
-        port: Self.port,
-        cycleNumber: record.counter,
-        cycleRecord: record,
-      }) + '\n'
+      const cycleData =
+        utils.logSafeStringify({
+          port: Self.port,
+          cycleNumber: record.counter,
+          cycleRecord: record,
+        }) + '\n'
       fs.appendFile(filePath, cycleData, err => {
         if (err) {
           console.error('Error appending to file:', err);
@@ -678,7 +679,7 @@ async function runQ4() {
 
     if (logFlags.p2pNonFatal)
       info(`
-    Certified cycle record: ${JSON.stringify(record)}
+    Certified cycle record: ${utils.logSafeStringify(record)}
     Certified cycle marker: ${JSON.stringify(marker)}
     Certified cycle cert: ${JSON.stringify(cert)}
   `)

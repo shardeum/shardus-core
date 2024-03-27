@@ -1,3 +1,4 @@
+import { nestedCountersInstance } from '../nestedCounters'
 import { isObject } from './checkTypes'
 
 const objToString = Object.prototype.toString
@@ -252,5 +253,20 @@ function base64BufferReviver(key: string, value: any): any {
     return BigInt('0x' + value)
   } else {
     return value
+  }
+}
+
+function bigIntReplacer(key: string, value: unknown): unknown {
+  if (typeof value === 'bigint') {
+    return value.toString(16)
+  }
+  return value
+}
+export function logSafeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value, bigIntReplacer)
+  } catch (error) {
+    nestedCountersInstance.countEvent('stringify', 'logSafeStringify: error: failed to stringify value')
+    return null
   }
 }
