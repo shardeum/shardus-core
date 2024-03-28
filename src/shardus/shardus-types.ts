@@ -849,7 +849,12 @@ export interface ServerConfiguration {
     /** The max number of nodes added to `activated` list in cycleRecord each cycle */
     allowActivePerCycle: number
     useProxyForDownCheck: boolean
+    /** The number of checker nodes to ask to investigate whether a node that is potentially lost */
     numCheckerNodes: number
+    /** The minimum number of down reports mark node as node as lost */
+    minChecksForDown: number
+    /** The minimum number of up reports to not mark node as node as lost */
+    minChecksForUp: number
     /** The multiplier of how many cycles to before attempting to join the network again */
     attemptJoiningWaitMultiplier: number
     /** The number of cycles to wait for a selected node to send sync-started gossip before removing it */

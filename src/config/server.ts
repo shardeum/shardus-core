@@ -130,6 +130,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     allowActivePerCycle: 7,
     useProxyForDownCheck: false,
     numCheckerNodes: 1,
+    minChecksForDown: 1,
+    minChecksForUp: 1,
     attemptJoiningWaitMultiplier: 2,
     cyclesToWaitForSyncStarted: 3,
     cyclesToRefreshEarly: 4,

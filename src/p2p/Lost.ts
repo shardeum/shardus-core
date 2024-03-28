@@ -330,16 +330,24 @@ export function getTxs(): P2P.LostTypes.Txs {
   for (const [key, lostRecordItems] of receivedLostRecordMap) {
     if (lostRecordItems == null || lostRecordItems.size === 0) continue
     let downMsgCount = 0
+    let upMsgCount = 0
     let downRecord: P2P.LostTypes.LostRecord
+    let upRecord: P2P.LostTypes.LostRecord
     for (const [checker, record] of lostRecordItems) {
       if (seen[record.target]) continue
       // if (record.cycle !== currentCycle) continue
       if (record.status === 'down') {
         downMsgCount++
         downRecord = record
+      } else if (record.status === 'up') {
+        upMsgCount++
+        upRecord = record
       }
     }
-    if (downMsgCount >= config.p2p.numCheckerNodes) {
+    if (upMsgCount >= config.p2p.minChecksForUp) {
+      seen[downRecord.target] = true
+      if (logFlags.verbose) info(`Saw at least ${config.p2p.minChecksForUp} up messages: ${JSON.stringify(upRecord)}`)
+    } else if (downMsgCount >= config.p2p.minChecksForDown) {
       lostTxs.push(downRecord.message)
       seen[downRecord.target] = true
       if (logFlags.verbose) info(`Adding lost record for ${downRecord.target} to lostTxs`)
@@ -878,7 +886,7 @@ function checkReport(report, expectCycle) {
   if (cyclediff < 0) return [false, 'reporter cycle is not as expected; too new']
   if (cyclediff >= 2) return [false, 'reporter cycle is not as expected; too old']
   if (report.target === report.reporter) return [false, 'target cannot be reporter'] // the target should not be the reporter
-  if (report.checker === report.target) return [false, 'target cannot be checker'] // the target should not be the reporter
+  if (report.checker === report.target) return [false, 'target cannot be checker'] // the target should not be the checker
   if (report.checker === report.reporter) {
     if (activeByIdOrder.length >= 3) return [false, 'checker cannot be reporter']
   }
