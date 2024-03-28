@@ -18,7 +18,7 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import * as Context from '../p2p/Context'
-import { potentiallyRemoved, activeByIdOrder, byIdOrder } from '../p2p/NodeList'
+import {potentiallyRemoved, activeByIdOrder, byIdOrder, getAgeIndexForNodeId} from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as NodeList from '../p2p/NodeList'
 import * as CycleChain from '../p2p/CycleChain'
@@ -4087,6 +4087,20 @@ class StateManager {
       if (logErrors)
         if (logFlags.error)
           /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+      return false
+    }
+
+    const {idx, total} = getAgeIndexForNodeId(nodeId)
+
+    // skip freshly rotated in nodes
+    if (total > 10 && idx <= 4) {
+      nestedCountersInstance.countEvent('skip-newly-rotated-node', nodeId)
+      return false
+    }
+
+    // skip about to be rotated out nodes
+    if (total > 10 && idx >= total - 4) {
+      nestedCountersInstance.countEvent('skip-about-to-rotate-out-node', nodeId)
       return false
     }
 

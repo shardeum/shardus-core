@@ -277,7 +277,7 @@ export function updateNode(
       // add node to syncing list if its status is changed to syncing
       if (update[key] === P2P.P2PTypes.NodeStatus.SYNCING) {
         insertSorted(syncingByIdOrder, node, propComparator('id'))
-        removeSelectedNode(node.id) 
+        removeSelectedNode(node.id)
       }
       if (update[key] === P2P.P2PTypes.NodeStatus.READY) {
         insertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
@@ -377,9 +377,13 @@ export function getDebug() {
  * @returns {idx: number, total: number} - idx is the index of the node in the list, total is the total number of nodes in the list
  */
 export function getAgeIndex(): { idx: number; total: number } {
+  return getAgeIndexForNodeId(id)
+}
+
+export function getAgeIndexForNodeId(nodeId: string): { idx: number; total: number } {
   const totalNodes = byJoinOrder.length
   for (let i = 0; i < byJoinOrder.length; i++) {
-    if (byJoinOrder[i].id === id) {
+    if (byJoinOrder[i].id === nodeId) {
       return { idx: totalNodes - i, total: totalNodes }
     }
   }
