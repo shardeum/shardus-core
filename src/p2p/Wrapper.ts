@@ -170,7 +170,7 @@ export class P2P extends EventEmitter {
 export const p2p = new P2P()
 
 class State extends EventEmitter {
-  getNode(id: string) {
+  getNode(id: string): P2PTypings.NodeListTypes.Node | undefined {
     return NodeList.nodes.get(id)
   }
 

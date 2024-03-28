@@ -1413,7 +1413,7 @@ class Shardus extends EventEmitter {
    * Returns node info given a node id
    * @param {*} id The nodeId of this node
    */
-  getNode(id: string): ShardusTypes.Node {
+  getNode(id: string): ShardusTypes.Node | undefined {
     return this.p2p.state.getNode(id)
   }
 
