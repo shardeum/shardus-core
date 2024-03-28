@@ -573,20 +573,20 @@ async function runQ3() {
   // Get txs and create this cycle's record, marker, and cert
   txs = collectCycleTxs()
   ;({ record, marker, cert } = makeCycleData(txs, CycleChain.newest))
-  
+
   if (config.debug.enableCycleRecordDebugTool) {
     if (currentQuarter === 3 && Self.isActive) {
       const cycleData =
-        utils.logSafeStringify({
+        utils.safeStringify({
           port: Self.port,
           cycleNumber: record.counter,
           cycleRecord: record,
         }) + '\n'
-      fs.appendFile(filePath, cycleData, err => {
+      fs.appendFile(filePath, cycleData, (err) => {
         if (err) {
-          console.error('Error appending to file:', err);
+          console.error('Error appending to file:', err)
         }
-      });
+      })
     }
   }
 
@@ -679,7 +679,7 @@ async function runQ4() {
 
     if (logFlags.p2pNonFatal)
       info(`
-    Certified cycle record: ${utils.logSafeStringify(record)}
+    Certified cycle record: ${utils.safeStringify(record)}
     Certified cycle marker: ${JSON.stringify(marker)}
     Certified cycle cert: ${JSON.stringify(cert)}
   `)
