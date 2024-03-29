@@ -34,7 +34,7 @@ import * as CycleCreator from '../p2p/CycleCreator'
 import { netConfig } from '../p2p/CycleCreator'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
 import { scheduleLostReport, removeNodeWithCertificiate } from '../p2p/Lost'
-import { activeByIdOrder } from '../p2p/NodeList'
+import { activeByIdOrder, getAgeIndexForNodeId } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
@@ -676,7 +676,10 @@ class Shardus extends EventEmitter {
       console.log('restore mode triggered on cycle', cycleNumber)
       this.logger.playbackLogState('restore', '', `Restore mode triggered on cycle ${cycleNumber}`)
 
-      nestedCountersInstance.countEvent('restore', `restore event: entered. seen on cycle:${cycleNumber} ${shardusGetTime()}`)
+      nestedCountersInstance.countEvent(
+        'restore',
+        `restore event: entered. seen on cycle:${cycleNumber} ${shardusGetTime()}`
+      )
       await this.stateManager.waitForShardCalcs()
       nestedCountersInstance.countEvent('restore', `restore event: got shard calcs. ${shardusGetTime()}`)
       // Start restoring state data
@@ -684,7 +687,10 @@ class Shardus extends EventEmitter {
         this.stateManager.renewState()
         await this.stateManager.accountSync.initialSyncMain(3)
         console.log('restore - initialSyncMain finished')
-        nestedCountersInstance.countEvent('restore', `restore event: syncAppData finished. ${shardusGetTime()}`)
+        nestedCountersInstance.countEvent(
+          'restore',
+          `restore event: syncAppData finished. ${shardusGetTime()}`
+        )
       } catch (err) {
         console.log(utils.formatErrorMessage(err))
         apoptosizeSelf(`initialSyncMain-failed: ${err?.message}`)
@@ -694,22 +700,31 @@ class Shardus extends EventEmitter {
       // After restoring state data, set syncing flags to true and go active
       await this.stateManager.startCatchUpQueue()
       console.log('restore - startCatchUpQueue')
-      nestedCountersInstance.countEvent('restore', `restore event: finished startCatchUpQueue. ${shardusGetTime()}`)
+      nestedCountersInstance.countEvent(
+        'restore',
+        `restore event: finished startCatchUpQueue. ${shardusGetTime()}`
+      )
       //await this.p2p.goActive()
       //console.log('syncAppData - goActive')
 
       let waited = false
       // if we are not in q1 anymore, wait till next cycle's q1 to send sync-finished gossip
       if (currentQuarter > 1) {
-        nestedCountersInstance.countEvent('restore', `sync-finished-restore: not in Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
+        nestedCountersInstance.countEvent(
+          'restore',
+          `sync-finished-restore: not in Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`
+        )
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished-restore: not is Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
         waited = true
       }
-      if(currentQuarter > 0){
+      if (currentQuarter > 0) {
         await waitForQ1SendRequests()
       }
       if (waited) {
-        nestedCountersInstance.countEvent('restore', `sync-finished-restore: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
+        nestedCountersInstance.countEvent(
+          'restore',
+          `sync-finished-restore: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`
+        )
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished-restore: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
       }
 
@@ -722,7 +737,10 @@ class Shardus extends EventEmitter {
       insertSyncFinished(Self.id)
       Comms.sendGossip('gossip-sync-finished', readyPayload)
 
-      nestedCountersInstance.countEvent('restore', `restore event: sendGossip gossip-sync-finished ${shardusGetTime()}`)
+      nestedCountersInstance.countEvent(
+        'restore',
+        `restore event: sendGossip gossip-sync-finished ${shardusGetTime()}`
+      )
       this.stateManager.appFinishedSyncing = true
       this.stateManager.startProcessingCycleSummaries()
     })
@@ -1073,15 +1091,21 @@ class Shardus extends EventEmitter {
       let waited = false
       // if quarter > 1 , wait till next cycle's q1 to send sync-finished gossip
       if (currentQuarter > 1) {
-        nestedCountersInstance.countEvent('p2p', `sync-finished: not in Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
+        nestedCountersInstance.countEvent(
+          'p2p',
+          `sync-finished: not in Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`
+        )
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished: not is Q1 after waiting by time. Current quarter: ${CycleCreator.currentQuarter}`)
         waited = true
       }
-      if(currentQuarter > 0){
+      if (currentQuarter > 0) {
         await waitForQ1SendRequests()
       }
       if (waited) {
-        nestedCountersInstance.countEvent('p2p', `sync-finished: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
+        nestedCountersInstance.countEvent(
+          'p2p',
+          `sync-finished: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`
+        )
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-finished: in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
       }
 
@@ -1143,12 +1167,12 @@ class Shardus extends EventEmitter {
    * Returns an object that tells whether a tx was successful or not and the reason why via the
    * validateTxnFields application SDK function.
    * Throws an error if an application was not provided to shardus.
-   * 
+   *
    * @param tx the TX format is not known to shardus core and can be any object
    * @param set this is an old feaure that can be used by the first node in the network to inject TXs early. candidate for deprecation
    * @param global this is used for injecting a tx that changes a global account completely different consensus is used for these.  see src/p2p/GlobalAccounts.ts
    * @param inputAppData optional opaque app data that can be passed in.  this is forwared to the dapp when precrack is called.
-   * @returns 
+   * @returns
    * {
    *   success: boolean,
    *   reason: string,
@@ -1394,6 +1418,10 @@ class Shardus extends EventEmitter {
 
   getNodeByPubKey(id: string): ShardusTypes.Node {
     return this.p2p.state.getNodeByPubKey(id)
+  }
+
+  getNodeRotationIndex(id: string): { idx: number; total: number } {
+    return getAgeIndexForNodeId(id)
   }
 
   isNodeActiveByPubKey(pubKey: string): boolean {
