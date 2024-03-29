@@ -543,6 +543,8 @@ class Shardus extends EventEmitter {
         //this console log is probably redundant but are disabled most of the time anyhow.
         //They may help slighly in the case of adding some context to the out.log file when full debugging is on.
         /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`In Shardus got network error-${context} ${route}-${subRoute} for request ID ${requestId} from node: ${utils.logNode(node)} ${ipPort} error:${errorGroup}` )
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`node:`, node)
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`requestId: ${requestId}, context: ${context}, route: ${route}, subRoute: ${subRoute}, errorGroup: ${errorGroup}`)
         if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'error', requestId)
         /** [TODO] Report lost */
         /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `error-${context}-${route}-${subRoute}`)

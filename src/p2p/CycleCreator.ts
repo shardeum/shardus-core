@@ -340,6 +340,7 @@ export async function startCycles() {
  * to run for every quarter of the cycle.
  */
 async function cycleCreator() {
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log('cycleCreator: currentCycle', currentCycle)
   // Set current quater to 0 while we are setting up the previous record
   //   Routes should use this to not process and just single-forward gossip
   currentQuarter = 0
@@ -714,6 +715,7 @@ function makeCycleData(txs: P2P.CycleCreatorTypes.CycleTxs, prevRecord?: P2P.Cyc
 }
 
 function collectCycleTxs(): P2P.CycleCreatorTypes.CycleTxs {
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log('collectCycleTxs: inside collectCycleTxs')
   // Collect cycle txs from all submodules
   const txs = submodules.map((submodule) => submodule.getTxs())
   return Object.assign({}, ...txs)
