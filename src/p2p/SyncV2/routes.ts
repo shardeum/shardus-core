@@ -119,7 +119,7 @@ const standbyListRoute: P2P.P2PTypes.Route<Handler> = {
         // respondSize = standbyListStr.length
         // res.write(standbyListStr)
         // res.end()
-        respondSize = jsonHttpResWithSize(res, transformBigIntsToHex(standbyList))
+        respondSize = jsonHttpResWithSize(res, standbyList)
         //res.json(standbyList)
       } else {
         /* prettier-ignore */ if (logFlags.debug) console.error( `rejecting standby list request: expected '${expectedHash}' != '${JoinV2.getStandbyListHash()}'` )
