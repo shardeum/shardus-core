@@ -115,7 +115,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     preGossipLostCheck: true,
     preGossipRecentCheck: true,
     initShutdown: false,
-    enableLostArchiversCycles: true,
+    enableLostArchiversCycles: false, //disabled until we can properly re-test and fix some issues
     lostArchiversCyclesToWait: 3,
     standbyListFastHash: false, //todo set to false and migrate
     networkBaselineEnabled: false, // feature flag to enable use of baselineNodes that's new threshold for the safety, restore, and recovery modes instead of minNodes
