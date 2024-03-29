@@ -264,11 +264,24 @@ function bigIntReplacer(key: string, value: unknown): unknown {
   return value
 }
 
-export function safeStringify(value: unknown): string {
+export function logSafeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value, bigIntReplacer)
+  } catch (error) {
+    nestedCountersInstance.countEvent('stringify', 'logSafeStringify: error: failed to stringify value')
+    return '{ error: "cannot stringify in logSafeStringify" }'
+  }
+}
+
+export function safeStringify(value: unknown, shouldRethrow = true): string {
   try {
     return JSON.stringify(value, bigIntReplacer)
   } catch (error) {
     nestedCountersInstance.countEvent('stringify', 'safeStringify: error: failed to stringify value')
+
+    if (shouldRethrow) {
+      throw new Error('safeStringify: failed to stringify value:' + error)
+    }
     return '{ error: "cannot stringify" }'
   }
 }

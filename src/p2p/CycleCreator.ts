@@ -679,7 +679,7 @@ async function runQ4() {
 
     if (logFlags.p2pNonFatal)
       info(`
-    Certified cycle record: ${utils.safeStringify(record)}
+    Certified cycle record: ${utils.logSafeStringify(record)}
     Certified cycle marker: ${JSON.stringify(marker)}
     Certified cycle cert: ${JSON.stringify(cert)}
   `)

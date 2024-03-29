@@ -730,12 +730,12 @@ class TransactionQueue {
           full_receipt: 'b',
           sign: 'o',
         })
-        if (error) return res.send(utils.safeStringify(result = { success: false, reason: error }))
+        if (error) return res.send(utils.logSafeStringify((result = { success: false, reason: error })))
         error = utils.validateTypes(req.body.sign, {
           owner: 's',
           sig: 's',
         })
-        if (error) return res.send(utils.safeStringify(result = { success: false, reason: error }))
+        if (error) return res.send(utils.logSafeStringify((result = { success: false, reason: error })))
 
         const { txId, full_receipt, sign } = req.body
         const isReqFromArchiver = Archivers.archivers.has(sign.owner)
