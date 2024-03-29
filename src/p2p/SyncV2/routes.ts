@@ -14,7 +14,6 @@ import * as JoinV2 from '../Join/v2'
 import { profilerInstance } from '../../utils/profiler'
 import { logFlags } from '../../logger'
 import { jsonHttpResWithSize } from '../../utils'
-import { cloneAndTransformBigIntsToHex } from "../../utils/transformBigIntsToHex";
 import { safeStringify } from '../../utils'
 
 /** An endpoint that returns the latest node list hash. */
@@ -120,7 +119,7 @@ const standbyListRoute: P2P.P2PTypes.Route<Handler> = {
         // respondSize = standbyListStr.length
         // res.write(standbyListStr)
         // res.end()
-        respondSize = jsonHttpResWithSize(res, cloneAndTransformBigIntsToHex(standbyList))
+        respondSize = jsonHttpResWithSize(res, transformBigIntsToHex(standbyList))
         //res.json(standbyList)
       } else {
         /* prettier-ignore */ if (logFlags.debug) console.error( `rejecting standby list request: expected '${expectedHash}' != '${JoinV2.getStandbyListHash()}'` )
