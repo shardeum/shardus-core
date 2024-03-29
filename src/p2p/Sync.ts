@@ -55,12 +55,14 @@ const cyclesRoute: P2P.P2PTypes.Route<Handler> = {
       let err = validateTypes(req, { body: 'o' })
       if (err) {
         warn('sync-cycles bad req ' + err)
+        // use res.send(safeStringify({ })) if returning an object
         res.json([])
         return
       }
       err = validateTypes(req.body, { start: 'n?', end: 'n?' })
       if (err) {
         warn('sync-cycles bad req.body ' + err)
+        // use res.send(safeStringify({ })) if returning an object
         res.json([])
         return
       }
@@ -68,7 +70,7 @@ const cyclesRoute: P2P.P2PTypes.Route<Handler> = {
       const end = req.body.end
       // const cycles = p2p.state.getCycles(start, end)
       const cycles = CycleChain.getCycleChain(start, end)
-      res.json(cycles)
+      res.send(safeStringify(cycles))
     } catch (e) {
       warn('sync-cycles', e)
     } finally {

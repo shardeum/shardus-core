@@ -13,6 +13,7 @@ import rfdc from 'rfdc'
 import { logFlags } from '../logger'
 import { nestedCountersInstance } from '..'
 import { shardusGetTime } from '../network'
+import { safeStringify } from '../utils'
 
 const clone = rfdc()
 
@@ -51,14 +52,14 @@ export function init() {
         standby: Join.getNodeRequestingJoin().length,
         desired: CycleChain.newest.desired,
       }
-      return res.json(networkStats)
+      return res.send(safeStringify(networkStats))
     } catch (e) {
       console.log(`Error getting load: ${e.message}`)
     }
   })
   network.registerExternalGet('age-index', isDebugModeMiddlewareLow, (req, res) => {
     try {
-      return res.json(getAgeIndex())
+      return res.send(safeStringify(getAgeIndex()))
     } catch (e) {
       console.log(`Error getting age index: ${e.message}`)
     }

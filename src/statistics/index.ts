@@ -93,7 +93,7 @@ class Statistics extends EventEmitter {
         stats.txRejected += this.getPreviousElement('txRejected') || 0
         stats.txExpired += this.getPreviousElement('txExpired') || 0
         stats.txProcessed += this.getPreviousElement('txProcessed') || 0
-        return res.json(stats)
+        return res.send(utils.safeStringify(stats))
       } catch (e) {
         console.log(`Error getting stats: ${JSON.stringify(e)}`)
       }

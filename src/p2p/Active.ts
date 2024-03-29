@@ -15,6 +15,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getSortedStandbyJoinRequests } from './Join/v2'
 import { selectNodesFromReadyList } from './Join/v2/syncFinished'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { safeStringify } from '../utils'
 
 let syncTimes = []
 let lastCheckedCycleForSyncTimes = 0
@@ -107,7 +108,7 @@ export function init() {
 
   network.registerExternalGet('debug-neverGoActive', isDebugModeMiddleware, (req, res) => {
     neverGoActive = !neverGoActive
-    res.json({ status: 'ok', neverGoActive: neverGoActive })
+    res.send(safeStringify({ status: 'ok', neverGoActive: neverGoActive }))
   })
 }
 

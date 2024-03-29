@@ -78,6 +78,7 @@ import {
   deserializeSignAppDataResp,
   serializeSignAppDataResp,
 } from '../types/SignAppDataResp'
+import { safeStringify } from '../utils'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -1874,7 +1875,7 @@ class Shardus extends EventEmitter {
       if (req.query.set) {
         this.debugForeverLoopsEnabled = req.query.set === 'true'
       }
-      res.json(`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`)
+      res.send(utils.safeStringify(`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`))
     })
   }
 
@@ -2445,20 +2446,20 @@ class Shardus extends EventEmitter {
   _registerRoutes() {
     // DEBUG routes
     this.network.registerExternalPost('exit', isDebugModeMiddlewareHigh, async (req, res) => {
-      res.json({ success: true })
+      res.send(safeStringify({ success: true }))
       await this.shutdown()
     })
     // TODO elevate security beyond high when we get multi sig.  or is that too slow when needed?
     this.network.registerExternalPost('exit-apop', isDebugModeMiddlewareHigh, async (req, res) => {
       apoptosizeSelf('Apoptosis called at exit-apop route')
-      res.json({ success: true })
+      res.send(safeStringify({ success: true }))
     })
 
     this.network.registerExternalGet('config', isDebugModeMiddlewareLow, async (req, res) => {
-      res.json({ config: this.config })
+      res.send(safeStringify({ config: this.config }))
     })
     this.network.registerExternalGet('netconfig', async (req, res) => {
-      res.json({ config: netConfig })
+      res.send(safeStringify({ config: netConfig }))
     })
 
     this.network.registerExternalGet('nodeInfo', async (req, res) => {
@@ -2479,7 +2480,7 @@ class Shardus extends EventEmitter {
           lostArchiversMap: lostArchiversMap,
         }
       }
-      res.json(result)
+      res.send(safeStringify(result))
     })
 
     this.network.registerExternalGet('joinInfo', isDebugModeMiddlewareMedium, async (req, res) => {
@@ -2500,7 +2501,7 @@ class Shardus extends EventEmitter {
         getLastHashedStandbyList: JoinV2.getLastHashedStandbyList(),
         getSortedStandbyNodeList: JoinV2.getSortedStandbyJoinRequests(),
       }
-      res.json(deepReplace(result, undefined, '__undefined__'))
+      res.send(safeStringify(deepReplace(result, undefined, '__undefined__')))
     })
 
     this.network.registerExternalGet('standby-list-debug', isDebugModeMiddlewareLow, async (req, res) => {
@@ -2510,21 +2511,21 @@ class Shardus extends EventEmitter {
         ip: node.nodeInfo.externalIp,
         port: node.nodeInfo.externalPort,
       }))
-      res.json(result)
+      res.send(safeStringify(result))
     })
 
     this.network.registerExternalGet('status-history', isDebugModeMiddlewareLow, async (req, res) => {
       let result = Self.getStatusHistoryCopy()
-      res.json(deepReplace(result, undefined, '__undefined__'))
+      res.send(safeStringify(deepReplace(result, undefined, '__undefined__')))
     })
 
     this.network.registerExternalGet('socketReport', isDebugModeMiddlewareLow, async (req, res) => {
-      res.json(await getSocketReport())
+      res.send(safeStringify(await getSocketReport()))
     })
     this.network.registerExternalGet('forceCycleSync', isDebugModeMiddleware, async (req, res) => {
       let enable = req.query.enable === 'true' || false
       config.p2p.hackForceCycleSyncComplete = enable
-      res.json(await getSocketReport())
+      res.send(safeStringify(await getSocketReport()))
     })
 
     this.p2p.registerInternal(
@@ -2589,7 +2590,7 @@ class Shardus extends EventEmitter {
         this.mainLogger.debug(`testGlobalAccountTX: req:${utils.stringifyReduce(req.body)}`)
         const tx = req.body.tx
         this.put(tx, false, true)
-        res.json({ success: true })
+        res.send(safeStringify({ success: true }))
       } catch (ex) {
         this.mainLogger.debug('testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.shardus_fatal(
@@ -2604,7 +2605,7 @@ class Shardus extends EventEmitter {
         this.mainLogger.debug(`testGlobalAccountTXSet: req:${utils.stringifyReduce(req.body)}`)
         const tx = req.body.tx
         this.put(tx, true, true)
-        res.json({ success: true })
+        res.send(safeStringify({ success: true }))
       } catch (ex) {
         this.mainLogger.debug('testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.shardus_fatal(

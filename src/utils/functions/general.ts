@@ -535,7 +535,13 @@ export function jsonHttpResWithSize(
 ): number {
   // res.setHeader('Content-Length', str.length)
   // res.setHeader('Content-Type', 'application/json')
-  const str = JSON.stringify(obj)
+  const replacer = (key: string, value: unknown): unknown => {
+    if (typeof value === 'bigint') {
+      return value.toString()
+    }
+    return value
+  }
+  const str = JSON.stringify(obj, replacer)
   res.write(str)
   res.end()
   return str.length

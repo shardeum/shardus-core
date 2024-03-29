@@ -1005,7 +1005,7 @@ class AccountPatcher {
           const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
           if (!hashTrieSyncConsensus) {
-            return res.json({ error: `Unable to find hashTrieSyncConsensus for last cycle ${lastCycle}` })
+            return res.send(utils.safeStringify({ error: `Unable to find hashTrieSyncConsensus for last cycle ${lastCycle}` }))
           }
 
           for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
@@ -1035,11 +1035,11 @@ class AccountPatcher {
               if (!isRadixInSync) outOfSyncRadix[radix] = simpleMap // eslint-disable-line security/detect-object-injection
             }
           }
-          return res.json({
+          return res.send(utils.safeStringify({
             cycle,
             notEnoughVotesRadix,
             outOfSyncRadix,
-          })
+          }))
         } catch (e) {
           console.log('Error', e)
           res.write(`${e}\n`)

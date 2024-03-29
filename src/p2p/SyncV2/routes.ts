@@ -15,6 +15,7 @@ import { profilerInstance } from '../../utils/profiler'
 import { logFlags } from '../../logger'
 import { jsonHttpResWithSize } from '../../utils'
 import { cloneAndTransformBigIntsToHex } from "../../utils/transformBigIntsToHex";
+import { safeStringify } from '../../utils'
 
 /** An endpoint that returns the latest node list hash. */
 const validatorListHashRoute: P2P.P2PTypes.Route<Handler> = {
@@ -22,7 +23,7 @@ const validatorListHashRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'validator-list-hash',
   handler: (_req, res) => {
     const nextCycleTimestamp = CycleCreator.nextQ1Start
-    res.json({ nodeListHash: NodeList.getNodeListHash(), nextCycleTimestamp })
+    res.send(safeStringify({ nodeListHash: NodeList.getNodeListHash(), nextCycleTimestamp }))
   },
 }
 
@@ -31,7 +32,7 @@ const archiverListHashRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'archiver-list-hash',
   handler: (_req, res) => {
-    res.json({ archiverListHash: Archivers.getArchiverListHash() })
+    res.send(safeStringify({ archiverListHash: Archivers.getArchiverListHash() }))
   },
 }
 
@@ -40,7 +41,7 @@ const standbyListHashRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'standby-list-hash',
   handler: (_req, res) => {
-    res.json({ standbyNodeListHash: JoinV2.getStandbyListHash() })
+    res.send(safeStringify({ standbyNodeListHash: JoinV2.getStandbyListHash() }))
   },
 }
 
@@ -49,7 +50,7 @@ const newestCycleHashRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'current-cycle-hash',
   handler: (_req, res) => {
-    res.json(CycleChain.getCurrentCycleMarker())
+    res.send(safeStringify(CycleChain.getCurrentCycleMarker()))
   },
 }
 
@@ -90,7 +91,7 @@ const archiverListRoute: P2P.P2PTypes.Route<Handler> = {
 
     // return the archiver list if the hash from the requester matches
     if (expectedHash && expectedHash === Archivers.getArchiverListHash()) {
-      res.json(Archivers.getLastHashedArchiverList())
+      res.send(safeStringify(Archivers.getLastHashedArchiverList()))
     } else {
       /* prettier-ignore */ if (logFlags.debug) console.error( `rejecting archiver list request: expected '${expectedHash}' != '${Archivers.getArchiverListHash()}'` )
       res.status(404).send(`archiver list with hash '${expectedHash}' not found`)
@@ -142,7 +143,7 @@ const cycleByMarkerRoute: P2P.P2PTypes.Route<Handler> = {
     // otherwise return an error.
     const cycle = CycleChain.cyclesByMarker[req.query.marker as string]
     if (cycle) {
-      res.json(cycle)
+      res.send(safeStringify(cycle))
     } else {
       res.status(404).send(`cycle with marker '${req.query.marker}' not found`)
     }
@@ -155,7 +156,7 @@ const newestCycleRecordRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'newest-cycle-record',
   handler: (_req, res) => {
     profilerInstance.scopedProfileSectionStart('newest-cycle-record', false)
-    res.json(CycleChain.newest)
+    res.send(safeStringify(CycleChain.newest))
     profilerInstance.scopedProfileSectionEnd('newest-cycle-record')
   },
 }

@@ -32,13 +32,14 @@ import { logFlags } from '../../logger'
 import { SyncStarted } from '@shardus/types/build/src/p2p/JoinTypes'
 import { addSyncStarted } from './v2/syncStarted'
 import { addStandbyRefresh } from './v2/standbyRefresh'
+import { safeStringify } from '../../utils'
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'cyclemarker',
   handler: (_req, res) => {
     const marker = CycleChain.newest ? CycleChain.newest.previous : '0'.repeat(64)
-    res.json(marker)
+    res.send(safeStringify(marker))
   },
 }
 
@@ -104,12 +105,12 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
     if (!externalPortReachable || !internalPortReachable) {
       /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-reject: !externalPortReachable || !internalPortReachable` )
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: !externalPortReachable || !internalPortReachable ${joinRequest.nodeInfo.publicKey} ${JSON.stringify({ host: externalIp, port: externalPort })}`)
-      return res.json({
+      return res.send(safeStringify({
         success: false,
         fatal: true,
         //the following message string is used by submitJoinV2.  if you change the string please update submitJoinV2
         reason: `IP or Port is not reachable. ext:${externalIp}:${externalPort} int:${internalIp}:${internalPort}}`,
-      })
+      }))
     }
 
     // if the port of the join request was reachable, this join request is free to be
@@ -184,7 +185,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
         Comms.sendGossip('gossip-join', joinRequest, '', null, NodeList.byIdOrder, true)
         nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
       }
-      return res.json(joinRequestResponse)
+      return res.send(safeStringify(joinRequestResponse))
     }
   },
 }
@@ -229,11 +230,13 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
     let err = utils.validateTypes(req, { body: 'o' })
     if (err) {
       warn('/standby-refresh bad req ' + err)
+      // use res.send(safeStringify({ })) if returning an object
       res.json()
     }
     err = utils.validateTypes(standbyRefreshRequest, { publicKey: 's', cycleNumber: 'n', sign: 'o' })
     if (err) {
       warn('/standby-refresh bad standby refresh request ' + err)
+      // use res.send(safeStringify({ })) if returning an object
       res.json()
     }
 
@@ -255,16 +258,18 @@ const joinedV2Route: P2P.P2PTypes.Route<Handler> = {
     let err = utils.validateTypes(req, { params: 'o' })
     if (err) {
       warn('joined/:publicKey bad req ' + err)
+      // use res.send(safeStringify({ })) if returning an object
       res.json()
     }
     err = utils.validateTypes(req.params, { publicKey: 's' })
     if (err) {
       warn('joined/:publicKey bad req.params ' + err)
+      // use res.send(safeStringify({ })) if returning an object
       res.json()
     }
     const publicKey = req.params.publicKey
     const id = NodeList.byPubKey.get(publicKey)?.id || null
-    res.json({ id, isOnStandbyList: isOnStandbyList(publicKey) })
+    res.send(safeStringify({ id, isOnStandbyList: isOnStandbyList(publicKey) }))
   },
 }
 
@@ -276,16 +281,18 @@ const joinedRoute: P2P.P2PTypes.Route<Handler> = {
     let err = utils.validateTypes(req, { params: 'o' })
     if (err) {
       warn('joined/:publicKey bad req ' + err)
+      // use res.send(safeStringify({ })) if returning an object
       res.json()
     }
     err = utils.validateTypes(req.params, { publicKey: 's' })
     if (err) {
       warn('joined/:publicKey bad req.params ' + err)
+      // use res.send(safeStringify({ })) if returning an object
       res.json()
     }
     const publicKey = req.params.publicKey
     const node = NodeList.byPubKey.get(publicKey)
-    res.json({ node })
+    res.send(safeStringify({ node }))
   },
 }
 

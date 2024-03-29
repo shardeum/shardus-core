@@ -47,6 +47,7 @@ import { robustQuery } from './Utils'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { SQLDataTypes } from '../storage/utils/schemaDefintions'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
+import { safeStringify } from '../utils'
 
 /** STATE */
 
@@ -69,7 +70,7 @@ const stopExternalRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'stop',
   handler: (_req, res) => {
     if (isDebugMode()) {
-      res.json({ status: 'goodbye cruel world' })
+      res.send(safeStringify({ status: 'goodbye cruel world' }))
       apoptosizeSelf('Apoptosis called at stopExternalRoute => src/p2p/Apoptosis.ts')
     }
   },

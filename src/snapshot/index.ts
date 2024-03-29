@@ -17,6 +17,7 @@ import { profilerInstance } from '../utils/profiler'
 import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
 import { getNewestCycle } from '../p2p/Sync'
+import { safeStringify } from '../utils'
 
 console.log('StateManager', StateManager)
 console.log('StateManager type', StateManager.StateManagerTypes)
@@ -710,7 +711,7 @@ function registerSnapshotRoutes() {
         res.json([])
         return
       }
-      if (Self.isActive) return res.json({ answer: P2P.SnapshotTypes.offerResponse.notNeeded })
+      if (Self.isActive) return res.send(safeStringify({ answer: P2P.SnapshotTypes.offerResponse.notNeeded }))
       const offerRequest = req.body
       let answer = P2P.SnapshotTypes.offerResponse.notNeeded
       const neededPartitonIds = []
@@ -728,7 +729,7 @@ function registerSnapshotRoutes() {
         }
         if (neededPartitonIds.length > 0) answer = P2P.SnapshotTypes.offerResponse.needed
       }
-      res.json({ answer })
+      res.send(safeStringify({ answer }))
       if (answer === P2P.SnapshotTypes.offerResponse.needed && missingPartitions.length > 0) {
         const downloadedSnapshotData = await SnapshotFunctions.downloadDataFromNode(offerRequest.downloadUrl)
         if (downloadedSnapshotData) processDownloadedMissingData(downloadedSnapshotData)
@@ -746,7 +747,7 @@ function registerSnapshotRoutes() {
         return
       }
       if (Self.isActive) {
-        return res.json({ answer: P2P.SnapshotTypes.offerResponse.notNeeded })
+        return res.send(safeStringify({ answer: P2P.SnapshotTypes.offerResponse.notNeeded }))
       }
       const offerRequest = req.body
       const neededPartitonIds = []
@@ -754,10 +755,10 @@ function registerSnapshotRoutes() {
       if (!safetySyncing || !safetyModeVals.networkStateHash) {
         if (!safetySyncing) log('We are not doing data exchange yet. Try agian later')
         if (!safetyModeVals.networkStateHash) log('We have empty network state hash. Try agian later')
-        return res.json({
+        return res.send(safeStringify({
           answer: P2P.SnapshotTypes.offerResponse.tryLater,
           waitTime: Context.config.p2p.cycleDuration * 1000 * 0.5,
-        })
+        }))
       }
       if (offerRequest.networkStateHash === safetyModeVals.networkStateHash) {
         // ask witnessing node to try offering data later
@@ -772,14 +773,14 @@ function registerSnapshotRoutes() {
           }
         }
         if (neededPartitonIds.length > 0) {
-          return res.json({
+          return res.send(safeStringify({
             answer: P2P.SnapshotTypes.offerResponse.needed,
             partitions: neededPartitonIds,
             hashes: neededHashes,
-          })
+          }))
         }
       }
-      return res.json({ answer: P2P.SnapshotTypes.offerResponse.notNeeded })
+      return res.send(safeStringify({ answer: P2P.SnapshotTypes.offerResponse.notNeeded }))
     },
   }
 

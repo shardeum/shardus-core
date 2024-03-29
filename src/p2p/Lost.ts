@@ -36,6 +36,7 @@ import { HashTrieReq, ProxyRequest, ProxyResponse } from '../state-manager/state
 import { GetTrieHashesRequest, serializeGetTrieHashesReq } from '../types/GetTrieHashesReq'
 import { GetTrieHashesResponse, deserializeGetTrieHashesResp } from '../types/GetTrieHashesResp'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
+import { safeStringify } from '../utils'
 
 /** TYPES */
 
@@ -93,7 +94,7 @@ const killExternalRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'kill',
   handler: (_req, res) => {
     if (allowKillRoute) {
-      res.json({ status: 'left the network without telling any peers' })
+      res.send(safeStringify({ status: 'left the network without telling any peers' }))
       killSelf(
         'Apoptosis being called killExternalRoute()->killSelf()->emitter.emit(`apoptosized`) at src/p2p/Lost.ts'
       )
@@ -106,7 +107,7 @@ const killOtherExternalRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'killother',
   handler: (_req, res) => {
     if (allowKillRoute) {
-      res.json({ status: 'killing another node' })
+      res.send(safeStringify({ status: 'killing another node' }))
       killOther()
     }
   },
@@ -119,7 +120,7 @@ const isDownCheckRoute: P2P.P2PTypes.Route<Handler> = {
     const nodeId = _req.query.nodeId
     const node = nodes.get(nodeId.toString())
     const result = await isDownCheck(node)
-    res.json({ status: result })
+    res.send(safeStringify({ status: result }))
   },
 }
 

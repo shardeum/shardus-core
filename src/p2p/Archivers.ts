@@ -32,6 +32,7 @@ import { shardusGetTime } from '../network'
 import { reportLostArchiver } from '../p2p/LostArchivers/functions'
 import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
 import { Result, ResultAsync } from 'neverthrow'
+import { safeStringify } from '../utils'
 import { arch } from 'os'
 
 const clone = rfdc()
@@ -926,7 +927,7 @@ export function registerRoutes() {
     const err = validateTypes(req, { body: 'o' })
     if (err) {
       warn(`joinarchiver: bad req ${err}`)
-      return res.json({ success: false, error: err })
+      return res.send(safeStringify({ success: false, error: err }))
     }
 
     const joinRequest = req.body
@@ -935,17 +936,17 @@ export function registerRoutes() {
     const accepted = await addArchiverJoinRequest(joinRequest)
     if (!accepted.success) {
       warn('Archiver join request not accepted.')
-      return res.json({ success: false, error: `Archiver join request rejected! ${accepted.reason}` })
+      return res.send(safeStringify({ success: false, error: `Archiver join request rejected! ${accepted.reason}` }))
     }
     if (logFlags.p2pNonFatal) info('Archiver join request accepted!')
-    return res.json({ success: true })
+    return res.send(safeStringify({ success: true }))
   })
 
   network.registerExternalPost('leavingarchivers', async (req, res) => {
     const err = validateTypes(req, { body: 'o' })
     if (err) {
       warn(`leavingarchivers: bad req ${err}`)
-      return res.json({ success: false, error: err })
+      return res.send(safeStringify({ success: false, error: err }))
     }
 
     const leaveRequest = req.body
@@ -954,10 +955,10 @@ export function registerRoutes() {
     const accepted = await addLeaveRequest(leaveRequest)
     if (!accepted.success) {
       warn('Archiver leave request not accepted.')
-      return res.json({ success: false, error: `Archiver leave request rejected! ${accepted.reason}` })
+      return res.send(safeStringify({ success: false, error: `Archiver leave request rejected! ${accepted.reason}` }))
     }
     if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')
-    return res.json({ success: true })
+    return res.send(safeStringify({ success: true }))
   })
   Comms.registerGossipHandler('joinarchiver', async (payload, sender, tracker) => {
     profilerInstance.scopedProfileSectionStart('joinarchiver')
@@ -999,14 +1000,14 @@ export function registerRoutes() {
     let err = validateTypes(req, { body: 'o' })
     if (err) {
       /* prettier-ignore */ if (logFlags.error) warn(`requestdata: bad req ${err}`)
-      return res.json({ success: false, error: err })
+      return res.send(safeStringify({ success: false, error: err }))
     }
     err = validateTypes(req.body, {
       tag: 's',
     })
     if (err) {
       /* prettier-ignore */ if (logFlags.error) warn(`requestdata: bad req.body ${err}`)
-      return res.json({ success: false, error: err })
+      return res.send(safeStringify({ success: false, error: err }))
     }
 
     const dataRequest = req.body
@@ -1017,14 +1018,14 @@ export function registerRoutes() {
     if (!foundArchiver) {
       const archiverNotFoundErr = 'Archiver not found in list'
       /* prettier-ignore */ if (logFlags.error) warn(archiverNotFoundErr)
-      return res.json({ success: false, error: archiverNotFoundErr })
+      return res.send(safeStringify({ success: false, error: archiverNotFoundErr }))
     }
 
     const invalidTagErr = 'Tag is invalid'
     const archiverCurvePk = crypto.convertPublicKeyToCurve(foundArchiver.publicKey)
     if (!crypto.authenticate(dataRequest, archiverCurvePk)) {
       /* prettier-ignore */ if (logFlags.error) warn(invalidTagErr)
-      return res.json({ success: false, error: invalidTagErr })
+      return res.send(safeStringify({ success: false, error: invalidTagErr }))
     }
 
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Tag in data request is valid')
@@ -1038,7 +1039,7 @@ export function registerRoutes() {
         if (recipients.size >= config.p2p.maxArchiversSubscriptionPerNode) {
           const maxArchiversSupportErr = 'Max archivers support reached'
           warn(maxArchiversSupportErr)
-          return res.json({ success: false, error: maxArchiversSupportErr })
+          return res.send(safeStringify({ success: false, error: maxArchiversSupportErr }))
         }
         addDataRecipient(dataRequest.nodeInfo, dataRequest)
       }
@@ -1046,7 +1047,7 @@ export function registerRoutes() {
         removeDataRecipient(dataRequest.publicKey)
         removeArchiverConnection(dataRequest.publicKey)
       }
-      return res.json({ success: true })
+      return res.send(safeStringify({ success: true }))
     }
 
     delete dataRequest.publicKey
@@ -1065,14 +1066,14 @@ export function registerRoutes() {
     if (dataRequests.length > 0) {
       addDataRecipient(dataRequest.nodeInfo, dataRequests)
     }
-    res.json({ success: true })
+    res.send(safeStringify({ success: true }))
   })
 
   network.registerExternalPost('querydata', (req, res) => {
     let err = validateTypes(req, { body: 'o' })
     if (err) {
       warn(`querydata: bad req ${err}`)
-      return res.json({ success: false, error: err })
+      return res.send(safeStringify({ success: false, error: err }))
     }
     err = validateTypes(req.body, {
       publicKey: 's',
@@ -1081,7 +1082,7 @@ export function registerRoutes() {
     })
     if (err) {
       warn(`querydata: bad req.body ${err}`)
-      return res.json({ success: false, error: err })
+      return res.send(safeStringify({ success: false, error: err }))
     }
     // [TODO] Authenticate tag
 
@@ -1092,7 +1093,7 @@ export function registerRoutes() {
     if (!foundArchiver) {
       const archiverNotFoundErr = 'Archiver not found in list'
       warn(archiverNotFoundErr)
-      return res.json({ success: false, error: archiverNotFoundErr })
+      return res.send(safeStringify({ success: false, error: archiverNotFoundErr }))
     }
     delete queryRequest.publicKey
     delete queryRequest.tag
@@ -1107,18 +1108,18 @@ export function registerRoutes() {
       data = getSummaryBlob(queryRequest.lastData)
       // console.log('Summary blob to send', data)
     }
-    res.json({ success: true, data: data })
+    res.send(safeStringify({ success: true, data: data }))
   })
 
   network.registerExternalGet('archivers', (req, res) => {
     let archivers = getArchiversList()
     // In restart network, when there is only one node, we just send the first archiver which is serving as data recipient
     if (Self.isFirst && Self.isRestartNetwork && NodeList.nodes.size < 2) archivers = [...recipients.values()]
-    res.json({ archivers })
+    res.send(safeStringify({ archivers }))
   })
 
   network.registerExternalGet('datarecipients', (req, res) => {
-    res.json({ dataRecipients: [...recipients.values()] })
+    res.send(safeStringify({ dataRecipients: [...recipients.values()] }))
   })
 }
 

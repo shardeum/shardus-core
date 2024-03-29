@@ -223,12 +223,12 @@ class TransactionConsenus {
 
     Context.network.registerExternalGet('debug-produceBadVote', isDebugModeMiddleware, (req, res) => {
       this.produceBadVote = !this.produceBadVote
-      res.json({ status: 'ok', produceBadVote: this.produceBadVote })
+      res.send(utils.safeStringify({ status: 'ok', produceBadVote: this.produceBadVote }))
     })
 
     Context.network.registerExternalGet('debug-produceBadChallenge', isDebugModeMiddleware, (req, res) => {
       this.produceBadChallenge = !this.produceBadChallenge
-      res.json({ status: 'ok', produceBadChallenge: this.produceBadChallenge })
+      res.send(utils.safeStringify({ status: 'ok', produceBadChallenge: this.produceBadChallenge }))
     })
 
     this.p2p.registerInternal(
