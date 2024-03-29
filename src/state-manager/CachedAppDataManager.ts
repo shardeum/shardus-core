@@ -346,7 +346,7 @@ class CachedAppDataManager {
 
           /* prettier-ignore */ if(logFlags.shardedCache) console.log(`cachedAppData: sendCorrespondingCachedAppData hasKey=false: ${utils.stringifyReduce(remoteHomeNode.nodeThatStoreOurParitionFull.map((v) => v.id))}`);
           /* prettier-ignore */ if(logFlags.shardedCache) console.log(`sendCorrespondingCachedAppData hasKey=false: full: ${utils.stringifyReduce(remoteHomeNode.nodeThatStoreOurParitionFull)}`);
-   
+
         }
         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`cachedAppData: sendCorrespondingCachedAppData hasKey=false  key: ${utils.stringifyReduce(key)}`);
         /* prettier-ignore */ if(logFlags.shardedCache) console.log(`cachedAppData: sendCorrespondingCachedAppData hasKey=false  key: ${utils.stringifyReduce(key)}`);
@@ -531,7 +531,7 @@ class CachedAppDataManager {
     if (accountIsRemote) {
       const validNodeRetries = 5
       let randomConsensusNode = null
-      
+
       for(let i=0; i<validNodeRetries; i++){
         const nodeCheck = this.stateManager.transactionQueue.getRandomConsensusNodeForAccount(address)
         if (nodeCheck == null) {
@@ -539,7 +539,7 @@ class CachedAppDataManager {
         }
         // Node Precheck!
         /* prettier-ignore */
-        if ( this.stateManager.isNodeValidForInternalMessage( nodeCheck.id, 'getLocalOrRemoteCachedAppData', true, true ) === true ) {
+        if ( this.stateManager.isNodeValidForInternalMessage( nodeCheck.id, 'getLocalOrRemoteCachedAppData', true, true, true ) === true ) {
           //this node is valid for use
           randomConsensusNode = nodeCheck
           break;
@@ -582,7 +582,7 @@ class CachedAppDataManager {
       } else {
         nestedCountersInstance.countEvent('cached-app-data', 'Remote Data: miss')
         if (logFlags.verbose) this.stateManager.getAccountFailDump(address, 'remote request missing data: result == null')
-        /* prettier-ignore */ if(logFlags.shardedCache) console.log(`cachedAppData: remote result failed: ${JSON.stringify(r)}`)  //todo dont check in 
+        /* prettier-ignore */ if(logFlags.shardedCache) console.log(`cachedAppData: remote result failed: ${JSON.stringify(r)}`)  //todo dont check in
       }
     } else {
       // we are local!

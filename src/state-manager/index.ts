@@ -2691,6 +2691,7 @@ class StateManager {
             randomConsensusNode.id,
             'getLocalOrRemoteAccount',
             true,
+            true,
             true
           ) === false
         ) {
@@ -4065,7 +4066,8 @@ class StateManager {
     debugMsg: string,
     checkForNodeDown = true,
     checkForNodeLost = true,
-    checkIsUpRecent = true
+    checkIsUpRecent = true,
+    checkNodesRotationBounds = false
   ): boolean {
     const node: Shardus.Node = this.p2p.state.getNode(nodeId)
     const logErrors = logFlags.debug
@@ -4093,13 +4095,13 @@ class StateManager {
     const {idx, total} = getAgeIndexForNodeId(nodeId)
 
     // skip freshly rotated in nodes
-    if (total > 10 && idx <= 4) {
+    if (checkNodesRotationBounds && total >= 10 && idx <= 3) {
       nestedCountersInstance.countEvent('skip-newly-rotated-node', nodeId)
       return false
     }
 
     // skip about to be rotated out nodes
-    if (total > 10 && idx >= total - 4) {
+    if (checkNodesRotationBounds && total >= 10 && idx >= total - 3) {
       nestedCountersInstance.countEvent('skip-about-to-rotate-out-node', nodeId)
       return false
     }
