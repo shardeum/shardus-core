@@ -887,6 +887,10 @@ export interface ServerConfiguration {
     requestStateForTxPostBinary: boolean
     broadcastStateBinary: boolean
     broadcastFinalStateBinary: boolean
+    /** number of nodes on both ends of the rotationIndex
+     *  that will not respond to queries like account data, inject etc
+     *  is only activated when more than 10 nodes active  */
+    rotationEdgeToAvoid: number
     /** mode to force network into. can be cleared.*/
     forcedMode?: string
   }

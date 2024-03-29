@@ -119,7 +119,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     standbyListFastHash: false, //todo set to false and migrate
     networkBaselineEnabled: false, // feature flag to enable use of baselineNodes that's new threshold for the safety, restore, and recovery modes instead of minNodes
     useBinarySerializedEndpoints: false,
-    useCombinedTellBinary: true, 
+    useCombinedTellBinary: true,
     rotationCountMultiply: 1,
     rotationCountAdd: 0,
     rotationPercentActive: 0.001, //rotate 0.1% of active nodes per cycle when in a steady processing state
@@ -151,7 +151,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     getAccountQueueCountBinary: true,
     getAccountDataWithQueueHintsBinary: true,
     getTxTimestampBinary: true,
-    getAppliedVoteBinary: false,   //disabled due to SHM-4286
+    getAppliedVoteBinary: false, //disabled due to SHM-4286
     getConfirmOrChallengeBinary: true,
     spreadAppliedVoteHashBinary: true,
     spreadTxToGroupSyncingBinary: true,
@@ -161,6 +161,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     requestStateForTxPostBinary: false, //disabled because unhandled rejection SHM-4299
     requestStateForTxBinary: true,
     requestReceiptForTxBinary: true,
+    rotationEdgeToAvoid: 2,
     forcedMode: '',
   },
   ip: {
@@ -274,7 +275,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     noVoteSeenExpirationTime: 10000,
     voteSeenExpirationTime: 20000,
     confirmationSeenExpirationTime: 30000,
-    voterPercentage: 0.1
+    voterPercentage: 0.1,
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

@@ -652,13 +652,13 @@ export function isNodeValidForInternalMessage(
   const { idx, total } = NodeList.getAgeIndexForNodeId(node.id)
 
   // skip freshly rotated in nodes
-  if (checkNodesRotationBounds && total >= 10 && idx <= 3) {
+  if (checkNodesRotationBounds && total >= 10 && idx <= config.p2p.rotationEdgeToAvoid) {
     nestedCountersInstance.countEvent('skip-newly-rotated-node', node.id)
     return false
   }
 
   // skip about to be rotated out nodes
-  if (checkNodesRotationBounds && total >= 10 && idx >= total - 3) {
+  if (checkNodesRotationBounds && total >= 10 && idx >= total - config.p2p.rotationEdgeToAvoid) {
     nestedCountersInstance.countEvent('skip-about-to-rotate-out-node', node.id)
     return false
   }
