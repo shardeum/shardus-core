@@ -1,5 +1,5 @@
 import { P2P } from '@shardus/types'
-import { Ordering } from '..'
+import { Ordering, safeStringify } from '..'
 import { Response } from 'express-serve-static-core'
 import { DevSecurityLevel } from '../../shardus/shardus-types'
 
@@ -535,13 +535,7 @@ export function jsonHttpResWithSize(
 ): number {
   // res.setHeader('Content-Length', str.length)
   // res.setHeader('Content-Type', 'application/json')
-  const replacer = (key: string, value: unknown): unknown => {
-    if (typeof value === 'bigint') {
-      return value.toString()
-    }
-    return value
-  }
-  const str = JSON.stringify(obj, replacer)
+  const str = safeStringify(obj)
   res.write(str)
   res.end()
   return str.length

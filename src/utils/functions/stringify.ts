@@ -258,15 +258,36 @@ function base64BufferReviver(key: string, value: any): any {
 
 function bigIntReplacer(key: string, value: unknown): unknown {
   if (typeof value === 'bigint') {
+    nestedCountersInstance.countEvent('stringify', 'bigIntReplacer: replaced for key: ' + key)
     return value.toString(16)
   }
   return value
 }
+
 export function safeStringify(value: unknown): string {
   try {
     return JSON.stringify(value, bigIntReplacer)
   } catch (error) {
     nestedCountersInstance.countEvent('stringify', 'safeStringify: error: failed to stringify value')
     return '{ error: "cannot stringify" }'
+  }
+}
+
+function bigIntReviver(key: string, value: any): unknown {
+  if (key === 'sig') return value
+  if (value && shouldReviveAsBigInt(value) && value.length !== 42 && value.length !== 64) {
+    nestedCountersInstance.countEvent('stringify', 'bigIntReviver: revived for key: ' + key)
+    return BigInt('0x' + value)
+  } else {
+    return value
+  }
+}
+
+export function safeParser(value: string): any {
+  try {
+    return JSON.parse(value, bigIntReviver)
+  } catch (error) {
+    nestedCountersInstance.countEvent('stringify', 'safeParser: error: failed to parse value')
+    return { error: 'cannot parse' }
   }
 }
