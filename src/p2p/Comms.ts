@@ -607,12 +607,13 @@ function sortByID(first, second) {
   return utils.sortAscProp(first, second, 'id')
 }
 
-function isNodeValidForInternalMessage(
+export function isNodeValidForInternalMessage(
   node: P2P.NodeListTypes.Node,
   debugMsg: string,
   checkForNodeDown = true,
   checkForNodeLost = true,
-  checkIsUpRecent = true
+  checkIsUpRecent = true,
+  checkNodesRotationBounds = false
 ): boolean {
   const logErrors = logFlags.debug
   if (node == null) {
@@ -648,18 +649,52 @@ function isNodeValidForInternalMessage(
     return false
   }
 
+  const { idx, total } = NodeList.getAgeIndexForNodeId(node.id)
+
+  // skip freshly rotated in nodes
+  if (checkNodesRotationBounds && total >= 10 && idx <= 3) {
+    nestedCountersInstance.countEvent('skip-newly-rotated-node', node.id)
+    return false
+  }
+
+  // skip about to be rotated out nodes
+  if (checkNodesRotationBounds && total >= 10 && idx >= total - 3) {
+    nestedCountersInstance.countEvent('skip-about-to-rotate-out-node', node.id)
+    return false
+  }
+
   // check up recent first which will tell us if we have gossip from this node in the last 5 seconds
   // consider a larger amount of time
   if (checkIsUpRecent) {
     const { upRecent, age } = isNodeUpRecent(node.id, 5000)
     if (upRecent === true) {
+      if (checkForNodeDown) {
+        const { down, state } = isNodeDown(node.id)
+        if (down === true) {
+          if (logErrors)
+            info(
+              `isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(
+                node.id
+              )} ${debugMsg}`
+            )
+        }
+      }
+      if (checkForNodeLost) {
+        if (isNodeLost(node.id) === true) {
+          if (logErrors)
+            info(
+              `isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(
+                node.id
+              )} ${debugMsg}`
+            )
+        }
+      }
       return true
     } else {
-      // if (logErrors)
-      //   error(
-      //     `isNodeUpRecentOverride: ${age} upRecent = false. no recent TX, but this is not a fail conditions`
-      //   )
-      // return false //not a fail conditions
+      if (logErrors)
+        warn(
+          `isNodeUpRecentOverride: ${age} upRecent = false. no recent TX, but this is not a fail conditions`
+        )
     }
   }
 

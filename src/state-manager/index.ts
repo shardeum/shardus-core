@@ -18,7 +18,7 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import * as Context from '../p2p/Context'
-import {potentiallyRemoved, activeByIdOrder, byIdOrder, getAgeIndexForNodeId} from '../p2p/NodeList'
+import { potentiallyRemoved, activeByIdOrder, byIdOrder } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as NodeList from '../p2p/NodeList'
 import * as CycleChain from '../p2p/CycleChain'
@@ -2268,8 +2268,8 @@ class StateManager {
     this.p2p.unregisterInternal('get_trie_accountHashes')
     this.p2p.unregisterInternal('get_account_data_by_hashes')
 
-    for (const binary_endpoint of Object.values(InternalRouteEnum)){
-    this.p2p.unregisterInternal(binary_endpoint)
+    for (const binary_endpoint of Object.values(InternalRouteEnum)) {
+      this.p2p.unregisterInternal(binary_endpoint)
     }
   }
 
@@ -2716,7 +2716,7 @@ class StateManager {
         this.config.p2p.useBinarySerializedEndpoints &&
         this.config.p2p.getAccountDataWithQueueHintsBinary
       ) {
-        try{
+        try {
           const serialized_res = await this.p2p.askBinary<
             GetAccountDataWithQueueHintsReqSerializable,
             GetAccountDataWithQueueHintsRespSerializable
@@ -2729,7 +2729,7 @@ class StateManager {
             {}
           )
           r = serialized_res as GetAccountDataWithQueueHintsResp
-        } catch (er){
+        } catch (er) {
           if (logFlags.verbose) this.mainLogger.error('askBinary', er)
           if (opts.canThrowException) {
             throw er
@@ -4070,93 +4070,14 @@ class StateManager {
     checkNodesRotationBounds = false
   ): boolean {
     const node: Shardus.Node = this.p2p.state.getNode(nodeId)
-    const logErrors = logFlags.debug
-    if (node == null) {
-      if (logErrors)
-        if (logFlags.error)
-          /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
-      return false
-    }
-
-    // Some modes are not compatible with doing a valid node check for outgoing messages
-    // if that is the case just return true and allow the message
-    if (modeAllowsValidNodeChecks() === false) {
-      return true
-    }
-
-    const nodeStatus = node.status
-    if (nodeStatus != 'active' || potentiallyRemoved.has(node.id)) {
-      if (logErrors)
-        if (logFlags.error)
-          /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
-      return false
-    }
-
-    const {idx, total} = getAgeIndexForNodeId(nodeId)
-
-    // skip freshly rotated in nodes
-    if (checkNodesRotationBounds && total >= 10 && idx <= 3) {
-      nestedCountersInstance.countEvent('skip-newly-rotated-node', nodeId)
-      return false
-    }
-
-    // skip about to be rotated out nodes
-    if (checkNodesRotationBounds && total >= 10 && idx >= total - 3) {
-      nestedCountersInstance.countEvent('skip-about-to-rotate-out-node', nodeId)
-      return false
-    }
-
-    if (checkIsUpRecent) {
-      const { upRecent, age } = isNodeUpRecent(nodeId, 5000)
-      if (upRecent === true) {
-        if (checkForNodeDown) {
-          const { down, state } = isNodeDown(nodeId)
-          if (down === true) {
-            if (logErrors)
-              this.mainLogger.debug(
-                `isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(
-                  nodeId
-                )} ${debugMsg}`
-              )
-          }
-        }
-        if (checkForNodeLost) {
-          if (isNodeLost(nodeId) === true) {
-            if (logErrors)
-              this.mainLogger.debug(
-                `isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(
-                  nodeId
-                )} ${debugMsg}`
-              )
-          }
-        }
-        return true
-      } else {
-        if (logErrors)
-          this.mainLogger.debug(
-            `isNodeUpRecentOverride: ${age} upRecent = false. no recent TX, but this is not a fail conditions`
-          )
-      }
-    }
-
-    if (checkForNodeDown) {
-      const { down, state } = isNodeDown(nodeId)
-      if (down === true) {
-        if (logErrors)
-          if (logFlags.error)
-            /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
-        return false
-      }
-    }
-    if (checkForNodeLost) {
-      if (isNodeLost(nodeId) === true) {
-        if (logErrors)
-          if (logFlags.error)
-            /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
-        return false
-      }
-    }
-    return true
+    return Comms.isNodeValidForInternalMessage(
+      node,
+      debugMsg,
+      checkForNodeDown,
+      checkForNodeLost,
+      checkIsUpRecent,
+      checkNodesRotationBounds
+    )
   }
 
   /**
