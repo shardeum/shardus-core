@@ -341,12 +341,12 @@ export function startupV2(): Promise<boolean> {
 
             /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `detected self as zombie ${latestCycle.counter} waiting ${Context.config.p2p.delayZombieRestartSec} before exiting`, 1)
 
-            utils.sleep(Context.config.p2p.delayZombieRestartSec).then(() => {  //give the network a chance to see we are not active
+            utils.sleep(Context.config.p2p.delayZombieRestartSec * 1000 /*sec to ms*/).then(() => {  //give the network a chance to see we are not active
               //TODO in the future if we are more confident in our ablility to shut down the node from functioning
               // we could have a shutdown wait. (but there is a lot of surface area)
               // the other method would be to request to be shut down but that is tricky and may not be possible
               // in all cases  i.e. our key changed
-              const message = `node detected as zombie node, waited ${Context.config.p2p.delayZombieRestartSec} minutes before restart`
+              const message = `node detected as zombie node, waited ${Context.config.p2p.delayZombieRestartSec} seconds before restart`
               emitter.emit(
                 'invoke-exit',
                 `node restarted ungracefully, needs to restart`,
