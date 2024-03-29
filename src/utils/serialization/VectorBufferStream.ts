@@ -76,7 +76,7 @@ export class VectorBufferStream {
   }
   public writeString(value: string): void {
     const size = Buffer.byteLength(value, 'utf8')
-    this.writeInt16(size) // Write the size of the string as a 16-bit integer
+    this.writeUInt32(size) // Write the size of the string as a 32-bit integer
     this.ensureCapacity(size)
     this.buffer.write(value, this.position, size, 'utf8')
     this.position += size
@@ -141,7 +141,7 @@ export class VectorBufferStream {
   ///////////////READ METHODS////////////////////
 
   public readString(): string {
-    const size = this.readInt16() // Read the size of the string as a 16-bit integer
+    const size = this.readUInt32() // Read the size of the string as a 32-bit integer
     const value = this.buffer.toString('utf8', this.position, this.position + size)
     this.position += size
     return value
