@@ -259,7 +259,7 @@ function base64BufferReviver(key: string, value: any): any {
 function bigIntReplacer(key: string, value: unknown): unknown {
   if (typeof value === 'bigint') {
     nestedCountersInstance.countEvent('stringify', 'bigIntReplacer: replaced for key: ' + key)
-    return value.toString(16)
+    return { type: 'bigint', value: value.toString(16) }
   }
   return value
 }
@@ -287,10 +287,9 @@ export function safeStringify(value: unknown, shouldRethrow = true): string {
 }
 
 function bigIntReviver(key: string, value: any): unknown {
-  if (key === 'sig') return value
-  if (value && shouldReviveAsBigInt(value) && value.length !== 42 && value.length !== 64) {
+  if (value && typeof value === 'object' && value.type === 'bigint') {
     nestedCountersInstance.countEvent('stringify', 'bigIntReviver: revived for key: ' + key)
-    return BigInt('0x' + value)
+    return BigInt('0x' + value.value)
   } else {
     return value
   }
