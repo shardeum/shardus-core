@@ -54,6 +54,10 @@ export function createLostArchiverRecord(obj: Partial<LostArchiverRecord>): Lost
  * Called by Archivers.ts
  */
 export function reportLostArchiver(publicKey: publicKey, errorMsg: string): void {
+  if (Context.config.p2p.enableLostArchiversCycles === false) {
+    info(`reportLostArchiver: not enabled, publicKey: ${publicKey}, errorMsg: ${errorMsg}`)
+    return
+  }
   info(`reportLostArchiver: publicKey: ${publicKey}, errorMsg: ${errorMsg}`)
   // Add new entry to lostArchiversMap for reported Archiver if it doesn't exist
   // This is to ensure that we don't overwrite existing entries

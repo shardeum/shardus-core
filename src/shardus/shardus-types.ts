@@ -824,6 +824,8 @@ export interface ServerConfiguration {
     preGossipRecentCheck: boolean
     /** The initShutdown flag can be switched on by an Admin/DAO via Change-Server-Config Tx to put the network in 'shutdown' mode */
     initShutdown: boolean
+    /** Enables or disables the Lost Archiver Detection feature */
+    enableLostArchiversCycles: boolean
     /** The number of consecutive cycles an Archiver has refute its appearance in the lostArchivers field before it is actually removed */
     lostArchiversCyclesToWait: number
     /** enable new logic for creating a hash of our join list */

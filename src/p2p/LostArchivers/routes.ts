@@ -9,7 +9,7 @@ import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
 import { GossipHandler, InternalHandler, Route, SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import { Handler } from 'express'
 import * as Comms from '../Comms'
-import { crypto, network } from '../Context'
+import { config, crypto, network } from '../Context'
 import { getRandomAvailableArchiver } from '../Utils'
 import * as funcs from './functions'
 import * as logging from './logging'
@@ -38,6 +38,11 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
 ) => {
   // the original gossip source is a node or nodes that the archiver notified as to the fact
   // that rumors of its death were highly exaggerated
+
+  // If Lost Archiver Detection is disabled, return
+  if (config.p2p.enableLostArchiversCycles === false) {
+    return
+  }
 
   // Ignore gossip outside of Q1 and Q2
   if (![1, 2].includes(currentQuarter)) {
@@ -92,6 +97,11 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
 ) => {
   // the original gossip source is the investigator node that confirmed the archiver is down
 
+  // If Lost Archiver Detection is disabled, return
+  if (config.p2p.enableLostArchiversCycles === false) {
+    return
+  }
+
   // Ignore gossip outside of Q1 and Q2
   if (![1, 2].includes(currentQuarter)) {
     logging.warn('lostArchiverUpGossip: not in Q1 or Q2')
@@ -144,6 +154,11 @@ const investigateLostArchiverRoute: Route<InternalHandler<SignedObject<Investiga
   handler: (payload, response, sender) => {
     // we're being told to investigate a seemingly lost archiver
 
+    // If Lost Archiver Detection is disabled, return
+    if (config.p2p.enableLostArchiversCycles === false) {
+      return
+    }
+
     logging.info(`investigateLostArchiverRoute: payload: ${inspect(payload)}, sender: ${sender}`)
 
     // check args
@@ -175,6 +190,11 @@ const investigateLostArchiverRoute: Route<InternalHandler<SignedObject<Investiga
 const investigateLostArchiverRouteBinary: Route<InternalBinaryHandler<Buffer>> = {
   name: InternalRouteEnum.binary_lost_archiver_investigate,
   handler: (payload, respond, header) => {
+    // If Lost Archiver Detection is disabled, return
+    if (config.p2p.enableLostArchiversCycles === false) {
+      return
+    }
+
     const route = InternalRouteEnum.binary_lost_archiver_investigate
     nestedCountersInstance.countEvent('internal', route)
     profilerInstance.scopedProfileSectionStart(route, false, payload.length)
@@ -232,6 +252,11 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'lost-archiver-refute',
   handler: (req, res) => {
+    // If Lost Archiver Detection is disabled, return
+    if (config.p2p.enableLostArchiversCycles === false) {
+      return
+    }
+
     // to-do: verify that validateArchiverUpMsg checks the signature or that whatever machinery invokes this route does; or do it ourselves
     // called by a refuting archiver
     const error = funcs.errorForArchiverRefutesLostMsg(req.body)
@@ -261,6 +286,11 @@ const reportFakeLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'report-fake-lost-archiver',
   handler: (req, res) => {
+    // If Lost Archiver Detection is disabled, return
+    if (config.p2p.enableLostArchiversCycles === false) {
+      return
+    }
+
     logging.warn('/report-fake-lost-archiver: reporting fake lost archiver')
     // the archiver can be specified with an optional 'publicKey' or 'publickey' query param
     // otherwise a random one is chosen
