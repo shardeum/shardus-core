@@ -2557,6 +2557,8 @@ class StateManager {
             randomConsensusNode.id,
             'getLocalOrRemoteAccountQueueCount',
             true,
+            true,
+            true,
             true
           ) === false
         ) {
@@ -2690,6 +2692,7 @@ class StateManager {
           this.isNodeValidForInternalMessage(
             randomConsensusNode.id,
             'getLocalOrRemoteAccount',
+            true,
             true,
             true,
             true
