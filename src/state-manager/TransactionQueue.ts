@@ -127,7 +127,7 @@ class TransactionQueue {
   _transactionQueue: QueueEntry[] //old name: newAcceptedTxQueue
   pendingTransactionQueue: QueueEntry[] //old name: newAcceptedTxQueueTempInjest
   archivedQueueEntries: QueueEntry[]
-  txDebugStatList: TxDebug[]
+  txDebugStatList: Map<string, TxDebug>
 
   _transactionQueueByID: Map<string, QueueEntry> //old name: newAcceptedTxQueueByID
   pendingTransactionQueueByID: Map<string, QueueEntry> //old name: newAcceptedTxQueueTempInjestByID
@@ -219,7 +219,7 @@ class TransactionQueue {
     this._transactionQueue = []
     this.pendingTransactionQueue = []
     this.archivedQueueEntries = []
-    this.txDebugStatList = []
+    this.txDebugStatList = new Map()
     this.receiptsToForward = []
     this.forwardedReceiptsByTimestamp = new Map()
     this.receiptsBundleByInterval = new Map()
@@ -1147,7 +1147,7 @@ class TransactionQueue {
     try {
       this.profiler.profileSectionStart('commit-1-setAccount')
       if (logFlags.verbose) {
-        /* prettier-ignore */ this.mainLogger.debug( `commitConsensedTransaction  ts:${timestamp} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}` )
+        /* prettier-ignore */ this.mainLogger.debug( `commitConsensedTransaction txId: ${queueEntry.logID}  ts:${timestamp} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}` )
         /* prettier-ignore */ this.mainLogger.debug( `commitConsensedTransaction  filter: ${utils.stringifyReduce(queueEntry.localKeys)}` )
         /* prettier-ignore */ this.mainLogger.debug(`commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
         /* prettier-ignore */ this.mainLogger.debug( `commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}` )
@@ -1310,7 +1310,7 @@ class TransactionQueue {
       }
 
       if (logFlags.verbose) {
-        this.mainLogger.debug(`commitConsensedTransaction  savedSomething: ${savedSomething}`)
+        this.mainLogger.debug(`commitConsensedTransaction ${queueEntry.logID}  savedSomething: ${savedSomething}`)
         this.mainLogger.debug(
           `commitConsensedTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(
             accountDataList
@@ -1665,6 +1665,8 @@ class TransactionQueue {
           startTime: {},
           endTime: {},
           duration: {},
+          startTimestamp: {},
+          endTimestamp: {},
         },
         executionGroupMap: new Map(),
         txSieveTime: 0,
@@ -1678,7 +1680,7 @@ class TransactionQueue {
         acceptConfirmOrChallenge: true,
         accountDataSet: false,
         topConfirmations: new Set(),
-        topVoters: new Set()
+        topVoters: new Set(),
       } // age comes from timestamp
       this.txDebugMarkStartTime(txQueueEntry, 'total_queue_time')
       this.txDebugMarkStartTime(txQueueEntry, 'aging')
@@ -3888,16 +3890,29 @@ class TransactionQueue {
   }
 
   dumpTxDebugToStatList(queueEntry: QueueEntry): void {
-    this.txDebugStatList.push({ ...queueEntry.txDebug })
+    this.txDebugStatList.set(queueEntry.acceptedTx.txId, { ...queueEntry.txDebug })
   }
 
   clearTxDebugStatList(): void {
-    this.txDebugStatList = []
+    this.txDebugStatList = new Map()
+  }
+
+  printTxDebugByTxId(txId: string): string {
+    // get the txStat from the txDebugStatList
+    const txStat = this.txDebugStatList.get(txId)
+    if (txStat == null) {
+      return 'No txStat found'
+    }
+    let resultStr = ''
+    for (const key in txStat.duration) {
+      resultStr += `${key}: start:${txStat.startTimestamp[key]} end:${txStat.endTimestamp[key]} ${txStat.duration[key]} ms\n`
+    }
+    return resultStr
   }
 
   printTxDebug(): string {
     const collector = {}
-    const totalTxCount = this.txDebugStatList.length
+    const totalTxCount = this.txDebugStatList.size
 
     const indexes = [
       'aging',
@@ -3914,7 +3929,7 @@ class TransactionQueue {
     ]
 
     /* eslint-disable security/detect-object-injection */
-    for (const txStat of this.txDebugStatList) {
+    for (const [txId, txStat] of this.txDebugStatList.entries()) {
       for (const key in txStat.duration) {
         if (!collector[key]) {
           collector[key] = {}
@@ -4498,12 +4513,14 @@ class TransactionQueue {
 
           // seen vote but we are past timeM3 + voteSeenExpirationTime
           if (txAge > timeM3 + configContext.stateManager.confirmationSeenExpirationTime && hasSeenVote && hasSeenConfirmation) {
+            nestedCountersInstance.countEvent('txExpired', `> timeM3 + confirmSeenExpirationTime`)
             this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + confirmSeenExpirationTime general case has' +
               ' vote and confirmation but fail' +
               ' to' +
               ' commit the tx')
             continue
           } else if (txAge > timeM3 + configContext.stateManager.voteSeenExpirationTime && hasSeenVote && !hasSeenConfirmation) {
+            nestedCountersInstance.countEvent('txExpired', `> timeM3 + voteSeenExpirationTime`)
             this.mainLogger.error(`${queueEntry.logID} txAge > timeM3 + voteSeenExpirationTime general case has vote but fail to generate receipt`)
             this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + voteSeenExpirationTime general case has vote but fail' +
               ' to' +
@@ -4511,6 +4528,7 @@ class TransactionQueue {
             continue
           } else if (txAge > timeM3 + configContext.stateManager.noVoteSeenExpirationTime && !hasSeenVote) {
             // seen no vote but past timeM3 + noVoteSeenExpirationTime
+            nestedCountersInstance.countEvent('txExpired', `> timeM3 + noVoteSeenExpirationTime`)
             this.mainLogger.error(`${queueEntry.logID} txAge > timeM3 + noVoteSeenExpirationTime general case. no vote seen`)
             this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + noVoteSeenExpirationTime general case. no vote seen')
             continue
@@ -4604,21 +4622,20 @@ class TransactionQueue {
 
           // Have a hard cap where we ALMOST expire but NOT remove TXs from queue after time > M3
           if (txAge > timeM3 + extraTime && queueEntry.isInExecutionHome && queueEntry.almostExpired == null) {
-            this.statemanager_fatal(
-              `txExpired3 > M3. general case`,
-              `txExpired txAge > timeM3 general case ` +
-                `txid: ${shortID} state: ${queueEntry.state} hasAll:${queueEntry.hasAll} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}  hasReceipt:${hasReceipt} matchingReceipt:${matchingReceipt} isInExecutionHome:${isInExecutionHome} hasVote: ${queueEntry.receivedBestVote != null}`
-            )
-            /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `setTxAlmostExpired ${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
-            //if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
-
-            /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `setTxAlmostExpired > M3. general case state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} hasReceipt:${hasReceipt} matchingReceipt:${matchingReceipt} isInExecutionHome:${isInExecutionHome} hasVote: ${queueEntry.receivedBestVote != null}`)
-            /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `setTxAlmostExpired > M3. general case sieveT:${queueEntry.txSieveTime} extraTime:${extraTime}`)
-
             const hasVoted = queueEntry.ourVote != null
             const receivedVote = queueEntry.receivedBestVote != null
+            if (!receivedVote && !hasVoted && queueEntry.almostExpired == null) {
+              this.statemanager_fatal(
+                `setTxAlmostExpired > M3. general case`,
+                `setTxAlmostExpired txAge > timeM3 general case ` +
+                `txid: ${shortID} state: ${queueEntry.state} hasAll:${queueEntry.hasAll} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}  hasReceipt:${hasReceipt} matchingReceipt:${matchingReceipt} isInExecutionHome:${isInExecutionHome} hasVote: ${queueEntry.receivedBestVote != null}`
+              )
+              /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `setTxAlmostExpired ${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
+              //if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
-            if (!receivedVote && !hasVoted) {
+              /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `setTxAlmostExpired > M3. general case state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} hasReceipt:${hasReceipt} matchingReceipt:${matchingReceipt} isInExecutionHome:${isInExecutionHome} hasVote: ${queueEntry.receivedBestVote != null}`)
+              /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `setTxAlmostExpired > M3. general case sieveT:${queueEntry.txSieveTime} extraTime:${extraTime}`)
+
               nestedCountersInstance.countEvent('txExpired', 'set to almostExpired because we have not voted' +
                 ' or received' +
                 ' a' +
@@ -5052,10 +5069,13 @@ class TransactionQueue {
                     } ${utils.stringifyReduce(result)}`
                   )
                 }
-                const isReceiptMatchPreApply =  this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, result)
+                const isReceiptMatchPreApply =
+                  this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, result)
 
                 if (logFlags.debug || this.stateManager.consensusLog) {
-                  this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isReceiptMatchPreApply : ${queueEntry.logID} ${isReceiptMatchPreApply}`)
+                  this.mainLogger.debug(
+                    `processAcceptedTxQueue2 tryProduceReceipt isReceiptMatchPreApply : ${queueEntry.logID} ${isReceiptMatchPreApply}`
+                  )
                 }
 
                 if (isReceiptMatchPreApply && queueEntry.isInExecutionHome) {
@@ -5119,14 +5139,20 @@ class TransactionQueue {
                   }
                   //continue
                 } else {
-                  nestedCountersInstance.countEvent('consensus', `hasAppliedReceiptMatchingPreApply: false, isInExecutionHome: ${queueEntry.isInExecutionHome}`)
+                  nestedCountersInstance.countEvent(
+                    'consensus',
+                    `hasAppliedReceiptMatchingPreApply: false, isInExecutionHome: ${queueEntry.isInExecutionHome}`
+                  )
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                   didNotMatchReceipt = true
                   queueEntry.appliedReceiptForRepair = result
 
                   queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
                   if (queueEntry.isInExecutionHome === false && queueEntry.appliedReceipt2 != null) {
-                    if (this.stateManager.consensusLog) this.mainLogger.debug(`processTransactions ${queueEntry.logID} we are not execution home, but we have a receipt2, go to await final data`)
+                    if (this.stateManager.consensusLog)
+                      this.mainLogger.debug(
+                        `processTransactions ${queueEntry.logID} we are not execution home, but we have a receipt2, go to await final data`
+                      )
                     this.updateTxState(queueEntry, 'await final data')
                   }
                 }
@@ -5342,7 +5368,7 @@ class TransactionQueue {
                   /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.checkAndSetAccountData()' )
                   await this.stateManager.checkAndSetAccountData(
                     accountRecords,
-                    'awaitFinalData_passed',
+                    `txId: ${queueEntry.logID} awaitFinalData_passed`,
                     false
                   )
                   /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.checkAndSetAccountData()', DebugComplete.Completed )
@@ -5456,6 +5482,12 @@ class TransactionQueue {
                   canCommitTX = false
                 }
 
+                nestedCountersInstance.countEvent(
+                  'stateManager',
+                  `canCommitTX: ${canCommitTX}, hasReceiptFail: ${hasReceiptFail}`
+                )
+
+                /* prettier-ignore */ if (logFlags.verbose) if (logFlags.debug) this.mainLogger.debug('shrd_commitingTx', `${shortID}`, `canCommitTX: ${canCommitTX}, hasReceiptFail: ${hasReceiptFail}`)
                 /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `canCommitTX: ${canCommitTX} `)
                 if (canCommitTX) {
                   // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
@@ -5664,7 +5696,11 @@ class TransactionQueue {
     /* prettier-ignore */ if (logFlags.verbose || this.stateManager.consensusLog) this.mainLogger.debug(`setTXExpired tx:${queueEntry.logID} ${message}  ts:${queueEntry.acceptedTx.timestamp} debug:${utils.stringifyReduce(queueEntry.debug)}`)
     this.updateTxState(queueEntry, 'expired')
     this.removeFromQueue(queueEntry, currentIndex)
-    this.app.transactionReceiptFail(queueEntry.acceptedTx.data, queueEntry.collectedData, queueEntry.preApplyTXResult?.applyResponse)
+    this.app.transactionReceiptFail(
+      queueEntry.acceptedTx.data,
+      queueEntry.collectedData,
+      queueEntry.preApplyTXResult?.applyResponse
+    )
 
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'txExpired', `tx: ${this.app.getSimpleTxDebugValue(queueEntry.acceptedTx?.data)}` )
 
@@ -6563,12 +6599,14 @@ class TransactionQueue {
   txDebugMarkStartTime(queueEntry: QueueEntry, state: string): void {
     if (queueEntry.txDebug.startTime[state] == null) {
       queueEntry.txDebug.startTime[state] = process.hrtime()
+      queueEntry.txDebug.startTimestamp[state] = shardusGetTime()
     }
   }
   txDebugMarkEndTime(queueEntry: QueueEntry, state: string): void {
     if (queueEntry.txDebug.startTime[state]) {
       const endTime = process.hrtime(queueEntry.txDebug.startTime[state])
       queueEntry.txDebug.endTime[state] = endTime
+      queueEntry.txDebug.endTimestamp[state] = shardusGetTime()
 
       const durationInNanoseconds = endTime[0] * 1e9 + endTime[1]
       const durationInMilliseconds = durationInNanoseconds / 1e6

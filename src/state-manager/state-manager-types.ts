@@ -12,6 +12,8 @@ export type TxDebug = {
   duration: { [key: string]: number }
   startTime: { [key: string]: HRTime }
   endTime: { [key: string]: HRTime }
+  startTimestamp: { [key: string]: number }
+  endTimestamp: { [key: string]: number }
 }
 
 export type QueueEntry = {

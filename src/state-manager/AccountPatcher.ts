@@ -2109,15 +2109,37 @@ class AccountPatcher {
     for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
       const votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
       const ourTrieNode = this.shardTrie.layerMaps[this.treeSyncDepth].get(radix)
+      if (logFlags.debug) this.mainLogger.debug(`Checking isInSync ${radix}, cycle: ${cycle}, ${JSON.stringify(votesMap)}`);
+
+      const nonConsensusRanges = this.getNonConsensusRanges(cycle)
+      const nonStorageRanges = this.getNonStoredRanges(cycle)
+      let hasNonConsensusRange = false
+      let hasNonStorageRange = false
+      for (const range of nonConsensusRanges) {
+        if (radix >= range.low && radix <= range.high) {
+          hasNonConsensusRange = true
+          nestedCountersInstance.countEvent(`accountPatcher`, `isInsync hasNonConsensusRange`, 1)
+        }
+      }
+      for (const range of nonStorageRanges) {
+        if (radix >= range.low && radix <= range.high) {
+          hasNonStorageRange = true
+          nestedCountersInstance.countEvent(`accountPatcher`, `isInsync hasNonStorageRange`, 1)
+        }
+      }
+      if (hasNonConsensusRange && hasNonStorageRange) continue
 
       //if we dont have the node we may have missed an account completely!
       if (ourTrieNode == null) {
+        /* prettier-ignore */ nestedCountersInstance.countRareEvent(`accountPatcher`, `isInSync ${radix} our trieNode === null`, 1)
+        if (logFlags.debug) this.mainLogger.debug(`isInSync ${radix} our trieNode === null, cycle: ${cycle}`)
         return false
       }
 
       if (votesMap.bestVotes < minVotes) {
         //temporary rare event so we can consider this.
         /* prettier-ignore */ nestedCountersInstance.countRareEvent(`accountPatcher`, `isInSync ${radix} votesMap.bestVotes < minVotes bestVotes: ${votesMap.bestVotes} < ${minVotes} uniqueVotes: ${votesMap.allVotes.size}`, 1)
+        /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `isInSync ${radix} votesMap.bestVotes < minVotes bestVotes: ${votesMap.bestVotes} < ${minVotes} uniqueVotes: ${votesMap.allVotes.size}`, 1)
       }
 
       // hasNonStorageRange = false
@@ -2278,8 +2300,50 @@ class AccountPatcher {
       toFix.sort(this.sortByRadix)
       this.statemanager_fatal(
         'debug findBadAccounts',
-        `debug findBadAccounts ${cycle}: ${utils.stringifyReduce(toFix)}`
+        `debug findBadAccounts ${cycle}: toFix: ${utils.stringifyReduce(toFix)}`
       )
+      for (let radixToFix of toFix) {
+        const votesMap = hashTrieSyncConsensus.radixHashVotes.get(radixToFix.radix)
+        let hasNonConsensusRange = false
+        let hasNonStorageRange = false
+
+        const nonConsensusRanges = this.getNonConsensusRanges(cycle)
+        const nonStorageRange = this.getNonStoredRanges(cycle)
+        for (const range of nonConsensusRanges) {
+          if (radixToFix.radix >= range.low && radixToFix.radix <= range.high) {
+            hasNonConsensusRange = true
+            nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts hasNonConsensusRange`, 1)
+          }
+        }
+        for (const range of nonStorageRange) {
+          if (radixToFix.radix >= range.low && radixToFix.radix <= range.high) {
+            hasNonStorageRange = true
+            nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts hasNonStorageRange`, 1)
+          }
+        }
+
+        const kvp = []
+        for (const [key, value] of votesMap.allVotes.entries()) {
+          kvp.push({
+            id: key,
+            count: value.count,
+            nodeIDs: value.voters.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
+          })
+        }
+        const simpleMap = {
+          bestHash: votesMap.bestHash,
+          bestVotes: votesMap.bestVotes,
+          allVotes: kvp,
+        }
+        this.statemanager_fatal(
+          'debug findBadAccounts',
+          `debug findBadAccounts ${cycle}: ${radixToFix.radix} isInNonConsensusRange: ${hasNonConsensusRange} isInNonStorageRange: ${hasNonStorageRange} bestVotes ${
+            votesMap.bestVotes
+          } minVotes:${minVotes} uniqueVotes: ${votesMap.allVotes.size} ${utils.stringifyReduce(
+            simpleMap
+          )}`
+        )
+      }
     }
 
     //record some debug info
@@ -2316,7 +2380,7 @@ class AccountPatcher {
     }
 
     stats.leafsChecked = toFix.length
-    //get bad accounts
+    //get bad accounts from the leaf nodes
     const { radixAndChildHashes, getAccountHashStats } = await this.getChildAccountHashes(toFix, cycle)
     stats.getAccountHashStats = getAccountHashStats
 
@@ -2350,10 +2414,10 @@ class AccountPatcher {
             if (accountMemData.c >= cycle - 1) {
               if (potentalBadAcc != null) {
                 if (potentalBadAcc.hash != potentalGoodAcc.hash) {
-                  stats.ok_trieHashBad++
+                  stats.ok_trieHashBad++ // mem account is good but trie account is bad
                 }
               } else {
-                stats.ok_noTrieAcc++
+                stats.ok_noTrieAcc++ // no trie account at all
               }
 
               //this was in cache, but stale so we can reinstate the cache since it still matches the group consensus
@@ -2537,11 +2601,13 @@ class AccountPatcher {
       }
 
       if (hasNonConsensusRange) {
-        if (lastCycleNonConsensus === false && hasNonStorageRange === false) {
+        if (lastCycleNonConsensus === false && hasNonStorageRange === false) { // lastCycleConsensus && hasStorageRange
           //we can share this data, may be a pain for nodes to verify..
           //todo include last cycle syncing..
+          nestedCountersInstance.countEvent(`accountPatcher`, `broadcast nonConsensus because lastCycleNonConsensus === false`, 1)
         } else {
           //we cant send this data
+          nestedCountersInstance.countEvent('accountPatcher', 'broadcast skip nonConsensus', 1)
           continue
         }
       }
@@ -2766,11 +2832,9 @@ class AccountPatcher {
       )
     }
 
-    if (this.isInSync(cycle) === false) {
-      if (this.stateManager.debugSkipPatcherRepair) {
-        this.failedLastTrieSync = true
-        return
-      }
+    let isInSync = this.isInSync(cycle)
+    if (logFlags.debug) this.mainLogger.debug(`isInSync: ${isInSync}, cycle: ${cycle}`)
+    if (isInSync === false) {
       let failHistoryObject: { repaired: number; s: number; e: number; cycles: number }
       if (lastFail === false) {
         this.failStartCycle = cycle
@@ -2790,6 +2854,10 @@ class AccountPatcher {
       const results = await this.findBadAccounts(cycle)
       /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `badAccounts c:${cycle} `, results.badAccounts.length)
       /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `accountHashesChecked c:${cycle}`, results.accountHashesChecked)
+
+      if (logFlags.debug) {
+        this.mainLogger.debug(`badAccounts cycle: ${cycle}, total: ${results.badAccounts.length}, accounts: ${JSON.stringify(results.badAccounts)}`)
+      }
 
       if (this.config.mode === 'debug' && this.config.debug.haltOnDataOOS) {
         this.statemanager_fatal(

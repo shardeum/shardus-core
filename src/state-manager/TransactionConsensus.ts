@@ -1837,6 +1837,7 @@ class TransactionConsenus {
       }
       const nodesToAsk = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
       const redundancy = 3
+      const maxRetry = 3
       const {
         topResult: response,
         isRobustResult,
@@ -1849,7 +1850,8 @@ class TransactionConsenus {
         true,
         true,
         false,
-        'robustQueryConfirmOrChallenge'
+        'robustQueryConfirmOrChallenge',
+        maxRetry
       )
       nestedCountersInstance.countEvent('robustQueryConfirmOrChallenge', `isRobustResult:${isRobustResult}`)
       if (!isRobustResult) {

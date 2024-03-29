@@ -265,7 +265,8 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   shuffleNodes = true,
   strictRedundancy = false,
   extraDebugging = false,
-  note = 'general'
+  note = 'general',
+  maxRetry = 20
 ): Promise<RobustQueryResult<Node, Response>> {
   if (nodes.length === 0) throw new Error('No nodes given.')
   if (typeof queryFn !== 'function') {
@@ -386,7 +387,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       nodesToQuery = nodes.splice(0, toQuery)
     }
     finalResult = await queryNodes(nodesToQuery)
-    if (tries >= 20) {
+    if (tries >= maxRetry) {
       /* prettier-ignore */ if (logFlags.console || config.debug.robustQueryDebug || extraDebugging) console.log('robustQuery: stopping after 20 tries.')
       if (extraDebugging) nestedCountersInstance.countEvent('robustQuery', `${note} stopped after 20 tries`)
       break

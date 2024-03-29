@@ -2180,6 +2180,23 @@ class StateManager {
       res.end()
     })
 
+    Context.network.registerExternalGet('print_tx_debug_by_txid', isDebugModeMiddlewareLow, (_req, res) => {
+      const txId = _req.query.txId
+      if (txId == null) {
+        res.write('txId parameter required')
+        res.end()
+        return
+      }
+      if (typeof  txId !== 'string') {
+        res.write('txId parameter must be a string')
+        res.end()
+        return
+      }
+      const result = this.transactionQueue.printTxDebugByTxId(txId)
+      res.write(result)
+      res.end()
+    })
+
     Context.network.registerExternalGet('last_process_stats', isDebugModeMiddlewareLow, (_req, res) => {
       const result = JSON.stringify(this.transactionQueue.lastProcessStats, null, 2)
       res.write(result)
