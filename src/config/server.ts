@@ -162,7 +162,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     requestStateForTxPostBinary: false, //disabled because unhandled rejection SHM-4299
     requestStateForTxBinary: true,
     requestReceiptForTxBinary: true,
-    rotationEdgeToAvoid: 2,
+    rotationEdgeToAvoid: 3,
     forcedMode: '',
     delayZombieRestartSec: 180,
   },
