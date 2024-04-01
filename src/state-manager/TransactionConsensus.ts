@@ -1847,25 +1847,25 @@ class TransactionConsenus {
       // const nodesToAsk = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
       let nodesToAsk = []
 
-      for (const key of Object.keys(queueEntry.localKeys)) {
-        if (queueEntry.localKeys[key] === true) {
-          const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
-            this.stateManager.currentCycleShardData.nodeShardData
-
-          const homeNode = ShardFunctions.findHomeNode(
-            Context.stateManager.currentCycleShardData.shardGlobals,
-            key,
-            Context.stateManager.currentCycleShardData.parititionShardDataMap
-          )
-          const storageNodes = homeNode.nodeThatStoreOurParitionFull
-          const storageNodesIdSet = new Set(storageNodes.map(node => node.id))
-          for (const node of queueEntry.transactionGroup) {
-            if (storageNodesIdSet.has(node.id)) {
-              nodesToAsk.push(node)
-            }
-          }
-        }
-      }
+      // for (const key of Object.keys(queueEntry.localKeys)) {
+      //   if (queueEntry.localKeys[key] === true) {
+      //     const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
+      //       this.stateManager.currentCycleShardData.nodeShardData
+      //
+      //     const homeNode = ShardFunctions.findHomeNode(
+      //       Context.stateManager.currentCycleShardData.shardGlobals,
+      //       key,
+      //       Context.stateManager.currentCycleShardData.parititionShardDataMap
+      //     )
+      //     const storageNodes = homeNode.nodeThatStoreOurParitionFull
+      //     const storageNodesIdSet = new Set(storageNodes.map(node => node.id))
+      //     for (const node of queueEntry.transactionGroup) {
+      //       if (storageNodesIdSet.has(node.id)) {
+      //         nodesToAsk.push(node)
+      //       }
+      //     }
+      //   }
+      // }
 
       nestedCountersInstance.countEvent('robustQueryConfirmOrChallenge', `nodesToAsk:${nodesToAsk.length}`)
 
@@ -1874,8 +1874,8 @@ class TransactionConsenus {
         nodesToAsk = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
       }
 
-      const redundancy = 5
-      const maxRetry = 2
+      const redundancy = 3
+      const maxRetry = 5
       const {
         topResult: response,
         isRobustResult,

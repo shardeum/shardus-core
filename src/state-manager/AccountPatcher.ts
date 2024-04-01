@@ -32,8 +32,8 @@ import {
   RadixAndHash,
   ShardedHashTrie,
   TrieAccount,
-  CycleShardData,
-} from './state-manager-types'
+  CycleShardData, AppliedReceipt2
+} from "./state-manager-types";
 import {
   isDebugModeMiddleware,
   isDebugModeMiddlewareLow,
@@ -357,7 +357,7 @@ class AccountPatcher {
         )
         if (logFlags.debug) this.mainLogger.debug(`update_too_old_account_data: ${updatedAccounts.length} updated, ${failedHashes.length} failed`)
         nestedCountersInstance.countEvent('accountPatcher', `update_too_old_account_data:${updatedAccounts.length} updated`)
-        nestedCountersInstance.countEvent('accountPatcher', `update_too_old_account_data:${failedHashes.length} failed`)
+        if (failedHashes.length > 0) nestedCountersInstance.countEvent('accountPatcher', `update_too_old_account_data:${failedHashes.length} failed`)
         let success = false
         if (updatedAccounts.length > 0 && failedHashes.length === 0) {
           success = true
@@ -3078,21 +3078,42 @@ class AccountPatcher {
       }
 
       if (tooOldAccountsMap.size > 0) {
+        if (logFlags.debug) this.mainLogger.debug(`too_old_account detected: ${tooOldAccountsMap.size}, ${utils.stringifyReduce(tooOldAccountsMap)}`)
+        nestedCountersInstance.countEvent('accountPatcher', `too_old_account detected c:${cycle}`)
         // ask the remote node to repair their data
         for (let [accountId, tooOldRecord] of tooOldAccountsMap) {
-          const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchivedByTimestamp(tooOldRecord.accountMemData.t, 'tooOld account repair')
+          const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchivedByTimestamp(tooOldRecord.accountMemData.t, 'too_old_account repair')
           if (archivedQueueEntry == null) {
-            nestedCountersInstance.countEvent('accountPatcher', `tooOld account repair archivedQueueEntry null c:${cycle}`)
+            nestedCountersInstance.countEvent('accountPatcher', `too_old_account repair archivedQueueEntry null c:${cycle}`)
             continue
           }
-          let queueEntryAccountWrites = archivedQueueEntry.preApplyTXResult.applyResponse.accountWrites.map((accountWrite) => accountWrite.accountId)
-          if (queueEntryAccountWrites.includes(accountId) === false) {
-            nestedCountersInstance.countEvent('accountPatcher', `tooOld account repair archivedQueueEntry account not in accountWrites c:${cycle}`)
+
+          const accountDataList = await this.app.getAccountDataByList([accountId])
+          const skippedAccounts: AccountIDAndHash[] = []
+
+          const accountDataFinal: Shardus.WrappedData[] = []
+          if (accountDataList != null) {
+            for (const wrappedAccount of accountDataList) {
+              if (wrappedAccount == null || wrappedAccount.stateId == null || wrappedAccount.data == null) {
+                continue
+              }
+              const { accountId, stateId, data: recordData } = wrappedAccount
+              const accountHash = this.app.calculateAccountHash(recordData)
+              if (tooOldRecord.accountMemData.h !== accountHash) {
+                skippedAccounts.push({ accountID: accountId, hash: stateId })
+                nestedCountersInstance.countEvent(`accountPatcher`, `too_old_account repair account hash mismatch skipped c:${cycle}`)
+                continue
+              }
+              accountDataFinal.push(wrappedAccount)
+            }
+          }
+          if (accountDataFinal.length === 0) {
+            nestedCountersInstance.countEvent('accountPatcher', `too_old_account repair accountDataFinal empty c:${cycle}`)
             continue
           }
-          let updatedAccountData = archivedQueueEntry.preApplyTXResult.applyResponse.accountWrites.find((accountWrite) => accountWrite.accountId === accountId)
+          let updatedAccountData = accountDataFinal[0]
           if (updatedAccountData == null || updatedAccountData.timestamp != tooOldRecord.accountMemData.t) {
-            nestedCountersInstance.countEvent('accountPatcher', `tooOld account repair archivedQueueEntry account data not found or timestamp mismatch c:${cycle}`)
+            nestedCountersInstance.countEvent('accountPatcher', `too_old_account repair archivedQueueEntry account data not found or timestamp mismatch c:${cycle}`)
             continue
           }
           const accountDataRequest: TooOldAccountUpdateRequest = {
@@ -3100,10 +3121,11 @@ class AccountPatcher {
             tooOldAccountRecord: tooOldRecord,
             txId: archivedQueueEntry.acceptedTx.txId,
             appliedReceipt2: this.stateManager.getReceipt2(archivedQueueEntry),
-            updatedAccountData: updatedAccountData.data
+            updatedAccountData: updatedAccountData
           }
           await this.p2p.tell([tooOldRecord.node], 'update_too_old_account_data', accountDataRequest)
-          nestedCountersInstance.countEvent('accountPatcher', `tooOld account repair requested c:${cycle}`)
+          nestedCountersInstance.countEvent('accountPatcher', `too_old_account repair requested c:${cycle}`)
+          if (logFlags.debug) this.mainLogger.debug(`too_old_account repair requested: ${accountId}, ${tooOldRecord.node.id}`)
         }
       }
 
