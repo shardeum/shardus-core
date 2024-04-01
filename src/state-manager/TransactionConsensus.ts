@@ -1,4 +1,5 @@
 import { CycleRecord } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
+import { P2P as P2PTypes, StateManager as StateManagerTypes } from '@shardus/types'
 import { Logger as log4jLogger } from 'log4js'
 import StateManager from '.'
 import Crypto from '../crypto'
@@ -1843,15 +1844,44 @@ class TransactionConsenus {
         } finally {
         }
       }
-      const nodesToAsk = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-      const redundancy = 3
-      const maxRetry = 3
+      // const nodesToAsk = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+      let nodesToAsk = []
+
+      for (const key of Object.keys(queueEntry.localKeys)) {
+        if (queueEntry.localKeys[key] === true) {
+          const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
+            this.stateManager.currentCycleShardData.nodeShardData
+
+          const homeNode = ShardFunctions.findHomeNode(
+            Context.stateManager.currentCycleShardData.shardGlobals,
+            key,
+            Context.stateManager.currentCycleShardData.parititionShardDataMap
+          )
+          const storageNodes = homeNode.nodeThatStoreOurParitionFull
+          const storageNodesIdSet = new Set(storageNodes.map(node => node.id))
+          for (const node of queueEntry.transactionGroup) {
+            if (storageNodesIdSet.has(node.id)) {
+              nodesToAsk.push(node)
+            }
+          }
+        }
+      }
+
+      nestedCountersInstance.countEvent('robustQueryConfirmOrChallenge', `nodesToAsk:${nodesToAsk.length}`)
+
+      if (nodesToAsk.length === 0) {
+        nestedCountersInstance.countEvent('robustQueryConfirmOrChallenge', `nodesToAsk is 0`)
+        nodesToAsk = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+      }
+
+      const redundancy = 5
+      const maxRetry = 2
       const {
         topResult: response,
         isRobustResult,
         winningNodes,
       } = await robustQuery(
-        this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry),
+        nodesToAsk,
         queryFn,
         eqFn,
         redundancy,
@@ -1929,7 +1959,8 @@ class TransactionConsenus {
       }
     }
     const redundancy = 3
-    const { topResult: response } = await robustQuery(consensNodes, queryFn, eqFn, redundancy, false)
+    const maxRetry = 5
+    const { topResult: response } = await robustQuery(consensNodes, queryFn, eqFn, redundancy, true, true, false, 'robustQueryAccountData', maxRetry)
     if (response && response.data) {
       const accountData = response.data.wrappedAccounts[0]
       return accountData
