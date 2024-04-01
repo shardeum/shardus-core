@@ -1150,6 +1150,8 @@ export interface ServerConfiguration {
   }
   /** Options for enabling features on the network at specific versions */
   features?: {
+    /** Generic flag for the dapp to enable/disable certain features. Todo: replace this with something less hardcoded **/
+    dappFeature1enabled: boolean
     /** Enabled at shardeum v1.1.3. Fixes homeNode check for TX group changes: https://gitlab.com/shardus/global/shardus-global-server/-/merge_requests/268 */
     fixHomeNodeCheckForTXGroupChanges?: boolean
     /** To enable at shardeum v1.1.3 */
