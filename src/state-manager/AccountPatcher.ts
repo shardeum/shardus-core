@@ -109,6 +109,25 @@ type AccountStats = {
   requested: number
 }
 
+interface AccountRepairDataResponse {
+  nodes: Shardus.Node[],
+  wrappedDataList: Shardus.WrappedData[],
+}
+interface TooOldAccountRecord {
+  wrappedData: Shardus.WrappedData
+  accountMemData: AccountHashCache
+  node: Shardus.Node
+}
+interface TooOldAccountUpdateRequest {
+  accountID: string
+  tooOldAccountRecord: TooOldAccountRecord
+  txId: string
+  appliedReceipt2: AppliedReceipt2
+  updatedAccountData: Shardus.WrappedData
+}
+
+type RequestEntry = { node: Shardus.Node; request: { cycle: number; accounts: AccountIDAndHash[] } }
+
 class AccountPatcher {
   app: Shardus.App
   crypto: Crypto
@@ -303,6 +322,49 @@ class AccountPatcher {
           respondSize = await respond(result)
         }
         profilerInstance.scopedProfileSectionEnd('get_trie_hashes', respondSize)
+      }
+    )
+
+    this.p2p.registerInternal(
+      'update_too_old_account_data',
+      async (
+        payload: TooOldAccountUpdateRequest,
+        respond: (arg0: boolean) => Promise<boolean>,
+        _sender: unknown,
+        _tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('update_too_old_account_data', false, msgSize)
+        let { accountID, tooOldAccountRecord, txId, appliedReceipt2, updatedAccountData } = payload
+
+        // todo: check the tx receipt from the archiver to see if the tx was applied
+
+        // check if we cover this accountId
+
+        // todo: check if the account is still too old
+
+        // check the hash and timestamp of the account data
+
+        // update the account data (and cache?)
+        const updatedAccounts: string[] = []
+        //save the account data.  note this will make sure account hashes match the wrappers and return failed
+        // hashes  that don't match
+        const failedHashes = await this.stateManager.checkAndSetAccountData(
+          [updatedAccountData],
+          `update_too_old_account_data:${txId}`,
+          true,
+          updatedAccounts
+        )
+        if (logFlags.debug) this.mainLogger.debug(`update_too_old_account_data: ${updatedAccounts.length} updated, ${failedHashes.length} failed`)
+        nestedCountersInstance.countEvent('accountPatcher', `update_too_old_account_data:${updatedAccounts.length} updated`)
+        nestedCountersInstance.countEvent('accountPatcher', `update_too_old_account_data:${failedHashes.length} failed`)
+        let success = false
+        if (updatedAccounts.length > 0 && failedHashes.length === 0) {
+          success = true
+        }
+        await respond(success)
+
+        profilerInstance.scopedProfileSectionEnd('update_too_old_account_data')
       }
     )
 
@@ -2886,10 +2948,17 @@ class AccountPatcher {
       }
 
       //request data for the list of bad accounts then update.
-      const { wrappedDataList, stateTableDataMap, getAccountStats } = await this.getAccountRepairData(
+      const { repairDataResponse, stateTableDataMap, getAccountStats } = await this.getAccountRepairData(
         cycle,
         results.badAccounts
       )
+
+      if (repairDataResponse == null) {
+        this.statemanager_fatal(
+          'checkAndSetAccountData repairDataResponse',
+          `c:${cycle} repairDataResponse is null`
+        )
+      }
 
       //we need filter our list of possible account data to use for corrections.
       //it is possible the majority voters could send us account data that is older than what we have.
@@ -2906,9 +2975,16 @@ class AccountPatcher {
         tsFix3: 0,
       }
 
+
+
+      let tooOldAccountsMap : Map<string, TooOldAccountRecord> = new Map()
+      let wrappedDataList = repairDataResponse.wrappedDataList
+
       // build a list of data that is good to use in this repair operation
       // Also, there is a section where cache accountHashCacheHistory.lastSeenCycle may get repaired.
-      for (const wrappedData of wrappedDataList) {
+      for (let i = 0; i < wrappedDataList.length; i++) {
+        let wrappedData: Shardus.WrappedData = wrappedDataList[i]
+        let nodeWeAsked = repairDataResponse.nodes[i]
         if (this.stateManager.accountCache.hasAccount(wrappedData.accountId)) {
           const accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(
             wrappedData.accountId
@@ -2927,6 +3003,11 @@ class AccountPatcher {
               )}  cacheTS:${accountMemData.t} cacheHash:${utils.stringifyReduce(accountMemData.h)}`
             )
             filterStats.tooOld++
+            tooOldAccountsMap.set(wrappedData.accountId, {
+              wrappedData,
+              accountMemData,
+              node: nodeWeAsked
+            })
             continue
           }
           //This is less likely to be hit here now that similar logic checking the hash happens upstream in findBadAccounts()
@@ -2993,6 +3074,36 @@ class AccountPatcher {
           filterStats.accepted++
           //this good account data to repair with
           wrappedDataListFiltered.push(wrappedData)
+        }
+      }
+
+      if (tooOldAccountsMap.size > 0) {
+        // ask the remote node to repair their data
+        for (let [accountId, tooOldRecord] of tooOldAccountsMap) {
+          const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchivedByTimestamp(tooOldRecord.accountMemData.t, 'tooOld account repair')
+          if (archivedQueueEntry == null) {
+            nestedCountersInstance.countEvent('accountPatcher', `tooOld account repair archivedQueueEntry null c:${cycle}`)
+            continue
+          }
+          let queueEntryAccountWrites = archivedQueueEntry.preApplyTXResult.applyResponse.accountWrites.map((accountWrite) => accountWrite.accountId)
+          if (queueEntryAccountWrites.includes(accountId) === false) {
+            nestedCountersInstance.countEvent('accountPatcher', `tooOld account repair archivedQueueEntry account not in accountWrites c:${cycle}`)
+            continue
+          }
+          let updatedAccountData = archivedQueueEntry.preApplyTXResult.applyResponse.accountWrites.find((accountWrite) => accountWrite.accountId === accountId)
+          if (updatedAccountData == null || updatedAccountData.timestamp != tooOldRecord.accountMemData.t) {
+            nestedCountersInstance.countEvent('accountPatcher', `tooOld account repair archivedQueueEntry account data not found or timestamp mismatch c:${cycle}`)
+            continue
+          }
+          const accountDataRequest: TooOldAccountUpdateRequest = {
+            accountID: accountId,
+            tooOldAccountRecord: tooOldRecord,
+            txId: archivedQueueEntry.acceptedTx.txId,
+            appliedReceipt2: this.stateManager.getReceipt2(archivedQueueEntry),
+            updatedAccountData: updatedAccountData.data
+          }
+          await this.p2p.tell([tooOldRecord.node], 'update_too_old_account_data', accountDataRequest)
+          nestedCountersInstance.countEvent('accountPatcher', `tooOld account repair requested c:${cycle}`)
         }
       }
 
@@ -3171,14 +3282,14 @@ class AccountPatcher {
     cycle: number,
     badAccounts: AccountIDAndHash[]
   ): Promise<{
-    wrappedDataList: Shardus.WrappedData[]
+    repairDataResponse: AccountRepairDataResponse
     stateTableDataMap: Map<string, Shardus.StateTableObject>
     getAccountStats: AccountStats
   }> {
     //pick which nodes to ask! /    //build up requests
     const nodesBySyncRadix: Map<
       string,
-      { node: Shardus.Node; request: { cycle: number; accounts: AccountIDAndHash[] } }
+      RequestEntry
     > = new Map()
     const accountHashMap = new Map()
 
@@ -3191,6 +3302,8 @@ class AccountPatcher {
       requested: 0,
       //alreadyOKHash:0
     }
+    let repairDataResponse: AccountRepairDataResponse
+    let allRequestEntries: Map<string, RequestEntry> = new Map()
 
     try {
       for (const accountEntry of badAccounts) {
@@ -3218,6 +3331,7 @@ class AccountPatcher {
           nodesBySyncRadix.set(syncRadix, requestEntry)
         }
         requestEntry.request.accounts.push(accountEntry)
+        allRequestEntries.set(accountEntry.accountID, requestEntry)
       }
 
       const promises = []
@@ -3319,6 +3433,16 @@ class AccountPatcher {
           }
         }
       }
+      let nodesWeAsked = []
+      for (const wrappedData of wrappedDataList) {
+        let requestEntry = allRequestEntries.get(wrappedData.accountId)
+        if (requestEntry != null) {
+          nodesWeAsked.push(requestEntry.node)
+        } else {
+          nodesWeAsked.push(null)
+        }
+      }
+      repairDataResponse = { wrappedDataList, nodes: nodesWeAsked }
     } catch (error) {
       this.statemanager_fatal(
         'getAccountRepairData fatal ' + wrappedDataList.length,
@@ -3326,7 +3450,7 @@ class AccountPatcher {
       )
     }
 
-    return { wrappedDataList, stateTableDataMap, getAccountStats }
+    return { repairDataResponse, stateTableDataMap, getAccountStats }
   }
 
   /***

@@ -2163,6 +2163,22 @@ class TransactionQueue {
     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`getQueueEntryArchived failed to find: ${utils.stringifyReduce(txid)} ${msg} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txid)]}`)
     return null
   }
+  /**
+   * getQueueEntryArchived
+   * get a queue entry from the archive queue only
+   * @param txid
+   * @param msg
+   */
+  getQueueEntryArchivedByTimestamp(timestamp: number, msg: string): QueueEntry | null {
+    for (const queueEntry of this.archivedQueueEntriesByID.values()) {
+      if (queueEntry.acceptedTx.timestamp === timestamp) {
+        return queueEntry
+      }
+    }
+    nestedCountersInstance.countRareEvent('error', `getQueueEntryArchived no entry: ${msg}`)
+    nestedCountersInstance.countEvent('error', `getQueueEntryArchived no entry: ${msg}`)
+    return null
+  }
 
   /**
    * queueEntryAddData
