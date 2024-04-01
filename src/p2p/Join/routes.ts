@@ -541,6 +541,7 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeLi
     return
   }
 
+
   // Validate payload structure and types
   let err = utils.validateTypes(payload, {
     publicKey: 's',
@@ -603,6 +604,29 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<SyncStarted, P2P.NodeLi
 
     if (!payload) {
       warn('No payload provided for the `SyncStarted` request.')
+      return
+    }
+
+    // Validate payload structure and types
+    let err = utils.validateTypes(payload, {
+      nodeId: 's',
+      cycleNumber: 'n',
+      sign: 'o',
+    })
+
+    if (err) {
+      /* prettier-ignore */ if (logFlags.error) warn(`gossipSyncStartedRoute: bad input ${err}`)
+      return
+    }
+
+    // validate the 'sign' object structure
+    err = utils.validateTypes(payload.sign, {
+      owner: 's',
+      sig: 's',
+    })
+
+    if (err) {
+      /* prettier-ignore */ if (logFlags.error) warn(`gossipSyncStartedRoute: bad input sign ${err}`)
       return
     }
 
