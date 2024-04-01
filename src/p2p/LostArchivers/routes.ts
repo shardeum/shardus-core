@@ -30,6 +30,7 @@ import { TypeIdentifierEnum } from '../../types/enum/TypeIdentifierEnum'
 import { safeStringify } from '../../utils'
 import { validateTypes } from '../../utils'
 import * as NodeList from '../NodeList'
+import { nestedCountersInstance } from '../../utils/nestedCounters'
 
 /** Gossip */
 
@@ -100,11 +101,6 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
     return
   }
 
-  // Do not forward gossip (non-original messages) after quarter 2
-  if (!isOrig && currentQuarter > 2) {
-    logging.warn(`lostArchiverUpGossip: Not forwarding non-original message received after Q2, currentQuarter: ${currentQuarter}`)
-    return
-  }
 
   const upMsg = payload as SignedObject<ArchiverUpMsg>
   const target = upMsg.downMsg.investigateMsg.target
@@ -146,6 +142,7 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
 
   // Ignore gossip outside of Q1 and Q2
   if (![1, 2].includes(currentQuarter)) {
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `lost-archiver-down-gossip-reject: not in Q1 or Q2`)
     logging.warn('lostArchiverUpGossip: not in Q1 or Q2')
     return
   }
@@ -177,7 +174,7 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
     return
   }
 
-  // Further validation for the 'sign' object structure
+  // Validate Sign Structure and Types
   err = validateTypes(payload.sign, {
     owner: 's',
     sig: 's',
