@@ -17,6 +17,7 @@ import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as CycleChain from './CycleChain'
+import { isNodeNearRotatingOut, isNodeRecentlyRotatedIn } from './Utils'
 
 /** ROUTES */
 
@@ -652,13 +653,13 @@ export function isNodeValidForInternalMessage(
   const { idx, total } = NodeList.getAgeIndexForNodeId(node.id)
 
   // skip freshly rotated in nodes
-  if (checkNodesRotationBounds && total >= 10 && idx <= config.p2p.rotationEdgeToAvoid) {
+  if (isNodeRecentlyRotatedIn(idx, total, checkNodesRotationBounds)) {
     nestedCountersInstance.countEvent('skip-newly-rotated-node', node.id)
     return false
   }
 
   // skip about to be rotated out nodes
-  if (checkNodesRotationBounds && total >= 10 && idx >= total - config.p2p.rotationEdgeToAvoid) {
+  if (isNodeNearRotatingOut(idx, total, checkNodesRotationBounds)) {
     nestedCountersInstance.countEvent('skip-about-to-rotate-out-node', node.id)
     return false
   }

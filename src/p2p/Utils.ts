@@ -579,3 +579,29 @@ export async function getActiveNodesFromArchiver(
     return Error(`Could not get seed list from seed node server 2 ${nodeListUrl}: ` + e.message)
   })
 }
+
+export function isNodeRecentlyRotatedIn(
+  idx: number,
+  numActiveNodes: number,
+  checkNodesRotationBounds: boolean
+): boolean {
+  return (
+    checkNodesRotationBounds &&
+    numActiveNodes >= 10 + config.p2p.rotationEdgeToAvoid &&
+    config.p2p.rotationEdgeToAvoid &&
+    idx <= config.p2p.rotationEdgeToAvoid
+  )
+}
+
+export function isNodeNearRotatingOut(
+  idx: number,
+  numActiveNodes: number,
+  checkNodesRotationBounds: boolean
+): boolean {
+  return (
+    checkNodesRotationBounds &&
+    numActiveNodes >= 10 + config.p2p.rotationEdgeToAvoid &&
+    config.p2p.rotationEdgeToAvoid &&
+    idx >= numActiveNodes - config.p2p.rotationEdgeToAvoid
+  )
+}
