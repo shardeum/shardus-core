@@ -285,8 +285,8 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     //let standbyRemoved_joined = 0
     let standbyRemoved_App = 0
     let skipped = 0
-    const standbyList = getLastHashedStandbyList()
     const standbyListMap = getStandbyNodesInfoMap()
+    const standbyList = Array.from(standbyListMap.values())
 
     if (config.p2p.standbyAgeScrub) {
       // scrub the stanby list of nodes that have been in it too long.  > standbyListCyclesTTL num cycles

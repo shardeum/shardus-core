@@ -1026,6 +1026,8 @@ export interface ServerConfiguration {
     enableCycleRecordDebugTool: boolean
     /**  Flag to force a tx to expire **/
     forcedExpiration: boolean
+    /** chance to ignore a request to submit a standby refresh request on behalf of a standby node */
+    ignoreStandbyRefreshChance: number
   }
   /** Options for the statistics module */
   statistics?: {

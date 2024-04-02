@@ -33,6 +33,7 @@ import { SyncStarted } from '@shardus/types/build/src/p2p/JoinTypes'
 import { addSyncStarted } from './v2/syncStarted'
 import { addStandbyRefresh } from './v2/standbyRefresh'
 import { safeStringify } from '../../utils'
+import { testFailChance } from '../../utils'
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
@@ -224,7 +225,17 @@ const syncStartedRoute: P2P.P2PTypes.Route<Handler> = {
 const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'standby-refresh',
-  handler: (req, res) => {
+  handler: async (req, res) => {
+
+    // check if we should ignore this request for debugging purposes
+    if (config.debug.ignoreStandbyRefreshChance > 0) {
+      // if we should ignore this request, sleep for 1.1 seconds since timeout is 1 second
+      if (testFailChance(config.debug.ignoreStandbyRefreshChance, 'standby-refresh', '', '', false)) {
+        await utils.sleep(3000)
+        res.status(500).send('simulated timeout')
+      }
+    }
+
     const standbyRefreshRequest = req.body
 
     let err = utils.validateTypes(req, { body: 'o' })

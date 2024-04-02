@@ -226,6 +226,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     enableScopedProfiling: true,
     enableCycleRecordDebugTool: false,
     forcedExpiration: false,
+    ignoreStandbyRefreshChance: 0,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {

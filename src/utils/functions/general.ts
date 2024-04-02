@@ -2,6 +2,8 @@ import { P2P } from '@shardus/types'
 import { Ordering, safeStringify } from '..'
 import { Response } from 'express-serve-static-core'
 import { DevSecurityLevel } from '../../shardus/shardus-types'
+import { nestedCountersInstance } from '../nestedCounters'
+import { logFlags } from '../../logger'
 
 const replacer = (key: string, value: any): any => {
   if (typeof value === 'bigint') {
@@ -595,4 +597,37 @@ export function getPrefixInt(hexAddress: string, length = 8): number {
   }
 
   return prefixInt;
+}
+
+/**
+ * test once at the given probability to fail.  If it fails, log the message and return true.  If it doesnt fail, return false.
+ * @param failChance
+ * @param debugName
+ * @param key
+ * @param message
+ * @param verboseRequired
+ * @returns
+ */
+export function testFailChance(
+  failChance: number,
+  debugName: string,
+  key: string,
+  message: string,
+  verboseRequired: boolean
+): boolean {
+  if (failChance == null) {
+    return false
+  }
+
+  const rand = Math.random()
+  if (failChance > rand) {
+    if (debugName != null) {
+      // if (verboseRequired === false || logFlags.verbose) {
+      //   this.logger.playbackLogNote(`dbg_fail_${debugName}`, key, message)
+      // }
+      nestedCountersInstance.countEvent('dbg_fail_', debugName ?? 'unknown')
+    }
+    return true
+  }
+  return false
 }
