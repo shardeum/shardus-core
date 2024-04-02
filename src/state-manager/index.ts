@@ -3478,6 +3478,7 @@ class StateManager {
     let removedallPartitionResponsesByCycleByPartition = 0
     let removedourPartitionResultsByCycle = 0
     let removedshardValuesByCycle = 0
+    let removedTrieConsensusData = 0
 
     // cleanup old partition objects / receipts.
     /* eslint-disable security/detect-object-injection */
@@ -3512,6 +3513,14 @@ class StateManager {
         removedshardValuesByCycle++
       }
     }
+
+    for (const cycleNum of this.accountPatcher.hashTrieSyncConsensusByCycle.keys()) {
+      if (cycleNum < oldestCycle) {
+        // delete old cycle
+        this.accountPatcher.hashTrieSyncConsensusByCycle.delete(cycleNum)
+        removedTrieConsensusData++
+      }
+    }    
 
     let removedtxByCycleByPartition = 0
     let removedrecentPartitionObjectsByCycleByHash = 0
@@ -3615,7 +3624,7 @@ class StateManager {
     //periodically clear any fifo locks that are unlocked and have not been used in 10 minutes.
     this.clearStaleFifoLocks()
 
-    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle} ${removedtxByCycleByPartition} ${removedrecentPartitionObjectsByCycleByHash} ${removedrepairUpdateDataByCycle} ${removedpartitionObjectsByCycle} ${removepartitionReceiptsByCycleCounter} ${removeourPartitionReceiptsByCycleCounter} archQ:${archivedEntriesRemoved}`)
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle} ${removedtxByCycleByPartition} ${removedrecentPartitionObjectsByCycleByHash} ${removedrepairUpdateDataByCycle} ${removedpartitionObjectsByCycle} ${removepartitionReceiptsByCycleCounter} ${removeourPartitionReceiptsByCycleCounter} archQ:${archivedEntriesRemoved} removedTrieConsensusData:${removedTrieConsensusData}`)
 
     // TODO 1 calculate timestamp for oldest accepted TX to delete.
 
