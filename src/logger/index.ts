@@ -10,11 +10,7 @@ const { stringify } = require('../utils')
 const log4jsExtend = require('log4js-extend')
 import got from 'got'
 import { parse as parseUrl } from 'url'
-import {
-  isDebugModeMiddleware,
-  isDebugModeMiddlewareLow,
-  isDebugModeMiddlewareMedium,
-} from '../network/debugMiddleware'
+import { isDebugModeMiddleware, isDebugModeMiddlewareLow, isDebugModeMiddlewareMedium } from '../network/debugMiddleware'
 import { isDebugMode } from '../debug'
 import { shardusGetTime } from '../network'
 
@@ -437,7 +433,7 @@ class Logger {
     let normalized = this._normalizeUrl(url)
     let host = parseUrl(normalized, true)
     try {
-      await got.get(host.href, {
+      await got.get(host, {
         timeout: 1000,
         retry: 0,
         throwHttpErrors: false,
@@ -451,7 +447,7 @@ class Logger {
     let normalized = this._normalizeUrl(url)
     let host = parseUrl(normalized, true)
     try {
-      const res = await got.get(host.href, {
+      const res = await got.get(host, {
         timeout: 7000,
         retry: 0,
         throwHttpErrors: false,
