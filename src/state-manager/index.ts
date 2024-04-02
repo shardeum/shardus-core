@@ -3527,7 +3527,7 @@ class StateManager {
         this.accountPatcher.hashTrieSyncConsensusByCycle.delete(cycleNum)
         removedTrieConsensusData++
       }
-    }
+    }    
 
     let removedtxByCycleByPartition = 0
     let removedrecentPartitionObjectsByCycleByHash = 0
