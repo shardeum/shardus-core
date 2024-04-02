@@ -1686,6 +1686,7 @@ class TransactionQueue {
         accountDataSet: false,
         topConfirmations: new Set(),
         topVoters: new Set(),
+        hasRobustConfirmation: false
       } // age comes from timestamp
       this.txDebugMarkStartTime(txQueueEntry, 'total_queue_time')
       this.txDebugMarkStartTime(txQueueEntry, 'aging')
@@ -4533,13 +4534,24 @@ class TransactionQueue {
           const hasSeenConfirmation = queueEntry.receivedBestConfirmation != null
 
           // seen vote but we are past timeM3 + voteSeenExpirationTime
-          if (txAge > timeM3 + configContext.stateManager.confirmationSeenExpirationTime && hasSeenVote && hasSeenConfirmation) {
-            nestedCountersInstance.countEvent('txExpired', `> timeM3 + confirmSeenExpirationTime`)
-            this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + confirmSeenExpirationTime general case has' +
-              ' vote and confirmation but fail' +
-              ' to' +
-              ' commit the tx')
+          if (txAge > timeM3 + configContext.stateManager.confirmationSeenExpirationTime + 10000) {
+            nestedCountersInstance.countEvent('txExpired', `txAge > timeM3 + confirmSeenExpirationTime + 10s`)
+            this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + confirmSeenExpirationTime + 10s')
             continue
+          } else if (txAge > timeM3 + configContext.stateManager.confirmationSeenExpirationTime) {
+            let shouldExpire = true
+            if (queueEntry.hasRobustConfirmation && queueEntry.isInExecutionHome) {
+              nestedCountersInstance.countEvent('txExpired', `> timeM3 + confirmSeenExpirationTime but hasRobustConfirmation = true, not expiring`)
+              shouldExpire = false
+            }
+            if (shouldExpire) {
+              nestedCountersInstance.countEvent('txExpired', `> timeM3 + confirmSeenExpirationTime hasRobustConfirmation: ${queueEntry.hasRobustConfirmation}`)
+              this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + confirmSeenExpirationTime general case has' +
+                ' vote and robust confirmation but fail' +
+                ' to' +
+                ' commit the tx')
+              continue
+            }
           } else if (txAge > timeM3 + configContext.stateManager.voteSeenExpirationTime && hasSeenVote && !hasSeenConfirmation) {
             nestedCountersInstance.countEvent('txExpired', `> timeM3 + voteSeenExpirationTime`)
             this.mainLogger.error(`${queueEntry.logID} txAge > timeM3 + voteSeenExpirationTime general case has vote but fail to generate receipt`)

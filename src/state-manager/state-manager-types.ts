@@ -115,6 +115,7 @@ export type QueueEntry = {
   topConfirmations: Set<string>
   topVoters: Set<string>
   almostExpired?: boolean
+  hasRobustConfirmation: boolean
 
   gossipedReceipt: boolean
   gossipedVote: boolean
