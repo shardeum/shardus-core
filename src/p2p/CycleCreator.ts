@@ -381,7 +381,7 @@ async function cycleCreator() {
       if (lastSavedData) {
         await storage.updateCycle({ networkId: lastSavedData.networkId }, data)
       } else {
-        // if node list hashes are not set at this point, set them to empty strings
+        // if node list hashes are not set at this point, set them to an empty array hash to avoid null values
         data.nodeListHash = data.nodeListHash || ''
         data.archiverListHash = data.archiverListHash || ''
         data.standbyNodeListHash = data.standbyNodeListHash || ''
@@ -734,6 +734,9 @@ function makeCycleRecord(
     lostSyncing: [],
     refuted: [],
     apoptosized: [],
+    nodeListHash: '',
+    archiverListHash: '',
+    standbyNodeListHash: '',
   }) as P2P.CycleCreatorTypes.CycleRecord
 
   submodules.map((submodule) => submodule.updateRecord(cycleTxs, cycleRecord, prevRecord))
@@ -1149,6 +1152,11 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
     const req: CompareCertReq = {
       certs: bestCycleCert.get(bestMarker),
       record: bestRecord,
+    }
+
+    // not enough data to start comparing
+    if(!req.certs || !req.record) {
+      return [null, node]
     }
 
     let resp: CompareCertRes
