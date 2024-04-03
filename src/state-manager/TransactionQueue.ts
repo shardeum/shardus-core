@@ -2214,7 +2214,7 @@ class TransactionQueue {
       queueEntry.hasAll = true
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
-          `queueEntryAddData hasAll: true for txId ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()}`
+          `queueEntryAddData hasAll: true for txId ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id}`
         )
       }
     }
