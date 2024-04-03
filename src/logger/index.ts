@@ -100,6 +100,8 @@ export type LogFlags = {
   aalg:boolean //details on automatic access list generation
   shardedCache: boolean //details on the sharded cache
 
+  lost: boolean // extra logging for the lost system
+
 }
 
 export let logFlags: LogFlags = {
@@ -133,6 +135,7 @@ export let logFlags: LogFlags = {
 
   aalg: false,
   shardedCache: false
+  lost: false,
 }
 
 class Logger {
