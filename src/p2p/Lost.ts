@@ -9,7 +9,7 @@ internal documents.
 
 import * as shardusCrypto from '@shardus/crypto-utils'
 import { P2P } from '@shardus/types'
-import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
+import { Route, SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import { Handler } from 'express'
 import * as http from '../http'
 import { logFlags } from '../logger'
@@ -37,6 +37,11 @@ import { GetTrieHashesRequest, serializeGetTrieHashesReq } from '../types/GetTri
 import { GetTrieHashesResponse, deserializeGetTrieHashesResp } from '../types/GetTrieHashesResp'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { safeStringify } from '../utils'
+import { InternalBinaryHandler } from '../types/Handler'
+import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
+import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
+import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
+import { LostReportReq, deserializeLostReportReq, serializeLostReportReq } from '../types/LostReportReq'
 
 /** TYPES */
 
@@ -222,6 +227,7 @@ export function init() {
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
   }
+  Comms.registerInternalBinary(LostReportBinaryHandler.name, LostReportBinaryHandler.handler)
   p2p.registerInternal(
     'proxy',
     async (
@@ -745,7 +751,18 @@ function reportLost(target, reason: string, requestId: string) {
       msgCopy.requestId = requestId
       report = crypto.sign(msgCopy)
       lostReported.set(key, report)
-      Comms.tell([checker], 'lost-report', report)
+      if (config.p2p.useBinarySerializedEndpoints && config.p2p.lostReportBinary) {
+        const request = report as LostReportReq
+        Comms.tellBinary<LostReportReq>(
+          [checker],
+          InternalRouteEnum.binary_lost_report,
+          request,
+          serializeLostReportReq,
+          {}
+        )
+      } else {
+        Comms.tell([checker], 'lost-report', report)
+      }
     }
     /* prettier-ignore */ if (logFlags.lost) console.log('reportLost: lostReported:', lostReported)
     /* prettier-ignore */ if (logFlags.lost) console.log('reportLost: sent lost-report without errors')
@@ -891,6 +908,94 @@ async function lostReportHandler(payload, response, sender) {
     profilerInstance.scopedProfileSectionEnd('lost-report')
   }
 }
+
+const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+  name: InternalRouteEnum.binary_lost_report,
+  handler: async (payload, respond, header, sign) => {
+    const route = InternalRouteEnum.binary_lost_report
+    nestedCountersInstance.countEvent('internal', route)
+    profilerInstance.scopedProfileSectionStart(route)
+    const errorHandler = (
+      errorType: RequestErrorEnum,
+      opts?: { customErrorLog?: string; customCounterSuffix?: string }
+    ): void => requestErrorHandler(route, errorType, header, opts)
+
+    try {
+      const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cLostReportReq)
+      if (!requestStream) {
+        return errorHandler(RequestErrorEnum.InvalidRequest)
+      }
+
+      const req: LostReportReq = deserializeLostReportReq(requestStream)
+      let requestId = generateUUID()
+      const sender = NodeList.nodes.get(header.sender_id)
+      /* prettier-ignore */ if (logFlags.verbose) info(`Got investigate request requestId: ${req.requestId}, req: ${JSON.stringify(req)} from ${logNode(sender)}`)
+      let err = ''
+      // for request tracing
+      err = validateTypes(req, { timestamp: 'n', requestId: 's' })
+      if (!err) {
+        /* prettier-ignore */ if (logFlags.verbose) info(`Lost report tracing, requestId: ${req.requestId}, timestamp: ${req.timestamp}, sender: ${logNode(sender)}`)
+        // requestId = header.uuid
+      }
+      err = validateTypes(req, { target: 's', reporter: 's', checker: 's', cycle: 'n', sign: 'o' })
+      if (err) {
+        warn(`requestId: ${requestId} bad input ${err}`)
+        return
+      }
+      err = validateTypes(sign, { owner: 's', sig: 's' })
+      if (err) {
+        warn(`requestId: ${requestId} bad input ${err}`)
+        return
+      }
+
+      if (stopReporting[req.target]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
+      const key = `${req.target}-${req.cycle}`
+      if (checkedLostRecordMap.get(key)) return // we have already seen this node for this cycle
+      const [valid, reason] = checkReport(req, currentCycle + 1)
+      if (!valid) {
+        warn(`Got bad investigate request. requestId: ${requestId}, reason: ${reason}`)
+        return
+      }
+
+      if (header.sender_id !== req.reporter) return // sender must be same as reporter
+      if (req.checker !== Self.id) return // the checker should be our node id
+      let record: P2P.LostTypes.LostRecord = {
+        target: req.target,
+        cycle: req.cycle,
+        status: 'checking',
+        message: req,
+        reporter: req.reporter,
+        checker: req.checker,
+      }
+
+       // check if we already know that this node is down
+      if (isDown[req.target]) {
+        record.status = 'down'
+        return
+      }
+
+      let result = await isDownCache(nodes.get(req.target), requestId)
+      /* prettier-ignore */ if (logFlags.verbose) info(`isDownCache for requestId: ${requestId}, result ${result}`)
+      if (allowKillRoute && req.killother) result = 'down'
+      if (record.status === 'checking') record.status = result
+      if (logFlags.verbose)
+      info(
+        `Status after checking for node ${req.target} payload cycle: ${req.cycle}, currentCycle: ${currentCycle} is ` +
+          record.status
+      )
+      if (!checkedLostRecordMap.has(key)) {
+        checkedLostRecordMap.set(key, record)
+      }
+      // At start of Q1 of the next cycle sendRequests() will start a gossip if the node was found to be down
+    } catch (e) {
+      nestedCountersInstance.countEvent('internal', `${route}-exception`)
+      p2pLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+    } finally {
+      profilerInstance.scopedProfileSectionEnd(route)
+    }
+  },
+}
+
 
 function checkReport(report, expectCycle) {
   if (!report || typeof report !== 'object') return [false, 'no report given']
