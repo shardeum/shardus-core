@@ -17,6 +17,7 @@ export type TxDebug = {
 }
 
 export type QueueEntry = {
+  gossipedCompleteData: boolean;
   eligibleNodeIdsToVote: Set<string>
   eligibleNodeIdsToConfirm: Set<string>
   acceptedTx: Shardus.AcceptedTx

@@ -6,10 +6,11 @@ import * as Apoptosis from '../p2p/Apoptosis'
 import * as Archivers from '../p2p/Archivers'
 import { P2PModuleContext as P2P, network as networkContext, config as configContext } from '../p2p/Context'
 import * as CycleChain from '../p2p/CycleChain'
-import { nodes, potentiallyRemoved } from '../p2p/NodeList'
+import { nodes, byPubKey, potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import * as utils from '../utils'
+import {Signature, SignedObject} from '@shardus/crypto-utils'
 import {
   errorToStringFull,
   inRangeOfCurrentTime,
@@ -309,6 +310,30 @@ class TransactionQueue {
       }
     )
 
+    this.p2p.registerInternal(
+      'broadcast_state_complete_data',
+      async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
+        profilerInstance.scopedProfileSectionStart('broadcast_state_complete_data')
+        try {
+          const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+          if (queueEntry == null) {
+            nestedCountersInstance.countEvent('processing', 'broadcast_state_complete_data_noQueueEntry')
+            return
+          }
+          if (queueEntry.gossipedCompleteData === true) {
+            return
+          }
+          for (const data of payload.stateList) {
+            this.queueEntryAddData(queueEntry, data)
+          }
+          Comms.sendGossip('broadcast_state_complete_data', payload, undefined, undefined, queueEntry.executionGroup, false, 6)
+          queueEntry.gossipedCompleteData = true
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('broadcast_state_complete_data')
+        }
+      }
+    )
+
     const broadcastStateRoute: P2PTypes.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_broadcast_state,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -376,14 +401,7 @@ class TransactionQueue {
               /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`${route} validateCorrespondingTellSender failed for ${state.accountId}`)
               return errorHandler(RequestErrorEnum.InvalidSender)
             }
-            this.queueEntryAddData(queueEntry, {
-              accountCreated: state.accountCreated,
-              isPartial: state.isPartial,
-              accountId: state.accountId,
-              stateId: state.stateId,
-              data: state.data,
-              timestamp: state.timestamp,
-            })
+            this.queueEntryAddData(queueEntry, state)
             if (queueEntry.state === 'syncing') {
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${state.accountId}`)
             }
@@ -1597,6 +1615,7 @@ class TransactionQueue {
 
       this.queueEntryCounter++
       const txQueueEntry: QueueEntry = {
+        gossipedCompleteData: false,
         eligibleNodeIdsToConfirm: new Set(),
         eligibleNodeIdsToVote: new Set(),
         acceptedTx: acceptedTx,
@@ -2099,7 +2118,7 @@ class TransactionQueue {
             syncData: accountData.syncData,
             accountCreated: false,
             isPartial: false,
-          })
+          }, false)
           /* prettier-ignore */ nestedCountersInstance.countEvent('transactionQueue', 'queueEntryPrePush_ri_added')
         }
       }
@@ -2188,7 +2207,7 @@ class TransactionQueue {
    * @param queueEntry
    * @param data
    */
-  queueEntryAddData(queueEntry: QueueEntry, data: Shardus.WrappedResponse): void {
+  queueEntryAddData(queueEntry: QueueEntry, data: Shardus.WrappedResponse, signatureCheck = false): void {
     if (queueEntry.collectedData[data.accountId] != null) {
       return // already have the data
     }
@@ -2201,7 +2220,42 @@ class TransactionQueue {
         )}`
       )
     }
+    if (queueEntry.collectedData[data.accountId] != null) {
+      // we have already collected this data
+      return
+    }
     profilerInstance.profileSectionStart('queueEntryAddData', true)
+    // check the signature of each account data
+    if (signatureCheck && (data.sign == null || data.sign.owner == null || data.sign.sig == null)) {
+      this.mainLogger.fatal(`queueEntryAddData: data.sign == null ${utils.stringifyReduce(data)}`)
+      nestedCountersInstance.countEvent('queueEntryAddData', 'data.sign == null')
+      return
+    }
+
+
+    if (signatureCheck) {
+      const dataSenderPublicKey = data.sign.owner
+      const dataSenderNode: Shardus.Node = byPubKey[dataSenderPublicKey]
+      if (dataSenderNode == null) {
+        nestedCountersInstance.countEvent('queueEntryAddData', 'dataSenderNode == null')
+        return
+      }
+      const consensusNodesForAccount = queueEntry.homeNodes[data.accountId]?.consensusNodeForOurNodeFull
+      if (consensusNodesForAccount == null || consensusNodesForAccount.map(n => n.id).includes(dataSenderNode.id) === false) {
+        nestedCountersInstance.countEvent('queueEntryAddData', 'data sender node is not in the consensus group of the' +
+          ' account')
+        return
+      }
+
+      const singedData = data as SignedObject
+
+      if (this.crypto.verify(singedData) === false) {
+        nestedCountersInstance.countEvent('queueEntryAddData', 'data signature verification failed')
+        return
+      }
+    }
+
+
     queueEntry.collectedData[data.accountId] = data
     queueEntry.dataCollected++
 
@@ -2212,11 +2266,15 @@ class TransactionQueue {
     if (queueEntry.dataCollected === queueEntry.uniqueKeys.length) {
       //  queueEntry.tx Keys.allKeys.length
       queueEntry.hasAll = true
+      this.gossipCompleteData(queueEntry)
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
           `queueEntryAddData hasAll: true for txId ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id}`
         )
       }
+    } else {
+      // gossip the received data to execution nodes
+      // todo: confirm with Omar. it seems like a extra gossiping. we should gossip only when we have all the data
     }
 
     if (data.localCache) {
@@ -2226,6 +2284,44 @@ class TransactionQueue {
 
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_addData', `${queueEntry.logID}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
     profilerInstance.profileSectionStart('queueEntryAddData', true)
+  }
+
+  async gossipCompleteData(queueEntry: QueueEntry): Promise<void> {
+    if (queueEntry.hasAll === false || queueEntry.gossipedCompleteData) {
+      return
+    }
+    const dataToGossip: WrappedResponses = {}
+    const stateList: Shardus.WrappedResponse[] = []
+    for (const accountId in queueEntry.collectedData) {
+      const data = queueEntry.collectedData[accountId]
+      const riCacheResult = await this.app.getCachedRIAccountData([accountId])
+      if (riCacheResult != null && riCacheResult.length > 0) {
+        nestedCountersInstance.countEvent('gossipCompleteData', 'riCacheResult, skipping')
+        continue
+      } else {
+        dataToGossip[accountId] = data
+        stateList.push(data)
+      }
+    }
+    const payload = {txid: queueEntry.acceptedTx.txId, stateList}
+    if (stateList.length > 0) {
+      Comms.sendGossip(
+        'broadcast_state_complete_data',
+        payload,
+        '',
+        Self.id,
+        queueEntry.executionGroup,
+        true,
+        6
+      )
+      queueEntry.gossipedCompleteData = true
+      nestedCountersInstance.countEvent('gossipCompleteData', `stateList: ${stateList.length}`)
+      if (logFlags.debug || this.stateManager.consensusLog) {
+        this.mainLogger.debug(
+          `gossipQueueEntryData: gossiped data for txId ${queueEntry.logID} at timestamp: ${shardusGetTime()} nodeId: ${Self.id}`
+        )
+      }
+    }
   }
 
   /**
@@ -3132,264 +3228,270 @@ class TransactionQueue {
    * -sends account data to the correct involved nodees
    * -loads locally available data into the queue entry
    */
-  async tellCorrespondingNodesOld(queueEntry: QueueEntry): Promise<unknown> {
-    if (this.stateManager.currentCycleShardData == null) {
-      throw new Error('tellCorrespondingNodes: currentCycleShardData == null')
-    }
-    if (queueEntry.uniqueKeys == null) {
-      throw new Error('tellCorrespondingNodes: queueEntry.uniqueKeys == null')
-    }
-    // Report data to corresponding nodes
-    const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
-    // let correspondingEdgeNodes = []
-    let correspondingAccNodes: Shardus.Node[] = []
-    const dataKeysWeHave = []
-    const dataValuesWeHave = []
-    const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
-    const remoteShardsByKey: { [accountID: string]: StateManagerTypes.shardFunctionTypes.NodeShardData } = {} // shard homenodes that we do not have the data for.
-    let loggedPartition = false
-    for (const key of queueEntry.uniqueKeys) {
-      ///   test here
-      // let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
-      // todo : if this works maybe a nicer or faster version could be used
-      let hasKey = false
-      // eslint-disable-next-line security/detect-object-injection
-      const homeNode = queueEntry.homeNodes[key]
-      if (homeNode.node.id === ourNodeData.node.id) {
-        hasKey = true
-      } else {
-        //perf todo: this seems like a slow calculation, coult improve this
-        for (const node of homeNode.nodeThatStoreOurParitionFull) {
-          if (node.id === ourNodeData.node.id) {
-            hasKey = true
-            break
-          }
-        }
-      }
-
-      // HOMENODEMATHS tellCorrespondingNodes patch the value of hasKey
-      // did we get patched in
-      if (queueEntry.patchedOnNodes.has(ourNodeData.node.id)) {
-        hasKey = true
-      }
-
-      // for(let patchedNodeID of queueEntry.patchedOnNodes.values()){
-      // }
-
-      let isGlobalKey = false
-      //intercept that we have this data rather than requesting it.
-      if (this.stateManager.accountGlobals.isGlobalAccount(key)) {
-        hasKey = true
-        isGlobalKey = true
-        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', queueEntry.logID, `tellCorrespondingNodes - has`)
-      }
-
-      if (hasKey === false) {
-        if (loggedPartition === false) {
-          loggedPartition = true
-          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull.map((v) => v.id))}`)
-          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: full: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull)}`)
-        }
-        /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false  key: ${utils.stringifyReduce(key)}`)
-      }
-
-      if (hasKey) {
-        // TODO PERF is it possible that this query could be used to update our in memory cache? (this would save us from some slow look ups) later on
-        //    when checking timestamps.. alternatively maybe there is a away we can note the timestamp with what is returned here in the queueEntry data
-        //    and not have to deal with the cache.
-        // todo old: Detect if our node covers this paritition..  need our partition data
-
-        this.profiler.profileSectionStart('process_dapp.getRelevantData')
-        this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
-        /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.app.getRelevantData old')
-        let data = await this.app.getRelevantData(
-          key,
-          queueEntry.acceptedTx.data,
-          queueEntry.acceptedTx.appData
-        )
-        /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.app.getRelevantData old', DebugComplete.Completed)
-        this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
-        this.profiler.profileSectionEnd('process_dapp.getRelevantData')
-
-        //only queue this up to share if it is not a global account. global accounts dont need to be shared.
-
-        // not sure if it is correct to update timestamp like this.
-        // if(data.timestamp === 0){
-        //   data.timestamp = queueEntry.acceptedTx.timestamp
-        // }
-
-        //if this is not freshly created data then we need to make a backup copy of it!!
-        //This prevents us from changing data before the commiting phase
-        if (data.accountCreated == false) {
-          data = utils.deepCopy(data)
-        }
-
-        if (isGlobalKey === false) {
-          // eslint-disable-next-line security/detect-object-injection
-          datas[key] = data
-          dataKeysWeHave.push(key)
-          dataValuesWeHave.push(data)
-        }
-
-        // eslint-disable-next-line security/detect-object-injection
-        queueEntry.localKeys[key] = true
-        // add this data to our own queue entry!!
-        this.queueEntryAddData(queueEntry, data)
-      } else {
-        // eslint-disable-next-line security/detect-object-injection
-        remoteShardsByKey[key] = queueEntry.homeNodes[key]
-      }
-    }
-    if (queueEntry.globalModification === true) {
-      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', queueEntry.logID, `tellCorrespondingNodes - globalModification = true, not telling other nodes`)
-      return
-    }
-
-    // if we are in the execution shard no need to forward data
-    // This is because other nodes will not expect pre-apply data anymore (but they will send us their pre apply data)
-    if (
-      queueEntry.globalModification === false &&
-      this.executeInOneShard &&
-      queueEntry.isInExecutionHome === true
-    ) {
-      //will this break things..
-      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', queueEntry.logID, `tellCorrespondingNodes - isInExecutionHome = true, not telling other nodes`)
-      return
-    }
-
-    let message: { stateList: Shardus.WrappedResponse[]; txid: string }
-    let edgeNodeIds = []
-    let consensusNodeIds = []
-
-    const nodesToSendTo: StringNodeObjectMap = {}
-    const doOnceNodeAccPair = new Set<string>() //can skip  node+acc if it happens more than once.
-
-    for (const key of queueEntry.uniqueKeys) {
-      // eslint-disable-next-line security/detect-object-injection
-      if (datas[key] != null) {
-        for (const key2 of queueEntry.uniqueKeys) {
-          if (key !== key2) {
-            // eslint-disable-next-line security/detect-object-injection
-            const localHomeNode = queueEntry.homeNodes[key]
-            // eslint-disable-next-line security/detect-object-injection
-            const remoteHomeNode = queueEntry.homeNodes[key2]
-
-            // //can ignore nodes not in the execution group since they will not be running apply
-            // if(this.executeInOneShard && (queueEntry.executionIdSet.has(remoteHomeNode.node.id) === false)){
-            //   continue
-            // }
-
-            const ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex(
-              (a) => a.id === ourNodeData.node.id
-            )
-            if (ourLocalConsensusIndex === -1) {
-              continue
-            }
-
-            edgeNodeIds = []
-            consensusNodeIds = []
-            correspondingAccNodes = []
-
-            // must add one to each lookup index!
-            const indicies = ShardFunctions.debugFastStableCorrespondingIndicies(
-              localHomeNode.consensusNodeForOurNodeFull.length,
-              remoteHomeNode.consensusNodeForOurNodeFull.length,
-              ourLocalConsensusIndex + 1
-            )
-            const edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(
-              localHomeNode.consensusNodeForOurNodeFull.length,
-              remoteHomeNode.edgeNodes.length,
-              ourLocalConsensusIndex + 1
-            )
-
-            let patchIndicies = []
-            if (remoteHomeNode.patchedOnNodes.length > 0) {
-              patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(
-                localHomeNode.consensusNodeForOurNodeFull.length,
-                remoteHomeNode.patchedOnNodes.length,
-                ourLocalConsensusIndex + 1
-              )
-            }
-
-            // HOMENODEMATHS need to work out sending data to our patched range.
-            // let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
-
-            // for each remote node lets save it's id
-            for (const index of indicies) {
-              const node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-              if (node != null && node.id !== ourNodeData.node.id) {
-                nodesToSendTo[node.id] = node
-                consensusNodeIds.push(node.id)
-              }
-            }
-            for (const index of edgeIndicies) {
-              const node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-              if (node != null && node.id !== ourNodeData.node.id) {
-                nodesToSendTo[node.id] = node
-                edgeNodeIds.push(node.id)
-              }
-            }
-
-            for (const index of patchIndicies) {
-              const node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-              if (node != null && node.id !== ourNodeData.node.id) {
-                nodesToSendTo[node.id] = node
-                //edgeNodeIds.push(node.id)
-              }
-            }
-
-            const dataToSend = []
-            // eslint-disable-next-line security/detect-object-injection
-            dataToSend.push(datas[key]) // only sending just this one key at a time
-            message = { stateList: dataToSend, txid: queueEntry.acceptedTx.txId }
-
-            //correspondingAccNodes = Object.values(nodesToSendTo)
-
-            //build correspondingAccNodes, but filter out nodeid, account key pairs we have seen before
-            for (const [accountID, node] of Object.entries(nodesToSendTo)) {
-              const keyPair = accountID + key
-              if (node != null && doOnceNodeAccPair.has(keyPair) === false) {
-                doOnceNodeAccPair.add(keyPair)
-
-                // consider this optimization later (should make it so we only send to execution set nodes)
-                // if(queueEntry.executionIdSet.has(remoteHomeNode.node.id) === true){
-                //   correspondingAccNodes.push(node)
-                // }
-                correspondingAccNodes.push(node)
-              }
-            }
-
-            if (correspondingAccNodes.length > 0) {
-              const remoteRelation = ShardFunctions.getNodeRelation(
-                remoteHomeNode,
-                this.stateManager.currentCycleShardData.ourNode.id
-              )
-              const localRelation = ShardFunctions.getNodeRelation(
-                localHomeNode,
-                this.stateManager.currentCycleShardData.ourNode.id
-              )
-              /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_tellCorrespondingNodes', `${queueEntry.acceptedTx.txId}`, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
-
-              // Filter nodes before we send tell()
-              const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
-                correspondingAccNodes,
-                'tellCorrespondingNodes',
-                true,
-                true
-              )
-              if (filteredNodes.length === 0) {
-                /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('tellCorrespondingNodes: filterValidNodesForInternalMessage no valid nodes left to try')
-                return null
-              }
-              const filterdCorrespondingAccNodes = filteredNodes
-
-              this.broadcastState(filterdCorrespondingAccNodes, message)
-            }
-          }
-        }
-      }
-    }
-  }
+  // async tellCorrespondingNodesOld(queueEntry: QueueEntry): Promise<unknown> {
+  //   if (this.stateManager.currentCycleShardData == null) {
+  //     throw new Error('tellCorrespondingNodes: currentCycleShardData == null')
+  //   }
+  //   if (queueEntry.uniqueKeys == null) {
+  //     throw new Error('tellCorrespondingNodes: queueEntry.uniqueKeys == null')
+  //   }
+  //   // Report data to corresponding nodes
+  //   const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
+  //   // let correspondingEdgeNodes = []
+  //   let correspondingAccNodes: Shardus.Node[] = []
+  //   const dataKeysWeHave = []
+  //   const dataValuesWeHave = []
+  //   const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
+  //   const remoteShardsByKey: { [accountID: string]: StateManagerTypes.shardFunctionTypes.NodeShardData } = {} // shard homenodes that we do not have the data for.
+  //   let loggedPartition = false
+  //   for (const key of queueEntry.uniqueKeys) {
+  //     ///   test here
+  //     // let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
+  //     // todo : if this works maybe a nicer or faster version could be used
+  //     let hasKey = false
+  //     // eslint-disable-next-line security/detect-object-injection
+  //     const homeNode = queueEntry.homeNodes[key]
+  //     if (homeNode.node.id === ourNodeData.node.id) {
+  //       hasKey = true
+  //     } else {
+  //       //perf todo: this seems like a slow calculation, coult improve this
+  //       for (const node of homeNode.nodeThatStoreOurParitionFull) {
+  //         if (node.id === ourNodeData.node.id) {
+  //           hasKey = true
+  //           break
+  //         }
+  //       }
+  //     }
+  //
+  //     // HOMENODEMATHS tellCorrespondingNodes patch the value of hasKey
+  //     // did we get patched in
+  //     if (queueEntry.patchedOnNodes.has(ourNodeData.node.id)) {
+  //       hasKey = true
+  //     }
+  //
+  //     // for(let patchedNodeID of queueEntry.patchedOnNodes.values()){
+  //     // }
+  //
+  //     let isGlobalKey = false
+  //     //intercept that we have this data rather than requesting it.
+  //     if (this.stateManager.accountGlobals.isGlobalAccount(key)) {
+  //       hasKey = true
+  //       isGlobalKey = true
+  //       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', queueEntry.logID, `tellCorrespondingNodes - has`)
+  //     }
+  //
+  //     if (hasKey === false) {
+  //       if (loggedPartition === false) {
+  //         loggedPartition = true
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull.map((v) => v.id))}`)
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: full: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull)}`)
+  //       }
+  //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false  key: ${utils.stringifyReduce(key)}`)
+  //     }
+  //
+  //     if (hasKey) {
+  //       // TODO PERF is it possible that this query could be used to update our in memory cache? (this would save us from some slow look ups) later on
+  //       //    when checking timestamps.. alternatively maybe there is a away we can note the timestamp with what is returned here in the queueEntry data
+  //       //    and not have to deal with the cache.
+  //       // todo old: Detect if our node covers this paritition..  need our partition data
+  //
+  //       this.profiler.profileSectionStart('process_dapp.getRelevantData')
+  //       this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
+  //       /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.app.getRelevantData old')
+  //       let data = await this.app.getRelevantData(
+  //         key,
+  //         queueEntry.acceptedTx.data,
+  //         queueEntry.acceptedTx.appData
+  //       )
+  //       /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.app.getRelevantData old', DebugComplete.Completed)
+  //       this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
+  //       this.profiler.profileSectionEnd('process_dapp.getRelevantData')
+  //
+  //       //only queue this up to share if it is not a global account. global accounts dont need to be shared.
+  //
+  //       // not sure if it is correct to update timestamp like this.
+  //       // if(data.timestamp === 0){
+  //       //   data.timestamp = queueEntry.acceptedTx.timestamp
+  //       // }
+  //
+  //       //if this is not freshly created data then we need to make a backup copy of it!!
+  //       //This prevents us from changing data before the commiting phase
+  //       if (data.accountCreated == false) {
+  //         data = utils.deepCopy(data)
+  //       }
+  //
+  //       if (isGlobalKey === false) {
+  //         // eslint-disable-next-line security/detect-object-injection
+  //         datas[key] = data
+  //         dataKeysWeHave.push(key)
+  //         dataValuesWeHave.push(data)
+  //       }
+  //
+  //       // eslint-disable-next-line security/detect-object-injection
+  //       queueEntry.localKeys[key] = true
+  //       // add this data to our own queue entry!!
+  //       this.queueEntryAddData(queueEntry, data)
+  //     } else {
+  //       // eslint-disable-next-line security/detect-object-injection
+  //       remoteShardsByKey[key] = queueEntry.homeNodes[key]
+  //     }
+  //   }
+  //   if (queueEntry.globalModification === true) {
+  //     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', queueEntry.logID, `tellCorrespondingNodes - globalModification = true, not telling other nodes`)
+  //     return
+  //   }
+  //
+  //   // if we are in the execution shard no need to forward data
+  //   // This is because other nodes will not expect pre-apply data anymore (but they will send us their pre apply data)
+  //   if (
+  //     queueEntry.globalModification === false &&
+  //     this.executeInOneShard &&
+  //     queueEntry.isInExecutionHome === true
+  //   ) {
+  //     //will this break things..
+  //     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', queueEntry.logID, `tellCorrespondingNodes - isInExecutionHome = true, not telling other nodes`)
+  //     return
+  //   }
+  //
+  //   let message: { stateList: Shardus.WrappedResponse[]; txid: string }
+  //   let edgeNodeIds = []
+  //   let consensusNodeIds = []
+  //
+  //   const nodesToSendTo: StringNodeObjectMap = {}
+  //   const doOnceNodeAccPair = new Set<string>() //can skip  node+acc if it happens more than once.
+  //
+  //   for (const key of queueEntry.uniqueKeys) {
+  //     // eslint-disable-next-line security/detect-object-injection
+  //     if (datas[key] != null) {
+  //       for (const key2 of queueEntry.uniqueKeys) {
+  //         if (key !== key2) {
+  //           // eslint-disable-next-line security/detect-object-injection
+  //           const localHomeNode = queueEntry.homeNodes[key]
+  //           // eslint-disable-next-line security/detect-object-injection
+  //           const remoteHomeNode = queueEntry.homeNodes[key2]
+  //
+  //           // //can ignore nodes not in the execution group since they will not be running apply
+  //           // if(this.executeInOneShard && (queueEntry.executionIdSet.has(remoteHomeNode.node.id) === false)){
+  //           //   continue
+  //           // }
+  //
+  //           const ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex(
+  //             (a) => a.id === ourNodeData.node.id
+  //           )
+  //           if (ourLocalConsensusIndex === -1) {
+  //             continue
+  //           }
+  //
+  //           edgeNodeIds = []
+  //           consensusNodeIds = []
+  //           correspondingAccNodes = []
+  //
+  //           // must add one to each lookup index!
+  //           const indicies = ShardFunctions.debugFastStableCorrespondingIndicies(
+  //             localHomeNode.consensusNodeForOurNodeFull.length,
+  //             remoteHomeNode.consensusNodeForOurNodeFull.length,
+  //             ourLocalConsensusIndex + 1
+  //           )
+  //           const edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(
+  //             localHomeNode.consensusNodeForOurNodeFull.length,
+  //             remoteHomeNode.edgeNodes.length,
+  //             ourLocalConsensusIndex + 1
+  //           )
+  //
+  //           let patchIndicies = []
+  //           if (remoteHomeNode.patchedOnNodes.length > 0) {
+  //             patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(
+  //               localHomeNode.consensusNodeForOurNodeFull.length,
+  //               remoteHomeNode.patchedOnNodes.length,
+  //               ourLocalConsensusIndex + 1
+  //             )
+  //           }
+  //
+  //           // HOMENODEMATHS need to work out sending data to our patched range.
+  //           // let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
+  //
+  //           // for each remote node lets save it's id
+  //           for (const index of indicies) {
+  //             const node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+  //             if (node != null && node.id !== ourNodeData.node.id) {
+  //               nodesToSendTo[node.id] = node
+  //               consensusNodeIds.push(node.id)
+  //             }
+  //           }
+  //           for (const index of edgeIndicies) {
+  //             const node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+  //             if (node != null && node.id !== ourNodeData.node.id) {
+  //               nodesToSendTo[node.id] = node
+  //               edgeNodeIds.push(node.id)
+  //             }
+  //           }
+  //
+  //           for (const index of patchIndicies) {
+  //             const node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+  //             if (node != null && node.id !== ourNodeData.node.id) {
+  //               nodesToSendTo[node.id] = node
+  //               //edgeNodeIds.push(node.id)
+  //             }
+  //           }
+  //
+  //           const dataToSend: Shardus.WrappedResponse[] = []
+  //           // eslint-disable-next-line security/detect-object-injection
+  //           dataToSend.push(datas[key]) // only sending just this one key at a time
+  //
+  //           // sign each account data
+  //           for (let data of dataToSend) {
+  //             data = this.crypto.sign(data)
+  //           }
+  //
+  //           message = { stateList: dataToSend, txid: queueEntry.acceptedTx.txId }
+  //
+  //           //correspondingAccNodes = Object.values(nodesToSendTo)
+  //
+  //           //build correspondingAccNodes, but filter out nodeid, account key pairs we have seen before
+  //           for (const [accountID, node] of Object.entries(nodesToSendTo)) {
+  //             const keyPair = accountID + key
+  //             if (node != null && doOnceNodeAccPair.has(keyPair) === false) {
+  //               doOnceNodeAccPair.add(keyPair)
+  //
+  //               // consider this optimization later (should make it so we only send to execution set nodes)
+  //               // if(queueEntry.executionIdSet.has(remoteHomeNode.node.id) === true){
+  //               //   correspondingAccNodes.push(node)
+  //               // }
+  //               correspondingAccNodes.push(node)
+  //             }
+  //           }
+  //
+  //           if (correspondingAccNodes.length > 0) {
+  //             const remoteRelation = ShardFunctions.getNodeRelation(
+  //               remoteHomeNode,
+  //               this.stateManager.currentCycleShardData.ourNode.id
+  //             )
+  //             const localRelation = ShardFunctions.getNodeRelation(
+  //               localHomeNode,
+  //               this.stateManager.currentCycleShardData.ourNode.id
+  //             )
+  //             /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_tellCorrespondingNodes', `${queueEntry.acceptedTx.txId}`, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
+  //
+  //             // Filter nodes before we send tell()
+  //             const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
+  //               correspondingAccNodes,
+  //               'tellCorrespondingNodes',
+  //               true,
+  //               true
+  //             )
+  //             if (filteredNodes.length === 0) {
+  //               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('tellCorrespondingNodes: filterValidNodesForInternalMessage no valid nodes left to try')
+  //               return null
+  //             }
+  //             const filterdCorrespondingAccNodes = filteredNodes
+  //
+  //             this.broadcastState(filterdCorrespondingAccNodes, message)
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
 
   async broadcastState(
     nodes: Shardus.Node[],
@@ -3524,7 +3626,7 @@ class TransactionQueue {
         // eslint-disable-next-line security/detect-object-injection
         queueEntry.localKeys[key] = true
         // add this data to our own queue entry!!
-        this.queueEntryAddData(queueEntry, data)
+        this.queueEntryAddData(queueEntry, data, false)
       } else {
         // eslint-disable-next-line security/detect-object-injection
         remoteShardsByKey[key] = queueEntry.homeNodes[key]
@@ -3630,6 +3732,12 @@ class TransactionQueue {
             const dataToSend = []
             // eslint-disable-next-line security/detect-object-injection
             dataToSend.push(datas[key]) // only sending just this one key at a time
+
+            // sign each account data
+            for (let data of dataToSend) {
+              data = this.crypto.sign(data)
+            }
+
             message = { stateList: dataToSend, txid: queueEntry.acceptedTx.txId }
 
             //build correspondingAccNodes, but filter out nodeid, account key pairs we have seen before
@@ -4745,7 +4853,7 @@ class TransactionQueue {
                 } else {
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodesOld(queueEntry)')
                   //specific fixes were needed for tellCorrespondingNodes.  tellCorrespondingNodesOld is the old version before fixes
-                  await this.tellCorrespondingNodesOld(queueEntry)
+                  await this.tellCorrespondingNodes(queueEntry)
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodesOld(queueEntry)', DebugComplete.Completed)
                 }
 

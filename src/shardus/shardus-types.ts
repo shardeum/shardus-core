@@ -475,7 +475,9 @@ export interface WrappedResponse extends WrappedData {
   prevStateId?: string
   // need a before copy of the data for stats system. may not be super effcient. possibly merge this with original data on the queue entry
   prevDataCopy?: any
+  sign?: Sign
 }
+
 
 // old version:
 // export interface WrappedResponse {

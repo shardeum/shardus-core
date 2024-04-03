@@ -1187,7 +1187,7 @@ class Shardus extends EventEmitter {
     set = false,
     global = false,
     inputAppData = null
-  ): Promise<{ success: boolean; reason: string; status: number }> {
+  ): Promise<{ success: boolean; reason: string; status: number, txId?: string }> {
     const noConsensus = set || global
 
     // Check if Consensor is ready to receive txs before processing it further
@@ -1242,6 +1242,7 @@ class Shardus extends EventEmitter {
       nestedCountersInstance.countEvent('rejected', 'isOverloaded')
       return { success: false, reason: 'Maximum load exceeded.', status: 500 }
     }
+    let txId = ''
 
     try {
       // Perform basic validation of the transaction fields
@@ -1280,7 +1281,7 @@ class Shardus extends EventEmitter {
 
       const injectedTimestamp = this.app.getTimestampFromTransaction(tx, appData)
 
-      const txId = this.app.calculateTxId(tx)
+      txId = this.app.calculateTxId(tx)
       let timestampReceipt: ShardusTypes.TimestampReceipt
       if (!injectedTimestamp || injectedTimestamp === -1) {
         if (injectedTimestamp === -1) {
@@ -1401,6 +1402,7 @@ class Shardus extends EventEmitter {
       success: true,
       reason: 'Transaction queued, poll for results.',
       status: 200, // 200 status code means transaction is generally successful
+      txId
     }
   }
 
