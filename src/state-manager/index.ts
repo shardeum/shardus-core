@@ -1423,8 +1423,9 @@ class StateManager {
           }
           respond(response, serializeRequestReceiptForTxResp)
         } catch (e) {
-          this.mainLogger.error(`${route} error: ${e.message}`)
-          this.mainLogger.error(e.stack)
+          this.mainLogger.error(`${route} error: ${e.message} stack: ${e.stack}`)
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          respond(response, serializeRequestReceiptForTxResp)
         } finally {
           profilerInstance.scopedProfileSectionEnd(route)
         }
@@ -1546,18 +1547,20 @@ class StateManager {
         ): void => requestErrorHandler(route, errorType, header, opts)
 
         try {
-          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cRequestStateForTxPostReq)
-          if (!requestStream) {
-            return errorHandler(RequestErrorEnum.InvalidRequest)
-          }
-
-          const req = deserializeRequestStateForTxPostReq(requestStream)
           const response: RequestStateForTxPostResp = {
             stateList: [],
             beforeHashes: {},
             note: '',
             success: false,
           }
+
+          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cRequestStateForTxPostReq)
+          if (!requestStream) {
+            errorHandler(RequestErrorEnum.InvalidRequest)
+            return respond(response, serializeRequestStateForTxPostResp)
+          }
+
+          const req = deserializeRequestStateForTxPostReq(requestStream)
           // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
           let queueEntry = this.transactionQueue.getQueueEntrySafe(req.txid)
           if (queueEntry == null) {
@@ -1744,20 +1747,23 @@ class StateManager {
           errorType: RequestErrorEnum,
           opts?: { customErrorLog?: string; customCounterSuffix?: string }
         ): void => requestErrorHandler(route, errorType, header, opts)
+
+        let response: RequestTxResp = {
+          stateList: [],
+          account_state_hash_before: {},
+          account_state_hash_after: {},
+          note: '',
+          success: false,
+        }
         try {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cRequestTxAndStateReq)
           if (!requestStream) {
-            return errorHandler(RequestErrorEnum.InvalidRequest)
+            errorHandler(RequestErrorEnum.InvalidRequest)
+            respond(response, serializeRequestTxAndStateResp)
+            return
           }
 
           const req: RequestTxAndStateReq = deserializeRequestTxAndStateReq(requestStream)
-          let response: RequestTxResp = {
-            stateList: [],
-            account_state_hash_before: {},
-            account_state_hash_after: {},
-            note: '',
-            success: false,
-          }
 
           const txid = req.txid
           const requestedAccountIds = req.accountIds
@@ -1831,6 +1837,7 @@ class StateManager {
           Context.logger
             .getLogger('p2p')
             .error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+          respond(response, serializeRequestTxAndStateResp)
         } finally {
           this.profiler.scopedProfileSectionEnd(route)
         }
@@ -2187,7 +2194,7 @@ class StateManager {
         res.end()
         return
       }
-      if (typeof  txId !== 'string') {
+      if (typeof txId !== 'string') {
         res.write('txId parameter must be a string')
         res.end()
         return
@@ -3520,7 +3527,7 @@ class StateManager {
         this.accountPatcher.hashTrieSyncConsensusByCycle.delete(cycleNum)
         removedTrieConsensusData++
       }
-    }    
+    }
 
     let removedtxByCycleByPartition = 0
     let removedrecentPartitionObjectsByCycleByHash = 0

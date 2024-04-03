@@ -2560,7 +2560,9 @@ class Shardus extends EventEmitter {
         try {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cSignAppDataReq)
           if (!requestStream) {
-            return errorHandler(RequestErrorEnum.InvalidRequest)
+            errorHandler(RequestErrorEnum.InvalidRequest)
+            respond({ success: false, signature: { owner: '', sig: '' } }, serializeSignAppDataResp)
+            return
           }
 
           const request: SignAppDataReq = deserializeSignAppDataReq(requestStream)
@@ -2576,6 +2578,7 @@ class Shardus extends EventEmitter {
         } catch (err) {
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
           this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(err)}`)
+          respond({ success: false, signature: { owner: '', sig: '' } }, serializeSignAppDataResp)
         } finally {
           this.profiler.scopedProfileSectionEnd(route)
         }

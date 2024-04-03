@@ -669,16 +669,19 @@ class TransactionQueue {
         const route = InternalRouteEnum.binary_request_state_for_tx
         profilerInstance.scopedProfileSectionStart(route)
         nestedCountersInstance.countEvent('internal', route)
+
+        const response: RequestStateForTxRespSerialized = {
+          stateList: [],
+          beforeHashes: {},
+          note: '',
+          success: false,
+        }
         try {
-          const response: RequestStateForTxRespSerialized = {
-            stateList: [],
-            beforeHashes: {},
-            note: '',
-            success: false,
-          }
           const responseStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cRequestStateForTxReq)
           if (!responseStream) {
-            throw new Error('Cannot get vector buffer stream from payload')
+            this.mainLogger.error(`${route}: Invalid request`)
+            respond(response, serializeRequestStateForTxResp)
+            return
           }
           const req = deserializeRequestStateForTxReq(responseStream)
           if (req.txid == null) {
@@ -714,6 +717,8 @@ class TransactionQueue {
               InternalRouteEnum.binary_request_state_for_tx
             }: Exception executing request: ${errorToStringFull(e)}`
           )
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          respond(response, serializeRequestStateForTxResp)
         } finally {
           profilerInstance.scopedProfileSectionEnd(InternalRouteEnum.binary_request_state_for_tx)
         }

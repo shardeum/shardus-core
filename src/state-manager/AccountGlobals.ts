@@ -185,7 +185,8 @@ class AccountGlobals {
         try {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGlobalAccountReportReq)
           if (!requestStream) {
-            return errorHandler(RequestErrorEnum.InvalidRequest)
+            errorHandler(RequestErrorEnum.InvalidRequest)
+            return respond({ error: 'Invalid request' }, serializeGlobalAccountReportResp)
           }
 
           const result: GlobalAccountReportRespSerializable = {
@@ -251,6 +252,7 @@ class AccountGlobals {
         } catch (e) {
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
           this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+          return respond({ error: 'Internal error' }, serializeGlobalAccountReportResp)
         } finally {
           this.profiler.scopedProfileSectionEnd(route)
         }

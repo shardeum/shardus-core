@@ -196,6 +196,7 @@ class CachedAppDataManager {
             nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
             this.mainLogger.error(`Invalid input stream for ${route}`)
             respond(response, serializeGetCachedAppDataResp)
+            return
           }
           const readableReq = deserializeGetCachedAppDataReq(requestStream)
           const foundCachedAppData = this.getCachedItem(readableReq.topic, readableReq.dataId)

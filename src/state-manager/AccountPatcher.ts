@@ -568,17 +568,18 @@ class AccountPatcher {
     const getTrieAccountHashesBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_get_trie_account_hashes,
       handler: (payload, respond, header, sign) => {
-        profilerInstance.scopedProfileSectionStart(
-          InternalRouteEnum.binary_get_trie_account_hashes,
-          false,
-          payload.length
-        )
+        const route = InternalRouteEnum.binary_get_trie_account_hashes
+        profilerInstance.scopedProfileSectionStart(route, false, payload.length)
         const result = {
           nodeChildHashes: [],
           stats: { matched: 0, visisted: 0, empty: 0, childCount: 0 },
         } as HashTrieAccountsResp
         try {
           const stream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAccountTrieHashesReq)
+          if (!stream) {
+            respond(result, serializeGetTrieAccountHashesResp)
+            return
+          }
           const req = deserializeGetTrieAccountHashesReq(stream)
           const radixList = req.radixList
           const patcherMaxChildHashResponses = this.config.stateManager.patcherMaxChildHashResponses
@@ -618,8 +619,10 @@ class AccountPatcher {
             'binary_get_trie_accountHashes-failed',
             'binary_get_trie_accountHashes:' + e.name + ': ' + e.message + ' at ' + e.stack
           )
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          respond(result, serializeGetTrieAccountHashesResp)
         } finally {
-          profilerInstance.scopedProfileSectionEnd('binary_get_trie_accountHashes')
+          profilerInstance.scopedProfileSectionEnd(route)
         }
       },
     }
@@ -857,13 +860,14 @@ class AccountPatcher {
           this.mainLogger.debug(`${route} 4 queryStats:${utils.stringifyReduce(queryStats)} `)
           this.mainLogger.debug(`${route}  stateTabledata:${utils.stringifyReduce(result.stateTableData)} `)
           result.accounts = accountDataFinal
+          respond(result, serializeGetAccountDataByHashesResp)
         } catch (ex) {
           this.statemanager_fatal(
             `get_account_data_by_hashes-failed`,
             'get_account_data_by_hashes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack
           )
-        } finally {
           respond(result, serializeGetAccountDataByHashesResp)
+        } finally {
           profilerInstance.scopedProfileSectionEnd(route)
         }
       },

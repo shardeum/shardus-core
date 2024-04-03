@@ -30,8 +30,16 @@ import { shardusGetTime } from '../network'
 import { InternalBinaryHandler } from '../types/Handler'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
-import { CompareCertRespSerializable, deserializeCompareCertResp, serializeCompareCertResp } from '../types/CompareCertResp'
-import { CompareCertReqSerializable, deserializeCompareCertReq, serializeCompareCertReq } from '../types/CompareCertReq'
+import {
+  CompareCertRespSerializable,
+  deserializeCompareCertResp,
+  serializeCompareCertResp,
+} from '../types/CompareCertResp'
+import {
+  CompareCertReqSerializable,
+  deserializeCompareCertReq,
+  serializeCompareCertReq,
+} from '../types/CompareCertReq'
 import { verifyPayload } from '../types/ajv/Helpers'
 import fs from 'fs'
 import path from 'path'
@@ -61,7 +69,7 @@ type submoduleTypes =
 
 /** STATE */
 
-const filePath = path.join(process.cwd(), 'data-logs', 'cycleRecords1.txt');
+const filePath = path.join(process.cwd(), 'data-logs', 'cycleRecords1.txt')
 
 let modeModuleMigrationApplied = false
 export let hasAlreadyEnteredProcessing = false
@@ -175,7 +183,9 @@ const compareCertBinaryHandler: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>
 
       const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cCompareCertReq)
       if (!requestStream) {
-        return errorHandler(RequestErrorEnum.InvalidRequest)
+        errorHandler(RequestErrorEnum.InvalidRequest)
+        respond(resp, serializeCompareCertResp)
+        return
       }
 
       const req: CompareCertReq = deserializeCompareCertReq(requestStream)
@@ -184,8 +194,7 @@ const compareCertBinaryHandler: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>
       if (errors && errors.length > 0) {
         p2pLogger.error(`compareCert: request validation errors: ${errors}`)
         respond({ certs: bestCycleCert.get(bestMarker), record: bestRecord }, serializeCompareCertResp)
-        profilerInstance.scopedProfileSectionEnd(route)
-        return;
+        return
       }
 
       const compareCertReq: CompareCertReq = {
@@ -206,7 +215,6 @@ const compareCertBinaryHandler: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>
   },
 }
 
-
 const routes = {
   internal: {
     'compare-cert': compareCertRoute,
@@ -216,7 +224,7 @@ const routes = {
   },
   internal2: {
     [compareCertBinaryHandler.name]: compareCertBinaryHandler,
-  }
+  },
 }
 
 /** CONTROL FUNCTIONS */
@@ -1155,7 +1163,7 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
     }
 
     // not enough data to start comparing
-    if(!req.certs || !req.record) {
+    if (!req.certs || !req.record) {
       return [null, node]
     }
 

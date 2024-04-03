@@ -282,14 +282,14 @@ class TransactionConsenus {
           ) {
             // eslint-disable-next-line security/detect-object-injection
             tsReceipt = this.txTimestampCache[readableReq.cycleCounter][readableReq.txId]
-            respond(tsReceipt, serializeGetTxTimestampResp)
+            return respond(tsReceipt, serializeGetTxTimestampResp)
           } else {
             const tsReceipt: Shardus.TimestampReceipt = this.generateTimestampReceipt(
               readableReq.txId,
               readableReq.cycleMarker,
               readableReq.cycleCounter
             )
-            respond(tsReceipt, serializeGetTxTimestampResp)
+            return respond(tsReceipt, serializeGetTxTimestampResp)
           }
         } catch (e) {
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
@@ -316,7 +316,7 @@ class TransactionConsenus {
             queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
               txId,
               'get_confirm_or_challenge'
-              ) 
+            )
           }
 
           if (queueEntry == null) {
@@ -392,6 +392,7 @@ class TransactionConsenus {
           }
           if (queueEntry == null) {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no queue entry for ${txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txId)]}`)
+            respond(confirmOrChallengeResult, serializeGetConfirmOrChallengeResp)
             return
           }
           if (queueEntry.receivedBestConfirmation == null && queueEntry.receivedBestChallenge == null) {
@@ -400,6 +401,7 @@ class TransactionConsenus {
               'get_confirm_or_challenge no confirmation or challenge'
             )
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no confirmation or challenge for ${queueEntry.logID}, bestVote: ${JSON.stringify(queueEntry.receivedBestVote)},  bestConfirmation: ${JSON.stringify(queueEntry.receivedBestConfirmation)}`)
+            respond(confirmOrChallengeResult, serializeGetConfirmOrChallengeResp)
             return
           }
           confirmOrChallengeResult.txId = txId
@@ -416,6 +418,7 @@ class TransactionConsenus {
         } catch (e) {
           // Error handling
           if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge error ${e.message}`)
+          respond(confirmOrChallengeResult, serializeGetConfirmOrChallengeResp)
         } finally {
           this.profiler.scopedProfileSectionEnd(route)
         }
