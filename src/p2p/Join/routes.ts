@@ -227,8 +227,12 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'standby-refresh',
   handler: async (req, res) => {
 
-    // check if we should ignore this request for debugging purposes
-    if (config.debug.ignoreStandbyRefreshChance > 0) {
+    // check if the config.debug.ignoreStandbyRefreshChance is a probability
+    if (config.debug.ignoreStandbyRefreshChance < 0 || config.debug.ignoreStandbyRefreshChance > 1) {
+      warn('invalid config.debug.ignoreStandbyRefreshChance value: ' + config.debug.ignoreStandbyRefreshChance)
+      res.status(500).send('invalid config.debug.ignoreStandbyRefreshChance value')
+    // check if we should ignore this request for testing purposes
+    } else if (config.debug.ignoreStandbyRefreshChance > 0) {
       // if we should ignore this request, sleep for 1.1 seconds since timeout is 1 second
       if (testFailChance(config.debug.ignoreStandbyRefreshChance, 'standby-refresh', '', '', false)) {
         await utils.sleep(3000)

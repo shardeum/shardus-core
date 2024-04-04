@@ -8,6 +8,7 @@ import { getStandbyNodesInfoMap } from './index'
 import * as CycleChain from '../../CycleChain'
 import { crypto } from '../../Context'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
+import { config } from '../../Context'
 import rfdc from 'rfdc'
 
 //const clone = rfdc()
@@ -24,6 +25,13 @@ export async function submitStandbyRefresh(publicKey: string, cycleNumber: numbe
       throw Error(`couldn't get active nodes: ${activeNodesResult.error}`);
     }
     const activeNodes = activeNodesResult.value;
+
+    let payload = {
+      publicKey: publicKey,
+      cycleNumber: cycleNumber,
+    };
+    payload = crypto.sign(payload);
+
     const maxRetries = 3;
     let attempts = 0;
     const queriedNodesPKs = []
@@ -39,17 +47,12 @@ export async function submitStandbyRefresh(publicKey: string, cycleNumber: numbe
         } while(queriedNodesPKs.includes(node.publicKey));
         queriedNodesPKs.push(node.publicKey);
 
-        let payload = {
-          publicKey: publicKey,
-          cycleNumber: cycleNumber,
-        };
-        payload = crypto.sign(payload);
-
         await http.post(`${node.ip}:${node.port}/standby-refresh`, payload);
         return ok(void 0); // Success, exit the function
       } catch (e) {
         console.error(`Attempt ${attempts + 1} failed: ${e}`);
         attempts++;
+        utils.sleep(config.p2p.resumbitStandbyRefreshWaitDuration); // Sleep for 1 second before retrying
       }
     }
 

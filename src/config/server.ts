@@ -168,6 +168,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     rotationEdgeToAvoid: 3,
     forcedMode: '',
     delayZombieRestartSec: 180,
+    resumbitStandbyRefreshWaitDuration: 1000, // 1 second in ms
   },
   ip: {
     externalIp: '0.0.0.0',

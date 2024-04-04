@@ -904,6 +904,8 @@ export interface ServerConfiguration {
     forcedMode?: string
     /** Number of seconds to wait before shutting down after discovering we are a zombie node */
     delayZombieRestartSec: number
+    // /** The number of ms to wait to resubmit a standby refresh request to an active node if we get an error */
+    resumbitStandbyRefreshWaitDuration: number
   }
   /** Server IP configuration */
   ip?: {
