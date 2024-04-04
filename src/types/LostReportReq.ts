@@ -30,10 +30,7 @@ export function serializeLostReportReq(stream: VectorBufferStream, obj: LostRepo
   stream.writeString(obj.requestId)
   stream.writeString(obj.sign.owner)
   stream.writeString(obj.sign.sig)
-  if (obj.killother) {
-    stream.writeUInt8(1)
-    stream.writeUInt8(obj.killother ? 1 : 0)
-  } else stream.writeUInt8(0)
+  stream.writeUInt8(obj.killother ? 1 : 0)
 }
 
 export function deserializeLostReportReq(stream: VectorBufferStream): LostReportReq {
@@ -53,10 +50,7 @@ export function deserializeLostReportReq(stream: VectorBufferStream): LostReport
       owner: stream.readString(),
       sig: stream.readString(),
     },
-  }
-  if (stream.readUInt8() === 1) {
-    // Check if killother is present
-    obj.killother = stream.readUInt8() === 1
+    killother: stream.readUInt8() === 1
   }
 
   return obj

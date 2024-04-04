@@ -930,24 +930,6 @@ const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       let requestId = generateUUID()
       const sender = NodeList.nodes.get(header.sender_id)
       /* prettier-ignore */ if (logFlags.verbose) info(`Got investigate request requestId: ${req.requestId}, req: ${JSON.stringify(req)} from ${logNode(sender)}`)
-      let err = ''
-      // for request tracing
-      err = validateTypes(req, { timestamp: 'n', requestId: 's' })
-      if (!err) {
-        /* prettier-ignore */ if (logFlags.verbose) info(`Lost report tracing, requestId: ${req.requestId}, timestamp: ${req.timestamp}, sender: ${logNode(sender)}`)
-        // requestId = header.uuid
-      }
-      err = validateTypes(req, { target: 's', reporter: 's', checker: 's', cycle: 'n', sign: 'o' })
-      if (err) {
-        warn(`requestId: ${requestId} bad input ${err}`)
-        return
-      }
-      err = validateTypes(sign, { owner: 's', sig: 's' })
-      if (err) {
-        warn(`requestId: ${requestId} bad input ${err}`)
-        return
-      }
-
       if (stopReporting[req.target]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
       const key = `${req.target}-${req.cycle}`
       if (checkedLostRecordMap.get(key)) return // we have already seen this node for this cycle
