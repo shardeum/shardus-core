@@ -134,7 +134,7 @@ export let logFlags: LogFlags = {
   profiling_verbose: false,
 
   aalg: false,
-  shardedCache: false
+  shardedCache: false,
   lost: false,
 }
 
