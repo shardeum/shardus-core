@@ -227,7 +227,9 @@ export function init() {
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
   }
+  
   Comms.registerInternalBinary(LostReportBinaryHandler.name, LostReportBinaryHandler.handler)
+  
   p2p.registerInternal(
     'proxy',
     async (
@@ -950,7 +952,7 @@ const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
         checker: req.checker,
       }
 
-       // check if we already know that this node is down
+      // check if we already know that this node is down
       if (isDown[req.target]) {
         record.status = 'down'
         return
@@ -961,10 +963,10 @@ const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       if (allowKillRoute && req.killother) result = 'down'
       if (record.status === 'checking') record.status = result
       if (logFlags.verbose)
-      info(
-        `Status after checking for node ${req.target} payload cycle: ${req.cycle}, currentCycle: ${currentCycle} is ` +
+        info(
+          `Status after checking for node ${req.target} payload cycle: ${req.cycle}, currentCycle: ${currentCycle} is ` +
           record.status
-      )
+        )
       if (!checkedLostRecordMap.has(key)) {
         checkedLostRecordMap.set(key, record)
       }
