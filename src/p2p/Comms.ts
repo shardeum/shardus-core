@@ -7,7 +7,7 @@ import { isNodeDown, isNodeLost, isNodeUpRecent, setIsUpTs } from '../p2p/Lost'
 import { ShardusTypes } from '../shardus'
 import { Sign } from '../shardus/shardus-types'
 import { InternalBinaryHandler } from '../types/Handler'
-import { requestSerializer, responseDeserializer, responseSerializer } from '../types/Helpers'
+import { requestSerializer, responseDeserializer, responseSerializer, throwIfError } from '../types/Helpers'
 import { deserializeWrappedReq } from '../types/WrappedReq'
 import * as utils from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -446,6 +446,7 @@ export async function askBinary<TReq, TResp>(
       }
 
     const respStream = VectorBufferStream.fromBuffer(res)
+    throwIfError(respStream)
     const deserializedResp = responseDeserializer(respStream, respDeserializerFunc)
     return deserializedResp
   } catch (err) {

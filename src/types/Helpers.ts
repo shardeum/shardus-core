@@ -7,6 +7,7 @@ import { WrappedResp, deserializeWrappedResp, serializeWrappedResp } from './Wra
 import { InternalRouteEnum } from './enum/InternalRouteEnum'
 import { RequestErrorEnum } from './enum/RequestErrorEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { deserializeResponseError } from './ResponseError'
 
 export const responseSerializer = <T>(
   data: T,
@@ -126,4 +127,12 @@ function estimateBinarySizeOfObject(obj): number {
   }
 
   return calculateSize(obj)
+}
+
+export const throwIfError = (stream: VectorBufferStream): void => {
+  const errorType = stream.readUInt16()
+  if (errorType !== TypeIdentifierEnum.cResponseError) {
+    return
+  }
+  throw deserializeResponseError(stream)
 }
