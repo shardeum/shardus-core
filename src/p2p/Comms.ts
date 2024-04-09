@@ -57,7 +57,7 @@ const gossipInternalBinaryRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer
       await handleGossip(req, header.sender_id, header.tracker_id, payload.length)
     } catch (e) {
       nestedCountersInstance.countEvent('internal', `${route}-exception`)
-      logger.getLogger('comms').error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+      logger.getLogger('comms-route').error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
     } finally {
       profilerInstance.scopedProfileSectionEnd(route)
     }
