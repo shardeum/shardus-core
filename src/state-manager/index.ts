@@ -2269,8 +2269,6 @@ class StateManager {
   }
 
   _unregisterEndpoints() {
-    this.p2p.unregisterInternal('get_account_state_hash')
-    this.p2p.unregisterInternal('get_account_state')
     this.p2p.unregisterInternal('get_account_data3')
     this.p2p.unregisterInternal('get_account_data_by_list')
 
