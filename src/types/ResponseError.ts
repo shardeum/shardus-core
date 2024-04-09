@@ -38,3 +38,15 @@ export function deserializeResponseError(stream: VectorBufferStream): ResponseEr
   const message = stream.readString()
   return new ResponseError(code, appCode, message)
 }
+
+export function InternalError(message: string, appCode = 0): ResponseError {
+  return new ResponseError(ResponseErrorEnum.InternalError, appCode, message)
+}
+
+export function BadRequest(message: string, appCode = 0): ResponseError {
+  return new ResponseError(ResponseErrorEnum.BadRequest, appCode, message)
+}
+
+export function NotFound(message: string, appCode = 0): ResponseError {
+  return new ResponseError(ResponseErrorEnum.NotFound, appCode, message)
+}

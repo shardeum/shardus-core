@@ -38,11 +38,7 @@ import { robustQuery } from '../p2p/Utils'
 import { SignedObject } from '@shardus/crypto-utils'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { GetAccountDataReqSerializable, serializeGetAccountDataReq } from '../types/GetAccountDataReq'
-import {
-  GetAccountDataRespSerializable,
-  deserializeGetAccountDataResp,
-  serializeGetAccountDataResp,
-} from '../types/GetAccountDataResp'
+import { GetAccountDataRespSerializable, deserializeGetAccountDataResp } from '../types/GetAccountDataResp'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { InternalBinaryHandler } from '../types/Handler'
 import { Route } from '@shardus/types/build/src/p2p/P2PTypes'
@@ -78,7 +74,12 @@ import {
   deserializeGetAppliedVoteReq,
   serializeGetAppliedVoteReq,
 } from '../types/GetAppliedVoteReq'
-import { GetAppliedVoteResp, deserializeGetAppliedVoteResp, serializeGetAppliedVoteResp } from '../types/GetAppliedVoteResp'
+import {
+  GetAppliedVoteResp,
+  deserializeGetAppliedVoteResp,
+  serializeGetAppliedVoteResp,
+} from '../types/GetAppliedVoteResp'
+import { BadRequest, InternalError, NotFound, serializeResponseError } from '../types/ResponseError'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -476,13 +477,13 @@ class TransactionConsenus {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAppliedVoteReq)
           if (!requestStream) {
             errorHandler(RequestErrorEnum.InvalidRequestType)
-            return respond({}, serializeGetAppliedVoteResp)
+            return respond(BadRequest('invalid request stream'), serializeResponseError)
           }
 
           // verification data checks
           if (header.verification_data == null) {
             errorHandler(RequestErrorEnum.MissingVerificationData)
-            return respond({}, serializeGetAppliedVoteResp)
+            return respond(BadRequest('missing verification data'), serializeResponseError)
           }
 
           const txId = header.verification_data
@@ -495,18 +496,18 @@ class TransactionConsenus {
           if (queueEntry == null) {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`${route} no queue entry for ${txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txId)]}`)
             errorHandler(RequestErrorEnum.InvalidRequest)
-            return respond({}, serializeGetAppliedVoteResp)
+            return respond(NotFound('queue entry not found'), serializeResponseError)
           }
 
           const req = deserializeGetAppliedVoteReq(requestStream)
           if (req.txId !== txId) {
             errorHandler(RequestErrorEnum.InvalidPayload, { customErrorLog: 'txId mismatch' })
-            return respond({}, serializeGetAppliedVoteResp)
+            return respond(BadRequest('txId mismatch'), serializeResponseError)
           }
 
           if (queueEntry.receivedBestVote == null) {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`${route} no receivedBestVote for ${req.txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(req.txId)]}`)
-            return respond({}, serializeGetAppliedVoteResp)
+            return respond(NotFound('receivedBestVote not found'), serializeResponseError)
           }
           const appliedVote: GetAppliedVoteResp = {
             txId,
@@ -519,6 +520,7 @@ class TransactionConsenus {
         } catch (e) {
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
           this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+          return respond(InternalError('exception executing request'), serializeResponseError)
         } finally {
           this.profiler.scopedProfileSectionEnd(route)
         }
@@ -1319,7 +1321,10 @@ class TransactionConsenus {
         }
       } else {
         if (queueEntry.completedConfirmedOrChallenge === false && queueEntry.isInExecutionHome) {
-          if (this.stateManager.consensusLog) this.mainLogger.info(`tryProduceReceipt ${queueEntry.logID} completedConfirmedOrChallenge === false and isInExecutionHome`)
+          if (this.stateManager.consensusLog)
+            this.mainLogger.info(
+              `tryProduceReceipt ${queueEntry.logID} completedConfirmedOrChallenge === false and isInExecutionHome`
+            )
           nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt still in confirm/challenge stage')
           return
         }
@@ -1932,7 +1937,10 @@ class TransactionConsenus {
   }
 
   async confirmOrChallenge(queueEntry: QueueEntry): Promise<void> {
-    if (this.stateManager.consensusLog) this.mainLogger.debug(`confirmOrChallenge: ${queueEntry.logID} isInExecutionHome: ${queueEntry.isInExecutionHome} completedConfirmedOrChallenge: ${queueEntry.completedConfirmedOrChallenge}`)
+    if (this.stateManager.consensusLog)
+      this.mainLogger.debug(
+        `confirmOrChallenge: ${queueEntry.logID} isInExecutionHome: ${queueEntry.isInExecutionHome} completedConfirmedOrChallenge: ${queueEntry.completedConfirmedOrChallenge}`
+      )
     try {
       if (queueEntry.ourVote == null && queueEntry.isInExecutionHome) {
         nestedCountersInstance.countEvent('confirmOrChallenge', 'ourVote == null and isInExecutionHome')
@@ -2090,7 +2098,10 @@ class TransactionConsenus {
           this.confirmVoteAndShare(queueEntry)
         } else if (eligibleToConfirm === false) {
           // we are not eligible to confirm
-          if (this.stateManager.consensusLog) this.mainLogger.debug(`confirmOrChallenge: ${queueEntry.logID} not eligible to confirm. set completedConfirmedOrChallenge to true`)
+          if (this.stateManager.consensusLog)
+            this.mainLogger.debug(
+              `confirmOrChallenge: ${queueEntry.logID} not eligible to confirm. set completedConfirmedOrChallenge to true`
+            )
           queueEntry.completedConfirmedOrChallenge = true
         }
       } else {
@@ -2133,7 +2144,8 @@ class TransactionConsenus {
       this.tryAppendMessage(queueEntry, signedConfirmMessage)
       queueEntry.gossipedConfirmOrChallenge = true
       queueEntry.completedConfirmedOrChallenge = true
-      if (this.stateManager.consensusLog) this.mainLogger.debug(`completedConfirmOrChallenge: ${queueEntry.logID}`)
+      if (this.stateManager.consensusLog)
+        this.mainLogger.debug(`completedConfirmOrChallenge: ${queueEntry.logID}`)
     } catch (e) {
       this.mainLogger.error(`confirmVoteAndShare: ${queueEntry.logID} error: ${e.message}`)
     } finally {
@@ -2451,7 +2463,8 @@ class TransactionConsenus {
           }
 
           if (isReceivedBetterVote) {
-            if (this.stateManager.consensusLog) this.mainLogger.debug(`createAndShareVote received better vote`)
+            if (this.stateManager.consensusLog)
+              this.mainLogger.debug(`createAndShareVote received better vote`)
             nestedCountersInstance.countEvent(
               'transactionConsensus',
               'createAndShareVote isReceivedBetterVote: true'
@@ -2639,7 +2652,9 @@ class TransactionConsenus {
       let receivedConfirmedNode: Shardus.NodeWithRank
 
       queueEntry.topConfirmations.add(confirmOrChallenge.nodeId)
-      this.mainLogger.info(`tryAppendMessage: ${queueEntry.logID} current topConfirmations: ${queueEntry.topConfirmations.size}`)
+      this.mainLogger.info(
+        `tryAppendMessage: ${queueEntry.logID} current topConfirmations: ${queueEntry.topConfirmations.size}`
+      )
 
       if (!queueEntry.receivedBestConfirmation) isBetterThanCurrentConfirmation = true
       else if (queueEntry.receivedBestConfirmation.nodeId === confirmOrChallenge.nodeId)
