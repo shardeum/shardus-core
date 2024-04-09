@@ -18,6 +18,11 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as CycleChain from './CycleChain'
 import { isNodeNearRotatingOut, isNodeRecentlyRotatedIn } from './Utils'
+import { deserializeGossipReq, GossipReqBinary, serializeGossipReq } from '../types/GossipReq'
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
+import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
+import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
+import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 
 /** ROUTES */
 
@@ -33,9 +38,38 @@ const gossipInternalRoute: P2P.P2PTypes.InternalHandler<GossipReq> = async (
   await handleGossip(payload, sender, tracker, msgSize)
 }
 
+const gossipInternalBinaryRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
+  name: InternalRouteEnum.binary_gossip,
+  handler: async (payload, response, header, sign) => {
+    const route = InternalRouteEnum.binary_gossip
+    nestedCountersInstance.countEvent('internal', route)
+    profilerInstance.scopedProfileSectionStart(route)
+    const errorHandler = (
+      errorType: RequestErrorEnum,
+      opts?: { customErrorLog?: string; customCounterSuffix?: string }
+    ): void => requestErrorHandler(route, errorType, header, opts)
+    try {
+      const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGossipReq)
+      if (!requestStream) {
+        return errorHandler(RequestErrorEnum.InvalidRequest)
+      }
+      const req: GossipReqBinary = deserializeGossipReq(requestStream)
+      await handleGossip(req, header.sender_id, header.tracker_id, payload.length)
+    } catch (e) {
+      nestedCountersInstance.countEvent('internal', `${route}-exception`)
+      logger.getLogger('comms').error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+    } finally {
+      profilerInstance.scopedProfileSectionEnd(route)
+    }
+  },
+}
+
 const routes = {
   internal: {
     gossip: gossipInternalRoute,
+  },
+  internalBinary: {
+    gossip: gossipInternalBinaryRoute,
   },
 }
 /** STATE */
@@ -68,6 +102,11 @@ export function init() {
   // Register routes
   for (const [name, handler] of Object.entries(routes.internal)) {
     registerInternal(name, handler)
+  }
+
+  // Register binary routes
+  for (const route of Object.values(routes.internalBinary)) {
+    registerInternalBinary(route.name, route.handler)
   }
 
   // Catch Q1 start events and log size of hashes
@@ -261,7 +300,7 @@ export async function tellBinary<TReq>(
   profilerInstance.profileSectionStart('p2p-tellBinary')
   profilerInstance.profileSectionStart(`p2p-tellBinary-${route}`)
   let msgSize = cUninitializedSize
-  if (tracker === '') {
+  if (tracker === '' || !appHeader.tracker_id) {
     tracker = createMsgTracker(route)
     appHeader.tracker_id = tracker
   }
@@ -890,8 +929,21 @@ export async function sendGossip(
 
     //console.log('recipients after filter')
     //recipients.forEach(node => console.log(node.externalPort))
-
-    msgSize = await tell(recipients, 'gossip', gossipPayload, true, tracker, type)
+    if (config.p2p.useBinarySerializedEndpoints === true) {
+      msgSize = await tellBinary<GossipReqBinary>(
+        recipients,
+        InternalRouteEnum.binary_gossip,
+        gossipPayload,
+        serializeGossipReq,
+        {
+          tracker_id: tracker,
+        },
+        true,
+        tracker
+      )
+    } else {
+      msgSize = await tell(recipients, 'gossip', gossipPayload, true, tracker, type)
+    }
   } catch (ex) {
     //console.log('entered catch ', ex)
     if (logFlags.verbose) {
