@@ -1087,6 +1087,11 @@ export function registerRoutes() {
     res.send(safeStringify({ archivers }))
   })
 
+  network.registerExternalGet('joinedArchiver/:publicKey', ({params: {publicKey}}, res) => {
+    const isJoined = archivers.has(publicKey)
+    res.json({ isJoined });
+  })
+
   network.registerExternalGet('datarecipients', (req, res) => {
     res.send(safeStringify({ dataRecipients: [...recipients.values()] }))
   })
