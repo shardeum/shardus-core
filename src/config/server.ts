@@ -155,14 +155,14 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     getAccountQueueCountBinary: true,
     getAccountDataWithQueueHintsBinary: true,
     getTxTimestampBinary: true,
-    getAppliedVoteBinary: false, //disabled due to SHM-4286
+    getAppliedVoteBinary: true, //disabled due to SHM-4286
     getConfirmOrChallengeBinary: true,
     spreadAppliedVoteHashBinary: true,
     spreadTxToGroupSyncingBinary: true,
     broadcastStateBinary: true,
     broadcastFinalStateBinary: true, //should be ok with latest fixes SHM-4282
     requestTxAndStateBinary: true,
-    requestStateForTxPostBinary: false, //disabled because unhandled rejection SHM-4299
+    requestStateForTxPostBinary: true, //disabled because unhandled rejection SHM-4299
     requestStateForTxBinary: true,
     requestReceiptForTxBinary: true,
     rotationEdgeToAvoid: 3,
