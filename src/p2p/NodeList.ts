@@ -382,10 +382,10 @@ export function getAgeIndex(): { idx: number; total: number } {
 }
 
 export function getAgeIndexForNodeId(nodeId: string): { idx: number; total: number } {
-  const totalNodes = byJoinOrder.length
+  const totalNodes = activeByIdOrder.length
   for (let i = 0; i < byJoinOrder.length; i++) {
     if (byJoinOrder[i].id === nodeId) {
-      return { idx: totalNodes - i, total: totalNodes }
+      return { idx: byJoinOrder.length - i, total: totalNodes }
     }
   }
   return { idx: -1, total: totalNodes }
