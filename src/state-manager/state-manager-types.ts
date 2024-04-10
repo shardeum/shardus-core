@@ -1093,6 +1093,7 @@ export type HashTrieReq = {
 
 export type HashTrieResp = {
   nodeHashes: RadixAndHash[] //{radix:string, hash:string}[]
+  nodeId: string
 }
 
 export type ProxyRequest = {
@@ -1113,6 +1114,11 @@ export type RadixAndHash = {
 export type AccountIDAndHash = {
   accountID: string
   hash: string
+}
+
+// Define a new type by extending AccountIDAndHash
+export type AccountIdAndHashToRepair = AccountIDAndHash & {
+  targetNodeId: string
 }
 
 //todo figure out why this failed
@@ -1138,6 +1144,10 @@ export type RadixAndChildHashes = {
   childAccounts: AccountIDAndHash[]
 }
 
+export type RadixAndChildHashesWithNodeId = RadixAndChildHashes & {
+  nodeId: string
+}
+
 export type HashTrieAccountsResp = {
   nodeChildHashes: RadixAndChildHashes[]
   stats: {
@@ -1146,6 +1156,7 @@ export type HashTrieAccountsResp = {
     empty: number
     childCount: number
   }
+  nodeId: string
 }
 
 export type HashTrieAccountDataRequest = {

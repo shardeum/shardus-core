@@ -3,6 +3,7 @@ import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export type GetTrieHashesResponse = {
   nodeHashes: { radix: string; hash: string }[]
+  nodeId?: string
 }
 
 const cGetTrieHashesRespVersion = 1
