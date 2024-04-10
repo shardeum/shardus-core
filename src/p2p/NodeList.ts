@@ -384,7 +384,7 @@ export function getAgeIndex(): { idx: number; total: number } {
 export function getAgeIndexForNodeId(nodeId: string): { idx: number; total: number } {
   const totalNodes = activeByIdOrder.length
   for (let i = 0; i < byJoinOrder.length; i++) {
-    if (byJoinOrder[i].id === nodeId) {
+    if (byJoinOrder[i].id === nodeId && byJoinOrder[i].status === P2P.P2PTypes.NodeStatus.ACTIVE) {
       return { idx: byJoinOrder.length - i, total: totalNodes }
     }
   }
