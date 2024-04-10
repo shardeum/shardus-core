@@ -54,7 +54,7 @@ export enum TypeIdentifierEnum {
   cSign,
   cAppliedVote,
   cGetAppliedVoteResp,
-  cLostReportReq
+  cLostReportReq,
   cGossipReq,
   cResponseError,
 }
