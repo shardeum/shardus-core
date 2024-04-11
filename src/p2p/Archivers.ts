@@ -515,7 +515,7 @@ async function forwardReceipts() {
 
   let pingNeeded = true
   // Ping the archivers if the last ping/forward receipts was 5 seconds ago
-  const LEAST_LAST_PING_TIME_MS = 5000
+  const LEAST_LAST_PING_TIME_MS = 3000
   if (
     config.p2p.instantForwardReceipts &&
     shardusGetTime() - stateManager.transactionQueue.receiptsForwardedTimestamp < LEAST_LAST_PING_TIME_MS

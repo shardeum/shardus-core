@@ -5893,33 +5893,13 @@ class TransactionQueue {
   }
 
   resetReceiptsToForward(): void {
-    const receiptsStorageUpdate = true
-    if (receiptsStorageUpdate) {
-      const MAX_RECEIPT_AGE_MS = 15000
-      const now = shardusGetTime()
-      // Clear receipts that are older than MAX_RECEIPT_AGE_MS
-      for (const [key] of this.forwardedReceiptsByTimestamp) {
-        if (now - key > MAX_RECEIPT_AGE_MS) {
-          this.forwardedReceiptsByTimestamp.delete(key)
-        }
+    const MAX_RECEIPT_AGE_MS = 25000 // 25s
+    const now = shardusGetTime()
+    // Clear receipts that are older than MAX_RECEIPT_AGE_MS
+    for (const [key] of this.forwardedReceiptsByTimestamp) {
+      if (now - key > MAX_RECEIPT_AGE_MS) {
+        this.forwardedReceiptsByTimestamp.delete(key)
       }
-    } else if (this.config.p2p.instantForwardReceipts) {
-      const lastReceiptsToForward = [...this.receiptsToForward]
-      this.receiptsToForward = []
-      // Save the receipts by the last 10 seconds, 20 seconds, and 30 seconds.
-      this.receiptsBundleByInterval.set(
-        Archivers.ReceiptsBundleByInterval['30SECS_DATA'],
-        this.receiptsBundleByInterval.get(Archivers.ReceiptsBundleByInterval['20SECS_DATA'])
-      )
-      this.receiptsBundleByInterval.set(
-        Archivers.ReceiptsBundleByInterval['20SECS_DATA'],
-        this.receiptsBundleByInterval.get(Archivers.ReceiptsBundleByInterval['10SECS_DATA'])
-      )
-      this.receiptsBundleByInterval.set(
-        Archivers.ReceiptsBundleByInterval['10SECS_DATA'],
-        lastReceiptsToForward
-      )
-      if (logFlags.console) console.log('receiptsBundleByInterval', this.receiptsBundleByInterval)
     }
   }
 
