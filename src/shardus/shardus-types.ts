@@ -1152,6 +1152,8 @@ export interface ServerConfiguration {
     confirmationSeenExpirationTime: number
     // percentage of execution group which will share the vote
     voterPercentage: number
+    // whether to wait upstream tx before enqueueing
+    waitUpstreamTx: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
@@ -1173,6 +1175,7 @@ export interface ServerConfiguration {
     startInServiceMode?: boolean
     /** This flag defaults to true. If set to true, addresses marked as ir will be fetched when tx is ageing. */
     enableRIAccountsCache: boolean
+    dappFeature1enabled: boolean
   }
 }
 

@@ -284,6 +284,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     voteSeenExpirationTime: 20000,
     confirmationSeenExpirationTime: 30000,
     voterPercentage: 0.1,
+    waitUpstreamTx: false
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,
@@ -293,6 +294,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     archiverDataSubscriptionsUpdate: false,
     startInServiceMode: false,
     enableRIAccountsCache: true,
+    dappFeature1enabled: false
   },
 }
 export default SERVER_CONFIG

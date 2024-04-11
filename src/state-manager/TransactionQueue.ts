@@ -1746,6 +1746,27 @@ class TransactionQueue {
         noConsensus = true
       }
 
+      if (configContext.stateManager.waitUpstreamTx) {
+        const keysToCheck = []
+        if (acceptedTx.shardusMemoryPatterns && acceptedTx.shardusMemoryPatterns.rw) {
+          keysToCheck.push(...acceptedTx.shardusMemoryPatterns.rw)
+        }
+        if (acceptedTx.shardusMemoryPatterns && acceptedTx.shardusMemoryPatterns.wo) {
+          keysToCheck.push(...acceptedTx.shardusMemoryPatterns.wo)
+        }
+        if (keysToCheck.length === 0) {
+          const sourceKey = acceptedTx.keys.sourceKeys[0]
+          keysToCheck.push(sourceKey)
+        }
+        for (const key of keysToCheck) {
+          const isAccountInQueue = this.isAccountInQueue(key)
+          if (isAccountInQueue) {
+            nestedCountersInstance.countEvent('stateManager', `cancel enqueue, isAccountInQueue ${key} ${isAccountInQueue}`)
+            return false
+          }
+        }
+      }
+
       const cycleNumber = this.stateManager.currentCycleShardData.cycleNumber
 
       this.queueEntryCounter++
@@ -6661,6 +6682,53 @@ class TransactionQueue {
     }
     /* prettier-ignore */ if (logFlags.verbose) console.log(`getAccountQueueCount: remote:${remote} ${count} acc:${utils.stringifyReduce(accountID)}`)
     return { count, committingAppData }
+  }
+
+  isAccountInQueue(accountID: string, remote = false): boolean {
+    for (const queueEntry of this.pendingTransactionQueue) {
+      if (queueEntry.uniqueKeys.includes(accountID)) {
+        const memoryPatterns = queueEntry.acceptedTx.shardusMemoryPatterns
+        if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
+          /* prettier-ignore */ if (logFlags.verbose) console.log( 'isAccountInQueue: found upstream tx in the' +
+            ' injested' +
+            ' queue:' )
+          nestedCountersInstance.countEvent('stateManager', `isAccountInQueue of injested`)
+          return true
+        }
+        const rw = memoryPatterns?.rw
+        const wo = memoryPatterns?.wo
+        if (rw && rw.includes(accountID) || wo && wo.includes(accountID)) {
+          /* prettier-ignore */ if (logFlags.verbose) console.log( 'isAccountInQueue: found upstream tx in the' +
+            ' injested' +
+            ' queue:' )
+          nestedCountersInstance.countEvent('stateManager', `isAccountInQueue rw or wo of injested`)
+          return true
+        }
+      }
+    }
+    for (const queueEntry of this._transactionQueue) {
+      if (queueEntry.uniqueKeys.includes(accountID)) {
+        const memoryPatterns = queueEntry.acceptedTx.shardusMemoryPatterns
+        if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
+          /* prettier-ignore */ if (logFlags.verbose) console.log( 'isAccountInQueue: found upstream tx in the' +
+            ' newAccepted' +
+            ' queue:' )
+          nestedCountersInstance.countEvent('stateManager', `isAccountInQueue of newAccepted`)
+          return true
+        }
+        const rw = memoryPatterns?.rw
+        const wo = memoryPatterns?.wo
+        if (rw && rw.includes(accountID) || wo && wo.includes(accountID)) {
+          /* prettier-ignore */ if (logFlags.verbose) console.log( 'isAccountInQueue: found upstream tx in the' +
+            ' newAccepted' +
+            ' queue:' )
+          nestedCountersInstance.countEvent('stateManager', `isAccountInQueue rw or wo of newAccepted`)
+          return true
+        }
+      }
+    }
+    /* prettier-ignore */ if (logFlags.verbose) console.log(`isAccountInQueue: false`)
+    return false
   }
 
   /**
