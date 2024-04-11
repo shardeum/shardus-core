@@ -17,6 +17,7 @@ export function serializeGetTrieHashesResp(
     stream.writeUInt16(TypeIdentifierEnum.cGetTrieHashesResp)
   }
   stream.writeUInt8(cGetTrieHashesRespVersion)
+  stream.writeString(response.nodeId || '')
   stream.writeUInt32(response.nodeHashes.length)
   for (const { radix, hash } of response.nodeHashes) {
     stream.writeString(radix)
@@ -29,6 +30,7 @@ export function deserializeGetTrieHashesResp(stream: VectorBufferStream): GetTri
   if (version > cGetTrieHashesRespVersion) {
     throw new Error('Unsupported version in deserializeGetTrieHashesResp')
   }
+  const nodeId = stream.readString()
   const length = stream.readUInt32()
   const hashes = []
   for (let i = 0; i < length; i++) {
@@ -36,5 +38,5 @@ export function deserializeGetTrieHashesResp(stream: VectorBufferStream): GetTri
     const hash = stream.readString()
     hashes.push({ radix, hash })
   }
-  return { nodeHashes: hashes }
+  return { nodeHashes: hashes, nodeId: nodeId || '' }
 }

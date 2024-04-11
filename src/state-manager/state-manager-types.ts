@@ -1111,6 +1111,9 @@ export type RadixAndHash = {
   radix: string
   hash: string
 }
+export type RadixAndHashWithNodeId = RadixAndHash & {
+  nodeId: string
+}
 export type AccountIDAndHash = {
   accountID: string
   hash: string

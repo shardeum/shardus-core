@@ -30,6 +30,7 @@ import {
   HashTrieSyncTell,
   HashTrieUpdateStats,
   RadixAndChildHashes,
+  RadixAndHashWithNodeId,
   RadixAndChildHashesWithNodeId,
   RadixAndHash,
   ShardedHashTrie,
@@ -373,7 +374,7 @@ class AccountPatcher {
     this.p2p.registerInternal(
       'repair_missing_accounts',
       async (
-        payload: AccountRepairInstruction[],
+        payload: {repairInstructions: AccountRepairInstruction[]},
         respond: (arg0: boolean) => Promise<boolean>,
         _sender: unknown,
         _tracker: string,
@@ -381,43 +382,47 @@ class AccountPatcher {
       ) => {
         profilerInstance.scopedProfileSectionStart('repair_missing_accounts', false, msgSize)
 
-        for (const repairInstruction of payload) {
-          const { accountID, txId, hash, accountData, targetNodeId } = repairInstruction
-          // todo: check the tx receipt from the archiver to see if the tx was applied
+        try {
+          for (const repairInstruction of payload?.repairInstructions) {
+            const { accountID, txId, hash, accountData, targetNodeId } = repairInstruction
+            // todo: check the tx receipt from the archiver to see if the tx was applied
 
-          // check if we cover this accountId
+            // check if we cover this accountId
 
-          // todo: check if the account is still too old
+            // todo: check if the account is still too old
 
-          // check the hash and timestamp of the account data
+            // check the hash and timestamp of the account data
 
-          const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, 'repair_missing_accounts')
+            const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, 'repair_missing_accounts')
 
-          if (archivedQueueEntry == null) {
-            nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: no archivedQueueEntry for txId: ${txId}`)
-            this.mainLogger.debug(`repair_missing_accounts: no archivedQueueEntry for txId: ${txId}`)
-            return await respond(false)
+            if (archivedQueueEntry == null) {
+              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: no archivedQueueEntry for txId: ${txId}`)
+              this.mainLogger.debug(`repair_missing_accounts: no archivedQueueEntry for txId: ${txId}`)
+              return await respond(false)
+            }
+
+            // update the account data (and cache?)
+            const updatedAccounts: string[] = []
+            //save the account data.  note this will make sure account hashes match the wrappers and return failed
+            // hashes  that don't match
+            const failedHashes = await this.stateManager.checkAndSetAccountData(
+              [accountData],
+              `repair_missing_accounts:${txId}`,
+              true,
+              updatedAccounts
+            )
+            if (logFlags.debug) this.mainLogger.debug(`repair_missing_accounts: ${updatedAccounts.length} updated, ${failedHashes.length} failed`)
+            nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts:${updatedAccounts.length} updated, accountId: ${utils.makeShortHash(accountID)}, cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
+            if (failedHashes.length > 0) nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts:${failedHashes.length} failed`)
+            let success = false
+            if (updatedAccounts.length > 0 && failedHashes.length === 0) {
+              success = true
+            }
+            await respond(success)
           }
-
-          // update the account data (and cache?)
-          const updatedAccounts: string[] = []
-          //save the account data.  note this will make sure account hashes match the wrappers and return failed
-          // hashes  that don't match
-          const failedHashes = await this.stateManager.checkAndSetAccountData(
-            [accountData],
-            `repair_missing_accounts:${txId}`,
-            true,
-            updatedAccounts
-          )
-          if (logFlags.debug) this.mainLogger.debug(`repair_missing_accounts: ${updatedAccounts.length} updated, ${failedHashes.length} failed`)
-          nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts:${updatedAccounts.length} updated, accountId: ${utils.makeShortHash(accountID)}, cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
-          if (failedHashes.length > 0) nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts:${failedHashes.length} failed`)
-          let success = false
-          if (updatedAccounts.length > 0 && failedHashes.length === 0) {
-            success = true
-          }
-          await respond(success)
+        } catch (e) {
         }
+
         profilerInstance.scopedProfileSectionEnd('repair_missing_accounts')
       }
     )
@@ -1852,11 +1857,11 @@ class AccountPatcher {
    * findExtraChildren
    * a debug method to figure out if we have keys not covered by other nodes.
    * @param consensusArray
-   * @param mapB
+   * @param localLayerMap
    * @returns
    */
-  findExtraBadKeys(consensusArray: RadixAndHash[], mapB: Map<string, HashTrieNode>): RadixAndHash[] {
-    const extraBadRadixes = []
+  findExtraBadKeys(consensusArray: RadixAndHashWithNodeId[], localLayerMap: Map<string, HashTrieNode>): RadixAndHashWithNodeId[] {
+    const extraBadRadixes: RadixAndHashWithNodeId[] = []
     if (consensusArray == null) {
       this.statemanager_fatal(
         'findExtraBadKeys: consensusArray == null',
@@ -1864,30 +1869,36 @@ class AccountPatcher {
       )
       return []
     }
-    const parentKeys = new Set()
-    const goodKeys = new Set()
+    const parentKeys: Set<{parentKey: string, nodeId: string}> = new Set()
+    const goodKeys: Set<string> = new Set()
     //build sets of parents and good keys
     for (const value of consensusArray) {
       const parentKey = value.radix.slice(0, value.radix.length - 1)
-      parentKeys.add(parentKey)
+      parentKeys.add({parentKey, nodeId: value.nodeId})
       goodKeys.add(value.radix)
     }
 
     //iterate all possible children of the parent keys and detect if we have extra keys that are not in the good list
-    for (const parentKey of parentKeys) {
+    for (const item of parentKeys) {
       for (let i = 0; i < 16; i++) {
-        const childKey = parentKey + i.toString(16)
-        const weHaveKey = mapB.has(childKey)
+        const childKey = item.parentKey + i.toString(16)
+        const weHaveKey = localLayerMap.has(childKey)
         if (weHaveKey) {
           const theyHaveKey = goodKeys.has(childKey)
           if (theyHaveKey === false) {
-            extraBadRadixes.push({radix: mapB.get(childKey).radix, hash: mapB.get(childKey).hash})
+            extraBadRadixes.push({radix: localLayerMap.get(childKey).radix, hash: localLayerMap.get(childKey).hash, nodeId: item.nodeId})
           }
         }
       }
     }
+    let uniqueExtraBadRadixes = []
+    for (const item of extraBadRadixes) {
+      if (uniqueExtraBadRadixes.find((x) => x.radix === item.radix) == null) {
+        uniqueExtraBadRadixes.push(item)
+      }
+    }
 
-    return extraBadRadixes
+    return uniqueExtraBadRadixes
   }
 
   /***
@@ -1994,8 +2005,8 @@ class AccountPatcher {
    * @param radixHashEntries
    * @param cycle
    */
-  async getChildrenOf(radixHashEntries: RadixAndHash[], cycle: number): Promise<{radixAndHash: RadixAndHash, nodeId: string}[]> {
-    let results: {radixAndHash: RadixAndHash, nodeId: string}[] = []
+  async getChildrenOf(radixHashEntries: RadixAndHash[], cycle: number): Promise<RadixAndHashWithNodeId[]> {
+    let results: RadixAndHashWithNodeId[] = []
     const requestMap: Map<Shardus.Node, HashTrieReq> = new Map()
     for (const radixHash of radixHashEntries) {
       const node = this.getNodeForQuery(radixHash.radix, cycle)
@@ -2022,7 +2033,7 @@ class AccountPatcher {
     // }
 
     const promises = []
-    for (const [key, value] of requestMap) {
+    for (const [node, value] of requestMap) {
       try {
         let promise
         if (
@@ -2030,7 +2041,7 @@ class AccountPatcher {
           this.stateManager.config.p2p.getTrieHashesBinary
         ) {
           promise = await this.p2p.askBinary<GetTrieHashesRequest, GetTrieHashesResponse>(
-            key,
+            node,
             InternalRouteEnum.binary_get_trie_hashes,
             value,
             serializeGetTrieHashesReq,
@@ -2038,7 +2049,7 @@ class AccountPatcher {
             {}
           )
         } else {
-          promise = this.p2p.ask(key, 'get_trie_hashes', value)
+          promise = this.p2p.ask(node, 'get_trie_hashes', value)
         }
         promises.push(promise)
       } catch (error) {
@@ -2051,17 +2062,19 @@ class AccountPatcher {
       const trieHashesResponses: GetTrieHashesResponse[] = await Promise.all(promises)
       for (const response of trieHashesResponses) {
         if (response != null && response.nodeHashes != null) {
-          let data:  {radixAndHash: RadixAndHash, nodeId: string}[] = response.nodeHashes.map(nodeHash => {
+          let data:  RadixAndHashWithNodeId[] = response.nodeHashes.map(nodeHash => {
             let item: RadixAndHash = {
               radix: nodeHash.radix,
               hash: nodeHash.hash
             }
             return {
-              radixAndHash: item,
+              radix: item.radix,
+              hash: item.hash,
               nodeId: response.nodeId
             }
           })
-          results.concat(data)
+          results = results.concat(data)
+        } else {
         }
       }
     } catch (error) {
@@ -2371,8 +2384,8 @@ class AccountPatcher {
       leafResponses: 0,
       getAccountHashStats: {},
     }
-    let extraBadKeys = []
-    let extraBadAccounts = []
+    let extraBadKeys: RadixAndHashWithNodeId[] = []
+    let extraBadAccounts: AccountIdAndHashToRepair[] = []
 
     const minVotes = this.calculateMinVotes()
 
@@ -2428,6 +2441,7 @@ class AccountPatcher {
     }
 
     let toFix = this.diffConsenus(goodVotes, badLayerMap)
+
 
     stats.badSyncRadix = toFix.length
 
@@ -2495,45 +2509,109 @@ class AccountPatcher {
       level++
       stats.checkedLevel = level
       badLayerMap = this.shardTrie.layerMaps[level] // eslint-disable-line security/detect-object-injection
-      const childrenToDiff = await this.getChildrenOf(toFix, cycle)
+      const remoteChildrenToDiff: RadixAndHashWithNodeId[] = await this.getChildrenOf(toFix, cycle)
 
-      if (childrenToDiff == null) {
-        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts childrenToDiff == null for radixes: ${JSON.stringify(toFix)}, cycle: ${cycle}`, 1)
+      if (remoteChildrenToDiff == null) {
+        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts remoteChildrenToDiff == null for radixes: ${JSON.stringify(toFix)}, cycle: ${cycle}`, 1)
       }
-      if (childrenToDiff.length === 0) {
-        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts childrenToDiff.length = 0 for radixes: ${JSON.stringify(toFix)}, cycle: ${cycle}`, 1)
+      if (remoteChildrenToDiff.length === 0) {
+        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts remoteChildrenToDiff.length = 0 for radixes: ${JSON.stringify(toFix)}, cycle: ${cycle}`, 1)
       }
 
-      this.mainLogger.debug(`findBadAccounts ${cycle}: level: ${level}, toFix: ${toFix.length}, childrenToDiff: ${JSON.stringify(childrenToDiff)}, badLayerMap: ${JSON.stringify(badLayerMap)}`)
-
-      toFix = this.diffConsenus(childrenToDiff.map(x => x.radixAndHash), badLayerMap)
+      this.mainLogger.debug(`findBadAccounts ${cycle}: level: ${level}, toFix: ${toFix.length}, childrenToDiff: ${JSON.stringify(remoteChildrenToDiff)}, badLayerMap: ${JSON.stringify(badLayerMap)}`)
+      toFix = this.diffConsenus(remoteChildrenToDiff, badLayerMap)
 
       stats.subHashesTested += toFix.length
 
       if (toFix.length === 0) {
         stats.trailColdLevel = level
-        extraBadKeys = this.findExtraBadKeys(childrenToDiff.map(x => x.radixAndHash), badLayerMap)
-        // if (extraBadKeys.length > 0) {
-        //   console.log(`thant: extraBadKeys: ${extraBadKeys.length} concated to toFix: ${toFix.length}`, toFix);
-        //   toFix = toFix.concat(extraBadKeys)
-        //   break
-        // }
+        extraBadKeys = this.findExtraBadKeys(remoteChildrenToDiff, badLayerMap)
+
+
+        let result = {
+          nodeChildHashes: [],
+          stats: {
+            matched: 0,
+            visisted: 0,
+            empty: 0,
+            childCount: 0,
+          },
+        } as HashTrieAccountsResp
+
+        let allLeafNodes: HashTrieNode[] = []
+
+        for (const radixAndHash of extraBadKeys) {
+          let level = radixAndHash.radix.length
+          while (level < this.treeMaxDepth) {
+            level++
+            const layerMap = this.shardTrie.layerMaps[level] // eslint-disable-line security/detect-object-injection
+            if (layerMap == null) {
+              /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_accountHashes badrange:${level}`)
+              break
+            }
+            const hashTrieNode = layerMap.get(radixAndHash.radix)
+            if (hashTrieNode != null && hashTrieNode.accounts != null) {
+              result.stats.visisted++
+              const childAccounts = []
+              result.nodeChildHashes.push({ radix: radixAndHash.radix, childAccounts })
+              for (const account of hashTrieNode.accounts) {
+                childAccounts.push({ accountID: account.accountID, hash: account.hash })
+                extraBadAccounts.push({ accountID: account.accountID, hash: account.hash, targetNodeId: radixAndHash.nodeId })
+                result.stats.childCount++
+              }
+              if (hashTrieNode.accounts.length === 0) {
+                result.stats.empty++
+              }
+            }
+          }
+        }
+
+        for (const radixAndHash of extraBadKeys) {
+          const radix = radixAndHash.radix
+          result.stats.visisted++
+          const level = radix.length
+          const layerMap = this.shardTrie.layerMaps[level] // eslint-disable-line security/detect-object-injection
+          if (layerMap == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('accountPatcher', `get_trie_accountHashes badrange:${level}`)
+            break
+          }
+
+          const currentNode = layerMap.get(radix)
+          const leafs: HashTrieNode[] = this.extractLeafNodes(currentNode)
+          for (const leaf of leafs) {
+            if (leaf != null && leaf.accounts != null) {
+              result.stats.matched++
+              const childAccounts = []
+              result.nodeChildHashes.push({ radix, childAccounts })
+              for (const account of leaf.accounts) {
+                childAccounts.push({ accountID: account.accountID, hash: account.hash })
+                extraBadAccounts.push({ accountID: account.accountID, hash: account.hash, targetNodeId: radixAndHash.nodeId })
+                result.stats.childCount++
+              }
+              if (leaf.accounts.length === 0) {
+                result.stats.empty++
+              }
+            }
+          }
+        }
+
+        if (extraBadKeys.length > 0) {
+          toFix = toFix.concat(extraBadKeys)
+          break
+        }
       }
-      console.log(`thant: toFix at level ${level}`, toFix);
 
       //record some debug info
       badHashesPerLevel[level] = toFix.length // eslint-disable-line security/detect-object-injection
       checkedKeysPerLevel[level] = toFix.map((x) => x.radix) // eslint-disable-line security/detect-object-injection
-      requestedKeysPerLevel[level] = childrenToDiff.length // eslint-disable-line security/detect-object-injection
-      hashesPerLevel[level] = childrenToDiff.length // eslint-disable-line security/detect-object-injection
+      requestedKeysPerLevel[level] = remoteChildrenToDiff.length // eslint-disable-line security/detect-object-injection
+      hashesPerLevel[level] = remoteChildrenToDiff.length // eslint-disable-line security/detect-object-injection
       // badLayerMap.size ...badLayerMap could be null!
     }
-    console.log(`thant: toFix after loop`, toFix);
 
     stats.leafsChecked = toFix.length
     //get bad accounts from the leaf nodes
     const { radixAndChildHashes, getAccountHashStats } = await this.getChildAccountHashes(toFix, cycle)
-    console.log(`thant: radixAndChildHashes`, radixAndChildHashes);
     stats.getAccountHashStats = getAccountHashStats
 
     stats.leafResponses = radixAndChildHashes.length
@@ -2636,11 +2714,35 @@ class AccountPatcher {
       badHashesPerLevel,
       accountHashesChecked,
       stats,
+      extraBadAccounts,
       extraBadKeys,
       accountsTheyNeedToRepair
     }
   }
 
+  extractLeafNodes(rootNode: HashTrieNode): HashTrieNode[] {
+    const leafNodes: HashTrieNode[] = [];
+
+    function traverse(node: HashTrieNode) {
+      if (node == null) {
+        return
+      }
+      if (node.children && node.children.length === 0) {
+        leafNodes.push(node);
+        return;
+      }
+
+      if (node.children && node.children.length > 0) {
+        for (const childNode of node.children) {
+          if (childNode) {
+            traverse(childNode);
+          }
+        }
+      }
+    }
+    traverse(rootNode);
+    return leafNodes;
+  }
   //big todo .. be able to test changes on a temp tree and validate the hashed before we commit updates
   //also need to actually update the full account data and not just our tree!!
 
@@ -2973,6 +3075,10 @@ class AccountPatcher {
         continue
       }
       const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchivedByTimestamp(accountData.timestamp, 'requestOtherNodesToRepair')
+      if (archivedQueueEntry == null) {
+        this.mainLogger.debug(`requestOtherNodesToRepair: archivedQueueEntry is null`)
+        continue
+      }
       const repairInstruction: AccountRepairInstruction = {
         accountID: accountData.accountId,
         hash: accountData.stateId,
@@ -2993,7 +3099,10 @@ class AccountPatcher {
           nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair node == null`, 1)
           this.mainLogger.debug(`requestOtherNodesToRepair: node == null`)
         }
-        this.p2p.tell([node], 'repair_missing_accounts', repairInstructions)
+        const message = {
+          repairInstructions
+        }
+        this.p2p.tell([node], 'repair_missing_accounts', message)
       }
     }
   }
@@ -3070,15 +3179,14 @@ class AccountPatcher {
 
       if (logFlags.debug) {
         this.mainLogger.debug(`badAccounts cycle: ${cycle}, ourBadAccounts: ${results.badAccounts.length}, ourBadAccounts: ${JSON.stringify(results.badAccounts)}`)
-        if (results.accountsTheyNeedToRepair.length > 0 || results.extraBadKeys.length > 0) {
-          let accountsTheyNeedToRepair = [...results.accountsTheyNeedToRepair]
-          if (results.extraBadKeys.length > 0) {
-            accountsTheyNeedToRepair = accountsTheyNeedToRepair.concat(results.extraBadKeys)
-          }
-          this.mainLogger.debug(`badAccounts cycle: ${cycle}, accountsTheyNeedToRepair: ${accountsTheyNeedToRepair.length}, accountsTheyNeedToRepair: ${JSON.stringify(accountsTheyNeedToRepair)}`)
-          console.log(`badAccounts cycle: ${cycle}, accountsTheyNeedToRepair: ${accountsTheyNeedToRepair.length}, accountsTheyNeedToRepair: ${JSON.stringify(accountsTheyNeedToRepair)}`)
-          this.requestOtherNodesToRepair(accountsTheyNeedToRepair)
+      }
+      if (results.accountsTheyNeedToRepair.length > 0 || results.extraBadAccounts.length > 0) {
+        let accountsTheyNeedToRepair = [...results.accountsTheyNeedToRepair]
+        if (results.extraBadAccounts.length > 0) {
+          accountsTheyNeedToRepair = accountsTheyNeedToRepair.concat(results.extraBadAccounts)
         }
+        this.mainLogger.debug(`badAccounts cycle: ${cycle}, accountsTheyNeedToRepair: ${accountsTheyNeedToRepair.length}, accountsTheyNeedToRepair: ${JSON.stringify(accountsTheyNeedToRepair)}`)
+        this.requestOtherNodesToRepair(accountsTheyNeedToRepair)
       }
 
       if (this.config.mode === 'debug' && this.config.debug.haltOnDataOOS) {
@@ -3961,7 +4069,8 @@ type BadAccountsInfo = {
   badHashesPerLevel: number[]
   accountHashesChecked: number
   stats: BadAccountStats
-  extraBadKeys: AccountIdAndHashToRepair[]
+  extraBadAccounts: AccountIdAndHashToRepair[]
+  extraBadKeys: RadixAndHash[]
   accountsTheyNeedToRepair: AccountIdAndHashToRepair[]
 }
 
