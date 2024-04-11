@@ -541,8 +541,7 @@ async function forwardReceipts() {
   }
 
   if (config.p2p.instantForwardReceipts) {
-    const receiptsStorageUpdate = true
-    if (newArchiversToForward.length > 0 && receiptsStorageUpdate) {
+    if (newArchiversToForward.length > 0) {
       const receipts = stateManager.transactionQueue.getReceiptsToForward()
       if (receipts && receipts.length > 0) {
         responses.RECEIPT = receipts
@@ -552,44 +551,6 @@ async function forwardReceipts() {
             console.log('Sending last 15s receipts to newly subscribed archivers', publicKey)
           const recipient = recipients.get(publicKey)
           if (!recipient) continue
-          forwardDataToSubscribedArchivers(responses, publicKey, recipient)
-        }
-      }
-    } else if (newArchiversToForward.length > 0 && !receiptsStorageUpdate) {
-      if (logFlags.console) console.log('newArchiversToForward', newArchiversToForward)
-      // Send last 30s, 20s, 10s and fresh receipts to new subscribed archivers
-      const _30SECS__DATA = stateManager.transactionQueue.receiptsBundleByInterval.get(
-        ReceiptsBundleByInterval['30SECS_DATA']
-      ) // of last 30 seconds
-      const _20SECS__DATA = stateManager.transactionQueue.receiptsBundleByInterval.get(
-        ReceiptsBundleByInterval['20SECS_DATA']
-      ) // of last 20 seconds
-      const _10SECS__DATA = stateManager.transactionQueue.receiptsBundleByInterval.get(
-        ReceiptsBundleByInterval['10SECS_DATA']
-      ) // of last 10 seconds
-      const freshReceipts = [...stateManager.transactionQueue.receiptsToForward] // of new receipts
-      for (let publicKey of newArchiversToForward) {
-        if (logFlags.console) console.log('Sending last 30s receipts to new subscribed archivers', publicKey)
-        const recipient = recipients.get(publicKey)
-        if (!recipient) continue
-        const DELAY_BETWEEN_FORWARD_MS = 1000
-        if (_30SECS__DATA && _30SECS__DATA.length > 0) {
-          responses.RECEIPT = [..._30SECS__DATA]
-          forwardDataToSubscribedArchivers(responses, publicKey, recipient)
-        }
-        await sleep(DELAY_BETWEEN_FORWARD_MS)
-        if (_20SECS__DATA && _20SECS__DATA.length > 0) {
-          responses.RECEIPT = [..._20SECS__DATA]
-          forwardDataToSubscribedArchivers(responses, publicKey, recipient)
-        }
-        await sleep(DELAY_BETWEEN_FORWARD_MS)
-        if (_10SECS__DATA && _10SECS__DATA.length > 0) {
-          responses.RECEIPT = [..._10SECS__DATA]
-          forwardDataToSubscribedArchivers(responses, publicKey, recipient)
-        }
-        await sleep(DELAY_BETWEEN_FORWARD_MS)
-        if (freshReceipts && freshReceipts.length > 0) {
-          responses.RECEIPT = [...freshReceipts]
           forwardDataToSubscribedArchivers(responses, publicKey, recipient)
         }
       }
@@ -936,7 +897,9 @@ export function registerRoutes() {
     const accepted = await addArchiverJoinRequest(joinRequest)
     if (!accepted.success) {
       warn('Archiver join request not accepted.')
-      return res.send(safeStringify({ success: false, error: `Archiver join request rejected! ${accepted.reason}` }))
+      return res.send(
+        safeStringify({ success: false, error: `Archiver join request rejected! ${accepted.reason}` })
+      )
     }
     if (logFlags.p2pNonFatal) info('Archiver join request accepted!')
     return res.send(safeStringify({ success: true }))
@@ -955,7 +918,9 @@ export function registerRoutes() {
     const accepted = await addLeaveRequest(leaveRequest)
     if (!accepted.success) {
       warn('Archiver leave request not accepted.')
-      return res.send(safeStringify({ success: false, error: `Archiver leave request rejected! ${accepted.reason}` }))
+      return res.send(
+        safeStringify({ success: false, error: `Archiver leave request rejected! ${accepted.reason}` })
+      )
     }
     if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')
     return res.send(safeStringify({ success: true }))

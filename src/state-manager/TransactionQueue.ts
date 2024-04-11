@@ -5734,17 +5734,8 @@ class TransactionQueue {
   }
 
   getArchiverReceiptFromQueueEntry(queueEntry: QueueEntry): ArchiverReceipt {
-    // const netId = '123abc'
-    // const receipt = this.stateManager.getReceipt(queueEntry)
-    // const status = receipt.result === true ? 'applied' : 'rejected'
-    // const status = this.stateManager.getReceiptResult(queueEntry) === true ? 'applied' : 'rejected'
-
-    // const txHash = queueEntry.acceptedTx.txId
-    // const obj = { tx: queueEntry.acceptedTx.data, status, netId }
-    // const txResultFullHash = this.crypto.hash(obj)
-    // const txIdShort = utils.short(txHash)
-    // const txResult = utils.short(txResultFullHash)
-    if (queueEntry.preApplyTXResult == null) return {} as ArchiverReceipt
+    if (!queueEntry.preApplyTXResult || !queueEntry.preApplyTXResult.applyResponse)
+      return {} as ArchiverReceipt
 
     const accountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
     const beforeAccountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}

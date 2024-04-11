@@ -848,6 +848,8 @@ class TransactionRepair {
                 queueEntry.ourVoteHash === this.crypto.hash(queueEntry.appliedReceiptForRepair2.appliedVote)
               ) {
                 if (this.config.p2p.experimentalSnapshot)
+                  if (logFlags.verbose)
+                    console.log('repair commit', queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
                   this.stateManager.transactionQueue.addReceiptToForward(queueEntry, 'repair')
               }
           }
