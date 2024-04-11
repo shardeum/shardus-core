@@ -66,9 +66,6 @@ type ScheduledRemoveNodeByApp = ScheduledRemoveByApp<P2P.NodeListTypes.Node>
 
 /** STATE */
 
-// [TODO] - This enables the /kill /killother debug route and should be set to false after testing
-const allowKillRoute = false
-
 let p2pLogger
 
 let lostReported = new Map<string, P2P.LostTypes.LostReport>()
@@ -108,12 +105,10 @@ const killExternalRoute: RouteHandlerWithAuthHandler<Handler> = {
   name: 'kill',
   authHandler: isDebugModeMiddlewareHigh,
   handler: (_req, res) => {
-    if (allowKillRoute) {
-      res.send(safeStringify({ status: 'left the network without telling any peers' }))
-      killSelf(
-        'Apoptosis being called killExternalRoute()->killSelf()->emitter.emit(`apoptosized`) at src/p2p/Lost.ts'
-      )
-    }
+    res.send(safeStringify({ status: 'left the network without telling any peers' }))
+    killSelf(
+      'Apoptosis being called killExternalRoute()->killSelf()->emitter.emit(`apoptosized`) at src/p2p/Lost.ts'
+    )
   },
 }
 
@@ -122,10 +117,8 @@ const killOtherExternalRoute: RouteHandlerWithAuthHandler<Handler> = {
   name: 'killother',
   authHandler: isDebugModeMiddlewareHigh,
   handler: (_req, res) => {
-    if (allowKillRoute) {
-      res.send(safeStringify({ status: 'killing another node' }))
-      killOther()
-    }
+    res.send(safeStringify({ status: 'killing another node' }))
+    killOther()
   },
 }
 
@@ -752,7 +745,7 @@ function reportLost(target, reason: string, requestId: string) {
         cycle: currentCycle,
       }
       // [TODO] - remove the following line after testing killother
-      if (allowKillRoute && reason === 'killother') report.killother = true
+      if (reason === 'killother') report.killother = true
       if (logFlags.lost) {
         /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, reporter: ${Self.ip}:${Self.port} id: ${Self.id}`)
         /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, checker: ${checker.internalIp}:${checker.internalPort} node details: ${logNode(checker)}`)
@@ -908,7 +901,7 @@ async function lostReportHandler(payload, response, sender) {
     let result = await isDownCache(nodes.get(payload.target), requestId)
     /* prettier-ignore */ if (logFlags.lost) console.log('lostReportHandler: result:', result)
     /* prettier-ignore */ if (logFlags.lost) info(`isDownCache for requestId: ${requestId}, result ${result}`)
-    if (allowKillRoute && payload.killother) result = 'down'
+    if (payload.killother) result = 'down'
     if (record.status === 'checking') record.status = result
     /* prettier-ignore */ if (logFlags.lost) info(
       `Status after checking for node ${payload.target} payload cycle: ${payload.cycle}, currentCycle: ${currentCycle} is ` +
@@ -989,7 +982,7 @@ const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
 
       let result = await isDownCache(nodes.get(req.target), requestId)
       /* prettier-ignore */ if (logFlags.verbose) info(`isDownCache for requestId: ${requestId}, result ${result}`)
-      if (allowKillRoute && req.killother) result = 'down'
+      if (req.killother) result = 'down'
       if (record.status === 'checking') record.status = result
       /* prettier-ignore */ if (logFlags.verbose) info(`Status after checking for node ${req.target} payload cycle: ${req.cycle}, currentCycle: ${currentCycle} is ` + record.status)
       if (!checkedLostRecordMap.has(key)) {
