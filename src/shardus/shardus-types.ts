@@ -1154,6 +1154,8 @@ export interface ServerConfiguration {
     voterPercentage: number
     // whether to wait upstream tx before enqueueing
     waitUpstreamTx: boolean
+    // whether the node should gossip complete data
+    gossipCompleteData: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
