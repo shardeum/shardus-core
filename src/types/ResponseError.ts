@@ -22,14 +22,14 @@ export function serializeResponseError(stream: VectorBufferStream, obj: Response
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cResponseError)
   }
-  stream.writeUInt16(cResponseErrorVersion)
+  stream.writeUInt8(cResponseErrorVersion)
   stream.writeInt32(obj.Code)
   stream.writeInt32(obj.AppCode)
   stream.writeString(obj.Message)
 }
 
 export function deserializeResponseError(stream: VectorBufferStream): ResponseError {
-  const version = stream.readUInt16()
+  const version = stream.readUInt8()
   if (version > cResponseErrorVersion) {
     throw new Error('ResponseError version mismatch')
   }

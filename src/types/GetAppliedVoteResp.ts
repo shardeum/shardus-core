@@ -18,14 +18,14 @@ export function serializeGetAppliedVoteResp(
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cGetAppliedVoteResp)
   }
-  stream.writeUInt16(cGetAppliedVoteRespVersion)
+  stream.writeUInt8(cGetAppliedVoteRespVersion)
   stream.writeString(obj.txId)
   serializeAppliedVote(stream, obj.appliedVote) // Serialize AppliedVote object
   stream.writeString(obj.appliedVoteHash)
 }
 
 export function deserializeGetAppliedVoteResp(stream: VectorBufferStream): GetAppliedVoteResp {
-  const version = stream.readUInt16()
+  const version = stream.readUInt8()
   if (version > cGetAppliedVoteRespVersion) {
     throw new Error('GetAppliedVoteResp version mismatch')
   }
