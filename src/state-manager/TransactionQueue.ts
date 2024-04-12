@@ -92,6 +92,7 @@ import {
   RequestReceiptForTxReqSerialized,
   serializeRequestReceiptForTxReq,
 } from '../types/RequestReceiptForTxReq'
+import { isNodeOutOfRotationBounds } from "../p2p/Utils";
 
 interface Receipt {
   tx: AcceptedTx
@@ -6642,7 +6643,17 @@ class TransactionQueue {
 
     // remove excluded consensus nodes
     const filteredConsensusGroup = consenusGroup.filter((node) => excludeNodeIds.indexOf(node.id) === -1)
-    return filteredConsensusGroup[Math.floor(Math.random() * filteredConsensusGroup.length)]
+
+    let maxRetry = 5;
+    let potentialNode: Shardus.Node
+    let isOutOfRotationBounds: boolean
+    do {
+      potentialNode = filteredConsensusGroup[Math.floor(Math.random() * filteredConsensusGroup.length)]
+      isOutOfRotationBounds = isNodeOutOfRotationBounds(potentialNode.id)
+      maxRetry--
+    } while (isOutOfRotationBounds && maxRetry > 0)
+
+    return potentialNode
   }
 
   getStorageGroupForAccount(accountID: string): Shardus.Node[] {

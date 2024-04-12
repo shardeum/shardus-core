@@ -18,7 +18,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as CycleChain from './CycleChain'
 import * as Shardus from '../shardus/shardus-types'
-import { isNodeNearRotatingOut, isNodeRecentlyRotatedIn } from './Utils'
+import { isNodeOutOfRotationBounds } from "./Utils";
 import { deserializeGossipReq, GossipReqBinary, serializeGossipReq } from '../types/GossipReq'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
@@ -697,17 +697,8 @@ export function isNodeValidForInternalMessage(
     return false
   }
 
-  const { idx, total } = NodeList.getAgeIndexForNodeId(node.id)
-
-  // skip freshly rotated in nodes
-  if (isNodeRecentlyRotatedIn(idx, total, checkNodesRotationBounds)) {
-    nestedCountersInstance.countEvent('skip-newly-rotated-node', node.id)
-    return false
-  }
-
-  // skip about to be rotated out nodes
-  if (isNodeNearRotatingOut(idx, total, checkNodesRotationBounds)) {
-    nestedCountersInstance.countEvent('skip-about-to-rotate-out-node', node.id)
+  const isOutOfRotationBounds = checkNodesRotationBounds && isNodeOutOfRotationBounds(node.id)
+  if (isOutOfRotationBounds) {
     return false
   }
 

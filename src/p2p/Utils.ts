@@ -580,28 +580,42 @@ export async function getActiveNodesFromArchiver(
   })
 }
 
-export function isNodeRecentlyRotatedIn(
+function isNodeRecentlyRotatedIn(
   idx: number,
-  numActiveNodes: number,
-  checkNodesRotationBounds: boolean
+  numActiveNodes: number
 ): boolean {
   return (
-    checkNodesRotationBounds &&
     numActiveNodes >= 10 + config.p2p.rotationEdgeToAvoid &&
     config.p2p.rotationEdgeToAvoid &&
     idx <= config.p2p.rotationEdgeToAvoid
   )
 }
 
-export function isNodeNearRotatingOut(
+function isNodeNearRotatingOut(
   idx: number,
-  numActiveNodes: number,
-  checkNodesRotationBounds: boolean
+  numActiveNodes: number
 ): boolean {
   return (
-    checkNodesRotationBounds &&
     numActiveNodes >= 10 + config.p2p.rotationEdgeToAvoid &&
     config.p2p.rotationEdgeToAvoid &&
     idx >= numActiveNodes - config.p2p.rotationEdgeToAvoid
   )
+}
+
+export function isNodeOutOfRotationBounds(
+  nodeId: string
+): boolean {
+
+  const { idx, total } = NodeList.getAgeIndexForNodeId(nodeId)
+  // skip freshly rotated in nodes
+  if (isNodeRecentlyRotatedIn(idx, total)) {
+    nestedCountersInstance.countEvent('skip-newly-rotated-node', nodeId)
+    return false
+  }
+
+  // skip about to be rotated out nodes
+  if (isNodeNearRotatingOut(idx, total)) {
+    nestedCountersInstance.countEvent('skip-about-to-rotate-out-node', nodeId)
+    return false
+  }
 }
