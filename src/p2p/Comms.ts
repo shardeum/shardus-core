@@ -7,7 +7,7 @@ import { isNodeDown, isNodeLost, isNodeUpRecent, setIsUpTs } from '../p2p/Lost'
 import { ShardusTypes } from '../shardus'
 import { Sign } from '../shardus/shardus-types'
 import { InternalBinaryHandler } from '../types/Handler'
-import { requestSerializer, responseDeserializer, responseSerializer, throwIfError } from '../types/Helpers'
+import { requestSerializer, responseDeserializer, responseSerializer } from '../types/Helpers'
 import { deserializeWrappedReq } from '../types/WrappedReq'
 import * as utils from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -24,6 +24,7 @@ import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
+import { ResponseError } from '../types/ResponseError'
 
 /** ROUTES */
 
@@ -58,7 +59,9 @@ const gossipInternalBinaryRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer
       await handleGossip(req, header.sender_id, header.tracker_id, payload.length)
     } catch (e) {
       nestedCountersInstance.countEvent('internal', `${route}-exception`)
-      logger.getLogger('comms-route').error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+      logger
+        .getLogger('comms-route')
+        .error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
     } finally {
       profilerInstance.scopedProfileSectionEnd(route)
     }
@@ -486,12 +489,15 @@ export async function askBinary<TReq, TResp>(
       }
 
     const respStream = VectorBufferStream.fromBuffer(res)
-    throwIfError(respStream)
     const deserializedResp = responseDeserializer(respStream, respDeserializerFunc)
     return deserializedResp
   } catch (err) {
-    error('P2P: askBinary: response extraction: ' + err)
-    console.log('P2P: askBinary: response extraction: ' + err)
+    if (err instanceof ResponseError) {
+      nestedCountersInstance.countEvent('comms-route', `askBinary ${route} error ${err.Code}`)
+    } else {
+      error(`P2P: askBinary: response extraction route: ${route} error: ${err}`)
+      console.log(`P2P: askBinary: response extraction route: ${route} error: ${err}`)
+    }
     throw err
   }
 }

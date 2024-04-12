@@ -37,6 +37,9 @@ export const responseDeserializer = <T>(
   const payloadStream = VectorBufferStream.fromBuffer(wrappedResp.payload)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const payloadType = payloadStream.readUInt16()
+  if (payloadType === TypeIdentifierEnum.cResponseError) {
+    throw deserializeResponseError(payloadStream)
+  }
   return deserializerFunc(payloadStream)
 }
 
@@ -127,12 +130,4 @@ function estimateBinarySizeOfObject(obj): number {
   }
 
   return calculateSize(obj)
-}
-
-export const throwIfError = (stream: VectorBufferStream): void => {
-  const errorType = stream.readUInt16()
-  if (errorType !== TypeIdentifierEnum.cResponseError) {
-    return
-  }
-  throw deserializeResponseError(stream)
 }
