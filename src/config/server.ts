@@ -295,7 +295,6 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     archiverDataSubscriptionsUpdate: false,
     startInServiceMode: false,
     enableRIAccountsCache: true,
-    dappFeature1enabled: false
   },
 }
 export default SERVER_CONFIG

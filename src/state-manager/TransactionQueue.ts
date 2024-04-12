@@ -2339,6 +2339,25 @@ class TransactionQueue {
     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`getQueueEntryArchived failed to find: ${utils.stringifyReduce(txid)} ${msg} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txid)]}`)
     return null
   }
+
+  getArchivedQueueEntryByAccountIdAndHash(accountId: string, hash: string, msg: string): QueueEntry | null {
+    for (const queueEntry of this.archivedQueueEntriesByID.values()) {
+      if (queueEntry.uniqueKeys.includes(accountId)) {
+        const bestReceivedVote = queueEntry.receivedBestVote
+        if (bestReceivedVote == null) continue
+        for (let i = 0; i < bestReceivedVote.account_id.length; i++) {
+          if (bestReceivedVote.account_id[i] === accountId) {
+            if (bestReceivedVote.account_state_hash_after[i] === hash) {
+              return queueEntry
+            }
+          }
+        }
+      }
+    }
+    nestedCountersInstance.countRareEvent('error', `getQueueEntryArchived no entry: ${msg}`)
+    nestedCountersInstance.countEvent('error', `getQueueEntryArchived no entry: ${msg}`)
+    return null
+  }
   /**
    * getQueueEntryArchived
    * get a queue entry from the archive queue only

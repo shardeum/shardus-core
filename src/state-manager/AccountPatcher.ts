@@ -329,7 +329,7 @@ class AccountPatcher {
     )
 
     this.p2p.registerInternal(
-      'update_too_old_account_data',
+      'repair_too_old_account_data',
       async (
         payload: TooOldAccountUpdateRequest,
         respond: (arg0: boolean) => Promise<boolean>,
@@ -337,24 +337,85 @@ class AccountPatcher {
         _tracker: string,
         msgSize: number
       ) => {
-        profilerInstance.scopedProfileSectionStart('update_too_old_account_data', false, msgSize)
+        profilerInstance.scopedProfileSectionStart('repair_too_old_account_data', false, msgSize)
         let { accountID, tooOldAccountRecord, txId, appliedReceipt2, updatedAccountData } = payload
-
-        // todo: check the tx receipt from the archiver to see if the tx was applied
+        const hash = updatedAccountData.stateId
+        const accountData = updatedAccountData
 
         // check if we cover this accountId
+        const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(accountID)
+        const isInStorageGroup = storageNodes.map((node) => node.id).includes(Self.id)
+        if (!isInStorageGroup) {
+          nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: not in storage group for account: ${accountID}`)
+          await respond(false)
+        }
+        // check if we have already repaired this account
+        const accountHashCache = this.stateManager.accountCache.getAccountHash(accountID)
+        if (accountHashCache != null && accountHashCache.h === hash) {
+          nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: already repaired account: ${accountID}`)
+          await respond(false)
+        }
+        if (accountHashCache != null && accountHashCache.t > accountData.timestamp) {
+          nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: we have newer account: ${accountID}`)
+          await respond(false)
+        }
 
-        // todo: check if the account is still too old
+        const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, 'repair_too_old_account_data')
 
-        // check the hash and timestamp of the account data
+        if (archivedQueueEntry == null) {
+          nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: no archivedQueueEntry for txId: ${txId}`)
+          this.mainLogger.debug(`repair_too_old_account_data: no archivedQueueEntry for txId: ${txId}`)
+          await respond(false)
+        }
+
+        // check the vote and confirmation status of the tx
+        let bestConfirmation = archivedQueueEntry.receivedBestConfirmation
+        let receivedBestVote = archivedQueueEntry.receivedBestVote
+        if (bestConfirmation != null) {
+          if (bestConfirmation.message === 'challenge') {
+            nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: challenge for txId: ${txId}`)
+            // continue
+          }
+          if (receivedBestVote == null) {
+            nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: no vote for txId: ${txId}`)
+            await respond(false)
+          }
+          if (receivedBestVote.cant_apply === true || receivedBestVote.transaction_result === false) {
+            nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: vote failed for txId: ${txId}`)
+            await respond(false)
+          }
+          let accountHashMatch = false
+          for (let i = 0; i < receivedBestVote.account_id.length; i++) {
+            if (receivedBestVote.account_id[i] === accountID) {
+              if (receivedBestVote.account_state_hash_after[i] !== hash) {
+                nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: vote hash mismatch for txId: ${txId}`)
+                accountHashMatch = false
+              } else {
+                accountHashMatch = true
+              }
+              break
+            }
+          }
+          if (accountHashMatch === false) {
+            nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: vote account hash mismatch for txId: ${txId}`)
+            await respond(false)
+          }
+        }
+
+        // check the account Data
+        const calculatedAccountHash = this.app.calculateAccountHash(accountData.data)
+        if (calculatedAccountHash !== hash) {
+          nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: hash mismatch between calculated account and provided hash ${txId}`)
+          await respond(false)
+        }
 
         // update the account data (and cache?)
         const updatedAccounts: string[] = []
         //save the account data.  note this will make sure account hashes match the wrappers and return failed
         // hashes  that don't match
         const failedHashes = await this.stateManager.checkAndSetAccountData(
-          [updatedAccountData],
-          `update_too_old_account_data:${txId}`,
+          [accountData],
+          `repair_too_old_account_data:${txId}`,
           true,
           updatedAccounts
         )
@@ -367,7 +428,7 @@ class AccountPatcher {
         }
         await respond(success)
 
-        profilerInstance.scopedProfileSectionEnd('update_too_old_account_data')
+        profilerInstance.scopedProfileSectionEnd('repair_too_old_account_data')
       }
     )
 
@@ -385,20 +446,78 @@ class AccountPatcher {
         try {
           for (const repairInstruction of payload?.repairInstructions) {
             const { accountID, txId, hash, accountData, targetNodeId } = repairInstruction
-            // todo: check the tx receipt from the archiver to see if the tx was applied
+
+            // check if we are the target node
+            if (targetNodeId !== Self.id) {
+              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: not target node for txId: ${txId}`)
+              continue
+            }
 
             // check if we cover this accountId
-
-            // todo: check if the account is still too old
-
-            // check the hash and timestamp of the account data
+            const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(accountID)
+            const isInStorageGroup = storageNodes.map((node) => node.id).includes(Self.id)
+            if (!isInStorageGroup) {
+              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: not in storage group for account: ${accountID}`)
+              continue
+            }
+            // check if we have already repaired this account
+            const accountHashCache = this.stateManager.accountCache.getAccountHash(accountID)
+            if (accountHashCache != null && accountHashCache.h === hash) {
+              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: already repaired account: ${accountID}`)
+              continue
+            }
+            if (accountHashCache != null && accountHashCache.t > accountData.timestamp) {
+              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: we have newer account: ${accountID}`)
+              continue
+            }
 
             const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, 'repair_missing_accounts')
 
             if (archivedQueueEntry == null) {
               nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: no archivedQueueEntry for txId: ${txId}`)
               this.mainLogger.debug(`repair_missing_accounts: no archivedQueueEntry for txId: ${txId}`)
-              return await respond(false)
+              continue
+            }
+
+            // check the vote and confirmation status of the tx
+            let bestConfirmation = archivedQueueEntry.receivedBestConfirmation
+            let receivedBestVote = archivedQueueEntry.receivedBestVote
+            if (bestConfirmation != null) {
+              if (bestConfirmation.message === 'challenge') {
+                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: challenge for txId: ${txId}`)
+                // continue
+              }
+              if (receivedBestVote == null) {
+                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: no vote for txId: ${txId}`)
+                continue
+              }
+              if (receivedBestVote.cant_apply === true || receivedBestVote.transaction_result === false) {
+                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: vote failed for txId: ${txId}`)
+                continue
+              }
+              let accountHashMatch = false
+              for (let i = 0; i < receivedBestVote.account_id.length; i++) {
+                if (receivedBestVote.account_id[i] === accountID) {
+                  if (receivedBestVote.account_state_hash_after[i] !== hash) {
+                    nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: vote hash mismatch for txId: ${txId}`)
+                    accountHashMatch = false
+                  } else {
+                    accountHashMatch = true
+                  }
+                  break
+                }
+              }
+              if (accountHashMatch === false) {
+                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: vote account hash mismatch for txId: ${txId}`)
+                continue
+              }
+            }
+
+            // check the account Data
+            const calculatedAccountHash = this.app.calculateAccountHash(accountData.data)
+            if (calculatedAccountHash !== hash) {
+              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: hash mismatch between calculated account and provided hash ${txId}`)
+              continue
             }
 
             // update the account data (and cache?)
@@ -418,8 +537,8 @@ class AccountPatcher {
             if (updatedAccounts.length > 0 && failedHashes.length === 0) {
               success = true
             }
-            await respond(success)
           }
+          await respond(true)
         } catch (e) {
         }
 
@@ -2422,7 +2541,8 @@ class AccountPatcher {
             )}`
           )
         }
-        continue
+        // skipping 50% votes restriction to allow patcher to do account based patching
+        // continue
       }
 
       //do we need to filter out a vote?
@@ -2441,7 +2561,6 @@ class AccountPatcher {
     }
 
     let toFix = this.diffConsenus(goodVotes, badLayerMap)
-
 
     stats.badSyncRadix = toFix.length
 
@@ -3072,11 +3191,18 @@ class AccountPatcher {
       let accountData = accountDataMap.get(accountToFix.accountID)
       if (accountData == null) {
         this.mainLogger.debug(`requestOtherNodesToRepair: accountData is null`)
+        nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair accountData == null`, 1)
         continue
       }
-      const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchivedByTimestamp(accountData.timestamp, 'requestOtherNodesToRepair')
+      if (accountData.stateId !== accountToFix.hash) {
+        this.mainLogger.debug(`requestOtherNodesToRepair: accountData.stateId !== accountToFix.hash`)
+        nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair accountData.stateId !== accountToFix.hash`, 1)
+        continue
+      }
+      const archivedQueueEntry = this.stateManager.transactionQueue.getArchivedQueueEntryByAccountIdAndHash(accountToFix.accountID, accountToFix.hash, 'requestOtherNodesToRepair')
       if (archivedQueueEntry == null) {
         this.mainLogger.debug(`requestOtherNodesToRepair: archivedQueueEntry is null`)
+        nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair archivedQueueEntry == null`, 1)
         continue
       }
       const repairInstruction: AccountRepairInstruction = {
@@ -3344,7 +3470,8 @@ class AccountPatcher {
         nestedCountersInstance.countEvent('accountPatcher', `too_old_account detected c:${cycle}`)
         // ask the remote node to repair their data
         for (let [accountId, tooOldRecord] of tooOldAccountsMap) {
-          const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchivedByTimestamp(tooOldRecord.accountMemData.t, 'too_old_account repair')
+          // const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchivedByTimestamp(tooOldRecord.accountMemData.t, 'too_old_account repair')
+          const archivedQueueEntry = this.stateManager.transactionQueue.getArchivedQueueEntryByAccountIdAndHash(accountId, tooOldRecord.accountMemData.h, 'too_old_account repair')
           if (archivedQueueEntry == null) {
             nestedCountersInstance.countEvent('accountPatcher', `too_old_account repair archivedQueueEntry null c:${cycle}`)
             continue
@@ -3385,11 +3512,11 @@ class AccountPatcher {
             appliedReceipt2: this.stateManager.getReceipt2(archivedQueueEntry),
             updatedAccountData: updatedAccountData
           }
-          await this.p2p.tell([tooOldRecord.node], 'update_too_old_account_data', accountDataRequest)
+          await this.p2p.tell([tooOldRecord.node], 'repair_too_old_account_data', accountDataRequest)
           let shortAccountId = utils.makeShortHash(accountId)
           let shortNodeId = utils.makeShortHash(tooOldRecord.node.id)
           nestedCountersInstance.countEvent('accountPatcher', `too_old_account repair requested. account: ${shortAccountId}, node: ${shortNodeId} c:${cycle}:`)
-          if (logFlags.debug) this.mainLogger.debug(`too_old_account repair requested: account: ${shortAccountId}, node: ${shortNodeId}`)
+          if (logFlags.debug) this.mainLogger.debug(`too_old_account repair requested: account: ${shortAccountId}, node: ${shortNodeId}, cycle: ${cycle}`)
         }
       }
 
