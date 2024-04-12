@@ -917,10 +917,7 @@ class TransactionConsenus {
     if (logFlags.debug) this.mainLogger.debug(`Pruned tx timestamp cache.`)
   }
 
-  async askTxnTimestampFromNode(
-    tx: Shardus.OpaqueTransaction,
-    txId: string
-  ): Promise<Shardus.TimestampReceipt | null> {
+  async askTxnTimestampFromNode(txId: string): Promise<Shardus.TimestampReceipt | null> {
     const homeNode = ShardFunctions.findHomeNode(
       Context.stateManager.currentCycleShardData.shardGlobals,
       txId,
