@@ -6368,7 +6368,7 @@ class TransactionQueue {
     for (const queueEntry of this.pendingTransactionQueue) {
       if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
         const tx = queueEntry.acceptedTx
-        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the injested queue:', `appData: ${JSON.stringify(tx.appData)}` )
+        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the injested queue:', `appData: ${utils.logSafeStringify(tx.appData)}` )
         count++
       }
     }
@@ -6379,7 +6379,7 @@ class TransactionQueue {
           committingAppData.push(tx.appData)
           continue
         }
-        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the newAccepted queue:', `appData: ${JSON.stringify(tx.appData)}` )
+        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the newAccepted queue:', `appData: ${utils.logSafeStringify(tx.appData)}` )
         count++
       }
     }
