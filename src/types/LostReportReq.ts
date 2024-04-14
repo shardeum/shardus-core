@@ -8,6 +8,10 @@ export interface LostReportReq {
   cycle: number
   timestamp: number
   requestId: string
+  sign: {
+    owner: string
+    sig: string
+  }
   killother?: boolean
 }
 
@@ -24,6 +28,8 @@ export function serializeLostReportReq(stream: VectorBufferStream, obj: LostRepo
   stream.writeUInt32(obj.cycle)
   stream.writeBigUInt64(BigInt(obj.timestamp))
   stream.writeString(obj.requestId)
+  stream.writeString(obj.sign.owner)
+  stream.writeString(obj.sign.sig)
   if (obj.killother) {
     stream.writeUInt8(1)
     stream.writeUInt8(obj.killother ? 1 : 0)
@@ -43,6 +49,10 @@ export function deserializeLostReportReq(stream: VectorBufferStream): LostReport
     cycle: stream.readUInt32(),
     timestamp: Number(stream.readBigUInt64()),
     requestId: stream.readString(),
+    sign: {
+      owner: stream.readString(),
+      sig: stream.readString(),
+    },
   }
   if (stream.readUInt8() === 1) {
     // Check if killother is present

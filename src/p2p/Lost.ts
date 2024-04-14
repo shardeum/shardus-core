@@ -943,7 +943,7 @@ const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
         })
         return
       }
-      const [valid, reason] = checkReport(req, currentCycle + 1, false)
+      const [valid, reason] = checkReport(req, currentCycle + 1)
       if (!valid) {
         warn(`Got bad investigate request. requestId: ${requestId}, reason: ${reason}`)
         errorHandler(RequestErrorEnum.InvalidRequest)
@@ -994,13 +994,13 @@ const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
   },
 }
 
-function checkReport(report, expectCycle, validateSign = true) {
+function checkReport(report, expectCycle) {
   if (!report || typeof report !== 'object') return [false, 'no report given']
   if (!report.reporter || typeof report.reporter !== 'string') return [false, 'no reporter field']
   if (!report.checker || typeof report.checker !== 'string') return [false, 'no checker field']
   if (!report.target || typeof report.target !== 'string') return [false, 'no target field']
   if (!report.cycle || typeof report.cycle !== 'number') return [false, 'no cycle field']
-  if (validateSign && (!report.sign || typeof report.sign !== 'object')) return [false, 'no sign field']
+  if (!report.sign || typeof report.sign !== 'object') return [false, 'no sign field']
   if (report.target == Self.id) return [false, 'target is self'] // Don' accept if target is our node
   const cyclediff = expectCycle - report.cycle
   if (cyclediff < 0) return [false, 'reporter cycle is not as expected; too new']
@@ -1029,8 +1029,7 @@ function checkReport(report, expectCycle, validateSign = true) {
     error('checkReport: ' + utils.formatErrorMessage(ex))
     return [false, `checker node look up fail ${report.checker}`] // we should be the checker based on our own calculations
   }
-  if (validateSign && !crypto.verify(report, nodes.get(report.reporter).publicKey))
-    return [false, 'bad sign from reporter'] // the report should be properly signed
+  if (!crypto.verify(report, nodes.get(report.reporter).publicKey)) return [false, 'bad sign from reporter'] // the report should be properly signed
   return [true, '']
 }
 
