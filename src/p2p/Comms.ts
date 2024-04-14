@@ -323,7 +323,7 @@ export async function tellBinary<TReq>(
     const wrappedReq = requestSerializer(message, serializerFunc)
     await network.tellBinary(nonSelfNodes, route, wrappedReq.getBuffer(), appHeader, tracker, logged)
   } catch (err) {
-    warn('tellBinary: network.tellBinary: P2P TELL_BINARY: failed', err)
+    warn(`tellBinary: network.tellBinary: P2P TELL_BINARY: failed. route: ${route}, error: ${err}`)
   }
   profilerInstance.profileSectionEnd('p2p-tellBinary')
   profilerInstance.profileSectionEnd(`p2p-tellBinary-${route}`)
@@ -472,7 +472,7 @@ export async function askBinary<TReq, TResp>(
     ))
   } catch (err) {
     console.log('P2P: askBinary: network.askBinary: ' + err)
-    error('P2P: askBinary: network.askBinary: ' + err)
+    error(`P2P: askBinary: network.askBinary: route: ${route} error: ${err}`)
     throw err
   }
   try {

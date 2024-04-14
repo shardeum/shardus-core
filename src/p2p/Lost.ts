@@ -227,9 +227,9 @@ export function init() {
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
   }
-  
+
   Comms.registerInternalBinary(LostReportBinaryHandler.name, LostReportBinaryHandler.handler)
-  
+
   p2p.registerInternal(
     'proxy',
     async (
@@ -359,7 +359,8 @@ export function getTxs(): P2P.LostTypes.Txs {
       seen[downRecord.target] = true
       /* prettier-ignore */ if (logFlags.lost) nestedCountersInstance.countEvent('testingLost', `${currentCycle}: Saw at least ${config.p2p.minChecksForUp} up messages`)
       /* prettier-ignore */ if (logFlags.lost) console.log(`getTxs: Saw at least ${config.p2p.minChecksForUp} up messages: ${JSON.stringify(upRecord)}`)
-      if (logFlags.verbose) info(`Saw at least ${config.p2p.minChecksForUp} up messages: ${JSON.stringify(upRecord)}`)
+      if (logFlags.verbose)
+        info(`Saw at least ${config.p2p.minChecksForUp} up messages: ${JSON.stringify(upRecord)}`)
     } else if (downMsgCount >= config.p2p.minChecksForDown) {
       lostTxs.push(downRecord.message)
       seen[downRecord.target] = true
@@ -752,7 +753,6 @@ function reportLost(target, reason: string, requestId: string) {
       msgCopy.timestamp = shardusGetTime()
       msgCopy.requestId = requestId
       report = crypto.sign(msgCopy)
-      lostReported.set(key, report)
       if (config.p2p.useBinarySerializedEndpoints && config.p2p.lostReportBinary) {
         const request = report as LostReportReq
         Comms.tellBinary<LostReportReq>(
@@ -765,6 +765,7 @@ function reportLost(target, reason: string, requestId: string) {
       } else {
         Comms.tell([checker], 'lost-report', report)
       }
+      lostReported.set(key, report)
     }
     /* prettier-ignore */ if (logFlags.lost) console.log('reportLost: lostReported:', lostReported)
     /* prettier-ignore */ if (logFlags.lost) console.log('reportLost: sent lost-report without errors')
@@ -925,7 +926,7 @@ const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
     try {
       const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cLostReportReq)
       if (!requestStream) {
-        return errorHandler(RequestErrorEnum.InvalidRequest)
+        return errorHandler(RequestErrorEnum.InvalidRequestType)
       }
 
       const req: LostReportReq = deserializeLostReportReq(requestStream)
@@ -935,14 +936,31 @@ const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       if (stopReporting[req.target]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
       const key = `${req.target}-${req.cycle}`
       if (checkedLostRecordMap.get(key)) return // we have already seen this node for this cycle
-      const [valid, reason] = checkReport(req, currentCycle + 1)
+      if (sign.owner !== sender.publicKey) {
+        errorHandler(RequestErrorEnum.InvalidRequest, {
+          customCounterSuffix: 'bad_sign_owner',
+          customErrorLog: 'bad sign owner',
+        })
+        return
+      }
+      const [valid, reason] = checkReport(req, currentCycle + 1, false)
       if (!valid) {
         warn(`Got bad investigate request. requestId: ${requestId}, reason: ${reason}`)
+        errorHandler(RequestErrorEnum.InvalidRequest)
         return
       }
 
-      if (header.sender_id !== req.reporter) return // sender must be same as reporter
-      if (req.checker !== Self.id) return // the checker should be our node id
+      if (header.sender_id !== req.reporter) {
+        errorHandler(RequestErrorEnum.InvalidSender)
+        return // sender must be same as reporter
+      }
+      if (req.checker !== Self.id) {
+        errorHandler(RequestErrorEnum.InvalidRequest, {
+          customCounterSuffix: 'bad_checker',
+          customErrorLog: 'the checker should be our node id',
+        })
+        return // the checker should be our node id
+      }
       let record: P2P.LostTypes.LostRecord = {
         target: req.target,
         cycle: req.cycle,
@@ -962,11 +980,7 @@ const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       /* prettier-ignore */ if (logFlags.verbose) info(`isDownCache for requestId: ${requestId}, result ${result}`)
       if (allowKillRoute && req.killother) result = 'down'
       if (record.status === 'checking') record.status = result
-      if (logFlags.verbose)
-        info(
-          `Status after checking for node ${req.target} payload cycle: ${req.cycle}, currentCycle: ${currentCycle} is ` +
-          record.status
-        )
+      /* prettier-ignore */ if (logFlags.verbose) info(`Status after checking for node ${req.target} payload cycle: ${req.cycle}, currentCycle: ${currentCycle} is ` + record.status)
       if (!checkedLostRecordMap.has(key)) {
         checkedLostRecordMap.set(key, record)
       }
@@ -980,14 +994,13 @@ const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
   },
 }
 
-
-function checkReport(report, expectCycle) {
+function checkReport(report, expectCycle, validateSign = true) {
   if (!report || typeof report !== 'object') return [false, 'no report given']
   if (!report.reporter || typeof report.reporter !== 'string') return [false, 'no reporter field']
   if (!report.checker || typeof report.checker !== 'string') return [false, 'no checker field']
   if (!report.target || typeof report.target !== 'string') return [false, 'no target field']
   if (!report.cycle || typeof report.cycle !== 'number') return [false, 'no cycle field']
-  if (!report.sign || typeof report.sign !== 'object') return [false, 'no sign field']
+  if (validateSign && (!report.sign || typeof report.sign !== 'object')) return [false, 'no sign field']
   if (report.target == Self.id) return [false, 'target is self'] // Don' accept if target is our node
   const cyclediff = expectCycle - report.cycle
   if (cyclediff < 0) return [false, 'reporter cycle is not as expected; too new']
@@ -1016,7 +1029,8 @@ function checkReport(report, expectCycle) {
     error('checkReport: ' + utils.formatErrorMessage(ex))
     return [false, `checker node look up fail ${report.checker}`] // we should be the checker based on our own calculations
   }
-  if (!crypto.verify(report, nodes.get(report.reporter).publicKey)) return [false, 'bad sign from reporter'] // the report should be properly signed
+  if (validateSign && !crypto.verify(report, nodes.get(report.reporter).publicKey))
+    return [false, 'bad sign from reporter'] // the report should be properly signed
   return [true, '']
 }
 
