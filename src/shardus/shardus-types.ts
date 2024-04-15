@@ -165,6 +165,8 @@ interface ValidateJoinRequestResponse {
 }
 
 export interface App {
+  injectTxToConsensor(consensor: ValidatorNodeDetails, tx: OpaqueTransaction): Promise<unknown>
+  getTxSenderAddress(tx: OpaqueTransaction): string
   /**
    * Runs fast validation of the tx checking if all tx fields present, data
    * types acceptable, and ranges valid.
@@ -611,6 +613,20 @@ export interface ServerConfiguration {
   transactionExpireTime?: number
   /** The changeListGlobalAccount sets the global network account value for the validator and thereby the whole network */
   globalAccount: string
+  /**
+   * [TODO] Introduced on 2024-04-15 and needs to be checked through out the code
+   * nonce mode:
+   *   * Client signed tx has a nonce
+   *   * network assigns timestamp
+   *   * if network cancels tx its gets resubmitted by the network
+   *   * if network cancels a tx its not propagated to archivers
+   * timestamp mode:
+   *   * Client signed tx has timestamp
+   *   * network does not assign timestamp
+   *   * if network cancels tx its does not get resubmitted by the network
+   *   * if network cancels a tx it gets propagated to archivers
+   */
+  nonceMode: boolean
   /** Crypto module configuration */
   crypto?: {
     /** The hashkey parameter is a String that is used to initialize the crypto module, which is used for the cryptographic functions within shardus */
