@@ -1465,14 +1465,14 @@ class TransactionConsenus {
                 )
               const robustReceipt: AppliedReceipt = {
                 txid: robustConfirmOrChallenge.appliedVote.txid,
-                result: robustConfirmOrChallenge.appliedVote.transaction_result,
+                result: false,
                 appliedVotes: [robustConfirmOrChallenge.appliedVote],
                 confirmOrChallenge: [robustConfirmOrChallenge],
                 app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
               }
               const robustReceipt2: AppliedReceipt2 = {
                 txid: robustConfirmOrChallenge.appliedVote.txid,
-                result: robustConfirmOrChallenge.appliedVote.transaction_result,
+                result: false,
                 appliedVote: robustConfirmOrChallenge.appliedVote,
                 confirmOrChallenge: robustConfirmOrChallenge,
                 app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
@@ -1532,9 +1532,9 @@ class TransactionConsenus {
 
             if (this.stateManager.consensusLog) {
               this.mainLogger.debug(
-                `tryProduceReceipt: ${queueEntry.logID} got result robustConfirmOrChallenge: ${utils.stringifyReduce(
-                  robustConfirmOrChallenge
-                )}`
+                `tryProduceReceipt: ${
+                  queueEntry.logID
+                } got result robustConfirmOrChallenge: ${utils.stringifyReduce(robustConfirmOrChallenge)}`
               )
             }
 
@@ -1962,7 +1962,17 @@ class TransactionConsenus {
     }
     const redundancy = 3
     const maxRetry = 5
-    const { topResult: response } = await robustQuery(consensNodes, queryFn, eqFn, redundancy, true, true, false, 'robustQueryAccountData', maxRetry)
+    const { topResult: response } = await robustQuery(
+      consensNodes,
+      queryFn,
+      eqFn,
+      redundancy,
+      true,
+      true,
+      false,
+      'robustQueryAccountData',
+      maxRetry
+    )
     if (response && response.data) {
       const accountData = response.data.wrappedAccounts[0]
       return accountData
