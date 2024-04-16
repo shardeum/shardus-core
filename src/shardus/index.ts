@@ -1270,19 +1270,21 @@ class Shardus extends EventEmitter {
       }
 
       // Forward transaction to a node that has the account data locally if we don't have it
-      const senderAddress = this.app.getTxSenderAddress(tx)
-      if (this.isAccountRemote(senderAddress)) {
-        const consensusGroup = this.getConsenusGroupForAccount(senderAddress)
-        // send transaction to consensus group node
-        // [TODO] - This is a temporary solution. We need to implement retry logic to select the next node and send the transaction to.
-        const node = utils.getRandom(consensusGroup, 1)[0]
-        const validatorDetails = {
-          ip: node.externalIp,
-          port: node.externalPort,
-          publicKey: node.publicKey
+      if (global === false) {
+        const senderAddress = this.app.getTxSenderAddress(tx)
+        if (senderAddress !== null && this.isAccountRemote(senderAddress)) {
+          const consensusGroup = this.getConsenusGroupForAccount(senderAddress)
+          // send transaction to consensus group node
+          // [TODO] - This is a temporary solution. We need to implement retry logic to select the next node and send the transaction to.
+          const node = utils.getRandom(consensusGroup, 1)[0]
+          const validatorDetails = {
+            ip: node.externalIp,
+            port: node.externalPort,
+            publicKey: node.publicKey
+          }
+          const result = await this.app.injectTxToConsensor(validatorDetails, tx)
+          return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }> 
         }
-        const result = await this.app.injectTxToConsensor(validatorDetails, tx)
-        return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }> 
       }
 
       // Give the dapp an opportunity to do some up front work and generate
