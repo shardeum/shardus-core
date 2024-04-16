@@ -889,6 +889,7 @@ class TransactionQueue {
       try {
         let error = utils.validateTypes(req.body, {
           txId: 's',
+          timestamp: 'n',
           full_receipt: 'b',
           sign: 'o',
         })
@@ -899,31 +900,36 @@ class TransactionQueue {
         })
         if (error) return res.send(utils.logSafeStringify((result = { success: false, reason: error })))
 
-        const { txId, full_receipt, sign } = req.body
+        const { txId, timestamp, full_receipt, sign } = req.body
         const isReqFromArchiver = Archivers.archivers.has(sign.owner)
         if (!isReqFromArchiver) {
           result = { success: false, reason: 'Request not from Archiver.' }
         } else {
           const isValidSignature = this.crypto.verify(req.body, sign.owner)
           if (isValidSignature) {
-            if (this.archivedQueueEntriesByID.has(txId)) {
-              if (logFlags.verbose) console.log('get-tx-receipt: ', txId, 'archived')
-              const queueEntry = this.archivedQueueEntriesByID.get(txId)
-              if (full_receipt) {
-                const fullReceipt: ArchiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
+            let queueEntry: QueueEntry
+            if (
+              this.archivedQueueEntriesByID.has(txId) &&
+              this.archivedQueueEntriesByID.get(txId)?.acceptedTx?.timestamp === timestamp
+            ) {
+              if (logFlags.verbose) console.log('get-tx-receipt: ', txId, timestamp, 'archived')
+              queueEntry = this.archivedQueueEntriesByID.get(txId)
+            } else if (
+              this._transactionQueueByID.has(txId) &&
+              this._transactionQueueByID.get(txId)?.state === 'commiting' &&
+              this._transactionQueueByID.get(txId)?.acceptedTx?.timestamp === timestamp
+            ) {
+              if (logFlags.verbose) console.log('get-tx-receipt: ', txId, timestamp, 'commiting')
+              queueEntry = this._transactionQueueByID.get(txId)
+            }
+            if (!queueEntry) return res.status(400).json({ success: false, reason: 'Receipt Not Found.' })
+            if (full_receipt) {
+              const fullReceipt: ArchiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
+              if (fullReceipt === null)
                 result = JSON.parse(utils.cryptoStringify({ success: true, receipt: fullReceipt }))
-              } else {
-                result = { success: true, receipt: this.stateManager.getReceipt2(queueEntry) }
-              }
-            } else if (!full_receipt && this._transactionQueueByID.get(txId)?.state === 'commiting') {
-              if (logFlags.verbose) console.log('get-tx-receipt: ', txId, 'commiting')
-              result = {
-                success: true,
-                receipt: this.stateManager.getReceipt2(this._transactionQueueByID.get(txId)),
-              }
-            } else {
               result = { success: false, reason: 'Receipt Not Found.' }
-              return res.status(400).json(result)
+            } else {
+              result = { success: true, receipt: this.stateManager.getReceipt2(queueEntry) }
             }
           } else {
             result = { success: false, reason: 'Invalid Signature.' }
@@ -932,7 +938,7 @@ class TransactionQueue {
         res.send(utils.safeStringify(result))
       } catch (e) {
         console.log('Error caught in /get-tx-receipt: ', e)
-        res.send(utils.safeStringify(result = { success: false, reason: e }))
+        res.send(utils.safeStringify((result = { success: false, reason: e })))
       }
     })
   }
@@ -6119,9 +6125,9 @@ class TransactionQueue {
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'txAlmostExpired', `tx: ${this.app.getSimpleTxDebugValue(queueEntry.acceptedTx?.data)}` )
   }
 
-  getArchiverReceiptFromQueueEntry(queueEntry: QueueEntry): ArchiverReceipt {
+  getArchiverReceiptFromQueueEntry(queueEntry: QueueEntry): ArchiverReceipt | null {
     if (!queueEntry.preApplyTXResult || !queueEntry.preApplyTXResult.applyResponse)
-      return {} as ArchiverReceipt
+      return null as ArchiverReceipt
 
     const accountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
     const beforeAccountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
