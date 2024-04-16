@@ -1,4 +1,5 @@
-import * as Shardus from '../shardus/shardus-types'
+import * as ShardusTypes from '../shardus/shardus-types'
+import Shardus from '../shardus'
 
 import { StateManager as StateManagerTypes, P2P as P2PTypes } from '@shardus/types'
 
@@ -140,11 +141,12 @@ class WrappedEventEmitter extends EventEmitter {
 class StateManager {
   //  class StateManager {
 
-  app: Shardus.App
+  shardus: Shardus
+  app: ShardusTypes.App
   storage: Storage
   p2p: P2P
   crypto: Crypto
-  config: Shardus.StrictServerConfiguration
+  config: ShardusTypes.StrictServerConfiguration
   profiler: Profiler
 
   mainLogger: Log4jsLogger
@@ -262,15 +264,17 @@ class StateManager {
    */
   constructor(
     profiler: Profiler,
-    app: Shardus.App,
+    app: ShardusTypes.App,
     logger: Logger,
     storage: Storage,
     p2p: P2P,
     crypto: Crypto,
-    config: Shardus.StrictServerConfiguration
+    config: ShardusTypes.StrictServerConfiguration,
+    shardus: Shardus
   ) {
     //super()
 
+    this.shardus = shardus
     this.p2p = p2p
     this.crypto = crypto
     this.storage = storage
@@ -301,7 +305,7 @@ class StateManager {
     this.lastActiveNodeCount = 0
 
     this.extendedRepairLogging = true
-    this.consensusLog = false
+    this.consensusLog = true
 
     this.shardValuesByCycle = new Map()
     this.currentCycleShardData = null as CycleShardData | null
@@ -970,7 +974,7 @@ class StateManager {
    * @param failedHashes This is a list of hashes that failed and should be ignored in the write operation.
    */
   async writeCombinedAccountDataToBackups(
-    goodAccounts: Shardus.WrappedData[],
+    goodAccounts: ShardusTypes.WrappedData[],
     failedHashes: string[]
   ): Promise<number> {
     // ?:{[id:string]: boolean}
@@ -1081,7 +1085,7 @@ class StateManager {
     return { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs, delta }
   }
 
-  testAccountDataWrapped(accountDataList: Shardus.WrappedData[]) {
+  testAccountDataWrapped(accountDataList: ShardusTypes.WrappedData[]) {
     if (accountDataList == null) {
       return
     }
@@ -1104,12 +1108,13 @@ class StateManager {
   }
 
   async checkAndSetAccountData(
-    accountRecords: Shardus.WrappedData[],
+    accountRecords: ShardusTypes.WrappedData[],
     note: string,
     processStats: boolean,
     updatedAccounts: string[] = null
   ): Promise<string[]> {
     const accountsToAdd: unknown[] = []
+    const wrappedAccountsToAdd: ShardusTypes.WrappedData[] = []
     const failedHashes: string[] = []
     for (const wrappedAccount of accountRecords) {
       const { accountId, stateId, data: recordData, timestamp } = wrappedAccount
@@ -1145,6 +1150,7 @@ class StateManager {
 
       if (stateId.length === hash.length && timingSafeEqual(Buffer.from(stateId), Buffer.from(hash))) {
         accountsToAdd.push(recordData)
+        wrappedAccountsToAdd.push(wrappedAccount)
 
         if (updatedAccounts != null) {
           updatedAccounts.push(accountId)
@@ -1227,6 +1233,7 @@ class StateManager {
     /* prettier-ignore */ this.transactionQueue.setDebugLastAwaitedCallInner('ths.app.setAccountData')
     await this.app.setAccountData(accountsToAdd)
     /* prettier-ignore */ this.transactionQueue.setDebugLastAwaitedCallInner('ths.app.setAccountData', DebugComplete.Completed)
+    this.transactionQueue.processNonceQueue(wrappedAccountsToAdd)
     return failedHashes
   }
 
@@ -1975,7 +1982,7 @@ class StateManager {
           }
           if (accountData != null) {
             for (const wrappedAccount of accountData) {
-              const wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
+              const wrappedAccountInQueueRef = wrappedAccount as ShardusTypes.WrappedDataFromQueue
               wrappedAccountInQueueRef.seenInQueue = false
 
               if (this.lastSeenAccountsMap != null) {
@@ -1990,7 +1997,7 @@ class StateManager {
           //this can throw an error an result in a non response
           this.testAccountDataWrapped(accountData)
           // we cast up the array return type because we have attached the seenInQueue memeber to the data.
-          result.accountData = accountData as Shardus.WrappedDataFromQueue[]
+          result.accountData = accountData as ShardusTypes.WrappedDataFromQueue[]
           responseSize = await respond(result)
         } catch (ex) {
           //we dont want to delay. let the asking node know qukcly so it can try again
@@ -2655,8 +2662,8 @@ class StateManager {
       useRICache: boolean // enables the RI cache. enable only for immutable data
       canThrowException?: boolean
     } = { useRICache: false, canThrowException: false }
-  ): Promise<Shardus.WrappedDataFromQueue | null> {
-    let wrappedAccount: Shardus.WrappedDataFromQueue | null = null
+  ): Promise<ShardusTypes.WrappedDataFromQueue | null> {
+    let wrappedAccount: ShardusTypes.WrappedDataFromQueue | null = null
     if (!isServiceMode()) {
       if (this.currentCycleShardData == null) {
         await this.waitForShardData()
@@ -2674,7 +2681,7 @@ class StateManager {
         if (riCacheResult.length > 0) {
           nestedCountersInstance.countEvent('stateManager', 'getLocalOrRemoteAccount: RI cache hit')
           if (logFlags.verbose) this.mainLogger.debug(`getLocalOrRemoteAccount: RI cache hit for ${address}`)
-          wrappedAccount = riCacheResult[0] as Shardus.WrappedDataFromQueue
+          wrappedAccount = riCacheResult[0] as ShardusTypes.WrappedDataFromQueue
           return wrappedAccount
         }
       } else {
@@ -2795,7 +2802,7 @@ class StateManager {
       if (accountData != null) {
         for (const wrappedAccountEntry of accountData) {
           // We are going to add in new data here, which upgrades the account wrapper to a new type.
-          const expandedRef = wrappedAccountEntry as Shardus.WrappedDataFromQueue
+          const expandedRef = wrappedAccountEntry as ShardusTypes.WrappedDataFromQueue
           expandedRef.seenInQueue = false
 
           if (this.lastSeenAccountsMap != null) {
@@ -2887,7 +2894,7 @@ class StateManager {
     return null
   }
 
-  getClosestNodes(hash: string, count = 1, selfExclude = false): Shardus.Node[] {
+  getClosestNodes(hash: string, count = 1, selfExclude = false): ShardusTypes.Node[] {
     if (this.currentCycleShardData == null) {
       throw new Error('getClosestNodes: network not ready')
     }
@@ -3024,7 +3031,7 @@ class StateManager {
   async setAccount(
     wrappedStates: WrappedResponses,
     localCachedData: LocalCachedData,
-    applyResponse: Shardus.ApplyResponse,
+    applyResponse: ShardusTypes.ApplyResponse,
     isGlobalModifyingTX: boolean,
     accountFilter?: AccountFilter,
     note?: string
@@ -3094,6 +3101,7 @@ class StateManager {
         /* prettier-ignore */ this.transactionQueue.setDebugLastAwaitedCallInner('this.app.updateAccountFull', DebugComplete.Completed)
       }
       savedSomething = true
+      this.transactionQueue.processNonceQueue([wrappedData])
     }
 
     return savedSomething
@@ -3105,7 +3113,7 @@ class StateManager {
    * with the update we will calculate the cycle based on timestamp rather than using the last current cycle counter
    */
   async updateAccountsCopyTable(
-    accountDataList: Shardus.AccountData[],
+    accountDataList: ShardusTypes.AccountData[],
     _repairing: boolean,
     txTimestamp: number
   ) {
@@ -3138,7 +3146,7 @@ class StateManager {
       const { accountId, data, timestamp, hash } = accountEntry
       const isGlobal = this.accountGlobals.isGlobalAccount(accountId)
 
-      const backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
+      const backupObj: ShardusTypes.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
 
       /* prettier-ignore */ if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
@@ -3154,7 +3162,7 @@ class StateManager {
    * you only need to set the true values for the globalAccountKeyMap
    * @param accountCopies
    */
-  async _commitAccountCopies(accountCopies: Shardus.AccountsCopy[]) {
+  async _commitAccountCopies(accountCopies: ShardusTypes.AccountsCopy[]) {
     const rawDataList: unknown[] = []
     if (accountCopies.length > 0) {
       for (const accountData of accountCopies) {
@@ -3195,7 +3203,7 @@ class StateManager {
           globalAccountKeyMap[accountId] = true
         }
 
-        const backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
+        const backupObj: ShardusTypes.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
 
         /* prettier-ignore */ if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
@@ -3525,7 +3533,7 @@ class StateManager {
         this.accountPatcher.hashTrieSyncConsensusByCycle.delete(cycleNum)
         removedTrieConsensusData++
       }
-    }    
+    }
 
     let removedtxByCycleByPartition = 0
     let removedrecentPartitionObjectsByCycleByHash = 0
@@ -3961,7 +3969,7 @@ class StateManager {
   }
 
   generateReceiptMapResults(
-    lastCycle: Shardus.Cycle
+    lastCycle: ShardusTypes.Cycle
   ): StateManagerTypes.StateManagerTypes.ReceiptMapResult[] {
     const results: StateManagerTypes.StateManagerTypes.ReceiptMapResult[] = []
 
@@ -4026,7 +4034,7 @@ class StateManager {
     const netId = '123abc'
     //go over the save list..
     for (const queueEntry of queueEntriesToSave) {
-      const accountData: Shardus.WrappedResponse[] = queueEntry?.preApplyTXResult?.applyResponse?.accountData
+      const accountData: ShardusTypes.WrappedResponse[] = queueEntry?.preApplyTXResult?.applyResponse?.accountData
       if (accountData == null) {
         /* prettier-ignore */ nestedCountersInstance.countRareEvent('generateReceiptMapResults' , `accountData==null tests: ${queueEntry?.preApplyTXResult == null} ${queueEntry?.preApplyTXResult?.applyResponse == null} ${queueEntry?.preApplyTXResult?.applyResponse?.accountData == null}` )
       }
@@ -4103,7 +4111,7 @@ class StateManager {
     checkIsUpRecent = true,
     checkNodesRotationBounds = false
   ): boolean {
-    const node: Shardus.Node = this.p2p.state.getNode(nodeId)
+    const node: ShardusTypes.Node = this.p2p.state.getNode(nodeId)
     return Comms.isNodeValidForInternalMessage(
       node,
       debugMsg,
@@ -4126,12 +4134,12 @@ class StateManager {
    * @returns A list of filtered nodes based on the settings passed in
    */
   filterValidNodesForInternalMessage(
-    nodeList: Shardus.Node[],
+    nodeList: ShardusTypes.Node[],
     debugMsg: string,
     checkForNodeDown = true,
     checkForNodeLost = true,
     checkIsUpRecent = true
-  ): Shardus.Node[] {
+  ): ShardusTypes.Node[] {
     const filteredNodes = []
 
     const logErrors = logFlags.debug
@@ -4212,7 +4220,7 @@ class StateManager {
    *
    * @returns
    */
-  getNodesForCycleShard(mode: P2PTypes.ModesTypes.Record['mode']): Shardus.Node[] {
+  getNodesForCycleShard(mode: P2PTypes.ModesTypes.Record['mode']): ShardusTypes.Node[] {
     if (mode === 'forming' || mode === 'processing' || mode === 'safety') return activeByIdOrder
     if (mode === 'restart' || mode === 'restore' || mode === 'recovery') return byIdOrder
     // For shutdown mode as well, we may want all nodes (This needs review)

@@ -40,10 +40,10 @@ import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
 import * as ShardusTypes from '../shardus/shardus-types'
-import { WrappedData, DevSecurityLevel, AppObjEnum } from '../shardus/shardus-types'
+import { AppObjEnum, DevSecurityLevel, WrappedData } from "../shardus/shardus-types";
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
-import { CachedAppData, QueueCountsResult } from '../state-manager/state-manager-types'
+import { CachedAppData, NonceQueueItem, QueueCountsResult } from "../state-manager/state-manager-types";
 import { DebugComplete } from '../state-manager/TransactionQueue'
 import Statistics from '../statistics'
 import Storage from '../storage'
@@ -984,6 +984,122 @@ class Shardus extends EventEmitter {
     }
   }
 
+  async _timestampAndQueueTransaction(tx: ShardusTypes.OpaqueTransaction, appData: any, global = false, noConsensus = false) {
+    const injectedTimestamp = this.app.getTimestampFromTransaction(tx, appData);
+
+    const txId = this.app.calculateTxId(tx);
+    let timestampReceipt: ShardusTypes.TimestampReceipt;
+    if (!injectedTimestamp || injectedTimestamp === -1) {
+      if (injectedTimestamp === -1) {
+        /* prettier-ignore */
+        if (logFlags.p2pNonFatal && logFlags.console) console.log("Dapp request to generate a new timestmap for the tx");
+      }
+      timestampReceipt = await this.stateManager.transactionConsensus.askTxnTimestampFromNode(tx, txId);
+      /* prettier-ignore */
+      if (logFlags.p2pNonFatal && logFlags.console) console.log("Network generated a" +
+        " timestamp", txId, timestampReceipt);
+    }
+    if (!injectedTimestamp && !timestampReceipt) {
+      this.shardus_fatal(
+        "put_noTimestamp",
+        `Transaction timestamp cannot be determined ${utils.stringifyReduce(tx)} `
+      );
+      this.statistics.incrementCounter("txRejected");
+      nestedCountersInstance.countEvent("rejected", "_timestampNotDetermined");
+      return {
+        success: false,
+        reason: "Transaction timestamp cannot be determined.",
+        status: 500
+      };
+    }
+    let timestampedTx;
+    if (timestampReceipt && timestampReceipt.timestamp) {
+      timestampedTx = {
+        tx,
+        timestampReceipt
+      };
+    } else {
+      timestampedTx = { tx };
+    }
+
+    // Perform fast validation of the transaction fields
+    const validateResult = this.app.validate(timestampedTx, appData);
+    if (validateResult.success === false) {
+      // 400 is a code for bad tx or client faulty
+      validateResult.status = validateResult.status ? validateResult.status : 400;
+      return validateResult;
+    }
+
+    // Ask App to crack open tx and return timestamp, id (hash), and keys
+    const { timestamp, id, keys, shardusMemoryPatterns } = this.app.crack(timestampedTx, appData);
+    // console.log('app.crack results', timestamp, id, keys)
+
+    // Validate the transaction's sourceKeys & targetKeys
+    if (this.config.debug.checkAddressFormat && !isValidShardusAddress(keys.allKeys)) {
+      this.shardus_fatal(
+        `put_invalidAddress`,
+        `Invalid Shardus Address found: allKeys:${keys.allKeys} ${utils.stringifyReduce(tx)}`
+      );
+      this.statistics.incrementCounter("txRejected");
+      nestedCountersInstance.countEvent("rejected", "_hasInvalidShardusAddresses");
+      return { success: false, reason: "Invalid Shardus Addresses", status: 400 };
+    }
+    // Validate the transaction timestamp
+    let txExpireTimeMs = this.config.transactionExpireTime * 1000;
+
+    if (global) {
+      txExpireTimeMs = 2 * 10 * 1000; //todo consider if this should be a config.
+    }
+
+    if (inRangeOfCurrentTime(timestamp, txExpireTimeMs, txExpireTimeMs) === false) {
+      /* prettier-ignore */
+      this.shardus_fatal(`tx_outofrange`, `Transaction timestamp out of range: timestamp:${timestamp} now:${shardusGetTime()} diff(now-ts):${shardusGetTime() - timestamp}  ${utils.stringifyReduce(tx)} our offset: ${getNetworkTimeOffset()} `);
+      this.statistics.incrementCounter("txRejected");
+      nestedCountersInstance.countEvent("rejected", "transaction timestamp out of range");
+      return { success: false, reason: "Transaction timestamp out of range", status: 400 };
+    }
+
+    this.profiler.profileSectionStart("put");
+
+    //as ShardusMemoryPatternsInput
+    // Pack into acceptedTx, and pass to StateManager
+    const acceptedTX: ShardusTypes.AcceptedTx = {
+      timestamp,
+      txId: id,
+      keys,
+      data: timestampedTx,
+      appData,
+      shardusMemoryPatterns: shardusMemoryPatterns
+    };
+    if (logFlags.verbose) this.mainLogger.debug("Transaction validated");
+    if (global === false) {
+      //temp way to make global modifying TXs not over count
+      this.statistics.incrementCounter("txInjected");
+    }
+    this.logger.playbackLogNote(
+      "tx_injected",
+      `${txId}`,
+      `Transaction: ${utils.stringifyReduce(timestampedTx)}`
+    );
+    let added = this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(
+      acceptedTX,
+      /*send gossip*/ true,
+      null,
+      global,
+      noConsensus
+    );
+    if (logFlags.verbose) {
+      this.mainLogger.debug(`End of injectTransaction ${utils.stringifyReduce(tx)}, added: ${added}`);
+    }
+
+    return {
+      success: true,
+      reason: "Transaction queued, poll for results.",
+      status: 200, // 200 status code means transaction is generally successful
+      txId
+    };
+  }
+
   /**
    * Function used to register listeners for transaction related events
    */
@@ -1032,7 +1148,8 @@ class Shardus extends EventEmitter {
       this.storage,
       this.p2p,
       this.crypto,
-      this.config
+      this.config,
+      this
     )
 
     this.storage.stateManager = this.stateManager
@@ -1184,7 +1301,7 @@ class Shardus extends EventEmitter {
    * }
    */
   async put(
-    tx: ShardusTypes.OpaqueTransaction,
+    tx: ShardusTypes.OpaqueTransaction | ShardusTypes.ReinjectedOpaqueTransaction,
     set = false,
     global = false,
     inputAppData = null
@@ -1269,21 +1386,81 @@ class Shardus extends EventEmitter {
         }
       }
 
+      const senderAddress = this.app.getTxSenderAddress(tx);
       // Forward transaction to a node that has the account data locally if we don't have it
       if (global === false) {
-        const senderAddress = this.app.getTxSenderAddress(tx)
-        if (senderAddress !== null && this.isAccountRemote(senderAddress)) {
+        if (senderAddress == null) {
+          return {
+            success: false,
+            reason: `Sender address is not available.`,
+            status: 500
+          };
+        }
+        let isConsensusNode = false;
+        let isReinjected = false;
+        if (typeof tx === "object" && "isReinjected" in tx) {
+          isReinjected = true;
+        }
+        let consensusGroup = this.getConsenusGroupForAccount(senderAddress);
+        for (const node of consensusGroup) {
+          if (node.id === Self.id) {
+            isConsensusNode = true;
+            break;
+          }
+        }
+        if (isReinjected === false) {
           const consensusGroup = this.getConsenusGroupForAccount(senderAddress)
           // send transaction to consensus group node
           // [TODO] - This is a temporary solution. We need to implement retry logic to select the next node and send the transaction to.
-          const node = utils.getRandom(consensusGroup, 1)[0]
-          const validatorDetails = {
-            ip: node.externalIp,
-            port: node.externalPort,
-            publicKey: node.publicKey
+          const nodes = utils.getRandom(consensusGroup, 5);
+          const selectedValidators = [];
+          for (const node of nodes) {
+            const validatorDetails = {
+              ip: node.externalIp,
+              port: node.externalPort,
+              publicKey: node.publicKey
+            };
+            selectedValidators.push(validatorDetails);
           }
-          const result = await this.app.injectTxToConsensor(validatorDetails, tx)
-          return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }> 
+          let reinjectedTx = tx as ShardusTypes.ReinjectedOpaqueTransaction;
+          reinjectedTx.isReinjected = true;
+          if (logFlags.debug) this.mainLogger.debug(`Reinjecting tx to consensus group. ${utils.stringify(reinjectedTx)}`)
+          nestedCountersInstance.countEvent('statistics', 'reinjectTxToConsensusGroup', selectedValidators.length)
+          const result = await this.app.injectTxToConsensor(selectedValidators, reinjectedTx);
+          return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
+        }
+      }
+      let shouldAddToNonceQueue = false;
+      let txNonce;
+      if (internalTx === false) {
+        let senderAccountNonce = await this.app.getAccountNonce(senderAddress);
+        txNonce = await this.app.getNonceFromTx(tx);
+
+        if (senderAccountNonce == null) {
+          if (this.config.mode === ShardusTypes.ServerMode.Release) {
+            return {
+              success: false,
+              reason: `Sender account nonce is not available. ${utils.stringifyReduce(tx)}`,
+              status: 500
+            };
+          }
+          senderAccountNonce = BigInt(0);
+        }
+
+        // app layer should return -1 if the account or tx does not have a nonce field
+        if (txNonce >= 0 && senderAccountNonce >= 0) {
+          if (txNonce < senderAccountNonce) {
+            if (logFlags.debug) this.mainLogger.debug(`txNonce < senderAccountNonce ${txNonce} < ${senderAccountNonce}`);
+            nestedCountersInstance.countEvent('rejected', 'txNonce < senderAccountNonce')
+            return {
+              success: false,
+              reason: `Transaction nonce is less than the account nonce. ${utils.stringifyReduce(tx)}`,
+              status: 500
+            };
+          } else if (txNonce > senderAccountNonce) {
+            shouldAddToNonceQueue = true;
+            if (logFlags.debug) this.mainLogger.debug(`txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce}`);
+          }
         }
       }
 
@@ -1297,108 +1474,25 @@ class Shardus extends EventEmitter {
           status: 500,
         }
       }
-
-      const injectedTimestamp = this.app.getTimestampFromTransaction(tx, appData)
-
-      txId = this.app.calculateTxId(tx)
-      let timestampReceipt: ShardusTypes.TimestampReceipt
-      if (!injectedTimestamp || injectedTimestamp === -1) {
-        if (injectedTimestamp === -1) {
-          /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('Dapp request to generate a new timestmap for the tx')
-        }
-        timestampReceipt = await this.stateManager.transactionConsensus.askTxnTimestampFromNode(tx, txId)
-        /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('Network generated a' +
-          ' timestamp', txId, timestampReceipt)
-      }
-      if (!injectedTimestamp && !timestampReceipt) {
-        this.shardus_fatal(
-          'put_noTimestamp',
-          `Transaction timestamp cannot be determined ${utils.stringifyReduce(tx)} `
-        )
-        this.statistics.incrementCounter('txRejected')
-        nestedCountersInstance.countEvent('rejected', '_timestampNotDetermined')
-        return {
-          success: false,
-          reason: 'Transaction timestamp cannot be determined.',
-          status: 500,
-        }
-      }
-      let timestampedTx
-      if (timestampReceipt && timestampReceipt.timestamp) {
-        timestampedTx = {
+      if (shouldAddToNonceQueue) {
+        const nonceQueueEntry: NonceQueueItem = {
           tx,
-          timestampReceipt,
+          accountId: senderAddress,
+          nonce: txNonce,
+          appData,
+          global,
+          noConsensus
         }
+        this.stateManager.transactionQueue.addTransactionToNonceQueue(nonceQueueEntry);
+        return {
+          success: true,
+          reason: `Transaction is added to pending nonce queue.`,
+          status: 200
+        };
       } else {
-        timestampedTx = { tx }
+        let result = await this._timestampAndQueueTransaction(tx, appData, global, noConsensus);
+        return result;
       }
-
-      // Perform fast validation of the transaction fields
-      const validateResult = this.app.validate(timestampedTx, appData)
-      if (validateResult.success === false) {
-        // 400 is a code for bad tx or client faulty
-        validateResult.status = validateResult.status ? validateResult.status : 400
-        return validateResult
-      }
-
-      // Ask App to crack open tx and return timestamp, id (hash), and keys
-      const { timestamp, id, keys, shardusMemoryPatterns } = this.app.crack(timestampedTx, appData)
-      // console.log('app.crack results', timestamp, id, keys)
-
-      // Validate the transaction's sourceKeys & targetKeys
-      if (this.config.debug.checkAddressFormat && !isValidShardusAddress(keys.allKeys)) {
-        this.shardus_fatal(
-          `put_invalidAddress`,
-          `Invalid Shardus Address found: allKeys:${keys.allKeys} ${utils.stringifyReduce(tx)}`
-        )
-        this.statistics.incrementCounter('txRejected')
-        nestedCountersInstance.countEvent('rejected', '_hasInvalidShardusAddresses')
-        return { success: false, reason: 'Invalid Shardus Addresses', status: 400 }
-      }
-      // Validate the transaction timestamp
-      let txExpireTimeMs = this.config.transactionExpireTime * 1000
-
-      if (global) {
-        txExpireTimeMs = 2 * 10 * 1000 //todo consider if this should be a config.
-      }
-
-      if (inRangeOfCurrentTime(timestamp, txExpireTimeMs, txExpireTimeMs) === false) {
-        /* prettier-ignore */ this.shardus_fatal( `tx_outofrange`, `Transaction timestamp out of range: timestamp:${timestamp} now:${shardusGetTime()} diff(now-ts):${ shardusGetTime() - timestamp }  ${utils.stringifyReduce(tx)} our offset: ${getNetworkTimeOffset()} ` )
-        this.statistics.incrementCounter('txRejected')
-        nestedCountersInstance.countEvent('rejected', 'transaction timestamp out of range')
-        return { success: false, reason: 'Transaction timestamp out of range', status: 400 }
-      }
-
-      this.profiler.profileSectionStart('put')
-
-      //as ShardusMemoryPatternsInput
-      // Pack into acceptedTx, and pass to StateManager
-      const acceptedTX: ShardusTypes.AcceptedTx = {
-        timestamp,
-        txId: id,
-        keys,
-        data: timestampedTx,
-        appData,
-        shardusMemoryPatterns: shardusMemoryPatterns,
-      }
-      if (logFlags.verbose) this.mainLogger.debug('Transaction validated')
-      if (global === false) {
-        //temp way to make global modifying TXs not over count
-        this.statistics.incrementCounter('txInjected')
-      }
-      this.logger.playbackLogNote(
-        'tx_injected',
-        `${txId}`,
-        `Transaction: ${utils.stringifyReduce(timestampedTx)}`
-      )
-      this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(
-        acceptedTX,
-        /*send gossip*/ true,
-        null,
-        global,
-        noConsensus
-      )
-
       // Pass received txs to any subscribed 'DATA' receivers
       // this.io.emit('DATA', tx)
     } catch (err) {
@@ -1413,16 +1507,7 @@ class Shardus extends EventEmitter {
       this.profiler.profileSectionEnd('put')
     }
 
-    if (logFlags.verbose) {
-      this.mainLogger.debug(`End of injectTransaction ${utils.stringifyReduce(tx)}`)
-    }
 
-    return {
-      success: true,
-      reason: 'Transaction queued, poll for results.',
-      status: 200, // 200 status code means transaction is generally successful
-      txId
-    }
   }
 
   /**
@@ -2458,6 +2543,12 @@ class Shardus extends EventEmitter {
       }
       if (typeof application.injectTxToConsensor === 'function') {
         applicationInterfaceImpl.injectTxToConsensor = (consensor, tx) => application.injectTxToConsensor(consensor, tx)
+      }
+      if (typeof application.getNonceFromTx === "function") {
+        applicationInterfaceImpl.getNonceFromTx = (tx) => application.getNonceFromTx(tx);
+      }
+      if (typeof application.getAccountNonce === "function") {
+        applicationInterfaceImpl.getAccountNonce = (accountId) => application.getAccountNonce(accountId);
       }
     } catch (ex) {
       this.shardus_fatal(

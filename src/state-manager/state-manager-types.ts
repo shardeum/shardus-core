@@ -823,6 +823,15 @@ export type QueueCountsResult = {
   account?: any
 }
 
+export interface NonceQueueItem {
+  tx: Shardus.OpaqueTransaction
+  nonce: bigint
+  accountId: string
+  appData: any
+  global: boolean
+  noConsensus: boolean
+}
+
 export type GlobalAccountReportResp = {
   ready: boolean
   combinedHash: string

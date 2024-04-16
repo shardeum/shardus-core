@@ -45,6 +45,7 @@ import {
   TxDebug,
   WrappedResponses,
   ArchiverReceipt,
+  NonceQueueItem
 } from './state-manager-types'
 import { isInternalTxAllowed, networkMode } from '../p2p/Modes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
@@ -187,6 +188,7 @@ class TransactionQueue {
   debugLastProcessingQueueStartTime: number
 
   debugRecentQueueEntry: QueueEntry
+  nonceQueue: Map<string, NonceQueueItem[]>
 
   constructor(
     stateManager: StateManager,
@@ -196,7 +198,7 @@ class TransactionQueue {
     storage: Storage,
     p2p: P2P,
     crypto: Crypto,
-    config: Shardus.StrictServerConfiguration
+    config: Shardus.StrictServerConfiguration,
   ) {
     this.crypto = crypto
     this.app = app
@@ -221,6 +223,7 @@ class TransactionQueue {
     this._transactionQueue = []
     this.pendingTransactionQueue = []
     this.archivedQueueEntries = []
+    this.nonceQueue = new Map()
     this.txDebugStatList = new Map()
     this.receiptsToForward = []
     this.forwardedReceiptsByTimestamp = new Map()
@@ -934,6 +937,48 @@ class TransactionQueue {
     })
   }
 
+  addTransactionToNonceQueue(nonceQueueEntry: NonceQueueItem): boolean {
+    try {
+      let queue = this.nonceQueue.get(nonceQueueEntry.accountId)
+      if (queue == null) {
+        queue = [nonceQueueEntry]
+        this.nonceQueue.set(nonceQueueEntry.accountId, queue)
+      } else if (queue && queue.length > 0) {
+        const isDuplicate = queue.some((item) => item.nonce === nonceQueueEntry.nonce)
+        if (isDuplicate) {
+          return false
+        }
+        queue.push(nonceQueueEntry)
+        queue = queue.sort((a, b) => Number(a.nonce) - Number(b.nonce))
+        this.nonceQueue.set(nonceQueueEntry.accountId, queue)
+      }
+      nestedCountersInstance.countEvent('processing', 'addTransactionToNonceQueue')
+      if (logFlags.debug) this.mainLogger.debug(`Added tx to nonce queue for ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce} nonceQueue: ${queue.length}`)
+    } catch (e) {
+      nestedCountersInstance.countEvent('processing', 'addTransactionToNonceQueueError')
+      this.mainLogger.error(`Error adding tx to nonce queue: ${e.message}, tx: ${utils.stringifyReduce(nonceQueueEntry)}`)
+    }
+  }
+  async processNonceQueue(accounts: Shardus.WrappedData[]): Promise<void> {
+    for (const account of accounts) {
+      const queue = this.nonceQueue.get(account.accountId)
+      if (queue == null) {
+        continue
+      }
+      for (const item of queue) {
+        const accountNonce = await this.app.getAccountNonce(account.accountId, account)
+        if (item.nonce === accountNonce) {
+          nestedCountersInstance.countEvent('processing', 'processNonceQueue foundMatchingNonce')
+          if (logFlags.debug) this.mainLogger.debug(`Found matching nonce in queue or ${account.accountId} with nonce ${item.nonce}`)
+          item.appData.requestNewTimestamp = true
+          await this.stateManager.shardus._timestampAndQueueTransaction(item.tx, item.appData, item.global, item.noConsensus)
+          // remove the item from the queue
+          const index = queue.indexOf(item)
+          queue.splice(index, 1)
+        }
+      }
+    }
+  }
   handleSharedTX(tx: Shardus.OpaqueTransaction, appData: unknown, sender: Shardus.Node): QueueEntry {
     profilerInstance.profileSectionStart('handleSharedTX')
     const internalTx = this.app.isInternalTx(tx)
@@ -2342,13 +2387,34 @@ class TransactionQueue {
   }
 
   getArchivedQueueEntryByAccountIdAndHash(accountId: string, hash: string, msg: string): QueueEntry | null {
+    let foundQueueEntry = false
+    let foundVote = false
+    let foundVoteMatchingHash = false
     for (const queueEntry of this.archivedQueueEntriesByID.values()) {
       if (queueEntry.uniqueKeys.includes(accountId)) {
-        const bestReceivedVote = queueEntry.receivedBestVote
-        if (bestReceivedVote == null) continue
+        foundQueueEntry = true
+        const receipt2: AppliedReceipt2 = this.stateManager.getReceipt2(queueEntry)
+        let bestReceivedVote
+        if (receipt2 !== null) {
+          bestReceivedVote = receipt2.appliedVote
+          if (receipt2.appliedVote) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get vote from' +
+            ' receipt2')
+        }
+        if (bestReceivedVote == null) {
+          bestReceivedVote = queueEntry.receivedBestVote
+          if (queueEntry.receivedBestVote) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get vote' +
+            ' from' +
+            ' receipt2')
+        }
+        if (bestReceivedVote == null) {
+          continue
+        }
+        foundVote = true
+        // this node might not have a vote for this tx
         for (let i = 0; i < bestReceivedVote.account_id.length; i++) {
           if (bestReceivedVote.account_id[i] === accountId) {
             if (bestReceivedVote.account_state_hash_after[i] === hash) {
+              foundVoteMatchingHash = true
               return queueEntry
             }
           }
@@ -2356,7 +2422,7 @@ class TransactionQueue {
       }
     }
     nestedCountersInstance.countRareEvent('error', `getQueueEntryArchived no entry: ${msg}`)
-    nestedCountersInstance.countEvent('error', `getQueueEntryArchived no entry: ${msg}`)
+    nestedCountersInstance.countEvent('error', `getQueueEntryArchived no entry: ${msg}, found queue entry: ${foundQueueEntry}, found vote: ${foundVote}, found vote matching hash: ${foundVoteMatchingHash}`)
     return null
   }
   /**
@@ -2445,7 +2511,7 @@ class TransactionQueue {
       this.gossipCompleteData(queueEntry)
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
-          `queueEntryAddData hasAll: true for txId ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id}`
+          `queueEntryAddData hasAll: true for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id}`
         )
       }
     } else {

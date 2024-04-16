@@ -165,7 +165,9 @@ interface ValidateJoinRequestResponse {
 }
 
 export interface App {
-  injectTxToConsensor(consensor: ValidatorNodeDetails, tx: OpaqueTransaction): Promise<unknown>
+  injectTxToConsensor(consensor: ValidatorNodeDetails[], tx: OpaqueTransaction): Promise<unknown>
+  getNonceFromTx(tx: OpaqueTransaction): bigint
+  getAccountNonce(accountId: string, wrappedData?: WrappedData): Promise<bigint>
   getTxSenderAddress(tx: OpaqueTransaction): string
   /**
    * Runs fast validation of the tx checking if all tx fields present, data
@@ -1404,6 +1406,10 @@ type ObjectAlias = object
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface OpaqueTransaction extends ObjectAlias {}
+
+export interface ReinjectedOpaqueTransaction extends OpaqueTransaction {
+  isReinjected: boolean
+}
 
 export type DeepRequired<T> = Required<{
   [P in keyof T]: T[P] extends object | undefined ? DeepRequired<Required<T[P]>> : T[P]
