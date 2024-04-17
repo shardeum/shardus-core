@@ -1174,6 +1174,10 @@ export interface ServerConfiguration {
     waitUpstreamTx: boolean
     // whether the node should gossip complete data
     gossipCompleteData: boolean
+    // how many node to re-inject the tx received from client
+    numberOfReInjectNodes: number
+    // max number of pending nonce tx for an account
+    maxPendingNonceTxs: number
   }
   /** Options for sharding calculations */
   sharding?: {

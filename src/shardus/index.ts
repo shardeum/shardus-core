@@ -34,7 +34,7 @@ import * as CycleCreator from '../p2p/CycleCreator'
 import { netConfig } from '../p2p/CycleCreator'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
 import { scheduleLostReport, removeNodeWithCertificiate } from '../p2p/Lost'
-import { activeByIdOrder, getAgeIndexForNodeId } from '../p2p/NodeList'
+import { activeByIdOrder, getAgeIndexForNodeId, nodes } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
@@ -1396,38 +1396,17 @@ class Shardus extends EventEmitter {
             status: 500
           };
         }
-        let isReinjected = false;
-        if (typeof tx === "object" && "isReinjected" in tx) {
-          isReinjected = true;
-        }
-        let consensusGroup = this.getConsenusGroupForAccount(senderAddress);
-        if (isReinjected === false) {
-          const consensusGroup = this.getConsenusGroupForAccount(senderAddress)
+        const consensusGroup = this.getConsenusGroupForAccount(senderAddress)
+        const isConsensusNode = consensusGroup.some((node) => node.id === Self.id)
+
+        if (isConsensusNode === false) {
           // send transaction to consensus group node
-          // [TODO] - This is a temporary solution. We need to implement retry logic to select the next node and send the transaction to.
-          const nodes = utils.getRandom(consensusGroup, 5);
-          const selectedValidators = [];
-          for (const node of nodes) {
-            const validatorDetails = {
-              ip: node.externalIp,
-              port: node.externalPort,
-              publicKey: node.publicKey
-            };
-            selectedValidators.push(validatorDetails);
-          }
-          let reinjectedTx = tx as ShardusTypes.ReinjectedOpaqueTransaction;
-          reinjectedTx.isReinjected = true;
-          if (logFlags.debug) this.mainLogger.debug(`Reinjecting tx to consensus group. ${utils.stringify(reinjectedTx)}`)
-          nestedCountersInstance.countEvent('statistics', 'reinjectTxToConsensusGroup', selectedValidators.length)
-          const result = await this.app.injectTxToConsensor(selectedValidators, reinjectedTx);
+          const result = await this.forwardTransactionToLuckyNodes(senderAddress, tx, 'non-consensus to consensus')
           return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
-        } else if (isReinjected === true) {
-          if (typeof tx === "object" && "isReinjected" in tx) {
-            delete tx.isReinjected;
-            if (logFlags.debug) this.mainLogger.debug(`Removed reInjected flag from tx. ${utils.stringify(tx)}`)
-          }
         }
       }
+      // we are consensus node for this tx
+      const txId = this.app.calculateTxId(tx);
       let shouldAddToNonceQueue = false;
       let txNonce;
       if (internalTx === false) {
@@ -1456,8 +1435,30 @@ class Shardus extends EventEmitter {
               status: 500
             };
           } else if (txNonce > senderAccountNonce) {
-            shouldAddToNonceQueue = true;
-            if (logFlags.debug) this.mainLogger.debug(`txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce}`);
+            // if the tx is already in the nonceQueue (based on txid not nonce), return an accepted response
+            const txInNonceQueue = this.stateManager.transactionQueue.isTxInPendingNonceQueue(senderAddress, txId)
+            if (txInNonceQueue) {
+              return {
+                success: true,
+                reason: `Transaction is already in pending nonce queue.`,
+                status: 200
+              }
+            }
+
+            // decide whether to put it in the nonce queue or not
+            const maxAllowedPendingNonce = senderAccountNonce + BigInt(Context.config.stateManager.maxPendingNonceTxs)
+            if ( txNonce <= maxAllowedPendingNonce) {
+              shouldAddToNonceQueue = true;
+              if (logFlags.debug) this.mainLogger.debug(`txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce}`);
+            } else {
+              if (logFlags.debug) this.mainLogger.debug(`txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce} + ${Context.config.stateManager.maxPendingNonceTxs}`);
+              nestedCountersInstance.countEvent('rejected', 'txNonce > senderAccountNonce + maxPendingNonceTxs')
+              return {
+                success: false,
+                reason: `Transaction nonce ${txNonce.toString()} is greater than max allowed pending nonce of ${maxAllowedPendingNonce.toString()}`,
+                status: 500
+              };
+            }
           }
         }
       }
@@ -1475,6 +1476,7 @@ class Shardus extends EventEmitter {
       if (shouldAddToNonceQueue) {
         const nonceQueueEntry: NonceQueueItem = {
           tx,
+          txId,
           accountId: senderAddress,
           nonce: txNonce,
           appData,
@@ -1482,12 +1484,10 @@ class Shardus extends EventEmitter {
           noConsensus
         }
         this.stateManager.transactionQueue.addTransactionToNonceQueue(nonceQueueEntry);
-        return {
-          success: true,
-          reason: `Transaction is added to pending nonce queue.`,
-          status: 200
-        };
+        let result = this.forwardTransactionToLuckyNodes(senderAddress, tx, 'consensus to consensus') // don't wait here
+        return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
       } else {
+        // tx nonce is equal to account nonce
         let result = await this._timestampAndQueueTransaction(tx, appData, global, noConsensus);
         return result;
       }
@@ -1504,8 +1504,33 @@ class Shardus extends EventEmitter {
     } finally {
       this.profiler.profileSectionEnd('put')
     }
+  }
 
+  async forwardTransactionToLuckyNodes(senderAddress, tx, message = ''): Promise<unknown> {
+    let closetNodeIds = this.getClosestNodes(senderAddress, Context.config.stateManager.numberOfReInjectNodes, false)
+    let selectedValidators = []
+    for (const id of closetNodeIds) {
+      if (id === Self.id) {
+        continue;
+      }
+      let node = nodes.get(id)
+      if (node.status !== 'active') continue
+      const validatorDetails = {
+        ip: node.externalIp,
+        port: node.externalPort,
+        publicKey: node.publicKey
+      };
+      // for debugging
+      let consensusGroup = this.getConsenusGroupForAccount(senderAddress)
+      let isConsensusNode = consensusGroup.some((node) => node.id === id)
+      if (logFlags.debug) this.mainLogger.debug(`Selected validator ${id} for account ${senderAddress} isConsensusNode: ${isConsensusNode}`)
+      selectedValidators.push(validatorDetails);
 
+      if (logFlags.debug) this.mainLogger.debug(`Forwarding injected tx to consensus group. reason: ${message} ${utils.stringify(tx)}`)
+      nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: ${message}`, selectedValidators.length)
+      const result = await this.app.injectTxToConsensor(selectedValidators, tx);
+      return result
+    }
   }
 
   /**

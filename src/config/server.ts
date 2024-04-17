@@ -289,7 +289,9 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     confirmationSeenExpirationTime: 30000,
     voterPercentage: 0.1,
     waitUpstreamTx: false,
-    gossipCompleteData: false
+    gossipCompleteData: false,
+    numberOfReInjectNodes: 5,
+    maxPendingNonceTxs: 10
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

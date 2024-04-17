@@ -943,26 +943,46 @@ class TransactionQueue {
     })
   }
 
-  addTransactionToNonceQueue(nonceQueueEntry: NonceQueueItem): boolean {
+  isTxInPendingNonceQueue(accountId: string, txId: string): boolean {
+    const queue = this.nonceQueue.get(accountId)
+    if (queue == null) {
+      return false
+    }
+    for (const item of queue) {
+      if (item.txId === txId) {
+        return true
+      }
+    }
+    return false
+  }
+
+  addTransactionToNonceQueue(nonceQueueEntry: NonceQueueItem): {success: boolean; reason?: string} {
     try {
       let queue = this.nonceQueue.get(nonceQueueEntry.accountId)
       if (queue == null) {
         queue = [nonceQueueEntry]
         this.nonceQueue.set(nonceQueueEntry.accountId, queue)
       } else if (queue && queue.length > 0) {
-        const isDuplicate = queue.some((item) => item.nonce === nonceQueueEntry.nonce)
-        if (isDuplicate) {
-          return false
+        for (let i = 0; i < queue.length; i++) {
+          if (queue[i].nonce === nonceQueueEntry.nonce) {
+            // there is existing item with the same nonce. replace it with the new one
+            queue[i] = nonceQueueEntry
+            nestedCountersInstance.countEvent('processing', 'replaceExistingNonceTx')
+            return { success: true, reason: 'Replace existing pending nonce tx' }
+          }
         }
+        // add new item to the queue
         queue.push(nonceQueueEntry)
         queue = queue.sort((a, b) => Number(a.nonce) - Number(b.nonce))
         this.nonceQueue.set(nonceQueueEntry.accountId, queue)
       }
       nestedCountersInstance.countEvent('processing', 'addTransactionToNonceQueue')
       if (logFlags.debug) this.mainLogger.debug(`Added tx to nonce queue for ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce} nonceQueue: ${queue.length}`)
+      return { success: true }
     } catch (e) {
       nestedCountersInstance.countEvent('processing', 'addTransactionToNonceQueueError')
       this.mainLogger.error(`Error adding tx to nonce queue: ${e.message}, tx: ${utils.stringifyReduce(nonceQueueEntry)}`)
+      return { success: false, reason: e.message }
     }
   }
   async processNonceQueue(accounts: Shardus.WrappedData[]): Promise<void> {

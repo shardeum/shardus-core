@@ -825,6 +825,7 @@ export type QueueCountsResult = {
 
 export interface NonceQueueItem {
   tx: Shardus.OpaqueTransaction
+  txId: string
   nonce: bigint
   accountId: string
   appData: any
