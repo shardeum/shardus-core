@@ -1558,14 +1558,14 @@ class TransactionConsenus {
               )
               const robustReceipt: AppliedReceipt = {
                 txid: robustConfirmOrChallenge.appliedVote.txid,
-                result: robustConfirmOrChallenge.appliedVote.transaction_result,
+                result: false,
                 appliedVotes: [robustConfirmOrChallenge.appliedVote],
                 confirmOrChallenge: [robustConfirmOrChallenge],
                 app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
               }
               const robustReceipt2: AppliedReceipt2 = {
                 txid: robustConfirmOrChallenge.appliedVote.txid,
-                result: robustConfirmOrChallenge.appliedVote.transaction_result,
+                result: false,
                 appliedVote: robustConfirmOrChallenge.appliedVote,
                 confirmOrChallenge: robustConfirmOrChallenge,
                 app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
