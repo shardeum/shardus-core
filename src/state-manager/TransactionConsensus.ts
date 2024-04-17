@@ -1440,9 +1440,9 @@ class TransactionConsenus {
 
             // Received another challenge receipt. Compare ranks
             let bestNodeFromRobustQuery: Shardus.NodeWithRank
-            if (queueEntry.executionGroupMap.has(robustConfirmOrChallenge.appliedVote.node_id)) {
+            if (queueEntry.executionGroupMap.has(robustConfirmOrChallenge.nodeId)) {
               bestNodeFromRobustQuery = queueEntry.executionGroupMap.get(
-                robustConfirmOrChallenge.appliedVote.node_id
+                robustConfirmOrChallenge.nodeId
               ) as Shardus.NodeWithRank
             }
             const isRobustQueryNodeBetter =
