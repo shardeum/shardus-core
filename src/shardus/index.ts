@@ -1396,18 +1396,11 @@ class Shardus extends EventEmitter {
             status: 500
           };
         }
-        let isConsensusNode = false;
         let isReinjected = false;
         if (typeof tx === "object" && "isReinjected" in tx) {
           isReinjected = true;
         }
         let consensusGroup = this.getConsenusGroupForAccount(senderAddress);
-        for (const node of consensusGroup) {
-          if (node.id === Self.id) {
-            isConsensusNode = true;
-            break;
-          }
-        }
         if (isReinjected === false) {
           const consensusGroup = this.getConsenusGroupForAccount(senderAddress)
           // send transaction to consensus group node
@@ -1428,6 +1421,11 @@ class Shardus extends EventEmitter {
           nestedCountersInstance.countEvent('statistics', 'reinjectTxToConsensusGroup', selectedValidators.length)
           const result = await this.app.injectTxToConsensor(selectedValidators, reinjectedTx);
           return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
+        } else if (isReinjected === true) {
+          if (typeof tx === "object" && "isReinjected" in tx) {
+            delete tx.isReinjected;
+            if (logFlags.debug) this.mainLogger.debug(`Removed reInjected flag from tx. ${utils.stringify(tx)}`)
+          }
         }
       }
       let shouldAddToNonceQueue = false;
