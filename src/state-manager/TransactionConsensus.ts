@@ -2731,7 +2731,6 @@ class TransactionConsenus {
 
       if (receivedConfirmedNode) {
         queueEntry.receivedBestConfirmedNode = receivedConfirmedNode
-        return true
       } else {
         if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
           queueEntry.receivedBestConfirmedNode = queueEntry.executionGroupMap.get(
@@ -2739,6 +2738,16 @@ class TransactionConsenus {
           ) as Shardus.NodeWithRank
         }
       }
+
+      if (logFlags.debug)
+        this.mainLogger.debug(
+          `tryAppendMessage: ${
+            queueEntry.logID
+          } confirmation received and processed. queueEntry.receivedBestConfirmation: ${JSON.stringify(
+            queueEntry.receivedBestConfirmation
+          )}, receivedBestConfirmedNode: ${queueEntry.receivedBestConfirmedNode}`
+        )
+      return true
     } else if (confirmOrChallenge.message === 'challenge') {
       let isBetterThanCurrentChallenge = false
       let receivedChallenger: Shardus.NodeWithRank
