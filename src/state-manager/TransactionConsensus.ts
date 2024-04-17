@@ -2711,7 +2711,7 @@ class TransactionConsenus {
         }
 
         isBetterThanCurrentConfirmation =
-          receivedConfirmedNode.rank > queueEntry.receivedBestConfirmedNode.rank
+          receivedConfirmedNode.rank < queueEntry.receivedBestConfirmedNode.rank
       }
 
       if (!isBetterThanCurrentConfirmation) {
