@@ -2638,6 +2638,7 @@ class TransactionConsenus {
 
     if (!isMessageFromExecutionNode) {
       this.mainLogger.error(`tryAppendMessage: ${queueEntry.logID} Message is not from an execution node.`)
+      return false
     }
 
     if (confirmOrChallenge.message === 'confirm') {
@@ -2794,7 +2795,6 @@ class TransactionConsenus {
       }
 
       queueEntry.receivedBestChallenge = confirmOrChallenge
-      queueEntry.lastConfirmOrChallengeTimestamp = shardusGetTime()
 
       if (receivedChallenger) {
         queueEntry.receivedBestChallenger = receivedChallenger
