@@ -602,6 +602,12 @@ function isNodeNearRotatingOut(
   )
 }
 
+/**
+ * Returns true if a node was recently rotate in or 
+ * will be rotated out soon
+ * @param nodeId 
+ * @returns 
+ */
 export function isNodeInRotationBounds(nodeId: string): boolean {
   const { idx, total } = NodeList.getAgeIndexForNodeId(nodeId)
   // skip freshly rotated in nodes
