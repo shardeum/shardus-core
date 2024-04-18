@@ -856,28 +856,14 @@ class Shardus extends EventEmitter {
     )
     Self.emitter.on('node-activated', ({ ...params }) => {
       try {
-        if (!this.stateManager.currentCycleShardData) throw new Error('No current cycle data')
-        if (params.publicKey == null) throw new Error('No node publicKey provided for node-activated event')
-        const consensusNodes = this.getConsenusGroupForAccount(params.publicKey)
-        for (let node of consensusNodes) {
-          if (node.id === Self.id) {
-            this.app.eventNotify?.({ type: 'node-activated', ...params })
-          }
-        }
+        this.app.eventNotify?.({ type: 'node-activated', ...params })
       } catch (e) {
         this.mainLogger.error(`Error: while processing node-activated event stack: ${e.stack}`)
       }
     })
     Self.emitter.on('node-deactivated', ({ ...params }) => {
       try {
-        if (!this.stateManager.currentCycleShardData) throw new Error('No current cycle data')
-        if (params.publicKey == null) throw new Error('No node publicKey provided for node-deactivated event')
-        const consensusNodes = this.getConsenusGroupForAccount(params.publicKey)
-        for (let node of consensusNodes) {
-          if (node.id === Self.id) {
-            this.app.eventNotify?.({ type: 'node-deactivated', ...params })
-          }
-        }
+        this.app.eventNotify?.({ type: 'node-deactivated', ...params })
       } catch (e) {
         this.mainLogger.error(`Error: while processing node-deactivated event stack: ${e.stack}`)
       }
