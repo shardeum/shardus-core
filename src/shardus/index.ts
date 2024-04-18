@@ -1514,7 +1514,7 @@ class Shardus extends EventEmitter {
         continue;
       }
       let node = nodes.get(id)
-      if (node.status !== 'active') continue
+      if (node.status !== 'active' || isNodeInRotationBounds(id)) continue
       const validatorDetails = {
         ip: node.externalIp,
         port: node.externalPort,
@@ -1531,6 +1531,7 @@ class Shardus extends EventEmitter {
       const result = await this.app.injectTxToConsensor(selectedValidators, tx);
       return result
     }
+    return { success: false, reason: 'No validators found to forward the transaction', status: 500 }
   }
 
   /**
