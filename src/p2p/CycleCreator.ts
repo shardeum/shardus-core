@@ -51,7 +51,7 @@ import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 const SECOND = 1000
 const BEST_CERTS_WANTED = 3
 const DESIRED_CERT_MATCHES = 3
-const MAX_CYCLES_TO_KEEP = 2
+const MAX_CYCLES_TO_KEEP = 20
 
 // add the types of any new modules here
 type submoduleTypes =
