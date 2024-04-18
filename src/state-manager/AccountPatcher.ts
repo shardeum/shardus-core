@@ -2745,6 +2745,7 @@ class AccountPatcher {
         const remoteAccountsMap = new Map()
         if (badTreeNode.accounts != null) {
           for (let i = 0; i < badTreeNode.accounts.length; i++) {
+            if (badTreeNode.accounts[i] == null) continue
             localAccountsMap.set(badTreeNode.accounts[i].accountID, badTreeNode.accounts[i]) // eslint-disable-line security/detect-object-injection
           }
         }
@@ -2813,7 +2814,13 @@ class AccountPatcher {
         }
         for (let i = 0; i < badTreeNode.accounts.length; i++) {
           const localAccount = badTreeNode.accounts[i] // eslint-disable-line security/detect-object-injection
-          const {account: remoteAccount, nodeId: targetNodeId} = remoteAccountsMap.get(localAccount.accountID)
+          if (localAccount == null) continue
+          const remoteNodeItem = remoteAccountsMap.get(localAccount.accountID)
+          if (remoteNodeItem == null) {
+            accountsWeNeedToRepair.push(localAccount)
+            continue
+          }
+          const {account: remoteAccount, nodeId: targetNodeId} = remoteNodeItem
           if (remoteAccount == null) {
             accountsTheyNeedToRepair.push({...localAccount, targetNodeId})
           }

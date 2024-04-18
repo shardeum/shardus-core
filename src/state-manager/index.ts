@@ -3840,7 +3840,12 @@ class StateManager {
     }
 
     await utils.sleep(10000) //wait 10 seconds
-    await this.accountPatcher.testAndPatchAccounts(lastCycle.counter)
+    try {
+      await this.accountPatcher.testAndPatchAccounts(lastCycle.counter)
+    } catch (e) {
+      this.statemanager_fatal('processPreviousCycleSummaries', `testAndPatchAccounts ${e.message}`)
+      nestedCountersInstance.countEvent('processPreviousCycleSummaries', `testAndPatchAccounts fail with exception: ${e.message}`)
+    }
   }
 
   /**
