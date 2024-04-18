@@ -210,9 +210,11 @@ export function removeNode(
     if (idx >= 0) readyByTimeAndIdOrder.splice(idx, 1)
   }
 
-  const joinRequestTimestamp = nodes.get(id).joinRequestTimestamp
-  idx = binarySearch(byJoinOrder, { joinRequestTimestamp, id }, propComparator2('joinRequestTimestamp', 'id'))
-  if (idx >= 0) byJoinOrder.splice(idx, 1)
+  const syncingTimestamp = nodes.get(id).syncingTimestamp
+  idx = binarySearch(byJoinOrder, { syncingTimestamp, id }, propComparator2('syncingTimestamp', 'id'))
+  if (idx >= 0) {
+    byJoinOrder.splice(idx, 1)
+  }
 
   // Remove from maps
   const node = nodes.get(id)
