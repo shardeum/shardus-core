@@ -602,20 +602,18 @@ function isNodeNearRotatingOut(
   )
 }
 
-export function isNodeOutOfRotationBounds(
-  nodeId: string
-): boolean {
-
+export function isNodeInRotationBounds(nodeId: string): boolean {
   const { idx, total } = NodeList.getAgeIndexForNodeId(nodeId)
   // skip freshly rotated in nodes
   if (isNodeRecentlyRotatedIn(idx, total)) {
     nestedCountersInstance.countEvent('skip-newly-rotated-node', nodeId)
-    return false
+    return true
   }
 
   // skip about to be rotated out nodes
   if (isNodeNearRotatingOut(idx, total)) {
     nestedCountersInstance.countEvent('skip-about-to-rotate-out-node', nodeId)
-    return false
+    return true
   }
+  return false
 }

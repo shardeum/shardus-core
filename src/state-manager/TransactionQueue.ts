@@ -93,7 +93,7 @@ import {
   RequestReceiptForTxReqSerialized,
   serializeRequestReceiptForTxReq,
 } from '../types/RequestReceiptForTxReq'
-import { isNodeOutOfRotationBounds } from "../p2p/Utils";
+import { isNodeInRotationBounds } from '../p2p/Utils'
 
 interface Receipt {
   tx: AcceptedTx
@@ -2340,12 +2340,12 @@ class TransactionQueue {
           this.app.setCachedRIAccountData([accountData])
           this.queueEntryAddData(txQueueEntry, {
             accountId: accountData.accountId,
-            stateId: accountData.stateId,
-            data: accountData.data,
-            timestamp: accountData.timestamp,
-            syncData: accountData.syncData,
-            accountCreated: false,
-            isPartial: false,
+              stateId: accountData.stateId,
+              data: accountData.data,
+              timestamp: accountData.timestamp,
+              syncData: accountData.syncData,
+              accountCreated: false,
+              isPartial: false,
           }, false)
           /* prettier-ignore */ nestedCountersInstance.countEvent('transactionQueue', 'queueEntryPrePush_ri_added')
         }
@@ -6736,14 +6736,14 @@ class TransactionQueue {
     // remove excluded consensus nodes
     const filteredConsensusGroup = consenusGroup.filter((node) => excludeNodeIds.indexOf(node.id) === -1)
 
-    let maxRetry = 5;
+    let maxRetry = 5
     let potentialNode: Shardus.Node
-    let isOutOfRotationBounds: boolean
+    let invalidNode: boolean
     do {
       potentialNode = filteredConsensusGroup[Math.floor(Math.random() * filteredConsensusGroup.length)]
-      isOutOfRotationBounds = isNodeOutOfRotationBounds(potentialNode.id)
+      invalidNode = isNodeInRotationBounds(potentialNode.id)
       maxRetry--
-    } while (isOutOfRotationBounds && maxRetry > 0)
+    } while (invalidNode && maxRetry > 0)
 
     return potentialNode
   }

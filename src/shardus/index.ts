@@ -79,7 +79,7 @@ import {
   serializeSignAppDataResp,
 } from '../types/SignAppDataResp'
 import { safeStringify } from '../utils'
-import { isNodeOutOfRotationBounds } from "../p2p/Utils";
+import { isNodeInRotationBounds } from '../p2p/Utils'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -1556,8 +1556,8 @@ class Shardus extends EventEmitter {
     return getAgeIndexForNodeId(id)
   }
 
-  isNodeOutOfRotationBounds(nodeId: string) {
-    return isNodeOutOfRotationBounds(nodeId)
+  isNodeInRotationBounds(nodeId: string) {
+    return isNodeInRotationBounds(nodeId)
   }
 
   isNodeActiveByPubKey(pubKey: string): boolean {

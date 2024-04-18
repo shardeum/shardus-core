@@ -18,7 +18,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as CycleChain from './CycleChain'
 import * as Shardus from '../shardus/shardus-types'
-import { isNodeOutOfRotationBounds } from "./Utils";
+import { isNodeInRotationBounds } from './Utils'
 import { deserializeGossipReq, GossipReqBinary, serializeGossipReq } from '../types/GossipReq'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
@@ -697,8 +697,8 @@ export function isNodeValidForInternalMessage(
     return false
   }
 
-  const isOutOfRotationBounds = checkNodesRotationBounds && isNodeOutOfRotationBounds(node.id)
-  if (isOutOfRotationBounds) {
+  const isInRotationBounds = checkNodesRotationBounds && isNodeInRotationBounds(node.id)
+  if (isInRotationBounds) {
     return false
   }
 
