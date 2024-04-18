@@ -102,8 +102,11 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
   byPubKey.set(node.publicKey, node)
   byIpPort.set(ipPort(node.internalIp, node.internalPort), node)
 
-  // Insert sorted by joinRequestTimstamp into byJoinOrder
-  insertSorted(byJoinOrder, node, propComparator2('joinRequestTimestamp', 'id'))
+  // Insert sorted by syncingTimestamp into byJoinOrder
+  // in the past this used joinRequestTimestamp, but joinRequestTimestamp now is the time when a node is put into
+  // the standbylist
+  // this will contain nodes that are selected, syncing, ready, and active
+  insertSorted(byJoinOrder, node, propComparator2('syncingTimestamp', 'id'))
 
   // Insert sorted by id into byIdOrder
   insertSorted(byIdOrder, node, propComparator('id'))
