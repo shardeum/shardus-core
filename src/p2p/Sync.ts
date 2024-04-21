@@ -13,6 +13,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
 import { profilerInstance } from '../utils/profiler'
+import * as utils from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { byJoinOrder } from './NodeList'
 import {
@@ -435,7 +436,7 @@ export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.Cycle
     return resp
   }
   const eqFn = (item1, item2) => {
-    /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`getNewestCycle: eqFn: item1 is: ${JSON.stringify(item1)}`)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`getNewestCycle: eqFn: item1 is: ${utils.stringify(item1)}`)
     try {
       if (item1.newestCycle.counter === item2.newestCycle.counter) return true
       return false

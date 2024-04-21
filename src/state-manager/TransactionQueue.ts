@@ -2413,43 +2413,48 @@ class TransactionQueue {
   }
 
   getArchivedQueueEntryByAccountIdAndHash(accountId: string, hash: string, msg: string): QueueEntry | null {
-    let foundQueueEntry = false
-    let foundVote = false
-    let foundVoteMatchingHash = false
-    for (const queueEntry of this.archivedQueueEntriesByID.values()) {
-      if (queueEntry.uniqueKeys.includes(accountId)) {
-        foundQueueEntry = true
-        const receipt2: AppliedReceipt2 = this.stateManager.getReceipt2(queueEntry)
-        let bestReceivedVote
-        if (receipt2 !== null) {
-          bestReceivedVote = receipt2.appliedVote
-          if (receipt2.appliedVote) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get vote from' +
-            ' receipt2')
-        }
-        if (bestReceivedVote == null) {
-          bestReceivedVote = queueEntry.receivedBestVote
-          if (queueEntry.receivedBestVote) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get vote' +
-            ' from' +
-            ' receipt2')
-        }
-        if (bestReceivedVote == null) {
-          continue
-        }
-        foundVote = true
-        // this node might not have a vote for this tx
-        for (let i = 0; i < bestReceivedVote.account_id.length; i++) {
-          if (bestReceivedVote.account_id[i] === accountId) {
-            if (bestReceivedVote.account_state_hash_after[i] === hash) {
-              foundVoteMatchingHash = true
-              return queueEntry
+    try {
+      let foundQueueEntry = false
+      let foundVote = false
+      let foundVoteMatchingHash = false
+      for (const queueEntry of this.archivedQueueEntriesByID.values()) {
+        if (queueEntry.uniqueKeys.includes(accountId)) {
+          foundQueueEntry = true
+          const receipt2: AppliedReceipt2 = this.stateManager.getReceipt2(queueEntry)
+          let bestReceivedVote
+          if (receipt2 !=  null) {
+            bestReceivedVote = receipt2.appliedVote
+            if (receipt2.appliedVote) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get vote from' +
+              ' receipt2')
+          }
+          if (bestReceivedVote == null) {
+            bestReceivedVote = queueEntry.receivedBestVote
+            if (queueEntry.receivedBestVote) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get vote' +
+              ' from' +
+              ' receipt2')
+          }
+          if (bestReceivedVote == null) {
+            continue
+          }
+          foundVote = true
+          // this node might not have a vote for this tx
+          for (let i = 0; i < bestReceivedVote.account_id.length; i++) {
+            if (bestReceivedVote.account_id[i] === accountId) {
+              if (bestReceivedVote.account_state_hash_after[i] === hash) {
+                foundVoteMatchingHash = true
+                return queueEntry
+              }
             }
           }
         }
       }
+      nestedCountersInstance.countRareEvent('error', `getQueueEntryArchived no entry: ${msg}`)
+      nestedCountersInstance.countEvent('error', `getQueueEntryArchived no entry: ${msg}, found queue entry: ${foundQueueEntry}, found vote: ${foundVote}, found vote matching hash: ${foundVoteMatchingHash}`)
+      return null
+    } catch(e) {
+      this.statemanager_fatal(`getArchivedQueueEntryByAccountIdAndHash`, `error: ${e.message}`)
+      return null
     }
-    nestedCountersInstance.countRareEvent('error', `getQueueEntryArchived no entry: ${msg}`)
-    nestedCountersInstance.countEvent('error', `getQueueEntryArchived no entry: ${msg}, found queue entry: ${foundQueueEntry}, found vote: ${foundVote}, found vote matching hash: ${foundVoteMatchingHash}`)
-    return null
   }
   /**
    * getQueueEntryArchived

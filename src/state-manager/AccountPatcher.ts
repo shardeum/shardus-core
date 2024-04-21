@@ -3187,56 +3187,61 @@ class AccountPatcher {
     await this.broadcastSyncHashes(cycle)
   }
   async requestOtherNodesToRepair(accountsToFix: AccountIdAndHashToRepair[]): Promise<void> {
-    const accountIdsToFix = accountsToFix.map((x) => x.accountID)
-    const accountDataList = await this.app.getAccountDataByList(accountIdsToFix)
-    const accountDataMap = new Map<string, Shardus.WrappedData>()
-    const repairInstructionMap = new Map<string, AccountRepairInstruction[]>()
-    for (const accountData of accountDataList) {
-      accountDataMap.set(accountData.accountId, accountData)
-    }
-    for (const accountToFix of accountsToFix) {
-      let accountData = accountDataMap.get(accountToFix.accountID)
-      if (accountData == null) {
-        this.mainLogger.debug(`requestOtherNodesToRepair: accountData is null`)
-        nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair accountData == null`, 1)
-        continue
+    try {
+      const accountIdsToFix = accountsToFix.map((x) => x.accountID)
+      const accountDataList = await this.app.getAccountDataByList(accountIdsToFix)
+      const accountDataMap = new Map<string, Shardus.WrappedData>()
+      const repairInstructionMap = new Map<string, AccountRepairInstruction[]>()
+      for (const accountData of accountDataList) {
+        accountDataMap.set(accountData.accountId, accountData)
       }
-      if (accountData.stateId !== accountToFix.hash) {
-        this.mainLogger.debug(`requestOtherNodesToRepair: accountData.stateId !== accountToFix.hash`)
-        nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair accountData.stateId !== accountToFix.hash`, 1)
-        continue
-      }
-      const archivedQueueEntry = this.stateManager.transactionQueue.getArchivedQueueEntryByAccountIdAndHash(accountToFix.accountID, accountToFix.hash, 'requestOtherNodesToRepair')
-      if (archivedQueueEntry == null) {
-        this.mainLogger.debug(`requestOtherNodesToRepair: archivedQueueEntry is null`)
-        nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair archivedQueueEntry == null`, 1)
-        continue
-      }
-      const repairInstruction: AccountRepairInstruction = {
-        accountID: accountData.accountId,
-        hash: accountData.stateId,
-        txId: archivedQueueEntry.acceptedTx.txId,
-        accountData,
-        targetNodeId: accountToFix.targetNodeId,
-      }
-      if (repairInstructionMap.has(repairInstruction.targetNodeId)) {
-        repairInstructionMap.get(repairInstruction.targetNodeId).push(repairInstruction)
-      } else {
-        repairInstructionMap.set(repairInstruction.targetNodeId, [repairInstruction])
-      }
-    }
-    if (repairInstructionMap.size > 0) {
-      for (const [nodeId, repairInstructions] of repairInstructionMap) {
-        const node = NodeList.nodes.get(nodeId)
-        if (node == null) {
-          nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair node == null`, 1)
-          this.mainLogger.debug(`requestOtherNodesToRepair: node == null`)
+      for (const accountToFix of accountsToFix) {
+        let accountData = accountDataMap.get(accountToFix.accountID)
+        if (accountData == null) {
+          this.mainLogger.debug(`requestOtherNodesToRepair: accountData is null`)
+          nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair accountData == null`, 1)
+          continue
         }
-        const message = {
-          repairInstructions
+        if (accountData.stateId !== accountToFix.hash) {
+          this.mainLogger.debug(`requestOtherNodesToRepair: accountData.stateId !== accountToFix.hash`)
+          nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair accountData.stateId !== accountToFix.hash`, 1)
+          continue
         }
-        this.p2p.tell([node], 'repair_missing_accounts', message)
+        const archivedQueueEntry = this.stateManager.transactionQueue.getArchivedQueueEntryByAccountIdAndHash(accountToFix.accountID, accountToFix.hash, 'requestOtherNodesToRepair')
+        if (archivedQueueEntry == null) {
+          this.mainLogger.debug(`requestOtherNodesToRepair: archivedQueueEntry is null`)
+          nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair archivedQueueEntry == null`, 1)
+          continue
+        }
+        const repairInstruction: AccountRepairInstruction = {
+          accountID: accountData.accountId,
+          hash: accountData.stateId,
+          txId: archivedQueueEntry.acceptedTx.txId,
+          accountData,
+          targetNodeId: accountToFix.targetNodeId,
+        }
+        if (repairInstructionMap.has(repairInstruction.targetNodeId)) {
+          repairInstructionMap.get(repairInstruction.targetNodeId).push(repairInstruction)
+        } else {
+          repairInstructionMap.set(repairInstruction.targetNodeId, [repairInstruction])
+        }
       }
+      if (repairInstructionMap.size > 0) {
+        for (const [nodeId, repairInstructions] of repairInstructionMap) {
+          const node = NodeList.nodes.get(nodeId)
+          if (node == null) {
+            nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair node == null`, 1)
+            this.mainLogger.debug(`requestOtherNodesToRepair: node == null`)
+          }
+          const message = {
+            repairInstructions
+          }
+          this.p2p.tell([node], 'repair_missing_accounts', message)
+        }
+      }
+    } catch (e) {
+      nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair error: ${e.message}`, 1)
+      this.statemanager_fatal(`requestOtherNodesToRepair`, `error: ${e}`)
     }
   }
 
