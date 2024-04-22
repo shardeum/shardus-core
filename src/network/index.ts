@@ -174,10 +174,9 @@ export class NetworkClass extends EventEmitter {
           return
         }
 
-        if(!route && data.error) {
-          if (logFlags.debug)
-            this.mainLogger.debug('Received a hang prevention dummy payload')
-          return;
+        if (!route && data.error) {
+          if (logFlags.debug) this.mainLogger.debug('Received a hang prevention dummy payload')
+          return
         }
 
         if (!route) {
@@ -276,7 +275,7 @@ export class NetworkClass extends EventEmitter {
   ) {
     const data = { route, payload: message }
     const promises = []
-    
+
     if (!nodes || nodes.length == 0) {
       /* prettier-ignore */ if (logFlags.net_verbose) console.log("returning from tellBinary because the node list is empty for route:" , route)
       return
@@ -301,7 +300,6 @@ export class NetworkClass extends EventEmitter {
         let errorGroup = ('' + err).slice(0, 20)
         nestedCountersInstance.countEvent('network', `error2-tellBinary ${route}`)
         for (const node of nodes) this.emit('error', node, requestId, 'tellBinary', errorGroup, route)
-        
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tellBinary) on ${route}: ${formatErrorMessage(err)}`)
       }
     } else {
