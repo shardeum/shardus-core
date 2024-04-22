@@ -2,7 +2,7 @@ import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { AppliedVoteSerializable, deserializeAppliedVote, serializeAppliedVote } from './AppliedVote'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
-const cGetAppliedVoteRespVersion = 3
+const cGetAppliedVoteRespVersion = 1
 
 export type GetAppliedVoteResp = {
   txId: string

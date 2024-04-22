@@ -81,6 +81,7 @@ import {
   serializeGetAppliedVoteResp,
 } from '../types/GetAppliedVoteResp'
 import { BadRequest, InternalError, NotFound, serializeResponseError } from '../types/ResponseError'
+import { randomUUID } from 'crypto'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -1753,26 +1754,35 @@ class TransactionConsenus {
       queueEntry.queryingRobustVote = true
       if (this.stateManager.consensusLog) this.mainLogger.debug(`robustQueryBestVote: ${queueEntry.logID}`)
       const queryFn = async (node: Shardus.Node): Promise<AppliedVoteQueryResponse> => {
-        const ip = node.externalIp
-        const port = node.externalPort
-        // the queryFunction must return null if the given node is our own
-        if (ip === Self.ip && port === Self.port) return null
-        const queryData: AppliedVoteQuery = { txId: queueEntry.acceptedTx.txId }
-        if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAppliedVoteBinary) {
-          const req = queryData as GetAppliedVoteReq
-          const rBin = await Comms.askBinary<GetAppliedVoteReq, GetAppliedVoteResp>(
-            node,
-            InternalRouteEnum.binary_get_applied_vote,
-            req,
-            serializeGetAppliedVoteReq,
-            deserializeGetAppliedVoteResp,
-            {
-              verification_data: `${queryData.txId}`,
-            }
-          )
-          return rBin
+        try {
+          const ip = node.externalIp
+          const port = node.externalPort
+          // the queryFunction must return null if the given node is our own
+          if (ip === Self.ip && port === Self.port) return null
+          const queryData: AppliedVoteQuery = { txId: queueEntry.acceptedTx.txId }
+          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAppliedVoteBinary) {
+            const req = queryData as GetAppliedVoteReq
+            const rBin = await Comms.askBinary<GetAppliedVoteReq, GetAppliedVoteResp>(
+              node,
+              InternalRouteEnum.binary_get_applied_vote,
+              req,
+              serializeGetAppliedVoteReq,
+              deserializeGetAppliedVoteResp,
+              {
+                verification_data: `${queryData.txId}`,
+              }
+            )
+            return rBin
+          }
+          return await Comms.ask(node, 'get_applied_vote', queryData)
+        } catch (e) {
+          this.mainLogger.error(`robustQueryBestVote: Failed query to node ${node.id} error: ${e.message}`)
+          return {
+            txId: `invalid-${randomUUID()}`,
+            appliedVote: null,
+            appliedVoteHash: null,
+          }
         }
-        return await Comms.ask(node, 'get_applied_vote', queryData)
       }
       const eqFn = (item1: AppliedVoteQueryResponse, item2: AppliedVoteQueryResponse): boolean => {
         try {
