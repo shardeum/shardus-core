@@ -1102,6 +1102,8 @@ export interface ServerConfiguration {
   }
   /** Server State manager module configuration */
   stateManager?: {
+    /** This limit the amount size of the nonce queue to protect out of memeory attacks. */
+    maxNonceQueueSize?: number
     /** The stateTableBucketSize parameter is an Integer which defines the max number of accountRecords that the p2p module will ask for in it’s get_account_state call. */
     stateTableBucketSize?: number
     /** The accountBucketSize This is also currently used as input to a p2p ask method for the max number of account records */

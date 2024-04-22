@@ -254,6 +254,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     },
   },
   stateManager: {
+    maxNonceQueueSize: 100000,
     stateTableBucketSize: 500,
     accountBucketSize: 200,
     patcherAccountsPerRequest: 250,

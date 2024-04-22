@@ -1481,6 +1481,18 @@ class Shardus extends EventEmitter {
           status: 500,
         }
       }
+      const shouldQueueNonceButPoolIsFull = 
+        shouldAddToNonceQueue && 
+        this.config.stateManager.maxNonceQueueSize <= this.stateManager.transactionQueue.nonceQueue.size;
+
+      //ITN fix. There will be separate effort to protect the pool more intelligently for mainnet.
+      if(shouldQueueNonceButPoolIsFull) {
+        return {
+          success: false,
+          reason: `Nonce pool is full, try again later`,
+          status: 500,
+        }
+      }
       if (shouldAddToNonceQueue) {
         const nonceQueueEntry: NonceQueueItem = {
           tx,
