@@ -320,6 +320,7 @@ class Reporter {
     // exist, compute them just-in-time
     const nodelistHash = NodeList.getNodeListHash()
     const archiverListHash = Archivers.getArchiverListHash()
+    const lastInSyncResult = this.stateManager.accountPatcher.lastInSyncResult
 
     try {
       await this._sendReport({
@@ -361,6 +362,7 @@ class Reporter {
         shardusVersion: packageJson.version,
         appData,
         archiverListHash,
+        lastInSyncResult
       })
       if (this.stateManager != null && config.mode === 'debug' && !config.debug.disableTxCoverageReport) {
         this.stateManager.transactionQueue.resetTxCoverageMap()

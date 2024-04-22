@@ -1193,6 +1193,12 @@ export type HashTrieUpdateStats = {
   totalLeafs: number
 }
 
+export interface IsInsyncResult {
+  radixes: any[]
+  stats: { good: number; bad: number; total: number }
+  insync: boolean
+}
+
 export type CycleDebugNotes = {
   repairs: number
   lateRepairs: number

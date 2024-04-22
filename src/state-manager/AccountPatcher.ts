@@ -35,6 +35,7 @@ import {
   RadixAndHash,
   ShardedHashTrie,
   TrieAccount,
+  IsInsyncResult,
   CycleShardData, AppliedReceipt2
 } from "./state-manager-types";
 import {
@@ -166,6 +167,8 @@ class AccountPatcher {
 
   debug_ignoreUpdates: boolean
 
+  lastInSyncResult: IsInsyncResult
+
   failedLastTrieSync: boolean
   failStartCycle: number
   failEndCycle: number
@@ -233,6 +236,7 @@ class AccountPatcher {
     this.debug_ignoreUpdates = false
 
     this.failedLastTrieSync = false
+    this.lastInSyncResult = null
 
     this.sendHashesToEdgeNodes = true
 
@@ -1296,7 +1300,12 @@ class AccountPatcher {
 
     Context.network.registerExternalGet('get-tree-last-insync', isDebugModeMiddlewareLow, (_req, res) => {
       res.write(`${this.failedLastTrieSync === false}\n`)
+      res.end()
+    })
 
+    Context.network.registerExternalGet('get-tree-last-insync-detail', isDebugModeMiddlewareLow, (_req, res) => {
+      let prettyJSON = JSON.stringify(this.lastInSyncResult, null, 2)
+      res.write(`${prettyJSON}\n`)
       res.end()
     })
 
@@ -1734,6 +1743,25 @@ class AccountPatcher {
   }
 
   getNonConsensusRanges(cycle: number): { low: string; high: string }[] {
+    let incompleteRanges = []
+
+    //get the min and max non covered area
+    const shardValues = this.stateManager.shardValuesByCycle.get(cycle)
+
+    const consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
+    const consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
+
+    incompleteRanges = this.getNonParitionRanges(
+      shardValues,
+      consensusStartPartition,
+      consensusEndPartition,
+      this.treeSyncDepth
+    )
+
+    return incompleteRanges
+  }
+
+  getConsensusRanges(cycle: number): { low: string; high: string }[] {
     let incompleteRanges = []
 
     //get the min and max non covered area
@@ -2355,11 +2383,20 @@ class AccountPatcher {
    *
    * @param cycle
    */
-  isInSync(cycle: number): boolean {
+  isInSync(cycle: number): IsInsyncResult {
     const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
+    let isInsyncResult: IsInsyncResult = {
+      radixes: [],
+      insync: true,
+      stats: {
+        good: 0,
+        bad: 0,
+        total: 0
+      }
+    }
 
     if (hashTrieSyncConsensus == null) {
-      return true
+      return isInsyncResult
     }
 
     // let nonStoredRanges = this.getNonStoredRanges(cycle)
@@ -2379,6 +2416,14 @@ class AccountPatcher {
       const nonStorageRanges = this.getNonStoredRanges(cycle)
       let hasNonConsensusRange = false
       let hasNonStorageRange = false
+      let lastCycleNonConsensus = false
+
+      for (const range of this.lastCycleNonConsensusRanges) {
+        if (radix >= range.low && radix <= range.high) {
+          lastCycleNonConsensus = true
+        }
+      }
+
       for (const range of nonConsensusRanges) {
         if (radix >= range.low && radix <= range.high) {
           hasNonConsensusRange = true
@@ -2391,13 +2436,21 @@ class AccountPatcher {
           nestedCountersInstance.countEvent(`accountPatcher`, `isInsync hasNonStorageRange`, 1)
         }
       }
+      let inConsensusRange = !hasNonConsensusRange
+      let inStorageRange = !hasNonStorageRange
+      let inEdgeRange = inStorageRange && !inConsensusRange
+
       if (hasNonConsensusRange && hasNonStorageRange) continue
 
       //if we dont have the node we may have missed an account completely!
       if (ourTrieNode == null) {
         /* prettier-ignore */ nestedCountersInstance.countRareEvent(`accountPatcher`, `isInSync ${radix} our trieNode === null`, 1)
         if (logFlags.debug) this.mainLogger.debug(`isInSync ${radix} our trieNode === null, cycle: ${cycle}`)
-        return false
+        isInsyncResult.radixes.push({radix, insync: false, inConsensusRange, inEdgeRange})
+        isInsyncResult.insync = false
+        isInsyncResult.stats.bad++
+        isInsyncResult.stats.total++
+        continue
       }
 
       if (votesMap.bestVotes < minVotes) {
@@ -2405,19 +2458,6 @@ class AccountPatcher {
         /* prettier-ignore */ nestedCountersInstance.countRareEvent(`accountPatcher`, `isInSync ${radix} votesMap.bestVotes < minVotes bestVotes: ${votesMap.bestVotes} < ${minVotes} uniqueVotes: ${votesMap.allVotes.size}`, 1)
         /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `isInSync ${radix} votesMap.bestVotes < minVotes bestVotes: ${votesMap.bestVotes} < ${minVotes} uniqueVotes: ${votesMap.allVotes.size}`, 1)
       }
-
-      // hasNonStorageRange = false
-      // //does our stored or consensus data actualy cover this range?
-      // for(let range of nonStoredRanges){
-      //   if(radix >= range.low && radix <= range.high){
-      //     hasNonStorageRange = true
-      //     continue
-      //   }
-      // }
-      // if(hasNonStorageRange){
-      //   //we dont store the full data needed by this radix so we cant repair it
-      //   continue
-      // }
 
       //TODO should not have to re compute this here!!
       ourTrieNode.hash = this.crypto.hash(ourTrieNode.childHashes)
@@ -2448,12 +2488,23 @@ class AccountPatcher {
             )}`
           )
         }
-        return false
+        isInsyncResult.insync = false
+        isInsyncResult.radixes.push({radix, insync: false, inConsensusRange, inEdgeRange})
+        isInsyncResult.stats.bad++
+        isInsyncResult.stats.total++
+      } else if (ourTrieNode.hash === votesMap.bestHash) {
+        isInsyncResult.radixes.push({radix, insync: true, inConsensusRange, inEdgeRange})
+        isInsyncResult.stats.good++
+        isInsyncResult.stats.total++
       }
     }
+    // sort the isInsyncResult.radixes by radix
+    isInsyncResult.radixes.sort((a, b) => {
+      return a.radix.localeCompare(b.radix)
+    })
     //todo what about situation where we do not have enough votes??
     //todo?? more utility / get list of oos radix
-    return true // {inSync, }
+    return isInsyncResult // {inSync, }
   }
 
   /***
@@ -3268,6 +3319,7 @@ class AccountPatcher {
     // nestedCountersInstance.countEvent(`accountPatcher`, `totalAccountsHashed`, updateStats.totalAccountsHashed)
 
     const lastFail = this.failedLastTrieSync
+    const lastInsyncResult = this.lastInSyncResult
 
     this.failedLastTrieSync = false
 
@@ -3292,9 +3344,10 @@ class AccountPatcher {
       )
     }
 
-    let isInSync = this.isInSync(cycle)
-    if (logFlags.debug) this.mainLogger.debug(`isInSync: ${isInSync}, cycle: ${cycle}`)
-    if (isInSync === false) {
+    let isInsyncResult = this.isInSync(cycle)
+    this.lastInSyncResult = isInsyncResult
+    if (logFlags.debug) this.mainLogger.debug(`isInSync: cycle: ${cycle}, isInsyncResult: ${JSON.stringify(isInsyncResult)}`)
+    if (isInsyncResult == null || isInsyncResult.insync === false) {
       let failHistoryObject: { repaired: number; s: number; e: number; cycles: number }
       if (lastFail === false) {
         this.failStartCycle = cycle
