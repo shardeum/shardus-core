@@ -42,6 +42,7 @@ import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { LostReportReq, deserializeLostReportReq, serializeLostReportReq } from '../types/LostReportReq'
+import { isDebugModeMiddlewareHigh } from '../network/debugMiddleware'
 
 /** TYPES */
 
@@ -64,9 +65,6 @@ type ScheduledLostNodeReport = ScheduledLostReport<P2P.NodeListTypes.Node>
 type ScheduledRemoveNodeByApp = ScheduledRemoveByApp<P2P.NodeListTypes.Node>
 
 /** STATE */
-
-// [TODO] - This enables the /kill /killother debug route and should be set to false after testing
-const allowKillRoute = false
 
 let p2pLogger
 
@@ -94,27 +92,33 @@ export declare type SignedPingMessage = PingMessage & SignedObject
 
 /** ROUTES */
 
-const killExternalRoute: P2P.P2PTypes.Route<Handler> = {
+interface RouteWithAuthHandler {
+  authHandler: Handler
+}
+
+type RouteHandlerWithAuthHandler<T> = P2P.P2PTypes.Route<T> & RouteWithAuthHandler
+
+/** ROUTES */
+
+const killExternalRoute: RouteHandlerWithAuthHandler<Handler> = {
   method: 'GET',
   name: 'kill',
+  authHandler: isDebugModeMiddlewareHigh,
   handler: (_req, res) => {
-    if (allowKillRoute) {
-      res.send(safeStringify({ status: 'left the network without telling any peers' }))
-      killSelf(
-        'Apoptosis being called killExternalRoute()->killSelf()->emitter.emit(`apoptosized`) at src/p2p/Lost.ts'
-      )
-    }
+    res.send(safeStringify({ status: 'left the network without telling any peers' }))
+    killSelf(
+      'Apoptosis being called killExternalRoute()->killSelf()->emitter.emit(`apoptosized`) at src/p2p/Lost.ts'
+    )
   },
 }
 
-const killOtherExternalRoute: P2P.P2PTypes.Route<Handler> = {
+const killOtherExternalRoute: RouteHandlerWithAuthHandler<Handler> = {
   method: 'GET',
   name: 'killother',
+  authHandler: isDebugModeMiddlewareHigh,
   handler: (_req, res) => {
-    if (allowKillRoute) {
-      res.send(safeStringify({ status: 'killing another node' }))
-      killOther()
-    }
+    res.send(safeStringify({ status: 'killing another node' }))
+    killOther()
   },
 }
 
@@ -219,7 +223,7 @@ export function init() {
   for (const route of routes.external) {
     // [TODO] - Add Comms.registerExternalGet and Post that pass through to network.*
     //          so that we can always just use Comms.* instead of network.*
-    network._registerExternal(route.method, route.name, route.handler)
+    network._registerExternal(route.method, route.name, route.authHandler, route.handler)
   }
   for (const route of routes.internal) {
     Comms.registerInternal(route.name, route.handler)
@@ -741,7 +745,7 @@ function reportLost(target, reason: string, requestId: string) {
         cycle: currentCycle,
       }
       // [TODO] - remove the following line after testing killother
-      if (allowKillRoute && reason === 'killother') report.killother = true
+      if (reason === 'killother') report.killother = true
       if (logFlags.lost) {
         /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, reporter: ${Self.ip}:${Self.port} id: ${Self.id}`)
         /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, checker: ${checker.internalIp}:${checker.internalPort} node details: ${logNode(checker)}`)
@@ -897,7 +901,7 @@ async function lostReportHandler(payload, response, sender) {
     let result = await isDownCache(nodes.get(payload.target), requestId)
     /* prettier-ignore */ if (logFlags.lost) console.log('lostReportHandler: result:', result)
     /* prettier-ignore */ if (logFlags.lost) info(`isDownCache for requestId: ${requestId}, result ${result}`)
-    if (allowKillRoute && payload.killother) result = 'down'
+    if (payload.killother) result = 'down'
     if (record.status === 'checking') record.status = result
     /* prettier-ignore */ if (logFlags.lost) info(
       `Status after checking for node ${payload.target} payload cycle: ${payload.cycle}, currentCycle: ${currentCycle} is ` +
@@ -978,7 +982,7 @@ const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
 
       let result = await isDownCache(nodes.get(req.target), requestId)
       /* prettier-ignore */ if (logFlags.verbose) info(`isDownCache for requestId: ${requestId}, result ${result}`)
-      if (allowKillRoute && req.killother) result = 'down'
+      if (req.killother) result = 'down'
       if (record.status === 'checking') record.status = result
       /* prettier-ignore */ if (logFlags.verbose) info(`Status after checking for node ${req.target} payload cycle: ${req.cycle}, currentCycle: ${currentCycle} is ` + record.status)
       if (!checkedLostRecordMap.has(key)) {
