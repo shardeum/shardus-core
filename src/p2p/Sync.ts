@@ -322,8 +322,8 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
       cycle.standbyNodeListHash = JoinV2.computeNewStandbyListHash()
     }
   }
-
-  if (config.debug.enableCycleRecordDebugTool) {
+  
+  if (config.debug.enableCycleRecordDebugTool || config.debug.localEnableCycleRecordDebugTool) {
     if (Self.isActive) {
       const cycleData =
         logSafeStringify({
