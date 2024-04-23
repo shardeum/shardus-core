@@ -737,7 +737,6 @@ function reportLost(target, reason: string, requestId: string) {
     /* prettier-ignore */ if (logFlags.lost) console.log('reportLost: checkerNodes:', checkerNodes)
     for (let checker of checkerNodes) {
       // const checker = getCheckerNode(target.id, currentCycle)
-      if (checker.id === Self.id && activeByIdOrder.length >= 3) return // we cannot be reporter and checker if there is 3 or more nodes in the network
       let report: P2P.LostTypes.LostReport = {
         target: target.id,
         checker: checker.id,
