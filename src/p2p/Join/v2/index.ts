@@ -88,15 +88,6 @@ export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = f
     return
   }
 
-  // if golden ticket is enabled, add nodes with adminCert + golden ticket to standbyNodesInfo immediately
-  if (
-    shardus.config.p2p.goldenTicketEnabled === true &&
-    joinRequest.appJoinData?.adminCert?.goldenTicket === true
-  ) {
-    addJoinRequestToStandbyMap(joinRequest)
-    return
-  }
-
   newJoinRequests.push(joinRequest)
 }
 
