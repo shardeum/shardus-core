@@ -794,18 +794,29 @@ function getMultipleCheckerNodes(
   const firstFourBytesOfMarker = key.slice(0, 8)
   const offset = parseInt(firstFourBytesOfMarker, 16)
   let pickedIndexes = utils.getIndexesPicked(activeByIdOrder.length, config.p2p.numCheckerNodes, offset)
-  pickedIndexes.forEach((index) => {
-    let currentNode = activeByIdOrder[index];
+  let attemptLimit = activeByIdOrder.length // Prevent infinite loops
 
-    // Skip the reporter or target nodes
-    while (currentNode.id === reporter || currentNode.id === target || checkerNodes.has(currentNode.id)) {
-      index = (index + 1) % activeByIdOrder.length;
-      currentNode = activeByIdOrder[index];
+  for (let i = 0; i < pickedIndexes.length; i++) {
+    let pickedIndex = pickedIndexes[i]
+    let currentNode = activeByIdOrder[pickedIndex]
+    let attempts = 0
+
+    // Ensure we do not select the reporter, target, or a duplicate, and handle loop limits
+    while ((currentNode.id === reporter || currentNode.id === target || checkerNodes.has(currentNode.id)) && attempts < attemptLimit) {
+      pickedIndex = (pickedIndex + 1) % activeByIdOrder.length
+      currentNode = activeByIdOrder[pickedIndex]
+      attempts++
     }
 
-    // Once a valid node is found, add it to the checkerNodes
-    checkerNodes.set(currentNode.id, currentNode);
-  });
+    // Check if we exceeded our attempt limit and break if so, indicating an issue
+    if (attempts >= attemptLimit) {
+      console.error("Failed to find suitable nodes; most nodes are either reporters or targets.")
+      return []
+    }
+
+    // Add the valid node to the map
+    checkerNodes.set(currentNode.id, currentNode)
+  }
   let selectedNodes = [...checkerNodes.values()]
   /* prettier-ignore */ if (logFlags.lost) info(
     `in getMultipleCheckerNodes checkerNodes for target: ${target}, reporter: ${reporter}, cycle: ${lostCycle}: ${JSON.stringify(
