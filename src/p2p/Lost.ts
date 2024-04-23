@@ -705,13 +705,13 @@ export function scheduleLostReport(target: P2P.NodeListTypes.Node, reason: strin
 function reportLost(target, reason: string, requestId: string) {
   /* prettier-ignore */ if (logFlags.lost) console.log('reportLost: this is to send to checker nodes')
   try {
-    /* prettier-ignore */ if (logFlags.lost) info(`Reporting lost for ${target.id}, requestId: ${requestId}.`)
-    /* prettier-ignore */ if (logFlags.lost) info(`Target node details for requestId: ${requestId}: ${logNode(target)}`)
     if (!target || !target.id) {
       // don't report if there's no target
       nestedCountersInstance.countEvent('p2p', 'reportLost skip: no target')
       return
     }
+    /* prettier-ignore */ if (logFlags.lost) info(`Reporting lost for ${target.id}, requestId: ${requestId}.`)
+    /* prettier-ignore */ if (logFlags.lost) info(`Target node details for requestId: ${requestId}: ${logNode(target)}`)
     if (target.id === Self.id) {
       nestedCountersInstance.countEvent('p2p', 'reportLost skip: self')
       return // don't report self
