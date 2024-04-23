@@ -138,10 +138,15 @@ class TransactionRepair {
           alternates: string[]
         }
       } = {}
-      
+
       const receivedReceipt = queueEntry?.appliedReceiptForRepair2
       if(!receivedReceipt) {
         nestedCountersInstance.countEvent('repair1', 'receivedReceipt is falsy')
+        return
+      }
+      if (receivedReceipt.result === false) {
+        nestedCountersInstance.countEvent('repair1', 'receivedReceipt.result is false')
+        /* prettier-ignore */  if (logFlags.debug) this.mainLogger.debug(`receivedReceipt.result is false for queueEntry: ${JSON.stringify(queueEntry)}`)
         return
       }
       const appliedVote = queueEntry?.appliedReceiptForRepair2?.appliedVote

@@ -311,6 +311,12 @@ class TransactionConsenus {
       async (payload: AppliedVoteQuery, respond: (arg0: ConfirmOrChallengeQuery) => unknown) => {
         nestedCountersInstance.countEvent('consensus', 'get_confirm_or_challenge')
         this.profiler.scopedProfileSectionStart('get_confirm_or_challenge handler', true)
+        const confirmOrChallengeResult: ConfirmOrChallengeQueryResponse = {
+          txId: '',
+          appliedVoteHash: '',
+          result: null,
+          uniqueCount: 0,
+        }
         try {
           const { txId } = payload
           let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId)
@@ -325,7 +331,7 @@ class TransactionConsenus {
           if (queueEntry == null) {
             /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug('get_confirm_or_challenge: queueEntry not found in getQueueEntrySafe or getQueueEntryArchived for txId: ', txId)
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no queue entry for ${payload.txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txId)]}`)
-            return
+            await respond(confirmOrChallengeResult)
           }
           if (queueEntry.receivedBestConfirmation == null && queueEntry.receivedBestChallenge == null) {
             nestedCountersInstance.countEvent(
@@ -333,29 +339,17 @@ class TransactionConsenus {
               'get_confirm_or_challenge no confirmation or challenge'
             )
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no confirmation or challenge for ${queueEntry.logID}, bestVote: ${JSON.stringify(queueEntry.receivedBestVote)},  bestConfirmation: ${JSON.stringify(queueEntry.receivedBestConfirmation)}`)
-            return
+            await respond(confirmOrChallengeResult)
           }
-          const waitedTime = shardusGetTime() - queueEntry.lastConfirmOrChallengeTimestamp
-          const waitCompletionPercent = waitedTime / this.config.stateManager.waitTimeBeforeReceipt
-          // late nodes should not respond to this request
-          // if (waitCompletionPercent < 0.5) {
-          //   nestedCountersInstance.countEvent(
-          //     'consensus',
-          //     'get_confirm_or_challenge wait completion: ' + waitCompletionPercent
-          //   )
-          //   nestedCountersInstance.countEvent('consensus', 'get_confirm_or_challenge still waiting messages')
-          //   /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge still accepting messages for ${queueEntry.logID}, bestVote: ${JSON.stringify(queueEntry.receivedBestVote)},  bestConfirmation: ${JSON.stringify(queueEntry.receivedBestConfirmation)}`)
-          //   return
-          // }
-          const confirmOrChallengeResult: ConfirmOrChallengeQueryResponse = {
-            txId,
-            appliedVoteHash: queueEntry.receivedBestVoteHash
-              ? queueEntry.receivedBestVoteHash
-              : this.calculateVoteHash(queueEntry.receivedBestVote),
-            result: queueEntry.receivedBestChallenge
-              ? queueEntry.receivedBestChallenge
-              : queueEntry.receivedBestConfirmation,
-            uniqueCount: queueEntry.receivedBestChallenge ? queueEntry.uniqueChallengesCount : 1,
+
+          // refine the result and unique count
+          const { receivedBestChallenge, receivedBestConfirmation, uniqueChallengesCount } = queueEntry;
+          if (receivedBestChallenge && uniqueChallengesCount >= this.config.stateManager.minRequiredChallenges) {
+            confirmOrChallengeResult.result = receivedBestChallenge;
+            confirmOrChallengeResult.uniqueCount = uniqueChallengesCount;
+          } else {
+            confirmOrChallengeResult.result = receivedBestConfirmation;
+            confirmOrChallengeResult.uniqueCount = 1;
           }
           await respond(confirmOrChallengeResult)
         } catch (e) {
@@ -407,16 +401,16 @@ class TransactionConsenus {
             respond(confirmOrChallengeResult, serializeGetConfirmOrChallengeResp)
             return
           }
-          confirmOrChallengeResult.txId = txId
-          confirmOrChallengeResult.appliedVoteHash = queueEntry.receivedBestVoteHash
-            ? queueEntry.receivedBestVoteHash
-            : this.calculateVoteHash(queueEntry.receivedBestVote)
-          confirmOrChallengeResult.result = queueEntry.receivedBestChallenge
-            ? queueEntry.receivedBestChallenge
-            : queueEntry.receivedBestConfirmation
-          confirmOrChallengeResult.uniqueCount = queueEntry.receivedBestChallenge
-            ? queueEntry.uniqueChallengesCount
-            : 1
+
+          // refine the result and unique count
+          const { receivedBestChallenge, receivedBestConfirmation, uniqueChallengesCount } = queueEntry;
+          if (receivedBestChallenge && uniqueChallengesCount >= this.config.stateManager.minRequiredChallenges) {
+            confirmOrChallengeResult.result = receivedBestChallenge;
+            confirmOrChallengeResult.uniqueCount = uniqueChallengesCount;
+          } else {
+            confirmOrChallengeResult.result = receivedBestConfirmation;
+            confirmOrChallengeResult.uniqueCount = 1;
+          }
           respond(confirmOrChallengeResult, serializeGetConfirmOrChallengeResp)
         } catch (e) {
           // Error handling

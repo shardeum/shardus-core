@@ -5537,7 +5537,11 @@ class TransactionQueue {
                   } else {
                     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                     // we are finished since there is nothing to apply
-                    // this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+                    if (logFlags.debug || this.stateManager.consensusLog) {
+                      /* prettier-ignore */ this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt failed result: false : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
+                      /* prettier-ignore */ this.statemanager_fatal(`processAcceptedTxQueue2`, `tryProduceReceipt failed result: false : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
+                    }
+                    nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt failed result = false')
                     this.updateTxState(queueEntry, 'fail')
                     this.removeFromQueue(queueEntry, currentIndex)
                     continue
@@ -5566,6 +5570,24 @@ class TransactionQueue {
                     `hasAppliedReceiptMatchingPreApply: false, isInExecutionHome: ${queueEntry.isInExecutionHome}`
                   )
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                  if (this.stateManager.getReceiptResult(queueEntry) === false) {
+                    // We got a reciept, but the consensus is that this TX was not applied.
+                    /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                    // we are finished since there is nothing to apply
+                    this.statemanager_fatal(
+                      `consensing: repairToMatchReceipt failed`,
+                      `consensing: repairToMatchReceipt failed ` +
+                        `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
+                    )
+                    if (logFlags.debug || this.stateManager.consensusLog) {
+                      /* prettier-ignore */ this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt failed result: false : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
+                      /* prettier-ignore */ this.statemanager_fatal(`processAcceptedTxQueue2`, `tryProduceReceipt failed result: false : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
+                    }
+                    nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt failed result = false')
+                    this.removeFromQueue(queueEntry, currentIndex)
+                    this.updateTxState(queueEntry, 'fail')
+                    continue
+                  }
                   didNotMatchReceipt = true
                   queueEntry.appliedReceiptForRepair = result
 
