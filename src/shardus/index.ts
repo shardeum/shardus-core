@@ -696,9 +696,13 @@ class Shardus extends EventEmitter {
           `restore event: syncAppData finished. ${shardusGetTime()}`
         )
       } catch (err) {
-        console.log(utils.formatErrorMessage(err))
-        apoptosizeSelf(`initialSyncMain-failed: ${err?.message}`)
+        console.log()
+        this.fatalLogger.fatal(
+          'restore-failed with Error: ' +
+          utils.formatErrorMessage(err)
+        )
         nestedCountersInstance.countEvent('restore', `restore event: fail and apop self. ${shardusGetTime()}`)
+        apoptosizeSelf(`restore-failed: ${err?.message}`)
         return
       }
       // After restoring state data, set syncing flags to true and go active
@@ -1179,7 +1183,11 @@ class Shardus extends EventEmitter {
         await this.stateManager.accountSync.initialSyncMain(3)
         console.log('syncAppData - initialSyncMain finished')
       } catch (err) {
-        console.log(utils.formatErrorMessage(err))
+        this.fatalLogger.fatal(
+          'initialSyncMain-failed with Error: ' +
+          utils.formatErrorMessage(err)
+        )
+        nestedCountersInstance.countEvent('syncAppData', `initialSyncMain event: fail and apop self. ${shardusGetTime()}`)
         apoptosizeSelf(`initialSyncMain-failed: ${err?.message}`)
         return
       }
