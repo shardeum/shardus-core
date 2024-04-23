@@ -85,7 +85,7 @@ const archiverListRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'archiver-list',
   handler: (req, res) => {
-    profilerInstance.scopedProfileSectionStart('newest-cycle-record', false)
+    profilerInstance.scopedProfileSectionStart('archiver-list', false)
     const expectedHash = req.query.hash
 
     // return the archiver list if the hash from the requester matches
@@ -95,7 +95,7 @@ const archiverListRoute: P2P.P2PTypes.Route<Handler> = {
       /* prettier-ignore */ if (logFlags.debug) console.error( `rejecting archiver list request: expected '${expectedHash}' != '${Archivers.getArchiverListHash()}'` )
       res.status(404).send(`archiver list with hash '${expectedHash}' not found`)
     }
-    profilerInstance.scopedProfileSectionEnd('newest-cycle-record')
+    profilerInstance.scopedProfileSectionEnd('archiver-list')
   },
 }
 
