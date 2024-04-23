@@ -810,7 +810,7 @@ function getMultipleCheckerNodes(
 
     // Check if we exceeded our attempt limit and break if so, indicating an issue
     if (attempts >= attemptLimit) {
-      console.error("Failed to find suitable nodes; most nodes are either reporters or targets.")
+      error('Failed to find suitable nodes; most nodes are either reporters or targets.')
       return []
     }
 
