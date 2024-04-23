@@ -790,21 +790,28 @@ function getMultipleCheckerNodes(
   const firstFourBytesOfMarker = key.slice(0, 8)
   const offset = parseInt(firstFourBytesOfMarker, 16)
   let pickedIndexes = utils.getIndexesPicked(activeByIdOrder.length, config.p2p.numCheckerNodes, offset)
+  let attemptLimit = activeByIdOrder.length // Prevent infinite loops
+
   for (let i = 0; i < pickedIndexes.length; i++) {
     let pickedIndex = pickedIndexes[i]
-    if (activeByIdOrder[pickedIndex].id === reporter) {
-      pickedIndex += 1
-      pickedIndex = pickedIndex % activeByIdOrder.length // make sure we dont go out of bounds
+    let currentNode = activeByIdOrder[pickedIndex]
+    let attempts = 0
+
+    // Ensure we do not select the reporter, target, or a duplicate, and handle loop limits
+    while ((currentNode.id === reporter || currentNode.id === target || checkerNodes.has(currentNode.id)) && attempts < attemptLimit) {
+      pickedIndex = (pickedIndex + 1) % activeByIdOrder.length
+      currentNode = activeByIdOrder[pickedIndex]
+      attempts++
     }
-    if (activeByIdOrder[pickedIndex].id === target) {
-      pickedIndex += 1
-      pickedIndex = pickedIndex % activeByIdOrder.length // make sure we dont go out of bounds
+
+    // Check if we exceeded our attempt limit and break if so, indicating an issue
+    if (attempts >= attemptLimit) {
+      error('Failed to find suitable nodes; most nodes are either reporters or targets.')
+      return []
     }
-    if (checkerNodes.has(activeByIdOrder[pickedIndex].id)) {
-      pickedIndex += 1
-      pickedIndex = pickedIndex % activeByIdOrder.length // make sure we dont go out of bounds
-    }
-    checkerNodes.set(activeByIdOrder[pickedIndex].id, activeByIdOrder[pickedIndex])
+
+    // Add the valid node to the map
+    checkerNodes.set(currentNode.id, currentNode)
   }
   let selectedNodes = [...checkerNodes.values()]
   /* prettier-ignore */ if (logFlags.lost) info(
