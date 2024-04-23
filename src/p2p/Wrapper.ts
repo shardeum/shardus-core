@@ -248,13 +248,13 @@ const state = new State()
 // Self.emitter.on('cycle_q1_start', (lastCycle: Shardus.Cycle, time: number) => {
 //   state.emit('cycle_q1_start', lastCycle, time)
 // })
-Self.emitter.on('cycle_q1_start', () => {
+Self.emitter?.on('cycle_q1_start', () => {
   state.emit('cycle_q1_start')
 })
-Self.emitter.on('cycle_q2_start', () => {
+Self.emitter?.on('cycle_q2_start', () => {
   state.emit('cycle_q2_start')
 })
-Self.emitter.on('cycle_q3_start', () => {
+Self.emitter?.on('cycle_q3_start', () => {
   state.emit('cycle_q3_start')
 })
 
