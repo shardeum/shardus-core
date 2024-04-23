@@ -967,6 +967,8 @@ class TransactionQueue {
           if (queue[i].nonce === nonceQueueEntry.nonce) {
             // there is existing item with the same nonce. replace it with the new one
             queue[i] = nonceQueueEntry
+            queue = queue.sort((a, b) => Number(a.nonce) - Number(b.nonce))
+            this.nonceQueue.set(nonceQueueEntry.accountId, queue)
             nestedCountersInstance.countEvent('processing', 'replaceExistingNonceTx')
             return { success: true, reason: 'Replace existing pending nonce tx' }
           }
@@ -995,7 +997,7 @@ class TransactionQueue {
         const accountNonce = await this.app.getAccountNonce(account.accountId, account)
         if (item.nonce === accountNonce) {
           nestedCountersInstance.countEvent('processing', 'processNonceQueue foundMatchingNonce')
-          if (logFlags.debug) this.mainLogger.debug(`Found matching nonce in queue or ${account.accountId} with nonce ${item.nonce}`)
+          if (logFlags.debug) this.mainLogger.debug(`Found matching nonce in queue or ${account.accountId} with nonce ${item.nonce}`, item)
           item.appData.requestNewTimestamp = true
           await this.stateManager.shardus._timestampAndQueueTransaction(item.tx, item.appData, item.global, item.noConsensus)
           // remove the item from the queue
