@@ -790,22 +790,18 @@ function getMultipleCheckerNodes(
   const firstFourBytesOfMarker = key.slice(0, 8)
   const offset = parseInt(firstFourBytesOfMarker, 16)
   let pickedIndexes = utils.getIndexesPicked(activeByIdOrder.length, config.p2p.numCheckerNodes, offset)
-  for (let i = 0; i < pickedIndexes.length; i++) {
-    let pickedIndex = pickedIndexes[i]
-    if (activeByIdOrder[pickedIndex].id === reporter) {
-      pickedIndex += 1
-      pickedIndex = pickedIndex % activeByIdOrder.length // make sure we dont go out of bounds
+  pickedIndexes.forEach((index) => {
+    let currentNode = activeByIdOrder[index];
+
+    // Skip the reporter or target nodes
+    while (currentNode.id === reporter || currentNode.id === target || checkerNodes.has(currentNode.id)) {
+      index = (index + 1) % activeByIdOrder.length;
+      currentNode = activeByIdOrder[index];
     }
-    if (activeByIdOrder[pickedIndex].id === target) {
-      pickedIndex += 1
-      pickedIndex = pickedIndex % activeByIdOrder.length // make sure we dont go out of bounds
-    }
-    if (checkerNodes.has(activeByIdOrder[pickedIndex].id)) {
-      pickedIndex += 1
-      pickedIndex = pickedIndex % activeByIdOrder.length // make sure we dont go out of bounds
-    }
-    checkerNodes.set(activeByIdOrder[pickedIndex].id, activeByIdOrder[pickedIndex])
-  }
+
+    // Once a valid node is found, add it to the checkerNodes
+    checkerNodes.set(currentNode.id, currentNode);
+  });
   let selectedNodes = [...checkerNodes.values()]
   /* prettier-ignore */ if (logFlags.lost) info(
     `in getMultipleCheckerNodes checkerNodes for target: ${target}, reporter: ${reporter}, cycle: ${lostCycle}: ${JSON.stringify(
