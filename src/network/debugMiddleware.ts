@@ -3,7 +3,7 @@ import * as Context from '../p2p/Context'
 import * as crypto from '@shardus/crypto-utils'
 import { DevSecurityLevel } from '../shardus/shardus-types'
 
-const MAX_COUNTER_BUFFER_MILLISECONDS = 60000
+const MAX_COUNTER_BUFFER_MILLISECONDS = 10000
 let lastCounter = 0
 
 // This function is used to check if the request is authorized to access the debug endpoint
