@@ -1487,6 +1487,7 @@ class Shardus extends EventEmitter {
 
       //ITN fix. There will be separate effort to protect the pool more intelligently for mainnet.
       if(shouldQueueNonceButPoolIsFull) {
+        nestedCountersInstance.countEvent('rejected', `Nonce pool is full, try again later`)
         return {
           success: false,
           reason: `Nonce pool is full, try again later`,
