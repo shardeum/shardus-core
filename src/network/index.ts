@@ -299,7 +299,8 @@ export class NetworkClass extends EventEmitter {
       } catch (err) {
         let errorGroup = ('' + err).slice(0, 20)
         nestedCountersInstance.countEvent('network', `error2-tellBinary ${route}`)
-        for (const node of nodes) this.emit('error', node, requestId, 'tellBinary', errorGroup, route)
+        //commenting out to temp fix GOLD-46 and GOLD-52
+        // this.emit('error', nodes, requestId, 'tellBinary', errorGroup, route)
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network error (tellBinary) on ${route}: ${formatErrorMessage(err)}`)
       }
     } else {
