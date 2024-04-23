@@ -707,6 +707,10 @@ function reportLost(target, reason: string, requestId: string) {
   try {
     /* prettier-ignore */ if (logFlags.lost) info(`Reporting lost for ${target.id}, requestId: ${requestId}.`)
     /* prettier-ignore */ if (logFlags.lost) info(`Target node details for requestId: ${requestId}: ${logNode(target)}`)
+    if (!target || !target.id) {
+      // don't report if there's no target
+      return
+    }
     if (target.id === Self.id) {
       nestedCountersInstance.countEvent('p2p', 'reportLost skip: self')
       return // don't report self
