@@ -306,7 +306,17 @@ function validateReceipt(receipt: P2P.GlobalAccountsTypes.Receipt) {
   }
   // Make a map of signs that overlap with consensusGroup
   const signsInConsensusGroup: P2P.P2PTypes.Signature[] = []
+  const uniqueSignOwnerMap = {}
+
   for (const sign of receipt.signs) {
+    const owner = sign.owner.toLowerCase()
+    if (uniqueSignOwnerMap[owner]) {
+      if (logFlags.console)
+        console.log(`validateReceipt: duplicate signatures for owner ${utils.stringifyReduce(sign.owner)}`)
+      continue
+    }
+    uniqueSignOwnerMap[owner] = true
+
     /** [TODO] [AS] Replace with NodeList.byPubKey.get() */
     // const node = p2p.state.getNodeByPubKey(sign.owner)
     const node = NodeList.byPubKey.get(sign.owner)
