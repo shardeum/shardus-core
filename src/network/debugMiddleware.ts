@@ -3,6 +3,8 @@ import * as Context from '../p2p/Context'
 import * as crypto from '@shardus/crypto-utils'
 import { DevSecurityLevel } from '../shardus/shardus-types'
 import SERVER_CONFIG from '../config/server'
+import { logFlags } from '../logger'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 const MAX_COUNTER_BUFFER_MILLISECONDS = 10000
 let lastCounter = 0
@@ -34,25 +36,33 @@ function handleDebugAuth(_req, res, next, authLevel) {
               next()
               return
             } else {
+              /* prettier-ignore */ if (logFlags.verbose) console.log('Authorization failed for security level', authLevel)
+              /* prettier-ignore */ nestedCountersInstance.countEvent( 'security', 'Authorization failed for security level: ', authLevel )
               return res.status(403).json({
                 status: 403,
                 message: 'FORBIDDEN!',
               })
             }
           } else {
-            console.log('Signature is not correct')
+            /* prettier-ignore */ if (logFlags.verbose) console.log('Signature is not correct')     
           }
         } else {
-          console.log(
-            'Counter is more than 10 seconds old or less than last counter. Counter: ',
-            currentCounter,
-            'last counter:',
-            lastCounter
-          )
+          if (logFlags.verbose) {
+            const parsedCounter = parseInt(sigObj.count)
+            if (Number.isNaN(parsedCounter)) {
+              console.log('Counter is not a number')
+            } else {
+              console.log('Counter is not larger than last counter', parsedCounter, lastCounter)
+            }
+          }
         }
       }
     }
-  } catch (error) { }
+  } catch (error) {
+    /* prettier-ignore */ if (logFlags.verbose) console.log('Error in handleDebugAuth:', error)
+    nestedCountersInstance.countEvent('security', 'debug unauthorized failure - exception caught')
+  }
+
   return res.status(401).json({
     status: 401,
     message: 'Unauthorized!',
