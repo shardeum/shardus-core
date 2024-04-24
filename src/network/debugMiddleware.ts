@@ -23,11 +23,12 @@ function handleDebugAuth(_req, res, next, authLevel) {
         //reguire a larger counter than before. This prevents replay attacks
         const currentCounter = parseInt(sigObj.count)
         const currentTime = new Date().getTime()
-        if (currentTime <= currentCounter + MAX_COUNTER_BUFFER_MILLISECONDS) {
+        if (currentCounter > lastCounter && currentCounter <= currentTime + MAX_COUNTER_BUFFER_MILLISECONDS) {
           let verified = Context.crypto.verify(sigObj, ownerPk)
           if (verified === true) {
             const authorized = ensureKeySecurity(ownerPk, authLevel)
             if (authorized) {
+              lastCounter = currentCounter
               next()
               return
             } else {
@@ -40,7 +41,13 @@ function handleDebugAuth(_req, res, next, authLevel) {
             console.log('Signature is not correct', sigObj, currentCounter)
           }
         } else {
-          console.log('Counter is more than 1 minute old. Counter: ', sigObj, currentCounter)
+          console.log(
+            'Counter is more than 10 seconds old or less than last counter. Counter: ',
+            sigObj,
+            currentCounter,
+            'last counter:',
+            lastCounter
+          )
         }
       }
     }
