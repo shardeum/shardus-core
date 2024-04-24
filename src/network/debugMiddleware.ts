@@ -2,6 +2,7 @@ import { isDebugMode, getHashedDevKey, getDevPublicKeys, ensureKeySecurity } fro
 import * as Context from '../p2p/Context'
 import * as crypto from '@shardus/crypto-utils'
 import { DevSecurityLevel } from '../shardus/shardus-types'
+import { escapeLogStringify } from '../utils'
 
 const MAX_COUNTER_BUFFER_MILLISECONDS = 10000
 let lastCounter = 0
@@ -38,13 +39,14 @@ function handleDebugAuth(_req, res, next, authLevel) {
               })
             }
           } else {
-            console.log('Signature is not correct', sigObj, currentCounter)
+            const sanitizedSigObject = escapeLogStringify(sigObj)
+            console.log('Signature is not correct', sanitizedSigObject)
           }
         } else {
+          const sanitizedSigObject = escapeLogStringify(sigObj)
           console.log(
-            'Counter is more than 10 seconds old or less than last counter. Counter: ',
-            sigObj,
-            currentCounter,
+            'Counter is more than 10 seconds old or less than last counter. SigObj: ',
+            sanitizedSigObject,
             'last counter:',
             lastCounter
           )
@@ -160,3 +162,24 @@ export const isDebugModeMiddlewareMultiSig = (_req, res, next) => {
     handleMultiDebugAuth(_req, res, next)
   } else next()
 }
+
+function escapeLogValue(value) {
+  if (typeof value === 'string') {
+    return value.replace(/[\r\n\t%]/g, (match) => {
+      switch (match) {
+        case '\r':
+          return '\\r'
+        case '\n':
+          return '\\n'
+        case '\t':
+          return '\\t'
+        case '%':
+          return '%25'
+        default:
+          return match
+      }
+    })
+  }
+  return value
+}
+

@@ -195,3 +195,27 @@ export function cryptoStringify(val: unknown, isArrayProp = false): string {
   }
   return ''
 }
+
+export function escapeLogStringify(obj: unknown): string {
+  return JSON.stringify(obj, (key, value) => escapeLogValue(value))
+}
+
+function escapeLogValue(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return value.replace(/[\r\n\t%]/g, (match) => {
+      switch (match) {
+        case '\r':
+          return '\\r'
+        case '\n':
+          return '\\n'
+        case '\t':
+          return '\\t'
+        case '%':
+          return '%25'
+        default:
+          return match
+      }
+    })
+  }
+  return value
+}
