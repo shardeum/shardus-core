@@ -49,7 +49,7 @@ export function init() {
         active: activeByIdOrder.length,
         syncing: syncingByIdOrder.length,
         ready: readyByTimeAndIdOrder.length,
-        standby: Join.getNodeRequestingJoin().length,
+        standby: CycleChain.newest.standby,
         desired: CycleChain.newest.desired,
       }
       return res.send(safeStringify(networkStats))
