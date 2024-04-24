@@ -100,7 +100,7 @@ export const requestErrorHandler = (
   nestedCountersInstance.countEvent('internal', counter)
 }
 
-function estimateBinarySizeOfObject(obj): number {
+export function estimateBinarySizeOfObject(obj): number {
   const sizes = {
     number: 8, // assuming a number is serialized as a double (8 bytes)
     boolean: 1,

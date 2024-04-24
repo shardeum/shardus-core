@@ -1232,6 +1232,8 @@ export type CacheTopic = {
   maxCacheElements: number
   cacheAppDataMap: Map<string, CachedAppData>
   cachedAppDataArray: CachedAppData[]
+  maxItemSize: number
+  cacheCountLimit: number
 }
 
 export type CacheAppDataResponse = {
