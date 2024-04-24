@@ -944,6 +944,7 @@ class TransactionQueue {
   }
 
   isTxInPendingNonceQueue(accountId: string, txId: string): boolean {
+    this.mainLogger.debug(`isTxInPendingNonceQueue ${accountId} ${txId}`, this.nonceQueue)
     const queue = this.nonceQueue.get(accountId)
     if (queue == null) {
       return false
@@ -959,9 +960,10 @@ class TransactionQueue {
   addTransactionToNonceQueue(nonceQueueEntry: NonceQueueItem): {success: boolean; reason?: string} {
     try {
       let queue = this.nonceQueue.get(nonceQueueEntry.accountId)
-      if (queue == null) {
+      if (queue == null || (Array.isArray(queue) && queue.length === 0)) {
         queue = [nonceQueueEntry]
         this.nonceQueue.set(nonceQueueEntry.accountId, queue)
+        if (logFlags.debug) this.mainLogger.debug(`add new nonce tx ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce}`)
       } else if (queue && queue.length > 0) {
         for (let i = 0; i < queue.length; i++) {
           if (queue[i].nonce === nonceQueueEntry.nonce) {
@@ -970,6 +972,7 @@ class TransactionQueue {
             queue = queue.sort((a, b) => Number(a.nonce) - Number(b.nonce))
             this.nonceQueue.set(nonceQueueEntry.accountId, queue)
             nestedCountersInstance.countEvent('processing', 'replaceExistingNonceTx')
+            if (logFlags.debug) this.mainLogger.debug(`replace existing nonce tx ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce}`)
             return { success: true, reason: 'Replace existing pending nonce tx' }
           }
         }
@@ -980,7 +983,7 @@ class TransactionQueue {
       }
       nestedCountersInstance.countEvent('processing', 'addTransactionToNonceQueue')
       if (logFlags.debug) this.mainLogger.debug(`Added tx to nonce queue for ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce} nonceQueue: ${queue.length}`)
-      return { success: true }
+      return { success: true, reason: `Nonce queue size for account: ${queue.length}` }
     } catch (e) {
       nestedCountersInstance.countEvent('processing', 'addTransactionToNonceQueueError')
       this.mainLogger.error(`Error adding tx to nonce queue: ${e.message}, tx: ${utils.stringifyReduce(nonceQueueEntry)}`)

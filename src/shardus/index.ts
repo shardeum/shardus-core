@@ -1452,6 +1452,7 @@ class Shardus extends EventEmitter {
                 status: 200
               }
             }
+            if (logFlags.debug) this.mainLogger.debug(`txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce} but not in nonce queue yet`)
 
             // decide whether to put it in the nonce queue or not
             const maxAllowedPendingNonce = senderAccountNonce + BigInt(Context.config.stateManager.maxPendingNonceTxs)
@@ -1481,8 +1482,8 @@ class Shardus extends EventEmitter {
           status: 500,
         }
       }
-      const shouldQueueNonceButPoolIsFull = 
-        shouldAddToNonceQueue && 
+      const shouldQueueNonceButPoolIsFull =
+        shouldAddToNonceQueue &&
         this.config.stateManager.maxNonceQueueSize <= this.stateManager.transactionQueue.nonceQueue.size;
 
       //ITN fix. There will be separate effort to protect the pool more intelligently for mainnet.
@@ -1504,7 +1505,7 @@ class Shardus extends EventEmitter {
           global,
           noConsensus
         }
-        this.stateManager.transactionQueue.addTransactionToNonceQueue(nonceQueueEntry);
+        let nonceQueueAddResult = this.stateManager.transactionQueue.addTransactionToNonceQueue(nonceQueueEntry);
         let result = this.forwardTransactionToLuckyNodes(senderAddress, tx, 'consensus to consensus') // don't wait here
         return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
       } else {
@@ -1535,7 +1536,10 @@ class Shardus extends EventEmitter {
         continue;
       }
       let node = nodes.get(id)
-      if (node.status !== 'active' || isNodeInRotationBounds(id)) continue
+      if (node.status !== 'active' || isNodeInRotationBounds(id)) {
+        if (logFlags.debug) this.mainLogger.debug(`forwardTransactionToLuckyNodes: node ${id} is not active or in rotation bounds. node.status: ${node.status} isNodeInRotationBounds: ${isNodeInRotationBounds(id)}`)
+        continue
+      }
       const validatorDetails = {
         ip: node.externalIp,
         port: node.externalPort,
@@ -1548,11 +1552,14 @@ class Shardus extends EventEmitter {
       selectedValidators.push(validatorDetails);
 
       if (logFlags.debug) this.mainLogger.debug(`Forwarding injected tx to consensus group. reason: ${message} ${utils.stringify(tx)}`)
-      nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: ${message}`, selectedValidators.length)
-      const result = await this.app.injectTxToConsensor(selectedValidators, tx);
-      return result
+      nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: ${message}`)
+      this.app.injectTxToConsensor(selectedValidators, tx);
     }
-    return { success: false, reason: 'No validators found to forward the transaction', status: 500 }
+    if (selectedValidators.length === 0) return { success: false, reason: 'No validators found to forward the' +
+        ' transaction', status: 500 }
+    else if (selectedValidators.length > 0) {
+      return { success: true, reason: 'Transaction forwarded to validators', status: 200 }
+    }
   }
 
   /**
