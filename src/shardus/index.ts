@@ -1408,12 +1408,21 @@ class Shardus extends EventEmitter {
         const isConsensusNode = consensusGroup.some((node) => node.id === Self.id)
 
         if (isConsensusNode === false) {
-          // send transaction to consensus group node
+          // send transaction to lucky consensus group node
           const result = await this.forwardTransactionToLuckyNodes(senderAddress, tx, 'non-consensus to consensus')
           return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
         }
+        // careful we may be consensus node but if we are not lucky we should forward to lucky nodes
+        let luckyNodeIds = this.getClosestNodes(senderAddress, Context.config.stateManager.numberOfReInjectNodes, false)
+        let isLuckyNode = luckyNodeIds.some((nodeId) => nodeId === Self.id)
+        if (isLuckyNode === false) {
+          const result = await this.forwardTransactionToLuckyNodes(senderAddress, tx, 'non-lucky consensus to lucky' +
+            ' consensus')
+          return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
+        }
       }
-      // we are consensus node for this tx
+
+      // we are consensus lucky node for this tx
       const txId = this.app.calculateTxId(tx);
       let shouldAddToNonceQueue = false;
       let txNonce;
@@ -1452,7 +1461,7 @@ class Shardus extends EventEmitter {
                 status: 200
               }
             }
-            if (logFlags.debug) this.mainLogger.debug(`txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce} but not in nonce queue yet`)
+            if (logFlags.debug) this.mainLogger.debug(`txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce} but txId is not in nonce queue yet`)
 
             // decide whether to put it in the nonce queue or not
             const maxAllowedPendingNonce = senderAccountNonce + BigInt(Context.config.stateManager.maxPendingNonceTxs)
@@ -1530,6 +1539,8 @@ class Shardus extends EventEmitter {
 
   async forwardTransactionToLuckyNodes(senderAddress, tx, message = ''): Promise<unknown> {
     let closetNodeIds = this.getClosestNodes(senderAddress, Context.config.stateManager.numberOfReInjectNodes, false)
+    if (logFlags.debug) this.mainLogger.debug(`forwardTransactionToLuckyNodes: closetNodeIds: ${JSON.stringify(closetNodeIds.sort())}`)
+
     let selectedValidators = []
     for (const id of closetNodeIds) {
       if (id === Self.id) {

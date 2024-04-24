@@ -963,7 +963,7 @@ class TransactionQueue {
       if (queue == null || (Array.isArray(queue) && queue.length === 0)) {
         queue = [nonceQueueEntry]
         this.nonceQueue.set(nonceQueueEntry.accountId, queue)
-        if (logFlags.debug) this.mainLogger.debug(`add new nonce tx ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce}`)
+        if (logFlags.debug) this.mainLogger.debug(`addinng new nonce tx: ${nonceQueueEntry.txId} ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce}`)
       } else if (queue && queue.length > 0) {
         for (let i = 0; i < queue.length; i++) {
           if (queue[i].nonce === nonceQueueEntry.nonce) {
@@ -972,7 +972,7 @@ class TransactionQueue {
             queue = queue.sort((a, b) => Number(a.nonce) - Number(b.nonce))
             this.nonceQueue.set(nonceQueueEntry.accountId, queue)
             nestedCountersInstance.countEvent('processing', 'replaceExistingNonceTx')
-            if (logFlags.debug) this.mainLogger.debug(`replace existing nonce tx ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce}`)
+            if (logFlags.debug) this.mainLogger.debug(`replace existing nonce tx ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce}, txId: ${nonceQueueEntry.txId}`)
             return { success: true, reason: 'Replace existing pending nonce tx' }
           }
         }
