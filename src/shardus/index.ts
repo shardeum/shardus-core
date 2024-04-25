@@ -80,6 +80,7 @@ import {
 } from '../types/SignAppDataResp'
 import { safeStringify } from '../utils'
 import { isNodeInRotationBounds } from '../p2p/Utils'
+import ShardFunctions from '../state-manager/shardFunctions'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
