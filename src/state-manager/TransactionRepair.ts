@@ -594,6 +594,11 @@ class TransactionRepair {
                   stats.responseFails++
                   continue
                 }
+              } catch (e) {
+                /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post  tx:${txLogID}  acc:${shortKey} e:${e}`)
+                node = null
+                stats.responseFails++
+                continue
               } finally {
                 this.profiler.profileSectionEnd('repair_asking_for_data')
               }
