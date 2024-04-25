@@ -38,12 +38,11 @@ function handleDebugAuth(_req, res, next, authLevel) {
               })
             }
           } else {
-            console.log('Signature is not correct', sigObj, currentCounter)
+            console.log('Signature is not correct')
           }
         } else {
           console.log(
             'Counter is more than 10 seconds old or less than last counter. Counter: ',
-            sigObj,
             currentCounter,
             'last counter:',
             lastCounter
