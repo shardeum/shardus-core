@@ -1512,15 +1512,16 @@ class Shardus extends EventEmitter {
           nonce: txNonce,
           appData,
           global,
-          noConsensus
+          noConsensus,
         }
-        let nonceQueueAddResult = this.stateManager.transactionQueue.addTransactionToNonceQueue(nonceQueueEntry);
-        let result = this.forwardTransactionToLuckyNodes(senderAddress, tx, 'consensus to consensus') // don't wait here
-        return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
+        let nonceQueueAddResult =
+          this.stateManager.transactionQueue.addTransactionToNonceQueue(nonceQueueEntry)
+        let result = this.forwardTransactionToLuckyNodes(senderAddress, tx, txId, 'consensus to consensus') // don't wait here
+        return result as Promise<{ success: boolean; reason: string; status: number; txId?: string }>
       } else {
         // tx nonce is equal to account nonce
-        let result = await this._timestampAndQueueTransaction(tx, appData, global, noConsensus);
-        return result;
+        let result = await this._timestampAndQueueTransaction(tx, appData, global, noConsensus)
+        return result
       }
       // Pass received txs to any subscribed 'DATA' receivers
       // this.io.emit('DATA', tx)
@@ -1537,40 +1538,98 @@ class Shardus extends EventEmitter {
     }
   }
 
-  async forwardTransactionToLuckyNodes(senderAddress, tx, message = ''): Promise<unknown> {
-    let closetNodeIds = this.getClosestNodes(senderAddress, Context.config.stateManager.numberOfReInjectNodes, false)
-    if (logFlags.debug) this.mainLogger.debug(`forwardTransactionToLuckyNodes: closetNodeIds: ${JSON.stringify(closetNodeIds.sort())}`)
+  async forwardTransactionToLuckyNodes(senderAddress: string, tx: ShardusTypes.OpaqueTransaction, txId: string, message = ''): Promise<unknown> {
+    let closetNodeIds = this.getClosestNodes(
+      senderAddress,
+      Context.config.stateManager.numberOfReInjectNodes,
+      false
+    )
+    const cycleShardData = this.stateManager.currentCycleShardData
+    const homeNode = ShardFunctions.findHomeNode(
+      cycleShardData.shardGlobals,
+      senderAddress,
+      cycleShardData.parititionShardDataMap
+    )
+    if (homeNode == null) {
+      return { success: false, reason: `Home node not found for account ${senderAddress}`, status: 500 }
+    }
+    if (logFlags.debug)
+      this.mainLogger.debug(
+        `forwardTransactionToLuckyNodes: homeNode: ${homeNode.node.id} closetNodeIds: ${JSON.stringify(
+          closetNodeIds.sort()
+        )}`
+      )
 
     let selectedValidators = []
+    selectedValidators.push({
+      id: homeNode.node.id,
+      ip: homeNode.node.externalIp,
+      port: homeNode.node.externalPort,
+      publicKey: homeNode.node.publicKey,
+    })
     for (const id of closetNodeIds) {
       if (id === Self.id) {
-        continue;
+        continue
       }
+      if (id === homeNode.node.id) continue // we already added the home node
       let node = nodes.get(id)
       if (node.status !== 'active' || isNodeInRotationBounds(id)) {
-        if (logFlags.debug) this.mainLogger.debug(`forwardTransactionToLuckyNodes: node ${id} is not active or in rotation bounds. node.status: ${node.status} isNodeInRotationBounds: ${isNodeInRotationBounds(id)}`)
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `forwardTransactionToLuckyNodes: node ${id} is not active or in rotation bounds. node.status: ${
+              node.status
+            } isNodeInRotationBounds: ${isNodeInRotationBounds(id)}`
+          )
         continue
       }
       const validatorDetails = {
+        id: node.id,
         ip: node.externalIp,
         port: node.externalPort,
-        publicKey: node.publicKey
-      };
-      // for debugging
-      let consensusGroup = this.getConsenusGroupForAccount(senderAddress)
-      let isConsensusNode = consensusGroup.some((node) => node.id === id)
-      if (logFlags.debug) this.mainLogger.debug(`Selected validator ${id} for account ${senderAddress} isConsensusNode: ${isConsensusNode}`)
-      selectedValidators.push(validatorDetails);
-
-      if (logFlags.debug) this.mainLogger.debug(`Forwarding injected tx to consensus group. reason: ${message} ${utils.stringify(tx)}`)
-      nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: ${message}`)
-      this.app.injectTxToConsensor(selectedValidators, tx);
+        publicKey: node.publicKey,
+      }
+      selectedValidators.push(validatorDetails)
     }
-    if (selectedValidators.length === 0) return { success: false, reason: 'No validators found to forward the' +
-        ' transaction', status: 500 }
-    else if (selectedValidators.length > 0) {
-      return { success: true, reason: 'Transaction forwarded to validators', status: 200 }
+    for (const validator of selectedValidators) {
+      try {
+        if (validator.id === homeNode.node.id) {
+          if (logFlags.debug)
+            this.mainLogger.debug(
+              `Forwarding injected tx ${txId} to home node ${validator.id} reason: ${message} ${utils.stringify(tx)}`
+            )
+          nestedCountersInstance.countEvent('statistics', `forwardTxToHomeNode: ${message}`)
+        } else {
+          if (logFlags.debug)
+            this.mainLogger.debug(
+              `Forwarding injected tx ${txId} to consensus group. reason: ${message} ${utils.stringify(tx)}`
+            )
+          nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: ${message}`)
+        }
+        const result: ShardusTypes.InjectTxResponse = await this.app.injectTxToConsensor([validator], tx)
+        if (result == null || result.success === false) {
+          if (logFlags.debug)
+            this.mainLogger.debug(
+              `Failed to forward tx ${txId} to node ${validator.id}`
+            )
+          continue
+        }
+        if (result && result.success === true) {
+          if (logFlags.debug)
+            this.mainLogger.debug(
+              `Forwarding injected tx to ${validator.id} succeeded. ${message} ${utils.stringify(tx)}`
+            )
+          return { success: true, reason: 'Transaction forwarded to validators', status: 200 }
+        }
+      } catch (e) {
+        if (logFlags.debug)
+          this.mainLogger.error(
+            `Forwarding injected tx to ${validator.id} failed. ${message} ${utils.stringify(tx)} error: ${
+              e.stack
+            }`
+          )
+      }
     }
+    return { success: false, reason: 'No validators found to forward the transaction', status: 500 }
   }
 
   /**

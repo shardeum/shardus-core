@@ -164,8 +164,13 @@ interface ValidateJoinRequestResponse {
   data?: string
 }
 
+export interface InjectTxResponse {
+  success: boolean
+  reason?: string
+}
+
 export interface App {
-  injectTxToConsensor(consensor: ValidatorNodeDetails[], tx: OpaqueTransaction): Promise<unknown>
+  injectTxToConsensor(consensor: ValidatorNodeDetails[], tx: OpaqueTransaction): Promise<InjectTxResponse | null>
   getNonceFromTx(tx: OpaqueTransaction): bigint
   getAccountNonce(accountId: string, wrappedData?: WrappedData): Promise<bigint>
   getTxSenderAddress(tx: OpaqueTransaction): string
