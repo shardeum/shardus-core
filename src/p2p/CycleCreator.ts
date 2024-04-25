@@ -358,11 +358,6 @@ async function cycleCreator() {
       prevRecord = await fetchLatestRecord()
     }
     while (!prevRecord) {
-      // [TODO] - when there are few nodes in the network, we may not
-      //          be able to get a previous record since the number of
-      //          matches for robust query may not be met. Maybe we should
-      //          count the number of tries and lower the number of matches
-      //          needed if the number of tries increases.
       warn(`cc: cycleCreator: Could not get fetch prevRecord. Trying again in 1 sec...  ${callTag}`)
       await utils.sleep(1 * SECOND)
       prevRecord = await fetchLatestRecord()
@@ -535,44 +530,6 @@ function runQ2() {
 /**
  * Handles cycle record creation tasks for quarter 3
  */
-/*
-[TODO] - might need to change how nodes compare cycle markers in Q3.
-  Noticed a problem where if a node is lost in Q2 and all nodes in
-  the network try to do a compare with this node, they all slowed down
-  and are not able to make a cycle record/marker and thus all try to
-  ask others for the missed cycle record, but no one has it, so the
-  network progress stops.
-  We should just do a robust query for the cycle marker and go with
-  the one that was most commonly used, otherwise just use what we
-  created, so that a slow node cannot prevent us from making our
-  marker. But rather than use cycle marker we should use set of
-  txhashes to make it easier to find which txs are being applied.
-
-  During Q1 and Q2 nodes build a list of valid txs they have seen.
-  At the start of Q3 they generate a hash of all the txs they have seen.
-  The cycle tx_hash is a hash of all the hashes of each valid tx
-  the node has seen and validated. If the node is queried for the
-  cycle_tx_hash it returns this even if sees and adds new txs to
-  the list of txs the node has seen and validated.
-  During Q3 the node does a robust query to get the most common
-  cycle_tx_hash and queries the node that provided it to get the
-  associated txs. The node validates these transactions and if
-  any one of the txs is invalid it does not use what it got from
-  the query. Otherwise as long as 2 or more nodes provided the
-  cycle_tx_hash it switches to using this.
-  Once the node has decided on the cycle_tx_hash it generates
-  the a cycle_tx_hash_vote by signing the cycle_tx_hash and gossips
-  that to other nodes. A node can only sign one cycle_tx_hash. If
-  it tries to sign more than one it can be punished and all votes
-  it submitted are ignored. The vote value is determined using
-  XOR of the node_id hash and the cycle_tx_hash. A cycle_cert is
-  created by combining the 3 highest value votes for a cycle_tx_hash.
-  A node regossips if the gossip it received improved the value
-  of the cert for the given cycle_tx_hash. The node regossips the
-  all or up to the 3 best votes it has for the cycle tx_hash.
-  The node also uses robust query to compare the best cycle_cert
-  it has with other nodes.
-*/
 async function runQ3() {
   currentQuarter = 3
   Self.emitter.emit('cycle_q3_start')
@@ -653,7 +610,6 @@ async function runQ4() {
   /* prettier-ignore */ info(`Q4: start: C${currentCycle} Q${currentQuarter}`)
 
   // Don't do cert comparison if you didn't make the cycle
-  // [TODO] - maybe we should still compare if we have bestCert since we may have got it from gossip
   if (madeCycle === false) {
     warn('In Q4 nothing to do since we madeCycle is false.')
     return
@@ -1275,7 +1231,6 @@ async function gossipMyCycleCert() {
 function gossipHandlerCycleCert(inp: CompareCertReq, sender: P2P.NodeListTypes.Node['id'], tracker: string) {
   profilerInstance.profileSectionStart('CycleCreator-gossipHandlerCycleCert')
   if (!validateCertsRecordTypes(inp, 'gossipHandlerCycleCert')) return
-  // [TODO] - submodules need to validate their part of the record
   const { certs: inpCerts, record: inpRecord } = inp
   if (!validateCerts(inpCerts, inpRecord, sender, 'gossipHandlerCycleCert')) {
     return
