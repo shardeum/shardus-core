@@ -24,7 +24,7 @@ async function _get(host, logIndex, timeout = 1000) {
     const res = await got.get(host, {
       timeout: timeout, //  Omar - setting this to 1 sec
       retry: 0, // Omar - setting this to 0.
-      json: true,
+      responseType: 'json',
     })
     return { ...res, body: safeParser(safeStringify(res.body)) }
   } catch (error) {
@@ -69,8 +69,8 @@ async function _post(host, payload, logIndex, timeout = 1000) {
     const res = await got.post(host, {
       timeout: timeout, // Omar - set this to 1 sec
       retry: 0, // Omar - set this to 0
-      json: true,
       body: payload,
+      responseType: 'json',
     })
 
     //if (getResponseObj) return res
