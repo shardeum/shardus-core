@@ -14,6 +14,8 @@ import { logFlags } from '../logger'
 import { nestedCountersInstance } from '..'
 import { shardusGetTime } from '../network'
 import { safeStringify } from '../utils'
+import { standbyNodesInfo } from "./Join/v2";
+import { getDesiredCount } from "./CycleAutoScale";
 
 const clone = rfdc()
 
@@ -49,8 +51,8 @@ export function init() {
         active: activeByIdOrder.length,
         syncing: syncingByIdOrder.length,
         ready: readyByTimeAndIdOrder.length,
-        standby: CycleChain.newest.standby,
-        desired: CycleChain.newest.desired,
+        standby: standbyNodesInfo.size,
+        desired: getDesiredCount(),
       }
       return res.send(safeStringify(networkStats))
     } catch (e) {
