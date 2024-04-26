@@ -236,8 +236,6 @@ class CachedAppDataManager {
       cachedAppDataArray: [],
       // default item size limit
       maxItemSize: Number.MAX_VALUE,
-      // default cache count limit
-      cacheCountLimit: Number.MAX_VALUE,
     }
     if (this.cacheTopicMap.has(topic)) return false
     this.cacheTopicMap.set(topic, cacheTopic)
@@ -291,7 +289,7 @@ class CachedAppDataManager {
     }
 
     if (!cacheTopic.cacheAppDataMap.has(dataID)) {
-      if (cacheTopic.cacheCountLimit < cacheTopic.cachedAppDataArray.length + 1) {
+      if (cacheTopic.maxCacheElements < cacheTopic.cachedAppDataArray.length + 1) {
         /* prettier-ignore */ if(logFlags.shardedCache) this.statemanager_fatal( 'insertCachedItem', `Topic ${topic} is at max cache count limit`)
         return
       }
@@ -307,7 +305,7 @@ class CachedAppDataManager {
     }
   }
 
-  setMemoryLimit(topic: string, cacheCountLimit: number, maxItemSize: number) {
+  setMemoryLimit(topic: string, maxItemSize: number) {
     const cacheTopic: CacheTopic = this.cacheTopicMap.get(topic)
     if (!cacheTopic) {
       // not safe to log such a large object in prod. commented out:
@@ -315,7 +313,6 @@ class CachedAppDataManager {
       return
     }
 
-    cacheTopic.cacheCountLimit = cacheCountLimit
     cacheTopic.maxItemSize = maxItemSize
   }
 
