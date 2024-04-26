@@ -1058,6 +1058,8 @@ export interface ServerConfiguration {
     ignoreStandbyRefreshChance: number
     /** Flag to enable/disable enableCycleRecordTool and download files written by it **/
     localEnableCycleRecordDebugTool: boolean
+    /** Flag to enable/disable logs for debugging OOS cycle records **/
+    cycleRecordOOSDebugLogs: boolean
   }
   /** Options for the statistics module */
   statistics?: {

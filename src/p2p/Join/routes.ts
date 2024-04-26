@@ -486,9 +486,19 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
   tracker: string
 ) => {
   profilerInstance.scopedProfileSectionStart('gossip-sync-finished')
+
+  if (config.debug.cycleRecordOOSDebugLogs) {
+    if (receivedSyncFinished.has(payload.nodeId) === false) {
+      receivedSyncFinished.set(payload.nodeId, true)
+      console.log('DEBUG CR-OOS: payload id: ', payload.nodeId)
+    }
+  }
+
   try {
     // Do not forward gossip after quarter 2
     if (CycleCreator.currentQuarter >= 3) {
+      if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: gossipSyncFinished rejected: cC: ', CycleCreator.currentCycle, ' cQ: ', CycleCreator.currentQuarter, ' payload id: ', payload.nodeId, ' payload cycle: ', payload.cycleNumber)
+      nestedCountersInstance.countEvent('p2p', `gossipSyncFinished rejected: cC: ${CycleCreator.currentCycle} cQ: ${CycleCreator.currentQuarter} payload id: ${payload.nodeId} payload cycle: ${payload.cycleNumber}`)
       /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('gossipSyncFinished rejected: due to currentQuarter >= 3', payload.nodeId, CycleCreator.currentQuarter)
       return
     }
@@ -549,3 +559,5 @@ export const routes = {
     'gossip-standby-refresh' : gossipStandbyRefresh,
   },
 }
+
+const receivedSyncFinished = new Map<string, boolean>()
