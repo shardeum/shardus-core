@@ -2792,6 +2792,7 @@ class TransactionQueue {
           }
           let result
           if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestStateForTxBinary) {
+            // GOLD-66 Error handling try/catch happens one layer outside of this function in process transactions
             result = (await this.p2p.askBinary<RequestStateForTxReq, RequestStateForTxRespSerialized>(
               node,
               InternalRouteEnum.binary_request_state_for_tx,
@@ -2955,6 +2956,7 @@ class TransactionQueue {
 
         const message = { txid: queueEntry.acceptedTx.txId, timestamp: queueEntry.acceptedTx.timestamp }
         let result = null
+        // GOLD-67 to be safe this function needs a try/catch block to prevent a timeout from causing an unhandled exception    
         if (
           this.stateManager.config.p2p.useBinarySerializedEndpoints &&
           this.stateManager.config.p2p.requestReceiptForTxBinary
