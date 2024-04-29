@@ -19,6 +19,7 @@ import {
 } from '../types/GlobalAccountReportResp'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
+import { BadRequest, InternalError, serializeResponseError } from '../types/ResponseError'
 
 class AccountGlobals {
   app: Shardus.App
@@ -186,7 +187,7 @@ class AccountGlobals {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGlobalAccountReportReq)
           if (!requestStream) {
             errorHandler(RequestErrorEnum.InvalidRequest)
-            return respond({ error: 'Invalid request' }, serializeGlobalAccountReportResp)
+            return respond(BadRequest('invalid request stream'), serializeResponseError)
           }
 
           const result: GlobalAccountReportRespSerializable = {
@@ -216,9 +217,8 @@ class AccountGlobals {
           }
 
           if (result.ready === false) {
-            nestedCountersInstance.countEvent(`sync`, `HACKFIX - forgot to return!`)
-            const error = { error: 'Result not ready' } as GlobalAccountReportRespSerializable
-            respond(error, serializeGlobalAccountReportResp)
+            nestedCountersInstance.countEvent(`sync`, `Server not ready to respond: ${route}!`)
+            respond(BadRequest('Result not ready'), serializeResponseError)
             return
           }
 
@@ -252,7 +252,7 @@ class AccountGlobals {
         } catch (e) {
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
           this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
-          return respond({ error: 'Internal error' }, serializeGlobalAccountReportResp)
+          return respond(InternalError('Exception executing request'), serializeResponseError)
         } finally {
           this.profiler.scopedProfileSectionEnd(route)
         }
