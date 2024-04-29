@@ -935,28 +935,32 @@ class TransactionConsenus {
       return this.generateTimestampReceipt(txId, cycleMarker, cycleCounter)
     } else {
       let timestampReceipt
+      try {
+        if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getTxTimestampBinary) {
+          const serialized_res = await this.p2p.askBinary<getTxTimestampReq, getTxTimestampResp>(
+            homeNode.node,
+            InternalRouteEnum.binary_get_tx_timestamp,
+            {
+              cycleMarker,
+              cycleCounter,
+              txId,
+            },
+            serializeGetTxTimestampReq,
+            deserializeGetTxTimestampResp,
+            {}
+          )
 
-      if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getTxTimestampBinary) {
-        const serialized_res = await this.p2p.askBinary<getTxTimestampReq, getTxTimestampResp>(
-          homeNode.node,
-          InternalRouteEnum.binary_get_tx_timestamp,
-          {
+          timestampReceipt = serialized_res
+        } else {
+          timestampReceipt = await Comms.ask(homeNode.node, 'get_tx_timestamp', {
             cycleMarker,
             cycleCounter,
             txId,
-          },
-          serializeGetTxTimestampReq,
-          deserializeGetTxTimestampResp,
-          {}
-        )
-
-        timestampReceipt = serialized_res
-      } else {
-        timestampReceipt = await Comms.ask(homeNode.node, 'get_tx_timestamp', {
-          cycleMarker,
-          cycleCounter,
-          txId,
-        })
+          })
+        }
+      } catch (e) {
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Error asking timestamp from node ${homeNode.node.publicKey}: ${e.message}`)
+        return null
       }
 
       // this originiates from network/ask level, isResponse might get added at any step to this object
