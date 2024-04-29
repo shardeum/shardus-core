@@ -2868,7 +2868,6 @@ class StateManager {
     const message = { accountIds: [address] }
     let result: GetAccountDataWithQueueHintsResp
     if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountDataWithQueueHintsBinary) {
-      
       try {
         const serialized_res = await this.p2p.askBinary<
           GetAccountDataWithQueueHintsReqSerializable,
