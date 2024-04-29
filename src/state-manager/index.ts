@@ -2617,7 +2617,7 @@ class StateManager {
           }
         } catch (error) {
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getLocalOrRemoteAccountQueueCount: askBinary ex: ${error.message}`)
-          return { count, committingAppData, account }
+          r = null
         }
 
         if (!r) {
