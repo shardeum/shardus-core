@@ -1937,21 +1937,31 @@ class TransactionConsenus {
         accountOffset: '',
       }
       let result
-      if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountDataBinary) {
-        const req = message as GetAccountDataReqSerializable
-        const rBin = await Comms.askBinary<GetAccountDataReqSerializable, GetAccountDataRespSerializable>(
-          node,
-          InternalRouteEnum.binary_get_account_data,
-          req,
-          serializeGetAccountDataReq,
-          deserializeGetAccountDataResp,
-          {}
-        )
-        if (((rBin.errors && rBin.errors.length === 0) || !rBin.errors) && rBin.data) {
-          result = rBin as GetAccountData3Resp
+      try {
+        if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountDataBinary) {
+          const req = message as GetAccountDataReqSerializable
+          const rBin = await Comms.askBinary<GetAccountDataReqSerializable, GetAccountDataRespSerializable>(
+            node,
+            InternalRouteEnum.binary_get_account_data,
+            req,
+            serializeGetAccountDataReq,
+            deserializeGetAccountDataResp,
+            {}
+          )
+          if (((rBin.errors && rBin.errors.length === 0) || !rBin.errors) && rBin.data) {
+            result = rBin as GetAccountData3Resp
+          }
+        } else {
+          result = await Comms.ask(node, 'get_account_data3', message)
         }
-      } else {
-        result = await Comms.ask(node, 'get_account_data3', message)
+      } catch (error) {
+        this.mainLogger.error(
+          `robustQueryAccountData: Failed query to node ${node.id}. askBinary ex: ${error.message}`
+        )
+        return {
+          data: null,
+          errors: [`robustQueryAccountData: Failed query to node ${node.id}. askBinary ex: ${error.message}`],
+        }
       }
       return result
     }
