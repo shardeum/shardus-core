@@ -2961,17 +2961,22 @@ class TransactionQueue {
           this.stateManager.config.p2p.useBinarySerializedEndpoints &&
           this.stateManager.config.p2p.requestReceiptForTxBinary
         ) {
-          result = await this.p2p.askBinary<
-            RequestReceiptForTxReqSerialized,
-            RequestReceiptForTxRespSerialized
-          >(
-            node,
-            InternalRouteEnum.binary_request_receipt_for_tx,
-            message,
-            serializeRequestReceiptForTxReq,
-            deserializeRequestReceiptForTxResp,
-            {}
-          )
+          try{
+            result = await this.p2p.askBinary<
+              RequestReceiptForTxReqSerialized,
+              RequestReceiptForTxRespSerialized
+            >(
+              node,
+              InternalRouteEnum.binary_request_receipt_for_tx,
+              message,
+              serializeRequestReceiptForTxReq,
+              deserializeRequestReceiptForTxResp,
+              {}
+            )
+          }catch(e){
+            this.statemanager_fatal(`queueEntryRequestMissingReceipt`, `error: ${e.message}`)
+            this.mainLogger.error(`askBinary error: ${InternalRouteEnum.binary_request_receipt_for_tx} asked to ${node.externalIp}:${node.externalPort}:${node.id}`)
+          }
         } else {
           result = await this.p2p.ask(node, 'request_receipt_for_tx', message) // not sure if we should await this.
         }
