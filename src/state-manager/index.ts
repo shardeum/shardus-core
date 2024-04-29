@@ -2598,18 +2598,26 @@ class StateManager {
         const message: RequestAccountQueueCounts = { accountIds: [address] }
         let r: QueueCountsResponse | false
 
-        if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountQueueCountBinary) {
-          const serialized_res = await this.p2p.askBinary<GetAccountQueueCountReq, GetAccountQueueCountResp>(
-            randomConsensusNode,
-            InternalRouteEnum.binary_get_account_queue_count,
-            message,
-            serializeGetAccountQueueCountReq,
-            deserializeGetAccountQueueCountResp,
-            {}
-          )
-          r = serialized_res as QueueCountsResponse
-        } else {
-          r = await this.p2p.ask(randomConsensusNode, 'get_account_queue_count', message)
+        try {
+          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountQueueCountBinary) {
+            const serialized_res = await this.p2p.askBinary<
+              GetAccountQueueCountReq,
+              GetAccountQueueCountResp
+            >(
+              randomConsensusNode,
+              InternalRouteEnum.binary_get_account_queue_count,
+              message,
+              serializeGetAccountQueueCountReq,
+              deserializeGetAccountQueueCountResp,
+              {}
+            )
+            r = serialized_res as QueueCountsResponse
+          } else {
+            r = await this.p2p.ask(randomConsensusNode, 'get_account_queue_count', message)
+          }
+        } catch (error) {
+          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getLocalOrRemoteAccountQueueCount: askBinary ex: ${error.message}`)
+          return { count, committingAppData, account }
         }
 
         if (!r) {
