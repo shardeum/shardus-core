@@ -208,8 +208,7 @@ class AccountGlobals {
             this.stateManager.appFinishedSyncing === false
           ) {
             result.ready = false
-            respond(result, serializeGlobalAccountReportResp)
-            return
+            return respond(result, serializeGlobalAccountReportResp)
           }
 
           for (const key of globalAccountKeys) {
@@ -218,8 +217,7 @@ class AccountGlobals {
 
           if (result.ready === false) {
             nestedCountersInstance.countEvent(`sync`, `Server not ready to respond: ${route}!`)
-            respond(BadRequest('Result not ready'), serializeResponseError)
-            return
+            return respond(BadRequest('Result not ready'), serializeResponseError)
           }
 
           let accountData: Shardus.WrappedData[]
