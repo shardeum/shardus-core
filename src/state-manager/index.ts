@@ -2887,7 +2887,7 @@ class StateManager {
             `ASK FAIL getRemoteAccount exception: ResponseError encountered. Code: ${er.Code}, AppCode: ${er.AppCode}, Message: ${er.Message}`
           )
         }
-        if (logFlags.verbose) this.mainLogger.error('ASK FAIL getRemoteAccount exception:', er)
+        else if (logFlags.verbose) this.mainLogger.error('ASK FAIL getRemoteAccount exception:', er)
         return null
       }
     } else {
