@@ -80,13 +80,25 @@ class LoadDetection extends EventEmitter {
   }
 
   configUpdated() {
-    if (this.desiredTxTime !== Context.config.loadDetection.desiredTxTime) {
-      this.desiredTxTime = typeof Context.config.loadDetection.desiredTxTime === 'string' ? Number(Context.config.loadDetection.desiredTxTime) : Context.config.loadDetection.desiredTxTime
-      console.log('Config updated for loadDetection.desiredTxTime', this.desiredTxTime)
-      nestedCountersInstance.countEvent(
-        'loadRelated',
-        `desiredTxTime config updated`
-      )
+    try {
+      if (this.desiredTxTime !== Context.config.loadDetection.desiredTxTime) {
+        this.desiredTxTime = typeof Context.config.loadDetection.desiredTxTime === 'string' ? Number(Context.config.loadDetection.desiredTxTime) : Context.config.loadDetection.desiredTxTime
+        console.log('Config updated for loadDetection.desiredTxTime', this.desiredTxTime)
+        nestedCountersInstance.countEvent(
+          'loadRelated',
+          `desiredTxTime config updated`
+        )
+      }
+      if (this.executeQueueLimit !== Context.config.loadDetection.executeQueueLimit) {
+        this.executeQueueLimit = typeof Context.config.loadDetection.desiredTxTime === 'string' ? Number(Context.config.loadDetection.executeQueueLimit) : Context.config.loadDetection.executeQueueLimit
+        console.log('Config updated for loadDetection.executeQueueLimit', this.executeQueueLimit)
+        nestedCountersInstance.countEvent(
+          'loadRelated',
+          `executeQueueLimit config updated`
+        )
+      }
+    } catch (e) {
+      nestedCountersInstance.countEvent('loadRelated', `config update failed`)
     }
   }
 
