@@ -185,7 +185,7 @@ const compareCertBinaryHandler: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>
       const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cCompareCertReq)
       if (!requestStream) {
         errorHandler(RequestErrorEnum.InvalidRequest)
-        return respond(NotFound('Invalid CompareCert request stream'), serializeResponseError)
+        return respond(BadRequest('Invalid CompareCert request stream'), serializeResponseError)
       }
 
       const req: CompareCertReq = deserializeCompareCertReq(requestStream)
