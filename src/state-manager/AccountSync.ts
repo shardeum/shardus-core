@@ -53,6 +53,7 @@ import {
   GlobalAccountReportRespSerializable,
   deserializeGlobalAccountReportResp,
 } from '../types/GlobalAccountReportResp'
+import { BadRequest, InternalError, serializeResponseError } from '../types/ResponseError'
 
 const REDUNDANCY = 3
 
@@ -424,14 +425,12 @@ class AccountSync {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAccountDataByListReq)
           if (!requestStream) {
             nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
-            respond({ accountData }, serializeGetAccountDataByListResp)
-            return
+            return respond(BadRequest(`${route} invalid request`), serializeResponseError)
           }
           const readableReq = deserializeGetAccountDataByListReq(requestStream)
           if (utils.isValidShardusAddress(readableReq.accountIds) === false) {
             nestedCountersInstance.countEvent('internal', `${route}-invalid_account_ids`)
-            respond({ accountData }, serializeGetAccountDataByListResp)
-            return
+            return respond(BadRequest(`${route} invalid account_ids`), serializeResponseError)
           }
 
           const result = {} as GetAccountDataByListResp
@@ -450,7 +449,7 @@ class AccountSync {
         } catch (e) {
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
           this.mainLogger.error(`${route}: Exception executing request: ${errorToStringFull(e)}`)
-          respond({ accountData: null }, serializeGetAccountDataByListResp)
+          return respond(InternalError(`${route} exception executing request`), serializeResponseError)
         } finally {
           this.profiler.scopedProfileSectionEnd(route)
         }
