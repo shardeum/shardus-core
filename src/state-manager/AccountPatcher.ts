@@ -88,6 +88,7 @@ import {
   deserializeGetTrieAccountHashesResp,
   serializeGetTrieAccountHashesResp,
 } from '../types/GetTrieAccountHashesResp'
+import { BadRequest, InternalError, serializeResponseError } from '../types/ResponseError'
 
 type Line = {
   raw: string
@@ -823,8 +824,8 @@ class AccountPatcher {
         try {
           const stream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAccountTrieHashesReq)
           if (!stream) {
-            respond(result, serializeGetTrieAccountHashesResp)
-            return
+            requestErrorHandler(route, RequestErrorEnum.InvalidRequest, header)
+            return respond(BadRequest('invalid request stream'), serializeResponseError)
           }
           const req = deserializeGetTrieAccountHashesReq(stream)
           const radixList = req.radixList
@@ -866,7 +867,7 @@ class AccountPatcher {
             'binary_get_trie_accountHashes:' + e.name + ': ' + e.message + ' at ' + e.stack
           )
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
-          respond(result, serializeGetTrieAccountHashesResp)
+          respond(InternalError('exception executing request'), serializeResponseError)
         } finally {
           profilerInstance.scopedProfileSectionEnd(route)
         }
