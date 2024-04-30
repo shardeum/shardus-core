@@ -2822,15 +2822,13 @@ class TransactionQueue {
 
           if (result == null) {
             if (logFlags.verbose) {
-              if (logFlags.error)
-                this.mainLogger.error('ASK FAIL request_state_for_tx with result as ', result)
+              if (logFlags.error) this.mainLogger.error('ASK FAIL request_state_for_tx')
             }
             /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
           if (result.success !== true) {
-            if (logFlags.error)
-              this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9 with result as ', result)
+            if (logFlags.error) this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9')
             /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
