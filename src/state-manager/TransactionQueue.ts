@@ -94,6 +94,8 @@ import {
   serializeRequestReceiptForTxReq,
 } from '../types/RequestReceiptForTxReq'
 import { isNodeInRotationBounds } from '../p2p/Utils'
+import { ResponseError } from '../types/ResponseError'
+import { error } from 'console'
 
 interface Receipt {
   tx: AcceptedTx
@@ -2840,19 +2842,32 @@ class TransactionQueue {
             txid: queueEntry.acceptedTx.txId,
             timestamp: queueEntry.acceptedTx.timestamp,
           }
-          let result
-          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestStateForTxBinary) {
-            // GOLD-66 Error handling try/catch happens one layer outside of this function in process transactions
-            result = (await this.p2p.askBinary<RequestStateForTxReq, RequestStateForTxRespSerialized>(
-              node,
-              InternalRouteEnum.binary_request_state_for_tx,
-              message,
-              serializeRequestStateForTxReq,
-              deserializeRequestStateForTxResp,
-              {}
-            )) as RequestStateForTxRespSerialized
-          } else {
-            result = (await this.p2p.ask(node, 'request_state_for_tx', message)) as RequestStateForTxResp
+          let result = null
+          try {
+            if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestStateForTxBinary) {
+              // GOLD-66 Error handling try/catch happens one layer outside of this function in process transactions
+              result = (await this.p2p.askBinary<RequestStateForTxReq, RequestStateForTxRespSerialized>(
+                node,
+                InternalRouteEnum.binary_request_state_for_tx,
+                message,
+                serializeRequestStateForTxReq,
+                deserializeRequestStateForTxResp,
+                {}
+              )) as RequestStateForTxRespSerialized
+            } else {
+              result = (await this.p2p.ask(node, 'request_state_for_tx', message)) as RequestStateForTxResp
+            }
+          } catch (error) {
+            /* prettier-ignore */ if (logFlags.error) {
+              if (error instanceof ResponseError) {
+                this.mainLogger.error(
+                  `ASK FAIL request_state_for_tx : exception encountered where the error is ${error}`
+                )
+              }
+            }
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('askBinary request_state_for_tx exception:', error)
+
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`askBinary error: ${InternalRouteEnum.binary_request_state_for_tx} asked to ${node.externalIp}:${node.externalPort}:${node.id}`)
           }
 
           if (result == null) {
@@ -2867,6 +2882,7 @@ class TransactionQueue {
             /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
+          
           let dataCountReturned = 0
           const accountIdsReturned = []
           for (const data of result.stateList) {
