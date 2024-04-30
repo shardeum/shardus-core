@@ -420,7 +420,7 @@ export class NetworkClass extends EventEmitter {
           if (this.statisticsInstance) this.statisticsInstance.incrementCounter('networkTimeout')
           const err = new Error(`askBinary: request timed out. ${utils.stringifyReduce(trackerId)}`)
           nestedCountersInstance.countRareEvent('network', 'timeout ' + route)
-          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network timeout (askBinary) on ${route}: ${formatErrorMessage(err)}`)
+          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Network timeout (askBinary) on ${route}: ${formatErrorMessage(err)} node: ${utils.logNode(node)}`)
           this.emit('timeout', node, requestId, 'askBinary')
           reject(err)
         }
