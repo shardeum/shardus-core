@@ -585,18 +585,24 @@ class CachedAppDataManager {
 
       const message = { topic, dataId }
       let r: CachedAppData | boolean
-      if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getCachedAppDataBinary) {
-        const resp = await this.p2p.askBinary<GetCachedAppDataReq, GetCachedAppDataResp>(
-          randomConsensusNode,
-          InternalRouteEnum.binary_get_cached_app_data,
-          message,
-          serializeGetCachedAppDataReq,
-          deserializeGetCachedAppDataResp,
-          {}
-        )
-        r = resp?.cachedAppData
-      } else {
-        r = await this.p2p.ask(randomConsensusNode, 'get_cached_app_data', message)
+      try {
+        if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getCachedAppDataBinary) {
+          const resp = await this.p2p.askBinary<GetCachedAppDataReq, GetCachedAppDataResp>(
+            randomConsensusNode,
+            InternalRouteEnum.binary_get_cached_app_data,
+            message,
+            serializeGetCachedAppDataReq,
+            deserializeGetCachedAppDataResp,
+            {}
+          )
+          r = resp?.cachedAppData
+        } else {
+          r = await this.p2p.ask(randomConsensusNode, 'get_cached_app_data', message)
+        }
+      } catch (e) {
+        if (logFlags.error) this.mainLogger.error(`cachedAppData: ASK exception getLocalOrRemoteCachedAppData`, e)
+        nestedCountersInstance.countEvent('cached-app-data', 'ask exception')
+        return null
       }
 
       if (r === false) {
