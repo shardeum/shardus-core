@@ -42,7 +42,7 @@ const newestCycleRoute: P2P.P2PTypes.Route<Handler> = {
   handler: (_req, res) => {
     profilerInstance.scopedProfileSectionStart('sync-newest-cycle')
     const newestCycle = CycleChain.newest || null
-    res.send(safeStringify({ newestCycle }))
+    res.send(utils.stringify({ newestCycle }))
     profilerInstance.scopedProfileSectionEnd('sync-newest-cycle')
   },
 }
@@ -123,7 +123,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
     nestedCountersInstance.countEvent('p2p', `sync-getting-cycles ${start} - ${end}`)
     const prevCycles = await getCycles(activeNodes, start, end)
     info(`Got cycles ${JSON.stringify(prevCycles.map((cycle) => cycle.counter))}`)
-    info(`  ${logSafeStringify(prevCycles)}`)
+    info(`  ${utils.stringify(prevCycles)}`)
 
     // If prevCycles is empty, start over
     if (prevCycles.length < 1) {
@@ -240,7 +240,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
   info('Synced to cycle', cycleToSyncTo.counter)
   info(`Sync complete; ${NodeList.activeByIdOrder.length} active nodes; ${CycleChain.cycles.length} cycles`)
   info(`NodeList after sync: ${JSON.stringify([...NodeList.nodes.entries()])}`)
-  info(`CycleChain after sync: ${logSafeStringify(CycleChain.cycles)}`)
+  info(`CycleChain after sync: ${utils.stringify(CycleChain.cycles)}`)
 
   const p2pSyncReport = {
     cycle: cycleToSyncTo.counter,
@@ -322,11 +322,11 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
       cycle.standbyNodeListHash = JoinV2.computeNewStandbyListHash()
     }
   }
-  
+
   if (config.debug.enableCycleRecordDebugTool || config.debug.localEnableCycleRecordDebugTool) {
     if (Self.isActive) {
       const cycleData =
-        logSafeStringify({
+        utils.stringify({
           port: Self.port,
           cycleNumber: cycle.counter,
           cycleRecord: cycle,
@@ -347,7 +347,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
 
   /* prettier-ignore */ if (logFlags.important_as_error)
     info(
-      `digestCycle ${logSafeStringify(
+      `digestCycle ${utils.stringify(
         cycle
       )} from ${source}... note: CycleChain.newest.counter: ${logSafeStringify(
         CycleChain.newest
