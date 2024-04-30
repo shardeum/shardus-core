@@ -925,9 +925,8 @@ class TransactionQueue {
             if (!queueEntry) return res.status(400).json({ success: false, reason: 'Receipt Not Found.' })
             if (full_receipt) {
               const fullReceipt: ArchiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
-              if (fullReceipt === null)
-                result = JSON.parse(utils.cryptoStringify({ success: true, receipt: fullReceipt }))
-              result = { success: false, reason: 'Receipt Not Found.' }
+              if (fullReceipt === null) return res.status(400).json({ success: false, reason: 'Receipt Not Found.' })
+              result = JSON.parse(utils.cryptoStringify({ success: true, receipt: fullReceipt }))
             } else {
               result = { success: true, receipt: this.stateManager.getReceipt2(queueEntry) }
             }

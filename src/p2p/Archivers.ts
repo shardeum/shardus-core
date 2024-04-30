@@ -63,12 +63,6 @@ export enum DataRequestTypes {
   UNSUBSCRIBE = 'UNSUBSCRIBE',
 }
 
-export enum ReceiptsBundleByInterval {
-  '30SECS_DATA',
-  '20SECS_DATA',
-  '10SECS_DATA',
-}
-
 // This is to check if the new archiver data subscriptions feature is activated in shardeum v1.1.3
 // We can remove later after v1.1.3 upgrade
 export let archiverDataSubscriptionsUpdateFeatureActivated = false
