@@ -96,6 +96,7 @@ export let submodules: submoduleTypes[] = [
 
 export let currentQuarter = -1 // means we have not started creating cycles
 export let currentCycle = 0
+export let currentStart = 0
 export let nextQ1Start = 0
 export let q1SendRequests = false // if we are in q1 this lets us know if we can send requests also
 
@@ -720,6 +721,8 @@ function makeCycleRecord(
     duration: prevRecord ? prevRecord.duration : config.p2p.cycleDuration,
     networkConfigHash: makeNetworkConfigHash(),
   }
+
+  currentStart = baseRecord.start
 
   const cycleRecord = Object.assign(baseRecord, {
     joined: [],

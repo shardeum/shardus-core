@@ -1245,6 +1245,7 @@ class Shardus extends EventEmitter {
       }
       readyPayload = Context.crypto.sign(readyPayload)
       Comms.sendGossip('gossip-sync-finished', readyPayload)
+      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: inital gossip send. id: ${Self.id}. tInC: ${shardusGetTime() - CycleCreator?.currentStart}`)
       console.log('syncAppData - gossip-sync-finished')
       this.stateManager.appFinishedSyncing = true
     }
