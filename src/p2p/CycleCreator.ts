@@ -45,6 +45,7 @@ import fs from 'fs'
 import path from 'path'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
+import { BadRequest, InternalError, NotFound, serializeResponseError } from '../types/ResponseError'
 
 /** CONSTANTS */
 
@@ -185,17 +186,15 @@ const compareCertBinaryHandler: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>
       const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cCompareCertReq)
       if (!requestStream) {
         errorHandler(RequestErrorEnum.InvalidRequest)
-        respond(resp, serializeCompareCertResp)
-        return
+        return respond(BadRequest('Invalid CompareCert request stream'), serializeResponseError)
       }
 
       const req: CompareCertReq = deserializeCompareCertReq(requestStream)
 
       const errors = verifyPayload('CompareCertReq', req)
       if (errors && errors.length > 0) {
-        p2pLogger.error(`compareCert: request validation errors: ${errors}`)
-        respond({ certs: bestCycleCert.get(bestMarker), record: bestRecord }, serializeCompareCertResp)
-        return
+        p2pLogger.error(`compareCert request validation errors: ${errors}`)
+        return respond(BadRequest('Request validation errors'), serializeResponseError)
       }
 
       const compareCertReq: CompareCertReq = {
@@ -208,8 +207,8 @@ const compareCertBinaryHandler: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>
       respond(resp, serializeCompareCertResp)
     } catch (errors) {
       nestedCountersInstance.countEvent('internal', `${route}-exception`)
-      p2pLogger.error(`${route}: Exception executing request: ${errorToStringFull(errors)}`)
-      respond({ certs: [], record: null }, serializeCompareCertResp)
+      p2pLogger.error(`${route} exception executing request: ${errorToStringFull(errors)}`)
+      return respond(InternalError('Exception executing request'), serializeResponseError)
     } finally {
       profilerInstance.scopedProfileSectionEnd(route)
     }
