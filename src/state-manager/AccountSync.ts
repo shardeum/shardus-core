@@ -951,41 +951,50 @@ class AccountSync {
     const queryFn = async (
       node: Shardus.Node
     ): Promise<Partial<GlobalAccountReportResp> & { msg: string }> => {
-      // Node Precheck!
-      if (
-        this.stateManager.isNodeValidForInternalMessage(node.id, 'getRobustGlobalReport', true, true) ===
-        false
-      ) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent( 'sync', `DATASYNC: getRobustGlobalReport_${tag} invalid node to ask: ${utils.stringifyReduce(node.id)}` )
+      try {
+        // Node Precheck!
+        if (
+          this.stateManager.isNodeValidForInternalMessage(node.id, 'getRobustGlobalReport', true, true) ===
+          false
+        ) {
+          /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} invalid node to ask: ${utils.stringifyReduce(node.id)}`)
+          return {
+            ready: false,
+            msg: `getRobustGlobalReport invalid node to ask: ${utils.stringifyReduce(node.id)}`,
+          }
+        }
+
+        // Various failure cases will alter the returned result so that it is tallied in a more orderly way.
+        // The random numbers were kept to prevent the hash of results from being equal, but now custom equalFn takes care of this concern
+        let result
+        if (
+          this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+          this.stateManager.config.p2p.getGloablAccountReportBinary
+        ) {
+          const request = {} as GlobalAccountReportReqSerializable
+          result = await this.p2p.askBinary<
+            GlobalAccountReportReqSerializable,
+            GlobalAccountReportRespSerializable
+          >(
+            node,
+            InternalRouteEnum.binary_get_globalaccountreport,
+            request,
+            serializeGlobalAccountReportReq,
+            deserializeGlobalAccountReportResp,
+            {}
+          )
+        } else {
+          result = await this.p2p.ask(node, 'get_globalaccountreport', {})
+        }
+        return checkResultFn(result, node.id)
+      } catch (error) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} exception`)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport exception ${utils.stringifyReduce(node.id)}, error: ${errorToStringFull(error)}`)
         return {
           ready: false,
-          msg: `getRobustGlobalReport invalid node to ask: ${utils.stringifyReduce(node.id)}`,
+          msg: `getRobustGlobalReport exception for node: ${utils.stringifyReduce(node.id)}`,
         }
       }
-
-      // Various failure cases will alter the returned result so that it is tallied in a more orderly way.
-      // The random numbers were kept to prevent the hash of results from being equal, but now custom equalFn takes care of this concern
-      let result
-      if (
-        this.stateManager.config.p2p.useBinarySerializedEndpoints &&
-        this.stateManager.config.p2p.getGloablAccountReportBinary
-      ) {
-        const request = {} as GlobalAccountReportReqSerializable
-        result = await this.p2p.askBinary<
-          GlobalAccountReportReqSerializable,
-          GlobalAccountReportRespSerializable
-        >(
-          node,
-          InternalRouteEnum.binary_get_globalaccountreport,
-          request,
-          serializeGlobalAccountReportReq,
-          deserializeGlobalAccountReportResp,
-          {}
-        )
-      } else {
-        result = await this.p2p.ask(node, 'get_globalaccountreport', {})
-      }
-      return checkResultFn(result, node.id)
     }
 
     const queryFnFromArchiver = async (
