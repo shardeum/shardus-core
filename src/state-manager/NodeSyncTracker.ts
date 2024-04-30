@@ -26,6 +26,7 @@ import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { AppObjEnum } from '../shardus/shardus-types'
 import { GetAccountDataReqSerializable, serializeGetAccountDataReq } from '../types/GetAccountDataReq'
 import { deserializeGetAccountDataResp, GetAccountDataRespSerializable } from '../types/GetAccountDataResp'
+import { ResponseError } from '../types/ResponseError'
 
 // Not sure where to put this interface yet. I guess maybe to @shardus/types? or to state-manager-types?
 // Keeping it here for now. can move it later.
@@ -457,6 +458,11 @@ export default class NodeSyncTracker implements SyncTrackerInterface {
 
           retry = await this.tryRetry('syncStateDataGlobals 1 ')
         } else {
+          if (error instanceof ResponseError && logFlags.error) {
+            this.accountSync.mainLogger.error(
+              `syncStateDataGlobals_ex: ResponseError encountered. Code: ${error.Code}, AppCode: ${error.AppCode}, Message: ${error.Message}`
+            )
+          }
           /* prettier-ignore */ this.accountSync.statemanager_fatal( `syncStateDataGlobals_ex`, 'syncStateDataGlobals failed: ' + errorToStringFull(error) )
           /* prettier-ignore */ if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
 
