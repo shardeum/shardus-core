@@ -30,7 +30,6 @@ import { TypeIdentifierEnum } from '../../types/enum/TypeIdentifierEnum'
 import { safeStringify } from '../../utils'
 import { validateTypes } from '../../utils'
 import * as NodeList from '../NodeList'
-import { nestedCountersInstance } from '../../utils/nestedCounters'
 
 /** Gossip */
 
