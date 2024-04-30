@@ -63,6 +63,12 @@ export enum DataRequestTypes {
   UNSUBSCRIBE = 'UNSUBSCRIBE',
 }
 
+export enum ReceiptsBundleByInterval {
+  '30SECS_DATA',
+  '20SECS_DATA',
+  '10SECS_DATA',
+}
+
 // This is to check if the new archiver data subscriptions feature is activated in shardeum v1.1.3
 // We can remove later after v1.1.3 upgrade
 export let archiverDataSubscriptionsUpdateFeatureActivated = false
@@ -1128,11 +1134,6 @@ export function registerRoutes() {
     // In restart network, when there is only one node, we just send the first archiver which is serving as data recipient
     if (Self.isFirst && Self.isRestartNetwork && NodeList.nodes.size < 2) archivers = [...recipients.values()]
     res.send(safeStringify({ archivers }))
-  })
-
-  network.registerExternalGet('joinedArchiver/:publicKey', ({params: {publicKey}}, res) => {
-    const isJoined = archivers.has(publicKey)
-    res.json({ isJoined });
   })
 
   network.registerExternalGet('datarecipients', (req, res) => {
