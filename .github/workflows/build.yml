@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/shardeum/jenkins-test-container:latest
-      options: --user node
+      options: --user root
 
     steps:
     - name: Checkout code
