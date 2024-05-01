@@ -15,9 +15,9 @@ jobs:
     name: Run Build
     runs-on: ubuntu-latest
     env:
-      HOME: /root
+      HOME: /home/node
     container:
-      image: ghcr.io/shardeum/jenkins-test-container:sys-153
+      image: ghcr.io/shardeum/jenkins-test-container:sys-153-nodeuser
       # options: --user root
 
     steps:
