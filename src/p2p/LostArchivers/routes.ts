@@ -210,7 +210,7 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
     return
   }
 
-  const downMsg = payload
+  const downMsg = payload as SignedObject<ArchiverDownMsg>
   const target = downMsg.investigateMsg.target
   // to-do: check target is a string or hexstring and min length
   let record = lostArchiversMap.get(target)
