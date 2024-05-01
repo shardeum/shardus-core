@@ -1,0 +1,30 @@
+name: Build Workflow
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+      - sys-153-add-build-github-workflow-step-to-shardus-core-on-pr
+
+jobs:
+  build:
+    name: Run Build
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/shardeum/jenkins-test-container:latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install dependencies with npm ci
+      run: npm ci
+
+    - name: Build the project
+      run: npm run build:dev
+
