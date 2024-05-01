@@ -475,8 +475,16 @@ export async function askBinary<TReq, TResp>(
     ))
   } catch (err) {
     nestedCountersInstance.countEvent('comms-route', `askBinary ${route} request error`)
-    console.log('P2P: askBinary: network.askBinary: ' + err)
-    error(`P2P: askBinary: network.askBinary: route: ${route} error: ${err}`)
+    console.log(
+      `P2P: askBinary: network.askBinary: route: ${route} request: ${utils.SerializeToJsonString(
+        message
+      )} error: ${err}`
+    )
+    error(
+      `P2P: askBinary: network.askBinary: route: ${route} request: ${utils.SerializeToJsonString(
+        message
+      )} error: ${err}`
+    )
     throw err
   }
   try {

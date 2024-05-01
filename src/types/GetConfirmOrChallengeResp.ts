@@ -6,7 +6,7 @@ import { DeSerializeFromJsonString, SerializeToJsonString } from '../utils'
 export type GetConfirmOrChallengeResp = {
   txId: string
   appliedVoteHash: string
-  result: ConfirmOrChallengeMessage
+  result?: ConfirmOrChallengeMessage
   uniqueCount: number
 }
 
@@ -23,7 +23,12 @@ export function serializeGetConfirmOrChallengeResp(
   stream.writeUInt8(cGetConfirmOrChallengeResponseVersion)
   stream.writeString(obj.txId)
   stream.writeString(obj.appliedVoteHash)
-  stream.writeString(SerializeToJsonString(obj.result))
+  if (obj.result) {
+    stream.writeUInt8(1)
+    stream.writeString(SerializeToJsonString(obj.result))
+  } else {
+    stream.writeUInt8(0)
+  }
   stream.writeUInt32(obj.uniqueCount)
 }
 
@@ -32,10 +37,18 @@ export function deserializeGetConfirmOrChallengeResp(stream: VectorBufferStream)
   if (version > cGetConfirmOrChallengeResponseVersion) {
     throw new Error('GetConfirmOrChallengeResponse version mismatch')
   }
+  const txId = stream.readString()
+  const appliedVoteHash = stream.readString()
+  const hasResult = stream.readUInt8() === 1
+  let result: ConfirmOrChallengeMessage | undefined
+  if (hasResult) {
+    result = DeSerializeFromJsonString(stream.readString())
+  }
+  const uniqueCount = stream.readUInt32()
   return {
-    txId: stream.readString(),
-    appliedVoteHash: stream.readString(),
-    result: DeSerializeFromJsonString(stream.readString()) as ConfirmOrChallengeMessage,
-    uniqueCount: stream.readUInt32(),
+    txId,
+    appliedVoteHash,
+    result,
+    uniqueCount,
   }
 }

@@ -367,7 +367,7 @@ class TransactionConsenus {
         const route = InternalRouteEnum.binary_get_confirm_or_challenge
         nestedCountersInstance.countEvent('internal', route)
         this.profiler.scopedProfileSectionStart(route, true, payload.length)
-        const confirmOrChallengeResult: ConfirmOrChallengeQueryResponse = {
+        const confirmOrChallengeResult: GetConfirmOrChallengeResp = {
           txId: '',
           appliedVoteHash: '',
           result: null,
