@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/shardeum/jenkins-test-container:latest
-      options: --user root
+      # options: --user root
 
     steps:
     - name: Checkout code
@@ -24,8 +24,6 @@ jobs:
     
     - name: Print environment info
       run: |
-        echo "Printing environment variables..."
-        env
         echo "Checking Node version..."
         node --version
         echo "Checking npm version..."
