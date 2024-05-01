@@ -14,6 +14,8 @@ jobs:
   build:
     name: Run Build
     runs-on: ubuntu-latest
+    env:
+      HOME: /root
     container:
       image: ghcr.io/shardeum/jenkins-test-container:sys-153
       # options: --user root
