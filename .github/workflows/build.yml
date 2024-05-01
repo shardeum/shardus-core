@@ -21,6 +21,19 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+    
+    - name: Print environment info
+      run: |
+        echo "Printing environment variables..."
+        env
+        echo "Checking Node version..."
+        node --version
+        echo "Checking npm version..."
+        npm --version
+        echo "Checking Rust setup..."
+        rustup show
+        cargo --version
+        rustc --version
 
     - name: Install dependencies with npm ci
       run: npm ci
