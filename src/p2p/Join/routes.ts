@@ -35,7 +35,7 @@ import { logFlags } from '../../logger'
 import { JoinRequest, StartedSyncingRequest } from "@shardus/types/build/src/p2p/JoinTypes";
 import { addSyncStarted } from './v2/syncStarted'
 import { addStandbyRefresh } from './v2/standbyRefresh'
-import { DeSerializeFromJsonString, safeStringify } from "../../utils";
+import { DeSerializeFromJsonString, safeParser, safeStringify } from "../../utils";
 import { testFailChance } from '../../utils'
 import { addStandbyAdd } from './v2/standbyAdd'
 
