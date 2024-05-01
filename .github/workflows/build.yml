@@ -19,19 +19,17 @@ jobs:
       # options: --user root
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    
     - name: Print environment info
       run: |
-        echo "Checking Node version..."
+        whoami
         node --version
-        echo "Checking npm version..."
         npm --version
-        echo "Checking Rust setup..."
         rustup show
         cargo --version
         rustc --version
+
+    - name: Checkout code
+      uses: actions/checkout@v3
 
     - name: Install dependencies with npm ci
       run: npm ci
