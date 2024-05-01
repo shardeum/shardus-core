@@ -15,8 +15,8 @@ jobs:
     name: Run Build
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/shardeum/jenkins-test-container:latest
-      options: --user root
+      image: ghcr.io/shardeum/jenkins-test-container:sys-153
+      # options: --user root
 
     steps:
     - name: Print environment info
