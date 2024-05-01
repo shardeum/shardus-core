@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - develop
+      - dev
   pull_request:
     branches:
       - main
-      - develop
+      - dev
       - sys-153-add-build-github-workflow-step-to-shardus-core-on-pr
 
 jobs:
