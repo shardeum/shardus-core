@@ -620,7 +620,7 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
         await respond(wrappedRespStream.getBuffer(), responseHeaders)
         return wrappedRespStream.getBufferLength()
       } catch (err: unknown) {
-        /* prettier-ignore */ error(`registerInternalBinary: responseHeaders: ${JSON.stringify(responseHeaders)}, Error: ${utils.formatErrorMessage(err)}, response: ${utils.SerializeToJsonString(response)}`)
+        /* prettier-ignore */ error(`registerInternalBinary: responseHeaders: ${JSON.stringify(responseHeaders)}, Response: ${utils.SerializeToJsonString(response)}, Error: ${utils.formatErrorMessage(err)}`)
         /* prettier-ignore */ nestedCountersInstance.countEvent('registerInternalBinary', `respondWrapped error`)
         return 0
       }
