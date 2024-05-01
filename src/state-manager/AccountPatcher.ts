@@ -2226,7 +2226,7 @@ class AccountPatcher {
         }
       }
     } catch (error) {
-      /* prettier-ignore */ this.statemanager_fatal('getChildrenOf failed', `getChildrenOf ASK-1 failed: ` + errorToStringFull(error))
+      /* prettier-ignore */ this.statemanager_fatal('getChildrenOf failed', `getChildrenOf ASK-2 failed: ` + errorToStringFull(error))
     }
 
     if (results.length > 0) {
