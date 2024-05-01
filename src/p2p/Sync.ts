@@ -204,7 +204,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
   } while (
     squasher.final.updated.length < activeNodeCount(cycleToSyncTo) ||
     squasher.final.added.length < totalNodeCount(cycleToSyncTo)
-  )
+    )
 
   // Now that our node list is synced, validate the anchor cycle's cert
   // [TODO] [AS]
@@ -389,7 +389,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
   let nodeLimit = 2 //todo set this to a higher number, but for now I want to make sure it works in a small test
   if (NodeList.activeByIdOrder.length <= nodeLimit) {
     /* prettier-ignore */ if (logFlags.important_as_error) {
-    info(`
+      info(`
       Digested C${cycle.counter}
         cycle record: ${logSafeStringify(cycle)}
         cycle changes: ${JSON.stringify(changes)}
@@ -399,7 +399,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
     }
   } else {
     /* prettier-ignore */ if (logFlags.important_as_error) {
-    info(`
+      info(`
     Digested C${cycle.counter}
       cycle record: ${logSafeStringify(cycle)}
       cycle changes: ${JSON.stringify(changes)}
