@@ -2201,7 +2201,7 @@ class AccountPatcher {
         }
         promises.push(promise)
       } catch (error) {
-        /* prettier-ignore */ this.statemanager_fatal('getChildrenOf failed', `getChildrenOf ASK-1 failed: ` + errorToStringFull(error))
+        /* prettier-ignore */ this.statemanager_fatal('getChildrenOf failed', `getChildrenOf ASK-1 failed: node: ${node.id} error: ${errorToStringFull(error)}`)
       }
     }
 
