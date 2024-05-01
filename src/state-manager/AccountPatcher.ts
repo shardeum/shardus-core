@@ -2201,7 +2201,7 @@ class AccountPatcher {
         }
         promises.push(promise)
       } catch (error) {
-        this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + errorToStringFull(error))
+        /* prettier-ignore */ this.statemanager_fatal('getChildrenOf failed', `getChildrenOf ASK-1 failed: ` + errorToStringFull(error))
       }
     }
 
@@ -2226,7 +2226,7 @@ class AccountPatcher {
         }
       }
     } catch (error) {
-      this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + errorToStringFull(error))
+      /* prettier-ignore */ this.statemanager_fatal('getChildrenOf failed', `getChildrenOf ASK-1 failed: ` + errorToStringFull(error))
     }
 
     if (results.length > 0) {
