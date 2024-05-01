@@ -14,10 +14,10 @@ jobs:
   build:
     name: Run Build
     runs-on: ubuntu-latest
-    env:
-      HOME: /home/node
     container:
       image: ghcr.io/shardeum/jenkins-test-container:sys-153-nodeuser
+      env:
+        HOME: /home/node
       # options: --user root
 
     steps:
