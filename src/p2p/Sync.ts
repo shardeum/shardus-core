@@ -42,7 +42,7 @@ const newestCycleRoute: P2P.P2PTypes.Route<Handler> = {
   handler: (_req, res) => {
     profilerInstance.scopedProfileSectionStart('sync-newest-cycle')
     const newestCycle = CycleChain.newest || null
-    res.send(utils.stringify({ newestCycle }))
+    res.send(safeStringify({ newestCycle }))
     profilerInstance.scopedProfileSectionEnd('sync-newest-cycle')
   },
 }
@@ -123,7 +123,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
     nestedCountersInstance.countEvent('p2p', `sync-getting-cycles ${start} - ${end}`)
     const prevCycles = await getCycles(activeNodes, start, end)
     info(`Got cycles ${JSON.stringify(prevCycles.map((cycle) => cycle.counter))}`)
-    info(`  ${utils.stringify(prevCycles)}`)
+    info(`  ${logSafeStringify(prevCycles)}`)
 
     // If prevCycles is empty, start over
     if (prevCycles.length < 1) {
@@ -204,7 +204,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
   } while (
     squasher.final.updated.length < activeNodeCount(cycleToSyncTo) ||
     squasher.final.added.length < totalNodeCount(cycleToSyncTo)
-  )
+    )
 
   // Now that our node list is synced, validate the anchor cycle's cert
   // [TODO] [AS]
@@ -240,7 +240,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
   info('Synced to cycle', cycleToSyncTo.counter)
   info(`Sync complete; ${NodeList.activeByIdOrder.length} active nodes; ${CycleChain.cycles.length} cycles`)
   info(`NodeList after sync: ${JSON.stringify([...NodeList.nodes.entries()])}`)
-  info(`CycleChain after sync: ${utils.stringify(CycleChain.cycles)}`)
+  info(`CycleChain after sync: ${logSafeStringify(CycleChain.cycles)}`)
 
   const p2pSyncReport = {
     cycle: cycleToSyncTo.counter,
@@ -326,7 +326,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
   if (config.debug.enableCycleRecordDebugTool || config.debug.localEnableCycleRecordDebugTool) {
     if (Self.isActive) {
       const cycleData =
-        utils.stringify({
+        logSafeStringify({
           port: Self.port,
           cycleNumber: cycle.counter,
           cycleRecord: cycle,
@@ -347,7 +347,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
 
   /* prettier-ignore */ if (logFlags.important_as_error)
     info(
-      `digestCycle ${utils.stringify(
+      `digestCycle ${logSafeStringify(
         cycle
       )} from ${source}... note: CycleChain.newest.counter: ${logSafeStringify(
         CycleChain.newest
@@ -389,7 +389,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
   let nodeLimit = 2 //todo set this to a higher number, but for now I want to make sure it works in a small test
   if (NodeList.activeByIdOrder.length <= nodeLimit) {
     /* prettier-ignore */ if (logFlags.important_as_error) {
-    info(`
+      info(`
       Digested C${cycle.counter}
         cycle record: ${logSafeStringify(cycle)}
         cycle changes: ${JSON.stringify(changes)}
@@ -399,7 +399,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
     }
   } else {
     /* prettier-ignore */ if (logFlags.important_as_error) {
-    info(`
+      info(`
     Digested C${cycle.counter}
       cycle record: ${logSafeStringify(cycle)}
       cycle changes: ${JSON.stringify(changes)}

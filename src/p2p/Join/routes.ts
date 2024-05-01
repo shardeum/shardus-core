@@ -29,10 +29,10 @@ import { addFinishedSyncing } from './v2/syncFinished'
 import { processNewUnjoinRequest, UnjoinRequest } from './v2/unjoin'
 import { isActive } from '../Self'
 import { logFlags } from '../../logger'
-import { SyncStarted } from '@shardus/types/build/src/p2p/JoinTypes'
+import { JoinRequest, SyncStarted } from "@shardus/types/build/src/p2p/JoinTypes";
 import { addSyncStarted } from './v2/syncStarted'
 import { addStandbyRefresh } from './v2/standbyRefresh'
-import { safeStringify } from '../../utils'
+import { DeSerializeFromJsonString, safeParser, safeStringify } from "../../utils";
 import { testFailChance } from '../../utils'
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
@@ -61,7 +61,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'join',
   handler: async (req, res) => {
-    const joinRequest = req.body
+    const joinRequest: JoinRequest = DeSerializeFromJsonString(utils.stringify(req.body))
 
     if (!isActive && !Self.isRestartNetwork) {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: not-active`)
@@ -478,7 +478,7 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<SyncStarted, P2P.NodeLi
 }
 
 /**
- * Handler for syncing finished gossip. Gossip coming from Join Protocol v2 in `enterSyncingState()` of startupV2 in Self.ts and the function below. 
+ * Handler for syncing finished gossip. Gossip coming from Join Protocol v2 in `enterSyncingState()` of startupV2 in Self.ts and the function below.
  */
 const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.FinishedSyncingRequest, P2P.NodeListTypes.Node['id']> = (
   payload: P2P.JoinTypes.FinishedSyncingRequest,
