@@ -667,7 +667,7 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
       console.log('DEBUG CR-OOS: payload id: ', payload.nodeId, ' payload cycle: ', payload.cycleNumber, 'cC: ', CycleCreator.currentCycle, ' cQ: ', CycleCreator.currentQuarter)
     }
   }
-  
+
   try {
     // Ignore gossip outside of Q1 and Q2
     if (![1, 2].includes(CycleCreator.currentQuarter)) {
@@ -723,7 +723,12 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
     // Validate payload in addFinishedSyncing
     const addFinishedSyncingResult = addFinishedSyncing(payload)
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `sync-finished validation success: ${addFinishedSyncingResult.success}`)
-    /* prettier-ignore */ if (!addFinishedSyncingResult.success) nestedCountersInstance.countEvent('p2p', `sync-finished failure reason: ${addFinishedSyncingResult.reason}`)
+    if (!addFinishedSyncingResult.success) {
+      if (addFinishedSyncingResult.reason !== 'node has already submitted syncFinished request') {
+        if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: gossipSyncFinished rejected: ', addFinishedSyncingResult.reason, ' payload id: ', payload.nodeId, ' payload cycle: ', payload.cycleNumber)
+      }
+      nestedCountersInstance.countEvent('p2p', `sync-finished failure reason: ${addFinishedSyncingResult.reason}`)
+    }
     if (addFinishedSyncingResult.success) {
       Comms.sendGossip('gossip-sync-finished', payload, tracker, sender, NodeList.byIdOrder, false)
     } else {
