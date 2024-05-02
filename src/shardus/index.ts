@@ -1661,6 +1661,10 @@ class Shardus extends EventEmitter {
     return isNodeInRotationBounds(nodeId)
   }
 
+  getAgeIndexForNodeId(nodeId: string): { idx: number; total: number } {
+    return getAgeIndexForNodeId(nodeId)
+  }
+
   isNodeActiveByPubKey(pubKey: string): boolean {
     const node = this.p2p.state.getNodeByPubKey(pubKey)
     if (node == null) {
