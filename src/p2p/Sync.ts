@@ -42,7 +42,7 @@ const newestCycleRoute: P2P.P2PTypes.Route<Handler> = {
   handler: (_req, res) => {
     profilerInstance.scopedProfileSectionStart('sync-newest-cycle')
     const newestCycle = CycleChain.newest || null
-    res.send(safeStringify({ newestCycle }))
+    res.send(utils.stringify({ newestCycle }))
     profilerInstance.scopedProfileSectionEnd('sync-newest-cycle')
   },
 }
@@ -257,6 +257,9 @@ type SyncNode = Partial<
 >
 
 export async function syncNewCycles(activeNodes: SyncNode[]) {
+  //console.log(`calling syncNewCycles cC: ${CycleCreator.currentCycle} cQ: ${CycleCreator.currentQuarter}`)
+  //console.trace()
+
   let newestCycle = await getNewestCycle(activeNodes)
   info(`syncNewCycles: myNewest=${CycleChain.newest.counter} netNewest=${newestCycle.counter}`)
 
@@ -312,6 +315,9 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
 }
 
 export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: string) {
+  //console.log(`calling digestCycle cC: ${CycleCreator.currentCycle} cQ: ${CycleCreator.currentQuarter}`)
+  //console.trace()
+
   // get the node list hashes *before* applying node changes
   if (config.p2p.useSyncProtocolV2 || config.p2p.writeSyncProtocolV2) {
     cycle.nodeListHash = NodeList.computeNewNodeListHash()
@@ -381,6 +387,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
   }
 
   CycleChain.append(cycle)
+  CycleCreator.setDigestedCycle(true)
 
   // TODO: This seems like a possible location to inetvene if our node
   // is getting far behind on what it thinks the current cycle is
