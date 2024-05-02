@@ -2188,7 +2188,7 @@ class AccountPatcher {
           this.stateManager.config.p2p.useBinarySerializedEndpoints &&
           this.stateManager.config.p2p.getTrieHashesBinary
         ) {
-          promise = await this.p2p.askBinary<GetTrieHashesRequest, GetTrieHashesResponse>(
+          promise = this.p2p.askBinary<GetTrieHashesRequest, GetTrieHashesResponse>(
             node,
             InternalRouteEnum.binary_get_trie_hashes,
             value,
