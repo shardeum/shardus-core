@@ -734,7 +734,8 @@ function makeCycleRecord(
     nodeListHash: '',
     archiverListHash: '',
     standbyNodeListHash: '',
-  }) as P2P.CycleCreatorTypes.CycleRecord
+    random: config.debug.randomCycleData ? Math.floor(Math.random() * 1000) + 1 : 0,
+  }) as P2P.CycleCreatorTypes.CycleRecord & { random: number }
 
   submodules.map((submodule) => submodule.updateRecord(cycleTxs, cycleRecord, prevRecord))
   //Updating Cycle Record if network has entered 'Shutdown' Mode
@@ -818,7 +819,10 @@ async function fetchLatestRecord(): Promise<P2P.CycleCreatorTypes.CycleRecord> {
         this.fatalLogger.fatal(
           'CycleCreator: fetchLatestRecord_A: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf '
         )
-        nestedCountersInstance.countEvent('fetchLatestRecord', `fetchLatestRecord_A fail and apop self. ${shardusGetTime()}`)
+        nestedCountersInstance.countEvent(
+          'fetchLatestRecord',
+          `fetchLatestRecord_A fail and apop self. ${shardusGetTime()}`
+        )
         Apoptosis.apoptosizeSelf('Apoptosized within fetchLatestRecord() => src/p2p/CycleCreator.ts')
       }
 
@@ -833,7 +837,10 @@ async function fetchLatestRecord(): Promise<P2P.CycleCreatorTypes.CycleRecord> {
         'CycleCreator: fetchLatestRecord_B: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf ',
         utils.formatErrorMessage(err)
       )
-      nestedCountersInstance.countEvent('fetchLatestRecord', `fetchLatestRecord_B fail and apop self. ${shardusGetTime()}`)
+      nestedCountersInstance.countEvent(
+        'fetchLatestRecord',
+        `fetchLatestRecord_B fail and apop self. ${shardusGetTime()}`
+      )
       Apoptosis.apoptosizeSelf('Apoptosized within fetchLatestRecord() => src/p2p/CycleCreator.ts')
     }
     return null
@@ -1179,6 +1186,7 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
     } else {
       resp = await Comms.ask(node, 'compare-cert', req)
     }
+    console.log('compareCycleCert: resp:', resp)
     if (!validateCertsRecordTypes(resp, 'compareCycleCert')) return [null, node]
     if (!(resp && resp.certs && resp.certs[0].marker && resp.record)) {
       throw new Error('compareCycleCert: Invalid query response')

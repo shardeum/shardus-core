@@ -1060,6 +1060,8 @@ export interface ServerConfiguration {
     localEnableCycleRecordDebugTool: boolean
     /** Flag to enable/disable logs for debugging OOS cycle records **/
     cycleRecordOOSDebugLogs: boolean
+    /** Flag to enable/disbale adding random data to cycle record */
+    randomCycleData: boolean
   }
   /** Options for the statistics module */
   statistics?: {

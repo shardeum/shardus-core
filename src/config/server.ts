@@ -234,7 +234,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     forcedExpiration: false,
     ignoreStandbyRefreshChance: 0,
     localEnableCycleRecordDebugTool: false,
-    cycleRecordOOSDebugLogs: false
+    cycleRecordOOSDebugLogs: false,
+    randomCycleData: true,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {
@@ -294,7 +295,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     waitUpstreamTx: false,
     gossipCompleteData: false,
     numberOfReInjectNodes: 5,
-    maxPendingNonceTxs: 10
+    maxPendingNonceTxs: 10,
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,
