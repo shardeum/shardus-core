@@ -497,7 +497,7 @@ export async function askBinary<TReq, TResp>(
       nestedCountersInstance.countEvent('comms-route', `askBinary ${route} error ${err.Code}`)
     } else {
       nestedCountersInstance.countEvent('comms-route', `askBinary ${route} response error`)
-      /* prettier-ignore */ error(`P2P: askBinary: response extraction route: ${route} error: ${err}`)
+      /* prettier-ignore */ error(`P2P: askBinary: response extraction route: ${route} res: ${utils.SerializeToJsonString(res)} error: ${err}`)
       /* prettier-ignore */ console.log(`P2P: askBinary: response extraction route: ${route} res: ${utils.SerializeToJsonString(res)} error: ${err}`)
     }
     throw err
