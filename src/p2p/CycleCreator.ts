@@ -109,6 +109,9 @@ export let netConfig: any = {}
 let createCycleTag = 0
 
 let madeCycle = false // True if we successfully created the last cycle record, otherwise false
+
+export let digestedCycle = false // True if we have digested the last cycle record, otherwise false
+
 // not used anymore
 //let madeCert = false // set to True after we make our own cert and try to gossip it
 
@@ -229,6 +232,10 @@ const routes = {
 
 /** CONTROL FUNCTIONS */
 
+export function setDigestedCycle(value) {
+  digestedCycle = value
+}
+
 export function init() {
   // Get a handle to write to p2p.log
   p2pLogger = logger.getLogger('p2p')
@@ -348,6 +355,8 @@ async function cycleCreator() {
   createCycleTag++
   let callTag = `cct${createCycleTag}`
   /* prettier-ignore */ if (logFlags.verbose) info( `cc: start C${currentCycle} Q${currentQuarter} madeCycle: ${madeCycle} bestMarker: ${bestMarker} ${callTag}` )
+
+  //console.log(`CycleCreator: at start of cycleCreator: bestrecord: ${bestRecord}`)
 
   try {
     // Get the previous record
@@ -499,6 +508,8 @@ async function runQ1() {
   Self.emitter.emit('cycle_q1_start')
   profilerInstance.profileSectionStart('CycleCreator-runQ1')
 
+  setDigestedCycle(false)
+
   if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 
   const SECOND = 1000
@@ -584,6 +595,9 @@ async function runQ3() {
     }
   }
 
+  console.log(`CycleCreator: shardusGetTime: ${shardusGetTime()} currentStart:${currentStart}`)
+  console.log(`CycleCreator: time so far: ${shardusGetTime() - currentStart}`)
+
   /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("cycle record: ", record)
 
   /*
@@ -625,6 +639,8 @@ async function runQ3() {
   // Gossip your cert for this cycle with the network
   gossipMyCycleCert()
 
+  //console.log(`CycleCreator: at end of q3: bestrecord: ${bestRecord}`)
+
   profilerInstance.profileSectionEnd('CycleCreator-runQ3')
 }
 
@@ -633,6 +649,9 @@ async function runQ3() {
  */
 async function runQ4() {
   currentQuarter = 4
+
+  //console.log(`CycleCreator: at start of q4: bestrecord: ${bestRecord}`)
+
   if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 
   /* prettier-ignore */ info(`Q4: start: C${currentCycle} Q${currentQuarter}`)
@@ -681,6 +700,8 @@ async function runQ4() {
     // Dont need this any more since we are not doing anything after this
     // if (cycleQuarterChanged(myC, myQ)) return
     profilerInstance.profileSectionEnd('CycleCreator-runQ4')
+
+    //console.log(`CycleCreator: at end of q4: bestrecord: ${bestRecord}`)
   }
 }
 
