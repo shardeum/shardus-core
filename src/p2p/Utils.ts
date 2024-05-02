@@ -585,7 +585,7 @@ function isNodeRecentlyRotatedIn(
   numActiveNodes: number
 ): boolean {
   return (
-    numActiveNodes >= 10 + config.p2p.rotationEdgeToAvoid &&
+    numActiveNodes >= 10 &&
     config.p2p.rotationEdgeToAvoid &&
     idx <= config.p2p.rotationEdgeToAvoid
   )
@@ -596,17 +596,17 @@ function isNodeNearRotatingOut(
   numActiveNodes: number
 ): boolean {
   return (
-    numActiveNodes >= 10 + config.p2p.rotationEdgeToAvoid &&
+    numActiveNodes >= 10 &&
     config.p2p.rotationEdgeToAvoid &&
-    idx >= numActiveNodes - config.p2p.rotationEdgeToAvoid
+    idx > numActiveNodes - config.p2p.rotationEdgeToAvoid
   )
 }
 
 /**
- * Returns true if a node was recently rotate in or 
+ * Returns true if a node was recently rotate in or
  * will be rotated out soon
- * @param nodeId 
- * @returns 
+ * @param nodeId
+ * @returns
  */
 export function isNodeInRotationBounds(nodeId: string): boolean {
   const { idx, total } = NodeList.getAgeIndexForNodeId(nodeId)
