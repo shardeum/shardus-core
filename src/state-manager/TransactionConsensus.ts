@@ -1132,7 +1132,7 @@ class TransactionConsenus {
       }
 
       //let payload = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
-      this.p2p.sendGossipIn('spread_appliedReceipt2', payload, '', sender, gossipGroup, true)
+      this.p2p.sendGossipIn('spread_appliedReceipt2', payload, '', sender, gossipGroup, false)
       if (logFlags.debug) this.mainLogger.debug(`shareAppliedReceipt ${queueEntry.logID} sent gossip`)
     }
   }
