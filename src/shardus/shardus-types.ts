@@ -1197,6 +1197,10 @@ export interface ServerConfiguration {
     nodesToGossipAppliedReceipt: number
     // set "true" will prevent tx from expiring
     disableTxExpiration: boolean
+    // whether to remove the tx from the queue if it stuck for X min
+    removeStuckTxsFromQueue: boolean
+    // time to wait before removing the tx from the queue
+    stuckTxRemoveTime: number
   }
   /** Options for sharding calculations */
   sharding?: {
