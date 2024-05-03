@@ -299,7 +299,9 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     maxPendingNonceTxs: 10,
     attachDataToReceipt: true,
     nodesToGossipAppliedReceipt: 5,
-    disableTxExpiration: true
+    disableTxExpiration: true,
+    removeStuckTxsFromQueue: false,
+    stuckTxRemoveTime: 1000 * 60 * 2, // 2 minutes
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,
