@@ -4418,7 +4418,7 @@ class TransactionQueue {
       }
     }
     // this.txDebugMarkEndTime(queueEntry, 'total_queue_time')
-    this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx)
+    this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx.txId)
     if (queueEntry.txDebug) this.dumpTxDebugToStatList(queueEntry)
     this._transactionQueue.splice(currentIndex, 1)
     this._transactionQueueByID.delete(queueEntry.acceptedTx.txId)
@@ -4461,6 +4461,7 @@ class TransactionQueue {
       this.archivedQueueEntriesByID.delete(this.archivedQueueEntries[0].acceptedTx.txId)
       this.archivedQueueEntries.shift()
     }
+    if (logFlags.debug) this.mainLogger.debug(`removeFromQueue: ${queueEntry.logID} done`);
   }
 
   /***
@@ -5573,7 +5574,9 @@ class TransactionQueue {
                     //forward all finished data to corresponding nodes
                     const awaitStart = shardusGetTime()
                     // This is an async function but we do not await it
-                    // this.tellCorrespondingNodesFinalData(queueEntry)
+                    if (configContext.stateManager.attachDataToReceipt === false) {
+                      this.tellCorrespondingNodesFinalData(queueEntry)
+                    }
                     this.updateSimpleStatsObject(
                       processStats.awaitStats,
                       'tellCorrespondingNodesFinalData',
