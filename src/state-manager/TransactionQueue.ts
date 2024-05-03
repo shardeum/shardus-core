@@ -4778,8 +4778,10 @@ class TransactionQueue {
 
               /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> M3 * 2. NormalTX Timed out. didSync == false. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
 
-              this.setTXExpired(queueEntry, currentIndex, 'old, timeM3 * 2')
-              continue
+              if (configContext.stateManager.disableTxExpiration === false) {
+                this.setTXExpired(queueEntry, currentIndex, 'old, timeM3 * 2')
+                continue
+              }
             }
 
             //This case should not happen now. but we may add it back in later.
@@ -4816,8 +4818,10 @@ class TransactionQueue {
 
                 /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> M3. receiptRequestFail after Timed Out. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
 
-                this.setTXExpired(queueEntry, currentIndex, 'old, timeM3, requestingReceiptFailed')
-                continue
+                if (configContext.stateManager.disableTxExpiration === false) {
+                  this.setTXExpired(queueEntry, currentIndex, 'old, timeM3, requestingReceiptFailed')
+                  continue
+                }
               }
 
               // This is the expiry case where repairFailed
@@ -4836,8 +4840,10 @@ class TransactionQueue {
 
                 /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> M3. repairFailed after Timed Out. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
 
-                this.setTXExpired(queueEntry, currentIndex, 'old, timeM3, repairFailed')
-                continue
+                if (configContext.stateManager.disableTxExpiration === false) {
+                  this.setTXExpired(queueEntry, currentIndex, 'old, timeM3, repairFailed')
+                  continue
+                }
               }
 
               // a few cases to wait for a receipt or request a receipt
@@ -4914,7 +4920,6 @@ class TransactionQueue {
               /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `txExpired txAge > timeM3 * 50. still syncing. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
 
               this.setTXExpired(queueEntry, currentIndex, 'old, timeM3 * 50!!')
-
               continue
             }
           }
@@ -4932,8 +4937,10 @@ class TransactionQueue {
                 //todo only keep on for temporarliy
                 /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> M2 canceled due to upstream TXs. sieveT:${queueEntry.txSieveTime}`)
 
-                this.setTXExpired(queueEntry, currentIndex, 'm2, processing or awaiting')
-                continue
+                if (configContext.stateManager.disableTxExpiration === false) {
+                  this.setTXExpired(queueEntry, currentIndex, 'm2, processing or awaiting')
+                  continue
+                }
               }
             }
           }
@@ -4943,8 +4950,10 @@ class TransactionQueue {
           // seen vote but we are past timeM3 + voteSeenExpirationTime
           if (txAge > timeM3 + configContext.stateManager.confirmationSeenExpirationTime + 10000) {
             nestedCountersInstance.countEvent('txExpired', `txAge > timeM3 + confirmSeenExpirationTime + 10s`)
-            this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + confirmSeenExpirationTime + 10s')
-            continue
+            if (configContext.stateManager.disableTxExpiration === false) {
+              this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + confirmSeenExpirationTime + 10s')
+              continue
+            }
           } else if (txAge > timeM3 + configContext.stateManager.confirmationSeenExpirationTime) {
             let shouldExpire = true
             if (queueEntry.hasRobustConfirmation && queueEntry.isInExecutionHome) {
@@ -4953,25 +4962,31 @@ class TransactionQueue {
             }
             if (shouldExpire) {
               nestedCountersInstance.countEvent('txExpired', `> timeM3 + confirmSeenExpirationTime hasRobustConfirmation: ${queueEntry.hasRobustConfirmation}`)
-              this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + confirmSeenExpirationTime general case has' +
-                ' vote and robust confirmation but fail' +
-                ' to' +
-                ' commit the tx')
-              continue
+              if (configContext.stateManager.disableTxExpiration === false) {
+                this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + confirmSeenExpirationTime general case has' +
+                  ' vote and robust confirmation but fail' +
+                  ' to' +
+                  ' commit the tx')
+                continue
+              }
             }
           } else if (txAge > timeM3 + configContext.stateManager.voteSeenExpirationTime && hasSeenVote && !hasSeenConfirmation) {
             nestedCountersInstance.countEvent('txExpired', `> timeM3 + voteSeenExpirationTime`)
             this.mainLogger.error(`${queueEntry.logID} txAge > timeM3 + voteSeenExpirationTime general case has vote but fail to generate receipt`)
-            this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + voteSeenExpirationTime general case has vote but fail' +
-              ' to' +
-              ' commit the tx')
-            continue
+            if (configContext.stateManager.disableTxExpiration === false) {
+              this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + voteSeenExpirationTime general case has vote but fail' +
+                ' to' +
+                ' commit the tx')
+              continue
+            }
           } else if (txAge > timeM3 + configContext.stateManager.noVoteSeenExpirationTime && !hasSeenVote) {
             // seen no vote but past timeM3 + noVoteSeenExpirationTime
             nestedCountersInstance.countEvent('txExpired', `> timeM3 + noVoteSeenExpirationTime`)
             this.mainLogger.error(`${queueEntry.logID} txAge > timeM3 + noVoteSeenExpirationTime general case. no vote seen`)
-            this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + noVoteSeenExpirationTime general case. no vote seen')
-            continue
+            if (configContext.stateManager.disableTxExpiration === false) {
+              this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + noVoteSeenExpirationTime general case. no vote seen')
+              continue
+            }
           }
 
           //If we are past time M2 there are few cases where we should give up on a TX right away
@@ -4999,7 +5014,9 @@ class TransactionQueue {
 
               /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> timeM2 fail ${reason} state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} `)
 
-              this.setTXExpired(queueEntry, currentIndex, 'm2 ' + reason)
+              if (configContext.stateManager.disableTxExpiration === false) {
+                this.setTXExpired(queueEntry, currentIndex, 'm2 ' + reason)
+              }
             }
           }
 
