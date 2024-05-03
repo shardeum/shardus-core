@@ -1292,6 +1292,8 @@ function validateJoinRequestTimestamp(joinRequestTimestamp: number): JoinRequest
   const requestValidUpperBound = cycleStarts + cycleDuration
   const requestValidLowerBound = cycleStarts - cycleDuration
 
+  console.log('DEBUG CR-OOS: validateJoinRequestTimestamp: Cyclechain.newest.counter: ', CycleChain.newest.counter.toString())
+
   if (joinRequestTimestamp < requestValidLowerBound) {
     nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-not-meet-lowerbound`)
     /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, timestamp is earlier than allowed cycle range')
