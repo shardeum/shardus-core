@@ -1119,9 +1119,7 @@ class TransactionConsenus {
             writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId]
               ? wrappedStates[writtenAccount.accountId].stateId
               : ''
-            writtenAccountsMap[writtenAccount.accountId].prevDataCopy = wrappedStates[writtenAccount.accountId]
-              ? utils.deepCopy(writtenAccount.data)
-              : {}
+            writtenAccountsMap[writtenAccount.accountId].prevDataCopy = null
 
             datas[writtenAccount.accountId] = writtenAccount.data
           }

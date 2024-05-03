@@ -1205,8 +1205,7 @@ class TransactionQueue {
       } else {
         const wrappedState = wrappedStates[key]
         wrappedState.prevStateId = wrappedState.stateId
-        // wrappedState.prevDataCopy = utils.deepCopy(wrappedState.data)
-        wrappedState.prevDataCopy = null  // Setting this to null to see if anything breaks  
+        wrappedState.prevDataCopy = utils.deepCopy(wrappedState.data)
 
         // important to update the wrappedState timestamp here to prevent bad timestamps from propagating the system
         const { timestamp: updatedTimestamp } = this.app.getTimestampAndHashFromAccount(wrappedState.data)
