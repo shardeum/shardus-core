@@ -90,11 +90,19 @@ class LoadDetection extends EventEmitter {
         )
       }
       if (this.executeQueueLimit !== Context.config.loadDetection.executeQueueLimit) {
-        this.executeQueueLimit = typeof Context.config.loadDetection.desiredTxTime === 'string' ? Number(Context.config.loadDetection.executeQueueLimit) : Context.config.loadDetection.executeQueueLimit
+        this.executeQueueLimit = typeof Context.config.loadDetection.executeQueueLimit === 'string' ? Number(Context.config.loadDetection.executeQueueLimit) : Context.config.loadDetection.executeQueueLimit
         console.log('Config updated for loadDetection.executeQueueLimit', this.executeQueueLimit)
         nestedCountersInstance.countEvent(
           'loadRelated',
           `executeQueueLimit config updated`
+        )
+      }
+      if (this.queueLimit !== Context.config.loadDetection.queueLimit) {
+        this.queueLimit = typeof Context.config.loadDetection.queueLimit === 'string' ? Number(Context.config.loadDetection.queueLimit) : Context.config.loadDetection.queueLimit
+        console.log('Config updated for loadDetection.queueLimit', this.queueLimit)
+        nestedCountersInstance.countEvent(
+          'loadRelated',
+          `queueLimit config updated`
         )
       }
     } catch (e) {
