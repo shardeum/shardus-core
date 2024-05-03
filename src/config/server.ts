@@ -229,7 +229,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     produceBadVote: false,
     produceBadChallenge: false,
     debugNTPErrorWindowMs: 200,
-    enableScopedProfiling: true,
+    enableScopedProfiling: false,
     enableCycleRecordDebugTool: false,
     forcedExpiration: false,
     ignoreStandbyRefreshChance: 0,

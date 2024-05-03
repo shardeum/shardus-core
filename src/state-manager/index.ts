@@ -305,7 +305,7 @@ class StateManager {
     this.lastActiveNodeCount = 0
 
     this.extendedRepairLogging = true
-    this.consensusLog = true
+    this.consensusLog = false
 
     this.shardValuesByCycle = new Map()
     this.currentCycleShardData = null as CycleShardData | null
