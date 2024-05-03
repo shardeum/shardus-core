@@ -7216,11 +7216,16 @@ class TransactionQueue {
       }
     }
   }
-  clearQueueItems(): void {
-    for (const queueEntry of this._transactionQueue) {
-      const currentIndex = this._transactionQueue.indexOf(queueEntry)
-      this.removeFromQueue(queueEntry, currentIndex)
+  clearQueueItems(): number {
+    try {
+      for (const queueEntry of this._transactionQueue) {
+        const currentIndex = this._transactionQueue.indexOf(queueEntry)
+        this.removeFromQueue(queueEntry, currentIndex)
+      }
+    } catch (e) {
+      console.error('clearQueueItems error:', e)
     }
+    return this._transactionQueue.length
   }
   getQueueItems(): any[] {
     return this._transactionQueue.map((queueEntry) => {
