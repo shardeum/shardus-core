@@ -786,6 +786,15 @@ export function modeAllowsValidNodeChecks() {
   return true
 }
 
+function calculateGossipFactor(numberOfNodes: number): number {
+  if (numberOfNodes === 0) return config.p2p.gossipFactor
+  function getBaseLog(x: number, y: number) {
+    return Math.log(y) / Math.log(x);
+  }
+  const gossipFactor = Math.ceil(getBaseLog(3, numberOfNodes))
+  return gossipFactor
+}
+
 /**
  * Send Gossip to all nodes, using gossip in
  */
@@ -843,7 +852,7 @@ export async function sendGossip(
     return msgSize
   }
 
-  let gossipFactor = config.p2p.gossipFactor
+  let gossipFactor = calculateGossipFactor(nodes.length)
   if (factor > 0) {
     gossipFactor = factor
   }
