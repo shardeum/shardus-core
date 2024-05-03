@@ -956,6 +956,17 @@ class TransactionQueue {
     return false
   }
 
+  getPendingCountInNonceQueue(): { totalQueued: number; totalAccounts: number; avgQueueLength: number} {
+    let totalQueued = 0
+    let totalAccounts = 0
+    for (const queue of this.nonceQueue.values()) {
+      totalQueued += queue.length
+      totalAccounts++
+    }
+    const avgQueueLength = totalQueued / totalAccounts
+    return { totalQueued, totalAccounts, avgQueueLength }
+  }
+
   addTransactionToNonceQueue(nonceQueueEntry: NonceQueueItem): {success: boolean; reason?: string} {
     try {
       let queue = this.nonceQueue.get(nonceQueueEntry.accountId)
@@ -2955,7 +2966,7 @@ class TransactionQueue {
 
         const message = { txid: queueEntry.acceptedTx.txId, timestamp: queueEntry.acceptedTx.timestamp }
         let result = null
-        // GOLD-67 to be safe this function needs a try/catch block to prevent a timeout from causing an unhandled exception    
+        // GOLD-67 to be safe this function needs a try/catch block to prevent a timeout from causing an unhandled exception
         if (
           this.stateManager.config.p2p.useBinarySerializedEndpoints &&
           this.stateManager.config.p2p.requestReceiptForTxBinary
@@ -4407,7 +4418,7 @@ class TransactionQueue {
       }
     }
     // this.txDebugMarkEndTime(queueEntry, 'total_queue_time')
-    this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx.txId)
+    this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx)
     if (queueEntry.txDebug) this.dumpTxDebugToStatList(queueEntry)
     this._transactionQueue.splice(currentIndex, 1)
     this._transactionQueueByID.delete(queueEntry.acceptedTx.txId)
@@ -5562,7 +5573,7 @@ class TransactionQueue {
                     //forward all finished data to corresponding nodes
                     const awaitStart = shardusGetTime()
                     // This is an async function but we do not await it
-                    this.tellCorrespondingNodesFinalData(queueEntry)
+                    // this.tellCorrespondingNodesFinalData(queueEntry)
                     this.updateSimpleStatsObject(
                       processStats.awaitStats,
                       'tellCorrespondingNodesFinalData',
@@ -5728,6 +5739,13 @@ class TransactionQueue {
               //   }
               // }
 
+              // remove from queue if we have commited data for this tx
+              if (configContext.stateManager.attachDataToReceipt && queueEntry.accountDataSet === true) {
+                if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_removeFromQueue : ${queueEntry.logID} because accountDataSet is true`)
+                this.removeFromQueue(queueEntry, currentIndex)
+                continue
+              }
+
               //collectedFinalData
               const vote = this.stateManager.getReceiptVote(queueEntry)
               const accountsNotStored = new Set()
@@ -5772,13 +5790,6 @@ class TransactionQueue {
 
                 if (incomplete && missingAccounts.length > 0) {
                   nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData incomplete')
-                  // /* prettier-ignore */ if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData incomplete : ${queueEntry.logID}, waiting queueEntry.debug.waitingOn`)
-
-                  // In the past we would ask for final data again if enough time ges by.  This is currently disabled
-                  // const txAge = shardusGetTime() - queueEntry.acceptedTx.timestamp
-                  // if (txAge > timeM2_5 && !queueEntry.queryingFinalData) {
-                  //   this.requestFinalData(queueEntry, missingAccounts)
-                  // }
                 }
 
                 /* eslint-enable security/detect-object-injection */
@@ -6151,6 +6162,7 @@ class TransactionQueue {
       queueEntry.collectedData,
       queueEntry.preApplyTXResult?.applyResponse
     )
+    this.stateManager.eventEmitter.emit('txExpired', queueEntry.acceptedTx.txId)
 
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'txExpired', `tx: ${this.app.getSimpleTxDebugValue(queueEntry.acceptedTx?.data)}` )
 

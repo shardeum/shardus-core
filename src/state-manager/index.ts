@@ -2237,6 +2237,12 @@ class StateManager {
       res.end()
     })
 
+    Context.network.registerExternalGet('debug-noncequeue-count', isDebugModeMiddleware, (req, res) => {
+      let result = this.transactionQueue.getPendingCountInNonceQueue()
+      res.json(result)
+      res.end()
+    })
+
     Context.network.registerExternalGet('debug-stuck-processing', isDebugModeMiddleware, (_req, res) => {
       res.send(utils.safeStringify(this.transactionQueue.getDebugProccessingStatus()))
     })

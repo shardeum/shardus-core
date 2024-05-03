@@ -663,13 +663,7 @@ class TransactionConsenus {
     this.p2p.registerGossipHandler(
       'spread_appliedReceipt2',
       async (
-        payload: {
-          txid: string
-          result?: boolean
-          appliedVote?: AppliedVote
-          signatures?: Shardus.Sign[]
-          app_data_hash?: string
-        },
+        payload: any,
         tracker: string,
         msgSize: number
       ) => {
@@ -677,8 +671,19 @@ class TransactionConsenus {
         profilerInstance.scopedProfileSectionStart('spread_appliedReceipt2', false, msgSize)
         const respondSize = cUninitializedSize
         try {
-          const receivedAppliedReceipt2 = payload as AppliedReceipt2
-          let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(receivedAppliedReceipt2.txid) // , payload.timestamp)
+          // extract txId
+          let txId: string
+          let receivedAppliedReceipt2: AppliedReceipt2
+          if (Context.config.stateManager.attachDataToReceipt) {
+            txId = payload.receipt?.txid
+            receivedAppliedReceipt2 = payload.receipt as AppliedReceipt2
+          } else {
+            receivedAppliedReceipt2 = payload as AppliedReceipt2
+            txId = receivedAppliedReceipt2.txid
+          }
+
+          // check if we have the queue entry
+          let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId) // , payload.timestamp)
           if (queueEntry == null) {
             if (queueEntry == null) {
               // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
@@ -695,8 +700,8 @@ class TransactionConsenus {
               /* prettier-ignore */
               if (logFlags.error || this.stateManager.consensusLog)
                 this.mainLogger.error(
-                  `spread_appliedReceipt no queue entry for ${receivedAppliedReceipt2.txid} dbg:${
-                    this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]
+                  `spread_appliedReceipt no queue entry for ${txId} dbg:${
+                    this.stateManager.debugTXHistory[utils.stringifyReduce(txId)]
                   }`
                 )
               // NEW start repair process that will find the TX then apply repairs
@@ -705,11 +710,12 @@ class TransactionConsenus {
             }
           }
 
+          // for debugging and testing purpose
           if (
             this.stateManager.testFailChance(
               this.stateManager.ignoreRecieptChance,
               'spread_appliedReceipt2',
-              utils.stringifyReduce(receivedAppliedReceipt2.txid),
+              utils.stringifyReduce(txId),
               '',
               logFlags.verbose
             ) === true
@@ -717,12 +723,13 @@ class TransactionConsenus {
             return
           }
 
-          // TODO STATESHARDING4 ENDPOINTS check payload format
-          // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
+          // todo: STATESHARDING4 ENDPOINTS check payload format
+          // todo: STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
 
           const receiptNotNull = receivedAppliedReceipt2 != null
 
-          if (queueEntry.state === 'expired' || queueEntry.state === 'almostExpired') {
+          // repair only if data is not attached to the receipt
+          if (Context.config.stateManager.attachDataToReceipt === false && (queueEntry.state === 'expired' || queueEntry.state === 'almostExpired')) {
             //have we tried to repair this yet?
             const startRepair = queueEntry.repairStarted === false
             /* prettier-ignore */
@@ -738,6 +745,7 @@ class TransactionConsenus {
             //return
           }
 
+          // decide whether we should store and forward the receipt
           let shouldStoreAndForward = false
           if (this.config.stateManager.useNewPOQ === false) {
             shouldStoreAndForward = queueEntry.gossipedReceipt === false
@@ -785,7 +793,18 @@ class TransactionConsenus {
                 )
             }
           }
+          // if we are tx group node and haven't got data yet, we should store and forward the receipt
+          if (shouldStoreAndForward === false) {
+            if (queueEntry.accountDataSet === false || Object.keys(queueEntry.collectedFinalData).length === 0) {
+              shouldStoreAndForward = true
+              if (logFlags.debug)
+                this.mainLogger.debug(
+                  `spread_appliedReceipt2 ${queueEntry.logID} we do not have account data yet. will store and forward`
+                )
+            }
+          }
 
+          // process, store and forward the receipt
           if (shouldStoreAndForward === true && queueEntry.gossipedReceipt === false) {
             queueEntry.gossipedReceipt = true
             /* prettier-ignore */
@@ -797,6 +816,49 @@ class TransactionConsenus {
             if (queueEntry.archived === false) {
               queueEntry.recievedAppliedReceipt2 = receivedAppliedReceipt2
               queueEntry.appliedReceipt2 = receivedAppliedReceipt2 // is this necessary?
+            } else {
+              this.mainLogger.error(`spread_appliedReceipt2 queueEntry.archived === true`)
+            }
+
+            // commit the accounts if the receipt is valid and has data attached
+            if (Context.config.stateManager.attachDataToReceipt && receivedAppliedReceipt2.result) {
+              const wrappedStates = payload.wrappedStates as { [key: string]: Shardus.WrappedResponse}
+              if (wrappedStates == null) {
+                nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 no wrappedStates`)
+                this.mainLogger.error(`spread_appliedReceipt2 no wrappedStates for ${txId}`)
+              } else {
+                const filteredStates = {}
+                const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
+                  this.stateManager.currentCycleShardData.nodeShardData
+                for (const accountId in wrappedStates) {
+                  const isLocal = ShardFunctions.testAddressInRange(
+                    accountId,
+                    nodeShardData.storedPartitions
+                  )
+                  if (isLocal) {
+                    filteredStates[accountId] = 1
+                  }
+                }
+                const accountRecords = []
+                for (const accountId in wrappedStates) {
+                  if (filteredStates[accountId] == null) continue
+                  const wrappedState = wrappedStates[accountId] as Shardus.WrappedResponse
+                  const indexOfAccountIdInVote = receivedAppliedReceipt2.appliedVote.account_id.indexOf(accountId)
+                  if (indexOfAccountIdInVote === -1) {
+                    this.mainLogger.error(`spread_appliedReceipt2 accountId ${accountId} not found in appliedVote`)
+                    continue
+                  }
+                  const afterStateHash = receivedAppliedReceipt2.appliedVote.account_state_hash_after[indexOfAccountIdInVote]
+                  if (wrappedState.stateId !== afterStateHash) {
+                    this.mainLogger.error(`spread_appliedReceipt2 accountId ${accountId} state hash mismatch with appliedVote`)
+                    continue
+                  }
+                  queueEntry.collectedFinalData[accountId] = wrappedState // processTx() will do actual commit
+                  accountRecords.push(wrappedState)
+                  nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 add to final data`, accountRecords.length)
+                }
+                if (logFlags.debug) this.mainLogger.debug(`Use final data from appliedReceipt2 ${queueEntry.logID}`, queueEntry.collectedFinalData);
+              }
             }
 
             // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.receivedAppliedReceipt2
@@ -1029,8 +1091,34 @@ class TransactionConsenus {
         `share appliedReceipt to neighbors`,
         gossipGroup
       )
+      let payload: any = queueEntry.appliedReceipt2
 
-      const payload = queueEntry.appliedReceipt2
+      if (Context.config.stateManager.attachDataToReceipt) {
+        // Report data to corresponding nodes
+        const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
+        const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
+
+        const applyResponse = queueEntry.preApplyTXResult.applyResponse
+        let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
+        const writtenAccountsMap: WrappedResponses = {}
+        if (applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+          for (const writtenAccount of applyResponse.accountWrites) {
+            writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+            writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId]
+              ? wrappedStates[writtenAccount.accountId].stateId
+              : ''
+            writtenAccountsMap[writtenAccount.accountId].prevDataCopy = wrappedStates[writtenAccount.accountId]
+              ? utils.deepCopy(writtenAccount.data)
+              : {}
+
+            datas[writtenAccount.accountId] = writtenAccount.data
+          }
+          //override wrapped states with writtenAccountsMap which should be more complete if it included
+          wrappedStates = writtenAccountsMap
+        }
+        payload = { receipt: queueEntry.appliedReceipt2, wrappedStates }
+      }
+
       //let payload = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
       this.p2p.sendGossipIn('spread_appliedReceipt2', payload, '', sender, gossipGroup, true)
       if (logFlags.debug) this.mainLogger.debug(`shareAppliedReceipt ${queueEntry.logID} sent gossip`)
