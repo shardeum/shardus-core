@@ -295,7 +295,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     gossipCompleteData: false,
     numberOfReInjectNodes: 5,
     maxPendingNonceTxs: 10,
-    attachDataToReceipt: true
+    attachDataToReceipt: true,
+    nodesToGossipAppliedReceipt: 5
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

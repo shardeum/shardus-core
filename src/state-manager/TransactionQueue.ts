@@ -5522,7 +5522,17 @@ class TransactionQueue {
                   nestedCountersInstance.countEvent('consensus', 'hasAppliedReceiptMatchingPreApply: true')
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
 
-                  const shouldSendReceipt = true
+                  let shouldSendReceipt = false
+                  let numberOfSharingNodes = configContext.stateManager.nodesToGossipAppliedReceipt
+                  if (numberOfSharingNodes > queueEntry.executionGroup.length) numberOfSharingNodes = queueEntry.executionGroup.length
+                  const highestRankedNodeIds = queueEntry.executionGroup.slice(0, numberOfSharingNodes).map(n => n.id)
+                  if (highestRankedNodeIds.includes(Self.id)) {
+                    // We are one of the top 5 nodes, so we should send the receipt
+                    shouldSendReceipt = true
+                    nestedCountersInstance.countEvent('consensus', 'shouldSendReceipt: true')
+                  } else {
+                    nestedCountersInstance.countEvent('consensus', 'shouldSendReceipt: false')
+                  }
                   // shouldSendReceipt = queueEntry.recievedAppliedReceipt == null
 
                   //todo check cant_apply flag to make sure a vote can form with it!

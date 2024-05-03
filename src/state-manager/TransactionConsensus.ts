@@ -713,6 +713,13 @@ class TransactionConsenus {
               return
             }
           }
+          if (queueEntry.hasValidFinalData || queueEntry.accountDataSet) {
+            /* prettier-ignore */
+            if (logFlags.debug || this.stateManager.consensusLog)
+              this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} Already Shared`)
+            nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 skipped Already Shared`)
+            return
+          }
 
           // for debugging and testing purpose
           if (
