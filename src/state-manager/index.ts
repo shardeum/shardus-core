@@ -2243,6 +2243,12 @@ class StateManager {
       res.end()
     })
 
+    Context.network.registerExternalGet('debug-queue-items', isDebugModeMiddleware, (req, res) => {
+      let result = this.transactionQueue.getQueueItems()
+      res.write(utils.stringify(result))
+      res.end()
+    })
+
     Context.network.registerExternalGet('debug-stuck-processing', isDebugModeMiddleware, (_req, res) => {
       res.send(utils.safeStringify(this.transactionQueue.getDebugProccessingStatus()))
     })

@@ -99,6 +99,7 @@ export type QueueEntry = {
   receivedBestChallenger?: Shardus.NodeWithRank
   newVotes: boolean
   voteCastAge: number
+  dataSharedTimestamp: number
   firstVoteReceivedTimestamp: number
   firstConfirmOrChallengeTimestamp: number
   lastVoteReceivedTimestamp: number
@@ -112,7 +113,8 @@ export type QueueEntry = {
   queryingRobustVote?: boolean
   queryingRobustConfirmOrChallenge?: boolean
   queryingRobustAccountData?: boolean
-  queryingFinalData?: boolean
+  queryingFinalData: boolean
+  lastFinalDataRequestTimestamp: number
   topConfirmations: Set<string>
   topVoters: Set<string>
   almostExpired?: boolean

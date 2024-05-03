@@ -670,6 +670,20 @@ class TransactionConsenus {
         nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 handler')
         profilerInstance.scopedProfileSectionStart('spread_appliedReceipt2', false, msgSize)
         const respondSize = cUninitializedSize
+
+        // ignore the message for debugging purpose
+        if (
+          this.stateManager.testFailChance(
+            this.stateManager.ignoreRecieptChance,
+            'spread_appliedReceipt2',
+            utils.stringifyReduce(payload.txid),
+            '',
+            logFlags.verbose
+          ) === true
+        ) {
+          return
+        }
+
         try {
           // extract txId
           let txId: string
@@ -681,6 +695,7 @@ class TransactionConsenus {
             receivedAppliedReceipt2 = payload as AppliedReceipt2
             txId = receivedAppliedReceipt2.txid
           }
+
           if (receivedAppliedReceipt2 == null || receivedAppliedReceipt2.confirmOrChallenge == null) {
             nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null receipt`)
             return
