@@ -681,6 +681,10 @@ class TransactionConsenus {
             receivedAppliedReceipt2 = payload as AppliedReceipt2
             txId = receivedAppliedReceipt2.txid
           }
+          if (receivedAppliedReceipt2 == null || receivedAppliedReceipt2.confirmOrChallenge == null) {
+            nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null receipt`)
+            return
+          }
 
           // check if we have the queue entry
           let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId) // , payload.timestamp)
