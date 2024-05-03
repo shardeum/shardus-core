@@ -294,7 +294,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     waitUpstreamTx: false,
     gossipCompleteData: false,
     numberOfReInjectNodes: 5,
-    maxPendingNonceTxs: 10
+    maxPendingNonceTxs: 10,
+    attachDataToReceipt: true
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

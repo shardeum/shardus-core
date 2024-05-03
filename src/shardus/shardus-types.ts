@@ -1189,6 +1189,8 @@ export interface ServerConfiguration {
     numberOfReInjectNodes: number
     // max number of pending nonce tx for an account
     maxPendingNonceTxs: number
+    // should attach final data to receipt
+    attachDataToReceipt: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
