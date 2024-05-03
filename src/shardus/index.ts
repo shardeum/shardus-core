@@ -1607,18 +1607,27 @@ class Shardus extends EventEmitter {
             )
           nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: ${message}`)
         }
+
         const result: ShardusTypes.InjectTxResponse = await this.app.injectTxToConsensor([validator], tx)
-        if (result == null || result.success === false) {
+
+        if (result == null) {
           if (logFlags.debug)
             this.mainLogger.debug(
-              `Failed to forward tx ${txId} to node ${validator.id}`
+              `Got null/undefined response upon forwarding injected tx: ${txId} to node ${validator.id}`
             )
           continue
+        }
+        if (result && result.success === false) {
+          if (logFlags.debug)
+            this.mainLogger.debug(
+              `Got unsuccessful response upon forwarding injected tx: ${validator.id}. ${message} ${utils.stringify(tx)}`
+            )
+          return { success: false, reason: result.reason, status: 500 }
         }
         if (result && result.success === true) {
           if (logFlags.debug)
             this.mainLogger.debug(
-              `Forwarding injected tx to ${validator.id} succeeded. ${message} ${utils.stringify(tx)}`
+              `Got successful response upon forwarding injected tx: ${validator.id}. ${message} ${utils.stringify(tx)}`
             )
           return { success: true, reason: 'Transaction forwarded to validators', status: 200 }
         }
