@@ -293,6 +293,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     voterPercentage: 0.1,
     waitUpstreamTx: false,
     gossipCompleteData: false,
+    shareCompleteData: true,
     numberOfReInjectNodes: 5,
     maxPendingNonceTxs: 10,
     attachDataToReceipt: true,

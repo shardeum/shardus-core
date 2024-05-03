@@ -1185,6 +1185,8 @@ export interface ServerConfiguration {
     waitUpstreamTx: boolean
     // whether the node should gossip complete data
     gossipCompleteData: boolean
+    // whether the node should share the complete data to neighbors
+    shareCompleteData: boolean
     // how many node to re-inject the tx received from client
     numberOfReInjectNodes: number
     // max number of pending nonce tx for an account
