@@ -1951,7 +1951,8 @@ class TransactionQueue {
         accountDataSet: false,
         topConfirmations: new Set(),
         topVoters: new Set(),
-        hasRobustConfirmation: false
+        hasRobustConfirmation: false,
+        sharedCompleteData: false
       } // age comes from timestamp
       this.txDebugMarkStartTime(txQueueEntry, 'total_queue_time')
       this.txDebugMarkStartTime(txQueueEntry, 'aging')
@@ -2557,15 +2558,13 @@ class TransactionQueue {
     if (queueEntry.dataCollected === queueEntry.uniqueKeys.length) {
       //  queueEntry.tx Keys.allKeys.length
       queueEntry.hasAll = true
-      this.gossipCompleteData(queueEntry)
+      // this.gossipCompleteData(queueEntry)
+      if (queueEntry.executionGroup.length > 1) this.shareCompleteDataToNeighbours(queueEntry)
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
           `queueEntryAddData hasAll: true for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id}`
         )
       }
-    } else {
-      // gossip the received data to execution nodes
-      // todo: confirm with Omar. it seems like a extra gossiping. we should gossip only when we have all the data
     }
 
     if (data.localCache) {
@@ -2575,6 +2574,44 @@ class TransactionQueue {
 
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_addData', `${queueEntry.logID}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
     profilerInstance.profileSectionStart('queueEntryAddData', true)
+  }
+
+  async shareCompleteDataToNeighbours(queueEntry: QueueEntry): Promise<void> {
+    if (configContext.stateManager.shareCompleteData === false) {
+      return
+    }
+    if (queueEntry.hasAll === false || queueEntry.sharedCompleteData) {
+      return
+    }
+    if (queueEntry.isInExecutionHome === false) {
+      return
+    }
+    const dataToShare: WrappedResponses = {}
+    const stateList: Shardus.WrappedResponse[] = []
+    for (const accountId in queueEntry.collectedData) {
+      const data = queueEntry.collectedData[accountId]
+      const riCacheResult = await this.app.getCachedRIAccountData([accountId])
+      if (riCacheResult != null && riCacheResult.length > 0) {
+        nestedCountersInstance.countEvent('shareCompleteDataToNeighbours', 'riCacheResult, skipping')
+        continue
+      } else {
+        dataToShare[accountId] = data
+        stateList.push(data)
+      }
+    }
+    const payload = {txid: queueEntry.acceptedTx.txId, stateList}
+    const neighboursNodes = utils.selectNeighbors(queueEntry.executionGroup, queueEntry.ourExGroupIndex, 2)
+    if (stateList.length > 0) {
+      this.broadcastState(neighboursNodes, payload)
+
+      queueEntry.sharedCompleteData = true
+      nestedCountersInstance.countEvent(`queueEntryAddData`, `sharedCompleteData stateList: ${stateList.length} neighbours: ${neighboursNodes.length}`)
+      if (logFlags.debug || this.stateManager.consensusLog) {
+        this.mainLogger.debug(
+          `shareCompleteDataToNeighbours: shared complete data for txId ${queueEntry.logID} at timestamp: ${shardusGetTime()} nodeId: ${Self.id} to neighbours: ${JSON.stringify(neighboursNodes.map((node) => node.id))}`
+        )
+      }
+    }
   }
 
   async gossipCompleteData(queueEntry: QueueEntry): Promise<void> {
@@ -4090,9 +4127,20 @@ class TransactionQueue {
     if (senderNode === null) return false
 
     const senderHasAddress = ShardFunctions.testAddressInRange(dataKey, senderNode.storedPartitions)
+    const senderIsInExecutionGroup = queueEntry.executionGroupMap.has(senderNodeId)
 
-    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`validateCorrespondingTellSender: data key: ${dataKey} sender node id: ${senderNodeId} senderHasAddress: ${senderHasAddress} receiverIsInExecutionGroup: ${receiverIsInExecutionGroup}`)
-    if (receiverIsInExecutionGroup === true || senderHasAddress === true) {
+    // check if sender is an execution neighouring node
+    const neighbourNodes = utils.selectNeighbors(queueEntry.executionGroup, queueEntry.ourExGroupIndex, 2) as Shardus.Node[]
+    const neighbourNodeIds = neighbourNodes.map((node) => node.id)
+    if (senderIsInExecutionGroup && neighbourNodeIds.includes(senderNodeId) === false) {
+      this.mainLogger.error(`validateCorrespondingTellSender: sender is an execution node but not a neighbour node`)
+      return false
+    }
+    if (senderIsInExecutionGroup) nestedCountersInstance.countEvent('stateManager', 'validateCorrespondingTellSender: sender is an execution node')
+    else nestedCountersInstance.countEvent('stateManager', 'validateCorrespondingTellSender: sender is not an execution node')
+
+    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`validateCorrespondingTellSender: data key: ${dataKey} sender node id: ${senderNodeId} senderHasAddress: ${senderHasAddress} receiverIsInExecutionGroup: ${receiverIsInExecutionGroup} senderIsInExecutionGroup: ${senderIsInExecutionGroup}`)
+    if (receiverIsInExecutionGroup === true || senderHasAddress === true || senderIsInExecutionGroup === true) {
       return true
     }
 
@@ -5189,6 +5237,7 @@ class TransactionQueue {
                     ' at ' +
                     ex.stack
                 )
+                queueEntry.dataSharedTimestamp = shardusGetTime()
                 nestedCountersInstance.countEvent(`processing`, `tellCorrespondingNodes fail`)
 
                 queueEntry.executionDebug.process1 = 'tell fail'
@@ -5838,6 +5887,7 @@ class TransactionQueue {
                   if (shouldStartFinalDataRequest && timeSinceLastFinalDataRequest > 5000) {
                     this.requestFinalData(queueEntry, missingAccounts)
                     queueEntry.lastFinalDataRequestTimestamp = shardusGetTime()
+                    continue
                   }
                 }
 
@@ -7152,6 +7202,12 @@ class TransactionQueue {
       }
     }
   }
+  clearQueueItems(): void {
+    for (const queueEntry of this._transactionQueue) {
+      const currentIndex = this._transactionQueue.indexOf(queueEntry)
+      this.removeFromQueue(queueEntry, currentIndex)
+    }
+  }
   getQueueItems(): any[] {
     return this._transactionQueue.map((queueEntry) => {
       return {
@@ -7165,7 +7221,8 @@ class TransactionQueue {
         finalData: queueEntry.collectedFinalData,
         preApplyResult: queueEntry.preApplyTXResult,
         txAge: shardusGetTime() - queueEntry.acceptedTx.timestamp,
-        queryingFinalData: queueEntry.queryingFinalData,
+        lastFinalDataRequestTimestamp: queueEntry.lastFinalDataRequestTimestamp,
+        dataSharedTimestamp: queueEntry.dataSharedTimestamp,
         firstVoteTimestamp: queueEntry.firstVoteReceivedTimestamp,
         firstConfirmationsTimestamp: queueEntry.firstConfirmOrChallengeTimestamp,
         robustBestConfirmation: queueEntry.receivedBestConfirmation,

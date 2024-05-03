@@ -158,6 +158,32 @@ export const debugExpand = (value: string): string => {
   return res
 }
 
+export const selectNeighbors = (array: any[], ourIndex: number, neighborsOnEachSide: number): any[] => {
+  const length = array.length;
+  const neighbors = [];
+
+  if (length === 0) return neighbors;
+  if (length < neighborsOnEachSide * 2 + 1) return array.slice(0, length);
+
+  try {
+    for (let i = 1; i <= neighborsOnEachSide; i++) {
+      const leftIndex = (ourIndex - i + length) % length;
+      const rightIndex = (ourIndex + i) % length;
+
+      if (leftIndex !== ourIndex) {
+        neighbors.push(array[leftIndex]);
+      }
+
+      if (rightIndex !== ourIndex && rightIndex !== leftIndex) {
+        neighbors.push(array[rightIndex]);
+      }
+    }
+  } catch (e) {
+    console.error(`Error selecting neighbors nodes: ${e.message}`);
+  }
+  return neighbors;
+}
+
 /*
 inp is the input object to be checked
 def is an object defining the expected input
