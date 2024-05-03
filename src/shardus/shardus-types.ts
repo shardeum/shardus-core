@@ -1193,6 +1193,8 @@ export interface ServerConfiguration {
     maxPendingNonceTxs: number
     // should attach final data to receipt
     attachDataToReceipt: boolean
+    // number of execution nodes to gossip appliedReceipt
+    nodesToGossipAppliedReceipt: number
   }
   /** Options for sharding calculations */
   sharding?: {
