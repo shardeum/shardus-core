@@ -5177,7 +5177,7 @@ class TransactionQueue {
               nestedCountersInstance.countEvent('sync', 'syncing state needs bump')
 
               queueEntry.waitForReceiptOnly = true
-              this.updateTxState(queueEntry, 'await final data')
+              // this.updateTxState(queueEntry, 'await final data')
             }
 
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
@@ -5828,7 +5828,16 @@ class TransactionQueue {
               }
 
               //collectedFinalData
-              const vote = this.stateManager.getReceiptVote(queueEntry)
+              // todo: get the vote from queueEntry.receivedBestVote or receivedBestConfirmation instead of receipt2
+              const receipt2 = this.stateManager.getReceipt2(queueEntry)
+              let vote
+              if (receipt2) {
+                vote = receipt2.appliedVote
+              } else if (queueEntry.receivedBestConfirmation?.appliedVote) {
+                vote = queueEntry.receivedBestConfirmation.appliedVote
+              } else if (queueEntry.receivedBestVote) {
+                vote = queueEntry.receivedBestVote
+              }
               const accountsNotStored = new Set()
               if (vote) {
                 let failed = false
@@ -5868,14 +5877,15 @@ class TransactionQueue {
                     break
                   }
                 }
+                // console.log(`thant: ${queueEntry.logID} incomplete: ${incomplete}, missingAccounts: ${missingAccounts}`)
 
                 if (incomplete && missingAccounts.length > 0) {
                   // start request process for missing data if we waited long enough
-                  const timeSinceDataShare = queueEntry.dataSharedTimestamp > 0 ? shardusGetTime() - queueEntry.dataSharedTimestamp : 0
+                  const timeSinceAwaitFinalStart = queueEntry.txDebug.startTimestamp['await final data'] > 0 ? shardusGetTime() - queueEntry.txDebug.startTimestamp['await final data'] : 0
                   let shouldStartFinalDataRequest = false
-                  if (timeSinceDataShare > 5000) {
+                  if (timeSinceAwaitFinalStart > 5000) {
                     shouldStartFinalDataRequest = true
-                    if (logFlags.debug) /* prettier-ignore */ this.mainLogger.debug(`shrd_awaitFinalData_incomplete : ${queueEntry.logID} starting finalDataRequest timeSinceDataShare: ${timeSinceDataShare}`)
+                    if (logFlags.debug) /* prettier-ignore */ this.mainLogger.debug(`shrd_awaitFinalData_incomplete : ${queueEntry.logID} starting finalDataRequest timeSinceDataShare: ${timeSinceAwaitFinalStart}`)
                   } else if (txAge > timeM3) {
                     // by this time we should have all the data we need
                     shouldStartFinalDataRequest = true
@@ -5884,6 +5894,7 @@ class TransactionQueue {
 
                   // start request process for missing data
                   const timeSinceLastFinalDataRequest = shardusGetTime() - queueEntry.lastFinalDataRequestTimestamp
+                  // console.log(`thant: ${queueEntry.logID} timeSinceLastFinalDataRequest: ${timeSinceLastFinalDataRequest}, shouldStartFinalDataRequest: ${shouldStartFinalDataRequest}`)
                   if (shouldStartFinalDataRequest && timeSinceLastFinalDataRequest > 5000) {
                     this.requestFinalData(queueEntry, missingAccounts)
                     queueEntry.lastFinalDataRequestTimestamp = shardusGetTime()
@@ -5966,8 +5977,11 @@ class TransactionQueue {
                 }
               } else {
                 nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData noVote')
-                // todo: what to do if we have no vote?
+                // console.log(`thant: ${queueEntry.logID} no vote from receipt in await final data`)
+                // todo: what to do if we have no vote? discuss with Omar
               }
+            } else {
+              // console.log(`thant: ${queueEntry.logID} account seen in await final data`);
             }
           }
           if (queueEntry.state === 'commiting') {
@@ -7228,6 +7242,7 @@ class TransactionQueue {
         robustBestConfirmation: queueEntry.receivedBestConfirmation,
         robustBestVote: queueEntry.receivedBestVote,
         txDebug: queueEntry.txDebug,
+        executionDebug: queueEntry.executionDebug,
       }
     })
   }
