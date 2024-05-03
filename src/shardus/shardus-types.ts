@@ -1193,6 +1193,8 @@ export interface ServerConfiguration {
     attachDataToReceipt: boolean
     // number of execution nodes to gossip appliedReceipt
     nodesToGossipAppliedReceipt: number
+    // set "true" will prevent tx from expiring
+    disableTxExpiration: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
