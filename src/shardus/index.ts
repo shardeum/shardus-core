@@ -1122,6 +1122,9 @@ class Shardus extends EventEmitter {
     this._registerListener(this.stateManager.eventEmitter, 'txProcessed', () =>
       this.statistics.incrementCounter('txProcessed')
     )
+    this._registerListener(this.stateManager.eventEmitter, 'txExpired', () =>
+      this.statistics.incrementCounter('txExpired')
+    )
   }
 
   /**
