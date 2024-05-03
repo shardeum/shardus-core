@@ -881,12 +881,13 @@ class TransactionConsenus {
               //no await so we cant get the message out size in a reasonable way
               this.p2p.sendGossipIn(
                 'spread_appliedReceipt2',
-                receivedAppliedReceipt2,
+                payload,
                 tracker,
                 sender,
                 gossipGroup,
                 false
               )
+              nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 gossip forwarded')
             }
           } else {
             // we get here if the receipt has already been shared
