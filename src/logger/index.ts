@@ -108,6 +108,8 @@ export type LogFlags = {
 
   lost: boolean // extra logging for the lost system
 
+  rotation: boolean // extra logging for the rotation system
+
 }
 
 export let logFlags: LogFlags = {
@@ -142,6 +144,7 @@ export let logFlags: LogFlags = {
   aalg: false,
   shardedCache: false,
   lost: false,
+  rotation: false,
 }
 
 const filePath1 = path.join(process.cwd(), 'data-logs', 'cycleRecords1.txt')
@@ -357,6 +360,8 @@ class Logger {
     //temp debug
     // logFlags.aalg = true
     // logFlags.shardedCache = true
+
+    //logFlags.rotation = true
   }
 
   setDefaultFlags() {
@@ -373,7 +378,7 @@ class Logger {
     logFlags.important_as_fatal = true
     logFlags.important_as_error = true
 
-
+    //logFlags.rotation = true
   }
 
   setFlagByName(name: string, value: boolean) {

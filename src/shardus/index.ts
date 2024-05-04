@@ -81,6 +81,7 @@ import {
 import { safeStringify } from '../utils'
 import { isNodeInRotationBounds } from '../p2p/Utils'
 import ShardFunctions from '../state-manager/shardFunctions'
+import SocketIO from 'socket.io'
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
@@ -1412,18 +1413,20 @@ class Shardus extends EventEmitter {
         const consensusGroup = this.getConsenusGroupForAccount(senderAddress)
         const isConsensusNode = consensusGroup.some((node) => node.id === Self.id)
 
-        if (isConsensusNode === false) {
-          // send transaction to lucky consensus group node
-          const result = await this.forwardTransactionToLuckyNodes(senderAddress, tx, 'non-consensus to consensus')
-          return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
-        }
-        // careful we may be consensus node but if we are not lucky we should forward to lucky nodes
-        let luckyNodeIds = this.getClosestNodes(senderAddress, Context.config.stateManager.numberOfReInjectNodes, false)
-        let isLuckyNode = luckyNodeIds.some((nodeId) => nodeId === Self.id)
-        if (isLuckyNode === false) {
-          const result = await this.forwardTransactionToLuckyNodes(senderAddress, tx, 'non-lucky consensus to lucky' +
-            ' consensus')
-          return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
+        if(Context.config.stateManager.forwardToLuckyNodes) {
+          if (isConsensusNode === false) {
+            // send transaction to lucky consensus group node
+            const result = await this.forwardTransactionToLuckyNodes(senderAddress, tx, 'non-consensus to consensus')
+            return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
+          }
+          // careful we may be consensus node but if we are not lucky we should forward to lucky nodes
+          let luckyNodeIds = this.getClosestNodes(senderAddress, Context.config.stateManager.numberOfReInjectNodes, false)
+          let isLuckyNode = luckyNodeIds.some((nodeId) => nodeId === Self.id)
+          if (isLuckyNode === false) {
+            const result = await this.forwardTransactionToLuckyNodes(senderAddress, tx, 'non-lucky consensus to lucky' +
+              ' consensus')
+            return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
+          }
         }
       }
 
@@ -1558,12 +1561,7 @@ class Shardus extends EventEmitter {
     if (homeNode == null) {
       return { success: false, reason: `Home node not found for account ${senderAddress}`, status: 500 }
     }
-    if (logFlags.debug)
-      this.mainLogger.debug(
-        `forwardTransactionToLuckyNodes: homeNode: ${homeNode.node.id} closetNodeIds: ${JSON.stringify(
-          closetNodeIds.sort()
-        )}`
-      )
+    /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `forwardTransactionToLuckyNodes: homeNode: ${homeNode.node.id} closetNodeIds: ${JSON.stringify( closetNodeIds.sort() )}` )
 
     let selectedValidators = []
     selectedValidators.push({
@@ -1572,19 +1570,26 @@ class Shardus extends EventEmitter {
       port: homeNode.node.externalPort,
       publicKey: homeNode.node.publicKey,
     })
+
+    let  stats ={
+      skippedSelf:0,
+      skippedRotation:0,
+      skippedHome:0
+    }
+
     for (const id of closetNodeIds) {
       if (id === Self.id) {
+        stats.skippedSelf++
         continue
       }
-      if (id === homeNode.node.id) continue // we already added the home node
+      if (id === homeNode.node.id){
+        stats.skippedHome++
+        continue // we already added the home node
+      } 
       let node = nodes.get(id)
       if (node.status !== 'active' || isNodeInRotationBounds(id)) {
-        if (logFlags.debug)
-          this.mainLogger.debug(
-            `forwardTransactionToLuckyNodes: node ${id} is not active or in rotation bounds. node.status: ${
-              node.status
-            } isNodeInRotationBounds: ${isNodeInRotationBounds(id)}`
-          )
+        /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `forwardTransactionToLuckyNodes: node ${id} is not active or in rotation bounds. node.status: ${ node.status } isNodeInRotationBounds: ${isNodeInRotationBounds(id)}` )
+        stats.skippedRotation++
         continue
       }
       const validatorDetails = {
@@ -1598,51 +1603,33 @@ class Shardus extends EventEmitter {
     for (const validator of selectedValidators) {
       try {
         if (validator.id === homeNode.node.id) {
-          if (logFlags.debug)
-            this.mainLogger.debug(
-              `Forwarding injected tx ${txId} to home node ${validator.id} reason: ${message} ${utils.stringify(tx)}`
-            )
+          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to home node ${validator.id} reason: ${message} ${utils.stringify(tx)}` )
           nestedCountersInstance.countEvent('statistics', `forwardTxToHomeNode: ${message}`)
         } else {
-          if (logFlags.debug)
-            this.mainLogger.debug(
-              `Forwarding injected tx ${txId} to consensus group. reason: ${message} ${utils.stringify(tx)}`
-            )
+          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to consensus group. reason: ${message} ${utils.stringify(tx)}` )
           nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: ${message}`)
         }
 
         const result: ShardusTypes.InjectTxResponse = await this.app.injectTxToConsensor([validator], tx)
 
         if (result == null) {
-          if (logFlags.debug)
-            this.mainLogger.debug(
-              `Got null/undefined response upon forwarding injected tx: ${txId} to node ${validator.id}`
-            )
+          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got null/undefined response upon forwarding injected tx: ${txId} to node ${validator.id}` )
           continue
         }
         if (result && result.success === false) {
-          if (logFlags.debug)
-            this.mainLogger.debug(
-              `Got unsuccessful response upon forwarding injected tx: ${validator.id}. ${message} ${utils.stringify(tx)}`
-            )
+          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got unsuccessful response upon forwarding injected tx: ${validator.id}. ${message} ${utils.stringify(tx)}` )
           return { success: false, reason: result.reason, status: 500 }
         }
         if (result && result.success === true) {
-          if (logFlags.debug)
-            this.mainLogger.debug(
-              `Got successful response upon forwarding injected tx: ${validator.id}. ${message} ${utils.stringify(tx)}`
-            )
+          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got successful response upon forwarding injected tx: ${validator.id}. ${message} ${utils.stringify(tx)}` )
           return { success: true, reason: 'Transaction forwarded to validators', status: 200 }
         }
       } catch (e) {
-        if (logFlags.debug)
-          this.mainLogger.error(
-            `Forwarding injected tx to ${validator.id} failed. ${message} ${utils.stringify(tx)} error: ${
-              e.stack
-            }`
-          )
+        /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx to ${validator.id} failed. ${message} ${utils.stringify(tx)} error: ${ e.stack }` )
       }
     }
+    nestedCountersInstance.countEvent('statistics', `forward failed: ${JSON.stringify(stats)}`)
+    /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx out of tries. ${JSON.stringify(stats)} ${utils.stringify(tx)} ` )
     return { success: false, reason: 'No validators found to forward the transaction', status: 500 }
   }
 

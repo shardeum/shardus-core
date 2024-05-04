@@ -683,6 +683,8 @@ export interface ServerConfiguration {
      **/
     gossipRecipients?: number
     gossipFactor?: number
+    /** When dynamicGossipFactor is true use calculateGossipFactor instead of gossipFactor */
+    dynamicGossipFactor: boolean
     gossipStartSeed?: number
     gossipSeedFallof?: number
     /** The gossipTimeout parameter is an Integer specifying the amount of time (in seconds) before an old gossip is deleted from a node. */
@@ -1169,6 +1171,8 @@ export interface ServerConfiguration {
     minRequiredChallenges: number
     // turn on the improved Proof of Quorum for large shards sizes
     useNewPOQ: boolean
+    // should the network forward TXs to lucky nodes?  (does not impact nonce queue, that will still forward)
+    forwardToLuckyNodes: boolean
     // whether the node should verify its data against the network before challenging
     integrityCheckBeforeChallenge: boolean
     // Should the protocol consier a precrack failure as a failed transaction
@@ -1187,6 +1191,10 @@ export interface ServerConfiguration {
     gossipCompleteData: boolean
     // whether the node should share the complete data to neighbors
     shareCompleteData: boolean
+    // state machine chages updateTxState in several places from 'consensing' to 'await final data'
+    txStateMachineChanges: boolean
+    // will a node attempt to request final data 
+    canRequestFinalData:boolean
     // how many node to re-inject the tx received from client
     numberOfReInjectNodes: number
     // max number of pending nonce tx for an account
