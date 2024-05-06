@@ -455,7 +455,7 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
     proofOfWork: 's',
     version: 's',
     sign: 'o',
-    appJoinData: '?',
+    //appJoinData: '?', //should be typed, currently any type
   })
 
   if (err) {
@@ -474,18 +474,20 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
     return
   }
 
-  const signer = NodeList.byPubKey.get(payload.sign.owner)
-  if (!signer) {
-    /* prettier-ignore */ if (logFlags.error) warn('join-gossip: Got join request from unknown node')
-  }
+  //TODO: What would be a way to validate the signature of the join request since node is not in NodeList yet? Meaning checking it is the original node that sent the request. Will this node what cycle the network is in?
+  // TODO: is it needed if join request is going to get validated below?
+  // const signer = NodeList.byPubKey.get(payload.sign.owner)
+  // if (!signer) {
+  //   /* prettier-ignore */ if (logFlags.error) warn('join-gossip: Got join request from unknown node')
+  // }
 
-  const isOrig = signer.id === sender
+  // const isOrig = signer.id === sender
 
-  // Only accept original txs in quarter 1
-  if (isOrig && CycleCreator.currentQuarter > 1) {
-    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-gossip-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
-    return
-  }
+  // // Only accept original txs in quarter 1
+  // if (isOrig && CycleCreator.currentQuarter > 1) {
+  //   /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-gossip-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
+  //   return
+  // }
 
   // ensure this join request doesn't already exist in standby nodes
   if (getStandbyNodesInfoMap().has(payload.nodeInfo.publicKey)) {
