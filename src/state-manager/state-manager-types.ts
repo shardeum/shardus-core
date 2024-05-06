@@ -640,7 +640,7 @@ export type AppliedVote = {
   node_id: string // record the node that is making this vote.. todo could look this up from the sig later
   sign?: Shardus.Sign
   // hash of app data
-  app_data_hash: string
+  app_data_hash?: string
 }
 
 // export type AppliedReceipt2 = {
