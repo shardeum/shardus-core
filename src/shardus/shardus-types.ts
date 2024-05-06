@@ -943,6 +943,8 @@ export interface ServerConfiguration {
     formingNodesPerCycle: number
     // /** Enables or disables filtering nodes from internal gossip if they are marked down. */
     downNodeFilteringEnabled: boolean
+    // /** The number of ms to wait to resubmit a standby add request to an active node if we get an error */
+    resubmitStandbyAddWaitDuration: number
   }
   /** Server IP configuration */
   ip?: {
