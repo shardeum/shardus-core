@@ -934,6 +934,8 @@ export interface ServerConfiguration {
     delayZombieRestartSec: number
     // /** The number of ms to wait to resubmit a standby refresh request to an active node if we get an error */
     resumbitStandbyRefreshWaitDuration: number
+    // /** The number of ms to wait to resubmit a standby add request to an active node if we get an error */
+    resubmitStandbyAddWaitDuration: number
   }
   /** Server IP configuration */
   ip?: {

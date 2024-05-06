@@ -36,6 +36,7 @@ import { addFinishedSyncing, drainFinishedSyncingRequest, newSyncFinishedNodes }
 //import { getLastCycleStandbyRefreshRequest, resetLastCycleStandbyRefreshRequests, drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
 import { drainNewStandbyRefreshRequests, addStandbyRefresh } from './v2/standbyRefresh'
 import rfdc from 'rfdc'
+import { addStandbyAdd, drainNewStandbyAddRequests } from './v2/standbyAdd'
 
 /** STATE */
 
@@ -48,6 +49,7 @@ let seen: Set<P2P.P2PTypes.Node['publicKey']>
 let queuedStartedSyncingId: string
 let queuedFinishedSyncingId: string
 let queuedStandbyRefreshPubKeys: string[] = []
+let queuedStandbyAddRequests: JoinRequest[] = []
 
 // whats this for? I was just going to use newStandbyRefreshRequests
 //let keepInStandbyCollector: Map<string, StandbyRefreshRequest>
@@ -204,7 +206,8 @@ export function getTxs(): P2P.JoinTypes.Txs {
     join: requestsCopy,
     startedSyncing: [],
     finishedSyncing: [],
-    standbyRefresh: []
+    standbyRefresh: [],
+    standbyAdd: [],
   }
 }
 
@@ -233,7 +236,7 @@ export function validateRecordTypes(rec: P2P.JoinTypes.Record): string {
 export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
   // TODO drop any invalid join requests. NOTE: this has never been implemented
   // yet, so this task is not a side effect of any work on join v2.
-  return { join: txs.join, startedSyncing: [], finishedSyncing: [], standbyRefresh: [] }
+  return { join: txs.join, startedSyncing: [], finishedSyncing: [], standbyRefresh: [], standbyAdd: [] }
 }
 
 export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
@@ -244,6 +247,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
   record.lostAfterSelection = []
   record.finishedSyncing = []
   record.standbyRefresh = []
+  record.standbyAdd = []
 
   if (config.p2p.useJoinProtocolV2) {
     // for join v2, add new standby nodes to the standbyAdd field ...
@@ -286,6 +290,10 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       record.standbyRefresh.push(standbyRefresh.publicKey)
     }
 
+    for (const standbyAdd of drainNewStandbyAddRequests()) {
+      record.standbyAdd.push(standbyAdd.joinRequest)
+    }
+
     let standbyRemoved_Age = 0
     //let standbyRemoved_joined = 0
     let standbyRemoved_App = 0
@@ -306,7 +314,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
         }
         //check 2 cycles before we would remove this node
         if (record.start - lastStandbyTimerRefresh > maxAge - 2) {
-          
+
           if (standbyListMap.has(key) === false) {
             skipped++
             continue
@@ -315,20 +323,20 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
           // is this done? what else is needed?
           //TODO deterministic selection of a node to query if the standby node is up
           //this checked response will become a cycle TX for the next cycle.
-          
+
           const offset = getPrefixInt(key, 8)
           const numActiveNodes = NodeList.activeByIdOrder.length
           const numCheckerNodes = 1
           const queueStandbyCheck = fastIsPicked(ourIndex, numActiveNodes, numCheckerNodes, offset)
 
-          //schedule a job or us to check on 
+          //schedule a job or us to check on
           if(queueStandbyCheck){
             localStandbyCheckerJobs.add(key)
           }
 
           // should be in parseRecord then
           //WE only set this map when digesting the cycle record if this node did a proper refresh action
-          //use this cycle start time as an updated time in the mapp of standby nodes refresh 
+          //use this cycle start time as an updated time in the mapp of standby nodes refresh
           //standbyNodesRefresh.set(key, record.start)
         }
         */
@@ -426,8 +434,8 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
           }
         }
       }
-      
-      
+
+
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${standbyRemoved_Age}  removed list: ${record.standbyRemove} ` )
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList(standbyList, `join.updateRecord: last-hashed ${record.counter}`)
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList( Array.from(getStandbyNodesInfoMap().values()), `join.updateRecord: standby-map ${record.counter}` )
@@ -642,6 +650,25 @@ export function sendRequests(): void {
     }
     queuedStandbyRefreshPubKeys = []
   }
+  if (queuedStandbyAddRequests?.length > 0) {
+    for (const standbyAddRequest of queuedStandbyAddRequests) {
+      const standbyAddTx: P2P.JoinTypes.StandbyAddRequest = crypto.sign({
+        joinRequest: standbyAddRequest,
+        cycleNumber: CycleChain.newest.counter,
+      })
+
+      const standbyAddResult = addStandbyAdd(standbyAddTx)
+      if (standbyAddResult.success === true) {
+        nestedCountersInstance.countEvent('p2p', `sending standby-add gossip to network`)
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`sending standby-add gossip to network`)
+        Comms.sendGossip('gossip-standby-add', standbyAddTx, '', null, NodeList.byIdOrder, true)
+      } else {
+        nestedCountersInstance.countEvent('p2p', `join:sendRequests failed to add our own standby-add message`)
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequests failed to add our own standby-add message`)
+      }
+    }
+    queuedStandbyAddRequests = []
+  }
   return
 }
 
@@ -660,6 +687,10 @@ export function queueFinishedSyncingRequest(nodeId: string): void {
 
 export function queueStandbyRefreshRequest(publicKey: string): void {
   queuedStandbyRefreshPubKeys.push(publicKey)
+}
+
+export function queueStandbyAddRequest(joinRequest: JoinRequest): void {
+  queuedStandbyAddRequests.push(joinRequest)
 }
 
 /** Module Functions */
@@ -1080,7 +1111,7 @@ export function computeNodeId(publicKey: string, cycleMarker: string): string {
  *
  * If the types are valid, it returns `null`.
  */
-function verifyJoinRequestTypes(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse | null {
+export function verifyJoinRequestTypes(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse | null {
   // Validate joinReq
   let err = utils.validateTypes(joinRequest, {
     cycleMarker: 's',
