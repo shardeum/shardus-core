@@ -5054,9 +5054,19 @@ class TransactionQueue {
             continue
           }
 
-          // seen vote but we are past timeM3 + voteSeenExpirationTime
           if (txAge > timeM3 + configContext.stateManager.confirmationSeenExpirationTime + 10000) {
             nestedCountersInstance.countEvent('txExpired', `txAge > timeM3 + confirmSeenExpirationTime + 10s`)
+            // maybe we missed the spread_appliedReceipt2 gossip, go to await final data if we have a confirmation
+            // we will request the final data (and probably receipt2)
+            if (configContext.stateManager.disableTxExpiration && hasSeenConfirmation) {
+              nestedCountersInstance.countEvent('txExpired', `> timeM3 + confirmSeenExpirationTime hasSeenVote: ${hasSeenVote} waitForReceiptOnly: ${queueEntry.waitForReceiptOnly}`)
+              if(this.config.stateManager.txStateMachineChanges){
+                this.updateTxState(queueEntry, 'await final data')
+              } else {
+                this.updateTxState(queueEntry, 'consensing')
+              }
+              continue
+            }
             if (configContext.stateManager.disableTxExpiration === false) {
               this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + confirmSeenExpirationTime + 10s')
               continue
@@ -5552,11 +5562,8 @@ class TransactionQueue {
                     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`processAcceptedTxQueue2 txResult problem txid:${queueEntry.logID} res: ${utils.stringifyReduce(txResult)} `)
                     queueEntry.waitForReceiptOnly = true
 
-                    if(this.config.stateManager.txStateMachineChanges){
-                      this.updateTxState(queueEntry, 'await final data')
-                    } else {
-                      this.updateTxState(queueEntry, 'consensing')
-                    } 
+                    // if apply failed, we need to go to consensing to get a receipt
+                    this.updateTxState(queueEntry, 'consensing')
                     //TODO: need to flag this case so that it does not artificially increase the network load
                   }
                 } catch (ex) {
@@ -5960,11 +5967,11 @@ class TransactionQueue {
                   let shouldStartFinalDataRequest = false
                   if (timeSinceAwaitFinalStart > 5000) {
                     shouldStartFinalDataRequest = true
-                    if (logFlags.debug) /* prettier-ignore */ this.mainLogger.debug(`shrd_awaitFinalData_incomplete : ${queueEntry.logID} starting finalDataRequest timeSinceDataShare: ${timeSinceAwaitFinalStart}`)
+                    if (logFlags.verbose) /* prettier-ignore */ this.mainLogger.debug(`shrd_awaitFinalData_incomplete : ${queueEntry.logID} starting finalDataRequest timeSinceDataShare: ${timeSinceAwaitFinalStart}`)
                   } else if (txAge > timeM3) {
                     // by this time we should have all the data we need
                     shouldStartFinalDataRequest = true
-                    if (logFlags.debug) /* prettier-ignore */ this.mainLogger.debug(`shrd_awaitFinalData_incomplete : ${queueEntry.logID} starting finalDataRequest txAge > timeM3 + confirmationSeenExpirationTime`)
+                    if (logFlags.verbose) /* prettier-ignore */ this.mainLogger.debug(`shrd_awaitFinalData_incomplete : ${queueEntry.logID} starting finalDataRequest txAge > timeM3 + confirmationSeenExpirationTime`)
                   }
 
                   // start request process for missing data
@@ -7324,6 +7331,7 @@ class TransactionQueue {
         robustBestVote: queueEntry.receivedBestVote,
         txDebug: queueEntry.txDebug,
         executionDebug: queueEntry.executionDebug,
+        waitForReceiptOnly: queueEntry.waitForReceiptOnly
       }
     })
   }
