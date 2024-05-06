@@ -1587,7 +1587,16 @@ class Shardus extends EventEmitter {
         continue // we already added the home node
       } 
       let node = nodes.get(id)
-      if (node.status !== 'active' || isNodeInRotationBounds(id)) {
+
+      //is this node safe in terms of rotation
+      let rotationCheckPassed = true 
+      if(Context.config.stateManager.forwardToLuckyNodesCheckRotation) {
+        //is in rotation means it in the edge 
+        rotationCheckPassed = isNodeInRotationBounds(id) === false
+      }
+
+      // if the node is not active or not in rotation bounds, skip it
+      if (node.status !== 'active' || (rotationCheckPassed === false)) {
         /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `forwardTransactionToLuckyNodes: node ${id} is not active or in rotation bounds. node.status: ${ node.status } isNodeInRotationBounds: ${isNodeInRotationBounds(id)}` )
         stats.skippedRotation++
         continue

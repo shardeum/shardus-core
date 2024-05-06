@@ -1175,6 +1175,8 @@ export interface ServerConfiguration {
     useNewPOQ: boolean
     // should the network forward TXs to lucky nodes?  (does not impact nonce queue, that will still forward)
     forwardToLuckyNodes: boolean
+    /// check rotation bounds when forwarding to lucky nodes
+    forwardToLuckyNodesCheckRotation: boolean
     // whether the node should verify its data against the network before challenging
     integrityCheckBeforeChallenge: boolean
     // Should the protocol consier a precrack failure as a failed transaction
