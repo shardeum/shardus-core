@@ -84,14 +84,14 @@ export function deleteStandbyNodeFromMap(key: publickey): boolean {
 export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = false): void {
   if (logFlags.verbose) console.log('saving join request:', joinRequest)
 
-  //TODO confirm this is the best place to submit the standby add tx
-  submitStandbyAdd(joinRequest)
-
   // if first node, add to standby list immediately
   if (persistImmediately) {
     addJoinRequestToStandbyMap(joinRequest)
     return
   }
+
+  //TODO confirm this is the best place to submit the standby add tx
+  submitStandbyAdd(joinRequest)
 
   newJoinRequests.push(joinRequest)
 }
