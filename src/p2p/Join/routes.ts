@@ -455,7 +455,7 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
     proofOfWork: 's',
     version: 's',
     sign: 'o',
-    //appJoinData: '?', //should be typed, currently any type
+    appJoinData: 'o', //should be typed, currently any type
   })
 
   if (err) {
@@ -473,7 +473,7 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
     /* prettier-ignore */ if (logFlags.error) warn(`join-gossip-reject: bad input sign ${err}`)
     return
   }
-
+  // ID for node that is sending the gossip...is sender the same as the signer... gossip handler there's sender and that is = payload.sign.owner
   //TODO: What would be a way to validate the signature of the join request since node is not in NodeList yet? Meaning checking it is the original node that sent the request. Will this node what cycle the network is in?
   // TODO: is it needed if join request is going to get validated below?
   // const signer = NodeList.byPubKey.get(payload.sign.owner)
