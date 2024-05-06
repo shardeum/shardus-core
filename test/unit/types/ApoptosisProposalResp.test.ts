@@ -17,11 +17,13 @@ describe('ApoptosisProposalResp Serialization', () => {
     const incompleteObjects = [
       { description: "missing 's'", data: { r: 1234 } as ApoptosisProposalResp },
       { description: "missing 'r'", data: { s: 'test' } as ApoptosisProposalResp },
+      { description: "null value in a field' ", data: { r:12, s:"check for null" } as ApoptosisProposalResp },
     ]
 
     test.each(incompleteObjects)(
       'should throw error if field is improper during serialization',
       ({ data }) => {
+        if(data.s === "check for null") data.s = null // we have added this for custom validation purposes
         const stream = new VectorBufferStream(0)
         expect(() => serializeApoptosisProposalResp(stream, data)).toThrow(Error)
       }
