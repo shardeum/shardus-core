@@ -178,6 +178,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     resumbitStandbyRefreshWaitDuration: 1000, // 1 second in ms
     formingNodesPerCycle: 7,
     downNodeFilteringEnabled: false,
+    resubmitStandbyAddWaitDuration: 1000, // 1 second in ms
   },
   ip: {
     externalIp: '0.0.0.0',
