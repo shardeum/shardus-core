@@ -5,9 +5,28 @@ import {
   deserializeApoptosisProposalResp,
   serializeApoptosisProposalResp,
 } from '../../../src/types/ApoptosisProposalResp'
+import { initAjvSchemas } from '../../../src/types/ajv/Helpers'
 import { TypeIdentifierEnum } from '../../../src/types/enum/TypeIdentifierEnum'
 
 describe('ApoptosisProposalResp Serialization', () => {
+  beforeAll(() => {
+    initAjvSchemas()
+  })
+
+  describe('Data validation Cases', () => {
+    const incompleteObjects = [
+      { description: "missing 's'", data: { r: 1234 } as ApoptosisProposalResp },
+      { description: "missing 'r'", data: { s: 'test' } as ApoptosisProposalResp },
+    ]
+
+    test.each(incompleteObjects)(
+      'should throw error if field is improper during serialization',
+      ({ data }) => {
+        const stream = new VectorBufferStream(0)
+        expect(() => serializeApoptosisProposalResp(stream, data)).toThrow(Error)
+      }
+    )
+  })
   test('should serialize with root true', () => {
     const obj: ApoptosisProposalResp = { s: 'test', r: 1234 }
     const stream = new VectorBufferStream(0)
