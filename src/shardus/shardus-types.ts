@@ -1062,6 +1062,8 @@ export interface ServerConfiguration {
     localEnableCycleRecordDebugTool: boolean
     /** Flag to enable/disable logs for debugging OOS cycle records **/
     cycleRecordOOSDebugLogs: boolean
+    /** Flag to enable/disable integration tests **/
+    enableTestMode: boolean
     /** Flag to enable/disbale adding random data to cycle record */
     randomCycleData: boolean
   }

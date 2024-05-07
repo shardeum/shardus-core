@@ -236,6 +236,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     ignoreStandbyRefreshChance: 0,
     localEnableCycleRecordDebugTool: false,
     cycleRecordOOSDebugLogs: false,
+    enableTestMode: false,
     randomCycleData: true,
   },
   statistics: { save: true, interval: 1 },
