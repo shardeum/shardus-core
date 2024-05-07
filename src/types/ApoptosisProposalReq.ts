@@ -13,9 +13,10 @@ export function serializeApoptosisProposalReq(
   obj: ApoptosisProposalReq,
   root = false
 ): void {
-  if (stream == null) throw new Error('null stream')
-  if (obj == null) throw new Error('null obj')
-  if (obj.id == null) throw new Error('null obj.id')
+  if (stream == null) throw new Error('invalid obj')
+  if (obj == null) throw new Error('invalid obj')
+  if (obj.id === null || obj.id === undefined) throw new Error('invalid obj')
+  if (obj.when === null || obj.when === undefined) throw new Error('invalid obj')
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cApoptosisProposalReq)
   }
