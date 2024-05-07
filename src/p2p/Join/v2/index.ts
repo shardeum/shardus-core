@@ -16,7 +16,6 @@ import { ResultAsync } from 'neverthrow'
 import { reset as resetAcceptance } from './acceptance'
 import { stringifyReduce } from '../../../utils/functions/stringifyReduce'
 import { logFlags } from '../../../logger'
-import { submitStandbyAdd } from './standbyAdd'
 
 const clone = rfdc()
 
@@ -89,10 +88,6 @@ export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = f
     return
   }
 
-  //TODO confirm this is the best place to submit the standby add tx
-  if (!shardus.p2p.isFirstSeed) {
-    submitStandbyAdd(joinRequest)
-  }
   newJoinRequests.push(joinRequest)
 }
 
