@@ -4,7 +4,11 @@ import * as http from '../../http'
 import { logFlags } from '../../logger'
 import { hexstring, P2P } from '@shardus/types'
 import * as utils from '../../utils'
-import { validateTypes, isEqualOrNewerVersion, fastIsPicked, getPrefixInt } from '../../utils'
+import {
+  validateTypes,
+  isEqualOrNewerVersion,
+  DeSerializeFromJsonString
+} from "../../utils";
 import * as Comms from '../Comms'
 import { config, crypto, logger, network, shardus } from '../Context'
 import * as CycleChain from '../CycleChain'
@@ -652,10 +656,13 @@ export function sendRequests(): void {
   }
   if (queuedStandbyAddRequests?.length > 0) {
     for (const standbyAddRequest of queuedStandbyAddRequests) {
-      const standbyAddTx: P2P.JoinTypes.StandbyAddRequest = crypto.sign({
-        joinRequest: standbyAddRequest,
-        cycleNumber: CycleChain.newest.counter,
-      })
+      const standbyAddTx: P2P.JoinTypes.StandbyAddRequest = DeSerializeFromJsonString(
+        utils.stringify(
+          crypto.sign({
+            joinRequest: standbyAddRequest,
+            cycleNumber: CycleChain.newest.counter,
+          })
+        ))
 
       const standbyAddResult = addStandbyAdd(standbyAddTx)
       if (standbyAddResult.success === true) {
