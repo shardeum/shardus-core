@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { BroadcastStateReq, serializeBroadcastStateReq } from '../../src/types/BroadcastStateReq'
-import { WrappedData } from '../../src/types/WrappedData'
-import { VectorBufferStream } from '../../src/utils/serialization/VectorBufferStream'
+import { BroadcastStateReq, serializeBroadcastStateReq } from '../../../src/types/BroadcastStateReq'
+import { WrappedData } from '../../../src/types/WrappedData'
+import { VectorBufferStream } from '../../../src/utils/serialization/VectorBufferStream'
 
 const resLength: number[] = []
 
