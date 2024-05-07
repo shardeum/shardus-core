@@ -1,5 +1,4 @@
-// @ts-nocheck
-/*eslint-disable*/
+/* eslint-disable */
 
 const ShardFunctions = require('../../../build/src/state-manager/shardFunctions2.js').default
 

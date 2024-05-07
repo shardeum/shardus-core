@@ -1,5 +1,4 @@
-// @ts-nocheck
-/*eslint-disable*/
+/* eslint-disable */
 
 var fs = require('fs')
 var path = require('path')

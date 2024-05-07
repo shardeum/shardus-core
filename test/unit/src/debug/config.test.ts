@@ -1,7 +1,7 @@
-import SERVER_CONFIG from '../config/server'
-import { setConfig } from '../p2p/Context'
-import { ServerMode, StrictServerConfiguration } from '../shardus/shardus-types'
-import { DebugConfigurations, isDebugMode, isDebugModeAnd } from './index'
+import SERVER_CONFIG from '../../../../src/config/server'
+import { setConfig } from '../../../../src/p2p/Context'
+import { ServerMode, StrictServerConfiguration } from '../../../../src/shardus/shardus-types'
+import { DebugConfigurations, isDebugMode, isDebugModeAnd } from '../../../../src/debug/index'
 
 test('debug > isDebugMode > Should return true if config mode is DEBUG', () => {
   const config = SERVER_CONFIG

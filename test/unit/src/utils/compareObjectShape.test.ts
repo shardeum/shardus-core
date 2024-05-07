@@ -1,4 +1,4 @@
-import { compareObjectShape } from '..'
+import { compareObjectShape } from '../../../../src/utils'
 
 test('compareObjectShape() > two identical object should return true', () => {
   const idol = {

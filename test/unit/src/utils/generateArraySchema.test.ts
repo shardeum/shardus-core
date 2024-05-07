@@ -1,4 +1,4 @@
-import { generateArraySchema } from '..'
+import { generateArraySchema } from '../../../../src/utils'
 
 test('generateArraySchema() > should generate proper array schema', () => {
   const num = [1, 3, 2]

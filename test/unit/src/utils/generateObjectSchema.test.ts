@@ -1,4 +1,4 @@
-import { generateObjectSchema } from '..'
+import { generateObjectSchema } from '../../../../src/utils'
 
 test('generateObjectSchema() > should generate proper object schema', () => {
   const obj = {
