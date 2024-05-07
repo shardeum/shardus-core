@@ -40,7 +40,6 @@ import { addFinishedSyncing, drainFinishedSyncingRequest, newSyncFinishedNodes }
 //import { getLastCycleStandbyRefreshRequest, resetLastCycleStandbyRefreshRequests, drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
 import { drainNewStandbyRefreshRequests, addStandbyRefresh } from './v2/standbyRefresh'
 import rfdc from 'rfdc'
-import { addStandbyAdd, drainNewStandbyAddRequests } from './v2/standbyAdd'
 
 /** STATE */
 
@@ -50,10 +49,10 @@ const clone = rfdc()
 
 let requests: P2P.JoinTypes.JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
+let queuedJoinRequests: JoinRequest[] = []
 let queuedStartedSyncingId: string
 let queuedFinishedSyncingId: string
 let queuedStandbyRefreshPubKeys: string[] = []
-let queuedStandbyAddRequests: JoinRequest[] = []
 
 // whats this for? I was just going to use newStandbyRefreshRequests
 //let keepInStandbyCollector: Map<string, StandbyRefreshRequest>
@@ -292,10 +291,6 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     // only the node that the refresh request was posted to would have the tx?
     for (const standbyRefresh of drainNewStandbyRefreshRequests()) {
       record.standbyRefresh.push(standbyRefresh.publicKey)
-    }
-
-    for (const standbyAdd of drainNewStandbyAddRequests()) {
-      record.standbyAdd.push(standbyAdd.joinRequest)
     }
 
     let standbyRemoved_Age = 0
@@ -654,27 +649,14 @@ export function sendRequests(): void {
     }
     queuedStandbyRefreshPubKeys = []
   }
-  if (queuedStandbyAddRequests?.length > 0) {
-    for (const standbyAddRequest of queuedStandbyAddRequests) {
-      const standbyAddTx: P2P.JoinTypes.StandbyAddRequest = DeSerializeFromJsonString(
-        utils.stringify(
-          crypto.sign({
-            joinRequest: standbyAddRequest,
-            cycleNumber: CycleChain.newest.counter,
-          })
-        ))
-
-      const standbyAddResult = addStandbyAdd(standbyAddTx)
-      if (standbyAddResult.success === true) {
-        nestedCountersInstance.countEvent('p2p', `sending standby-add gossip to network`)
-        /* prettier-ignore */ if (logFlags.verbose) console.log(`sending standby-add gossip to network`)
-        Comms.sendGossip('gossip-standby-add', standbyAddTx, '', null, NodeList.byIdOrder, true)
-      } else {
-        nestedCountersInstance.countEvent('p2p', `join:sendRequests failed to add our own standby-add message`)
-        /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequests failed to add our own standby-add message`)
-      }
+  if (queuedJoinRequests?.length > 0) {
+    for (const joinRequest of queuedJoinRequests) {
+      saveJoinRequest(joinRequest)
+      Comms.sendGossip('gossip-valid-join-requests', joinRequest, '', null, NodeList.byIdOrder, true)
+      nestedCountersInstance.countEvent('p2p', `saved join request and gossiped to network`)
+      /* prettier-ignore */ if (logFlags.verbose) console.log(`saved join request and gossiped to network`)
     }
-    queuedStandbyAddRequests = []
+    queuedJoinRequests = []
   }
   return
 }
@@ -696,8 +678,8 @@ export function queueStandbyRefreshRequest(publicKey: string): void {
   queuedStandbyRefreshPubKeys.push(publicKey)
 }
 
-export function queueStandbyAddRequest(joinRequest: JoinRequest): void {
-  queuedStandbyAddRequests.push(joinRequest)
+export function queueJoinRequest(joinRequest: JoinRequest): void {
+  queuedJoinRequests.push(joinRequest)
 }
 
 /** Module Functions */
