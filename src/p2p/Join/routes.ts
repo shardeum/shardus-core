@@ -32,10 +32,10 @@ import { addFinishedSyncing } from './v2/syncFinished'
 import { processNewUnjoinRequest, UnjoinRequest } from './v2/unjoin'
 import { isActive } from '../Self'
 import { logFlags } from '../../logger'
-import { StartedSyncingRequest } from '@shardus/types/build/src/p2p/JoinTypes'
+import { JoinRequest, StartedSyncingRequest } from "@shardus/types/build/src/p2p/JoinTypes";
 import { addSyncStarted } from './v2/syncStarted'
 import { addStandbyRefresh } from './v2/standbyRefresh'
-import { safeStringify } from '../../utils'
+import { DeSerializeFromJsonString, safeStringify } from "../../utils";
 import { testFailChance } from '../../utils'
 import { addStandbyAdd } from './v2/standbyAdd'
 
@@ -65,7 +65,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'join',
   handler: async (req, res) => {
-    const joinRequest = req.body
+    const joinRequest: JoinRequest = DeSerializeFromJsonString(utils.stringify(req.body))
 
     if (!isActive && !Self.isRestartNetwork) {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: not-active`)
@@ -281,7 +281,7 @@ const standbyAddRoute: P2P.P2PTypes.Route<Handler> = {
       }
     }
 
-    const standbyRefreshRequest = req.body.joinRequest
+    const standbyRefreshRequest: JoinRequest = DeSerializeFromJsonString(utils.stringify(req.body))
 
     let err = verifyJoinRequestTypes(standbyRefreshRequest)
     if (err) {
