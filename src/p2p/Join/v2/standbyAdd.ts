@@ -36,7 +36,7 @@ export async function submitStandbyAdd(joinRequest: JoinRequest): Promise<Result
         } while(queriedNodesPKs.includes(node.publicKey));
         queriedNodesPKs.push(node.publicKey);
 
-        await http.post(`${node.ip}:${node.port}/standby-add`, utils.cryptoStringify(joinRequest))
+        await http.post(`${node.ip}:${node.port}/standby-add`, JSON.parse(utils.cryptoStringify(joinRequest)))
         return ok(void 0)
       } catch (e) {
         console.error(`Attempt ${attempts + 1} failed: ${e}`);
