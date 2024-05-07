@@ -17,7 +17,7 @@ import {
   verifyJoinRequestSignature,
   warn,
   queueStandbyRefreshRequest,
-  queueStandbyAddRequest,
+  queueJoinRequest,
   verifyJoinRequestTypes
 } from '.'
 import { config } from '../Context'
@@ -37,7 +37,6 @@ import { addSyncStarted } from './v2/syncStarted'
 import { addStandbyRefresh } from './v2/standbyRefresh'
 import { Utils } from '@shardus/types'
 import { testFailChance } from '../../utils'
-import { addStandbyAdd } from './v2/standbyAdd'
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
@@ -168,13 +167,14 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
         })
       }
 
+      // following block is DEPRECATED
       // add the join request to the global list of join requests. this will also
       // add it to the list of new join requests that will be processed as part of
       // cycle creation to create a standy node list.
-      saveJoinRequest(joinRequest)
+      // saveJoinRequest(joinRequest)
 
-      // finally, gossip it to other nodes.
-      Comms.sendGossip('gossip-valid-join-requests', joinRequest, '', null, NodeList.byIdOrder, true)
+      // then, queue this join request to be sent when sendRequests is called at the start of Q1
+      queueJoinRequest(joinRequest)
 
       /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join success` )
       // respond with the number of standby nodes for the user's information
@@ -258,38 +258,6 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
     }
 
     queueStandbyRefreshRequest(standbyRefreshPubKey)
-    return res.status(200).send()
-  },
-}
-
-
-const standbyAddRoute: P2P.P2PTypes.Route<Handler> = {
-  method: 'POST',
-  name: 'standby-add',
-  handler: async (req, res) => {
-
-    // check if the config.debug.ignoreStandbyRefreshChance is a probability
-    if (config.debug.ignoreStandbyRefreshChance < 0 || config.debug.ignoreStandbyRefreshChance > 1) {
-      warn('invalid config.debug.ignoreStandbyRefreshChance value: ' + config.debug.ignoreStandbyRefreshChance)
-      res.status(500).send('invalid config.debug.ignoreStandbyRefreshChance value')
-    // check if we should ignore this request for testing purposes
-    } else if (config.debug.ignoreStandbyRefreshChance > 0) {
-      // if we should ignore this request, sleep for 1.1 seconds since timeout is 1 second
-      if (testFailChance(config.debug.ignoreStandbyRefreshChance, 'standby-refresh', '', '', false)) {
-        await utils.sleep(3000)
-        res.status(500).send('simulated timeout')
-      }
-    }
-
-    const standbyRefreshRequest: JoinRequest = DeSerializeFromJsonString(utils.stringify(req.body))
-
-    let err = verifyJoinRequestTypes(standbyRefreshRequest)
-    if (err) {
-      warn('/standby-add bad req ' + err.reason)
-      res.status(400).send()
-    }
-
-    queueStandbyAddRequest(standbyRefreshRequest)
     return res.status(200).send()
   },
 }
@@ -582,37 +550,8 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.StandbyRefr
 }
 
 
-const gossipStandbyAdd: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.StandbyAddRequest, P2P.NodeListTypes.Node['id']> = async (
-  payload,
-  sender,
-  tracker
-) => {
-  profilerInstance.scopedProfileSectionStart('gossip-standby-refresh')
-  nestedCountersInstance.countEvent('p2p', `received gossip-standby-refresh`)
-  /* prettier-ignore */ if (logFlags.verbose) console.log(`received gossip-standby-refresh`)
-  try {
-    //if (logFlags.p2pNonFatal) info(`Got scale request: ${JSON.stringify(payload)}`)
-    if (!payload) {
-      warn('No payload provided for the `StandbyAddRequest` request.')
-      return
-    }
-    if (CycleCreator.currentQuarter >= 3) return
-
-    const added = addStandbyAdd(payload)
-    nestedCountersInstance.countEvent('p2p', `standby-refresh validation success: ${added.success}`)
-    /* prettier-ignore */ if (logFlags.verbose) console.log(`standby-refresh validation success: ${added.success}`)
-    if (!added.success) nestedCountersInstance.countEvent('p2p', `standby-refresh failure reason: ${added.reason}`)
-    /* prettier-ignore */ if (logFlags.verbose && !added.success) console.log(`standby-refresh validation reason: ${added.reason}`)
-    if (added.success)
-      Comms.sendGossip('gossip-standby-refresh', payload, tracker, sender, NodeList.byIdOrder, false)
-  } finally {
-    profilerInstance.scopedProfileSectionEnd('gossip-standby-refresh')
-  }
-}
-
-
 export const routes = {
-  external: [cycleMarkerRoute, joinRoute, joinedRoute, joinedV2Route, acceptedRoute, unjoinRoute, standbyRefreshRoute, standbyAddRoute],
+  external: [cycleMarkerRoute, joinRoute, joinedRoute, joinedV2Route, acceptedRoute, unjoinRoute, standbyRefreshRoute],
   gossip: {
     'gossip-join': gossipJoinRoute,
     'gossip-valid-join-requests': gossipValidJoinRequests,
@@ -620,7 +559,6 @@ export const routes = {
     'gossip-sync-started': gossipSyncStartedRoute,
     'gossip-sync-finished': gossipSyncFinishedRoute,
     'gossip-standby-refresh' : gossipStandbyRefresh,
-    'gossip-standby-add' : gossipStandbyAdd,
   },
 }
 

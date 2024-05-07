@@ -90,10 +90,6 @@ export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = f
     return
   }
 
-  //TODO confirm this is the best place to submit the standby add tx
-  if (!shardus.p2p.isFirstSeed) {
-    submitStandbyAdd(joinRequest)
-  }
   newJoinRequests.push(joinRequest)
 }
 
