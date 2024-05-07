@@ -54,8 +54,6 @@ export function serializeAppliedVote(
     stream.writeUInt8(0)
   }
 
-
-  stream.writeString(obj.app_data_hash)
 }
 
 export function deserializeAppliedVote(stream: VectorBufferStream): AppliedVoteSerializable {
