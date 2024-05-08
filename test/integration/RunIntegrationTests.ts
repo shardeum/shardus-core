@@ -4,6 +4,7 @@ import { GetAccountDataInternalApiTest } from './functions/GetAccountDataInterna
 import { NetworkClass } from '../../src/network'
 
 let myNetworkContext: NetworkClass
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const results: any[] = []
 
 export const addResult = (testType: string, name: string, result: string, time: number): void => {

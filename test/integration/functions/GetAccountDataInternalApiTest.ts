@@ -1,12 +1,12 @@
 import * as Comms from '../../../src/p2p/Comms'
 import { ShardusTypes } from '../../../src/shardus'
 import {
-  serializeGetAccountDataReq,
   GetAccountDataReqSerializable,
+  serializeGetAccountDataReq,
 } from '../../../src/types/GetAccountDataReq'
 import {
-  deserializeGetAccountDataResp,
   GetAccountDataRespSerializable,
+  deserializeGetAccountDataResp,
 } from '../../../src/types/GetAccountDataResp'
 import { InternalRouteEnum } from '../../../src/types/enum/InternalRouteEnum'
 import { addResult } from '../RunIntegrationTests'
