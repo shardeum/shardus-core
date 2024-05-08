@@ -1052,6 +1052,8 @@ export interface ServerConfiguration {
     debugNTPErrorWindowMs: number
     /**  Flag to enable detail scoped profiling **/
     enableScopedProfiling: boolean
+    /**  Flag to enable basic profiling **/
+    enableBasicProfiling: boolean
     /**  Flag to enable writing cycle records to text file for debugging **/
     enableCycleRecordDebugTool: boolean
     /**  Flag to force a tx to expire **/
@@ -1064,6 +1066,8 @@ export interface ServerConfiguration {
     cycleRecordOOSDebugLogs: boolean
     /** Flag to enable/disable integration tests **/
     enableTestMode: boolean
+    /** Whether to enable high-resolution profiling */
+    highResolutionProfiling: boolean
   }
   /** Options for the statistics module */
   statistics?: {
