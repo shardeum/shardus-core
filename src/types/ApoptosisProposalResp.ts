@@ -14,7 +14,7 @@ export function serializeApoptosisProposalResp(
   obj: ApoptosisProposalResp,
   root = false
 ): void {
-  const errors = verifyPayload('ApoptosisProposal', obj)
+  const errors = verifyPayload('ApoptosisProposalResp', obj)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }
@@ -38,7 +38,7 @@ export function deserializeApoptosisProposalResp(stream: VectorBufferStream): Ap
     s,
     r,
   }
-  const errors = verifyPayload('ApoptosisProposal', obj)
+  const errors = verifyPayload('ApoptosisProposalResp', obj)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }
