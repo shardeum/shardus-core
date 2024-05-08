@@ -1,9 +1,10 @@
-const StateManager = require('../../../src/state-manager')
+/* eslint-disable */
+const StateManager = require('../../../../src/state-manager')
 // const utils = require('../../../utils')
 
 // / <reference types='../../../src/state-manager' />
 /**
- * @typedef {import('../../../src/state-manager').GenericHashSetEntry} GenericHashSetEntry
+ * @typedef {import('../../../../src/state-manager').GenericHashSetEntry} GenericHashSetEntry
  */
 
 /** @type {GenericHashSetEntry[]} */

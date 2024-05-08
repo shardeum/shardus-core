@@ -1,12 +1,8 @@
-
-
+/* eslint-disable */
 
 const utils = require('../../../dist/utils/functions/general')
 
-
-
 let cycleOffset = 0
-
 
 // function fastIsPicked(ourIndex, groupSize, numToPick, offset=0){
 //     let isPicked = false
@@ -22,22 +18,18 @@ let cycleOffset = 0
 //     return isPicked
 // }
 
-
-function runSimulation(numActiveNodes, numToPick, cycleOffset){
-    let output = []
-    for(let i=0; i<numActiveNodes; i++ ){
-        if(utils.fastIsPicked(i, numActiveNodes, numToPick, cycleOffset)){
-            output.push(i)
-        }
+function runSimulation(numActiveNodes, numToPick, cycleOffset) {
+  let output = []
+  for (let i = 0; i < numActiveNodes; i++) {
+    if (utils.fastIsPicked(i, numActiveNodes, numToPick, cycleOffset)) {
+      output.push(i)
     }
-    console.log(`pick ${numToPick} from ${numActiveNodes} len:${output.length}`)
-    console.log(`${JSON.stringify(output)}`)
+  }
+  console.log(`pick ${numToPick} from ${numActiveNodes} len:${output.length}`)
+  console.log(`${JSON.stringify(output)}`)
 }
 
-
-
-for(let i=0; i<5; i++){
-    cycleOffset = i
-    runSimulation(1337, 30, cycleOffset + 5301)
+for (let i = 0; i < 5; i++) {
+  cycleOffset = i
+  runSimulation(1337, 30, cycleOffset + 5301)
 }
-
