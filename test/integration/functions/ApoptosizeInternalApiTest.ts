@@ -1,11 +1,11 @@
+import * as Comms from '../../../src/p2p/Comms'
+import { ShardusTypes } from '../../../src/shardus'
+import { ApoptosisProposalReq, serializeApoptosisProposalReq } from '../../../src/types/ApoptosisProposalReq'
 import {
   ApoptosisProposalResp,
   deserializeApoptosisProposalResp,
   serializeApoptosisProposalResp,
 } from '../../../src/types/ApoptosisProposalResp'
-import { ApoptosisProposalReq, serializeApoptosisProposalReq } from '../../../src/types/ApoptosisProposalReq'
-import * as Comms from '../../../src/p2p/Comms'
-import { ShardusTypes } from '../../../src/shardus'
 import { addResult } from '../RunIntegrationTests'
 
 export const ApopotosizeInternalApiTest = async (node: ShardusTypes.Node): Promise<void> => {
