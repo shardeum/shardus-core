@@ -24,7 +24,7 @@ import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
-import { ResponseError } from '../types/ResponseError'
+import { InternalError, ResponseError, serializeResponseError } from '../types/ResponseError'
 
 /** ROUTES */
 
@@ -603,6 +603,7 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
       return
     }
 
+    let hasHandlerResponded = false
     // Create wrapped respond function for sending back data
     const respondWrapped = async (
       response,
@@ -618,6 +619,7 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
           /* prettier-ignore */ if (logFlags.playback) logger.playbackLog(header.sender_id, 'self', 'InternalRecvResp', route, header.tracker_id, response)
         }
         await respond(wrappedRespStream.getBuffer(), responseHeaders)
+        hasHandlerResponded = true
         return wrappedRespStream.getBufferLength()
       } catch (err: unknown) {
         /* prettier-ignore */ error(`registerInternalBinary: route: ${route} responseHeaders: ${JSON.stringify(responseHeaders)}, Response: ${utils.SerializeToJsonString(response)}, Error: ${utils.formatErrorMessage(err)}`)
@@ -635,6 +637,20 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
       warn('registerInternalBinary: internal routes can only be used by nodes in the network...')
       return
     }
+
+    if (!hasHandlerResponded && route !== 'gossip') {
+      nestedCountersInstance.countEvent('comms-route', `no-response`)
+      nestedCountersInstance.countEvent('comms-route', `no-response ${route}`)
+      const wrappedError = responseSerializer(
+        InternalError('Handler failed to respond'),
+        serializeResponseError
+      )
+      const responseHeaders: AppHeader = {}
+      responseHeaders.sender_id = Self.id
+      responseHeaders.tracker_id = header.tracker_id
+      await respond(wrappedError.getBuffer(), responseHeaders)
+    }
+
     // Checks to see if we can extract the actual payload from the wrapped message
     const requestPayload = _extractPayloadBinary(wrappedPayload)
     if (!requestPayload) {
