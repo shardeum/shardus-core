@@ -20,7 +20,7 @@ import * as CycleChain from './CycleChain'
 import * as Shardus from '../shardus/shardus-types'
 import { isNodeInRotationBounds } from './Utils'
 import { deserializeGossipReq, GossipReqBinary, serializeGossipReq } from '../types/GossipReq'
-import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
+import { InternalRouteEnum, isAskRoute } from '../types/enum/InternalRouteEnum'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
@@ -618,8 +618,8 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
         if (route !== 'gossip') {
           /* prettier-ignore */ if (logFlags.playback) logger.playbackLog(header.sender_id, 'self', 'InternalRecvResp', route, header.tracker_id, response)
         }
-        await respond(wrappedRespStream.getBuffer(), responseHeaders)
         hasHandlerResponded = true
+        await respond(wrappedRespStream.getBuffer(), responseHeaders)
         return wrappedRespStream.getBufferLength()
       } catch (err: unknown) {
         /* prettier-ignore */ error(`registerInternalBinary: route: ${route} responseHeaders: ${JSON.stringify(responseHeaders)}, Response: ${utils.SerializeToJsonString(response)}, Error: ${utils.formatErrorMessage(err)}`)
@@ -638,19 +638,6 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
       return
     }
 
-    if (!hasHandlerResponded && route !== 'gossip') {
-      nestedCountersInstance.countEvent('comms-route', `no-response`)
-      nestedCountersInstance.countEvent('comms-route', `no-response ${route}`)
-      const wrappedError = responseSerializer(
-        InternalError('Handler failed to respond'),
-        serializeResponseError
-      )
-      const responseHeaders: AppHeader = {}
-      responseHeaders.sender_id = Self.id
-      responseHeaders.tracker_id = header.tracker_id
-      await respond(wrappedError.getBuffer(), responseHeaders)
-    }
-
     // Checks to see if we can extract the actual payload from the wrapped message
     const requestPayload = _extractPayloadBinary(wrappedPayload)
     if (!requestPayload) {
@@ -665,6 +652,19 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
     setIsUpTs(header.sender_id) //is this correct?
 
     await handler(requestPayload, respondWrapped, header, sign)
+
+    if (!hasHandlerResponded && isAskRoute(route)) {
+      nestedCountersInstance.countEvent('comms-route', `no-response`)
+      nestedCountersInstance.countEvent('comms-route', `no-response ${route}`)
+      const wrappedError = responseSerializer(
+        InternalError('Handler failed to respond'),
+        serializeResponseError
+      )
+      const responseHeaders: AppHeader = {}
+      responseHeaders.sender_id = Self.id
+      responseHeaders.tracker_id = header.tracker_id
+      await respond(wrappedError.getBuffer(), responseHeaders)
+    }
   }
   network.registerInternal(route, wrappedHandler)
 }
@@ -811,7 +811,7 @@ export function modeAllowsValidNodeChecks() {
 function calculateGossipFactor(numberOfNodes: number): number {
   if (numberOfNodes === 0) return config.p2p.gossipFactor
   function getBaseLog(x: number, y: number) {
-    return Math.log(y) / Math.log(x);
+    return Math.log(y) / Math.log(x)
   }
   const gossipFactor = Math.ceil(getBaseLog(3, numberOfNodes))
   return gossipFactor
@@ -874,9 +874,8 @@ export async function sendGossip(
     return msgSize
   }
 
-
   let gossipFactor = config.p2p.gossipFactor
-  if(config.p2p.dynamicGossipFactor){
+  if (config.p2p.dynamicGossipFactor) {
     gossipFactor = calculateGossipFactor(nodes.length)
   }
   if (factor > 0) {

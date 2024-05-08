@@ -21,11 +21,41 @@ export enum InternalRouteEnum {
   binary_sign_app_data = 'binary/sign_app_data', // ask
   binary_get_trie_account_hashes = 'binary/get_trie_account_hashes', // ask
   binary_get_cached_app_data = 'binary/get_cached_app_data', // ask
-  binary_request_tx_and_state = 'binary/request_tx_and_state', //ask
+  binary_request_tx_and_state = 'binary/request_tx_and_state', // ask
   binary_lost_archiver_investigate = 'binary/lost_archiver_investigate', // tell
   binary_request_state_for_tx = 'binary/request_state_for_tx', // ask
   binary_request_receipt_for_tx = 'binary/request_receipt_for_tx', // ask
   binary_get_applied_vote = 'binary/get_applied_vote', // ask
   binary_lost_report = 'binary/lost_report', // tell
   binary_gossip = 'binary/gossip', // tell
+}
+
+const askRoutes = new Set([
+  InternalRouteEnum.apoptosize,
+  InternalRouteEnum.binary_get_account_data_with_queue_hints,
+  InternalRouteEnum.binary_get_account_queue_count,
+  InternalRouteEnum.binary_get_account_data_by_list,
+  InternalRouteEnum.binary_get_account_data,
+  InternalRouteEnum.binary_compare_cert,
+  InternalRouteEnum.binary_get_tx_timestamp,
+  InternalRouteEnum.binary_get_trie_hashes,
+  InternalRouteEnum.binary_get_account_data_by_hashes,
+  InternalRouteEnum.binary_request_state_for_tx_post,
+  InternalRouteEnum.binary_get_globalaccountreport,
+  InternalRouteEnum.binary_get_confirm_or_challenge,
+  InternalRouteEnum.binary_sign_app_data,
+  InternalRouteEnum.binary_get_trie_account_hashes,
+  InternalRouteEnum.binary_get_cached_app_data,
+  InternalRouteEnum.binary_request_tx_and_state,
+  InternalRouteEnum.binary_request_state_for_tx,
+  InternalRouteEnum.binary_request_receipt_for_tx,
+  InternalRouteEnum.binary_get_applied_vote,
+])
+
+export function isAskRoute(route: string): boolean {
+  return askRoutes.has(route as InternalRouteEnum)
+}
+
+export function isTellRoute(route: string): boolean {
+  return !isAskRoute(route) || route === InternalRouteEnum.apoptosize
 }
