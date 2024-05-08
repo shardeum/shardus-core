@@ -1,3 +1,4 @@
+/* eslint-disable */
 const ShardFunctions = require('../../../build/src/state-manager/shardFunctions.js').default
 // import {ShardGlobals,ShardInfo,WrappableParitionRange,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
 // import ShardFunctions from './shardFunctions.js'

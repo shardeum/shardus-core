@@ -1,3 +1,4 @@
+/* eslint-disable */
 //  const StateManager = require('../../../src/state-manager')
 
 var fs = require('fs')
