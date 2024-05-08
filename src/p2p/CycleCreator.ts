@@ -357,10 +357,18 @@ async function cycleCreator() {
       warn(`cc: !prevRecord. Fetech now. ${callTag}`)
       prevRecord = await fetchLatestRecord()
     }
+    let trialCount = 15
     while (!prevRecord) {
       warn(`cc: cycleCreator: Could not get fetch prevRecord. Trying again in 1 sec...  ${callTag}`)
       await utils.sleep(1 * SECOND)
       prevRecord = await fetchLatestRecord()
+      trialCount--
+
+      if (trialCount == 0) {
+        Apoptosis.apoptosizeSelf(
+          'Apoptosized due to failing to fetch prevRecord within cycleCreator() => src/p2p/CycleCreator.ts'
+        )
+      }
     }
 
     /* prettier-ignore */ if (logFlags.verbose) info(`cc: prevRecord.counter: ${prevRecord.counter} ${callTag}`)
