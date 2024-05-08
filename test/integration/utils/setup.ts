@@ -1,13 +1,13 @@
 // shardus-core/test/integration/setup.ts
+import * as crypto from '@shardus/crypto-utils'
 import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
 import SHARDUS_CONFIG from '../../../src/config'
+import * as http from '../../../src/http'
 import Logger from '../../../src/logger'
 import { NetworkClass } from '../../../src/network'
+import * as Context from '../../../src/p2p/Context'
 import { ShardusTypes } from '../../../src/shardus'
 import Profiler from '../../../src/utils/profiler'
-import * as http from '../../../src/http'
-import * as crypto from '@shardus/crypto-utils'
-import * as Context from '../../../src/p2p/Context'
 
 const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG
 crypto.init('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
@@ -26,7 +26,7 @@ const getNodeDetails = async (host: string, port: string) => {
   try {
     // Try to get the info of the node
     const data = await http.get(`http://${host}:${port}/nodeInfo`)
-    if (typeof data === 'object') {
+    if (data !== null && typeof data === 'object') {
       const nodeinfo = data['nodeInfo']
       return nodeinfo
     } else {

@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BroadcastStateReq, serializeBroadcastStateReq } from '../../../src/types/BroadcastStateReq'
-import { WrappedData } from '../../../src/types/WrappedData'
+import { WrappedDataResponse } from '../../../src/types/WrappedDataResponse'
 import { VectorBufferStream } from '../../../src/utils/serialization/VectorBufferStream'
 
 const resLength: number[] = []
 
 const newBroadcastStateReq = (stateCount: number): BroadcastStateReq => {
-  const wrappedData: WrappedData = {
+  const wrappedData: WrappedDataResponse = {
     accountCreated: true,
     isPartial: true,
     accountId: 'f'.repeat(64),
