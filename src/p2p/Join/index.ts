@@ -653,6 +653,8 @@ export function sendRequests(): void {
   }
   if (queuedJoinRequests?.length > 0) {
     for (const joinRequest of queuedJoinRequests) {
+      // since join request was already validated last cycle, we can just set seen to true directly
+      seen.add(joinRequest.nodeInfo.publicKey)
       saveJoinRequest(joinRequest)
       Comms.sendGossip('gossip-valid-join-requests', joinRequest, '', null, NodeList.byIdOrder, true)
       nestedCountersInstance.countEvent('p2p', `saved join request and gossiped to network`)
