@@ -1,4 +1,5 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export type getTxTimestampReq = { txId: string; cycleCounter: number; cycleMarker: string }
@@ -10,10 +11,13 @@ export function serializeGetTxTimestampReq(
   obj: getTxTimestampReq,
   root = false
 ): void {
+  const errors = verifyPayload('GetTxTimestampReq', obj)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cGetTxTimestampReq)
   }
-
   stream.writeUInt8(cGetTxTimestampReqVersion)
   stream.writeString(obj.txId)
   stream.writeUInt32(obj.cycleCounter)

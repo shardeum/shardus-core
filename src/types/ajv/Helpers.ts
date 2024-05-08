@@ -3,13 +3,17 @@ import { getVerifyFunction } from '../../utils/serialization/SchemaHelpers'
 import { initGetAccountData3Req } from './GetAccountData3Req'
 import { initCompareCertReq } from './CompareCert'
 import { initSpreadTxToGroupSyncingReq } from './SpreadTxToGroupSyncingReq'
-import { initApoptosisProposal } from './ApoptosisProposal'
+import { initApoptosisProposal } from './ApoptosisProposalResp'
+import { initGetTxTimestampReq } from './GetTxTimestampReq'
+import { initGetTxTimestampResp } from './GetTxTimestampResp'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
   initCompareCertReq()
   initSpreadTxToGroupSyncingReq()
   initApoptosisProposal()
+  initGetTxTimestampReq()
+  initGetTxTimestampResp()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {
