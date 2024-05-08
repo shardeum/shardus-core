@@ -1,15 +1,16 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
 
-const schemaApoptosis = {
+const schemaGetTxTimestampReq = {
   type: 'object',
   properties: {
-    s: { type: 'string' },
-    r: { type: 'number' },
+    txId: { type: 'string' },
+    cycleCounter: { type: 'number' },
+    cycleMarker: { type: 'string' },
   },
-  required: ['s', 'r'],
+  required: ['txId', 'cycleCounter', 'cycleMarker'],
 }
 
-export function initApoptosisProposal(): void {
+export function initGetTxTimestampReq(): void {
   addSchemaDependencies()
   addSchemas()
 }
@@ -21,5 +22,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('ApoptosisProposal', schemaApoptosis)
+  addSchema('GetTxTimestampReq', schemaGetTxTimestampReq)
 }
