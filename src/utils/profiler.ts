@@ -223,6 +223,7 @@ class Profiler {
   }
 
   profileSectionStart(sectionName: string, internal = false): void {
+    if (!Context.config.debug.enableBasicProfiling) return
     // eslint-disable-next-line security/detect-object-injection
     let section = this.sectionTimes[sectionName]
 
@@ -267,6 +268,7 @@ class Profiler {
   }
 
   profileSectionEnd(sectionName: string, internal = false): void {
+    if (!Context.config.debug.enableBasicProfiling) return
     // eslint-disable-next-line security/detect-object-injection
     const section: SectionStat = this.sectionTimes[sectionName]
     if (section == null || section.started === false) {
