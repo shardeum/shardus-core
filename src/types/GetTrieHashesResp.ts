@@ -6,7 +6,7 @@ export type GetTrieHashesResponse = {
   nodeId?: string
 }
 
-const cGetTrieHashesRespVersion = 1
+export const cGetTrieHashesRespVersion = 1
 
 export function serializeGetTrieHashesResp(
   stream: VectorBufferStream,
