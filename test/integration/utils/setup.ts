@@ -48,7 +48,7 @@ export async function setupTestEnvironment(): Promise<{
   const networkContext = new NetworkClass(defaultConfigs.server, logger, undefined)
 
   // Fetch node list from the archiver endpoint
-  const nodeListResponse = await http.get<NodeListResponse>('http://localhost:4000/nodelist')
+  const nodeListResponse = await http.get<NodeListResponse>('http://127.0.0.1:4000/nodelist')
   const nodeList = nodeListResponse.nodeList
   const randomNode = nodeList[Math.floor(Math.random() * nodeList.length)]
 
