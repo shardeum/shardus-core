@@ -1,14 +1,9 @@
 import { setupTestEnvironment } from './utils/setup'
 import { ApopotosizeInternalApiTest } from './functions/ApoptosizeInternalApiTest'
 import { GetAccountDataInternalApiTest } from './functions/GetAccountDataInternalApiTest'
-import { ShardusTypes } from '../../src/shardus'
 import { NetworkClass } from '../../src/network'
-import { exec } from 'child_process'
 
-let myNode: ShardusTypes.Node
 let myNetworkContext: NetworkClass
-let testInternalPort: number
-let testExternalPort: number
 const results: any[] = []
 
 export const addResult = (testType: string, name: string, result: string, time: number): void => {
@@ -30,27 +25,26 @@ const displayResults = (): void => {
 
     const passedTests = results.filter((result) => result.result === 'Pass').length
     const failedTests = results.filter((result) => result.result === 'Fail').length
+    const errorTests = results.filter((result) => result.result === 'Error').length
     console.log(`\x1b[32mPassed: ${passedTests}\x1b[0m`) // Green for passed tests
-    console.log(`\x1b[31mFailed: ${failedTests}\x1b[0m`) // Red for failed tests
+    console.log(`\x1b[33mFailed: ${failedTests}\x1b[0m`) // Yellow for failed tests
+    console.log(`\x1b[31mErrors: ${errorTests}\x1b[0m`) // Red for error tests
   }
 }
 
 async function runIntegrationTests(): Promise<void> {
   try {
     // Setup the environment
-    const { node, networkContext, internalPort, externalPort } = await setupTestEnvironment()
-    myNode = node
+    const { node, networkContext } = await setupTestEnvironment()
     myNetworkContext = networkContext
-    testInternalPort = internalPort
-    testExternalPort = externalPort
 
     console.log('Running integration tests...')
     console.log('----------------------------------------------------------------------------------------')
     console.log('----------------------------------------------------------------------------------------')
 
     // Run all integration tests or individual tests by commenting out the other
-    await ApopotosizeInternalApiTest(myNode)
-    await GetAccountDataInternalApiTest(myNode)
+    await ApopotosizeInternalApiTest(node)
+    await GetAccountDataInternalApiTest(node)
   } catch (error) {
     console.error('Error during integration tests:', error)
   } finally {

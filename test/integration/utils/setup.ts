@@ -41,8 +41,6 @@ const getNodeDetails = async (host: string, port: string) => {
 export async function setupTestEnvironment(): Promise<{
   node: ShardusTypes.Node
   networkContext: NetworkClass
-  internalPort: number
-  externalPort: number
 }> {
   const logger = new Logger(defaultConfigs.server.baseDir, defaultConfigs.logs, 'fatal')
   const networkContext = new NetworkClass(defaultConfigs.server, logger, undefined)
@@ -113,5 +111,5 @@ export async function setupTestEnvironment(): Promise<{
     syncingTimestamp: Date.now(),
     readyTimestamp: 0,
   }
-  return { node, networkContext, internalPort, externalPort }
+  return { node, networkContext }
 }

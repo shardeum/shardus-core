@@ -8,10 +8,7 @@ import * as Comms from '../../../src/p2p/Comms'
 import { ShardusTypes } from '../../../src/shardus'
 import { addResult } from '../RunIntegrationTests'
 
-let node: ShardusTypes.Node
-export const ApopotosizeInternalApiTest = async (myNode: ShardusTypes.Node): Promise<void> => {
-  node = myNode
-
+export const ApopotosizeInternalApiTest = async (node: ShardusTypes.Node): Promise<void> => {
   // tests
   try {
     const startTime = Date.now()
@@ -25,7 +22,7 @@ export const ApopotosizeInternalApiTest = async (myNode: ShardusTypes.Node): Pro
       obj,
       serializeApoptosisProposalResp,
       deserializeApoptosisProposalResp,
-      {},
+      { sender_id: node.id },
       '0x546567890ab'
     )
     const endTime = Date.now()
@@ -48,7 +45,7 @@ export const ApopotosizeInternalApiTest = async (myNode: ShardusTypes.Node): Pro
       obj,
       serializeApoptosisProposalReq,
       deserializeApoptosisProposalResp,
-      {},
+      { sender_id: node.id },
       '0x1234567890ab'
     )
     const endTime = Date.now()
@@ -71,7 +68,7 @@ export const ApopotosizeInternalApiTest = async (myNode: ShardusTypes.Node): Pro
       obj,
       serializeApoptosisProposalReq,
       deserializeApoptosisProposalResp,
-      {},
+      { sender_id: node.id },
       '0x2234567890ab'
     )
     const endTime = Date.now()
@@ -94,6 +91,7 @@ export const ApopotosizeInternalApiTest = async (myNode: ShardusTypes.Node): Pro
       obj,
       serializeApoptosisProposalReq,
       {
+        sender_id: node.id,
         tracker_id: '0x11234567890ab',
       },
       false,
