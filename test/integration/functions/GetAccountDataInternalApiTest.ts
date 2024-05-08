@@ -11,10 +11,7 @@ import {
 import { InternalRouteEnum } from '../../../src/types/enum/InternalRouteEnum'
 import { addResult } from '../RunIntegrationTests'
 
-let node: ShardusTypes.Node
-
-export const GetAccountDataInternalApiTest = async (myNode: ShardusTypes.Node): Promise<void> => {
-  node = myNode
+export const GetAccountDataInternalApiTest = async (node: ShardusTypes.Node): Promise<void> => {
   try {
     const startTime = Date.now()
     //dummy message
@@ -32,7 +29,9 @@ export const GetAccountDataInternalApiTest = async (myNode: ShardusTypes.Node): 
       message,
       serializeGetAccountDataReq,
       deserializeGetAccountDataResp,
-      {},
+      {
+        sender_id: node.id,
+      },
       '0x546567890ab'
     )
     const endTime = Date.now()
