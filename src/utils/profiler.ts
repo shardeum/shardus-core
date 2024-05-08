@@ -240,7 +240,9 @@ class Profiler {
       this.sectionTimes[sectionName] = section
     }
 
-    section.start = process.hrtime.bigint()
+    section.start = Context.config.debug.highResolutionProfiling
+      ? process.hrtime.bigint()
+      : BigInt(Date.now())
     section.started = true
     section.c++
 
@@ -276,7 +278,7 @@ class Profiler {
       return
     }
 
-    section.end = process.hrtime.bigint()
+    section.end = Context.config.debug.highResolutionProfiling ? process.hrtime.bigint() : BigInt(Date.now())
     section.total += section.end - section.start
     section.started = false
 
@@ -363,7 +365,9 @@ class Profiler {
       stat.avg = stat.total / stat.c
     }
 
-    section.start = process.hrtime.bigint()
+    section.start = Context.config.debug.highResolutionProfiling
+      ? process.hrtime.bigint()
+      : BigInt(Date.now())
     section.started = true
     section.c++
   }
@@ -376,7 +380,7 @@ class Profiler {
       if (profilerSelfReporting) return
     }
 
-    section.end = process.hrtime.bigint()
+    section.end = Context.config.debug.highResolutionProfiling ? process.hrtime.bigint() : BigInt(Date.now())
 
     const duration = section.end - section.start
     section.total += duration
@@ -488,7 +492,7 @@ class Profiler {
   printAndClearReport(): string {
     this.profileSectionEnd('_total', true)
     let result = 'Profile Sections:\n'
-    const d1 = this.cleanInt(1e6) // will get us ms
+    const d1 = Context.config.debug.highResolutionProfiling ? this.cleanInt(1e6) : this.cleanInt(1) // will get us ms
     const divider = BigInt(d1)
 
     const totalSection = this.sectionTimes['_total']
@@ -530,7 +534,7 @@ class Profiler {
 
   printAndClearScopedReport(): string {
     let result = 'Scoped Profile Sections:\n'
-    const d1 = this.cleanInt(1e6) // will get us ms
+    const d1 = Context.config.debug.highResolutionProfiling ? this.cleanInt(1e6) : this.cleanInt(1) // will get us ms
     const divider = BigInt(d1)
 
     const lines = []
@@ -583,7 +587,7 @@ class Profiler {
   }
 
   scopedTimesDataReport(): ScopedTimesDataReport {
-    const d1 = this.cleanInt(1e6) // will get us ms
+    const d1 = Context.config.debug.highResolutionProfiling ? this.cleanInt(1e6) : this.cleanInt(1) // will get us ms
     const divider = BigInt(d1)
 
     const times: TimesDataReport[] = []
