@@ -6064,9 +6064,13 @@ class TransactionQueue {
                 // todo: what to do if we have no vote? discuss with Omar
               }
             } else {
-              queueEntry.executionDebug.logFinalData = `has all final data, but busy`
+              const upstreamTx = this.processQueue_getUpstreamTx(seenAccounts, queueEntry)
+              queueEntry.executionDebug.logFinalData = `has all final data, but busy. upstreamTx: ${upstreamTx?.logID}`
               nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData busy')
-              this.statemanager_fatal(`await final data`, `${queueEntry.logID} upstream account seen in await final data: ${utils.stringify(queueEntry)}`);
+              if (logFlags.verbose) {
+                this.statemanager_fatal(`await final data`, `${queueEntry.logID} upstream account seen in await final data. Our queueEntry: ${utils.stringify(queueEntry)}`);
+                this.statemanager_fatal(`await final data`, `${queueEntry.logID} upstream account seen in await final data. Upstream queueEntry: ${utils.stringify(upstreamTx)}`);
+              }
             }
           }
           if (queueEntry.state === 'commiting') {
@@ -6624,6 +6628,23 @@ class TransactionQueue {
     return false
   }
 
+  processQueue_getUpstreamTx(seenAccounts: SeenAccounts, queueEntry: QueueEntry): QueueEntry | null {
+    if (this.config.debug.useShardusMemoryPatterns && queueEntry.shardusMemoryPatternSets != null) {
+      return null
+    }
+    if (queueEntry.uniqueKeys == null) {
+      //TSConversion double check if this needs extra logging
+      return null
+    }
+    for (const key of queueEntry.uniqueKeys) {
+      // eslint-disable-next-line security/detect-object-injection
+      if (seenAccounts[key] != null) {
+        return seenAccounts[key]
+      }
+    }
+    return null
+  }
+
   /**
    * processQueue_markAccountsSeen
    * Helper for processQueue to mark accounts as seen.
@@ -6785,7 +6806,8 @@ class TransactionQueue {
     }
     /* eslint-disable security/detect-object-injection */
     for (const key of queueEntry.uniqueKeys) {
-      if (seenAccounts[key] === queueEntry) {
+      if (seenAccounts[key] != null && seenAccounts[key].logID === queueEntry.logID) {
+        if (logFlags.verbose) this.mainLogger.debug(`${new Date()}}clearing key ${key} for tx ${queueEntry.logID}`);
         seenAccounts[key] = null
       }
     }
