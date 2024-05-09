@@ -1272,4 +1272,5 @@ export type ExecutionDebug = {
   log3?: unknown
   txResult?: unknown
   logBusy?: unknown
+  logFinalData?: unknown
 }

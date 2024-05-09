@@ -6064,7 +6064,9 @@ class TransactionQueue {
                 // todo: what to do if we have no vote? discuss with Omar
               }
             } else {
-              // console.log(`thant: ${queueEntry.logID} account seen in await final data`);
+              queueEntry.executionDebug.logFinalData = `has all final data, but busy`
+              nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData busy')
+              this.statemanager_fatal(`await final data`, `${queueEntry.logID} upstream account seen in await final data: ${utils.stringify(queueEntry)}`);
             }
           }
           if (queueEntry.state === 'commiting') {
@@ -7329,6 +7331,7 @@ class TransactionQueue {
         firstConfirmationsTimestamp: queueEntry.firstConfirmOrChallengeTimestamp,
         robustBestConfirmation: queueEntry.receivedBestConfirmation,
         robustBestVote: queueEntry.receivedBestVote,
+        robustBestChallenge: queueEntry.receivedBestChallenge,
         txDebug: queueEntry.txDebug,
         executionDebug: queueEntry.executionDebug,
         waitForReceiptOnly: queueEntry.waitForReceiptOnly
