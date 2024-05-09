@@ -16,6 +16,7 @@ import { ResultAsync } from 'neverthrow'
 import { reset as resetAcceptance } from './acceptance'
 import { stringifyReduce } from '../../../utils/functions/stringifyReduce'
 import { logFlags } from '../../../logger'
+import { getSeen } from '..'
 
 const clone = rfdc()
 
@@ -34,7 +35,7 @@ export const standbyNodesRefresh: Map<publickey, number> = new Map()
  * "drained" when the cycle is digested. Its entries are added to `standbyNodeList` as part of cycle...
  * digestion. appetizing!
  */
-let newJoinRequests: JoinRequest[] = []
+export let newJoinRequests: JoinRequest[] = []
 
 export function init(): void {
   console.log('initializing join protocol v2')
@@ -87,6 +88,10 @@ export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = f
     addJoinRequestToStandbyMap(joinRequest)
     return
   }
+
+  if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: contents of seen:', getSeen())
+  if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: adding join request to newJoinRequests:', joinRequest.nodeInfo.publicKey)
+  console.trace()
 
   newJoinRequests.push(joinRequest)
 }
