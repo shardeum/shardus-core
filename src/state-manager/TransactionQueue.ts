@@ -5058,7 +5058,7 @@ class TransactionQueue {
             nestedCountersInstance.countEvent('txExpired', `txAge > timeM3 + confirmSeenExpirationTime + 10s`)
             // maybe we missed the spread_appliedReceipt2 gossip, go to await final data if we have a confirmation
             // we will request the final data (and probably receipt2)
-            if (configContext.stateManager.disableTxExpiration && hasSeenConfirmation) {
+            if (configContext.stateManager.disableTxExpiration && hasSeenVote) {
               nestedCountersInstance.countEvent('txExpired', `> timeM3 + confirmSeenExpirationTime hasSeenVote: ${hasSeenVote} waitForReceiptOnly: ${queueEntry.waitForReceiptOnly}`)
               if(this.config.stateManager.txStateMachineChanges){
                 this.updateTxState(queueEntry, 'await final data')
