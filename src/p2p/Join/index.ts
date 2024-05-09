@@ -28,6 +28,7 @@ import {
   getStandbyNodesInfoMap,
   saveJoinRequest,
   standbyNodesInfoHashes,
+  newJoinRequests
 } from './v2'
 import { err, ok, Result } from 'neverthrow'
 import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
@@ -51,7 +52,8 @@ const clone = rfdc()
 
 let requests: P2P.JoinTypes.JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
-let queuedJoinRequests: JoinRequest[] = []
+let queuedReceivedJoinRequests: P2P.JoinTypes.JoinRequest[] = []
+let queuedJoinRequestsForGossip: JoinRequest[] = []
 let queuedStartedSyncingId: string
 let queuedFinishedSyncingId: string
 let queuedStandbyRefreshPubKeys: string[] = []
@@ -68,6 +70,10 @@ export function setAllowBogon(value: boolean): void {
 }
 export function getAllowBogon(): boolean {
   return allowBogon
+}
+
+export function getSeen(): Set<P2P.P2PTypes.Node['publicKey']> {
+  return seen
 }
 
 let mode = null
@@ -256,7 +262,9 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
   if (config.p2p.useJoinProtocolV2) {
     // for join v2, add new standby nodes to the standbyAdd field ...
+    console.log(`DEBUG CR-OOS: in updateRecord: newJoinRequests length: ${newJoinRequests.length}`)
     for (const standbyNode of drainNewJoinRequests()) {
+      console.log(`DEBUG CR-OOS: draining new join request ${standbyNode.nodeInfo.publicKey}`)
       record.standbyAdd.push(standbyNode)
     }
 
@@ -473,6 +481,18 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `standbyRemoved_Age: ${standbyRemoved_Age} standbyRemoved_App: ${standbyRemoved_App}` )
 
     record.joinedConsensors.sort()
+
+    if (CycleCreator.currentQuarter === 3) {
+      // transfer join requests received this cycle to queue for gossipping next cycle
+      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: queuedJoinRequestsForGossip length: ${queuedJoinRequestsForGossip.length}`)
+      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: queuedReceivedJoinRequests length: ${queuedReceivedJoinRequests.length}`)
+      queuedJoinRequestsForGossip = queuedReceivedJoinRequests
+      queuedReceivedJoinRequests = []
+      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: after swap`) 
+      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: queuedJoinRequestsForGossip length: ${queuedJoinRequestsForGossip.length}`)
+      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: queuedReceivedJoinRequests length: ${queuedReceivedJoinRequests.length}`)
+    }
+
   } else {
     // old protocol handling
     record.joinedConsensors = txs.join
@@ -651,16 +671,31 @@ export function sendRequests(): void {
     }
     queuedStandbyRefreshPubKeys = []
   }
-  if (queuedJoinRequests?.length > 0) {
-    for (const joinRequest of queuedJoinRequests) {
-      // since join request was already validated last cycle, we can just set seen to true directly
-      seen.add(joinRequest.nodeInfo.publicKey)
-      saveJoinRequest(joinRequest)
+  if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: sendRequests: before sending joinRequestsForGossip`)
+  if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: sendRequests: sendRequests: queuedJoinRequestsForGossip length: ${queuedJoinRequestsForGossip.length}`)
+
+  if (queuedJoinRequestsForGossip?.length > 0) {
+    for (const joinRequest of queuedJoinRequestsForGossip) {
+      // its possible that we have already seen this join request via gossip before we send it ourselves
+      if (newJoinRequests.includes(joinRequest) === false) {
+        if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: SEND_REQUESTS: joinReq not in newJoinRequests, saving it now`)
+        // since join request was already validated last cycle, we can just set seen to true directly
+        seen.add(joinRequest.nodeInfo.publicKey)
+        saveJoinRequest(joinRequest)
+      } 
+      // else {
+      //   if (newJoinRequests.includes(joinRequest)) {
+      //     console.log(`DEBUG CR-OOS: joinReq in seen and in newJoinRequests`)
+      //   } else {
+      //     console.log(`DEBUG CR-OOS: joinReq in seen and not in newJoinRequests`)
+      //   }
+      // }
       Comms.sendGossip('gossip-valid-join-requests', joinRequest, '', null, NodeList.byIdOrder, true)
       nestedCountersInstance.countEvent('p2p', `saved join request and gossiped to network`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`saved join request and gossiped to network`)
     }
-    queuedJoinRequests = []
+    console.log(`DEBUG CR-OOS: in sendRequests: newJoinRequests length: ${newJoinRequests.length}`)
+    queuedJoinRequestsForGossip = []
   }
   return
 }
@@ -683,7 +718,7 @@ export function queueStandbyRefreshRequest(publicKey: string): void {
 }
 
 export function queueJoinRequest(joinRequest: JoinRequest): void {
-  queuedJoinRequests.push(joinRequest)
+  queuedReceivedJoinRequests.push(joinRequest)
 }
 
 /** Module Functions */
@@ -904,6 +939,8 @@ export async function submitJoinV2(
       }
     }
   }
+
+  console.log('submitJoinV2: selectedNodes', selectedNodes.map((n) => `${n.port}`))
 
   for (const node of selectedNodes) {
     try {
