@@ -79,6 +79,10 @@ export function deserializeGetTxTimestampResp(stream: VectorBufferStream): getTx
     ...(sign && { sign }),
     ...(typeof isResponse !== 'undefined' && { isResponse }),
   }
+  const errors = verifyPayload('GetTxTimestampResp', result)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
 
   return result
 }

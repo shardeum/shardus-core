@@ -37,5 +37,10 @@ export function deserializeGetTxTimestampReq(stream: VectorBufferStream): getTxT
     cycleMarker: stream.readString(),
   }
 
+  const errors = verifyPayload('GetTxTimestampReq', obj)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
+
   return obj
 }
