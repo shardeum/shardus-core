@@ -223,7 +223,7 @@ class Profiler {
   }
 
   profileSectionStart(sectionName: string, internal = false): void {
-    if (!Context.config.debug.enableBasicProfiling) return
+    if (!Context.config?.debug?.enableBasicProfiling) return
     // eslint-disable-next-line security/detect-object-injection
     let section = this.sectionTimes[sectionName]
 
@@ -240,7 +240,7 @@ class Profiler {
       this.sectionTimes[sectionName] = section
     }
 
-    section.start = Context.config.debug.highResolutionProfiling
+    section.start = Context.config?.debug?.highResolutionProfiling
       ? process.hrtime.bigint()
       : BigInt(Date.now())
     section.started = true
@@ -270,7 +270,7 @@ class Profiler {
   }
 
   profileSectionEnd(sectionName: string, internal = false): void {
-    if (!Context.config.debug.enableBasicProfiling) return
+    if (!Context.config?.debug?.enableBasicProfiling) return
     // eslint-disable-next-line security/detect-object-injection
     const section: SectionStat = this.sectionTimes[sectionName]
     if (section == null || section.started === false) {
@@ -278,7 +278,9 @@ class Profiler {
       return
     }
 
-    section.end = Context.config.debug.highResolutionProfiling ? process.hrtime.bigint() : BigInt(Date.now())
+    section.end = Context.config?.debug?.highResolutionProfiling
+      ? process.hrtime.bigint()
+      : BigInt(Date.now())
     section.total += section.end - section.start
     section.started = false
 
@@ -306,7 +308,7 @@ class Profiler {
   }
 
   scopedProfileSectionStart(sectionName: string, internal = false, messageSize: number = cNoSizeTrack): void {
-    if (Context.config.debug.enableScopedProfiling === false) return
+    if (Context.config?.debug?.enableScopedProfiling === false) return
     // eslint-disable-next-line security/detect-object-injection
     let section: SectionStat = this.scopedSectionTimes[sectionName]
 
@@ -365,7 +367,7 @@ class Profiler {
       stat.avg = stat.total / stat.c
     }
 
-    section.start = Context.config.debug.highResolutionProfiling
+    section.start = Context.config?.debug?.highResolutionProfiling
       ? process.hrtime.bigint()
       : BigInt(Date.now())
     section.started = true
@@ -373,14 +375,16 @@ class Profiler {
   }
 
   scopedProfileSectionEnd(sectionName: string, messageSize: number = cNoSizeTrack): void {
-    if (Context.config.debug.enableScopedProfiling === false) return
+    if (Context.config?.debug?.enableScopedProfiling === false) return
     // eslint-disable-next-line security/detect-object-injection
     const section = this.scopedSectionTimes[sectionName]
     if (section == null || section.started === false) {
       if (profilerSelfReporting) return
     }
 
-    section.end = Context.config.debug.highResolutionProfiling ? process.hrtime.bigint() : BigInt(Date.now())
+    section.end = Context.config?.debug?.highResolutionProfiling
+      ? process.hrtime.bigint()
+      : BigInt(Date.now())
 
     const duration = section.end - section.start
     section.total += duration
@@ -417,26 +421,22 @@ class Profiler {
     let duty = BigInt(0)
     let netInternlDuty = BigInt(0)
     let netExternlDuty = BigInt(0)
-    if (internalTotalBusy != null && internalTotal != null) {
-      if (internalTotal.total > BigInt(0)) {
+    if (internalTotal != null) {
+      if (internalTotalBusy != null && internalTotal.total > BigInt(0)) {
         duty = (BigInt(100) * internalTotalBusy.total) / internalTotal.total
       }
-    }
-    if (internalNetInternl != null && internalTotal != null) {
-      if (internalTotal.total > BigInt(0)) {
+      if (internalNetInternl != null && internalTotal.total > BigInt(0)) {
         netInternlDuty = (BigInt(100) * internalNetInternl.total) / internalTotal.total
       }
-    }
-    if (internalNetExternl != null && internalTotal != null) {
-      if (internalTotal.total > BigInt(0)) {
+      if (internalNetExternl != null && internalTotal.total > BigInt(0)) {
         netExternlDuty = (BigInt(100) * internalNetExternl.total) / internalTotal.total
       }
     }
     this.profileSectionStart('_internal_total', true)
 
     //clear these timers
-    internalTotal.total = BigInt(0)
-    internalTotalBusy.total = BigInt(0)
+    if (internalTotal) internalTotal.total = BigInt(0)
+    if (internalTotalBusy) internalTotalBusy.total = BigInt(0)
     if (internalNetInternl) internalNetInternl.total = BigInt(0)
     if (internalNetExternl) internalNetExternl.total = BigInt(0)
 
@@ -492,7 +492,7 @@ class Profiler {
   printAndClearReport(): string {
     this.profileSectionEnd('_total', true)
     let result = 'Profile Sections:\n'
-    const d1 = Context.config.debug.highResolutionProfiling ? this.cleanInt(1e6) : this.cleanInt(1) // will get us ms
+    const d1 = Context.config?.debug?.highResolutionProfiling ? this.cleanInt(1e6) : this.cleanInt(1) // will get us ms
     const divider = BigInt(d1)
 
     const totalSection = this.sectionTimes['_total']
@@ -534,7 +534,7 @@ class Profiler {
 
   printAndClearScopedReport(): string {
     let result = 'Scoped Profile Sections:\n'
-    const d1 = Context.config.debug.highResolutionProfiling ? this.cleanInt(1e6) : this.cleanInt(1) // will get us ms
+    const d1 = Context.config?.debug?.highResolutionProfiling ? this.cleanInt(1e6) : this.cleanInt(1) // will get us ms
     const divider = BigInt(d1)
 
     const lines = []
@@ -587,7 +587,7 @@ class Profiler {
   }
 
   scopedTimesDataReport(): ScopedTimesDataReport {
-    const d1 = Context.config.debug.highResolutionProfiling ? this.cleanInt(1e6) : this.cleanInt(1) // will get us ms
+    const d1 = Context.config?.debug?.highResolutionProfiling ? this.cleanInt(1e6) : this.cleanInt(1) // will get us ms
     const divider = BigInt(d1)
 
     const times: TimesDataReport[] = []
