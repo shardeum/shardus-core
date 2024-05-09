@@ -162,6 +162,8 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       }
       joinRequest.selectionNum = selectionNumResult.value
 
+      console.log(`DEBUG CR-OOS: JOIN_REQ: computed selectionNum for ${joinRequest.nodeInfo.externalPort} joinReq: ${joinRequest.selectionNum}`)
+
       if (CycleCreator.currentQuarter > 1) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `rejected-late-join-request ${CycleCreator.currentQuarter}`)
         return res.status(400).json({
@@ -400,11 +402,11 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
 > = (payload: P2P.JoinTypes.JoinRequest, sender: P2P.NodeListTypes.Node['id'], tracker: string) => {
 
   if (config.debug.cycleRecordOOSDebugLogs) {
-    if (receivedJoin.has(payload.nodeInfo.publicKey) === false) {
-      receivedJoin.set(payload.nodeInfo.publicKey, true)
+    //if (receivedJoin.has(payload.nodeInfo.publicKey) === false) {
+      //receivedJoin.set(payload.nodeInfo.publicKey, true)
       const sendingNode = NodeList.activeByIdOrder.find((node) => node.id === sender)
       console.log('DEBUG CR-OOS: JOIN_REQ in gossip: ', ' sender ', sendingNode.externalPort, ' payload.pubKey: ', payload.nodeInfo.publicKey, 'cC: ', CycleCreator.currentCycle, ' cQ: ', CycleCreator.currentQuarter)
-    }
+    //}
   }
 
   // do not forward gossip after quarter 2
@@ -442,6 +444,7 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
   }
   payload.selectionNum = selectionNumResult.value
 
+  if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: JOIN_REQ: saving joinReq, pubkey: ${payload.nodeInfo.publicKey}`)
   // add the join request to the global list of join requests. this will also
   // add it to the list of new join requests that will be processed as part of
   // cycle creation to create a standy node list.
