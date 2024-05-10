@@ -5581,7 +5581,7 @@ class TransactionQueue {
                       // }
                     } else {
                       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_preApplyTx_createAndShareVote', `${shortID}`, ``)
-                      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 createAndShareVote : ${queueEntry.logID} `)
+                      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 calling createAndShareVote : ${queueEntry.logID} `)
                       const awaitStart = shardusGetTime()
 
                       queueEntry.voteCastAge = txAge
@@ -5792,15 +5792,15 @@ class TransactionQueue {
                     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                     // we are finished since there is nothing to apply
                     this.statemanager_fatal(
-                      `consensing: repairToMatchReceipt failed`,
-                      `consensing: repairToMatchReceipt failed ` +
+                      `consensing: on a failed receipt`,
+                      `consensing: got a failed receipt for ` +
                         `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
                     )
                     if (logFlags.debug || this.stateManager.consensusLog) {
                       /* prettier-ignore */ this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt failed result: false : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
                       /* prettier-ignore */ this.statemanager_fatal(`processAcceptedTxQueue2`, `tryProduceReceipt failed result: false : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
                     }
-                    nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt failed result = false')
+                    nestedCountersInstance.countEvent('consensus', 'consensed on failed result')
                     this.removeFromQueue(queueEntry, currentIndex)
                     this.updateTxState(queueEntry, 'fail')
                     continue
@@ -5950,7 +5950,31 @@ class TransactionQueue {
               //collectedFinalData
               //PURPL-74 todo: get the vote from queueEntry.receivedBestVote or receivedBestConfirmation instead of receipt2
               const receipt2 = this.stateManager.getReceipt2(queueEntry)
+              const timeSinceAwaitFinalStart = queueEntry.txDebug.startTimestamp['await final data'] > 0 ? shardusGetTime() - queueEntry.txDebug.startTimestamp['await final data'] : 0
               let vote
+
+              // first check if this is a challenge receipt
+              if (receipt2 && receipt2.confirmOrChallenge.message === 'challenge') {
+                if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} challenge from receipt2`)
+                this.updateTxState(queueEntry, 'fail')
+                this.removeFromQueue(queueEntry, currentIndex)
+              } if (receipt2 == null && queueEntry.receivedBestChallenge) {
+                const enoughUniqueChallenges = queueEntry.uniqueChallengesCount >= configContext.stateManager.minRequiredChallenges
+                if (enoughUniqueChallenges) {
+                  if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} has unique challenges`)
+                  this.updateTxState(queueEntry, 'fail')
+                  this.removeFromQueue(queueEntry, currentIndex)
+                } else if (timeSinceAwaitFinalStart > 1000 * 30) {
+                  // if we have a challenge and we have waited for a minute, we can fail the tx
+                  if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} not enough but waited long enough`)
+                  this.updateTxState(queueEntry, 'fail')
+                  this.removeFromQueue(queueEntry, currentIndex)
+                } else {
+                  if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} not enough challenges but waited ${timeSinceAwaitFinalStart}ms`)
+                }
+                continue
+              }
+
               if (receipt2) {
                 vote = receipt2.appliedVote
               } else if (queueEntry.receivedBestConfirmation?.appliedVote) {
@@ -6000,9 +6024,8 @@ class TransactionQueue {
                 // console.log(`thant: ${queueEntry.logID} incomplete: ${incomplete}, missingAccounts: ${missingAccounts}`)
 
                 if (incomplete && missingAccounts.length > 0) {
-                  
+
                   // start request process for missing data if we waited long enough
-                  const timeSinceAwaitFinalStart = queueEntry.txDebug.startTimestamp['await final data'] > 0 ? shardusGetTime() - queueEntry.txDebug.startTimestamp['await final data'] : 0
                   let shouldStartFinalDataRequest = false
                   if (timeSinceAwaitFinalStart > 5000) {
                     shouldStartFinalDataRequest = true
@@ -6104,6 +6127,7 @@ class TransactionQueue {
               }
             } else {
               const upstreamTx = this.processQueue_getUpstreamTx(seenAccounts, queueEntry)
+              if (queueEntry.executionDebug == null) queueEntry.executionDebug = {}
               queueEntry.executionDebug.logFinalData = `has all final data, but busy. upstreamTx: ${upstreamTx?.logID}`
               nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData busy')
               if (logFlags.verbose) {
@@ -6181,7 +6205,7 @@ class TransactionQueue {
                   // the final state of the queue entry will be pass or fail based on the receipt
                   if (queueEntry.recievedAppliedReceipt2.result === false) {
                     canCommitTX = false
-                    hasReceiptFail = false
+                    hasReceiptFail = true
                   }
                 } else {
                   canCommitTX = false
@@ -7396,7 +7420,10 @@ class TransactionQueue {
         robustBestChallenge: queueEntry.receivedBestChallenge,
         txDebug: queueEntry.txDebug,
         executionDebug: queueEntry.executionDebug,
-        waitForReceiptOnly: queueEntry.waitForReceiptOnly
+        waitForReceiptOnly: queueEntry.waitForReceiptOnly,
+        ourVote: queueEntry.ourVote || null,
+        receipt2: this.stateManager.getReceipt2(queueEntry) || null,
+        uniqueChallenges: queueEntry.uniqueChallengesCount
       }
     })
   }
