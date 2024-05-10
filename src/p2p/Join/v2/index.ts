@@ -90,7 +90,7 @@ export function saveJoinRequest(joinRequest: JoinRequest, persistImmediately = f
     return
   }
 
-  if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: contents of seen:', getSeen())
+  if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: contents of newJoinRequests:', newJoinRequests)
   if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: adding join request to newJoinRequests:', joinRequest.nodeInfo.publicKey)
   console.trace()
 
