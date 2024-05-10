@@ -16,6 +16,7 @@ import { getSortedStandbyJoinRequests } from './Join/v2'
 import { selectNodesFromReadyList } from './Join/v2/syncFinished'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { safeStringify } from '../utils'
+import { validateGossipPayload, verifyOriginalSenderAndQuarter } from '../utils/GossipValidation'
 
 let syncTimes = []
 let lastCheckedCycleForSyncTimes = 0
@@ -29,41 +30,20 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
   profilerInstance.scopedProfileSectionStart('gossip-active', true)
   try {
     // Ignore gossip outside of Q1 and Q2
-    if (![1, 2].includes(CycleCreator.currentQuarter)) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-active: not in Q1 or Q2')
+    if (
+      !validateGossipPayload(
+        payload,
+        { nodeId: 's', status: 's', timestamp: 'n', sign: 'o' },
+        'gossip-active'
+      )
+    ) {
       return
     }
-    if (!payload) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-active: missing payload')
-      return
-    }
+
     if (logFlags.p2pNonFatal) info(`Got active request: ${JSON.stringify(payload)}`)
-    let err = ''
-    err = validateTypes(payload, {
-      nodeId: 's',
-      status: 's',
-      timestamp: 'n',
-      sign: 'o',
-    })
-    if (err) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-active: bad input ' + err)
-      return
-    }
-    err = validateTypes(payload.sign, { owner: 's', sig: 's' })
-    if (err) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-active: bad input sign ' + err)
-      return
-    }
 
-    const signer = NodeList.byPubKey.get(payload.sign.owner)
-    if (!signer) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-active: Got active request from unknown node')
-    }
-    const isOrig = signer.id === sender
-
-    // Only accept original txs in quarter 1
-    if (isOrig && CycleCreator.currentQuarter > 1) {
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:gossip-active CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
+    // Check if the sender is the original sender. If so check if in Q1 to accept the request
+    if (!verifyOriginalSenderAndQuarter(payload, sender as string, 'gossip-active')) {
       return
     }
 

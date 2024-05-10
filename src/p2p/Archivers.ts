@@ -34,6 +34,7 @@ import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
 import { Result, ResultAsync } from 'neverthrow'
 import { safeStringify } from '../utils'
 import { arch } from 'os'
+import { validateGossipPayload, verifyOriginalSenderAndQuarter } from '../utils/GossipValidation'
 
 const clone = rfdc()
 
@@ -927,54 +928,15 @@ export function registerRoutes() {
     profilerInstance.scopedProfileSectionStart('joinarchiver')
     try {
       // Ignore gossip outside of Q1 and Q2
-      if (![1, 2].includes(CycleCreator.currentQuarter)) {
-        if (logFlags.error) warn('joinarchiver-reject: not in Q1 or Q2')
+      if (!validateGossipPayload(payload, { nodeInfo: 'o', requestType: 's', requestTimestamp: 'n', sign: 'o'}, 'joinarchiver')) {
         return
       }
 
-      // Check if payload/argument present
-      if (!payload) {
-        if (logFlags.error) warn('joinarchiver-reject: missing payload')
+      // check if original request and if so only accept in Q1
+      if (!verifyOriginalSenderAndQuarter(payload, sender, 'joinarchiver')) {
         return
       }
 
-      // Validate Types
-      let err = validateTypes(payload, {
-        nodeInfo: 'o',
-        requestType: 's',
-        requestTimestamp: 'n',
-        sign: 'o',
-      })
-      if (err) {
-        warn('joinarchiver-reject: bad input ' + err)
-        return
-      }
-
-      // Validate Payload.sign Structure
-      err = validateTypes(payload.sign, { owner: 's', sig: 's' })
-      if (err) {
-        warn('joinarchiver-reject: bad input sign ' + err)
-        return
-      }
-
-      // Check Signer Known
-      const signer = NodeList.byPubKey.get(payload.sign.owner)
-      if (!signer) {
-        /* prettier-ignore */ if (logFlags.error) warn('joinarchiver-reject: Got join request from unknown node')
-      }
-
-      // Verify Sender as Original Signer
-      const isOrig = signer.id === sender
-      if (!isOrig) {
-        warn('joinarchiver-reject: Sender is not the original signer')
-        return
-      }
-
-      // Check Quarter for Original Requests and only want to accept original requests in Q1
-      if (isOrig && CycleCreator.currentQuarter > 1) {
-        warn('joinarchiver: Rejecting original request outside of Q1')
-        return
-      }
       if (logFlags.console) console.log('Join request gossip received:', payload)
       const accepted = await addArchiverJoinRequest(payload, tracker, false)
       if (logFlags.console) {
