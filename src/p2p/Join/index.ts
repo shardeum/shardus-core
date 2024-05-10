@@ -70,10 +70,6 @@ export function getAllowBogon(): boolean {
   return allowBogon
 }
 
-export function getSeen(): Set<P2P.P2PTypes.Node['publicKey']> {
-  return seen
-}
-
 let mode = null
 
 // let hasSubmittedJoinRequest = false
@@ -674,20 +670,26 @@ export function sendRequests(): void {
 
   if (queuedJoinRequestsForGossip?.length > 0) {
     for (const joinRequest of queuedJoinRequestsForGossip) {
-      // its possible that we have already seen this join request via gossip before we send it ourselves
-      if (newJoinRequests.includes(joinRequest) === false) {
+      // re-compute selection number for the join request for the current cycle
+      const selectionNumResult = computeSelectionNum(joinRequest)
+      if (selectionNumResult.isErr()) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-route-reject: failed to compute selection number` )
+        /* prettier-ignore */ if (logFlags.p2pNonFatal)console.error( `failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`, JSON.stringify(selectionNumResult.error) )
+        return
+      }
+      joinRequest.selectionNum = selectionNumResult.value
+
+      if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: contents of seen:', seen)
+
+      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: SEND_REQUESTS: joinRequest`, joinRequest)
+      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: SEND_REQUESTS: newJoinRequests`, newJoinRequests)
+      // its possible that we have already seen this join request via gossip before we send it
+      if (seen.has(joinRequest.nodeInfo.publicKey) === false) {
         if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: SEND_REQUESTS: joinReq not in newJoinRequests, saving it now`)
         // since join request was already validated last cycle, we can just set seen to true directly
         seen.add(joinRequest.nodeInfo.publicKey)
         saveJoinRequest(joinRequest)
       } 
-      // else {
-      //   if (newJoinRequests.includes(joinRequest)) {
-      //     console.log(`DEBUG CR-OOS: joinReq in seen and in newJoinRequests`)
-      //   } else {
-      //     console.log(`DEBUG CR-OOS: joinReq in seen and not in newJoinRequests`)
-      //   }
-      // }
       Comms.sendGossip('gossip-valid-join-requests', joinRequest, '', null, NodeList.byIdOrder, true)
       nestedCountersInstance.countEvent('p2p', `saved join request and gossiped to network`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`saved join request and gossiped to network`)
@@ -1419,6 +1421,7 @@ export function computeSelectionNum(joinRequest: JoinRequest): Result<string, Jo
   const selectionKey = selectionKeyResult.value
 
   // calculate the selection number based on the selection key
+  if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: computeSelectionNum: CycleChain.newest.counter: ', CycleChain.newest.counter)
   const obj = {
     cycleNumber: CycleChain.newest.counter,
     selectionKey,
