@@ -28,9 +28,7 @@ import { deserializeLostArchiverInvestigateReq } from '../../types/LostArchiverI
 import { getStreamWithTypeCheck } from '../../types/Helpers'
 import { TypeIdentifierEnum } from '../../types/enum/TypeIdentifierEnum'
 import { safeStringify } from '../../utils'
-import { validateTypes } from '../../utils'
-import * as NodeList from '../NodeList'
-import { validateGossipPayload, verifyOriginalSenderAndQuarter } from '../../utils/GossipValidation'
+import { checkGossipPayload, verifyOriginalSenderAndQuarter } from '../../utils/GossipValidation'
 
 /** Gossip */
 
@@ -48,7 +46,7 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
   }
   // Validate the payload structure and types and check if the node is in Q1 or Q2
   if (
-    !validateGossipPayload(
+    !checkGossipPayload(
       payload,
       { type: 's', downMsg: 'o', refuteMsg: 'o', cycle: 's', sign: 'o' },
       'lostArchiverUpGossip'
@@ -56,7 +54,6 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
   ) {
     return
   }
-
 
   // to-do: need a guard on logging logging.info() and others?
   logging.info(`lostArchiverUpGossip: payload: ${inspect(payload)}, sender: ${sender}, tracker: ${tracker}`)
@@ -67,12 +64,13 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
 
   const error = funcs.errorForArchiverUpMsg(payload)
   if (error) {
-    nestedCountersInstance.countEvent('lostArchivers', `lostArchiverUpGossip invalid payload ${error}`)    
+    nestedCountersInstance.countEvent('lostArchivers', `lostArchiverUpGossip invalid payload ${error}`)
     logging.warn(`lostArchiverUpGossip: invalid payload error: ${error}, payload: ${inspect(payload)}`)
     return
   }
 
   // TODO []: check who is signer for this endpoint or this check is even needed here
+    // Signed by the investigator, but is check for Q1 needed like with other gossips?
   // check if the signer is the original sender and if the node is in Q1 to continue
   if (!verifyOriginalSenderAndQuarter(payload, sender, 'lostArchiverUpGossip')) {
     return
@@ -118,7 +116,7 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
 
   // Ignore gossip outside of Q1 and Q2, plus check the payload structure and types
   if (
-    !validateGossipPayload(
+    !checkGossipPayload(
       payload,
       { type: 's', investigateMsg: 'o', cycle: 's', sign: 'o' },
       'lostArchiverDownGossip'
@@ -141,6 +139,7 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
   }
 
   // TODO []: check who is signer for this endpoint or this check is even needed here
+  // Signed by the investigator, but is check for Q1 needed like with other gossips?
   // check if the signer is the original sender and if the node is in Q1 to continue
   if (!verifyOriginalSenderAndQuarter(payload, sender, 'lostArchiverDownGossip')) {
     return

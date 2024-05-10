@@ -16,7 +16,7 @@ import { getSortedStandbyJoinRequests } from './Join/v2'
 import { selectNodesFromReadyList } from './Join/v2/syncFinished'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { safeStringify } from '../utils'
-import { validateGossipPayload, verifyOriginalSenderAndQuarter } from '../utils/GossipValidation'
+import { checkGossipPayload, verifyOriginalSenderAndQuarter } from '../utils/GossipValidation'
 
 let syncTimes = []
 let lastCheckedCycleForSyncTimes = 0
@@ -29,13 +29,9 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
 ) => {
   profilerInstance.scopedProfileSectionStart('gossip-active', true)
   try {
-    // Ignore gossip outside of Q1 and Q2
+    // Ignore gossip outside of Q1 and Q2 and check if the payload structure is valid
     if (
-      !validateGossipPayload(
-        payload,
-        { nodeId: 's', status: 's', timestamp: 'n', sign: 'o' },
-        'gossip-active'
-      )
+      !checkGossipPayload(payload, { nodeId: 's', status: 's', timestamp: 'n', sign: 'o' }, 'gossip-active')
     ) {
       return
     }
