@@ -590,20 +590,9 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `sync-finished validation success: ${addFinishedSyncingResult.success}`)
     if (!addFinishedSyncingResult.success) {
       if (addFinishedSyncingResult.reason !== 'node has already submitted syncFinished request') {
-        if (config.debug.cycleRecordOOSDebugLogs)
-          console.log(
-            'DEBUG CR-OOS: gossipSyncFinished rejected: ',
-            addFinishedSyncingResult.reason,
-            ' payload id: ',
-            payload.nodeId,
-            ' payload cycle: ',
-            payload.cycleNumber
-          )
+        if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: gossipSyncFinished rejected: ', addFinishedSyncingResult.reason, ' payload id: ', payload.nodeId, ' payload cycle: ', payload.cycleNumber)
       }
-      nestedCountersInstance.countEvent(
-        'p2p',
-        `sync-finished failure reason: ${addFinishedSyncingResult.reason}`
-      )
+      nestedCountersInstance.countEvent('p2p', `sync-finished failure reason: ${addFinishedSyncingResult.reason}`)
     }
     if (addFinishedSyncingResult.success) {
       Comms.sendGossip('gossip-sync-finished', payload, tracker, sender, NodeList.byIdOrder, false)
