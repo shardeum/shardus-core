@@ -37,7 +37,7 @@ export function checkGossipPayload<T extends GossipPayload>(
   // Check if the current quarter is either 1 or 2
   if (![1, 2].includes(CycleCreator.currentQuarter)) {
     // count the event if the current quarter is not 1 or 2
-    nestedCountersInstance.countEvent('p2p', `${logContext}-reject: not in Q1 or Q2`)
+    nestedCountersInstance.countEvent('p2p', `${logContext}-reject: not in Q1 or Q2. currentCycle: ${CycleCreator.currentCycle} `)
 
     const isJoinReq = isJoinRequest(payload)
 
