@@ -1,11 +1,11 @@
-import { VectorBufferStream } from '../../../src/utils/serialization/VectorBufferStream'
+import { VectorBufferStream } from '../../../../src'
 import {
+  deserializeGetTxTimestampResp,
   getTxTimestampResp,
   serializeGetTxTimestampResp,
-  deserializeGetTxTimestampResp,
-} from '../../../src/types/GetTxTimestampResp'
-import { TypeIdentifierEnum } from '../../../src/types/enum/TypeIdentifierEnum'
-import { initAjvSchemas } from '../../../src/types/ajv/Helpers'
+} from '../../../../src/types/GetTxTimestampResp'
+import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
+import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 
 describe('getTxTimestampResp Serialization and Deserialization', () => {
   beforeAll(() => {
@@ -302,6 +302,25 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
         cycleCounter: 2147483647,
         timestamp: 123456789012345,
       })
+    })
+  })
+
+  describe('GetTxTimestampResp Serialization and Deserialization Together', () => {
+    it('should serialize and deserialize maintaining data integrity', () => {
+      let obj: getTxTimestampResp = {
+        txId: '123',
+        cycleMarker: '456',
+        cycleCounter: 789,
+        timestamp: 101112,
+        sign: { owner: 'owner123', sig: 'signature123' },
+        isResponse: true,
+      }
+      let stream = new VectorBufferStream(0)
+      serializeGetTxTimestampResp(stream, obj, false)
+      stream.position = 0 // Reset for reading
+
+      const deserializedObj = deserializeGetTxTimestampResp(stream)
+      expect(deserializedObj).toEqual(obj)
     })
   })
 })

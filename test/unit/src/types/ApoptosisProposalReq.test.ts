@@ -1,11 +1,11 @@
-import { VectorBufferStream } from '../../../src'
+import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
 import {
   ApoptosisProposalReq,
   cApoptosisProposalReqVersion,
   deserializeApoptosisProposalReq,
   serializeApoptosisProposalReq,
-} from '../../../src/types/ApoptosisProposalReq'
-import { TypeIdentifierEnum } from '../../../src/types/enum/TypeIdentifierEnum'
+} from '../../../../src/types/ApoptosisProposalReq'
+import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 
 /* 
 
@@ -32,7 +32,7 @@ describe('ApoptosisProposalReq Serialization', () => {
       ({ data }) => {
         if (data.id === 'null') data.id = null // we have added this for custom validation purposes
         const stream = new VectorBufferStream(0)
-        expect(() => serializeApoptosisProposalReq(stream, data)).toThrow("invalid obj")
+        expect(() => serializeApoptosisProposalReq(stream, data)).toThrow('invalid obj')
       }
     )
   })
@@ -88,7 +88,6 @@ describe('ApoptosisProposalReq Serialization', () => {
 
     expect(stream.getBuffer()).toEqual(expectedStream.getBuffer())
   })
-
 })
 
 describe('ApoptosisProposalReq Deserialization', () => {
@@ -139,5 +138,4 @@ describe('ApoptosisProposalReq Deserialization', () => {
 
     expect(obj).toEqual({ id: 'large', when: 2147483647 })
   })
-
 })
