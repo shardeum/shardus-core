@@ -210,7 +210,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
           joinRequest,
           '',
           null,
-          [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder],
+          [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
           true
         )
         nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
@@ -235,7 +235,7 @@ const unjoinRoute: P2P.P2PTypes.Route<Handler> = {
       joinRequest,
       '',
       null,
-      [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder],
+      [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
       true
     )
   },
@@ -416,7 +416,7 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
           payload,
           tracker,
           sender,
-          [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder],
+          [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
           false
         )
     } finally {
@@ -519,7 +519,7 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
     payload,
     tracker,
     sender,
-    [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder],
+    [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
     false
   )
 }
@@ -540,7 +540,7 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeLi
     payload,
     tracker,
     sender,
-    [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder],
+    [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
     false
   )
 }
@@ -623,7 +623,7 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<
         payload,
         tracker,
         sender,
-        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder],
+        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
         false
       )
   } finally {
@@ -719,7 +719,7 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<
         payload,
         tracker,
         sender,
-        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder],
+        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
         false
       )
     } else {
@@ -757,7 +757,7 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<
         payload,
         tracker,
         sender,
-        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder],
+        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
         false
       )
   } finally {
