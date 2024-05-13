@@ -3,7 +3,7 @@ import { P2P } from '@shardus/types'
 import { Logger } from 'log4js'
 import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import { ShardusEvent } from '../shardus/shardus-types'
-import { binarySearch, getTime, insertSorted, propComparator, propComparator2 } from '../utils'
+import { binarySearch, getTime, insertSorted, linearInsertSorted, propComparator, propComparator2 } from '../utils'
 import * as Comms from './Comms'
 import { config, crypto, logger, network } from './Context'
 import * as CycleChain from './CycleChain'
@@ -128,7 +128,7 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
 
   // If node is READY status, insert sorted by readyTimestamp and id to tiebreak into readyByTimeAndIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.READY) {
-    insertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
+    linearInsertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
   }
 
   // If active, insert sorted by id into activeByIdOrder
@@ -286,7 +286,7 @@ export function updateNode(
         removeSelectedNode(node.id)
       }
       if (update[key] === P2P.P2PTypes.NodeStatus.READY) {
-        insertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
+        linearInsertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
         if (config.p2p.hardenNewSyncingProtocol) {
           if (selectedById.has(node.id)) removeSelectedNode(node.id) // in case we missed the sync-started gossip
         }

@@ -40,6 +40,19 @@ export function insertSorted<T>(arr: T[], item: T, comparator?: Comparator<T>): 
   arr.splice(i, 0, item)
 }
 
+
+export function linearInsertSorted<T>(arr: T[], item: T, comparator?: Comparator<T>): void {
+  let i = 0
+  while (i < arr.length) {
+    if (comparator(item, arr[i]) < 0) {
+      break
+    }
+    i++
+  }
+
+  arr.splice(i, 0, item)
+}
+
 /**
  * Binary find lowest
  * Returns the index of the lowest element in the array. The array is monotonically increasing to the right, but
