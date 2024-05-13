@@ -171,6 +171,9 @@ export function addNodes(newNodes: P2P.NodeListTypes.Node[], caller: string) {
 
 export function removeSelectedNode(id: string) {
   selectedById.delete(id)
+  const idx = binarySearch(selectedByIdOrder, { id }, propComparator('id'))
+  /* prettier-ignore */ if (logFlags.verbose) console.log('Removing selected node', id, idx)
+  if (idx >= 0) selectedByIdOrder.splice(idx, 1)
 }
 
 export function removeSyncingNode(id: string) {
