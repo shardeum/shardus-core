@@ -390,6 +390,8 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
   CycleChain.append(cycle)
   CycleCreator.setDigestedCycle(true)
 
+  if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: digestCycle: Nodelist.byIdOrder: `, NodeList.byIdOrder)
+
   // TODO: This seems like a possible location to inetvene if our node
   // is getting far behind on what it thinks the current cycle is
   // first would like to know how it is getting behind.

@@ -672,6 +672,9 @@ export function sendRequests(): void {
 
   if (queuedJoinRequestsForGossip?.length > 0) {
     for (const joinRequest of queuedJoinRequestsForGossip) {
+      // TODO: may need to check if node is on standby and maybe validate the request again
+      // need to think about this more
+
       // re-compute selection number for the join request for the current cycle
       const selectionNumResult = computeSelectionNum(joinRequest)
       if (selectionNumResult.isErr()) {

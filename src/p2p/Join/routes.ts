@@ -475,6 +475,8 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<StartedSyncingRequest, 
   tracker
 ) => {
 
+  if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: CycleChain.newest.counter: ', CycleChain.newest.counter)
+
   if (config.debug.cycleRecordOOSDebugLogs) {
     if (receivedSyncStarted.has(payload.nodeId) === false) {
       receivedSyncStarted.set(payload.nodeId, true)
@@ -524,6 +526,8 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
   tracker: string
 ) => {
   profilerInstance.scopedProfileSectionStart('gossip-sync-finished')
+
+  if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: CycleChain.newest.counter: ', CycleChain.newest.counter)
 
   if (config.debug.cycleRecordOOSDebugLogs) {
     if (receivedSyncFinished.has(payload.nodeId) === false) {
