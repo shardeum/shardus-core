@@ -623,7 +623,7 @@ export function sendRequests(): void {
     })
     queuedStartedSyncingId = undefined
 
-    if(addSyncStarted(syncStartedTx).success === true) {
+    if (addSyncStarted(syncStartedTx).success === true) {
       nestedCountersInstance.countEvent('p2p', `sending sync-started gossip to network`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`sending sync-started gossip to network`)
       const self = NodeList.byJoinOrder.find((node) => node.id === syncStartedTx.nodeId)
@@ -632,7 +632,7 @@ export function sendRequests(): void {
         syncStartedTx,
         '',
         null,
-        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder, self],
+        nodeListFromStates(['active', 'ready', 'syncing']),
         true
       )
     } else {
@@ -655,7 +655,7 @@ export function sendRequests(): void {
         syncFinishedTx,
         '',
         null,
-        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
+        nodeListFromStates(['active', 'ready', 'syncing']),
         true
       )
     } else {
@@ -1526,6 +1526,31 @@ function decideNodeSelection(joinRequest: P2P.JoinTypes.JoinRequest): JoinReques
     reason: 'Join request accepted',
     fatal: false,
   }
+}
+
+export function nodeListFromStates(states: string[]): P2P.NodeListTypes.Node[] {
+  const stateMappings: { [key: string]: P2P.NodeListTypes.Node[] } = {
+    active: NodeList.activeByIdOrder,
+    ready: NodeList.readyByTimeAndIdOrder,
+    syncing: NodeList.syncingByIdOrder,
+    standby: NodeList.standbyByIdOrder,
+    selected: NodeList.selectedByIdOrder,
+  }
+
+  // Collect arrays from requested states
+  const result = states.reduce((acc, state) => {
+    if (stateMappings[state]) {
+      acc.push(...stateMappings[state]) 
+    }
+    return acc
+  }, [] as P2P.NodeListTypes.Node[])
+
+  const self = NodeList.byJoinOrder.find((node) => node.id === Self.id)
+  if (self) {
+    result.push(self)
+  }
+
+  return result
 }
 
 function info(...msg: string[]): void {
