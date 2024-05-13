@@ -1251,6 +1251,7 @@ export interface LogsConfiguration {
     fatal?: string
     net?: string
     app?: string
+    seq?: string
   }
   options?: {
     appenders?: {
@@ -1260,6 +1261,11 @@ export interface LogsConfiguration {
         backups?: number
       }
       main?: {
+        type?: string
+        maxLogSize?: number
+        backups?: number
+      }
+      seq?: {
         type?: string
         maxLogSize?: number
         backups?: number
@@ -1335,6 +1341,10 @@ export interface LogsConfiguration {
         level?: string
       }
       main?: {
+        appenders?: string[]
+        level?: string
+      }
+      seq?: {
         appenders?: string[]
         level?: string
       }
