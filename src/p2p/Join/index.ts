@@ -624,7 +624,14 @@ export function sendRequests(): void {
     if(addSyncStarted(syncStartedTx).success === true) {
       nestedCountersInstance.countEvent('p2p', `sending sync-started gossip to network`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`sending sync-started gossip to network`)
-      Comms.sendGossip('gossip-sync-started', syncStartedTx, '', null, NodeList.byIdOrder, true)
+      Comms.sendGossip(
+        'gossip-sync-started',
+        syncStartedTx,
+        '',
+        null,
+        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
+        true
+      )
     } else {
       nestedCountersInstance.countEvent('p2p', `join:sendRequests failed to add our own sync-started message`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequestsfailed to add our own sync-started message`)
@@ -640,7 +647,14 @@ export function sendRequests(): void {
     if (addFinishedSyncing(syncFinishedTx).success === true) {
       nestedCountersInstance.countEvent('p2p', `sending sync-finished gossip to network`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`sending sync-finished gossip to network`)
-      Comms.sendGossip('gossip-sync-finished', syncFinishedTx, '', null, NodeList.byIdOrder, true)
+      Comms.sendGossip(
+        'gossip-sync-finished',
+        syncFinishedTx,
+        '',
+        null,
+        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
+        true
+      )
     } else {
       nestedCountersInstance.countEvent('p2p', `join:sendRequests failed to add our own sync-finished message`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequests failed to add our own sync-finished message`)
