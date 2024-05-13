@@ -3,7 +3,7 @@ import { ServerMode, StrictServerConfiguration } from '../shardus/shardus-types'
 const SERVER_CONFIG: StrictServerConfiguration = {
   heartbeatInterval: 5,
   baseDir: '.',
-  transactionExpireTime: 5,
+  transactionExpireTime: 20,
   globalAccount: '0'.repeat(64),
   /**
    * [TODO] Introduced on 2024-04-15 and needs to be checked through out the code
@@ -132,7 +132,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     rotationPercentActive: 0.001, //rotate 0.1% of active nodes per cycle when in a steady processing state
     rotationMaxAddPercent: 0.1,
     rotationMaxRemovePercent: 0.05,
-    allowActivePerCycle: 7,
+    allowActivePerCycle: 31,
     useProxyForDownCheck: false,
     numCheckerNodes: 1,
     minChecksForDown: 1,
@@ -160,7 +160,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     getAccountQueueCountBinary: true,
     getAccountDataWithQueueHintsBinary: true,
     getTxTimestampBinary: true,
-    getAppliedVoteBinary: true, //disabled due to SHM-4286
+    getAppliedVoteBinary: false, //disabled due to SHM-4286
     getConfirmOrChallengeBinary: true,
     spreadAppliedVoteHashBinary: true,
     spreadTxToGroupSyncingBinary: true,
