@@ -4604,7 +4604,7 @@ class TransactionQueue {
     const seenAccounts: SeenAccounts = {}
     let pushedProfilerTag = null
     const startTime = shardusGetTime()
-    this.mainLogger.info(`0x10052024 ${ipInfo.externalIp} ${shardusGetTime()} 0x0000 processTransactions _transactionQueue.length ${this._transactionQueue.length}`)
+    if (logFlags.seqdiagram) this.mainLogger.info(`0x10052024 ${ipInfo.externalIp} ${shardusGetTime()} 0x0000 processTransactions _transactionQueue.length ${this._transactionQueue.length}`)
 
     const processStats: ProcessQueueStats = {
       totalTime: 0,
@@ -4824,7 +4824,7 @@ class TransactionQueue {
 
         // eslint-disable-next-line security/detect-object-injection
         const queueEntry: QueueEntry = this._transactionQueue[currentIndex]
-        this.mainLogger.info(`0x10052024 ${ipInfo.externalIp} ${shardusGetTime()} 0x0001 currentIndex:${currentIndex} txId:${queueEntry.acceptedTx.txId} state:${queueEntry.state}`)
+        if (logFlags.seqdiagram) this.mainLogger.info(`0x10052024 ${ipInfo.externalIp} ${shardusGetTime()} 0x0001 currentIndex:${currentIndex} txId:${queueEntry.acceptedTx.txId} state:${queueEntry.state}`)
         const txTime = queueEntry.txKeys.timestamp
         const txAge = currentTime - txTime
 
