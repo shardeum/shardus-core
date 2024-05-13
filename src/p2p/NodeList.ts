@@ -35,7 +35,6 @@ export let activeIdToPartition: Map<string, number>
 export let syncingByIdOrder: P2P.NodeListTypes.Node[]
 export let selectedByIdOrder: P2P.NodeListTypes.Node[]
 export let standbyByIdOrder: P2P.NodeListTypes.Node[]
-export let initializingByIdOrder: P2P.NodeListTypes.Node[]
 export let readyByTimeAndIdOrder: P2P.NodeListTypes.Node[]
 export let activeOthersByIdOrder: P2P.NodeListTypes.Node[]
 export let potentiallyRemoved: Set<P2P.NodeListTypes.Node['id']>
@@ -89,7 +88,6 @@ export function reset(caller: string) {
   syncingByIdOrder = []
   selectedByIdOrder = []
   standbyByIdOrder = []
-  initializingByIdOrder = []
   readyByTimeAndIdOrder = []
   activeOthersByIdOrder = []
   potentiallyRemoved = new Set()
@@ -128,10 +126,6 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
     insertSorted(othersByIdOrder, node, propComparator('id'))
   }
 
-  // If initializing, insert into initializingByIdOrder
-  if (node.status === P2P.P2PTypes.NodeStatus.INITIALIZING) {
-    insertSorted(initializingByIdOrder, node, propComparator('id'))
-  }
   // If selected, insert into standbyByIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.STANDBY) {
     insertSorted(standbyByIdOrder, node, propComparator('id'))
@@ -212,9 +206,6 @@ export function removeNode(
   }
 
   // Remove from arrays
-  idx = binarySearch(initializingByIdOrder, { id }, propComparator('id'))
-  if (idx >= 0) initializingByIdOrder.splice(idx, 1)
-
   idx = binarySearch(selectedByIdOrder, { id }, propComparator('id'))
   if (idx >= 0) selectedByIdOrder.splice(idx, 1)
 
