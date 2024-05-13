@@ -1475,18 +1475,7 @@ class TransactionConsenus {
               `tryProduceReceipt: ${queueEntry.logID} stopped accepting confirm/challenge messages`
             )
 
-          if (logFlags.debug) {
-            this.mainLogger.debug(
-              `tryProduceReceipt: ${
-                queueEntry.logID
-              } ready to decide final receipt. bestReceivedChallenge: ${utils.stringifyReduce(
-                queueEntry.receivedBestChallenge
-              )}, bestReceivedConfirmation: ${utils.stringifyReduce(
-                queueEntry.receivedBestConfirmation
-              )}, receivedBestConfirmedNode: ${utils.stringifyReduce(queueEntry.receivedBestConfirmedNode)}`
-            )
-          }
-
+          if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} ready to decide final receipt. bestReceivedChallenge: ${utils.stringifyReduce(queueEntry.receivedBestChallenge)}, bestReceivedConfirmation: ${utils.stringifyReduce(queueEntry.receivedBestConfirmation)}, receivedBestConfirmedNode: ${utils.stringifyReduce(queueEntry.receivedBestConfirmedNode)}`) // prettier-ignore
           if (this.stateManager.consensusLog) {
             this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} ready to decide final receipt.`)
             this.mainLogger.debug(
@@ -1525,6 +1514,7 @@ class TransactionConsenus {
                 )}`
               )
 
+            // todo: we still need to check if we have a better challenge receipt from robust query ??
             const robustQueryResult = await this.robustQueryConfirmOrChallenge(queueEntry)
             const robustConfirmOrChallenge = robustQueryResult?.result
             const robustUniqueCount = robustQueryResult?.uniqueCount
