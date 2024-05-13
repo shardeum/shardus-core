@@ -693,6 +693,8 @@ export function isNodeValidForInternalMessage(
 
   // Also may add a flag to change if we also allow other statuses
   if (nodeStatus != 'active' || NodeList.potentiallyRemoved.has(node.id)) {
+    if (config.debug.cycleRecordOOSDebugLogs && nodeStatus != 'active') console.log(`DEBUG CR-OOS: isNodeValidForInternalMessage: filtering ${node.externalPort} b/c its not active. Node object:`, node)
+    if (config.debug.cycleRecordOOSDebugLogs && NodeList.potentiallyRemoved.has(node.id)) console.log(`DEBUG CR-OOS: isNodeValidForInternalMessage: filtering ${node.externalPort} b/c its potentially removed`)
     if (logErrors)
       if (logFlags.error)
         /* prettier-ignore */ error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(node.id)} ${debugMsg}`)
