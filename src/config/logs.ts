@@ -3,10 +3,11 @@ import { StrictLogsConfiguration } from '../shardus/shardus-types'
 const LOGS_CONFIG: StrictLogsConfiguration = {
   saveConsoleOutput: true,
   dir: 'logs',
-  files: { main: '', fatal: '', net: '', app: '' },
+  files: { main: '', fatal: '', net: '', app: '', seq: '' },
   options: {
     appenders: {
       out: { type: 'console', maxLogSize: 10000000, backups: 10 },
+      seq: { type: 'file', maxLogSize: 10000000, backups: 10 },
       main: { type: 'file', maxLogSize: 10000000, backups: 10 },
       app: { type: 'file', maxLogSize: 10000000, backups: 10 },
       p2p: { type: 'file', maxLogSize: 10000000, backups: 10 },
@@ -25,6 +26,7 @@ const LOGS_CONFIG: StrictLogsConfiguration = {
       default: { appenders: ['out'], level: 'trace' },
       app: { appenders: ['app', 'errors'], level: 'trace' },
       main: { appenders: ['main', 'errors'], level: 'trace' },
+      seq: { appenders: ['seq'], level: 'trace' },
       p2p: { appenders: ['p2p'], level: 'trace' },
       snapshot: { appenders: ['snapshot'], level: 'trace' },
       cycle: { appenders: ['cycle'], level: 'trace' },

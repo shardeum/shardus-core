@@ -2,7 +2,7 @@ import { AppHeader } from '@shardus/net/build/src/types'
 import { P2P } from '@shardus/types'
 import { Logger } from 'log4js'
 import { logFlags } from '../logger'
-import { shardusGetTime } from '../network'
+import { ipInfo, shardusGetTime } from '../network'
 import { isNodeDown, isNodeLost, isNodeUpRecent, setIsUpTs } from '../p2p/Lost'
 import { ShardusTypes } from '../shardus'
 import { Sign } from '../shardus/shardus-types'
@@ -79,6 +79,7 @@ const routes = {
 /** STATE */
 
 let p2pLogger: Logger
+let seqLogger: Logger
 
 let acceptInternal = false
 
@@ -102,6 +103,7 @@ export function setAcceptInternal(enabled: boolean) {
 
 export function init() {
   p2pLogger = logger.getLogger('p2p')
+  seqLogger = logger.getLogger('seq')
 
   // Register routes
   for (const [name, handler] of Object.entries(routes.internal)) {
@@ -829,7 +831,8 @@ export async function sendGossip(
   inpNodes: Shardus.Node[] | Shardus.NodeWithRank[] = NodeList.byIdOrder, // Joining nodes need gossip too; we don't
   // send to ourself
   isOrigin = false,
-  factor = -1
+  factor = -1,
+  txId = ''
 ) {
   //console.log('entered sendGossip gossiping ', type)
   let msgSize = cUninitializedSize
@@ -962,6 +965,12 @@ export async function sendGossip(
 
     //console.log('recipients after filter')
     //recipients.forEach(node => console.log(node.externalPort))
+    if (logFlags.seqdiagram && txId != '') {
+      for (const node of recipients) {
+        seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} ${ipInfo.internalIp}-->>${node.internalIp}: g:${type}`)
+      }
+    }
+
     if (config.p2p.useBinarySerializedEndpoints === true) {
       msgSize = await tellBinary<GossipReqBinary>(
         recipients,

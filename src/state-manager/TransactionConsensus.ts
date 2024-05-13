@@ -34,7 +34,7 @@ import {
   RequestReceiptForTxResp,
   WrappedResponses,
 } from './state-manager-types'
-import { shardusGetTime } from '../network'
+import { ipInfo, shardusGetTime } from '../network'
 import { robustQuery } from '../p2p/Utils'
 import { SignedObject } from '@shardus/crypto-utils'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
@@ -95,6 +95,7 @@ class TransactionConsenus {
   stateManager: StateManager
 
   mainLogger: log4jLogger
+  seqLogger: log4jLogger
   fatalLogger: log4jLogger
   shardLogger: log4jLogger
   statsLogger: log4jLogger
@@ -125,6 +126,7 @@ class TransactionConsenus {
     this.stateManager = stateManager
 
     this.mainLogger = logger.getLogger('main')
+    this.seqLogger = logger.getLogger('seq')
     this.fatalLogger = logger.getLogger('fatal')
     this.shardLogger = logger.getLogger('shardDump')
     this.statsLogger = logger.getLogger('statsDump')
@@ -554,7 +556,9 @@ class TransactionConsenus {
                 tracker,
                 null,
                 queueEntry.transactionGroup,
-                false
+                false,
+                -1,
+                queueEntry.acceptedTx.txId
               )
             }
           }
@@ -647,7 +651,9 @@ class TransactionConsenus {
                 tracker,
                 sender,
                 gossipGroup,
-                false
+                false,
+                -1,
+                queueEntry.acceptedTx.txId
               )
             }
           } else {
@@ -907,7 +913,9 @@ class TransactionConsenus {
                 tracker,
                 sender,
                 gossipGroup,
-                false
+                false,
+                -1,
+                queueEntry.acceptedTx.txId
               )
               nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 gossip forwarded')
             }
@@ -960,7 +968,7 @@ class TransactionConsenus {
             // Gossip further
             const sender = null
             const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-            Comms.sendGossip('spread_confirmOrChallenge', payload, '', sender, gossipGroup, false, 10)
+            Comms.sendGossip('spread_confirmOrChallenge', payload, '', sender, gossipGroup, false, 10, queueEntry.acceptedTx.txId)
             queueEntry.gossipedConfirmOrChallenge = true
           }
         } catch (e) {
@@ -1023,6 +1031,7 @@ class TransactionConsenus {
       let timestampReceipt
       try {
         if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getTxTimestampBinary) {
+          if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${ipInfo.internalIp}-->>${homeNode.node.internalIp}: ${'get_tx_timestamp'}`)
           const serialized_res = await this.p2p.askBinary<getTxTimestampReq, getTxTimestampResp>(
             homeNode.node,
             InternalRouteEnum.binary_get_tx_timestamp,
@@ -1149,7 +1158,7 @@ class TransactionConsenus {
       }
 
       //let payload = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
-      this.p2p.sendGossipIn('spread_appliedReceipt2', payload, '', sender, gossipGroup, false)
+      this.p2p.sendGossipIn('spread_appliedReceipt2', payload, '', sender, gossipGroup, false, -1, queueEntry.acceptedTx.txId)
       if (logFlags.debug) this.mainLogger.debug(`shareAppliedReceipt ${queueEntry.logID} sent gossip`)
     }
   }
@@ -1858,6 +1867,7 @@ class TransactionConsenus {
   async robustQueryBestVote(queueEntry: QueueEntry): Promise<AppliedVote> {
     profilerInstance.profileSectionStart('robustQueryBestVote', true)
     profilerInstance.scopedProfileSectionStart('robustQueryBestVote')
+    const txId = queueEntry.acceptedTx.txId
     try {
       queueEntry.queryingRobustVote = true
       if (this.stateManager.consensusLog) this.mainLogger.debug(`robustQueryBestVote: ${queueEntry.logID}`)
@@ -1870,6 +1880,7 @@ class TransactionConsenus {
           const queryData: AppliedVoteQuery = { txId: queueEntry.acceptedTx.txId }
           if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAppliedVoteBinary) {
             const req = queryData as GetAppliedVoteReq
+            if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${ipInfo.internalIp}-->>${node.internalIp}: ${'get_applied_vote'}`)
             const rBin = await Comms.askBinary<GetAppliedVoteReq, GetAppliedVoteResp>(
               node,
               InternalRouteEnum.binary_get_applied_vote,
@@ -1913,6 +1924,8 @@ class TransactionConsenus {
       )
       if (response && response.appliedVote) {
         return response.appliedVote
+      } else {
+        this.mainLogger.error(`robustQueryBestVote: ${txId} no response from robustQuery`)
       }
     } catch (e) {
       this.mainLogger.error(`robustQueryBestVote: ${queueEntry.logID} error: ${e.message}`)
@@ -1934,6 +1947,7 @@ class TransactionConsenus {
       const queryFn = async (node: Shardus.Node): Promise<ConfirmOrChallengeQueryResponse> => {
         if (node.externalIp === Self.ip && node.externalPort === Self.port) return null
         const queryData = { txId: queueEntry.acceptedTx.txId }
+        if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queryData.txId} ${ipInfo.internalIp}-->>${node.internalIp}: ${'get_confirm_or_challenge'}`)
         return this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getConfirmOrChallengeBinary
           ? await Comms.askBinary<GetConfirmOrChallengeReq, GetConfirmOrChallengeResp>(
               node,
@@ -2034,7 +2048,8 @@ class TransactionConsenus {
 
   async robustQueryAccountData(
     consensNodes: Shardus.Node[],
-    accountId: string
+    accountId: string,
+    txId: string
   ): Promise<Shardus.WrappedData> {
     const queryFn = async (node: Shardus.Node): Promise<GetAccountData3Resp> => {
       const ip = node.externalIp
@@ -2054,6 +2069,7 @@ class TransactionConsenus {
       try {
         if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountDataBinary) {
           const req = message as GetAccountDataReqSerializable
+          if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${ipInfo.internalIp}-->>${node.internalIp}: ${'get_account_data3'}`)
           const rBin = await Comms.askBinary<GetAccountDataReqSerializable, GetAccountDataRespSerializable>(
             node,
             InternalRouteEnum.binary_get_account_data,
@@ -2312,7 +2328,7 @@ class TransactionConsenus {
 
       //Share message to tx group
       const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-      Comms.sendGossip('spread_confirmOrChallenge', signedConfirmMessage, '', Self.id, gossipGroup, true, 10)
+      Comms.sendGossip('spread_confirmOrChallenge', signedConfirmMessage, '', Self.id, gossipGroup, true, 10, queueEntry.acceptedTx.txId)
       this.tryAppendMessage(queueEntry, signedConfirmMessage)
       queueEntry.gossipedConfirmOrChallenge = true
       queueEntry.completedConfirmedOrChallenge = true
@@ -2385,7 +2401,7 @@ class TransactionConsenus {
 
       //Share message to tx group
       const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-      Comms.sendGossip('spread_confirmOrChallenge', signedChallengeMessage, '', null, gossipGroup, true, 10)
+      Comms.sendGossip('spread_confirmOrChallenge', signedChallengeMessage, '', null, gossipGroup, true, 10, queueEntry.acceptedTx.txId)
       this.tryAppendMessage(queueEntry, signedChallengeMessage)
       queueEntry.gossipedConfirmOrChallenge = true
       queueEntry.completedConfirmedOrChallenge = true
@@ -2412,7 +2428,8 @@ class TransactionConsenus {
         this.stateManager.transactionQueue.queueEntryGetConsensusGroupForAccount(queueEntry, key)
       const promise = this.stateManager.transactionConsensus.robustQueryAccountData(
         consensuGroupForAccount,
-        key
+        key,
+        queueEntry.acceptedTx.txId
       )
       queueEntry.robustAccountDataPromises[key] = promise
     }
@@ -2690,7 +2707,7 @@ class TransactionConsenus {
 
         if (this.stateManager.transactionQueue.useNewPOQ) {
           // Gossip the vote to the entire consensus group
-          Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4)
+          Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4, queueEntry.acceptedTx.txId)
         } else {
           this.profiler.profileSectionStart('createAndShareVote-tell')
           if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.spreadAppliedVoteHashBinary) {

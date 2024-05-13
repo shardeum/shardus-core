@@ -8,6 +8,7 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import ShardFunctions from './shardFunctions'
+import { ipInfo, shardusGetTime } from '../network'
 import StateManager from '.'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { QueueEntry, AppliedVote, AccountHashCache, RequestStateForTxResp } from './state-manager-types'
@@ -28,6 +29,7 @@ class TransactionRepair {
   stateManager: StateManager
 
   mainLogger: log4jsLogger
+  seqLogger: log4jsLogger
   fatalLogger: log4jsLogger
   shardLogger: log4jsLogger
   statsLogger: log4jsLogger
@@ -53,6 +55,7 @@ class TransactionRepair {
     this.stateManager = stateManager
 
     this.mainLogger = logger.getLogger('main')
+    this.seqLogger = logger.getLogger('seq')
     this.fatalLogger = logger.getLogger('fatal')
     this.shardLogger = logger.getLogger('shardDump')
     this.statsLogger = logger.getLogger('statsDump')
@@ -568,6 +571,7 @@ class TransactionRepair {
                   this.config.p2p.requestStateForTxPostBinary
                 ) {
                   const request = message as RequestStateForTxPostReq
+                  if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${message.txid} ${ipInfo.internalIp}-->>${node.internalIp}: ${'request_state_for_tx_post'}`)
                   // GOLD-65 This only has a try /finally.  repairToMatchReceipt is called in several places so it is better hanlde the error here
                   result = await this.p2p.askBinary<RequestStateForTxPostReq, RequestStateForTxPostResp>(
                     node,

@@ -109,7 +109,7 @@ export type LogFlags = {
   lost: boolean // extra logging for the lost system
 
   rotation: boolean // extra logging for the rotation system
-
+  seqdiagram: boolean // logging for mermaid sequential diagrams
 }
 
 export let logFlags: LogFlags = {
@@ -145,6 +145,7 @@ export let logFlags: LogFlags = {
   shardedCache: false,
   lost: false,
   rotation: false,
+  seqdiagram: false
 }
 
 const filePath1 = path.join(process.cwd(), 'data-logs', 'cycleRecords1.txt')
