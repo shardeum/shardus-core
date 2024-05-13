@@ -18,7 +18,8 @@ import {
   warn,
   queueStandbyRefreshRequest,
   queueJoinRequest,
-  verifyJoinRequestTypes
+  verifyJoinRequestTypes,
+  nodeListFromStates,
 } from '.'
 import { config } from '../Context'
 import { isBogonIP } from '../../utils/functions/checkIP'
@@ -32,10 +33,10 @@ import { addFinishedSyncing } from './v2/syncFinished'
 import { processNewUnjoinRequest, UnjoinRequest } from './v2/unjoin'
 import { isActive } from '../Self'
 import { logFlags } from '../../logger'
-import { JoinRequest, StartedSyncingRequest } from "@shardus/types/build/src/p2p/JoinTypes";
+import { JoinRequest, StartedSyncingRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { addSyncStarted } from './v2/syncStarted'
 import { addStandbyRefresh } from './v2/standbyRefresh'
-import { DeSerializeFromJsonString, safeParser, safeStringify } from "../../utils";
+import { DeSerializeFromJsonString, safeParser, safeStringify } from '../../utils'
 import { testFailChance } from '../../utils'
 import { shardusGetTime } from '../../network'
 
@@ -212,7 +213,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
           joinRequest,
           '',
           null,
-          [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
+          nodeListFromStates(['active', 'ready', 'syncing']),
           true
         )
         nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
@@ -237,7 +238,7 @@ const unjoinRoute: P2P.P2PTypes.Route<Handler> = {
       joinRequest,
       '',
       null,
-      [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
+      nodeListFromStates(['active', 'ready', 'syncing']),
       true
     )
   },
@@ -418,7 +419,7 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
           payload,
           tracker,
           sender,
-          [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
+          nodeListFromStates(['active', 'ready', 'syncing']),
           false
         )
     } finally {
@@ -521,7 +522,7 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
     payload,
     tracker,
     sender,
-    [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
+    nodeListFromStates(['active', 'ready', 'syncing']),
     false
   )
 }
@@ -542,7 +543,7 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeLi
     payload,
     tracker,
     sender,
-    [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
+    nodeListFromStates(['active', 'ready', 'syncing']),
     false
   )
 }
@@ -625,7 +626,7 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<
         payload,
         tracker,
         sender,
-        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
+        nodeListFromStates(['active', 'ready', 'syncing']),
         false
       )
   } finally {
@@ -721,7 +722,7 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<
         payload,
         tracker,
         sender,
-        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
+        nodeListFromStates(['active', 'ready', 'syncing']),
         false
       )
     } else {
@@ -759,7 +760,7 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<
         payload,
         tracker,
         sender,
-        [...NodeList.activeByIdOrder, ...NodeList.readyByTimeAndIdOrder, ...NodeList.syncingByIdOrder],
+        nodeListFromStates(['active', 'ready', 'syncing']),
         false
       )
   } finally {

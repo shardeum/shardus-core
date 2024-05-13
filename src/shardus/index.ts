@@ -82,7 +82,7 @@ import { safeStringify } from '../utils'
 import { isNodeInRotationBounds } from '../p2p/Utils'
 import ShardFunctions from '../state-manager/shardFunctions'
 import SocketIO from 'socket.io'
-import { queueFinishedSyncingRequest } from '../p2p/Join'
+import { nodeListFromStates, queueFinishedSyncingRequest } from '../p2p/Join'
 import * as NodeList from '../p2p/NodeList'
 
 
@@ -1146,11 +1146,13 @@ class Shardus extends EventEmitter {
         cycleNumber: CycleChain.getNewest()?.counter,
       }
       readyPayload = Context.crypto.sign(readyPayload)
-      Comms.sendGossip('gossip-sync-finished', readyPayload, undefined, undefined, [
-        ...NodeList.activeByIdOrder,
-        ...NodeList.readyByTimeAndIdOrder,
-        ...NodeList.syncingByIdOrder,
-      ])
+      Comms.sendGossip(
+        'gossip-sync-finished',
+        readyPayload,
+        undefined,
+        undefined,
+        nodeListFromStates(['active', 'ready', 'syncing'])
+      )
       if (this.stateManager) {
         this.stateManager.appFinishedSyncing = true
       }
