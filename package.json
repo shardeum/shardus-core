@@ -1,6 +1,6 @@
 {
   "name": "@shardus/core",
-  "version": "2.12.30-29",
+  "version": "2.12.30-30",
   "engines": {
     "node": "18.16.1"
   },
