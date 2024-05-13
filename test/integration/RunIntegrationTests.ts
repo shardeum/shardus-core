@@ -36,7 +36,7 @@ const displayResults = (): void => {
 async function runIntegrationTests(): Promise<void> {
   try {
     // Setup the environment
-    const { node, networkContext } = await setupTestEnvironment()
+    const { dummyNode, targetNode, networkContext } = await setupTestEnvironment()
     myNetworkContext = networkContext
 
     console.log('Running integration tests...')
@@ -44,8 +44,8 @@ async function runIntegrationTests(): Promise<void> {
     console.log('----------------------------------------------------------------------------------------')
 
     // Run all integration tests or individual tests by commenting out the other
-    await ApopotosizeInternalApiTest(node)
-    await GetAccountDataInternalApiTest(node)
+    await ApopotosizeInternalApiTest(dummyNode, targetNode)
+    await GetAccountDataInternalApiTest(dummyNode, targetNode)
   } catch (error) {
     console.error('Error during integration tests:', error)
   } finally {

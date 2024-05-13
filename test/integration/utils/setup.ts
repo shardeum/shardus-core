@@ -39,7 +39,8 @@ const getNodeDetails = async (host: string, port: string) => {
 }
 
 export async function setupTestEnvironment(): Promise<{
-  node: ShardusTypes.Node
+  dummyNode: ShardusTypes.Node
+  targetNode: ShardusTypes.Node
   networkContext: NetworkClass
 }> {
   const logger = new Logger(defaultConfigs.server.baseDir, defaultConfigs.logs, 'fatal')
@@ -94,7 +95,25 @@ export async function setupTestEnvironment(): Promise<{
   }
 
   // Create a node object
-  const node: ShardusTypes.Node = {
+  const dummyNode: ShardusTypes.Node = {
+    publicKey: keyPair.publicKey,
+    externalIp: '127.0.0.1',
+    externalPort: 1337,
+    internalIp: '127.0.0.1',
+    internalPort: 1337,
+    address: keyPair.publicKey,
+    joinRequestTimestamp: Date.now(),
+    activeTimestamp: Date.now(),
+    curvePublicKey: keyPair.publicKey,
+    status: NodeStatus.ACTIVE,
+    cycleJoined: '',
+    counterRefreshed: 0,
+    id: crypto.hashObj({ publicKey: keyPair.publicKey, cycleMarker: 'madeupcyclemarker' }),
+    syncingTimestamp: Date.now(),
+    readyTimestamp: 0,
+  }
+  
+  const targetNode: ShardusTypes.Node = {
     publicKey: nodeInfo.publicKey,
     externalIp: nodeInfo.externalIp,
     externalPort: nodeInfo.externalPort,
@@ -111,5 +130,6 @@ export async function setupTestEnvironment(): Promise<{
     syncingTimestamp: Date.now(),
     readyTimestamp: 0,
   }
-  return { node, networkContext }
+
+  return { dummyNode, networkContext, targetNode }
 }
