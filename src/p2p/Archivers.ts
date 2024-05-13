@@ -938,7 +938,7 @@ export function registerRoutes() {
         return
       }
 
-      // check if original request and if so only accept in Q1
+      // if original sender then check if in Q1 to continue
       if (!verifyOriginalSenderAndQuarter(payload, sender, 'joinarchiver')) {
         return
       }

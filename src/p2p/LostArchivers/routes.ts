@@ -69,9 +69,7 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
     return
   }
 
-  // TODO []: check who is signer for this endpoint or this check is even needed here
-    // Signed by the investigator, but is check for Q1 needed like with other gossips?
-  // check if the signer is the original sender and if the node is in Q1 to continue
+  // If original sender then check if in Q1 to continue
   if (!verifyOriginalSenderAndQuarter(payload, sender, 'lostArchiverUpGossip')) {
     return
   }
@@ -138,9 +136,7 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
     return
   }
 
-  // TODO []: check who is signer for this endpoint or this check is even needed here
-  // Signed by the investigator, but is check for Q1 needed like with other gossips?
-  // check if the signer is the original sender and if the node is in Q1 to continue
+  // If original sender then check if in Q1 to continue
   if (!verifyOriginalSenderAndQuarter(payload, sender, 'lostArchiverDownGossip')) {
     return
   }

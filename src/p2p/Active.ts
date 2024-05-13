@@ -38,7 +38,7 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
 
     if (logFlags.p2pNonFatal) info(`Got active request: ${JSON.stringify(payload)}`)
 
-    // Check if the sender is the original sender. If so check if in Q1 to accept the request
+    // If the sender is the original sender check if in Q1 to accept the request
     if (!verifyOriginalSenderAndQuarter(payload, sender as string, 'gossip-active')) {
       return
     }

@@ -112,7 +112,7 @@ export function verifyOriginalSenderAndQuarter(
   context: string
 ): boolean {
   const signer = NodeList.byPubKey.get(payload.sign.owner)
-  // TODO []: check if this is correct and why. Check Active.ts of original dev branch...
+  // if no signer warn and continue by returning true
   if (!signer) {
     /* prettier-ignore */ if (logFlags.error) warn(`${context}: Got ${context} from unknown node`);
     return true
