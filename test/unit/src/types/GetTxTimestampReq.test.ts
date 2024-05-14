@@ -1,12 +1,12 @@
-import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
 import {
+  cGetTxTimestampReqVersion,
+  deserializeGetTxTimestampReq,
   getTxTimestampReq,
   serializeGetTxTimestampReq,
-  deserializeGetTxTimestampReq,
-  cGetTxTimestampReqVersion,
 } from '../../../../src/types/GetTxTimestampReq'
-import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
+import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
+import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
 
 describe('GetTxTimestampReq Tests', () => {
   beforeAll(() => {
@@ -15,15 +15,9 @@ describe('GetTxTimestampReq Tests', () => {
 
   describe('serializeGetTxTimestampReq', () => {
     let stream: VectorBufferStream
-    let obj: getTxTimestampReq
 
     beforeEach(() => {
       stream = new VectorBufferStream(0)
-      obj = {
-        txId: 'testTxId',
-        cycleCounter: 100,
-        cycleMarker: 'marker123',
-      }
     })
 
     describe('Data validation Cases', () => {
@@ -155,12 +149,12 @@ describe('GetTxTimestampReq Tests', () => {
 
   describe('GetTxTimestampReq Serialization and Deserialization Together', () => {
     it('should serialize and deserialize maintaining data integrity', () => {
-      let obj: getTxTimestampReq = {
+      const obj: getTxTimestampReq = {
         txId: 'uniqueTxId',
         cycleCounter: 4294967295,
         cycleMarker: 'endMarker',
       }
-      let stream = new VectorBufferStream(0)
+      const stream = new VectorBufferStream(0)
       serializeGetTxTimestampReq(stream, obj, false)
       stream.position = 0 // Reset for reading
 

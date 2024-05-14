@@ -36,8 +36,9 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
       test.each(invalidObjects)(
         'should throw error if field is improper during serialization',
         ({ data }) => {
+          const dataClone = JSON.parse(JSON.stringify(data))
           const stream = new VectorBufferStream(0)
-          expect(() => serializeGetTxTimestampResp(stream, data)).toThrow('Data validation error')
+          expect(() => serializeGetTxTimestampResp(stream, dataClone)).toThrow('Data validation error')
         }
       )
     })
@@ -62,8 +63,8 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
       expectedStream.writeUInt32(obj.cycleCounter)
       expectedStream.writeBigUInt64(BigInt(obj.timestamp))
       expectedStream.writeUInt8(1) // sign present
-      expectedStream.writeString(obj.sign.owner)
-      expectedStream.writeString(obj.sign.sig)
+      expectedStream.writeString(obj.sign?.owner ?? '')
+      expectedStream.writeString(obj.sign?.sig ?? '')
       expectedStream.writeUInt8(1) // isResponse present
       expectedStream.writeUInt8(obj.isResponse ? 1 : 0)
 
@@ -91,8 +92,8 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
       expectedStream.writeUInt32(obj.cycleCounter)
       expectedStream.writeBigUInt64(BigInt(obj.timestamp))
       expectedStream.writeUInt8(1) // sign present
-      expectedStream.writeString(obj.sign.owner)
-      expectedStream.writeString(obj.sign.sig)
+      expectedStream.writeString(obj.sign?.owner ?? '')
+      expectedStream.writeString(obj.sign?.sig ?? '')
       expectedStream.writeUInt8(1) // isResponse present
       expectedStream.writeUInt8(obj.isResponse ? 1 : 0)
 
@@ -118,8 +119,8 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
       expectedStream.writeUInt32(obj.cycleCounter)
       expectedStream.writeBigUInt64(BigInt(obj.timestamp))
       expectedStream.writeUInt8(1) // sign present
-      expectedStream.writeString(obj.sign.owner)
-      expectedStream.writeString(obj.sign.sig)
+      expectedStream.writeString(obj.sign?.owner ?? '')
+      expectedStream.writeString(obj.sign?.sig ?? '')
       expectedStream.writeUInt8(1) // isResponse present
       expectedStream.writeUInt8(obj.isResponse ? 1 : 0)
 
@@ -147,8 +148,8 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
 
       // Handling optional sign
       expectedStream.writeUInt8(1) // sign is present
-      expectedStream.writeString(obj.sign.owner)
-      expectedStream.writeString(obj.sign.sig)
+      expectedStream.writeString(obj.sign?.owner ?? '')
+      expectedStream.writeString(obj.sign?.sig ?? '')
 
       // Handling optional isResponse
       expectedStream.writeUInt8(1) // isResponse is present
@@ -201,8 +202,8 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
 
       // Handling optional sign
       expectedStream.writeUInt8(1) // sign is present
-      expectedStream.writeString(obj.sign.owner)
-      expectedStream.writeString(obj.sign.sig)
+      expectedStream.writeString(obj.sign?.owner ?? '')
+      expectedStream.writeString(obj.sign?.sig ?? '')
 
       // Handling optional isResponse
       expectedStream.writeUInt8(1) // isResponse is present
@@ -307,7 +308,7 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
 
   describe('GetTxTimestampResp Serialization and Deserialization Together', () => {
     it('should serialize and deserialize maintaining data integrity', () => {
-      let obj: getTxTimestampResp = {
+      const obj: getTxTimestampResp = {
         txId: '123',
         cycleMarker: '456',
         cycleCounter: 789,
@@ -315,7 +316,7 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
         sign: { owner: 'owner123', sig: 'signature123' },
         isResponse: true,
       }
-      let stream = new VectorBufferStream(0)
+      const stream = new VectorBufferStream(0)
       serializeGetTxTimestampResp(stream, obj, false)
       stream.position = 0 // Reset for reading
 

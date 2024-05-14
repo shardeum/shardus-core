@@ -1,4 +1,3 @@
-import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
 import {
   ApoptosisProposalReq,
   cApoptosisProposalReqVersion,
@@ -6,15 +5,7 @@ import {
   serializeApoptosisProposalReq,
 } from '../../../../src/types/ApoptosisProposalReq'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
-
-/* 
-
-export interface ApoptosisProposalReq {
-  id: string
-  when: number
-}
-
-*/
+import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
 
 describe('ApoptosisProposalReq Serialization', () => {
   describe('Data validation Cases', () => {
@@ -30,9 +21,12 @@ describe('ApoptosisProposalReq Serialization', () => {
     test.each(incompleteObjects)(
       'should throw error if field is improper during serialization',
       ({ data }) => {
-        if (data.id === 'null') data.id = null // we have added this for custom validation purposes
+        const dataClone = JSON.parse(JSON.stringify(data))
+        if (dataClone.id === 'null') {
+          dataClone.id = null // we have added this for custom validation purposes
+        }
         const stream = new VectorBufferStream(0)
-        expect(() => serializeApoptosisProposalReq(stream, data)).toThrow('invalid obj')
+        expect(() => serializeApoptosisProposalReq(stream, dataClone)).toThrow('invalid obj')
       }
     )
   })
