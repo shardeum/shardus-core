@@ -128,7 +128,7 @@ describe('GetAccountDataWithQueueHintsReq Serialization and Deserialization', ()
       })
     })
 
-    test('should throw an error if version is unsupported', () => {
+    test('should throw a version mismatch error if the version number does not match', () => {
       const stream = new VectorBufferStream(0)
       stream.writeUInt8(cGetAccountDataWithQueueHintsReqVersion + 1)
       stream.writeUInt32(3)

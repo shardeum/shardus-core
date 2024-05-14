@@ -223,7 +223,7 @@ describe('GetAccountDataWithQueueHintsResp Serialization and Deserialization', (
       stream.writeUInt8(cGetAccountDataWithQueueHintsRespVersion + 1) // Incorrect version
       stream.position = 0 // Reset position for reading
 
-      expect(() => deserializeGetAccountDataWithQueueHintsResp(stream)).toThrow()
+      expect(() => deserializeGetAccountDataWithQueueHintsResp(stream)).toThrow('GetAccountDataWithQueueHintsResp version mismatch')
     })
   })
 
