@@ -48,7 +48,6 @@ export function deserializeGetAccountDataWithQueueHintsResp(
       accountData.push(deserializeWrappedDataFromQueue(stream)) // Deserialize each WrappedDataFromQueueBinary
     }
   }
-  console.log("The data is: ", accountData)
   return {
     accountData,
   }
