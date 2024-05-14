@@ -108,14 +108,13 @@ function stringifier(
         }
       }
     // eslint-disable-next-line no-fallthrough
+    case 'function':
     case 'undefined':
       return isArrayProp ? null : undefined
     case 'string':
       return JSON.stringify(val)
     case 'bigint':
-      // Add some special identifier for bigint
-      // return JSON.stringify({__BigInt__: val.toString()})
-      return JSON.stringify(val.toString(16))
+      return JSON.stringify({ dataType: 'bi', value: val.toString(16) })
     default:
       return isFinite(val) ? val : null
   }
@@ -215,17 +214,7 @@ export function SerializeToJsonString(obj: unknown): string {
 
 // Decodes base64 strings to buffer
 export function DeSerializeFromJsonString<T>(jsonString: string): T {
-  return JSON.parse(jsonString, base64BufferReviver) as T
-}
-
-function shouldReviveAsBigInt(value: string, length?: number): boolean {
-  if (value && typeof value === 'string' && value.indexOf('0x') >= 0) return false // do not convert strings with 0x
-  // prefix
-  if (typeof value !== 'string' || !value.match(/^[0-9A-Fa-f]*$/)) return false
-
-  if (typeof length !== 'undefined' && length > 0 && value.length !== 2 + 2 * length) return false
-
-  return true
+  return JSON.parse(jsonString, typeReviver) as T
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -239,18 +228,19 @@ function GetBufferFromField(input: any, encoding?: 'base64' | 'hex'): Buffer {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function base64BufferReviver(key: string, value: any): any {
+function typeReviver(key: string, value: any): any {
   if (key === 'sig') return value
   const originalObject = value
   if (
     isObject(originalObject) &&
     Object.prototype.hasOwnProperty.call(originalObject, 'dataType') &&
-    originalObject.dataType &&
-    originalObject.dataType == 'bh'
+    originalObject.dataType
   ) {
-    return new Uint8Array(GetBufferFromField(originalObject, 'base64'))
-  } else if (value && shouldReviveAsBigInt(value) && value.length !== 42 && value.length !== 64) {
-    return BigInt('0x' + value)
+    if (originalObject.dataType == 'bh') {
+      return new Uint8Array(GetBufferFromField(originalObject, 'base64'))
+    } else if (originalObject.dataType == 'bi') {
+      return BigInt('0x' + value)
+    }
   } else {
     return value
   }
