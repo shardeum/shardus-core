@@ -6,7 +6,7 @@ import {
   WrappedDataFromQueueSerializable,
 } from './WrappedDataFromQueue'
 
-const cGetAccountDataWithQueueHintsRespVersion = 1
+export const cGetAccountDataWithQueueHintsRespVersion = 1
 
 export type GetAccountDataWithQueueHintsRespSerializable = {
   accountData: WrappedDataFromQueueSerializable[] | null
@@ -48,6 +48,7 @@ export function deserializeGetAccountDataWithQueueHintsResp(
       accountData.push(deserializeWrappedDataFromQueue(stream)) // Deserialize each WrappedDataFromQueueBinary
     }
   }
+  console.log("The data is: ", accountData)
   return {
     accountData,
   }

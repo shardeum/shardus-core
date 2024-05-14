@@ -1,7 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
-const cGetAccountDataWithQueueHintsReqVersion = 1
+export const cGetAccountDataWithQueueHintsReqVersion = 1
 
 export type GetAccountDataWithQueueHintsReqSerializable = {
   accountIds: string[]
