@@ -73,6 +73,7 @@ import {
   QueueCountsResponse,
   QueueCountsResult,
   ConfirmOrChallengeMessage,
+  TimestampRemoveRequest
 } from './state-manager-types'
 import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
@@ -254,6 +255,7 @@ class StateManager {
   lastActiveCount: number
 
   useAccountWritesOnly: boolean
+  reinjectTxsMap: Map<string, number>
   /***
    *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########
    *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ##
@@ -437,6 +439,7 @@ class StateManager {
     this.superLargeNetworkDebugReduction = true
 
     this.lastActiveCount = -1
+    this.reinjectTxsMap = new Map()
   }
 
   renewState() {
@@ -4275,6 +4278,98 @@ class StateManager {
   getTxRepair(): TransactionRepair {
     if (this.transactionRepair) {
       return this.transactionRepair
+    }
+  }
+  async handleChallengedTransaction(queueEntry: QueueEntry) {
+    // schedule to reinject this transaction
+    if (Context.config.stateManager.reinjectChallengedTxs === true) {
+      const executionKey = queueEntry.executionShardKey
+      const acceptedTx = Object.assign({}, queueEntry.acceptedTx) // make a copy
+      const receipt2 = Object.assign({}, this.getReceipt2(queueEntry)) // make a copy
+      const timestampedTx = acceptedTx.data
+
+      if (this.reinjectTxsMap.get(acceptedTx.txId) > Context.config.stateManager.maxReinjectChallengedTxs) {
+        this.mainLogger.error(`handleChallengedTransaction maxReinjectChallengedTxs reached for txId: ${acceptedTx.txId}`)
+        this.reinjectTxsMap.delete(acceptedTx.txId)
+        return
+      }
+
+      await this.askToRemoveTimestampCache(acceptedTx, receipt2)
+      // check if we are luck node for this account
+      const closetNodes = this.shardus.getClosestNodes(executionKey, 5, false)
+      if (closetNodes.length === 0) return
+      if (closetNodes.includes(Self.id) === false) return
+
+      let txToReinject = Object.assign({}, timestampedTx.tx) // make a copy
+      let reinjectTimestamp = timestampedTx.timestampReceipt.timestamp + Context.config.p2p.cycleDuration * 1000
+      let now = shardusGetTime()
+      if (now > reinjectTimestamp) {
+        reinjectTimestamp = now + Context.config.p2p.cycleDuration * 1000
+      }
+      let waitTime = reinjectTimestamp - now
+      nestedCountersInstance.countEvent('reinjectChallengedTxs', `waitTime: ${waitTime}`)
+      this.mainLogger.debug(`reinjectChallengedTxs waitTime: ${waitTime} txId: ${acceptedTx.txId}`)
+      setTimeout(async () => {
+        // remove the archive tx if it is still there
+        this.transactionQueue.removeTxFromArchivedQueue(acceptedTx.txId)
+
+        let success = false
+        let maxRetry = 3
+        let count = 0
+        while (success === false && count <  maxRetry) {
+          count++
+          try {
+            const reinjectResult = await this.shardus.put(txToReinject)
+            this.mainLogger.debug(`reinjectChallengedTxs retry: ${count} ${utils.stringify(reinjectResult)}`)
+            if (reinjectResult.success === true) {
+              success = true
+              nestedCountersInstance.countEvent('reinjectChallengedTxs', `success: true count: ${count}`)
+              if (this.reinjectTxsMap.has(acceptedTx.txId)) {
+                // increase the count
+                this.reinjectTxsMap.set(acceptedTx.txId, this.reinjectTxsMap.get(acceptedTx.txId) + 1)
+              } else {
+                this.reinjectTxsMap.set(acceptedTx.txId, 1)
+              }
+            }
+          } catch (e) {
+            this.mainLogger.error(`reinjectChallengedTxs error: ${e.message}`)
+            nestedCountersInstance.countEvent('reinjectChallengedTxs', `error: ${e.message}`)
+          }
+          if (success === false) {
+            this.mainLogger.debug(`reinjectChallengedTxs retry: ${count} failed. waiting 3 seconds`)
+            await utils.sleep(3000)
+            await this.askToRemoveTimestampCache(acceptedTx, receipt2)
+          }
+        }
+      }, waitTime)
+    }
+  }
+  async askToRemoveTimestampCache(acceptedTx: QueueEntry['acceptedTx'], receipt2: AppliedReceipt2) {
+    const homeNode = ShardFunctions.findHomeNode(
+      Context.stateManager.currentCycleShardData.shardGlobals,
+      acceptedTx.txId,
+      Context.stateManager.currentCycleShardData.parititionShardDataMap
+    )
+    if (receipt2 == null) {
+      this.mainLogger.error(`askToRemoveTimestampCache receipt2 == null ${utils.stringifyReduce(acceptedTx)}`)
+      return
+    }
+    if (receipt2.confirmOrChallenge.message !== 'challenge') {
+      this.mainLogger.error(`askToRemoveTimestampCache receipt2.confirmOrChallenge.message !== 'challenge' ${utils.stringifyReduce(acceptedTx)}`)
+      return
+    }
+    if (acceptedTx.data.timestampReceipt == null) {
+      this.mainLogger.error(`askToRemoveTimestampCache queueEntry.acceptedTx.data.timestampReceipt == null ${utils.stringifyReduce(acceptedTx)}`)
+      return
+    }
+    const cycleCounter = acceptedTx.data.timestampReceipt.cycleCounter
+    // attach challenge receipt to payload
+    const payload: TimestampRemoveRequest = {txId: acceptedTx.txId, receipt2, cycleCounter}
+    try {
+      await this.p2p.tell([homeNode.node], 'remove_timestamp_cache', payload)
+    } catch (e) {
+      nestedCountersInstance.countEvent('askToRemoveTimestampCache', `error: ${e.message}`)
+      this.mainLogger.error(`askToRemoveTimestampCache error: ${e.message}`)
     }
   }
 

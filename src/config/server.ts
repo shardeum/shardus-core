@@ -312,6 +312,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     removeStuckChallengedTXs: true,
     receiptRemoveFix: true,
     stuckTxQueueFix: true
+    reinjectChallengedTxs: false, //leave this off, will remove later
+    maxReinjectChallengedTxs: 5,
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

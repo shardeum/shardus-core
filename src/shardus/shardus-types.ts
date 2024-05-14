@@ -511,6 +511,11 @@ export interface TimestampReceipt {
   timestamp: number
 }
 
+export interface TimestampedTx {
+  tx: OpaqueTransaction
+  timestampReceipt?: TimestampReceipt
+}
+
 export interface AccountData2 {
   /** Account ID */
   accountId: string
@@ -1201,7 +1206,7 @@ export interface ServerConfiguration {
     shareCompleteData: boolean
     // state machine chages updateTxState in several places from 'consensing' to 'await final data'
     txStateMachineChanges: boolean
-    // will a node attempt to request final data 
+    // will a node attempt to request final data
     canRequestFinalData:boolean
     // how many node to re-inject the tx received from client
     numberOfReInjectNodes: number
@@ -1215,7 +1220,7 @@ export interface ServerConfiguration {
     disableTxExpiration: boolean
     // whether to remove the tx from the queue if it stuck for X min
     removeStuckTxsFromQueue: boolean
-    // time to wait before removing the tx from the queue
+    // how long to wait before removing the tx from the queue
     stuckTxRemoveTime: number
     // remove a stuck challenged tx 
     removeStuckChallengedTXs: boolean
@@ -1223,6 +1228,10 @@ export interface ServerConfiguration {
     receiptRemoveFix: boolean
     // fix for stuck txs in the queue
     stuckTxQueueFix: boolean
+    // whether nodes should re-inject the txs that are challenged
+    reinjectChallengedTxs: boolean
+    // max number of times a tx can be re-injected
+    maxReinjectChallengedTxs: number
   }
   /** Options for sharding calculations */
   sharding?: {
@@ -1438,7 +1447,7 @@ export interface AcceptedTx {
   timestamp: number
   txId: string
   keys: TransactionKeys
-  data: OpaqueTransaction
+  data: TimestampedTx
   appData: any
   shardusMemoryPatterns: ShardusMemoryPatternsInput
 }

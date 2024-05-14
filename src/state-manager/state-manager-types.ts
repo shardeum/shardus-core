@@ -91,6 +91,8 @@ export type QueueEntry = {
   ourVoteHash?: string
   collectedVotes: AppliedVote[]
   collectedVoteHashes: AppliedVoteHash[]
+  pendingVotes: Map<string, AppliedVote>,
+  pendingConfirmOrChallenge: Map<string, ConfirmOrChallengeMessage>
   receivedBestVote?: AppliedVote
   receivedBestVoteHash?: string
   receivedBestVoter?: Shardus.NodeWithRank
@@ -98,6 +100,8 @@ export type QueueEntry = {
   receivedBestConfirmedNode?: Shardus.NodeWithRank
   receivedBestChallenge?: ConfirmOrChallengeMessage
   receivedBestChallenger?: Shardus.NodeWithRank
+  robustQueryVoteCompleted: boolean
+  robustQueryConfirmOrChallengeCompleted: boolean
   newVotes: boolean
   voteCastAge: number
   dataSharedTimestamp: number
@@ -1233,6 +1237,12 @@ export type CachedAppData = {
   dataID: string
   appData: unknown
   cycle: number
+}
+
+export interface TimestampRemoveRequest {
+  txId: string
+  receipt2: AppliedReceipt2
+  cycleCounter: number
 }
 
 export type CacheTopic = {
