@@ -1,4 +1,3 @@
-import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
 import {
   ApoptosisProposalResp,
   cApoptosisProposalRespVersion,
@@ -7,6 +6,7 @@ import {
 } from '../../../../src/types/ApoptosisProposalResp'
 import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
+import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
 
 describe('ApoptosisProposalResp Serialization and Deserialization', () => {
   beforeAll(() => {
@@ -20,16 +20,19 @@ describe('ApoptosisProposalResp Serialization and Deserialization', () => {
         { description: "missing 'r'", data: { s: 'test' } as ApoptosisProposalResp },
         {
           description: "null value in a field' ",
-          data: { r: 12, s: 'check for null' } as ApoptosisProposalResp,
+          data: { r: 12, s: 'null' } as ApoptosisProposalResp,
         },
       ]
 
       test.each(incompleteObjects)(
         'should throw error if field is improper during serialization',
         ({ data }) => {
-          if (data.s === 'check for null') data.s = null // we have added this for custom validation purposes
+          const dataClone = JSON.parse(JSON.stringify(data))
+          if (dataClone.s === 'null') {
+            dataClone.s = null // we have added this for custom validation purposes
+          }
           const stream = new VectorBufferStream(0)
-          expect(() => serializeApoptosisProposalResp(stream, data)).toThrow('Data validation error')
+          expect(() => serializeApoptosisProposalResp(stream, dataClone)).toThrow('Data validation error')
         }
       )
     })
