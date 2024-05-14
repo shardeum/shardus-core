@@ -412,12 +412,13 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
     } else if (
       // In these modes, the target count should be set to the desired/min count
       prevRecord.mode === 'safety' ||
-      prevRecord.mode === 'recovery' ||
       prevRecord.mode === 'restore'
     ) {
       // For the number of nodes to be added in each cycle during these modes is defined in the calculateToAcceptV2 function
       // using minNodes here since target is what will be used to get into processing mode
       targetCount = config.p2p.minNodes
+    } else if (prevRecord.mode === 'recovery') {
+      targetCount = config.p2p.minNodes + config.p2p.extraNodesToAddInRestart
     } else if (prevRecord.mode === 'restart') {
       // In restart mode, all the nodes remain in 'selected?' mode until the desired number of nodes are reached
       /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in restart")
