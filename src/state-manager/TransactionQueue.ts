@@ -45,7 +45,8 @@ import {
   TxDebug,
   WrappedResponses,
   ArchiverReceipt,
-  NonceQueueItem
+  NonceQueueItem,
+  AppliedVote
 } from './state-manager-types'
 import { isInternalTxAllowed, networkMode } from '../p2p/Modes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
@@ -5077,8 +5078,9 @@ class TransactionQueue {
                   //todo only keep on for temporarliy
                   /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> M2 canceled due to upstream TXs. sieveT:${queueEntry.txSieveTime}`)
                   this.setTXExpired(queueEntry, currentIndex, 'm2, processing or awaiting')
+                  if (configContext.stateManager.stuckTxQueueFix) continue // we need to skip this TX and move to the next one
                 }
-                continue
+                if (configContext.stateManager.stuckTxQueueFix === false) continue
               }
             }
           }
@@ -5100,12 +5102,16 @@ class TransactionQueue {
             if (configContext.stateManager.disableTxExpiration && hasSeenVote) {
               nestedCountersInstance.countEvent('txExpired', `> timeM3 + confirmSeenExpirationTime state: ${queueEntry.state} hasSeenVote: ${hasSeenVote} hasSeenConfirmation: ${hasSeenConfirmation} waitForReceiptOnly: ${queueEntry.waitForReceiptOnly}`)
               if(this.config.stateManager.txStateMachineChanges){
-                // this.updateTxState(queueEntry, 'await final data')
-                this.updateTxState(queueEntry, 'consensing')
+                if (configContext.stateManager.stuckTxQueueFix) {
+                  // make sure we are not resetting the state and causing state start timestamp to be updated repeatedly
+                  if (queueEntry.state !== 'await final data') this.updateTxState(queueEntry, 'await final data')
+                } else {
+                  this.updateTxState(queueEntry, 'await final data')
+                }
               } else {
                 this.updateTxState(queueEntry, 'consensing')
               }
-              continue
+              if (configContext.stateManager.stuckTxQueueFix === false) continue // we should not skip this TX
             }
             if (configContext.stateManager.disableTxExpiration === false) {
               this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + confirmSeenExpirationTime + 10s')
@@ -5971,7 +5977,7 @@ class TransactionQueue {
               //PURPL-74 todo: get the vote from queueEntry.receivedBestVote or receivedBestConfirmation instead of receipt2
               const receipt2 = this.stateManager.getReceipt2(queueEntry)
               const timeSinceAwaitFinalStart = queueEntry.txDebug.startTimestamp['await final data'] > 0 ? shardusGetTime() - queueEntry.txDebug.startTimestamp['await final data'] : 0
-              let vote
+              let vote: AppliedVote
               
               if(configContext.stateManager.removeStuckChallengedTXs){
                 // first check if this is a challenge receipt
@@ -6004,6 +6010,9 @@ class TransactionQueue {
                 vote = queueEntry.receivedBestConfirmation.appliedVote
               } else if (queueEntry.receivedBestVote) {
                 vote = queueEntry.receivedBestVote
+              } else if (queueEntry.ourVote && configContext.stateManager.stuckTxQueueFix) {
+                // allow node to request missing data if it has an own vote
+                vote = queueEntry.ourVote
               }
               const accountsNotStored = new Set()
               if (vote) {
@@ -7460,6 +7469,7 @@ class TransactionQueue {
     })
   }
   updateTxState(queueEntry: QueueEntry, nextState: string): void {
+    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`Updating tx ${queueEntry.logID} state from ${queueEntry.state} to ${nextState}`)
     if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${ipInfo.internalIp}: ${queueEntry.state}-${nextState}`)
     const currentState = queueEntry.state
     this.txDebugMarkEndTime(queueEntry, currentState)
