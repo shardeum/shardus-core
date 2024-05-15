@@ -268,7 +268,9 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
       res.send(safeStringify({ status: 'failure', message: error }))
       return
     }
-    const refuteMsg = req.body as SignedObject<ArchiverRefutesLostMsg>
+
+    const { archiver, cycle, sign } = req.body
+    const refuteMsg: SignedObject<ArchiverRefutesLostMsg> = { archiver, cycle, sign }
     const target = refuteMsg.archiver
     // to-do: check target is a string or hexstring and min length
     let record = lostArchiversMap.get(target)

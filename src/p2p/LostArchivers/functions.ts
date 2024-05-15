@@ -143,12 +143,16 @@ export function getInvestigator(target: publicKey, marker: CycleMarker): Node {
   let idx = binarySearch(activeByIdOrder, near, (i, r) => i.localeCompare(r.id))
   if (idx < 0) idx = (-1 - idx) % activeByIdOrder.length
   // eslint-disable-next-line security/detect-object-injection
-  const foundNode = activeByIdOrder[idx]
+  let foundNode = activeByIdOrder[idx]
   // eslint-disable-next-line security/detect-object-injection
   if (foundNode == null) {
     throw new Error(`activeByIdOrder idx:${idx} length: ${activeByIdOrder.length}`)
   }
-  if (foundNode.id === id) idx = (idx + 1) % activeByIdOrder.length // skip to next node if the selected node is target
+  if (foundNode.id === id) {
+    idx = (idx + 1) % activeByIdOrder.length
+    // eslint-disable-next-line security/detect-object-injection
+    foundNode = activeByIdOrder[idx]
+  } // skip to next node if the selected node is target
   return foundNode
 }
 
@@ -320,7 +324,27 @@ export function errorForArchiverRefutesLostMsg(
   if (msg.sign == null) return 'no signature'
   const missing = missingProperties(msg, 'archiver cycle')
   if (missing.length) return `missing properties: ${missing.join(', ')}`
-  // to-do: check for valid signature
+
+  // check if provided archiver is present in Archivers list or not
+  const archiver = Archivers.archivers.get(msg.archiver)
+  if (!archiver) {
+    warn(
+      `refuteLostArchiverRoute: provided archiver '${msg.archiver}' is not in the archivers list`
+    )
+    return 'provided archiver is unknown'
+  }
+
+  // check cycle marker of req.body
+  if(msg.cycle !== CycleChain.getCurrentCycleMarker()) {
+    warn(`refuteLostArchiverRoute: cycle marker mismatch`)
+    return 'cycle marker mismatch'
+  }
+
+  // verify crypto token
+  if (!Context.crypto.verify(msg, msg.archiver)) {
+    return 'invalid signature'
+  }
+
   return null
 }
 

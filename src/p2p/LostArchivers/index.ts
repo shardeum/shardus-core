@@ -120,7 +120,7 @@ export function updateRecord(
 
   // add all txs.lostArchivers publicKeys to record.lostArchivers
   for (const tx of txs.lostArchivers) {
-    const target = tx.investigateMsg?.target
+    const target = tx?.investigateMsg?.target
     if(target) {
       insertSorted(lostArchivers, target)
     } else {
@@ -129,7 +129,7 @@ export function updateRecord(
   }
   // add all txs.refutedArchivers publicKeys to record.refutedArchivers
   for (const tx of txs.refutedArchivers) {
-    const target = tx.downMsg?.investigateMsg?.target
+    const target = tx?.downMsg?.investigateMsg?.target
     if(target) {
       insertSorted(refutedArchivers, target)
     } else {
