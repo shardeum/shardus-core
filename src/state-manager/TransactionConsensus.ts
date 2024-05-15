@@ -2826,6 +2826,7 @@ class TransactionConsenus {
           queueEntry.receivedBestVote
         )}`
       )
+      nestedCountersInstance.countEvent('confirmOrChallenge', 'not same vote as finalized vote')
       return false
     }
 
