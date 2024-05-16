@@ -667,9 +667,19 @@ export function sendRequests(): void {
       if (standbyRefreshResult.success === true) {
         nestedCountersInstance.countEvent('p2p', `sending standby-refresh gossip to network`)
         /* prettier-ignore */ if (logFlags.verbose) console.log(`sending standby-refresh gossip to network`)
-        Comms.sendGossip('gossip-standby-refresh', standbyRefreshTx, '', null, NodeList.byIdOrder, true)
+        Comms.sendGossip(
+          'gossip-standby-refresh',
+          standbyRefreshTx,
+          '',
+          null,
+          nodeListFromStates(['active', 'ready', 'syncing']),
+          true
+        )
       } else {
-        nestedCountersInstance.countEvent('p2p', `join:sendRequests failed to add our own standby-refresh message`)
+        nestedCountersInstance.countEvent(
+          'p2p',
+          `join:sendRequests failed to add our own standby-refresh message`
+        )
         /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequests failed to add our own standby-refresh message`)
       }
     }
@@ -697,7 +707,14 @@ export function sendRequests(): void {
         seen.add(joinRequest.nodeInfo.publicKey)
         saveJoinRequest(joinRequest)
       }
-      Comms.sendGossip('gossip-valid-join-requests', joinRequest, '', null, NodeList.byIdOrder, true)
+      Comms.sendGossip(
+        'gossip-valid-join-requests',
+        joinRequest,
+        '',
+        null,
+        nodeListFromStates(['active', 'ready', 'syncing']),
+        true
+      )
       nestedCountersInstance.countEvent('p2p', `saved join request and gossiped to network`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`saved join request and gossiped to network`)
     }
