@@ -46,6 +46,7 @@ import path from 'path'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { BadRequest, InternalError, NotFound, serializeResponseError } from '../types/ResponseError'
+import { nodeListFromStates } from './Join'
 
 /** CONSTANTS */
 
@@ -1281,7 +1282,14 @@ async function gossipCycleCert(sender: P2P.NodeListTypes.Node['id'], tracker?: s
     record: bestRecord,
   }
   const signedCertGossip = crypto.sign(certGossip)
-  Comms.sendGossip('gossip-cert', signedCertGossip, tracker, sender, NodeList.byIdOrder, true)
+  Comms.sendGossip(
+    'gossip-cert',
+    signedCertGossip,
+    tracker,
+    sender,
+    nodeListFromStates(['active', 'ready', 'syncing']),
+    true
+  )
 }
 
 function pruneCycleChain() {
