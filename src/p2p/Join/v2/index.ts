@@ -36,7 +36,7 @@ export const standbyNodesRefresh: Map<publickey, number> = new Map()
  * "drained" when the cycle is digested. Its entries are added to `standbyNodeList` as part of cycle...
  * digestion. appetizing!
  */
-export let newJoinRequests: JoinRequest[] = []
+let newJoinRequests: JoinRequest[] = []
 
 export function init(): void {
   console.log('initializing join protocol v2')

@@ -28,7 +28,6 @@ import {
   getStandbyNodesInfoMap,
   saveJoinRequest,
   standbyNodesInfoHashes,
-  newJoinRequests
 } from './v2'
 import { err, ok, Result } from 'neverthrow'
 import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
