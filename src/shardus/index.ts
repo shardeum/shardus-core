@@ -1018,7 +1018,7 @@ class Shardus extends EventEmitter {
         status: 500
       };
     }
-    let timestampedTx;
+    let timestampedTx: ShardusTypes.TimestampedTx
     if (timestampReceipt && timestampReceipt.timestamp) {
       timestampedTx = {
         tx,
