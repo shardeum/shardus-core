@@ -5952,27 +5952,29 @@ class TransactionQueue {
               const receipt2 = this.stateManager.getReceipt2(queueEntry)
               const timeSinceAwaitFinalStart = queueEntry.txDebug.startTimestamp['await final data'] > 0 ? shardusGetTime() - queueEntry.txDebug.startTimestamp['await final data'] : 0
               let vote
-
-              // first check if this is a challenge receipt
-              if (receipt2 && receipt2.confirmOrChallenge.message === 'challenge') {
-                if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} challenge from receipt2`)
-                this.updateTxState(queueEntry, 'fail')
-                this.removeFromQueue(queueEntry, currentIndex)
-              } if (receipt2 == null && queueEntry.receivedBestChallenge) {
-                const enoughUniqueChallenges = queueEntry.uniqueChallengesCount >= configContext.stateManager.minRequiredChallenges
-                if (enoughUniqueChallenges) {
-                  if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} has unique challenges`)
+              
+              if(configContext.stateManager.removeStuckChallengedTXs){
+                // first check if this is a challenge receipt
+                if (receipt2 && receipt2.confirmOrChallenge.message === 'challenge') {
+                  if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} challenge from receipt2`)
                   this.updateTxState(queueEntry, 'fail')
                   this.removeFromQueue(queueEntry, currentIndex)
-                } else if (timeSinceAwaitFinalStart > 1000 * 30) {
-                  // if we have a challenge and we have waited for a minute, we can fail the tx
-                  if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} not enough but waited long enough`)
-                  this.updateTxState(queueEntry, 'fail')
-                  this.removeFromQueue(queueEntry, currentIndex)
-                } else {
-                  if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} not enough challenges but waited ${timeSinceAwaitFinalStart}ms`)
+                } if (receipt2 == null && queueEntry.receivedBestChallenge) {
+                  const enoughUniqueChallenges = queueEntry.uniqueChallengesCount >= configContext.stateManager.minRequiredChallenges
+                  if (enoughUniqueChallenges) {
+                    if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} has unique challenges`)
+                    this.updateTxState(queueEntry, 'fail')
+                    this.removeFromQueue(queueEntry, currentIndex)
+                  } else if (timeSinceAwaitFinalStart > 1000 * 30) {
+                    // if we have a challenge and we have waited for a minute, we can fail the tx
+                    if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} not enough but waited long enough`)
+                    this.updateTxState(queueEntry, 'fail')
+                    this.removeFromQueue(queueEntry, currentIndex)
+                  } else {
+                    if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} not enough challenges but waited ${timeSinceAwaitFinalStart}ms`)
+                  }
+                  continue
                 }
-                continue
               }
 
               if (receipt2) {
@@ -6205,7 +6207,11 @@ class TransactionQueue {
                   // the final state of the queue entry will be pass or fail based on the receipt
                   if (queueEntry.recievedAppliedReceipt2.result === false) {
                     canCommitTX = false
-                    hasReceiptFail = true
+                    if(configContext.stateManager.receiptRemoveFix){
+                      hasReceiptFail = true
+                    } else {
+                      hasReceiptFail = false
+                    }
                   }
                 } else {
                   canCommitTX = false
