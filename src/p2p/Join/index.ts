@@ -619,7 +619,6 @@ export function sendRequests(): void {
     if (addSyncStarted(syncStartedTx).success === true) {
       nestedCountersInstance.countEvent('p2p', `sending sync-started gossip to network`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`sending sync-started gossip to network`)
-      const self = NodeList.byJoinOrder.find((node) => node.id === syncStartedTx.nodeId)
       Comms.sendGossip(
         'gossip-sync-started',
         syncStartedTx,
