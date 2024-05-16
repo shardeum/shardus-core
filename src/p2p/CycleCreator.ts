@@ -478,8 +478,6 @@ async function cycleCreator() {
 
     /* prettier-ignore */ if (logFlags.verbose) info(`cc: scheduling currentCycle:${currentCycle} ${callTag} ${startQ1}`)
 
-    if (config.debug.cycleRecordOOSDebugLogs) console.log(`CycleCreator: Cycle ${currentCycle} started`)
-
     schedule(runQ1, startQ1, { runEvenIfLateBy: quarterDuration - 1 * SECOND }) // if there's at least one sec before Q2 starts, we can start Q1 now
     schedule(runQ2, startQ2)
     schedule(runQ3, startQ3)

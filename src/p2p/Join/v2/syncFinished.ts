@@ -133,7 +133,6 @@ export function isNodeSelectedReadyList(nodeId: string): boolean {
 
 export function selectNodesFromReadyList(mode: string): P2P.NodeListTypes.Node[] {
   if (mode === 'processing') {
-    if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: selectNodesFromReadyList: NodeList.readyByTimeAndIdOrder: ', NodeList.readyByTimeAndIdOrder)
     return NodeList.readyByTimeAndIdOrder.slice(0, config.p2p.allowActivePerCycle)
   } else {
     return NodeList.readyByTimeAndIdOrder
