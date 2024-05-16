@@ -239,7 +239,6 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     forcedExpiration: false,
     ignoreStandbyRefreshChance: 0,
     localEnableCycleRecordDebugTool: false,
-    cycleRecordOOSDebugLogs: false,
     enableTestMode: false,
     highResolutionProfiling: true,
     randomCycleData: false,

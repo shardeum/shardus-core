@@ -256,9 +256,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
   if (config.p2p.useJoinProtocolV2) {
     // for join v2, add new standby nodes to the standbyAdd field ...
-    if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: in updateRecord: newJoinRequests length: ${newJoinRequests.length}`)
     for (const standbyNode of drainNewJoinRequests()) {
-      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: draining new join request ${standbyNode.nodeInfo.publicKey}`)
       record.standbyAdd.push(standbyNode)
     }
 
@@ -478,13 +476,8 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
     if (CycleCreator.currentQuarter === 3) {
       // transfer join requests received this cycle to queue for gossipping next cycle
-      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: queuedJoinRequestsForGossip length: ${queuedJoinRequestsForGossip.length}`)
-      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: queuedReceivedJoinRequests length: ${queuedReceivedJoinRequests.length}`)
       queuedJoinRequestsForGossip = queuedReceivedJoinRequests
       queuedReceivedJoinRequests = []
-      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: after swap`)
-      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: queuedJoinRequestsForGossip length: ${queuedJoinRequestsForGossip.length}`)
-      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: queuedReceivedJoinRequests length: ${queuedReceivedJoinRequests.length}`)
     }
 
   } else {
@@ -680,8 +673,6 @@ export function sendRequests(): void {
     }
     queuedStandbyRefreshPubKeys = []
   }
-  if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: sendRequests: before sending joinRequestsForGossip`)
-  if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: sendRequests: sendRequests: queuedJoinRequestsForGossip length: ${queuedJoinRequestsForGossip.length}`)
 
   if (queuedJoinRequestsForGossip?.length > 0) {
     for (const joinRequest of queuedJoinRequestsForGossip) {
@@ -697,13 +688,9 @@ export function sendRequests(): void {
       }
       joinRequest.selectionNum = selectionNumResult.value
 
-      if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: contents of seen:', seen)
 
-      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: SEND_REQUESTS: joinRequest`, joinRequest)
-      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: SEND_REQUESTS: newJoinRequests`, newJoinRequests)
       // its possible that we have already seen this join request via gossip before we send it
       if (seen.has(joinRequest.nodeInfo.publicKey) === false) {
-        if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: SEND_REQUESTS: joinReq not in newJoinRequests, saving it now`)
         // since join request was already validated last cycle, we can just set seen to true directly
         seen.add(joinRequest.nodeInfo.publicKey)
         saveJoinRequest(joinRequest)
@@ -712,7 +699,6 @@ export function sendRequests(): void {
       nestedCountersInstance.countEvent('p2p', `saved join request and gossiped to network`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`saved join request and gossiped to network`)
     }
-    if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: in sendRequests: newJoinRequests length: ${newJoinRequests.length}`)
     queuedJoinRequestsForGossip = []
   }
   return
@@ -1347,8 +1333,6 @@ function validateJoinRequestTimestamp(joinRequestTimestamp: number): JoinRequest
   const requestValidUpperBound = cycleStarts + cycleDuration
   const requestValidLowerBound = cycleStarts - cycleDuration
 
-  /* prettier-ignore */ if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: validateJoinRequestTimestamp: Cyclechain.newest.counter: ', CycleChain.newest.counter.toString())
-
   if (joinRequestTimestamp < requestValidLowerBound) {
     nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-not-meet-lowerbound`)
     /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, timestamp is earlier than allowed cycle range')
@@ -1439,7 +1423,6 @@ export function computeSelectionNum(joinRequest: JoinRequest): Result<string, Jo
   const selectionKey = selectionKeyResult.value
 
   // calculate the selection number based on the selection key
-  if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: computeSelectionNum: CycleChain.newest.counter: ', CycleChain.newest.counter)
   const obj = {
     cycleNumber: CycleChain.newest.counter,
     selectionKey,

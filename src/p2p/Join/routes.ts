@@ -139,12 +139,6 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       // that reason.
       const validationError = validateJoinRequest(joinRequest)
       if (validationError) {
-        if (config.debug.cycleRecordOOSDebugLogs)
-          if (validationError.reason !== 'Node has already been seen this cycle. Unable to add join request.')
-            console.log(
-              'DEBUG CR-OOS: joinRoute: gossipJoin rejected: failed to validate join request: ',
-              validationError
-            )
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: validateJoinRequest ${validationError.reason}`)
         /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: validateJoinRequest ${validationError.reason} ${joinRequest.nodeInfo.publicKey}:`)
         return res.status(400).json(validationError)
@@ -168,8 +162,6 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       }
       joinRequest.selectionNum = selectionNumResult.value
 
-      /* prettier-ignore */ if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: joinRoute: computed selectionNum for ${joinRequest.nodeInfo.externalPort}'s joinReq: ${joinRequest.selectionNum}`)
-
       if (CycleCreator.currentQuarter > 1) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `rejected-late-join-request ${CycleCreator.currentQuarter}`)
         return res.status(400).json({
@@ -184,13 +176,6 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       // add it to the list of new join requests that will be processed as part of
       // cycle creation to create a standy node list.
       // saveJoinRequest(joinRequest)
-
-      if (config.debug.cycleRecordOOSDebugLogs)
-        console.log(
-          `DEBUG CR-OOS: joinRoute: queueing joinReq. pubkey: ${joinRequest.nodeInfo.publicKey}. tInC: ${
-            shardusGetTime() - CycleCreator.currentStart
-          }`
-        )
 
       // then, queue this join request to be sent when sendRequests is called at the start of Q1
       queueJoinRequest(joinRequest)
@@ -433,46 +418,15 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
   P2P.JoinTypes.JoinRequest,
   P2P.NodeListTypes.Node['id']
 > = (payload: P2P.JoinTypes.JoinRequest, sender: P2P.NodeListTypes.Node['id'], tracker: string) => {
-  if (config.debug.cycleRecordOOSDebugLogs) {
-    //if (receivedJoin.has(payload.nodeInfo.publicKey) === false) {
-    //receivedJoin.set(payload.nodeInfo.publicKey, true)
-    const sendingNode = NodeList.activeByIdOrder.find((node) => node.id === sender)
-    console.log(
-      'DEBUG CR-OOS: gossipValidJoinRequests: ',
-      ' sender ',
-      sendingNode.externalPort,
-      ' payload.pubKey: ',
-      payload.nodeInfo.publicKey,
-      'cC: ',
-      CycleCreator.currentCycle,
-      ' cQ: ',
-      CycleCreator.currentQuarter
-    )
-    //}
-  }
 
   // do not forward gossip after quarter 2
   if (CycleCreator.currentQuarter > 2) {
-    if (config.debug.cycleRecordOOSDebugLogs)
-      console.log(
-        'DEBUG CR-OOS: gossipValidJoinRequests: Q is > 2: cC: ',
-        CycleCreator.currentCycle,
-        ' cQ: ',
-        CycleCreator.currentQuarter,
-        ' payload id: ',
-        payload.nodeInfo.publicKey
-      )
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-gossip-reject: late-request > Q2:  ${CycleCreator.currentQuarter}` )
     return
   }
 
   // ensure this join request doesn't already exist in standby nodes
   if (getStandbyNodesInfoMap().has(payload.nodeInfo.publicKey)) {
-    if (config.debug.cycleRecordOOSDebugLogs)
-      console.log(
-        'DEBUG CR-OOS: gossipValidJoinRequests: gossipJoin rejected: already standby: ',
-        payload.nodeInfo.publicKey
-      )
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-gossip-reject: node already standby` )
     /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error(`join request for pubkey ${payload.nodeInfo.publicKey} already exists as a standby node`)
     return
@@ -481,12 +435,6 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
   // validate the join request first
   const validationError = validateJoinRequest(payload)
   if (validationError) {
-    if (config.debug.cycleRecordOOSDebugLogs)
-      if (validationError.reason !== 'Node has already been seen this cycle. Unable to add join request.')
-        console.log(
-          'DEBUG CR-OOS: gossipValidJoinRequests: gossipJoin rejected: failed to validate join request: ',
-          validationError
-        )
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-gossip-reject: failed to validate join request` )
     /* prettier-ignore */ if (logFlags.p2pNonFatal)console.error(`failed to validate join request when gossiping: ${validationError}`)
     return
@@ -499,16 +447,9 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
     /* prettier-ignore */ if (logFlags.p2pNonFatal)console.error( `failed to compute selection number for node ${payload.nodeInfo.publicKey}:`, JSON.stringify(selectionNumResult.error) )
     return
   }
-  if (config.debug.cycleRecordOOSDebugLogs)
-    console.log(
-      `DEBUG CR-OOS: gossipValidJoinRequests: computed selectionNum for ${payload.nodeInfo.externalPort}'s joinReq: ${selectionNumResult.value}`
-    )
+
   payload.selectionNum = selectionNumResult.value
 
-  if (config.debug.cycleRecordOOSDebugLogs)
-    console.log(
-      `DEBUG CR-OOS: gossipValidJoinRequests: saving joinReq, pubkey: ${payload.nodeInfo.publicKey}`
-    )
   // add the join request to the global list of join requests. this will also
   // add it to the list of new join requests that will be processed as part of
   // cycle creation to create a standy node list.
@@ -550,30 +491,9 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<
   StartedSyncingRequest,
   P2P.NodeListTypes.Node['id']
 > = (payload, sender, tracker) => {
-  if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: CycleChain.newest.counter: ', CycleChain.newest.counter)
-
-  if (config.debug.cycleRecordOOSDebugLogs) {
-    if (receivedSyncStarted.has(payload.nodeId) === false) {
-      receivedSyncStarted.set(payload.nodeId, true)
-      const sendingNode = NodeList.byIdOrder.find((node) => node.id === sender)
-      console.log(
-        'DEBUG CR-OOS: STARTED_SYNCING: ',
-        ' sender ',
-        sendingNode.externalPort,
-        ' payload id: ',
-        payload.nodeId,
-        ' payload cycle: ',
-        payload.cycleNumber,
-        'cC: ',
-        CycleCreator.currentCycle,
-        ' cQ: ',
-        CycleCreator.currentQuarter
-      )
-    }
-  }
-
   profilerInstance.scopedProfileSectionStart('gossip-sync-started')
   nestedCountersInstance.countEvent('p2p', `received gossip-sync-started`)
+
   /* prettier-ignore */ if (logFlags.verbose) console.log(`received gossip-sync-started`)
   try {
     if (!payload) {
@@ -582,17 +502,10 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<
     }
     // Do not forward gossip after quarter 2
     if (CycleCreator.currentQuarter >= 3) {
-      if (config.debug.cycleRecordOOSDebugLogs)
-        console.log(
-          'DEBUG CR-OOS: STARTED_SYNCING: gossipSyncFinished rejected: cC: ',
-          CycleCreator.currentCycle,
-          ' cQ: ',
-          CycleCreator.currentQuarter,
-          ' payload id: ',
-          payload.nodeId,
-          ' payload cycle: ',
-          payload.cycleNumber
-        )
+      nestedCountersInstance.countEvent(
+        'p2p',
+        `gossipSyncStarted rejected: late-request > Q2: cC: ${CycleCreator.currentCycle} cQ: ${CycleCreator.currentQuarter} payload id: ${payload.nodeId} payload cycle: ${payload.cycleNumber}`
+      )
       return
     }
 
@@ -604,17 +517,6 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<
     )
     /* prettier-ignore */ if (logFlags.verbose) console.log(`sync-started validation success: ${addSyncStartedResult.success}`)
     if (!addSyncStartedResult.success) {
-      if (addSyncStartedResult.reason !== 'node has already submitted syncStarted request') {
-        if (config.debug.cycleRecordOOSDebugLogs)
-          console.log(
-            'DEBUG CR-OOS: STARTED_SYNCING: gossipSyncFinished rejected: ',
-            addSyncStartedResult.reason,
-            ' payload id: ',
-            payload.nodeId,
-            ' payload cycle: ',
-            payload.cycleNumber
-          )
-      }
       nestedCountersInstance.countEvent('p2p', `sync-started failure reason: ${addSyncStartedResult.reason}`)
     }
     /* prettier-ignore */ if (logFlags.verbose && !addSyncStartedResult.success) console.log(`sync-started validation reason: ${addSyncStartedResult.reason}`)
@@ -645,45 +547,12 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<
 ) => {
   profilerInstance.scopedProfileSectionStart('gossip-sync-finished')
 
-  if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: CycleChain.newest.counter: ', CycleChain.newest.counter)
-
-  if (config.debug.cycleRecordOOSDebugLogs) {
-    if (receivedSyncFinished.has(payload.nodeId) === false) {
-      receivedSyncFinished.set(payload.nodeId, true)
-      const sendingNode = NodeList.byIdOrder.find((node) => node.id === sender)
-      console.log(
-        'DEBUG CR-OOS: FINISHED_SYNCING:',
-        ' sender ',
-        sendingNode.externalPort,
-        'payload id: ',
-        payload.nodeId,
-        ' payload cycle: ',
-        payload.cycleNumber,
-        'cC: ',
-        CycleCreator.currentCycle,
-        ' cQ: ',
-        CycleCreator.currentQuarter
-      )
-    }
-  }
-
   try {
     // Do not forward gossip after quarter 2
     if (CycleCreator.currentQuarter >= 3) {
-      if (config.debug.cycleRecordOOSDebugLogs)
-        console.log(
-          'DEBUG CR-OOS: FINISHED_SYNCING: gossipSyncFinished rejected: cC: ',
-          CycleCreator.currentCycle,
-          ' cQ: ',
-          CycleCreator.currentQuarter,
-          ' payload id: ',
-          payload.nodeId,
-          ' payload cycle: ',
-          payload.cycleNumber
-        )
       nestedCountersInstance.countEvent(
         'p2p',
-        `gossipSyncFinished rejected: cC: ${CycleCreator.currentCycle} cQ: ${CycleCreator.currentQuarter} payload id: ${payload.nodeId} payload cycle: ${payload.cycleNumber}`
+        `gossipSyncFinished rejected: late-request > Q2: cC: ${CycleCreator.currentCycle} cQ: ${CycleCreator.currentQuarter} payload id: ${payload.nodeId} payload cycle: ${payload.cycleNumber}`
       )
       /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('gossipSyncFinished rejected: due to currentQuarter >= 3', payload.nodeId, CycleCreator.currentQuarter)
       return
@@ -698,17 +567,6 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<
       `sync-finished validation success: ${addFinishedSyncingResult.success}`
     )
     if (!addFinishedSyncingResult.success) {
-      if (addFinishedSyncingResult.reason !== 'node has already submitted syncFinished request') {
-        if (config.debug.cycleRecordOOSDebugLogs)
-          console.log(
-            'DEBUG CR-OOS: FINISHED_SYNCING: gossipSyncFinished rejected: ',
-            addFinishedSyncingResult.reason,
-            ' payload id: ',
-            payload.nodeId,
-            ' payload cycle: ',
-            payload.cycleNumber
-          )
-      }
       nestedCountersInstance.countEvent(
         'p2p',
         `sync-finished failure reason: ${addFinishedSyncingResult.reason}`
@@ -778,7 +636,3 @@ export const routes = {
     'gossip-standby-refresh' : gossipStandbyRefresh,
   },
 }
-
-const receivedSyncStarted = new Map<string, boolean>()
-const receivedSyncFinished = new Map<string, boolean>()
-const receivedJoin = new Map<string, boolean>()
