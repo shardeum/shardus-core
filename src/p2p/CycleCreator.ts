@@ -583,9 +583,6 @@ async function runQ3() {
     }
   }
 
-  console.log(`CycleCreator: shardusGetTime: ${shardusGetTime()} currentStart:${currentStart}`)
-  console.log(`CycleCreator: time so far: ${shardusGetTime() - currentStart}`)
-
   /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("cycle record: ", record)
 
   /*
