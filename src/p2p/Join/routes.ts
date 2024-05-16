@@ -166,9 +166,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       }
       joinRequest.selectionNum = selectionNumResult.value
 
-      console.log(
-        `DEBUG CR-OOS: joinRoute: computed selectionNum for ${joinRequest.nodeInfo.externalPort}'s joinReq: ${joinRequest.selectionNum}`
-      )
+      /* prettier-ignore */ if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: joinRoute: computed selectionNum for ${joinRequest.nodeInfo.externalPort}'s joinReq: ${joinRequest.selectionNum}`)
 
       if (CycleCreator.currentQuarter > 1) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `rejected-late-join-request ${CycleCreator.currentQuarter}`)

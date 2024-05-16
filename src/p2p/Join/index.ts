@@ -714,7 +714,7 @@ export function sendRequests(): void {
       nestedCountersInstance.countEvent('p2p', `saved join request and gossiped to network`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`saved join request and gossiped to network`)
     }
-    console.log(`DEBUG CR-OOS: in sendRequests: newJoinRequests length: ${newJoinRequests.length}`)
+    if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: in sendRequests: newJoinRequests length: ${newJoinRequests.length}`)
     queuedJoinRequestsForGossip = []
   }
   return
@@ -1349,7 +1349,7 @@ function validateJoinRequestTimestamp(joinRequestTimestamp: number): JoinRequest
   const requestValidUpperBound = cycleStarts + cycleDuration
   const requestValidLowerBound = cycleStarts - cycleDuration
 
-  console.log('DEBUG CR-OOS: validateJoinRequestTimestamp: Cyclechain.newest.counter: ', CycleChain.newest.counter.toString())
+  /* prettier-ignore */ if (config.debug.cycleRecordOOSDebugLogs) console.log('DEBUG CR-OOS: validateJoinRequestTimestamp: Cyclechain.newest.counter: ', CycleChain.newest.counter.toString())
 
   if (joinRequestTimestamp < requestValidLowerBound) {
     nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-not-meet-lowerbound`)
