@@ -116,7 +116,7 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
   // in the past this used joinRequestTimestamp, but joinRequestTimestamp now is the time when a node is put into
   // the standbylist
   // this will contain nodes that are selected, syncing, ready, and active
-  insertSorted(byJoinOrder, node, propComparator2('syncingTimestamp', 'id'))
+  linearInsertSorted(byJoinOrder, node, propComparator2('syncingTimestamp', 'id'))
 
   // Insert sorted by id into byIdOrder
   insertSorted(byIdOrder, node, propComparator('id'))
@@ -310,24 +310,21 @@ export function updateNode(
     // Update node properties
     for (const key of Object.keys(update)) {
       node[key] = update[key]
-      // add node to syncing list if its status is changed to syncing
-      if (update[key] === P2P.P2PTypes.NodeStatus.SYNCING) {
-        insertSorted(syncingByIdOrder, node, propComparator('id'))
-        removeSelectedNode(node.id)
-      }
-      if (update[key] === P2P.P2PTypes.NodeStatus.READY) {
-        linearInsertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
-        if (config.p2p.hardenNewSyncingProtocol) {
-          if (selectedById.has(node.id)) removeSelectedNode(node.id) // in case we missed the sync-started gossip
-        }
-        removeSyncingNode(node.id)
-      }
     }
-    //test if this node is in the active list already.  if it is not, then we can add it
-    let idx = binarySearch(activeByIdOrder, { id: node.id }, propComparator('id'))
-    if (idx < 0) {
-      // Add the node to active arrays, if needed
-      if (update.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
+    // add node to syncing list if its status is changed to syncing
+    if (update.status === P2P.P2PTypes.NodeStatus.SYNCING) {
+      insertSorted(syncingByIdOrder, node, propComparator('id'))
+      removeSelectedNode(node.id)
+    } else if (update.status === P2P.P2PTypes.NodeStatus.READY) {
+      linearInsertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
+      if (config.p2p.hardenNewSyncingProtocol) {
+        if (selectedById.has(node.id)) removeSelectedNode(node.id) // in case we missed the sync-started gossip
+      }
+      removeSyncingNode(node.id)
+    } else if (update.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
+      //test if this node is in the active list already.  if it is not, then we can add it
+      let idx = binarySearch(activeByIdOrder, { id: node.id }, propComparator('id'))
+      if (idx < 0) {
         insertSorted(activeByIdOrder, node, propComparator('id'))
         for (let i = 0; i < activeByIdOrder.length; i++) {
           activeIdToPartition.set(activeByIdOrder[i].id, i)
