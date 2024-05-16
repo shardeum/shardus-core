@@ -357,8 +357,6 @@ async function cycleCreator() {
   let callTag = `cct${createCycleTag}`
   /* prettier-ignore */ if (logFlags.verbose) info( `cc: start C${currentCycle} Q${currentQuarter} madeCycle: ${madeCycle} bestMarker: ${bestMarker} ${callTag}` )
 
-  //console.log(`CycleCreator: at start of cycleCreator: bestrecord: ${bestRecord}`)
-
   try {
     // Get the previous record
     //let prevRecord = madeCycle ? bestRecord : await fetchLatestRecord()
@@ -640,8 +638,6 @@ async function runQ3() {
   // Gossip your cert for this cycle with the network
   gossipMyCycleCert()
 
-  //console.log(`CycleCreator: at end of q3: bestrecord: ${bestRecord}`)
-
   profilerInstance.profileSectionEnd('CycleCreator-runQ3')
 }
 
@@ -650,8 +646,6 @@ async function runQ3() {
  */
 async function runQ4() {
   currentQuarter = 4
-
-  //console.log(`CycleCreator: at start of q4: bestrecord: ${bestRecord}`)
 
   if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 
@@ -701,8 +695,6 @@ async function runQ4() {
     // Dont need this any more since we are not doing anything after this
     // if (cycleQuarterChanged(myC, myQ)) return
     profilerInstance.profileSectionEnd('CycleCreator-runQ4')
-
-    //console.log(`CycleCreator: at end of q4: bestrecord: ${bestRecord}`)
   }
 }
 
