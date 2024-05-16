@@ -5113,7 +5113,8 @@ class TransactionQueue {
               if(this.config.stateManager.txStateMachineChanges){
                 if (configContext.stateManager.stuckTxQueueFix) {
                   // make sure we are not resetting the state and causing state start timestamp to be updated repeatedly
-                  if (queueEntry.state !== 'await final data') this.updateTxState(queueEntry, 'await final data')
+                  if (queueEntry.state !== 'await final data' && queueEntry.state !== 'await repair') this.updateTxState(queueEntry, 'await' +
+                    ' final data')
                 } else {
                   this.updateTxState(queueEntry, 'await final data')
                 }
@@ -5983,6 +5984,12 @@ class TransactionQueue {
 
               nestedCountersInstance.countEvent('stateManager', 'repairFinished')
               continue
+            } else if (queueEntry.repairFailed === true) {
+              // if the repair failed, we need to fail the TX. Let the patcher take care of it.
+              this.updateTxState(queueEntry, 'fail')
+              this.removeFromQueue(queueEntry, currentIndex)
+              nestedCountersInstance.countEvent('stateManager', 'repairFailed')
+              continue
             }
           }
           if (queueEntry.state === 'await final data') {
@@ -6083,7 +6090,7 @@ class TransactionQueue {
                   if (wrappedAccount && wrappedAccount.stateId != accountHash) {
                     if (logFlags.debug)
                       this.mainLogger.debug(
-                        `shrd_awaitFinalData_failed : ${queueEntry.logID} wrappedAccount.stateId != accountHash`
+                        `shrd_awaitFinalData_failed : ${queueEntry.logID} wrappedAccount.stateId != accountHash from the vote`
                       )
                     failed = true
                     break
