@@ -257,9 +257,6 @@ type SyncNode = Partial<
 >
 
 export async function syncNewCycles(activeNodes: SyncNode[]) {
-  //console.log(`calling syncNewCycles cC: ${CycleCreator.currentCycle} cQ: ${CycleCreator.currentQuarter}`)
-  //console.trace()
-
   let newestCycle = await getNewestCycle(activeNodes)
   info(`syncNewCycles: myNewest=${CycleChain.newest.counter} netNewest=${newestCycle.counter}`)
 
@@ -315,9 +312,6 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
 }
 
 export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: string) {
-  //console.log(`calling digestCycle cC: ${CycleCreator.currentCycle} cQ: ${CycleCreator.currentQuarter}`)
-  //console.trace()
-
   // get the node list hashes *before* applying node changes
   if (config.p2p.useSyncProtocolV2 || config.p2p.writeSyncProtocolV2) {
     cycle.nodeListHash = NodeList.computeNewNodeListHash()
@@ -328,7 +322,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
       cycle.standbyNodeListHash = JoinV2.computeNewStandbyListHash()
     }
   }
-  
+
   if (config.debug.enableCycleRecordDebugTool || config.debug.localEnableCycleRecordDebugTool) {
     if (Self.isActive) {
       const cycleData =
