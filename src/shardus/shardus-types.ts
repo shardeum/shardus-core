@@ -1217,6 +1217,10 @@ export interface ServerConfiguration {
     removeStuckTxsFromQueue: boolean
     // time to wait before removing the tx from the queue
     stuckTxRemoveTime: number
+    // remove a stuck challenged tx 
+    removeStuckChallengedTXs: boolean
+    // receipt remove fix
+    receiptRemoveFix: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
