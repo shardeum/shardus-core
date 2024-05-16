@@ -32,7 +32,7 @@ import { shardusGetTime } from '../network'
 import { reportLostArchiver } from '../p2p/LostArchivers/functions'
 import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
 import { Result, ResultAsync } from 'neverthrow'
-import { safeStringify } from '../utils'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 import { arch } from 'os'
 
 const clone = rfdc()

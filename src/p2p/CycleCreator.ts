@@ -46,6 +46,7 @@ import path from 'path'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { BadRequest, InternalError, NotFound, serializeResponseError } from '../types/ResponseError'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 /** CONSTANTS */
 
@@ -571,7 +572,7 @@ async function runQ3() {
   if (config.debug.enableCycleRecordDebugTool || config.debug.localEnableCycleRecordDebugTool) {
     if (currentQuarter === 3 && Self.isActive) {
       const cycleData =
-        utils.safeStringify({
+        safeStringify({
           port: Self.port,
           cycleNumber: record.counter,
           cycleRecord: record,
@@ -672,7 +673,7 @@ async function runQ4() {
 
     if (logFlags.p2pNonFatal)
       info(`
-    Certified cycle record: ${utils.logSafeStringify(record)}
+    Certified cycle record: ${safeStringify(record)}
     Certified cycle marker: ${JSON.stringify(marker)}
     Certified cycle cert: ${JSON.stringify(cert)}
   `)

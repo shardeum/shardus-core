@@ -1,7 +1,7 @@
 import { P2P } from '@shardus/types'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
-import { DeSerializeFromJsonString, SerializeToJsonString } from '../utils'
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 export interface CompareCertRespSerializable {
   certs: P2P.CycleCreatorTypes.CycleCert[]
@@ -18,7 +18,7 @@ export const serializeCompareCertResp = (
     stream.writeUInt16(TypeIdentifierEnum.cCompareCertResp)
   }
   stream.writeUInt8(cCompareCertRespVersion)
-  stream.writeString(SerializeToJsonString(inp))
+  stream.writeString(safeStringify(inp))
 }
 
 export const deserializeCompareCertResp = (stream: VectorBufferStream): CompareCertRespSerializable => {
@@ -27,7 +27,7 @@ export const deserializeCompareCertResp = (stream: VectorBufferStream): CompareC
     throw new Error(`Unsupported CompareCertRespSerializable version ${version}`)
   }
 
-  const obj: CompareCertRespSerializable = DeSerializeFromJsonString(stream.readString())
+  const obj: CompareCertRespSerializable = safeJsonParse(stream.readString())
 
   return obj
 }

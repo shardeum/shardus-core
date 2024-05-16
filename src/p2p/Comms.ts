@@ -25,6 +25,7 @@ import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { InternalError, ResponseError, serializeResponseError } from '../types/ResponseError'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 /** ROUTES */
 
@@ -477,8 +478,8 @@ export async function askBinary<TReq, TResp>(
     ))
   } catch (err) {
     nestedCountersInstance.countEvent('comms-route', `askBinary ${route} request error`)
-    /* prettier-ignore */ console.log(`P2P: askBinary: network.askBinary: route: ${route} request: ${utils.SerializeToJsonString(message)} error: ${err}`)
-    /* prettier-ignore */ error(`P2P: askBinary: network.askBinary: route: ${route} request: ${utils.SerializeToJsonString(message)} error: ${err}`)
+    /* prettier-ignore */ console.log(`P2P: askBinary: network.askBinary: route: ${route} request: ${safeStringify(message)} error: ${err}`)
+    /* prettier-ignore */ error(`P2P: askBinary: network.askBinary: route: ${route} request: ${safeStringify(message)} error: ${err}`)
     throw err
   }
   try {
@@ -499,8 +500,8 @@ export async function askBinary<TReq, TResp>(
       nestedCountersInstance.countEvent('comms-route', `askBinary ${route} error ${err.Code}`)
     } else {
       nestedCountersInstance.countEvent('comms-route', `askBinary ${route} response error`)
-      /* prettier-ignore */ error(`P2P: askBinary: response extraction route: ${route} res: ${utils.SerializeToJsonString(res)} error: ${err}`)
-      /* prettier-ignore */ console.log(`P2P: askBinary: response extraction route: ${route} res: ${utils.SerializeToJsonString(res)} error: ${err}`)
+      /* prettier-ignore */ error(`P2P: askBinary: response extraction route: ${route} res: ${safeStringify(res)} error: ${err}`)
+      /* prettier-ignore */ console.log(`P2P: askBinary: response extraction route: ${route} res: ${safeStringify(res)} error: ${err}`)
     }
     throw err
   }
@@ -624,7 +625,7 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
         await respond(wrappedRespStream.getBuffer(), responseHeaders)
         return wrappedRespStream.getBufferLength()
       } catch (err: unknown) {
-        /* prettier-ignore */ error(`registerInternalBinary: route: ${route} responseHeaders: ${JSON.stringify(responseHeaders)}, Response: ${utils.SerializeToJsonString(response)}, Error: ${utils.formatErrorMessage(err)}`)
+        /* prettier-ignore */ error(`registerInternalBinary: route: ${route} responseHeaders: ${safeStringify(responseHeaders)}, Response: ${safeStringify(response)}, Error: ${utils.formatErrorMessage(err)}`)
         /* prettier-ignore */ nestedCountersInstance.countEvent('registerInternalBinary', `respondWrapped ${route} error`)
         return 0
       }

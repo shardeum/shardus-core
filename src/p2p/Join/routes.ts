@@ -32,7 +32,7 @@ import { logFlags } from '../../logger'
 import { SyncStarted } from '@shardus/types/build/src/p2p/JoinTypes'
 import { addSyncStarted } from './v2/syncStarted'
 import { addStandbyRefresh } from './v2/standbyRefresh'
-import { safeStringify } from '../../utils'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 import { testFailChance } from '../../utils'
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {

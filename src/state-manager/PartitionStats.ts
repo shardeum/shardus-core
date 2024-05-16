@@ -1,6 +1,6 @@
 import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
-import {stringify} from '../utils'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 import Profiler from '../utils/profiler'
 import Crypto from '../crypto'
@@ -160,7 +160,7 @@ class PartitionStats {
 
       const blob = this.dumpLogsForCycle(cycle, false, cycleShardValues)
 
-      res.write(stringify(blob) + '\n')
+      res.write(safeStringify(blob) + '\n')
       res.end()
     })
 
@@ -927,7 +927,7 @@ class PartitionStats {
             dataByParition.set(partition, dataTally)
           }
 
-          const dataString = stringify(dataStatsObj.opaqueBlob)
+          const dataString = safeStringify(dataStatsObj.opaqueBlob)
           dataTally = dataByParition.get(partition)
 
           dataTally.data.push(dataStatsObj)
@@ -1077,7 +1077,7 @@ class PartitionStats {
           dataByParition.set(partition, dataTally)
         }
 
-        const dataString = stringify(txStatsObj.opaqueBlob)
+        const dataString = safeStringify(txStatsObj.opaqueBlob)
         dataTally = dataByParition.get(partition)
 
         dataTally.data.push(txStatsObj)

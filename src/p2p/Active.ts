@@ -15,7 +15,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getSortedStandbyJoinRequests } from './Join/v2'
 import { selectNodesFromReadyList } from './Join/v2/syncFinished'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
-import { safeStringify } from '../utils'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 let syncTimes = []
 let lastCheckedCycleForSyncTimes = 0

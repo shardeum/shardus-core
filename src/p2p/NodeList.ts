@@ -13,7 +13,7 @@ import rfdc from 'rfdc'
 import { logFlags } from '../logger'
 import { nestedCountersInstance } from '..'
 import { shardusGetTime } from '../network'
-import { safeStringify } from '../utils'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 const clone = rfdc()
 

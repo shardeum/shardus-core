@@ -4,6 +4,7 @@ import * as utils from '../utils'
 import Crypto from '../crypto'
 import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import { getNetworkTimeOffset, shardusGetTime } from '../network'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 type CounterMap = Map<string, CounterNode>
 interface CounterNode {
@@ -39,7 +40,7 @@ class NestedCounters {
       if (req.headers.accept === 'application/json') {
         // Send JSON response
         res.setHeader('Content-Type', 'application/json')
-        res.send(utils.safeStringify({
+        res.send(safeStringify({
           timestamp: shardusGetTime(),
           report: arrayReport,
         }))

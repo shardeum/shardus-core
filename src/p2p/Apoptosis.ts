@@ -47,7 +47,8 @@ import { robustQuery } from './Utils'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { SQLDataTypes } from '../storage/utils/schemaDefintions'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
-import { safeStringify } from '../utils'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+
 
 /** STATE */
 

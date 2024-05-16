@@ -1,9 +1,10 @@
 import { P2P } from '@shardus/types'
-import { Ordering, safeStringify } from '..'
+import { Ordering } from '..'
 import { Response } from 'express-serve-static-core'
 import { DevSecurityLevel } from '../../shardus/shardus-types'
 import { nestedCountersInstance } from '../nestedCounters'
 import { logFlags } from '../../logger'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 const replacer = (key: string, value: any): any => {
   if (typeof value === 'bigint') {

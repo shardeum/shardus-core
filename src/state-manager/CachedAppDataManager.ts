@@ -46,6 +46,7 @@ import {
   deserializeGetCachedAppDataResp,
   serializeGetCachedAppDataResp,
 } from '../types/GetCachedAppDataResp'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 class CachedAppDataManager {
   app: Shardus.App
@@ -102,7 +103,7 @@ class CachedAppDataManager {
     this.p2p.registerInternal('send_cachedAppData', async (payload: CacheAppDataResponse) => {
       profilerInstance.scopedProfileSectionStart('send_cachedAppData')
       try {
-        /* prettier-ignore */ if (logFlags.net_trace && logFlags.console) console.log(`send_cachedAppData full payload`, utils.SerializeToJsonString(payload));
+        /* prettier-ignore */ if (logFlags.net_trace && logFlags.console) console.log(`send_cachedAppData full payload`, safeStringify(payload));
         const cachedAppData = payload.cachedAppData
         const existingCachedAppData = this.getCachedItem(payload.topic, cachedAppData.dataID)
         if (existingCachedAppData) {

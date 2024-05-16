@@ -1,3 +1,4 @@
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 import { stateManager } from '../p2p/Context'
 import {
   AppObjEnum,
@@ -6,7 +7,6 @@ import {
   TransactionKeys,
   TimestampedTx,
 } from '../shardus/shardus-types'
-import { DeSerializeFromJsonString, SerializeToJsonString } from '../utils'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
@@ -31,10 +31,10 @@ export function serializeSpreadTxToGroupSyncingReq(
   stream.writeUInt8(cSpreadTxToGroupSyncingReqVersion)
   stream.writeBigUInt64(BigInt(inp.timestamp))
   stream.writeString(inp.txId)
-  stream.writeString(SerializeToJsonString(inp.keys))
-  stream.writeString(SerializeToJsonString(inp.data))
+  stream.writeString(safeStringify(inp.keys))
+  stream.writeString(safeStringify(inp.data))
   stream.writeBuffer(stateManager.app.binarySerializeObject(AppObjEnum.AppData, inp.appData))
-  stream.writeString(SerializeToJsonString(inp.shardusMemoryPatterns))
+  stream.writeString(safeStringify(inp.shardusMemoryPatterns))
 }
 
 export function deserializeSpreadTxToGroupSyncingReq(stream: VectorBufferStream): SpreadTxToGroupSyncingReq {
@@ -45,9 +45,9 @@ export function deserializeSpreadTxToGroupSyncingReq(stream: VectorBufferStream)
   return {
     timestamp: Number(stream.readBigUInt64()),
     txId: stream.readString(),
-    keys: DeSerializeFromJsonString(stream.readString()),
-    data: DeSerializeFromJsonString(stream.readString()),
+    keys: safeJsonParse(stream.readString()),
+    data: safeJsonParse(stream.readString()),
     appData: stateManager.app.binaryDeserializeObject(AppObjEnum.AppData, stream.readBuffer()),
-    shardusMemoryPatterns: DeSerializeFromJsonString(stream.readString()),
+    shardusMemoryPatterns: safeJsonParse(stream.readString()),
   }
 }

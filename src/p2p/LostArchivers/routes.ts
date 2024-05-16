@@ -27,7 +27,7 @@ import { profilerInstance } from '../../utils/profiler'
 import { deserializeLostArchiverInvestigateReq } from '../../types/LostArchiverInvestigateReq'
 import { getStreamWithTypeCheck } from '../../types/Helpers'
 import { TypeIdentifierEnum } from '../../types/enum/TypeIdentifierEnum'
-import { safeStringify } from '../../utils'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 /** Gossip */
 

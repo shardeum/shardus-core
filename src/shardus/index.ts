@@ -78,7 +78,7 @@ import {
   deserializeSignAppDataResp,
   serializeSignAppDataResp,
 } from '../types/SignAppDataResp'
-import { safeStringify } from '../utils'
+import { safeStringify, safeJsonParse } from '@shardus/types/build/src/utils/functions/stringify'
 import { isNodeInRotationBounds } from '../p2p/Utils'
 import ShardFunctions from '../state-manager/shardFunctions'
 import SocketIO from 'socket.io'
@@ -1633,10 +1633,10 @@ class Shardus extends EventEmitter {
         this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_req_${context} ${activeIdToPartition.get(validator.id)}`)
 
         if (validator.id === homeNode.node.id) {
-          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to home node ${validator.id} reason: ${message} ${utils.stringify(tx)}` )
+          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to home node ${validator.id} reason: ${message} ${safeStringify(tx)}` )
           nestedCountersInstance.countEvent('statistics', `forwardTxToHomeNode: ${message}`)
         } else {
-          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to consensus group. reason: ${message} ${utils.stringify(tx)}` )
+          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to consensus group. reason: ${message} ${safeStringify(tx)}` )
           nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: ${message}`)
         }
         
@@ -1663,7 +1663,7 @@ class Shardus extends EventEmitter {
       }
     }
     nestedCountersInstance.countEvent('statistics', `forward failed: ${JSON.stringify(stats)}`)
-    /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx out of tries. ${JSON.stringify(stats)} ${utils.stringify(tx)} ` )
+    /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx out of tries. ${JSON.stringify(stats)} ${safeStringify(tx)} ` )
     return { success: false, reason: 'No validators found to forward the transaction', status: 500 }
   }
 
@@ -2144,7 +2144,7 @@ class Shardus extends EventEmitter {
       if (req.query.set) {
         this.debugForeverLoopsEnabled = req.query.set === 'true'
       }
-      res.send(utils.safeStringify(`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`))
+      res.send(safeStringify(`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`))
     })
   }
 
@@ -2679,7 +2679,7 @@ class Shardus extends EventEmitter {
       } else {
         console.log('binarySerializeObject not implemented')
         applicationInterfaceImpl.binarySerializeObject = (identifier: string, obj: any): Buffer => {
-          return Buffer.from(utils.SerializeToJsonString(obj), 'utf8')
+          return Buffer.from(safeStringify(obj), 'utf8')
         }
       }
       if (typeof application.binaryDeserializeObject === 'function') {
@@ -2692,7 +2692,7 @@ class Shardus extends EventEmitter {
       } else {
         console.log('binaryDeserializeObject not implemented')
         applicationInterfaceImpl.binaryDeserializeObject = (identifier: string, buffer: Buffer): any => {
-          return utils.DeSerializeFromJsonString(buffer.toString('utf8'))
+          return safeJsonParse(buffer.toString('utf8'))
         }
       }
       if (typeof application.getTxSenderAddress === 'function') {

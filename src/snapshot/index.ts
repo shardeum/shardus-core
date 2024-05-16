@@ -17,7 +17,8 @@ import { profilerInstance } from '../utils/profiler'
 import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
 import { getNewestCycle } from '../p2p/Sync'
-import { safeStringify } from '../utils'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+// import { safeStringify } from '../utils'
 
 console.log('StateManager', StateManager)
 console.log('StateManager type', StateManager.StateManagerTypes)

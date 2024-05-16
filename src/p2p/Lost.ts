@@ -36,7 +36,7 @@ import { HashTrieReq, ProxyRequest, ProxyResponse } from '../state-manager/state
 import { GetTrieHashesRequest, serializeGetTrieHashesReq } from '../types/GetTrieHashesReq'
 import { GetTrieHashesResponse, deserializeGetTrieHashesResp } from '../types/GetTrieHashesResp'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
-import { safeStringify } from '../utils'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 import { InternalBinaryHandler } from '../types/Handler'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
@@ -677,7 +677,7 @@ export function scheduleLostReport(target: P2P.NodeListTypes.Node, reason: strin
     const previousScheduleValue = scheduledForLostReport.get(key)
     if (logFlags.verbose) {
       /* prettier-ignore */ info(`Target node ${target.id} already scheduled for lost report. requestId: ${previousScheduleValue.requestId}.`)
-      /* prettier-ignore */ info(`Previous scheduled lost report details for ${target.id}: ${utils.stringify(previousScheduleValue)}`)
+      /* prettier-ignore */ info(`Previous scheduled lost report details for ${target.id}: ${safeStringify(previousScheduleValue)}`)
     }
   }
   scheduledForLostReport.set(key, {
@@ -1137,7 +1137,7 @@ export function removeNodeWithCertificiate(certificate: P2P.LostTypes.RemoveCert
     const previousScheduleValue = scheduledRemoveApp.get(certificate.nodePublicKey)
     if (logFlags.verbose) {
       /* prettier-ignore */ info(`Target node ${certificate.nodePublicKey} already scheduled for removing.`)
-      /* prettier-ignore */ info(`Previous scheduled lost report details for ${certificate.nodePublicKey}: ${utils.stringify(previousScheduleValue)}`)
+      /* prettier-ignore */ info(`Previous scheduled lost report details for ${certificate.nodePublicKey}: ${safeStringify(previousScheduleValue)}`)
     }
     return
   }

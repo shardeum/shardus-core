@@ -1,7 +1,8 @@
 import { parse as parseUrl } from 'url'
 import got from 'got'
 import { logFlags } from '../logger'
-import { safeParser, safeStringify, stringifyReduceLimit } from '../utils'
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { stringifyReduceLimit } from '../utils'
 
 let _logger = null
 let getIndex = 1
@@ -26,7 +27,7 @@ async function _get(host, logIndex, timeout = 1000) {
       retry: 0, // Omar - setting this to 0.
       json: true,
     })
-    return { ...res, body: safeParser(safeStringify(res.body)) }
+    return { ...res, body: safeJsonParse(safeStringify(res.body)) }
   } catch (error) {
     if (logFlags.playback === false && logFlags.verbose === false) {
       throw error
@@ -75,7 +76,7 @@ async function _post(host, payload, logIndex, timeout = 1000) {
 
     //if (getResponseObj) return res
     //return res.body
-    return { ...res, body: safeParser(safeStringify(res.body)) }
+    return { ...res, body: safeJsonParse(safeStringify(res.body)) }
   } catch (error) {
     if (logFlags.playback === false && logFlags.verbose === false) {
       throw error

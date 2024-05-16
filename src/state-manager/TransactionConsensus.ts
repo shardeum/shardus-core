@@ -84,6 +84,7 @@ import {
 } from '../types/GetAppliedVoteResp'
 import { BadRequest, InternalError, NotFound, serializeResponseError } from '../types/ResponseError'
 import { randomUUID } from 'crypto'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -230,12 +231,12 @@ class TransactionConsenus {
 
     Context.network.registerExternalGet('debug-produceBadVote', isDebugModeMiddleware, (req, res) => {
       this.produceBadVote = !this.produceBadVote
-      res.send(utils.safeStringify({ status: 'ok', produceBadVote: this.produceBadVote }))
+      res.send(safeStringify({ status: 'ok', produceBadVote: this.produceBadVote }))
     })
 
     Context.network.registerExternalGet('debug-produceBadChallenge', isDebugModeMiddleware, (req, res) => {
       this.produceBadChallenge = !this.produceBadChallenge
-      res.send(utils.safeStringify({ status: 'ok', produceBadChallenge: this.produceBadChallenge }))
+      res.send(safeStringify({ status: 'ok', produceBadChallenge: this.produceBadChallenge }))
     })
 
     this.p2p.registerInternal(
@@ -1614,7 +1615,7 @@ class TransactionConsenus {
                 this.mainLogger.debug(
                   `tryProduceReceipt: ${
                     queueEntry.logID
-                  } challenge from robust query is better than our challenge. robustQueryConfirmOrChallenge: ${utils.stringify(
+                  } challenge from robust query is better than our challenge. robustQueryConfirmOrChallenge: ${safeStringify(
                     robustConfirmOrChallenge
                   )}`
                 )
@@ -1761,11 +1762,11 @@ class TransactionConsenus {
                 this.mainLogger.debug(
                   `tryProduceReceipt: ${
                     queueEntry.logID
-                  } confirmation from robust query is better than our confirm. bestNodeFromRobust?Query: ${utils.stringify(
+                  } confirmation from robust query is better than our confirm. bestNodeFromRobust?Query: ${safeStringify(
                     bestNodeFromRobustQuery
-                  )}, queueEntry.receivedBestVoter: ${utils.stringify(
+                  )}, queueEntry.receivedBestVoter: ${safeStringify(
                     queueEntry.receivedBestVoter
-                  )}, robustQueryConfirmOrChallenge: ${utils.stringify(robustConfirmOrChallenge)}`
+                  )}, robustQueryConfirmOrChallenge: ${safeStringify(robustConfirmOrChallenge)}`
                 )
               const robustReceipt: AppliedReceipt = {
                 txid: robustConfirmOrChallenge.appliedVote.txid,
@@ -2508,9 +2509,9 @@ class TransactionConsenus {
             this.mainLogger.debug(
               `checkAccountIntegrity: ${
                 queueEntry.logID
-              } key: ${key} failed. collectedAccountData: ${utils.stringify(
+              } key: ${key} failed. collectedAccountData: ${safeStringify(
                 collectedAccountData
-              )} robustAccountData: ${utils.stringify(robustQueryAccountData)}`
+              )} robustAccountData: ${safeStringify(robustQueryAccountData)}`
             )
           }
         }
@@ -3076,9 +3077,9 @@ class TransactionConsenus {
           this.mainLogger.debug(
             `tryAppendVote: logId:${
               queueEntry.logID
-            } received node is not part of eligible nodes to vote, vote: ${utils.stringify(
+            } received node is not part of eligible nodes to vote, vote: ${safeStringify(
               vote
-            )}, eligibleNodesToVote: ${utils.stringify(queueEntry.eligibleNodeIdsToVote)}`
+            )}, eligibleNodesToVote: ${safeStringify(queueEntry.eligibleNodeIdsToVote)}`
           )
         }
         return

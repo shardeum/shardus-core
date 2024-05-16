@@ -1,6 +1,6 @@
 import Log4js from 'log4js'
 import Sqlite3 from 'better-sqlite3'
-import {stringify} from '../utils'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 import * as Shardus from '../shardus/shardus-types'
 import Profiler from '../utils/profiler'
 import fs from 'fs'
@@ -148,7 +148,7 @@ class BetterSqlite3Storage {
 
       // eslint-disable-next-line security/detect-object-injection
       if (table.isColumnJSON[column]) {
-        value = stringify(value)
+        value = safeStringify(value)
       }
       inputs.push(value)
     }
@@ -267,7 +267,7 @@ class BetterSqlite3Storage {
           paramEntry.sql = `${paramEntry.name} ${paramEntry.type} ?`
 
           if (table.isColumnJSON[paramEntry.name]) {
-            paramEntry.v1 = stringify(paramEntry.v1)
+            paramEntry.v1 = safeStringify(paramEntry.v1)
           }
           paramEntry.vals = [paramEntry.v1]
         }

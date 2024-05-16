@@ -14,11 +14,10 @@ import {Signature, SignedObject} from '@shardus/crypto-utils'
 import {
   errorToStringFull,
   inRangeOfCurrentTime,
-  stringify,
   withTimeout,
   XOR,
-  selectIndexesWithOffeset,
 } from '../utils'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 import * as Self from '../p2p/Self'
 import * as Comms from '../p2p/Comms'
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -451,7 +450,7 @@ class TransactionQueue {
             return
           }
           if (logFlags.debug)
-            this.mainLogger.debug(`broadcast_finalstate ${queueEntry.logID}, ${stringify(payload.stateList)}`)
+            this.mainLogger.debug(`broadcast_finalstate ${queueEntry.logID}, ${safeStringify(payload.stateList)}`)
           // add the data in
           const savedAccountIds: Set<string> = new Set()
           for (const data of payload.stateList) {
@@ -734,7 +733,7 @@ class TransactionQueue {
             return
           }
           if (logFlags.debug)
-            this.mainLogger.debug(`gossip-final-state ${queueEntry.logID}, ${stringify(payload.stateList)}`)
+            this.mainLogger.debug(`gossip-final-state ${queueEntry.logID}, ${safeStringify(payload.stateList)}`)
           // add the data in
           let saveSomething = false
           for (const data of payload.stateList) {
@@ -905,12 +904,12 @@ class TransactionQueue {
           full_receipt: 'b',
           sign: 'o',
         })
-        if (error) return res.send(utils.logSafeStringify((result = { success: false, reason: error })))
+        if (error) return res.send(safeStringify((result = { success: false, reason: error })))
         error = utils.validateTypes(req.body.sign, {
           owner: 's',
           sig: 's',
         })
-        if (error) return res.send(utils.logSafeStringify((result = { success: false, reason: error })))
+        if (error) return res.send(safeStringify((result = { success: false, reason: error })))
 
         const { txId, timestamp, full_receipt, sign } = req.body
         const isReqFromArchiver = Archivers.archivers.has(sign.owner)
@@ -938,7 +937,7 @@ class TransactionQueue {
             if (full_receipt) {
               const fullReceipt: ArchiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
               if (fullReceipt === null) return res.status(400).json({ success: false, reason: 'Receipt Not Found.' })
-              result = JSON.parse(utils.cryptoStringify({ success: true, receipt: fullReceipt }))
+              result = JSON.parse(safeStringify({ success: true, receipt: fullReceipt }))
             } else {
               result = { success: true, receipt: this.stateManager.getReceipt2(queueEntry) }
             }
@@ -946,10 +945,10 @@ class TransactionQueue {
             result = { success: false, reason: 'Invalid Signature.' }
           }
         }
-        res.send(utils.safeStringify(result))
+        res.send(safeStringify(result))
       } catch (e) {
         console.log('Error caught in /get-tx-receipt: ', e)
-        res.send(utils.safeStringify((result = { success: false, reason: e })))
+        res.send(safeStringify((result = { success: false, reason: e })))
       }
     })
   }
@@ -2584,7 +2583,7 @@ class TransactionQueue {
     queueEntry.dataCollected++
 
     //make a deep copy of the data
-    queueEntry.originalData[data.accountId] = JSON.parse(stringify(data))
+    queueEntry.originalData[data.accountId] = JSON.parse(safeStringify(data))
     queueEntry.beforeHashes[data.accountId] = data.stateId
 
     if (queueEntry.dataCollected === queueEntry.uniqueKeys.length) {
@@ -7236,7 +7235,7 @@ class TransactionQueue {
     for (const queueEntry of this.pendingTransactionQueue) {
       if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
         const tx = queueEntry.acceptedTx
-        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the injested queue:', `appData: ${utils.logSafeStringify(tx.appData)}` )
+        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the injested queue:', `appData: ${safeStringify(tx.appData)}` )
         count++
       }
     }
@@ -7247,7 +7246,7 @@ class TransactionQueue {
           committingAppData.push(tx.appData)
           continue
         }
-        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the newAccepted queue:', `appData: ${utils.logSafeStringify(tx.appData)}` )
+        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the newAccepted queue:', `appData: ${safeStringify(tx.appData)}` )
         count++
       }
     }

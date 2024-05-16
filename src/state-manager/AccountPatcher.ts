@@ -89,6 +89,7 @@ import {
   serializeGetTrieAccountHashesResp,
 } from '../types/GetTrieAccountHashesResp'
 import { BadRequest, InternalError, serializeResponseError } from '../types/ResponseError'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 type Line = {
   raw: string
@@ -1256,7 +1257,7 @@ class AccountPatcher {
           const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
           if (!hashTrieSyncConsensus) {
-            return res.send(utils.safeStringify({ error: `Unable to find hashTrieSyncConsensus for last cycle ${lastCycle}` }))
+            return res.send(safeStringify({ error: `Unable to find hashTrieSyncConsensus for last cycle ${lastCycle}` }))
           }
 
           for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
@@ -1286,7 +1287,7 @@ class AccountPatcher {
               if (!isRadixInSync) outOfSyncRadix[radix] = simpleMap // eslint-disable-line security/detect-object-injection
             }
           }
-          return res.send(utils.safeStringify({
+          return res.send(safeStringify({
             cycle,
             notEnoughVotesRadix,
             outOfSyncRadix,

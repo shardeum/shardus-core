@@ -1,6 +1,6 @@
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
-import { DeSerializeFromJsonString, SerializeToJsonString } from '../utils'
 
 export interface GossipReqBinary {
   type: string
@@ -15,7 +15,7 @@ export function serializeGossipReq(stream: VectorBufferStream, obj: GossipReqBin
   }
   stream.writeUInt8(cGossipReqVersion)
   stream.writeString(obj.type)
-  stream.writeString(SerializeToJsonString(obj.data))
+  stream.writeString(safeStringify(obj.data))
 }
 
 export function deserializeGossipReq(stream: VectorBufferStream): GossipReqBinary {
@@ -24,6 +24,6 @@ export function deserializeGossipReq(stream: VectorBufferStream): GossipReqBinar
     throw new Error('GossipReq version mismatch')
   }
   const type = stream.readString()
-  const data = DeSerializeFromJsonString(stream.readString()) as unknown
+  const data = safeJsonParse(stream.readString()) as unknown
   return { type, data }
 }

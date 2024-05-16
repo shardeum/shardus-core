@@ -1,4 +1,4 @@
-import { DeSerializeFromJsonString, SerializeToJsonString } from '../utils'
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
@@ -23,7 +23,7 @@ export function serializeMakeReceiptReq(stream: VectorBufferStream, obj: MakeRec
   stream.writeString(obj.sign.owner)
   stream.writeString(obj.sign.sig)
   stream.writeString(obj.address)
-  stream.writeString(SerializeToJsonString(obj.value))
+  stream.writeString(safeStringify(obj.value))
   stream.writeBigUInt64(BigInt(obj.when))
   stream.writeString(obj.source)
 }
@@ -39,7 +39,7 @@ export function deserializeMakeReceiptReq(stream: VectorBufferStream): MakeRecei
       sig: stream.readString(),
     },
     address: stream.readString(),
-    value: DeSerializeFromJsonString(stream.readString()),
+    value: safeJsonParse(stream.readString()),
     when: Number(stream.readBigUInt64()),
     source: stream.readString(),
   }

@@ -14,7 +14,7 @@ import * as JoinV2 from '../Join/v2'
 import { profilerInstance } from '../../utils/profiler'
 import { logFlags } from '../../logger'
 import { jsonHttpResWithSize } from '../../utils'
-import { safeStringify } from '../../utils'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 /** An endpoint that returns the latest node list hash. */
 const validatorListHashRoute: P2P.P2PTypes.Route<Handler> = {
