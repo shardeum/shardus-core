@@ -18,6 +18,7 @@ import { RequestStateForTxPostResp, deserializeRequestStateForTxPostResp } from 
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import * as NodeList from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 class TransactionRepair {
   app: Shardus.App
@@ -151,13 +152,13 @@ class TransactionRepair {
       }
       if (receivedReceipt.result === false) {
         nestedCountersInstance.countEvent('repair1', 'receivedReceipt.result is false')
-        /* prettier-ignore */  if (logFlags.debug) this.mainLogger.debug(`receivedReceipt.result is false for queueEntry: ${JSON.stringify(queueEntry)}`)
+        /* prettier-ignore */  if (logFlags.debug) this.mainLogger.debug(`receivedReceipt.result is false for queueEntry: ${safeStringify(queueEntry)}`)
         return
       }
       const appliedVote = queueEntry?.appliedReceiptForRepair2?.appliedVote
       if(!appliedVote) {
         nestedCountersInstance.countEvent('repair1', 'appliedVote is falsy')
-        /* prettier-ignore */  if (logFlags.debug) this.mainLogger.debug(`appliedVote is undefined for queueEntry: ${JSON.stringify(queueEntry)}`)
+        /* prettier-ignore */  if (logFlags.debug) this.mainLogger.debug(`appliedVote is undefined for queueEntry: ${safeStringify(queueEntry)}`)
         return
       }
 

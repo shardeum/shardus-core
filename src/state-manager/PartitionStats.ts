@@ -189,7 +189,7 @@ class PartitionStats {
           }
           //raw dump or compute?
           if (raw === 'true') {
-            res.write(JSON.stringify(lines))
+            res.write(safeStringify(lines))
           } else {
             {
               const {
@@ -443,7 +443,7 @@ class PartitionStats {
       this.mainLogger.debug(
         `statData enter:statsDataSummaryInit op:${opCounter} c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(
           accountId
-        )}  inputs:${JSON.stringify({ accountDataRaw })}`
+        )}  inputs:${safeStringify({ accountDataRaw })}`
       )
 
     const blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountId)
@@ -537,7 +537,7 @@ class PartitionStats {
       this.mainLogger.debug(
         `statData enter:statsDataSummaryUpdate op:${opCounter} c:${cycle} ${debugMsg}  accForBin:${utils.makeShortHash(
           accountDataAfter.accountId
-        )}   inputs:${JSON.stringify({
+        )}   inputs:${safeStringify({
           accountDataBefore,
           accountDataAfter,
         })}`
@@ -750,7 +750,7 @@ class PartitionStats {
         continue
       }
       if (excludeEmpty === false || summaryBlob.counter > 0) {
-        const cloneSummaryBlob = JSON.parse(JSON.stringify(summaryBlob))
+        const cloneSummaryBlob = JSON.parse(safeStringify(summaryBlob))
         statsDump.dataStats.push(cloneSummaryBlob)
       }
       coveredParitionCount++
@@ -1145,7 +1145,7 @@ class PartitionStats {
         for (const [, value] of Object.entries(statsObj.cycleDebugNotes)) {
           const valueNum = value as number
           if (valueNum >= 1) {
-            stream.write(`${statsObj.owner} : ${JSON.stringify(statsObj.cycleDebugNotes)}`)
+            stream.write(`${statsObj.owner} : ${safeStringify(statsObj.cycleDebugNotes)}`)
             break
           }
         }

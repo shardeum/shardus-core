@@ -18,7 +18,6 @@ import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
 import { getNewestCycle } from '../p2p/Sync'
 import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
-// import { safeStringify } from '../utils'
 
 console.log('StateManager', StateManager)
 console.log('StateManager type', StateManager.StateManagerTypes)
@@ -348,7 +347,7 @@ export function startSnapshotting() {
             if (logFlags.console) console.log(`Summary Obj for partition ${partition}`, summaryObj)
             if (summaryObj) {
               if (logFlags.console) console.log('summaryObj', summaryObj)
-              if (logFlags.console) console.log('summaryObj stringified', JSON.stringify(summaryObj))
+              if (logFlags.console) console.log('summaryObj stringified', safeStringify(summaryObj))
               if (logFlags.console) console.log('summaryObj hash', Context.crypto.hash(summaryObj))
             }
           }
@@ -676,7 +675,7 @@ function processDownloadedMissingData(missingData) {
     const accountsInPartition = partitionData.data.map((acc) => {
       return {
         accountId: acc.accountId,
-        data: typeof acc.data === 'object' ? JSON.stringify(acc.data) : acc.data,
+        data: typeof acc.data === 'object' ? safeStringify(acc.data) : acc.data,
         timestamp: acc.timestamp,
         hash: acc.hash,
         isGlobal: acc.isGlobal,

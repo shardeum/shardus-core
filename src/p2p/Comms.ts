@@ -146,7 +146,7 @@ function _authenticateByNode(message, node) {
       ? crypto.verify(message, node.publicKey)
       : crypto.authenticate(message, node.curvePublicKey)
   } catch (e) {
-    /* prettier-ignore */ if (logFlags.verbose) error(`Invalid or missing authentication/signature tag on message: ${JSON.stringify(message)}`)
+    /* prettier-ignore */ if (logFlags.verbose) error(`Invalid or missing authentication/signature tag on message: ${safeStringify(message)}`)
     return false
   }
   return result
@@ -156,7 +156,7 @@ function _authenticateByNode(message, node) {
 // This method could have done a complete deserialization into the specific type but,
 // that is avoided as we want to delay parsing of payload until header checks succeed.
 function _extractPayloadBinary(wrappedPayload): Buffer {
-  /* prettier-ignore */ if (logFlags.verbose) console.log('_extractPayloadBinary: wrappedPayload', JSON.stringify(wrappedPayload))
+  /* prettier-ignore */ if (logFlags.verbose) console.log('_extractPayloadBinary: wrappedPayload', safeStringify(wrappedPayload))
   let buffer = null
   if (wrappedPayload instanceof Buffer) {
     /* prettier-ignore */ if (logFlags.verbose) info(`_extractPayloadBinary: wrappedPayload is a buffer: ${wrappedPayload}`)
@@ -183,7 +183,7 @@ function _extractPayloadBinary(wrappedPayload): Buffer {
 function _extractPayload(wrappedPayload, nodeGroup) {
   let err = utils.validateTypes(wrappedPayload, { error: 's?' })
   if (err) {
-    warn('extractPayload: bad wrappedPayload: ' + err + ' ' + JSON.stringify(wrappedPayload))
+    warn('extractPayload: bad wrappedPayload: ' + err + ' ' + safeStringify(wrappedPayload))
     return [null]
   }
   if (wrappedPayload.error) {
@@ -208,7 +208,7 @@ function _extractPayload(wrappedPayload, nodeGroup) {
         }
   )
   if (err) {
-    warn('extractPayload: bad wrappedPayload: ' + err + ' ' + JSON.stringify(wrappedPayload))
+    warn('extractPayload: bad wrappedPayload: ' + err + ' ' + safeStringify(wrappedPayload))
     return [null]
   }
   // Check to see if node is in expected node group
@@ -423,7 +423,7 @@ export async function ask(
     const [response] = _extractPayload(respWithAuth, [node])
     if (!response) {
       throw new Error(
-        `Unable to verify response to ask request: ${route} -- ${JSON.stringify(message)} from node: ${
+        `Unable to verify response to ask request: ${route} -- ${safeStringify(message)} from node: ${
           node.id
         }`
       )
@@ -484,7 +484,7 @@ export async function askBinary<TReq, TResp>(
   }
   try {
     if (!res)
-      /* prettier-ignore */ throw new Error(`Empty response to askBinary request: ${route} -- ${JSON.stringify(message)} from node: ${node.id}`)
+      /* prettier-ignore */ throw new Error(`Empty response to askBinary request: ${route} -- ${safeStringify(message)} from node: ${node.id}`)
 
     if (header && sign)
       if (header.sender_id !== node.id || sign.owner !== node.publicKey) {
@@ -631,7 +631,7 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
       }
     }
     /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) console.log('header:', header)
-    /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternalBinary: request info: route: ${route} header: ${JSON.stringify(header)} sign: ${JSON.stringify(sign)}`)
+    /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternalBinary: request info: route: ${route} header: ${safeStringify(header)} sign: ${safeStringify(sign)}`)
     if (
       !NodeList.byPubKey.has(sign.owner) &&
       !NodeList.nodes.has(header.sender_id) &&
@@ -1132,7 +1132,7 @@ export async function handleGossip(payload, sender, tracker = '', msgSize = cNoS
 
   const gossipHandler = gossipHandlers[type]
   if (!gossipHandler) {
-    warn(`Gossip Handler not found: type ${type}, data: ${JSON.stringify(data)}`)
+    warn(`Gossip Handler not found: type ${type}, data: ${safeStringify(data)}`)
     return
   }
 
@@ -1226,8 +1226,8 @@ function pruneGossipHashes() {
   //  warn(`gossipedHashesRecv:${gossipedHashesRecv.size} gossipedHashesSent:${gossipedHashesSent.size}`)
   if (logFlags.p2pNonFatal) {
     info(`Total  gossipSent:${gossipSent} gossipRecv:${gossipRecv}`)
-    info(`Sent gossip by type: ${JSON.stringify(gossipTypeSent)}`)
-    info(`Recv gossip by type: ${JSON.stringify(gossipTypeRecv)}`)
+    info(`Sent gossip by type: ${safeStringify(gossipTypeSent)}`)
+    info(`Recv gossip by type: ${safeStringify(gossipTypeRecv)}`)
   }
 }
 

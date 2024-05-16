@@ -14,6 +14,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { enterRecovery, enterSafety } from './Modes'
 import { getOurNodeIndex } from './Utils'
 import { shardusGetTime } from '../network'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 /** STATE */
 
@@ -40,7 +41,7 @@ const gossipScaleRoute: P2P.P2PTypes.GossipHandler<P2P.CycleAutoScaleTypes.Signe
 ) => {
   profilerInstance.scopedProfileSectionStart('gossip-scaling')
   try {
-    if (logFlags.p2pNonFatal) info(`Got scale request: ${JSON.stringify(payload)}`)
+    if (logFlags.p2pNonFatal) info(`Got scale request: ${safeStringify(payload)}`)
     if (!payload) {
       warn('No payload provided for the `scaling` request.')
       return
@@ -126,7 +127,7 @@ function _requestNetworkScaling(upOrDown) {
   const isRequestAdded = addExtScalingRequest(signedRequest)
   if (isRequestAdded) {
     info(
-      `Our scale request is added. Gossiping our scale request to other nodes. ${JSON.stringify(
+      `Our scale request is added. Gossiping our scale request to other nodes. ${safeStringify(
         signedRequest
       )}`
     )
@@ -178,7 +179,7 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
     !scalingRequest.scale ||
     !scalingRequest.sign
   ) {
-    warn(`Invalid scaling request, missing fields. Request: ${JSON.stringify(scalingRequest)}`)
+    warn(`Invalid scaling request, missing fields. Request: ${safeStringify(scalingRequest)}`)
     return false
   }
   // Check if cycle counter matches
@@ -186,7 +187,7 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
     warn(
       `Invalid scaling request, not for this cycle. Current cycle:${
         CycleCreator.currentCycle
-      }, cycleInScaleRequest: ${scalingRequest.counter} Request: ${JSON.stringify(scalingRequest)}`
+      }, cycleInScaleRequest: ${scalingRequest.counter} Request: ${safeStringify(scalingRequest)}`
     )
     return false
   }
@@ -195,7 +196,7 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
     scalingRequest.scale !== P2P.CycleAutoScaleTypes.ScaleType.UP &&
     scalingRequest.scale !== P2P.CycleAutoScaleTypes.ScaleType.DOWN
   ) {
-    warn(`Invalid scaling request, not a valid scaling type. Request: ${JSON.stringify(scalingRequest)}`)
+    warn(`Invalid scaling request, not a valid scaling type. Request: ${safeStringify(scalingRequest)}`)
     return false
   }
   // Try to get the node who supposedly signed this request
@@ -204,11 +205,11 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
     node = NodeList.nodes.get(scalingRequest.nodeId)
   } catch (e) {
     warn(e)
-    warn(`Invalid scaling request, not a known node. Request: ${JSON.stringify(scalingRequest)}`)
+    warn(`Invalid scaling request, not a known node. Request: ${safeStringify(scalingRequest)}`)
     return false
   }
   if (node == null) {
-    warn(`Invalid scaling request, not a known node. Request: ${JSON.stringify(scalingRequest)}`)
+    warn(`Invalid scaling request, not a known node. Request: ${safeStringify(scalingRequest)}`)
     return false
   }
 
@@ -216,7 +217,7 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
 
   // Return false if fails validation for signature
   if (!crypto.verify(scalingRequest, node.publicKey)) {
-    warn(`Invalid scaling request, signature is not valid. Request: ${JSON.stringify(scalingRequest)}`)
+    warn(`Invalid scaling request, signature is not valid. Request: ${safeStringify(scalingRequest)}`)
     return false
   }
   return true
@@ -552,7 +553,7 @@ function _addToScalingRequests(scalingRequest): boolean {
       //_checkScaling() //Wait till later to calculate this.  Not for perf reasons, but to get the max possible votes considered
       return true
     default:
-      warn(`Invalid scaling type in _addToScalingRequests(). Request: ${JSON.stringify(scalingRequest)}`)
+      warn(`Invalid scaling type in _addToScalingRequests(). Request: ${safeStringify(scalingRequest)}`)
       return false
   }
 }

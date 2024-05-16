@@ -9,6 +9,7 @@ import { insertSorted, lerp } from '../utils'
 import * as CycleCreator from './CycleCreator'
 import * as CycleChain from './CycleChain'
 import { logFlags } from '../logger'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 interface ToAcceptResult {
   add: number
@@ -290,7 +291,7 @@ export function getExpiredRemovedV2(
     lastLoggedCycle = cycle
     info(
       'scale down dump:' +
-        JSON.stringify({
+        safeStringify({
           cycle,
           scaleFactor: CycleCreator.scaleFactor,
           // scaleDownRemove,

@@ -56,7 +56,7 @@ class Crypto {
         return
       }
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(`error fetching keypair from database ${JSON.stringify(e)}`)
+      if (logFlags.error) this.mainLogger.error(`error fetching keypair from database ${safeStringify(e)}`)
     }
 
     if (this.config.crypto.keyPairConfig.useKeyPairFromFile) {
@@ -77,7 +77,7 @@ class Crypto {
       this.mainLogger.info('New keypair successfully generated and saved to database.')
       this.setCurveKeyPair(this.keypair)
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(`error ${JSON.stringify(e)}`)
+      if (logFlags.error) this.mainLogger.error(`error ${safeStringify(e)}`)
     }
   }
 
@@ -97,7 +97,7 @@ class Crypto {
   writeKeypairToFile(keypair: Keypair): void {
     // probably safe; accesses keypair defined by config
     // eslint-disable-next-line security/detect-non-literal-fs-filename
-    fs.writeFileSync(this.getKeyPairFile(), JSON.stringify(keypair))
+    fs.writeFileSync(this.getKeyPairFile(), safeStringify(keypair))
   }
 
   readKeypairFromFile(): crypto.Keypair {
@@ -207,7 +207,7 @@ class Crypto {
       }
       return crypto.verifyObj(obj)
     } catch (e) {
-      this.mainLogger.error(`Error in verifying object ${JSON.stringify(obj)}`, e)
+      this.mainLogger.error(`Error in verifying object ${safeStringify(obj)}`, e)
       return false
     }
   }

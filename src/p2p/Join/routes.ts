@@ -105,7 +105,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
 
     if (!externalPortReachable || !internalPortReachable) {
       /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-reject: !externalPortReachable || !internalPortReachable` )
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: !externalPortReachable || !internalPortReachable ${joinRequest.nodeInfo.publicKey} ${JSON.stringify({ host: externalIp, port: externalPort })}`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: !externalPortReachable || !internalPortReachable ${joinRequest.nodeInfo.publicKey} ${safeStringify({ host: externalIp, port: externalPort })}`)
       return res.send(safeStringify({
         success: false,
         fatal: true,
@@ -150,7 +150,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       const selectionNumResult = computeSelectionNum(joinRequest)
       if (selectionNumResult.isErr()) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: failed selection number ${selectionNumResult.error.reason}`)
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`, JSON.stringify(selectionNumResult.error) )
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`, safeStringify(selectionNumResult.error) )
         return res.status(500).json(selectionNumResult.error)
       }
       joinRequest.selectionNum = selectionNumResult.value
@@ -420,7 +420,7 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
   const selectionNumResult = computeSelectionNum(payload)
   if (selectionNumResult.isErr()) {
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-gossip-reject:  node already standby` )
-    /* prettier-ignore */ if (logFlags.p2pNonFatal)console.error( `failed to compute selection number for node ${payload.nodeInfo.publicKey}:`, JSON.stringify(selectionNumResult.error) )
+    /* prettier-ignore */ if (logFlags.p2pNonFatal)console.error( `failed to compute selection number for node ${payload.nodeInfo.publicKey}:`, safeStringify(selectionNumResult.error) )
     return
   }
   payload.selectionNum = selectionNumResult.value

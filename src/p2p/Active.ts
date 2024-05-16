@@ -28,7 +28,7 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
 ) => {
   profilerInstance.scopedProfileSectionStart('gossip-active', true)
   try {
-    if (logFlags.p2pNonFatal) info(`Got active request: ${JSON.stringify(payload)}`)
+    if (logFlags.p2pNonFatal) info(`Got active request: ${safeStringify(payload)}`)
     let err = ''
     err = validateTypes(payload, {
       nodeId: 's',
@@ -216,7 +216,7 @@ export function updateRecord(
     const medianIndex = Math.floor(syncDurations.length / 2)
     const medianSyncTime = syncDurations[medianIndex]
 
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Sync time records sorted', syncTimes.length, JSON.stringify(syncTimes))
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Sync time records sorted', syncTimes.length, safeStringify(syncTimes))
 
     if (CycleChain.newest) {
       /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Median sync time at cycle ${cycleCounter} is ${medianSyncTime} s.`)
@@ -264,7 +264,7 @@ export function sendRequests() {
     const activeTx = crypto.sign(queuedRequest)
     queuedRequest = undefined
 
-    if (logFlags.important_as_fatal) info(`Gossiping active request: ${JSON.stringify(activeTx)}`)
+    if (logFlags.important_as_fatal) info(`Gossiping active request: ${safeStringify(activeTx)}`)
     nestedCountersInstance.countEvent('p2p', `p2p:sendRequests Gossiping active request`)
 
     if (addActiveTx(activeTx) === false) {
@@ -327,7 +327,7 @@ function validateActiveRequest(request: P2P.ActiveTypes.SignedActiveRequest) {
     return false
   }
   if (!crypto.verify(request, node.publicKey)) {
-    /* prettier-ignore */ if(logFlags.important_as_error) warn(`validateActiveRequest: bad signature, request: ${JSON.stringify(request)} ${request.nodeId}`)
+    /* prettier-ignore */ if(logFlags.important_as_error) warn(`validateActiveRequest: bad signature, request: ${safeStringify(request)} ${request.nodeId}`)
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `active:validateActiveRequests bad signature`)
     return false
   }

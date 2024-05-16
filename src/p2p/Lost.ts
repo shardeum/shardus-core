@@ -362,9 +362,9 @@ export function getTxs(): P2P.LostTypes.Txs {
     if (upMsgCount >= config.p2p.minChecksForUp) {
       seen[downRecord.target] = true
       /* prettier-ignore */ if (logFlags.lost) nestedCountersInstance.countEvent('testingLost', `${currentCycle}: Saw at least ${config.p2p.minChecksForUp} up messages`)
-      /* prettier-ignore */ if (logFlags.lost) console.log(`getTxs: Saw at least ${config.p2p.minChecksForUp} up messages: ${JSON.stringify(upRecord)}`)
+      /* prettier-ignore */ if (logFlags.lost) console.log(`getTxs: Saw at least ${config.p2p.minChecksForUp} up messages: ${safeStringify(upRecord)}`)
       if (logFlags.verbose)
-        info(`Saw at least ${config.p2p.minChecksForUp} up messages: ${JSON.stringify(upRecord)}`)
+        info(`Saw at least ${config.p2p.minChecksForUp} up messages: ${safeStringify(upRecord)}`)
     } else if (downMsgCount >= config.p2p.minChecksForDown) {
       lostTxs.push(downRecord.message)
       seen[downRecord.target] = true
@@ -372,7 +372,7 @@ export function getTxs(): P2P.LostTypes.Txs {
       /* prettier-ignore */ if (logFlags.lost) console.log(`getTxs: Adding lost record for ${downRecord.target} to lostTxs`)
       /* prettier-ignore */ if (logFlags.lost) if (logFlags.verbose) info(`Adding lost record for ${downRecord.target} to lostTxs`)
     } else {
-      /* prettier-ignore */ if (logFlags.lost) info(`Not enough down messages to be considered lost: ${JSON.stringify(downRecord)}`)
+      /* prettier-ignore */ if (logFlags.lost) info(`Not enough down messages to be considered lost: ${safeStringify(downRecord)}`)
     }
   }
 
@@ -613,7 +613,7 @@ export function sendRequests() {
         info(
           `Gossiping node down message for node: ${record.target} payload.cycle ${
             record.cycle
-          }: ${JSON.stringify(msg)}`
+          }: ${safeStringify(msg)}`
         )
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'send-lost-down', 1)
       //this next line is probably too spammy to leave in forever (but ok to comment out and keep)
@@ -635,7 +635,7 @@ export function sendRequests() {
   }
   if (sendRefute === currentCycle) {
     let upGossipMsg = { target: Self.id, status: 'up', cycle: currentCycle }
-    warn(`Gossiping node up message: ${JSON.stringify(upGossipMsg)}`)
+    warn(`Gossiping node up message: ${safeStringify(upGossipMsg)}`)
     let signedUpGossipMsg: P2P.LostTypes.SignedUpGossipMessage = crypto.sign(upGossipMsg)
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'self-refute', 1)
     //this next line is probably too spammy to leave in forever (but ok to comment out and keep)
@@ -750,7 +750,7 @@ function reportLost(target, reason: string, requestId: string) {
         /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, reporter: ${Self.ip}:${Self.port} id: ${Self.id}`)
         /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, checker: ${checker.internalIp}:${checker.internalPort} node details: ${logNode(checker)}`)
         /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, target: ${target.internalIp}:${target.internalPort} cycle: ${report.cycle} node details: ${logNode(target)}`)
-        /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${JSON.stringify(report)}`)
+        /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${safeStringify(report)}`)
       }
 
       const msgCopy = JSON.parse(shardusCrypto.stringify(report))
@@ -815,7 +815,7 @@ function getMultipleCheckerNodes(
   }
   let selectedNodes = [...checkerNodes.values()]
   /* prettier-ignore */ if (logFlags.lost) info(
-    `in getMultipleCheckerNodes checkerNodes for target: ${target}, reporter: ${reporter}, cycle: ${lostCycle}: ${JSON.stringify(
+    `in getMultipleCheckerNodes checkerNodes for target: ${target}, reporter: ${reporter}, cycle: ${lostCycle}: ${safeStringify(
       selectedNodes
     )}`
   )
@@ -853,7 +853,7 @@ function getCheckerNode(id, cycle) {
   if (foundNode.id === id) idx = (idx + 1) % activeByIdOrder.length // skip to next node if the selected node is target
   if (logFlags.lost) {
     info(`in getCheckerNode oidx:${oidx} idx:${idx} near:${near}  cycle:${cycle}  id:${id}`)
-    info(`${JSON.stringify(activeByIdOrder.map((n) => n.id))}`)
+    info(`${safeStringify(activeByIdOrder.map((n) => n.id))}`)
   }
   return activeByIdOrder[idx]
 }
@@ -864,7 +864,7 @@ async function lostReportHandler(payload, response, sender) {
   profilerInstance.scopedProfileSectionStart('lost-report')
   try {
     let requestId = generateUUID()
-    /* prettier-ignore */ if (logFlags.lost) info(`Got investigate request requestId: ${requestId}, req: ${JSON.stringify(payload)} from ${logNode(sender)}`)
+    /* prettier-ignore */ if (logFlags.lost) info(`Got investigate request requestId: ${requestId}, req: ${safeStringify(payload)} from ${logNode(sender)}`)
     let err = ''
     // for request tracing
     err = validateTypes(payload, { timestamp: 'n', requestId: 's' })
@@ -943,7 +943,7 @@ const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       const req: LostReportReq = deserializeLostReportReq(requestStream)
       let requestId = generateUUID()
       const sender = NodeList.nodes.get(header.sender_id)
-      /* prettier-ignore */ if (logFlags.verbose) info(`Got investigate request requestId: ${req.requestId}, req: ${JSON.stringify(req)} from ${logNode(sender)}`)
+      /* prettier-ignore */ if (logFlags.verbose) info(`Got investigate request requestId: ${req.requestId}, req: ${safeStringify(req)} from ${logNode(sender)}`)
       if (stopReporting[req.target]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
       const key = `${req.target}-${req.cycle}`
       if (checkedLostRecordMap.get(key)) return // we have already seen this node for this cycle
@@ -1278,7 +1278,7 @@ async function isDownCheck(node) {
 function downGossipHandler(payload: P2P.LostTypes.SignedDownGossipMessage, sender, tracker) {
   /* prettier-ignore */ if (logFlags.lost) console.log('downGossipHandler: this is to receive the gossip from checker nodes')
   /* prettier-ignore */ if (logFlags.lost) console.log('downGossipHandler: target:', payload.report.target)
-  /* prettier-ignore */ if (logFlags.lost) info(`Got downGossip: ${JSON.stringify(payload)}`)
+  /* prettier-ignore */ if (logFlags.lost) info(`Got downGossip: ${safeStringify(payload)}`)
   let err = ''
   err = validateTypes(payload, { cycle: 'n', report: 'o', status: 's', sign: 'o' })
   if (err) {
@@ -1313,13 +1313,13 @@ function downGossipHandler(payload: P2P.LostTypes.SignedDownGossipMessage, sende
   }
   let [valid, reason] = checkQuarter(payload.report.checker, sender)
   if (!valid) {
-    warn(`Bad downGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
+    warn(`Bad downGossip message. reason:${reason} message:${safeStringify(payload)}`)
     warn(`cycle:${currentCycle} quarter:${currentQuarter} sender:${sender}`)
     return
   }
   ;[valid, reason] = checkDownMsg(payload, currentCycle)
   if (!valid) {
-    warn(`Bad downGossip message. reason:${reason}. message:${JSON.stringify(payload)}`)
+    warn(`Bad downGossip message. reason:${reason}. message:${safeStringify(payload)}`)
     warn(`cycle:${currentCycle} quarter:${currentQuarter} sender:${sender}`)
     return
   }
@@ -1333,7 +1333,7 @@ function downGossipHandler(payload: P2P.LostTypes.SignedDownGossipMessage, sende
   }
   if (receivedLostRecordMap.has(key) && receivedLostRecordMap.get(key).has(payload.report.checker)) {
     if (logFlags.verbose)
-      info(`downGossip already seen and processed. report ${JSON.stringify(payload.report)}`)
+      info(`downGossip already seen and processed. report ${safeStringify(payload.report)}`)
     return
   }
   if (receivedLostRecordMap.has(key)) {
@@ -1370,7 +1370,7 @@ function checkDownMsg(payload: P2P.LostTypes.SignedDownGossipMessage, expectedCy
 }
 
 function upGossipHandler(payload, sender, tracker) {
-  /* prettier-ignore */ if (logFlags.lost) info(`Got upGossip: ${JSON.stringify(payload)}`)
+  /* prettier-ignore */ if (logFlags.lost) info(`Got upGossip: ${safeStringify(payload)}`)
   let err = ''
   err = validateTypes(payload, { cycle: 'n', target: 's', status: 's', sign: 'o' })
   if (err) {
@@ -1388,7 +1388,7 @@ function upGossipHandler(payload, sender, tracker) {
   }
   let [valid, reason] = checkQuarter(payload.target, sender)
   if (!valid) {
-    warn(`Bad upGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
+    warn(`Bad upGossip message. reason:${reason} message:${safeStringify(payload)}`)
     return
   }
   const key = `${payload.target}-${payload.cycle}`
@@ -1396,7 +1396,7 @@ function upGossipHandler(payload, sender, tracker) {
   if (rec && rec.status === 'up') return // we have already gossiped this node for this cycle
   ;[valid, reason] = checkUpMsg(payload, currentCycle)
   if (!valid) {
-    warn(`Bad upGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
+    warn(`Bad upGossip message. reason:${reason} message:${safeStringify(payload)}`)
     return
   }
   upGossipMap.set(key, payload)
@@ -1415,7 +1415,7 @@ function removeByAppHandler(payload: P2P.LostTypes.RemoveCertificate, sender, tr
   if (rec) return // we have already gossiped this node for this cycle
   let [valid, reason] = checkQuarter(target, sender)
   if (!valid) {
-    warn(`Bad downGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
+    warn(`Bad downGossip message. reason:${reason} message:${safeStringify(payload)}`)
     warn(`cycle:${currentCycle} quarter:${currentQuarter} sender:${sender}`)
     return
   }
@@ -1425,14 +1425,14 @@ function removeByAppHandler(payload: P2P.LostTypes.RemoveCertificate, sender, tr
 
 function checkUpMsg(payload: P2P.LostTypes.SignedUpGossipMessage, expectedCycle) {
   if (!nodes.has(payload.target))
-    return [false, `target is not an active node  ${payload.target}  ${JSON.stringify(activeByIdOrder)}`]
+    return [false, `target is not an active node  ${payload.target}  ${safeStringify(activeByIdOrder)}`]
   if (!crypto.verify(payload, nodes.get(payload.target).publicKey)) return [false, 'bad sign from target']
   return [true, '']
 }
 
 function checkRemoveByAppMsg(payload: P2P.LostTypes.RemoveByAppMessage, expectedCycle) {
   if (!nodes.has(payload.target))
-    return [false, `target is not an active node  ${payload.target}  ${JSON.stringify(activeByIdOrder)}`]
+    return [false, `target is not an active node  ${payload.target}  ${safeStringify(activeByIdOrder)}`]
   // todo: verify signature
   // if (!crypto.verify(payload, nodes.get(payload.target).publicKey)) return [false, 'bad sign from target']
   return [true, '']

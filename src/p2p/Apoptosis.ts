@@ -112,7 +112,7 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> 
         when: req.when,
         sign: sign,
       }
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got Apoptosis proposal: ${JSON.stringify(apopProposal)}`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got Apoptosis proposal: ${safeStringify(apopProposal)}`)
       let err = ''
 
       if (apopProposal.id === 'isDownCheck') {
@@ -150,7 +150,7 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> 
           response(resp, serializeApoptosisProposalResp)
           return
         } else {
-          /* prettier-ignore */ if (logFlags.error) warn(`addProposal failed for payload: ${JSON.stringify(apopProposal)}`)
+          /* prettier-ignore */ if (logFlags.error) warn(`addProposal failed for payload: ${safeStringify(apopProposal)}`)
           let resp: ApoptosisProposalResp = { s: 'fail', r: 4 }
           response(resp, serializeApoptosisProposalResp)
           return
@@ -174,7 +174,7 @@ const apoptosisGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ApoptosisTypes.Signed
 ) => {
   profilerInstance.scopedProfileSectionStart('apoptosis')
   try {
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got Apoptosis gossip: ${JSON.stringify(payload)}`)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got Apoptosis gossip: ${safeStringify(payload)}`)
     let err = ''
     err = validateTypes(payload, { when: 'n', id: 's', sign: 'o' })
     if (err) {
@@ -362,7 +362,7 @@ export async function apoptosizeSelf(message: string) {
     }
     /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Redunancy is ${redunancy}   ${message}`)
     await robustQuery(activeNodes, qF, eF, redunancy, true)
-    /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}   ${message}`)
+    /* prettier-ignore */ if (logFlags.important_as_fatal) warn(`Sent apoptosize-self proposal: ${safeStringify(proposal)}   ${message}`)
   }
   // Omar - added the following line. Maybe we should emit an event when we apoptosize so other modules and app can clean up
   Self.emitter.emit('invoke-exit', `In apoptosizeSelf. ${message}`, getCallstack(), message) // we can pass true as a parameter if we want to be restarted

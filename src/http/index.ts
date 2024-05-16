@@ -114,20 +114,20 @@ function logError(method: string, error: any, host: any, logIndex: any) {
   if (error.code === 'ETIMEDOUT') {
     /* prettier-ignore */ if (logFlags.verbose) console.error(`${method}: HTTP request timed out:`, error)
     if (_logger) {
-      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-timeout', host.pathname, logIndex, JSON.stringify(error))
+      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-timeout', host.pathname, logIndex, safeStringify(error))
     }
     throw error
   } else if (error.response && error.response.statusCode === 400) {
     /* prettier-ignore */ if (logFlags.verbose) console.error(`${method}: Bad Request:`, error.message, ' ', error)
     if (_logger) {
-      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-400', host.pathname, logIndex, JSON.stringify(error))
+      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-400', host.pathname, logIndex, safeStringify(error))
     }
     throw error
   } else {
     // Handle other errors
     /* prettier-ignore */ if (logFlags.verbose) console.error(`${method}: An unexpected error occurred:`, error)
     if (_logger) {
-      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-err', host.pathname, logIndex, JSON.stringify(error))
+      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-err', host.pathname, logIndex, safeStringify(error))
     }
     throw error
   }

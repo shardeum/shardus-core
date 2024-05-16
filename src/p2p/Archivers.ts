@@ -890,7 +890,7 @@ export function registerRoutes() {
     }
 
     const joinRequest = req.body
-    if (logFlags.p2pNonFatal) info(`Archiver join request received: ${JSON.stringify(joinRequest)}`)
+    if (logFlags.p2pNonFatal) info(`Archiver join request received: ${safeStringify(joinRequest)}`)
 
     const accepted = await addArchiverJoinRequest(joinRequest)
     if (!accepted.success) {
@@ -911,7 +911,7 @@ export function registerRoutes() {
     }
 
     const leaveRequest = req.body
-    if (logFlags.p2pNonFatal) info(`Archiver leave request received: ${JSON.stringify(leaveRequest)}`)
+    if (logFlags.p2pNonFatal) info(`Archiver leave request received: ${safeStringify(leaveRequest)}`)
 
     const accepted = await addLeaveRequest(leaveRequest)
     if (!accepted.success) {
@@ -974,7 +974,7 @@ export function registerRoutes() {
     }
 
     const dataRequest = req.body
-    if (logFlags.p2pNonFatal) info('dataRequest received', JSON.stringify(dataRequest))
+    if (logFlags.p2pNonFatal) info('dataRequest received', safeStringify(dataRequest))
 
     const foundArchiver = archivers.get(dataRequest.publicKey)
 
@@ -1050,7 +1050,7 @@ export function registerRoutes() {
     // [TODO] Authenticate tag
 
     const queryRequest = req.body
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) info('queryRequest received', JSON.stringify(queryRequest))
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info('queryRequest received', safeStringify(queryRequest))
 
     const foundArchiver = archivers.get(queryRequest.publicKey)
     if (!foundArchiver) {
@@ -1106,7 +1106,7 @@ export function computeNewArchiverListHash(): hexstring {
   // deep cloning is necessary as archiver information may be mutated by
   // reference.
   lastHashedList = clone(sortedByPubKey())
-  /* prettier-ignore */ if (logFlags.p2pNonFatal) info('hashing archiver list:', JSON.stringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) info('hashing archiver list:', safeStringify(lastHashedList))
   const hash = crypto.hash(lastHashedList)
   /* prettier-ignore */ if (logFlags.p2pNonFatal) info('the new archiver list hash is', hash)
   return hash
@@ -1132,7 +1132,7 @@ let lastHashedList: P2P.ArchiversTypes.JoinedArchiver[] = []
 
 /** Returns the last list of archivers that had its hash computed. */
 export function getLastHashedArchiverList(): P2P.ArchiversTypes.JoinedArchiver[] {
-  /* prettier-ignore */ if (logFlags.p2pNonFatal) info('returning last hashed archiver list:', JSON.stringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) info('returning last hashed archiver list:', safeStringify(lastHashedList))
   return lastHashedList
 }
 

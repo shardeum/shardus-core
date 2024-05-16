@@ -12,6 +12,7 @@ import { Cycle, CycleShardData } from '../state-manager/state-manager-types'
 import { safetyModeVals, snapshotLogger } from './index'
 import { hashMap } from './partition-gossip'
 import { NetworkClass } from '../network'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 /** TYPES */
 
@@ -364,7 +365,7 @@ export function registerDownloadRoutes(
       hash: oldPartitionHashMap.get(partitionId),
     }
   }
-  dataToSend = JSON.stringify(dataToSend)
+  dataToSend = safeStringify(dataToSend)
   if (logFlags.console) console.log('Registering download route', typeof dataToSend, dataToSend)
 
   network.registerExternalGet('download-snapshot-data', (_req, res) => {

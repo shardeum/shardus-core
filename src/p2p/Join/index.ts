@@ -36,6 +36,7 @@ import { drainFinishedSyncingRequest, newSyncFinishedNodes } from './v2/syncFini
 //import { getLastCycleStandbyRefreshRequest, resetLastCycleStandbyRefreshRequests, drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
 import { drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
 import rfdc from 'rfdc'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 /** STATE */
 
@@ -174,7 +175,7 @@ export function calculateToAccept(): number {
     lastLoggedCycle = cycle
     info(
       'scale dump:' +
-        JSON.stringify({
+        safeStringify({
           cycle,
           scaleFactor: CycleCreator.scaleFactor,
           needed,
@@ -627,7 +628,7 @@ export async function createJoinRequest(
   const joinReq = {
     nodeInfo,
     cycleMarker,
-    proofOfWork: JSON.stringify(proofOfWork),
+    proofOfWork: safeStringify(proofOfWork),
     version,
     selectionNum: undefined,
   }
@@ -643,7 +644,7 @@ export async function createJoinRequest(
     }
   }
   const signedJoinReq = crypto.sign(joinReq)
-  if (logFlags.p2pNonFatal) info(`Join request created... Join request: ${JSON.stringify(signedJoinReq)}`)
+  if (logFlags.p2pNonFatal) info(`Join request created... Join request: ${safeStringify(signedJoinReq)}`)
   return signedJoinReq
 }
 
@@ -851,7 +852,7 @@ export async function submitJoinV2(
   let unreachable = 0
 
   for (const res of responses) {
-    /* prettier-ignore */ if (logFlags.important_as_fatal) info(`Join Request Response: ${JSON.stringify(res)}`)
+    /* prettier-ignore */ if (logFlags.important_as_fatal) info(`Join Request Response: ${safeStringify(res)}`)
     if (res && res.fatal) {
       errs.push(res)
 
@@ -1097,7 +1098,7 @@ function verifyNodeUnknown(nodeInfo: P2P.P2PTypes.P2PNode): JoinRequestResponse 
   const ipPort = NodeList.ipPort(nodeInfo.internalIp, nodeInfo.internalPort)
   if (NodeList.byIpPort.has(ipPort)) {
     const message = 'Cannot add join request for this node, already a known node (by IP address).'
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(message, JSON.stringify(NodeList.byIpPort.get(ipPort)))
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(message, safeStringify(NodeList.byIpPort.get(ipPort)))
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-already-known`)
     return {
       success: false,
@@ -1284,7 +1285,7 @@ export function verifyJoinRequestSignature(
   joinRequest: P2P.JoinTypes.JoinRequest
 ): JoinRequestResponse | null {
   if (!crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)) {
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('join bad sign ' + JSON.stringify(joinRequest))
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('join bad sign ' + safeStringify(joinRequest))
     nestedCountersInstance.countEvent('p2p', `join-reject-bad-sign`)
     return {
       success: false,

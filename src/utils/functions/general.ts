@@ -371,7 +371,7 @@ export function compareObjectShape(
   }
   const admirer_schema = generateObjectSchema(admirer, { arrTypeDiversity: true })
 
-  if (JSON.stringify(idol_schema) === JSON.stringify(admirer_schema)) {
+  if (safeStringify(idol_schema) === safeStringify(admirer_schema)) {
     isValid = true
     return { isValid, error }
   }
@@ -380,7 +380,7 @@ export function compareObjectShape(
   // this function is not meant to be call outside of this block
   const smartComparator = (idol_type, admirer_type): boolean => {
     if (typeof idol_type === 'object' && idol_type.constructor === Object) {
-      return JSON.stringify(idol_type) === JSON.stringify(admirer_type)
+      return safeStringify(idol_type) === safeStringify(admirer_type)
     } else {
       return idol_type === admirer_type
     }
@@ -527,7 +527,7 @@ export function formatErrorMessage(err: unknown, printStack: boolean = true): st
     //     errMsg += `${key}: ${errObj[key]}\n`
     //   }
     // } else {
-    errMsg = `Unknown error: ${JSON.stringify(err)}`
+    errMsg = `Unknown error: ${safeStringify(err)}`
     // }
   } else {
     errMsg = `Unknown error: ${err}`
@@ -592,16 +592,16 @@ export function stringForKeys(obj: unknown, keys: ArrayLike<string> | string | n
     else if (typeof keys == 'string') keys = keys.split(/[ ,]+/)
     // justification for the suppression below: the keys are not originated by user input, but developer source code
     const items = Array.from(keys)
-      .map((key) => (obj[key] === undefined ? 'undefined' : JSON.stringify(obj[key]))) // eslint-disable-line security/detect-object-injection
+      .map((key) => (obj[key] === undefined ? 'undefined' : safeStringify(obj[key]))) // eslint-disable-line security/detect-object-injection
       .join(', ')
     return `{${items}}`
   } catch (e) {
     // throwing an exception would be bad for logging/debugging, so we just return a string
     let objStr: string
     try {
-      objStr = JSON.stringify(obj)
+      objStr = safeStringify(obj)
     } catch (e) {
-      objStr = '(stringForKeys(): exception for JSON.stringify())'
+      objStr = '(stringForKeys(): exception for safeStringify())'
     }
     return `(stringForKeys(): exception: ${e}, obj: ${objStr})`
   }

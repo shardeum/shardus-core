@@ -1331,7 +1331,7 @@ class Shardus extends EventEmitter {
     if (!this.appProvided)
       throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
     if (logFlags.verbose)
-      this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(tx)} set:${set} global:${global}`) // not reducing tx here so we can get the long hashes
+      this.mainLogger.debug(`Start of injectTransaction ${safeStringify(tx)} set:${set} global:${global}`) // not reducing tx here so we can get the long hashes
     if (!this.stateManager.accountSync.dataSyncMainPhaseComplete) {
       this.statistics.incrementCounter('txRejected')
       nestedCountersInstance.countEvent('rejected', '!dataSyncMainPhaseComplete')
@@ -1352,7 +1352,7 @@ class Shardus extends EventEmitter {
           // This ok because we are initializing a global at the set time period
         } else {
           if (logFlags.verbose)
-            this.mainLogger.debug(`txRejected ${JSON.stringify(tx)} set:${set} global:${global}`)
+            this.mainLogger.debug(`txRejected ${safeStringify(tx)} set:${set} global:${global}`)
 
           this.statistics.incrementCounter('txRejected')
           nestedCountersInstance.countEvent('rejected', '!allowTransactions')
@@ -1578,7 +1578,7 @@ class Shardus extends EventEmitter {
     if (homeNode == null) {
       return { success: false, reason: `Home node not found for account ${senderAddress}`, status: 500 }
     }
-    /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `forwardTransactionToLuckyNodes: homeNode: ${homeNode.node.id} closetNodeIds: ${JSON.stringify( closetNodeIds.sort() )}` )
+    /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `forwardTransactionToLuckyNodes: homeNode: ${homeNode.node.id} closetNodeIds: ${safeStringify( closetNodeIds.sort() )}` )
 
     let selectedValidators = []
     if (Self.id != homeNode.node.id)
@@ -1662,8 +1662,8 @@ class Shardus extends EventEmitter {
         /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx to ${validator.id} failed. ${message} ${utils.stringify(tx)} error: ${ e.stack }` )
       }
     }
-    nestedCountersInstance.countEvent('statistics', `forward failed: ${JSON.stringify(stats)}`)
-    /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx out of tries. ${JSON.stringify(stats)} ${safeStringify(tx)} ` )
+    nestedCountersInstance.countEvent('statistics', `forward failed: ${safeStringify(stats)}`)
+    /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx out of tries. ${safeStringify(stats)} ${safeStringify(tx)} ` )
     return { success: false, reason: 'No validators found to forward the transaction', status: 500 }
   }
 
@@ -3060,7 +3060,7 @@ class Shardus extends EventEmitter {
       scopedReport.cycle = lastCycle.counter
       scopedReport.node = `${Self.ip}:${Self.port}`
       scopedReport.id = utils.makeShortHash(Self.id)
-      nestedCountersInstance.countRareEvent('scopedTimeReport', JSON.stringify(scopedReport))
+      nestedCountersInstance.countRareEvent('scopedTimeReport', safeStringify(scopedReport))
     }
   }
 

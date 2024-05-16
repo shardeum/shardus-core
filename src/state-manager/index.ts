@@ -2269,7 +2269,7 @@ class StateManager {
 
       const isStuck = this.transactionQueue.isStuckProcessing
       if (isStuck) {
-        response = JSON.stringify(this.transactionQueue.getDebugProccessingStatus())
+        response = safeStringify(this.transactionQueue.getDebugProccessingStatus())
         this.transactionQueue.fixStuckProcessing(clear)
       }
       res.write(response)
@@ -3269,7 +3269,7 @@ class StateManager {
           //Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
           await this.storage.createOrReplaceAccountCopy(backupObj)
         } catch (error) {
-          /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` _commitAccountCopies storage: ${JSON.stringify(error)}}`)
+          /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` _commitAccountCopies storage: ${safeStringify(error)}}`)
           nestedCountersInstance.countEvent('_commitAccountCopies', `_commitAccountCopies fail`)
         }
       }

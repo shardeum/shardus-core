@@ -363,7 +363,7 @@ class TransactionConsenus {
               'consensus',
               'get_confirm_or_challenge no confirmation or challenge'
             )
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no confirmation or challenge for ${queueEntry.logID}, bestVote: ${JSON.stringify(queueEntry.receivedBestVote)},  bestConfirmation: ${JSON.stringify(queueEntry.receivedBestConfirmation)}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no confirmation or challenge for ${queueEntry.logID}, bestVote: ${safeStringify(queueEntry.receivedBestVote)},  bestConfirmation: ${safeStringify(queueEntry.receivedBestConfirmation)}`)
             await respond(confirmOrChallengeResult)
           }
 
@@ -422,7 +422,7 @@ class TransactionConsenus {
               'consensus',
               'get_confirm_or_challenge no confirmation or challenge'
             )
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no confirmation or challenge for ${queueEntry.logID}, bestVote: ${JSON.stringify(queueEntry.receivedBestVote)},  bestConfirmation: ${JSON.stringify(queueEntry.receivedBestConfirmation)}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no confirmation or challenge for ${queueEntry.logID}, bestVote: ${safeStringify(queueEntry.receivedBestVote)},  bestConfirmation: ${safeStringify(queueEntry.receivedBestConfirmation)}`)
             respond(confirmOrChallengeResult, serializeGetConfirmOrChallengeResp)
             return
           }
@@ -1101,7 +1101,7 @@ class TransactionConsenus {
 
       const isValid = this.crypto.verify(timestampReceipt, homeNode.node.publicKey)
       if (isValid) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Timestamp receipt received from home node. TxId: ${txId} isValid: ${isValid}, timestampReceipt: ${JSON.stringify(timestampReceipt)}`)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Timestamp receipt received from home node. TxId: ${txId} isValid: ${isValid}, timestampReceipt: ${safeStringify(timestampReceipt)}`)
         return timestampReceipt
       } else {
         /* prettier-ignore */ if (logFlags.fatal) this.mainLogger.fatal(`Timestamp receipt received from home node ${homeNode.node.publicKey} is not valid. ${utils.stringifyReduce(timestampReceipt)}`)
@@ -2187,7 +2187,7 @@ class TransactionConsenus {
       }
       if (logFlags.debug)
         this.mainLogger.debug(
-          `confirmOrChallenge: ${queueEntry.logID}  receivedBestVote: ${JSON.stringify(
+          `confirmOrChallenge: ${queueEntry.logID}  receivedBestVote: ${safeStringify(
             queueEntry.receivedBestVote
           )}} `
         )
@@ -2443,7 +2443,7 @@ class TransactionConsenus {
       const signedChallengeMessage = this.crypto.sign(challengeMessage)
       if (logFlags.debug)
         this.mainLogger.debug(
-          `challengeVoteAndShare: ${queueEntry.logID}  ${JSON.stringify(signedChallengeMessage)}}`
+          `challengeVoteAndShare: ${queueEntry.logID}  ${safeStringify(signedChallengeMessage)}}`
         )
 
       //Share message to tx group
@@ -2839,7 +2839,7 @@ class TransactionConsenus {
     /* prettier-ignore */
     if (logFlags.playback) this.logger.playbackLogNote("tryAppendMessage", `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`);
     /* prettier-ignore */
-    if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID}   ${JSON.stringify(confirmOrChallenge)} `);
+    if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID}   ${safeStringify(confirmOrChallenge)} `);
     // check if the node is in the execution group
     const isMessageFromExecutionNode = queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)
 
@@ -2881,7 +2881,7 @@ class TransactionConsenus {
       this.mainLogger.error(
         `tryAppendMessage: ${
           queueEntry.logID
-        } confirmOrChallenge is not for the same vote that was finalized in the previous phase, queueEntry.receivedBestVote: ${JSON.stringify(
+        } confirmOrChallenge is not for the same vote that was finalized in the previous phase, queueEntry.receivedBestVote: ${safeStringify(
           queueEntry.receivedBestVote
         )}`
       )
@@ -2953,7 +2953,7 @@ class TransactionConsenus {
         this.mainLogger.debug(
           `tryAppendMessage: ${
             queueEntry.logID
-          } confirmation received and processed. queueEntry.receivedBestConfirmation: ${JSON.stringify(
+          } confirmation received and processed. queueEntry.receivedBestConfirmation: ${safeStringify(
             queueEntry.receivedBestConfirmation
           )}, receivedBestConfirmedNode: ${queueEntry.receivedBestConfirmedNode}`
         )
@@ -2968,7 +2968,7 @@ class TransactionConsenus {
         queueEntry.uniqueChallengesCount++
         if (this.stateManager.consensusLog)
           this.mainLogger.debug(
-            `tryAppendMessage: ${queueEntry.logID} unique challenge added. ${JSON.stringify(
+            `tryAppendMessage: ${queueEntry.logID} unique challenge added. ${safeStringify(
               queueEntry.uniqueChallenges
             )}`
           )
@@ -2977,7 +2977,7 @@ class TransactionConsenus {
       this.mainLogger.debug(
         `tryAppendMessage: ${
           queueEntry.logID
-        } challenge received and processing. queueEntry.receivedBestChallenge: ${JSON.stringify(
+        } challenge received and processing. queueEntry.receivedBestChallenge: ${safeStringify(
           queueEntry.receivedBestChallenge
         )}`
       )
@@ -3017,7 +3017,7 @@ class TransactionConsenus {
         this.mainLogger.debug(
           `tryAppendMessage: ${
             queueEntry.logID
-          } challenge received and processed. queueEntry.receivedBestChallenge: ${JSON.stringify(
+          } challenge received and processed. queueEntry.receivedBestChallenge: ${safeStringify(
             queueEntry.receivedBestChallenge
           )}, receivedBestChallenger: ${queueEntry.receivedBestChallenger}`
         )

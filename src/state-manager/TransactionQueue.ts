@@ -2639,7 +2639,7 @@ class TransactionQueue {
       nestedCountersInstance.countEvent(`queueEntryAddData`, `sharedCompleteData stateList: ${stateList.length} neighbours: ${neighboursNodes.length}`)
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
-          `shareCompleteDataToNeighbours: shared complete data for txId ${queueEntry.logID} at timestamp: ${shardusGetTime()} nodeId: ${Self.id} to neighbours: ${JSON.stringify(neighboursNodes.map((node) => node.id))}`
+          `shareCompleteDataToNeighbours: shared complete data for txId ${queueEntry.logID} at timestamp: ${shardusGetTime()} nodeId: ${Self.id} to neighbours: ${safeStringify(neighboursNodes.map((node) => node.id))}`
         )
       }
     }
@@ -3401,8 +3401,8 @@ class TransactionQueue {
             executionKeys.push(utils.makeShortHash(node.id) + `:${node.externalPort}`)
           }
         }
-        /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionGroup:${JSON.stringify(executionKeys)}`)
-        /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('queueEntryGetTransactionGroup', `queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionGroup:${JSON.stringify(executionKeys)}`)
+        /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionGroup:${safeStringify(executionKeys)}`)
+        /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('queueEntryGetTransactionGroup', `queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionGroup:${safeStringify(executionKeys)}`)
       }
 
       // if(queueEntry.globalModification === false && this.executeInOneShard && key === queueEntry.executionShardKey){
@@ -4151,7 +4151,7 @@ class TransactionQueue {
               }
             }
 
-            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', queueEntry.logID, `tellCorrespondingNodes nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${JSON.stringify(indicies)} edgeIndicies:${JSON.stringify(edgeIndicies)} patchIndicies:${JSON.stringify(patchIndicies)}  doOnceNodeAccPair: ${JSON.stringify([...doOnceNodeAccPair.keys()])} ourLocalConsensusIndex:${ourLocalConsensusIndex} ourSendingGroupSize:${ourSendingGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} pachedListSize:${pachedListSize}`)
+            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', queueEntry.logID, `tellCorrespondingNodes nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${safeStringify(indicies)} edgeIndicies:${safeStringify(edgeIndicies)} patchIndicies:${safeStringify(patchIndicies)}  doOnceNodeAccPair: ${safeStringify([...doOnceNodeAccPair.keys()])} ourLocalConsensusIndex:${ourLocalConsensusIndex} ourSendingGroupSize:${ourSendingGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} pachedListSize:${pachedListSize}`)
 
             if (correspondingAccNodes.length > 0) {
               const remoteRelation = ShardFunctions.getNodeRelation(
@@ -4383,7 +4383,7 @@ class TransactionQueue {
         }
 
         //how can we be making so many calls??
-        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${JSON.stringify(indicies)} edgeIndicies:${JSON.stringify(edgeIndicies)} patchIndicies:${JSON.stringify(patchIndicies)}  doOnceNodeAccPair: ${JSON.stringify([...doOnceNodeAccPair.keys()])} ourLocalExecutionSetIndex:${ourLocalExecutionSetIndex} ourSendingGroupSize:${ourSendingGroupSize} consensusListSize:${consensusListSize} edgeListSize:${edgeListSize} pachedListSize:${pachedListSize}`)
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${safeStringify(indicies)} edgeIndicies:${safeStringify(edgeIndicies)} patchIndicies:${safeStringify(patchIndicies)}  doOnceNodeAccPair: ${safeStringify([...doOnceNodeAccPair.keys()])} ourLocalExecutionSetIndex:${ourLocalExecutionSetIndex} ourSendingGroupSize:${ourSendingGroupSize} consensusListSize:${consensusListSize} edgeListSize:${edgeListSize} pachedListSize:${pachedListSize}`)
 
         const dataToSend: Shardus.WrappedResponse[] = []
         // eslint-disable-next-line security/detect-object-injection
@@ -6478,20 +6478,20 @@ class TransactionQueue {
           `processAcceptedTxQueue excceded time ${processTime / 1000} firstTime:${firstTime}`,
           `processAcceptedTxQueue excceded time ${
             processTime / 1000
-          } firstTime:${firstTime} stats:${JSON.stringify(processStats)}`
+          } firstTime:${firstTime} stats:${safeStringify(processStats)}`
         )
         this.lastProcessStats['10+'] = processStats
       } else if (processTime > 5000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 5s')
-        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`processTime > 5s ${processTime / 1000} stats:${JSON.stringify(processStats)}`)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`processTime > 5s ${processTime / 1000} stats:${safeStringify(processStats)}`)
         this.lastProcessStats['5+'] = processStats
       } else if (processTime > 2000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 2s')
-        /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`processTime > 2s ${processTime / 1000} stats:${JSON.stringify(processStats)}`)
+        /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`processTime > 2s ${processTime / 1000} stats:${safeStringify(processStats)}`)
         this.lastProcessStats['2+'] = processStats
       } else if (processTime > 1000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 1s')
-        /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`processTime > 1s ${processTime / 1000} stats:${JSON.stringify(processStats)}`)
+        /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`processTime > 1s ${processTime / 1000} stats:${safeStringify(processStats)}`)
         this.lastProcessStats['1+'] = processStats
       }
 
@@ -7341,7 +7341,7 @@ class TransactionQueue {
 
       this.statemanager_fatal(
         `onProcesssingQueueStuck`,
-        `onProcesssingQueueStuck: ${JSON.stringify(this.getDebugProccessingStatus())}`
+        `onProcesssingQueueStuck: ${safeStringify(this.getDebugProccessingStatus())}`
       )
     }
 

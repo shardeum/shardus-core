@@ -123,7 +123,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
     info(`Getting cycles ${start} - ${end}...`)
     nestedCountersInstance.countEvent('p2p', `sync-getting-cycles ${start} - ${end}`)
     const prevCycles = await getCycles(activeNodes, start, end)
-    info(`Got cycles ${JSON.stringify(prevCycles.map((cycle) => cycle.counter))}`)
+    info(`Got cycles ${safeStringify(prevCycles.map((cycle) => cycle.counter))}`)
     info(`  ${safeStringify(prevCycles)}`)
 
     // If prevCycles is empty, start over
@@ -151,11 +151,11 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
 
       let missingStr = 'none detected'
       if (missingListCount > 0) {
-        missingStr = JSON.stringify(missingList[0])
+        missingStr = safeStringify(missingList[0])
       }
 
       /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `sync-getting-cycles failed to get ${start} - ${end}  expectedMissing:${expectedMissing} missingListCount:${missingListCount} missing:${missingStr}` )
-      /* prettier-ignore */ error( `sync-getting-cycles failed to get ${start} - ${end}  expectedMissing:${expectedMissing} missingListCount:${missingListCount}` + JSON.stringify(missingList) )
+      /* prettier-ignore */ error( `sync-getting-cycles failed to get ${start} - ${end}  expectedMissing:${expectedMissing} missingListCount:${missingListCount}` + safeStringify(missingList) )
 
       if (config.p2p.hackForceCycleSyncComplete === true && missingListCount === 0) {
         /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `hack-fix: go active missing count is 0`)
@@ -240,7 +240,7 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
 
   info('Synced to cycle', cycleToSyncTo.counter)
   info(`Sync complete; ${NodeList.activeByIdOrder.length} active nodes; ${CycleChain.cycles.length} cycles`)
-  info(`NodeList after sync: ${JSON.stringify([...NodeList.nodes.entries()])}`)
+  info(`NodeList after sync: ${safeStringify([...NodeList.nodes.entries()])}`)
   info(`CycleChain after sync: ${safeStringify(CycleChain.cycles)}`)
 
   const p2pSyncReport = {
@@ -393,9 +393,9 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
     info(`
       Digested C${cycle.counter}
         cycle record: ${safeStringify(cycle)}
-        cycle changes: ${JSON.stringify(changes)}
-        node list: ${JSON.stringify([...NodeList.nodes.values()])}
-        active nodes: ${JSON.stringify(NodeList.activeByIdOrder)}
+        cycle changes: ${safeStringify(changes)}
+        node list: ${safeStringify([...NodeList.nodes.values()])}
+        active nodes: ${safeStringify(NodeList.activeByIdOrder)}
     `)
     }
   } else {
@@ -403,7 +403,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
     info(`
     Digested C${cycle.counter}
       cycle record: ${safeStringify(cycle)}
-      cycle changes: ${JSON.stringify(changes)}
+      cycle changes: ${safeStringify(changes)}
       node list: too many to list: ${NodeList.nodes.size}
       active nodes: too many to list: ${NodeList.activeByIdOrder.length}
     `)
@@ -455,7 +455,7 @@ export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.Cycle
     redundancy,
     true
   )
-  /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`getNewestCycle: robustQuery response is: ${JSON.stringify(response)}`)
+  /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`getNewestCycle: robustQuery response is: ${safeStringify(response)}`)
 
   // [TODO] Validate response
   if (!response?.newestCycle) throw new Error('warning: getNewestCycle: no newestCycle yet')

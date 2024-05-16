@@ -416,7 +416,7 @@ export function computeNewNodeListHash(): hexstring {
   // deep cloning is necessary as validator information may be mutated by
   // reference.
   lastHashedList = clone(byJoinOrder)
-  /* prettier-ignore */ if (logFlags.verbose) info('hashing validator list:', JSON.stringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.verbose) info('hashing validator list:', safeStringify(lastHashedList))
   let hash = crypto.hash(lastHashedList)
   /* prettier-ignore */ if (logFlags.verbose) info('the new validator list hash is', hash)
   return hash
@@ -443,7 +443,7 @@ let lastHashedList: P2P.NodeListTypes.Node[] = []
 
 /** Returns the last list of nodes that had its hash computed. */
 export function getLastHashedNodeList(): P2P.NodeListTypes.Node[] {
-  /* prettier-ignore */ if (logFlags.verbose) info('returning last hashed validator list:', JSON.stringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.verbose) info('returning last hashed validator list:', safeStringify(lastHashedList))
   return lastHashedList
 }
 

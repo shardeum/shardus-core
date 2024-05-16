@@ -19,6 +19,7 @@ import { formatErrorMessage } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 /** TYPES */
 export interface IPInfo {
@@ -118,7 +119,7 @@ export class NetworkClass extends EventEmitter {
           if (self.verboseLogsNet) {
             self.netLogger.debug(
               'External\t' +
-                JSON.stringify({
+                safeStringify({
                   url: req.url,
                   method: req.method,
                   body: req.body,
@@ -180,7 +181,7 @@ export class NetworkClass extends EventEmitter {
         }
 
         if (!route) {
-          /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug( 'Network: ' + `Unable to read request, payload of received message: ${JSON.stringify(data)}` )
+          /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug( 'Network: ' + `Unable to read request, payload of received message: ${safeStringify(data)}` )
           throw new Error('Unable to read request, no route specified.')
         }
         if (!this.internalRoutes[route]) throw new Error('Unable to handle request, invalid route.')
@@ -200,7 +201,7 @@ export class NetworkClass extends EventEmitter {
         if (logFlags.net_trace) {
           this.netLogger.debug(
             'Internal\t' +
-              JSON.stringify({
+              safeStringify({
                 url: route,
                 body: payload,
               })
@@ -827,7 +828,7 @@ export async function checkAndUpdateTimeSyncedOffset(timeServers) {
         ntpOffsetMs = 0
       }
 
-      /* prettier-ignore */ console.log(`ntpOffset ${ntpOffsetMs} Offset is in range: ${isInRange} time:${JSON.stringify(time)} host:${host}}`)
+      /* prettier-ignore */ console.log(`ntpOffset ${ntpOffsetMs} Offset is in range: ${isInRange} time:${safeStringify(time)} host:${host}}`)
       return isInRange
     } catch (e) {
       mainLogger.warn(`Couldn't fetch ntp time from server at ${host}`)

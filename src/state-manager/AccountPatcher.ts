@@ -1223,7 +1223,7 @@ class AccountPatcher {
           let hashTrieNode = layerMap.get(radix.toLowerCase())
           if (!subTree) {
             // deep clone the trie node before removing children property
-            hashTrieNode = JSON.parse(JSON.stringify(hashTrieNode))
+            hashTrieNode = JSON.parse(safeStringify(hashTrieNode))
             delete hashTrieNode.children
           }
           //strip noisy fields
@@ -1373,9 +1373,9 @@ class AccountPatcher {
         const accountHash = this.stateManager.accountCache.getAccountHash(id)
         const accountHashFull = this.stateManager.accountCache.getAccountDebugObject(id) //this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(id)
         const accountData = await this.app.getAccountDataByList([id])
-        res.write(`trieAccount: ${JSON.stringify(trieAccount)} \n`)
-        res.write(`accountHash: ${JSON.stringify(accountHash)} \n`)
-        res.write(`accountHashFull: ${JSON.stringify(accountHashFull)} \n`)
+        res.write(`trieAccount: ${safeStringify(trieAccount)} \n`)
+        res.write(`accountHash: ${safeStringify(accountHash)} \n`)
+        res.write(`accountHashFull: ${safeStringify(accountHashFull)} \n`)
         res.write(`accountData: ${JSON.stringify(accountData, appdata_replacer)} \n\n`)
         res.write(`tests: \n`)
         if (accountData != null && accountData.length === 1 && accountHash != null) {
@@ -1429,7 +1429,7 @@ class AccountPatcher {
 
         if (possibleAccountsIds.length === 0) {
           res.write(
-            JSON.stringify({
+            safeStringify({
               success: false,
               error: 'could not find account',
             })
@@ -1463,7 +1463,7 @@ class AccountPatcher {
             }
           }
           res.write(
-            JSON.stringify({
+            safeStringify({
               success: true,
               result: resObj,
             })
@@ -1471,7 +1471,7 @@ class AccountPatcher {
         }
       } catch (e) {
         res.write(
-          JSON.stringify({
+          safeStringify({
             success: false,
             error: e,
           })
@@ -2412,7 +2412,7 @@ class AccountPatcher {
     for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
       const votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
       const ourTrieNode = this.shardTrie.layerMaps[this.treeSyncDepth].get(radix)
-      if (logFlags.debug) this.mainLogger.debug(`Checking isInSync ${radix}, cycle: ${cycle}, ${JSON.stringify(votesMap)}`);
+      if (logFlags.debug) this.mainLogger.debug(`Checking isInSync ${radix}, cycle: ${cycle}, ${safeStringify(votesMap)}`);
 
       const nonConsensusRanges = this.getNonConsensusRanges(cycle)
       const nonStorageRanges = this.getNonStoredRanges(cycle)
@@ -2684,13 +2684,13 @@ class AccountPatcher {
       const remoteChildrenToDiff: RadixAndHashWithNodeId[] = await this.getChildrenOf(toFix, cycle)
 
       if (remoteChildrenToDiff == null) {
-        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts remoteChildrenToDiff == null for radixes: ${JSON.stringify(toFix)}, cycle: ${cycle}`, 1)
+        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts remoteChildrenToDiff == null for radixes: ${safeStringify(toFix)}, cycle: ${cycle}`, 1)
       }
       if (remoteChildrenToDiff.length === 0) {
-        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts remoteChildrenToDiff.length = 0 for radixes: ${JSON.stringify(toFix)}, cycle: ${cycle}`, 1)
+        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts remoteChildrenToDiff.length = 0 for radixes: ${safeStringify(toFix)}, cycle: ${cycle}`, 1)
       }
 
-      this.mainLogger.debug(`findBadAccounts ${cycle}: level: ${level}, toFix: ${toFix.length}, childrenToDiff: ${JSON.stringify(remoteChildrenToDiff)}, badLayerMap: ${JSON.stringify(badLayerMap)}`)
+      this.mainLogger.debug(`findBadAccounts ${cycle}: level: ${level}, toFix: ${toFix.length}, childrenToDiff: ${safeStringify(remoteChildrenToDiff)}, badLayerMap: ${safeStringify(badLayerMap)}`)
       toFix = this.diffConsenus(remoteChildrenToDiff, badLayerMap)
 
       stats.subHashesTested += toFix.length
@@ -3348,7 +3348,7 @@ class AccountPatcher {
 
     let isInsyncResult = this.isInSync(cycle)
     this.lastInSyncResult = isInsyncResult
-    if (logFlags.debug) this.mainLogger.debug(`isInSync: cycle: ${cycle}, isInsyncResult: ${JSON.stringify(isInsyncResult)}`)
+    if (logFlags.debug) this.mainLogger.debug(`isInSync: cycle: ${cycle}, isInsyncResult: ${safeStringify(isInsyncResult)}`)
     if (isInsyncResult == null || isInsyncResult.insync === false) {
       let failHistoryObject: { repaired: number; s: number; e: number; cycles: number }
       if (lastFail === false) {
@@ -3371,14 +3371,14 @@ class AccountPatcher {
       /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `accountHashesChecked c:${cycle}`, results.accountHashesChecked)
 
       if (logFlags.debug) {
-        this.mainLogger.debug(`badAccounts cycle: ${cycle}, ourBadAccounts: ${results.badAccounts.length}, ourBadAccounts: ${JSON.stringify(results.badAccounts)}`)
+        this.mainLogger.debug(`badAccounts cycle: ${cycle}, ourBadAccounts: ${results.badAccounts.length}, ourBadAccounts: ${safeStringify(results.badAccounts)}`)
       }
       if (results.accountsTheyNeedToRepair.length > 0 || results.extraBadAccounts.length > 0) {
         let accountsTheyNeedToRepair = [...results.accountsTheyNeedToRepair]
         if (results.extraBadAccounts.length > 0) {
           accountsTheyNeedToRepair = accountsTheyNeedToRepair.concat(results.extraBadAccounts)
         }
-        this.mainLogger.debug(`badAccounts cycle: ${cycle}, accountsTheyNeedToRepair: ${accountsTheyNeedToRepair.length}, accountsTheyNeedToRepair: ${JSON.stringify(accountsTheyNeedToRepair)}`)
+        this.mainLogger.debug(`badAccounts cycle: ${cycle}, accountsTheyNeedToRepair: ${accountsTheyNeedToRepair.length}, accountsTheyNeedToRepair: ${safeStringify(accountsTheyNeedToRepair)}`)
         this.requestOtherNodesToRepair(accountsTheyNeedToRepair)
       }
 
@@ -3400,7 +3400,7 @@ class AccountPatcher {
       if (results.extraBadKeys.length > 0) {
         this.statemanager_fatal(
           'checkAndSetAccountData extra bad keys',
-          `c:${cycle} extra bad keys: ${JSON.stringify(results.extraBadKeys)}  `
+          `c:${cycle} extra bad keys: ${safeStringify(results.extraBadKeys)}  `
         )
       }
 
@@ -3704,10 +3704,10 @@ class AccountPatcher {
         failHistoryObject.e = this.failEndCycle
         failHistoryObject.cycles = this.failEndCycle - this.failStartCycle
 
-        /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `inSync again. ${JSON.stringify(this.syncFailHistory[this.syncFailHistory.length -1])}`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `inSync again. ${safeStringify(this.syncFailHistory[this.syncFailHistory.length -1])}`)
 
         //this is not really a fatal log so should be removed eventually. is is somewhat usefull context though when debugging.
-        this.statemanager_fatal(`inSync again`, JSON.stringify(this.syncFailHistory))
+        this.statemanager_fatal(`inSync again`, safeStringify(this.syncFailHistory))
       }
     }
   }
@@ -4045,7 +4045,7 @@ class AccountPatcher {
         const voteEntry = votes[key2] // eslint-disable-line security/detect-object-injection
         let voters = ''
         if (key2 !== '[]') {
-          voters = `---voters:${JSON.stringify(voteEntry.ownerIds)}`
+          voters = `---voters:${safeStringify(voteEntry.ownerIds)}`
         }
 
         stream.write(`partition: ${key}  votes: ${voteEntry.voteCount} values: ${key2} \t\t\t${voters}\n`)
@@ -4093,7 +4093,7 @@ class AccountPatcher {
         const voteEntry = votes[key2] // eslint-disable-line security/detect-object-injection
         let voters = ''
         if (key2 !== '[]') {
-          voters = `---voters:${JSON.stringify(voteEntry.ownerIds)}`
+          voters = `---voters:${safeStringify(voteEntry.ownerIds)}`
         }
 
         stream.write(
@@ -4179,7 +4179,7 @@ class AccountPatcher {
       stream.write(
         `node: ${range.id} ${range.ipPort}\tgraph: ${partitionGraph}\thome: ${
           range.hP
-        }   data:${JSON.stringify(range)}\n`
+        }   data:${safeStringify(range)}\n`
       )
     }
     stream.write(`\n\n`)
@@ -4216,12 +4216,12 @@ class AccountPatcher {
       stream.write(
         `node: ${nodesCovered.id} ${nodesCovered.ipPort}\tgraph: ${partitionGraph}\thome: ${
           nodesCovered.hP
-        } data:${JSON.stringify(nodesCovered)}\n`
+        } data:${safeStringify(nodesCovered)}\n`
       )
     }
     stream.write(`\n\n`)
     for (const list of nodeLists) {
-      stream.write(`${JSON.stringify(list)} \n`)
+      stream.write(`${safeStringify(list)} \n`)
     }
 
     return { allPassed, allPassed2 }
