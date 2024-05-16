@@ -1222,16 +1222,12 @@ export interface ServerConfiguration {
     removeStuckTxsFromQueue: boolean
     // how long to wait before removing the tx from the queue
     stuckTxRemoveTime: number
-    // remove a stuck challenged tx 
+    // remove a stuck challenged tx
     removeStuckChallengedTXs: boolean
     // receipt remove fix
     receiptRemoveFix: boolean
     // fix for stuck txs in the queue
     stuckTxQueueFix: boolean
-    // whether nodes should re-inject the txs that are challenged
-    reinjectChallengedTxs: boolean
-    // max number of times a tx can be re-injected
-    maxReinjectChallengedTxs: number
   }
   /** Options for sharding calculations */
   sharding?: {

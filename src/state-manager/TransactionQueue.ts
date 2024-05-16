@@ -2904,7 +2904,7 @@ class TransactionQueue {
             /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
-          
+
           let dataCountReturned = 0
           const accountIdsReturned = []
           for (const data of result.stateList) {
@@ -2952,7 +2952,7 @@ class TransactionQueue {
         this.updateTxState(queueEntry, 'await final data')
       } else {
         this.updateTxState(queueEntry, 'consensing')
-      } 
+      }
 
       if (logFlags.debug)
         this.mainLogger.debug(`queueEntryRequestMissingData failed to get all data for: ${queueEntry.logID}`)
@@ -4743,7 +4743,7 @@ class TransactionQueue {
               this.updateTxState(txQueueEntry, 'await final data')
             } else {
               this.updateTxState(txQueueEntry, 'consensing')
-            } 
+            }
           }
 
           // do not injest tranactions that are long expired. there could be 10k+ of them if we are restarting the processing queue
@@ -5009,7 +5009,7 @@ class TransactionQueue {
                         this.updateTxState(queueEntry, 'await final data')
                       } else {
                         this.updateTxState(queueEntry, 'consensing')
-                      } 
+                      }
                       continue
                     }
                   }
@@ -5042,12 +5042,12 @@ class TransactionQueue {
                     /* prettier-ignore */ nestedCountersInstance.countEvent('txMissingReceipt', `txAge > timeM3 => ask for receipt now. state:${queueEntry.state} globalMod:${queueEntry.globalModification} seen:${seen}`)
                     queueEntry.waitForReceiptOnly = true
                     queueEntry.m2TimeoutReached = true
-                    
+
                     if(this.config.stateManager.txStateMachineChanges){
                       this.updateTxState(queueEntry, 'await final data')
                     } else {
                       this.updateTxState(queueEntry, 'consensing')
-                    } 
+                    }
                     continue
                   }
                 }
@@ -5305,7 +5305,7 @@ class TransactionQueue {
                 // this.updateTxState(queueEntry, 'await final data')
               } else {
                 this.updateTxState(queueEntry, 'await final data')
-              } 
+              }
             }
 
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
@@ -5443,7 +5443,7 @@ class TransactionQueue {
                   this.updateTxState(queueEntry, 'await final data')
                 } else {
                   this.updateTxState(queueEntry, 'consensing')
-                } 
+                }
                 continue
               }
             }
@@ -5778,24 +5778,20 @@ class TransactionQueue {
                   const txId = queueEntry.acceptedTx.txId
                   const logID = queueEntry.logID
                   this.updateTxState(queueEntry, 'fail')
-                  try {
-                    await this.stateManager.handleChallengedTransaction(queueEntry)
-                  } catch (ex) {
-                    this.mainLogger.error(
-                      `processAcceptedTxQueue2 handleChallengedTransaction: ${ex.name}: ${ex.message} at ${ex.stack}`
-                    )
-                  }
                   this.removeFromQueue(queueEntry, currentIndex, true) // we don't want to archive this
                   nestedCountersInstance.countEvent('consensus', 'isChallengedReceipt: true removing from queue')
                   this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isChallengedReceipt : ${logID}. remove from queue`)
-                  const checkQueueEntry = this._transactionQueueByID.get(txId)
-                  const checkQueueEntry2 = this._transactionQueue.find(q => q.acceptedTx.txId === txId)
-                  if (checkQueueEntry != null) {
-                    this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isChallengedReceipt : ${logID}. checkQueueEntry is not null. Remove from queue failed`)
-                  }
-                  if (checkQueueEntry2 != null) {
-                    this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isChallengedReceipt : ${logID}. checkQueueEntry2 is not null. Remove from queue failed`)
-                  }
+
+                  // these are only for debugging
+
+                  // const checkQueueEntry = this._transactionQueueByID.get(txId)
+                  // const checkQueueEntry2 = this._transactionQueue.find(q => q.acceptedTx.txId === txId)
+                  // if (checkQueueEntry != null) {
+                  //   this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isChallengedReceipt : ${logID}. checkQueueEntry is not null. Remove from queue failed`)
+                  // }
+                  // if (checkQueueEntry2 != null) {
+                  //   this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isChallengedReceipt : ${logID}. checkQueueEntry2 is not null. Remove from queue failed`)
+                  // }
                   continue
                 }
 
@@ -6018,7 +6014,7 @@ class TransactionQueue {
               const receipt2 = this.stateManager.getReceipt2(queueEntry)
               const timeSinceAwaitFinalStart = queueEntry.txDebug.startTimestamp['await final data'] > 0 ? shardusGetTime() - queueEntry.txDebug.startTimestamp['await final data'] : 0
               let vote: AppliedVote
-              
+
               if(configContext.stateManager.removeStuckChallengedTXs){
                 // first check if this is a challenge receipt
                 if (receipt2 && receipt2.confirmOrChallenge.message === 'challenge') {
