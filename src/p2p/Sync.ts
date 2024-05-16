@@ -382,7 +382,6 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
   }
 
   CycleChain.append(cycle)
-  CycleCreator.setDigestedCycle(true)
 
   // TODO: This seems like a possible location to inetvene if our node
   // is getting far behind on what it thinks the current cycle is

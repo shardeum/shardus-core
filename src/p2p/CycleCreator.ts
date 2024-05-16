@@ -111,8 +111,6 @@ let createCycleTag = 0
 
 let madeCycle = false // True if we successfully created the last cycle record, otherwise false
 
-export let digestedCycle = false // True if we have digested the last cycle record, otherwise false
-
 // not used anymore
 //let madeCert = false // set to True after we make our own cert and try to gossip it
 
@@ -232,10 +230,6 @@ const routes = {
 }
 
 /** CONTROL FUNCTIONS */
-
-export function setDigestedCycle(value) {
-  digestedCycle = value
-}
 
 export function init() {
   // Get a handle to write to p2p.log
@@ -504,8 +498,6 @@ async function runQ1() {
   currentQuarter = 1
   Self.emitter.emit('cycle_q1_start')
   profilerInstance.profileSectionStart('CycleCreator-runQ1')
-
-  setDigestedCycle(false)
 
   if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 

@@ -1350,7 +1350,7 @@ function validateJoinRequestTimestamp(joinRequestTimestamp: number): JoinRequest
     /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, its timestamp exceeds allowed cycle range')
     return {
       success: false,
-      reason: 'Cannot add join request, timestamp exceeds allowed cycle range. we have digested the cycle: ' + CycleCreator.digestedCycle,
+      reason: 'Cannot add join request, timestamp exceeds allowed cycle range',
       fatal: false,
     }
   }
