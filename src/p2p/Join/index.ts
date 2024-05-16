@@ -258,9 +258,9 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
   if (config.p2p.useJoinProtocolV2) {
     // for join v2, add new standby nodes to the standbyAdd field ...
-    console.log(`DEBUG CR-OOS: in updateRecord: newJoinRequests length: ${newJoinRequests.length}`)
+    if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: in updateRecord: newJoinRequests length: ${newJoinRequests.length}`)
     for (const standbyNode of drainNewJoinRequests()) {
-      console.log(`DEBUG CR-OOS: draining new join request ${standbyNode.nodeInfo.publicKey}`)
+      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: draining new join request ${standbyNode.nodeInfo.publicKey}`)
       record.standbyAdd.push(standbyNode)
     }
 
@@ -484,7 +484,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: queuedReceivedJoinRequests length: ${queuedReceivedJoinRequests.length}`)
       queuedJoinRequestsForGossip = queuedReceivedJoinRequests
       queuedReceivedJoinRequests = []
-      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: after swap`) 
+      if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: after swap`)
       if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: queuedJoinRequestsForGossip length: ${queuedJoinRequestsForGossip.length}`)
       if (config.debug.cycleRecordOOSDebugLogs) console.log(`DEBUG CR-OOS: updateRecord: queuedReceivedJoinRequests length: ${queuedReceivedJoinRequests.length}`)
     }
@@ -709,7 +709,7 @@ export function sendRequests(): void {
         // since join request was already validated last cycle, we can just set seen to true directly
         seen.add(joinRequest.nodeInfo.publicKey)
         saveJoinRequest(joinRequest)
-      } 
+      }
       Comms.sendGossip('gossip-valid-join-requests', joinRequest, '', null, NodeList.byIdOrder, true)
       nestedCountersInstance.countEvent('p2p', `saved join request and gossiped to network`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`saved join request and gossiped to network`)
@@ -1540,7 +1540,7 @@ export function nodeListFromStates(states: string[]): P2P.NodeListTypes.Node[] {
   // Collect arrays from requested states
   const result = states.reduce((acc, state) => {
     if (stateMappings[state]) {
-      acc.push(...stateMappings[state]) 
+      acc.push(...stateMappings[state])
     }
     return acc
   }, [] as P2P.NodeListTypes.Node[])
