@@ -1,4 +1,4 @@
-import { hexstring, stringify } from '@shardus/crypto-utils'
+import { hexstring } from '@shardus/crypto-utils'
 import { P2P } from '@shardus/types'
 import { Logger } from 'log4js'
 import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
@@ -95,7 +95,7 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
 
   // Don't add duplicates
   if (nodes.has(node.id)) {
-    warn(`NodeList.addNode: tried to add duplicate ${node.externalPort}: ${stringify(node)}\n` + `${caller}`)
+    warn(`NodeList.addNode: tried to add duplicate ${node.externalPort}: ${safeStringify(node)}\n` + `${caller}`)
 
     return
   }
@@ -383,8 +383,8 @@ export function getDebug() {
       `
   if (VERBOSE)
     output += `
-    NODELIST:   ${stringify(byJoinOrder)}
-    CYCLECHAIN: ${stringify(CycleChain.cycles)}
+    NODELIST:   ${safeStringify(byJoinOrder)}
+    CYCLECHAIN: ${safeStringify(CycleChain.cycles)}
   `
   return output
 }

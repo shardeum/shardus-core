@@ -753,7 +753,7 @@ function reportLost(target, reason: string, requestId: string) {
         /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${safeStringify(report)}`)
       }
 
-      const msgCopy = safeJsonParse(shardusCrypto.stringify(report))
+      const msgCopy = safeJsonParse(safeStringify(report))
       msgCopy.timestamp = shardusGetTime()
       msgCopy.requestId = requestId
       report = crypto.sign(msgCopy)

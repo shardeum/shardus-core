@@ -44,7 +44,7 @@ class Crypto {
 
   async init(): Promise<void> {
     crypto.init(this.config.crypto.hashKey)
-    crypto.setCustomStringifier(safeStringify, 'shardus_crypto_stringify')
+    crypto.setCustomStringifier(safeStringify, 'shardus_types_safeStringify')
 
     try {
       this.storage._checkInit()
@@ -141,7 +141,7 @@ class Crypto {
   }
 
   tag<T>(obj: T, recipientCurvePk: crypto.curvePublicKey): T & crypto.TaggedObject {
-    const objCopy = safeJsonParse(crypto.stringify(obj))
+    const objCopy = safeJsonParse(safeStringify(obj))
     const sharedKey = this.getSharedKey(recipientCurvePk)
     crypto.tagObj(objCopy, sharedKey)
     return objCopy
@@ -161,7 +161,7 @@ class Crypto {
     obj: T,
     recipientCurvePk: crypto.curvePublicKey
   ): T & { msgSize: number } & crypto.TaggedObject {
-    const strEncoded = crypto.stringify(obj)
+    const strEncoded = safeStringify(obj)
     const msgSize = strEncoded.length //get the message size
     const objCopy = safeJsonParse(strEncoded)
     objCopy.msgSize = msgSize // set the size
@@ -171,7 +171,7 @@ class Crypto {
   }
 
   signWithSize<T>(obj: T): T & crypto.SignedObject {
-    const wrappedMsgStr = crypto.stringify(obj)
+    const wrappedMsgStr = safeStringify(obj)
     const msgLength = wrappedMsgStr.length
     // What the linter wants:
     // const newObj = {
@@ -195,7 +195,7 @@ class Crypto {
   }
 
   sign<T>(obj: T): T & crypto.SignedObject {
-    const objCopy = safeJsonParse(crypto.stringify(obj))
+    const objCopy = safeJsonParse(safeStringify(obj))
     crypto.signObj(objCopy, this.keypair.secretKey, this.keypair.publicKey)
     return objCopy
   }
