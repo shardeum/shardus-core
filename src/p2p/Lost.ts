@@ -36,7 +36,7 @@ import { HashTrieReq, ProxyRequest, ProxyResponse } from '../state-manager/state
 import { GetTrieHashesRequest, serializeGetTrieHashesReq } from '../types/GetTrieHashesReq'
 import { GetTrieHashesResponse, deserializeGetTrieHashesResp } from '../types/GetTrieHashesResp'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 import { InternalBinaryHandler } from '../types/Handler'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
@@ -753,7 +753,7 @@ function reportLost(target, reason: string, requestId: string) {
         /* prettier-ignore */ info(`Sending investigate request. requestId: ${requestId}, msg: ${safeStringify(report)}`)
       }
 
-      const msgCopy = JSON.parse(shardusCrypto.stringify(report))
+      const msgCopy = safeJsonParse(shardusCrypto.stringify(report))
       msgCopy.timestamp = shardusGetTime()
       msgCopy.requestId = requestId
       report = crypto.sign(msgCopy)

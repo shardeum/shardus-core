@@ -6,7 +6,7 @@ import path from 'path'
 import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 
 export type HashableObject = (object | string) & { sign?: Shardus.Sign }
@@ -106,7 +106,7 @@ class Crypto {
     if (fs.existsSync(this.getKeyPairFile())) {
       // eslint-disable-next-line security/detect-non-literal-fs-filename
       const fileData = fs.readFileSync(this.getKeyPairFile())
-      return JSON.parse(fileData.toString())
+      return safeJsonParse(fileData.toString())
     }
     return null
   }
@@ -141,7 +141,7 @@ class Crypto {
   }
 
   tag<T>(obj: T, recipientCurvePk: crypto.curvePublicKey): T & crypto.TaggedObject {
-    const objCopy = JSON.parse(crypto.stringify(obj))
+    const objCopy = safeJsonParse(crypto.stringify(obj))
     const sharedKey = this.getSharedKey(recipientCurvePk)
     crypto.tagObj(objCopy, sharedKey)
     return objCopy
@@ -163,7 +163,7 @@ class Crypto {
   ): T & { msgSize: number } & crypto.TaggedObject {
     const strEncoded = crypto.stringify(obj)
     const msgSize = strEncoded.length //get the message size
-    const objCopy = JSON.parse(strEncoded)
+    const objCopy = safeJsonParse(strEncoded)
     objCopy.msgSize = msgSize // set the size
     const sharedKey = this.getSharedKey(recipientCurvePk)
     crypto.tagObj(objCopy, sharedKey)
@@ -195,7 +195,7 @@ class Crypto {
   }
 
   sign<T>(obj: T): T & crypto.SignedObject {
-    const objCopy = JSON.parse(crypto.stringify(obj))
+    const objCopy = safeJsonParse(crypto.stringify(obj))
     crypto.signObj(objCopy, this.keypair.secretKey, this.keypair.publicKey)
     return objCopy
   }

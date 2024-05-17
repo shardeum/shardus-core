@@ -17,7 +17,7 @@ import {
   withTimeout,
   XOR,
 } from '../utils'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 import * as Self from '../p2p/Self'
 import * as Comms from '../p2p/Comms'
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -937,7 +937,7 @@ class TransactionQueue {
             if (full_receipt) {
               const fullReceipt: ArchiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
               if (fullReceipt === null) return res.status(400).json({ success: false, reason: 'Receipt Not Found.' })
-              result = JSON.parse(safeStringify({ success: true, receipt: fullReceipt }))
+              result = safeJsonParse(safeStringify({ success: true, receipt: fullReceipt }))
             } else {
               result = { success: true, receipt: this.stateManager.getReceipt2(queueEntry) }
             }
@@ -2583,7 +2583,7 @@ class TransactionQueue {
     queueEntry.dataCollected++
 
     //make a deep copy of the data
-    queueEntry.originalData[data.accountId] = JSON.parse(safeStringify(data))
+    queueEntry.originalData[data.accountId] = safeJsonParse(safeStringify(data))
     queueEntry.beforeHashes[data.accountId] = data.stateId
 
     if (queueEntry.dataCollected === queueEntry.uniqueKeys.length) {

@@ -89,7 +89,7 @@ import {
   serializeGetTrieAccountHashesResp,
 } from '../types/GetTrieAccountHashesResp'
 import { BadRequest, InternalError, serializeResponseError } from '../types/ResponseError'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 type Line = {
   raw: string
@@ -1195,7 +1195,7 @@ class AccountPatcher {
 
           //strip noisy fields
           const tempString = JSON.stringify(trieRoot, utils.debugReplacer)
-          const processedObject = JSON.parse(tempString)
+          const processedObject = safeJsonParse(tempString)
 
           // use stringify to put a stable sort on the object keys (important for comparisons)
           const finalStr = utils.stringifyReduce(processedObject)
@@ -1223,12 +1223,12 @@ class AccountPatcher {
           let hashTrieNode = layerMap.get(radix.toLowerCase())
           if (!subTree) {
             // deep clone the trie node before removing children property
-            hashTrieNode = JSON.parse(safeStringify(hashTrieNode))
+            hashTrieNode = safeJsonParse(safeStringify(hashTrieNode))
             delete hashTrieNode.children
           }
           //strip noisy fields
           const tempString = JSON.stringify(hashTrieNode, utils.debugReplacer)
-          const processedObject = JSON.parse(tempString)
+          const processedObject = safeJsonParse(tempString)
 
           // use stringify to put a stable sort on the object keys (important for comparisons)
           const finalStr = utils.stringifyReduce(processedObject)
@@ -3967,7 +3967,7 @@ class AccountPatcher {
         //this.generalLog(string)
         let partitionObj: { cycle: number; owner: string }
         try {
-          partitionObj = JSON.parse(partitionStr)
+          partitionObj = safeJsonParse(partitionStr)
         } catch (error) {
           this.mainLogger.error('error parsing partitionObj', error, partitionStr)
           continue

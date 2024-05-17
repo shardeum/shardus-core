@@ -1,6 +1,6 @@
 import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 import Profiler from '../utils/profiler'
 import Crypto from '../crypto'
@@ -750,7 +750,7 @@ class PartitionStats {
         continue
       }
       if (excludeEmpty === false || summaryBlob.counter > 0) {
-        const cloneSummaryBlob = JSON.parse(safeStringify(summaryBlob))
+        const cloneSummaryBlob = safeJsonParse(safeStringify(summaryBlob))
         statsDump.dataStats.push(cloneSummaryBlob)
       }
       coveredParitionCount++
@@ -871,7 +871,7 @@ class PartitionStats {
         //this.generalLog(string)
         let statsObj: { cycle: number; owner: string }
         try {
-          statsObj = JSON.parse(statsStr)
+          statsObj = safeJsonParse(statsStr)
         } catch (err) {
           if (logFlags.error) this.mainLogger.error(`Fail to parse statsObj: ${statsStr}`, err)
           continue
@@ -1018,7 +1018,7 @@ class PartitionStats {
         //this.generalLog(string)
         let statsObj: { cycle: number; owner: string }
         try {
-          statsObj = JSON.parse(statsStr)
+          statsObj = safeJsonParse(statsStr)
         } catch (err) {
           if (logFlags.error) this.mainLogger.error(`Fail to parse statsObj: ${statsStr}`, err)
           continue

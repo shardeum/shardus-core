@@ -10,7 +10,7 @@ import ShardFunctions from './shardFunctions'
 import EventEmitter from 'events'
 import * as utils from '../utils'
 
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 // not sure about this.
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
@@ -3212,7 +3212,7 @@ class StateManager {
         // make sure the data is not a json string
         if (utils.isString(accountData.data)) {
           try {
-            accountData.data = JSON.parse(accountData.data as string)
+            accountData.data = safeJsonParse(accountData.data as string)
           } catch (error) {
             /* prettier-ignore */ this.mainLogger.error(` _commitAccountCopies fail to parse accountData.data: ${accountData.data} data: ${utils.stringifyReduce(accountData)}`)
           }

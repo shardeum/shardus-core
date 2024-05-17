@@ -18,7 +18,7 @@ import { ColumnDescription } from './utils/schemaDefintions'
 import { Op } from './utils/sqlOpertors'
 import { nestedCountersInstance } from "../utils/nestedCounters";
 import { shardusGetTime } from "../network";
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 /** A type alias to avoid both `any` and having to spell this type out any time
  * we want to use it. */
@@ -514,7 +514,7 @@ class Storage {
       throw new Error(e)
     }
     if (prop && prop.value) {
-      return JSON.parse(prop.value)
+      return safeJsonParse(prop.value)
     }
     return null
   }

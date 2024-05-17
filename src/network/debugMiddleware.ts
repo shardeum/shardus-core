@@ -1,8 +1,9 @@
-import { isDebugMode, getHashedDevKey, getDevPublicKeys, ensureKeySecurity } from '../debug'
+import { isDebugMode, getDevPublicKeys, ensureKeySecurity } from '../debug'
 import * as Context from '../p2p/Context'
 import * as crypto from '@shardus/crypto-utils'
 import { DevSecurityLevel } from '../shardus/shardus-types'
 import SERVER_CONFIG from '../config/server'
+import { safeJsonParse } from '@shardus/types/build/src/utils/functions/stringify'
 
 let lastCounter = 0
 let multiSigLstCounter = 0
@@ -58,8 +59,8 @@ function handleMultiDebugAuth(_req, res, next) {
       const devPublicKeys = getDevPublicKeys() // This should return list of public keys
 
       // Parse the proposal and signatures from the query parameters
-      const parsedProposal = JSON.parse(_req.query.proposal)
-      const parsedSignatures = JSON.parse(_req.query.sig)
+      const parsedProposal = safeJsonParse(_req.query.proposal)
+      const parsedSignatures = safeJsonParse(_req.query.sig)
 
       // Verify the signatures against the proposal
       let allSignaturesValid = false

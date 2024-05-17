@@ -12,7 +12,7 @@ import { Cycle, CycleShardData } from '../state-manager/state-manager-types'
 import { safetyModeVals, snapshotLogger } from './index'
 import { hashMap } from './partition-gossip'
 import { NetworkClass } from '../network'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 /** TYPES */
 
@@ -405,7 +405,7 @@ export async function downloadDataFromNode(url: got.GotUrl): Promise<unknown> {
         reject(err)
       } else {
         try {
-          const parsedData = JSON.parse(result.toString())
+          const parsedData = safeJsonParse(result.toString())
           resolve(parsedData)
         } catch (e) {
           resolve(null)

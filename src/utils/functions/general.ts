@@ -3,8 +3,7 @@ import { Ordering } from '..'
 import { Response } from 'express-serve-static-core'
 import { DevSecurityLevel } from '../../shardus/shardus-types'
 import { nestedCountersInstance } from '../nestedCounters'
-import { logFlags } from '../../logger'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 
 const replacer = (key: string, value: any): any => {
   if (typeof value === 'bigint') {
@@ -58,7 +57,7 @@ export const deepCopy = <T>(obj: T): T => {
   if (typeof obj !== 'object') {
     throw Error('Given element is not of type object.')
   }
-  return JSON.parse(JSON.stringify(obj, replacer), reviver)
+  return safeJsonParse(JSON.stringify(obj, replacer))
 }
 
 export const mod = (n, m): number => {

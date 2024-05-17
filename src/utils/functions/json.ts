@@ -1,9 +1,10 @@
+import { safeJsonParse } from '@shardus/types/build/src/utils/functions/stringify'
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 
 export const readJSON = <T>(filename): T => {
   const file = readFileSync(filename).toString()
-  const config = JSON.parse(file)
+  const config = safeJsonParse(file)
   return config
 }
 
