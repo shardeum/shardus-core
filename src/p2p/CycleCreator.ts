@@ -1185,7 +1185,7 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
     } else {
       resp = await Comms.ask(node, 'compare-cert', req)
     }
-    console.log('compareCycleCert: resp:', resp)
+
     if (!validateCertsRecordTypes(resp, 'compareCycleCert')) return [null, node]
     if (!(resp && resp.certs && resp.certs[0].marker && resp.record)) {
       throw new Error('compareCycleCert: Invalid query response')
