@@ -1068,6 +1068,8 @@ export interface ServerConfiguration {
     enableTestMode: boolean
     /** Whether to enable high-resolution profiling */
     highResolutionProfiling: boolean
+    /** Flag to enable/disbale adding random data to cycle record */
+    randomCycleData: boolean
   }
   /** Options for the statistics module */
   statistics?: {
@@ -1201,8 +1203,8 @@ export interface ServerConfiguration {
     shareCompleteData: boolean
     // state machine chages updateTxState in several places from 'consensing' to 'await final data'
     txStateMachineChanges: boolean
-    // will a node attempt to request final data 
-    canRequestFinalData:boolean
+    // will a node attempt to request final data
+    canRequestFinalData: boolean
     // how many node to re-inject the tx received from client
     numberOfReInjectNodes: number
     // max number of pending nonce tx for an account
