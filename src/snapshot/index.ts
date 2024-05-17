@@ -18,6 +18,7 @@ import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
 import { getNewestCycle } from '../p2p/Sync'
 import { Utils } from '@shardus/types'
+import { nodeListFromStates } from '../p2p/Join'
 
 console.log('StateManager', StateManager)
 console.log('StateManager type', StateManager.StateManagerTypes)
@@ -354,7 +355,7 @@ export function startSnapshotting() {
         }
         const signedMessage = Context.crypto.sign(message)
 
-        Comms.sendGossip('snapshot_gossip', signedMessage, '', null, NodeList.byIdOrder, true)
+        Comms.sendGossip('snapshot_gossip', signedMessage, '', null, nodeListFromStates(['active', 'ready', 'syncing']), true)
         partitionGossip.forwardedGossips.set(message.sender, true)
         collector.process([message])
 
