@@ -1572,12 +1572,13 @@ class Shardus extends EventEmitter {
     /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `forwardTransactionToLuckyNodes: homeNode: ${homeNode.node.id} closetNodeIds: ${JSON.stringify( closetNodeIds.sort() )}` )
 
     let selectedValidators = []
-    selectedValidators.push({
-      id: homeNode.node.id,
-      ip: homeNode.node.externalIp,
-      port: homeNode.node.externalPort,
-      publicKey: homeNode.node.publicKey,
-    })
+    if (Self.id != homeNode.node.id)
+      selectedValidators.push({
+        id: homeNode.node.id,
+        ip: homeNode.node.externalIp,
+        port: homeNode.node.externalPort,
+        publicKey: homeNode.node.publicKey,
+      })
 
     let  stats ={
       skippedSelf:0,
@@ -1640,7 +1641,7 @@ class Shardus extends EventEmitter {
         if (result && result.success === false) {
           this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_false_${context} ${activeIdToPartition.get(validator.id)}`)
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got unsuccessful response upon forwarding injected tx: ${validator.id}. ${message} ${utils.stringify(tx)}` )
-          return { success: false, reason: result.reason, status: 500 }
+          continue
         }
         if (result && result.success === true) {
           this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_success_${context} ${activeIdToPartition.get(validator.id)}`)
