@@ -290,6 +290,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     minRequiredChallenges: 1,
     useNewPOQ: false,
     forwardToLuckyNodes: true,
+    forwardToLuckyNodesNonceQueue: false,
     forwardToLuckyNodesCheckRotation: true,
     integrityCheckBeforeChallenge: true,
     checkPrecrackStatus: true,

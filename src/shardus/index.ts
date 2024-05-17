@@ -1532,8 +1532,17 @@ class Shardus extends EventEmitter {
         }
         let nonceQueueAddResult =
           this.stateManager.transactionQueue.addTransactionToNonceQueue(nonceQueueEntry)
-        let result = this.forwardTransactionToLuckyNodes(senderAddress, tx, txId, 'consensus to consensus', '3') // don't wait here
-        return result as Promise<{ success: boolean; reason: string; status: number; txId?: string }>
+
+        if(Context.config.stateManager.forwardToLuckyNodesNonceQueue){
+          let result = this.forwardTransactionToLuckyNodes(senderAddress, tx, txId, 'consensus to consensus', '3') // don't wait here
+          return result as Promise<{ success: boolean; reason: string; status: number; txId?: string }>
+        } else {
+          return {
+            success: true,
+            reason: `Transaction added to pending nonce queue.`,
+            status: 200
+          }            
+        }
       } else {
         // tx nonce is equal to account nonce
         let result = await this._timestampAndQueueTransaction(tx, appData, global, noConsensus)
