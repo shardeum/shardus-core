@@ -387,7 +387,7 @@ export function registerDownloadRoutes(
   })
 }
 
-export async function downloadDataFromNode(url: got.GotUrl): Promise<unknown> {
+export async function downloadDataFromNode(url: string): Promise<unknown> {
   log('Downloading snapshot data from server...', url)
   const res = await got(url, {
     timeout: 1000, //  Omar - setting this to 1 sec
