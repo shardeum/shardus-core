@@ -17,6 +17,7 @@ import { Ordering } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions'
+import * as NodeList from '../p2p/NodeList'
 import {
   AppliedReceipt,
   AppliedReceipt2,
@@ -452,7 +453,7 @@ class TransactionConsenus {
 
     this.p2p.registerInternal(
       'get_applied_vote',
-      async (payload: AppliedVoteQuery, respond: (arg0: AppliedVoteQueryResponse) => unknown) => {
+      async (payload: AppliedVoteQuery, respond: (arg0: AppliedVoteQueryResponse) => unknown) => {        
         nestedCountersInstance.countEvent('consensus', 'get_applied_vote')
         const { txId } = payload
         let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId)
@@ -1066,7 +1067,7 @@ class TransactionConsenus {
       let timestampReceipt
       try {
         if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getTxTimestampBinary) {
-          if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${ipInfo.internalIp}-->>${homeNode.node.internalIp}: ${'get_tx_timestamp'}`)
+          if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(homeNode.node.id)}: ${'get_tx_timestamp'}`)
           const serialized_res = await this.p2p.askBinary<getTxTimestampReq, getTxTimestampResp>(
             homeNode.node,
             InternalRouteEnum.binary_get_tx_timestamp,
@@ -1918,7 +1919,7 @@ class TransactionConsenus {
           const queryData: AppliedVoteQuery = { txId: queueEntry.acceptedTx.txId }
           if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAppliedVoteBinary) {
             const req = queryData as GetAppliedVoteReq
-            if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${ipInfo.internalIp}-->>${node.internalIp}: ${'get_applied_vote'}`)
+            if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'get_applied_vote'}`)
             const rBin = await Comms.askBinary<GetAppliedVoteReq, GetAppliedVoteResp>(
               node,
               InternalRouteEnum.binary_get_applied_vote,
@@ -1931,7 +1932,7 @@ class TransactionConsenus {
             )
             return rBin
           }
-          return await Comms.ask(node, 'get_applied_vote', queryData)
+          return await Comms.ask(node, 'get_applied_vote', queryData)          
         } catch (e) {
           this.mainLogger.error(`robustQueryBestVote: Failed query to node ${node.id} error: ${e.message}`)
           return {
@@ -1985,7 +1986,7 @@ class TransactionConsenus {
       const queryFn = async (node: Shardus.Node): Promise<ConfirmOrChallengeQueryResponse> => {
         if (node.externalIp === Self.ip && node.externalPort === Self.port) return null
         const queryData = { txId: queueEntry.acceptedTx.txId }
-        if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queryData.txId} ${ipInfo.internalIp}-->>${node.internalIp}: ${'get_confirm_or_challenge'}`)
+        if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queryData.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'get_confirm_or_challenge'}`)
         return this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getConfirmOrChallengeBinary
           ? await Comms.askBinary<GetConfirmOrChallengeReq, GetConfirmOrChallengeResp>(
               node,
@@ -2107,7 +2108,7 @@ class TransactionConsenus {
       try {
         if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountDataBinary) {
           const req = message as GetAccountDataReqSerializable
-          if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${ipInfo.internalIp}-->>${node.internalIp}: ${'get_account_data3'}`)
+          if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'get_account_data3'}`)
           const rBin = await Comms.askBinary<GetAccountDataReqSerializable, GetAccountDataRespSerializable>(
             node,
             InternalRouteEnum.binary_get_account_data,

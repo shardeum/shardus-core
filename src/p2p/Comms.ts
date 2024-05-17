@@ -966,11 +966,14 @@ export async function sendGossip(
     //console.log('recipients after filter')
     //recipients.forEach(node => console.log(node.externalPort))
     if (logFlags.seqdiagram && txId != '') {
-      for (const node of recipients) {
-        seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} ${ipInfo.internalIp}-->>${node.internalIp}: g:${type}`)
+      let prefix = ''
+      if (isOrigin)
+        prefix = 'orig:'
+      for (const node of recipients) {        
+        seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: g:${prefix}${type}`)
       }
     }
-
+    
     if (config.p2p.useBinarySerializedEndpoints === true) {
       msgSize = await tellBinary<GossipReqBinary>(
         recipients,

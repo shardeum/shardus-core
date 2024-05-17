@@ -24,6 +24,7 @@ import * as Comms from '../p2p/Comms'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions'
+import * as NodeList from '../p2p/NodeList'
 import {
   AcceptedTx,
   AccountFilter,
@@ -1002,6 +1003,7 @@ class TransactionQueue {
         queue = queue.sort((a, b) => Number(a.nonce) - Number(b.nonce))
         this.nonceQueue.set(nonceQueueEntry.accountId, queue)
       }
+      this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${nonceQueueEntry.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: pause_nonceQ`)
       nestedCountersInstance.countEvent('processing', 'addTransactionToNonceQueue')
       if (logFlags.debug) this.mainLogger.debug(`Added tx to nonce queue for ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce} nonceQueue: ${queue.length}`)
       return { success: true, reason: `Nonce queue size for account: ${queue.length}` }
@@ -2075,7 +2077,7 @@ class TransactionQueue {
               txQueueEntry.acceptedTx.txId,
               txQueueEntry.acceptedTx.timestamp
             )
-          }
+          }                    
 
           const minNodesToVote = 3
           const voterPercentage = configContext.stateManager.voterPercentage
@@ -2087,12 +2089,13 @@ class TransactionQueue {
           txQueueEntry.eligibleNodeIdsToVote = new Set(
             txQueueEntry.executionGroup.slice(0, numberOfVoters).map((node) => node.id)
           )
+          
           // confirm nodes are lowest ranked nodes
           txQueueEntry.eligibleNodeIdsToConfirm = new Set(
             txQueueEntry.executionGroup
               .slice(txQueueEntry.executionGroup.length - numberOfVoters)
               .map((node) => node.id)
-          )
+          )          
 
           const ourID = this.stateManager.currentCycleShardData.ourNode.id
           for (let idx = 0; idx < txQueueEntry.executionGroup.length; idx++) {
@@ -2101,8 +2104,15 @@ class TransactionQueue {
             txQueueEntry.executionGroupMap.set(node.id, node)
             if (node.id === ourID) {
               txQueueEntry.ourExGroupIndex = idx
-            }
+              this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: index ${txQueueEntry.ourExGroupIndex}`)
+            }            
           }
+          if (txQueueEntry.eligibleNodeIdsToConfirm.has(Self.id)) {
+            this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: confirmator`)
+          }
+          if (txQueueEntry.eligibleNodeIdsToVote.has(Self.id)) {
+            this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: voter`)
+          }          
 
           //if we are not in the execution group then set isInExecutionHome to false
           if (
@@ -2287,10 +2297,10 @@ class TransactionQueue {
                       this.stateManager.config.p2p.spreadTxToGroupSyncingBinary
                     ) {
                       if (logFlags.seqdiagram) {
-                        for (const node of this.stateManager.currentCycleShardData.syncingNeighborsTxGroup) {
-                          this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${acceptedTx.txId} ${ipInfo.internalIp}-->>${node.internalIp}: ${'spread_tx_to_group_syncing'}`)
+                        for (const node of this.stateManager.currentCycleShardData.syncingNeighborsTxGroup) {                
+                          this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'spread_tx_to_group_syncing'}`)
                         }
-                      }
+                      }                      
                       const request = acceptedTx as SpreadTxToGroupSyncingReq
                       this.p2p.tellBinary<SpreadTxToGroupSyncingReq>(
                         this.stateManager.currentCycleShardData.syncingNeighborsTxGroup,
@@ -2342,7 +2352,7 @@ class TransactionQueue {
         this.pendingTransactionQueue.push(txQueueEntry)
         this.pendingTransactionQueueByID.set(txQueueEntry.acceptedTx.txId, txQueueEntry)
 
-        if (logFlags.seqdiagram) this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txQueueEntry.acceptedTx.txId} Note over ${ipInfo.internalIp}: pendingQ`)
+        if (logFlags.seqdiagram) this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txQueueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: pendingQ`)
 
         /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_txPreQueued', `${txQueueEntry.logID}`, `${txQueueEntry.logID} gm:${txQueueEntry.globalModification}`)
         // start the queue if needed
@@ -2581,7 +2591,7 @@ class TransactionQueue {
       //  queueEntry.tx Keys.allKeys.length
       queueEntry.hasAll = true
       // this.gossipCompleteData(queueEntry)
-      if (queueEntry.executionGroup.length > 1) this.shareCompleteDataToNeighbours(queueEntry)
+      if (queueEntry.executionGroup && queueEntry.executionGroup.length > 1) this.shareCompleteDataToNeighbours(queueEntry)
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
           `queueEntryAddData hasAll: true for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id}`
@@ -2867,7 +2877,7 @@ class TransactionQueue {
           try {
             if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestStateForTxBinary) {
               // GOLD-66 Error handling try/catch happens one layer outside of this function in process transactions
-              if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${message.txid} ${ipInfo.internalIp}-->>${node.internalIp}: ${'request_state_for_tx'}`)
+              if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'request_state_for_tx'}`)
               result = (await this.p2p.askBinary<RequestStateForTxReq, RequestStateForTxRespSerialized>(
                 node,
                 InternalRouteEnum.binary_request_state_for_tx,
@@ -2949,7 +2959,7 @@ class TransactionQueue {
       queueEntry.waitForReceiptOnly = true
 
       if(this.config.stateManager.txStateMachineChanges){
-        this.updateTxState(queueEntry, 'await final data')
+        this.updateTxState(queueEntry, 'await final data', 'missing data')
       } else {
         this.updateTxState(queueEntry, 'consensing')
       }
@@ -3056,7 +3066,7 @@ class TransactionQueue {
           this.stateManager.config.p2p.requestReceiptForTxBinary
         ) {
           try {
-            if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${message.txid} ${ipInfo.internalIp}-->>${node.internalIp}: ${'request_receipt_for_tx'}`)
+            if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'request_receipt_for_tx'}`)
             result = await this.p2p.askBinary<
               RequestReceiptForTxReqSerialized,
               RequestReceiptForTxRespSerialized
@@ -3879,20 +3889,20 @@ class TransactionQueue {
   async broadcastState(
     nodes: Shardus.Node[],
     message: { stateList: Shardus.WrappedResponse[]; txid: string },
-    context: string
+    context: string 
   ): Promise<void> {
     if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastStateBinary) {
       // convert legacy message to binary supported type
-      const request = message as BroadcastStateReq
+      const request = message as BroadcastStateReq  
       if (logFlags.seqdiagram) {
-        for (const node of nodes) {
+        for (const node of nodes) {                        
           if (context == "tellCorrespondingNodes") {
-            this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${ipInfo.internalIp}-->>${node.internalIp}: ${'broadcast_state_nodes'}`)
+            this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_state_nodes'}`)
           } else {
-            this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${ipInfo.internalIp}-->>${node.internalIp}: ${'broadcast_state_neighbour'}`)
-          }
+            this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_state_neighbour'}`)
+          }        
         }
-      }
+      }          
       this.p2p.tellBinary<BroadcastStateReq>(
         nodes,
         InternalRouteEnum.binary_broadcast_state,
@@ -4412,11 +4422,11 @@ class TransactionQueue {
             // convert legacy message to binary supported type
             const request = message as BroadcastFinalStateReq
             if (logFlags.seqdiagram) {
-              for (const node of filterdCorrespondingAccNodes) {
-                this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${ipInfo.internalIp}-->>${node.internalIp}: ${'broadcast_finalstate'}`)
+              for (const node of filterdCorrespondingAccNodes) {                
+                this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_finalstate'}`)
               }
             }
-
+            
             this.p2p.tellBinary<BroadcastFinalStateReq>(
               filterdCorrespondingAccNodes,
               InternalRouteEnum.binary_broadcast_finalstate,
@@ -4537,7 +4547,7 @@ class TransactionQueue {
    */
   removeFromQueue(queueEntry: QueueEntry, currentIndex: number, archive = true): void {
     // end all the pending txDebug timers
-    if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${ipInfo.internalIp}: removed`)
+    if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: removed`)
     for (const key in queueEntry.txDebug.startTime) {
       if (queueEntry.txDebug.startTime[key] != null) {
         this.txDebugMarkEndTime(queueEntry, key)
@@ -4613,8 +4623,7 @@ class TransactionQueue {
   async processTransactions(firstTime = false): Promise<void> {
     const seenAccounts: SeenAccounts = {}
     let pushedProfilerTag = null
-    const startTime = shardusGetTime()
-    if (logFlags.seqdiagram) this.mainLogger.info(`0x10052024 ${ipInfo.externalIp} ${shardusGetTime()} 0x0000 processTransactions _transactionQueue.length ${this._transactionQueue.length}`)
+    const startTime = shardusGetTime()        
 
     const processStats: ProcessQueueStats = {
       totalTime: 0,
@@ -4671,6 +4680,8 @@ class TransactionQueue {
       }
 
       this.profiler.profileSectionStart('processQ')
+
+      if (logFlags.seqdiagram) this.mainLogger.info(`0x10052024 ${ipInfo.externalIp} ${shardusGetTime()} 0x0000 processTransactions _transactionQueue.length ${this._transactionQueue.length}`)
 
       if (this.stateManager.currentCycleShardData == null) {
         nestedCountersInstance.countEvent('stateManager', 'currentCycleShardData == null early exit')
@@ -4740,7 +4751,7 @@ class TransactionQueue {
             nestedCountersInstance.countEvent('processing', 'txExpired1 > M. waitForReceiptOnly')
             txQueueEntry.waitForReceiptOnly = true
             if(this.config.stateManager.txStateMachineChanges){
-              this.updateTxState(txQueueEntry, 'await final data')
+              this.updateTxState(txQueueEntry, 'await final data', 'processTx1')
             } else {
               this.updateTxState(txQueueEntry, 'consensing')
             }
@@ -4776,7 +4787,7 @@ class TransactionQueue {
           this._transactionQueue.splice(index + 1, 0, txQueueEntry)
           this._transactionQueueByID.set(txQueueEntry.acceptedTx.txId, txQueueEntry)
 
-          if (logFlags.seqdiagram) this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txQueueEntry.acceptedTx.txId} Note over ${ipInfo.internalIp}: aging`)
+          if (logFlags.seqdiagram) this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txQueueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: aging`)
 
           processStats.inserted++
 
@@ -4834,7 +4845,7 @@ class TransactionQueue {
 
         // eslint-disable-next-line security/detect-object-injection
         const queueEntry: QueueEntry = this._transactionQueue[currentIndex]
-        if (logFlags.seqdiagram) this.mainLogger.info(`0x10052024 ${ipInfo.externalIp} ${shardusGetTime()} 0x0001 currentIndex:${currentIndex} txId:${queueEntry.acceptedTx.txId} state:${queueEntry.state}`)
+        if (logFlags.seqdiagram)  this.mainLogger.info(`0x10052024 ${ipInfo.externalIp} ${shardusGetTime()} 0x0001 currentIndex:${currentIndex} txId:${queueEntry.acceptedTx.txId} state:${queueEntry.state}`)
         const txTime = queueEntry.txKeys.timestamp
         const txAge = currentTime - txTime
 
@@ -5006,7 +5017,7 @@ class TransactionQueue {
                       queueEntry.m2TimeoutReached = true
 
                       if(this.config.stateManager.txStateMachineChanges){
-                        this.updateTxState(queueEntry, 'await final data')
+                        this.updateTxState(queueEntry, 'await final data', 'processTx2')
                       } else {
                         this.updateTxState(queueEntry, 'consensing')
                       }
@@ -5044,7 +5055,7 @@ class TransactionQueue {
                     queueEntry.m2TimeoutReached = true
 
                     if(this.config.stateManager.txStateMachineChanges){
-                      this.updateTxState(queueEntry, 'await final data')
+                      this.updateTxState(queueEntry, 'await final data', 'processTx3')
                     } else {
                       this.updateTxState(queueEntry, 'consensing')
                     }
@@ -5116,8 +5127,9 @@ class TransactionQueue {
                   if (queueEntry.state !== 'await final data' && queueEntry.state !== 'await repair') this.updateTxState(queueEntry, 'await' +
                     ' final data')
                 } else {
-                  this.updateTxState(queueEntry, 'await final data')
+                  this.updateTxState(queueEntry, 'await final data', 'processTx4')
                 }
+
               } else {
                 this.updateTxState(queueEntry, 'consensing')
               }
@@ -5305,8 +5317,8 @@ class TransactionQueue {
               if(this.config.stateManager.txStateMachineChanges){
                 // this.updateTxState(queueEntry, 'await final data')
               } else {
-                this.updateTxState(queueEntry, 'await final data')
-              }
+                this.updateTxState(queueEntry, 'await final data', 'processTx5')
+              } 
             }
 
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
@@ -5371,7 +5383,7 @@ class TransactionQueue {
 
                 queueEntry.executionDebug.process1 = 'tell fail'
               } finally {
-                this.updateTxState(queueEntry, 'awaiting data')
+                this.updateTxState(queueEntry, 'awaiting data', 'processing')
 
                 //if we are not going to execute the TX go strait to consensing
                 if (
@@ -5441,7 +5453,7 @@ class TransactionQueue {
                 queueEntry.waitForReceiptOnly = true
 
                 if(this.config.stateManager.txStateMachineChanges){
-                  this.updateTxState(queueEntry, 'await final data')
+                  this.updateTxState(queueEntry, 'await final data', 'processTx6')
                 } else {
                   this.updateTxState(queueEntry, 'consensing')
                 }
@@ -5875,7 +5887,7 @@ class TransactionQueue {
                       this.mainLogger.debug(
                         `processTransactions ${queueEntry.logID} we are not execution home, but we have a receipt2, go to await final data`
                       )
-                    this.updateTxState(queueEntry, 'await final data')
+                    this.updateTxState(queueEntry, 'await final data', 'processTx7')
                   }
                 }
               }
@@ -6491,6 +6503,7 @@ class TransactionQueue {
           this.stateManager.tryStartTransactionProcessingQueue()
         }, 15)
       } else {
+        if (logFlags.seqdiagram) this.mainLogger.info(`0x10052024 ${ipInfo.externalIp} ${shardusGetTime()} 0x0000 processTransactions _transactionQueue.length 0`)
         this.transactionQueueHasRemainingWork = false
       }
 
@@ -6673,7 +6686,7 @@ class TransactionQueue {
       let response
       if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestTxAndStateBinary) {
         const requestMessage = message as RequestTxAndStateReq
-        if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} ${ipInfo.internalIp}-->>${nodeToAsk.internalIp}: ${'request_tx_and_state'}`)
+        if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(nodeToAsk.id)}: ${'request_tx_and_state'}`)
         response = await Comms.askBinary<RequestTxAndStateReq, RequestTxAndStateResp>(
           nodeToAsk,
           InternalRouteEnum.binary_request_tx_and_state,
@@ -7519,9 +7532,12 @@ class TransactionQueue {
     }
     if (this.archivedQueueEntriesByID.has(txId)) delete this.archivedQueueEntriesByID[txId]
   }
-  updateTxState(queueEntry: QueueEntry, nextState: string): void {
-    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`Updating tx ${queueEntry.logID} state from ${queueEntry.state} to ${nextState}`)
-    if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${ipInfo.internalIp}: ${queueEntry.state}-${nextState}`)
+  updateTxState(queueEntry: QueueEntry, nextState: string, context = ''): void {
+    if (logFlags.seqdiagram) 
+      if (context == '')
+        this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: ${queueEntry.state}-${nextState}`)
+      else 
+        this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: ${queueEntry.state}-${nextState}:${context}`)
     const currentState = queueEntry.state
     this.txDebugMarkEndTime(queueEntry, currentState)
     queueEntry.state = nextState
