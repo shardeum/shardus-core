@@ -269,7 +269,7 @@ const syncStartedRoute: P2P.P2PTypes.Route<Handler> = {
     if (processResult.success === false) {
       return res.status(500).send(processResult.reason)
     }
-    Comms.sendGossip('gossip-sync-started', syncStarted, '', null, NodeList.byIdOrder, true)
+    Comms.sendGossip('gossip-sync-started', syncStarted, '', null, nodeListFromStates(['active', 'ready', 'syncing']), true)
     return res.status(200).send()
   },
 }

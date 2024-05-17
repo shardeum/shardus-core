@@ -35,6 +35,7 @@ import { Result, ResultAsync } from 'neverthrow'
 import { Utils } from '@shardus/types'
 import { arch } from 'os'
 import { checkGossipPayload } from '../utils/GossipValidation'
+import { nodeListFromStates } from './Join'
 
 const clone = rfdc()
 
@@ -319,7 +320,7 @@ export function addArchiverJoinRequest(joinRequest: P2P.ArchiversTypes.Request, 
       joinRequest
     )
   if (gossip === true) {
-    Comms.sendGossip('joinarchiver', joinRequest, tracker, null, NodeList.byIdOrder, true)
+    Comms.sendGossip('joinarchiver', joinRequest, tracker, null, nodeListFromStates(['active', 'ready', 'syncing']), true)
   }
   return { success: true }
 }
@@ -428,7 +429,7 @@ export function addLeaveRequest(leaveRequest: P2P.ArchiversTypes.Request, tracke
   leaveRequests.push(leaveRequest)
   if (logFlags.console) console.log('adding leave requests', leaveRequests)
   if (gossip === true) {
-    Comms.sendGossip('leavingarchiver', leaveRequest, tracker, null, NodeList.byIdOrder, true)
+    Comms.sendGossip('leavingarchiver', leaveRequest, tracker, null, nodeListFromStates(['active', 'ready', 'syncing']), true)
   }
   return { success: true }
 }
@@ -958,7 +959,7 @@ export function registerRoutes() {
       const accepted = await addLeaveRequest(payload, tracker, false)
       if (!accepted.success) return warn('Archiver leave request not accepted.')
       /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')
-      Comms.sendGossip('leavingarchiver', payload, tracker, sender, NodeList.byIdOrder, false)
+      Comms.sendGossip('leavingarchiver', payload, tracker, sender, nodeListFromStates(['active', 'ready', 'syncing']), false)
     } finally {
       profilerInstance.scopedProfileSectionEnd('leavingarchiver')
     }

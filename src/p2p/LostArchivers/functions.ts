@@ -30,6 +30,7 @@ import {
 import { InternalRouteEnum } from '../../types/enum/InternalRouteEnum'
 import { tellBinary } from '../Comms'
 import { Utils } from '@shardus/types'
+import { nodeListFromStates } from '../Join'
 
 /** Lost Archivers Functions */
 
@@ -209,7 +210,7 @@ export function tellNetworkArchiverIsDown(record: LostArchiverRecord): void {
   })
   info(`tellNetworkArchiverIsDown: downMsg: ${Utils.safeStringify(downMsg)}`)
   record.archiverDownMsg = downMsg
-  Comms.sendGossip('lost-archiver-down', downMsg, '', null, NodeList.byIdOrder, /* isOrigin */ true)
+  Comms.sendGossip('lost-archiver-down', downMsg, '', null, nodeListFromStates(['active', 'ready', 'syncing']), /* isOrigin */ true)
   // This is to inform the rest of the network that the Archiver is down
 }
 
