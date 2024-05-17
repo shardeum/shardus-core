@@ -21,10 +21,10 @@ function _normalizeUrl(url: string) {
 
 async function _get(host, logIndex, timeout = 1000) {
   try {
-    const res = await got.get(host, {
+    const res = await got.get(host.href, {
       timeout: timeout, //  Omar - setting this to 1 sec
       retry: 0, // Omar - setting this to 0.
-      json: true,
+      responseType: 'json',
     })
     return { ...res, body: safeParser(safeStringify(res.body)) }
   } catch (error) {
@@ -66,16 +66,16 @@ async function get<T>(url: string, getResponseObj = false, timeout = 1000): Prom
 
 async function _post(host, payload, logIndex, timeout = 1000) {
   try {
-    const res = await got.post(host, {
+    const res = await got.post(host.href, {
       timeout: timeout, // Omar - set this to 1 sec
-      retry: 0, // Omar - set this to 0
-      json: true,
-      body: payload,
+      retry: 0, // Omar - set this to 0      
+      responseType: 'json',
+      json: payload,
     })
 
     //if (getResponseObj) return res
     //return res.body
-    return { ...res, body: safeParser(safeStringify(res.body)) }
+    return { ...res, body: safeParser(safeStringify(res.body))}
   } catch (error) {
     if (logFlags.playback === false && logFlags.verbose === false) {
       throw error
@@ -100,7 +100,6 @@ async function post(givenHost, body, getResponseObj = false, timeout = 1000) {
   }
 
   let res = await _post(host, body, localIndex, timeout)
-
   if (_logger) {
     /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog( host.hostname + ':' + host.port, 'self', 'HttpResponseRecv', host.pathname, localIndex, stringifyReduceLimit(res.body, 1000) + '  res:: ' + stringifyReduceLimit(res, httpResLogLength) )
   }

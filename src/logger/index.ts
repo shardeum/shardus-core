@@ -508,7 +508,7 @@ class Logger {
     let normalized = this._normalizeUrl(url)
     let host = parseUrl(normalized, true)
     try {
-      await got.get(host, {
+      await got.get(host.href, {
         timeout: 1000,
         retry: 0,
         throwHttpErrors: false,
@@ -522,7 +522,7 @@ class Logger {
     let normalized = this._normalizeUrl(url)
     let host = parseUrl(normalized, true)
     try {
-      const res = await got.get(host, {
+      const res = await got.get(host.href, {
         timeout: 7000,
         retry: 0,
         throwHttpErrors: false,
