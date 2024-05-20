@@ -29,10 +29,10 @@ import { addFinishedSyncing } from './v2/syncFinished'
 import { processNewUnjoinRequest, UnjoinRequest } from './v2/unjoin'
 import { isActive } from '../Self'
 import { logFlags } from '../../logger'
-import { JoinRequest, SyncStarted } from "@shardus/types/build/src/p2p/JoinTypes";
+import { JoinRequest, SyncStarted } from '@shardus/types/build/src/p2p/JoinTypes'
 import { addSyncStarted } from './v2/syncStarted'
 import { addStandbyRefresh } from './v2/standbyRefresh'
-import { DeSerializeFromJsonString, safeParser, safeStringify } from "../../utils";
+import { DeSerializeFromJsonString, safeParser, safeStringify } from '../../utils'
 import { testFailChance } from '../../utils'
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
