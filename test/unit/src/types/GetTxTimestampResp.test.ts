@@ -37,7 +37,7 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
       test.each(invalidObjects)(
         'should throw error if field is improper during serialization',
         ({ data }) => {
-          const dataClone = safeJsonParse(safeStringify(data))
+          const dataClone = safeJsonParse(StringUtils.safeStringify(data))
           const stream = new VectorBufferStream(0)
           expect(() => serializeGetTxTimestampResp(stream, dataClone)).toThrow('Data validation error')
         }

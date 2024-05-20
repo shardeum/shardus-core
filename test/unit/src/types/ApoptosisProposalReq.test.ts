@@ -22,7 +22,7 @@ describe('ApoptosisProposalReq Serialization', () => {
     test.each(incompleteObjects)(
       'should throw error if field is improper during serialization',
       ({ data }) => {
-        const dataClone = safeJsonParse(safeStringify(data))
+        const dataClone = safeJsonParse(StringUtils.safeStringify(data))
         if (dataClone.id === 'null') {
           dataClone.id = null // we have added this for custom validation purposes
         }
