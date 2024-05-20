@@ -17,11 +17,6 @@ interface GossipPayload {
   cycleNumber?: number
 }
 
-// Check if an object is a JoinRequest
-function isJoinRequest(payload: GossipPayload | JoinRequest): payload is JoinRequest {
-  return payload && typeof payload === 'object' && 'nodeInfo' in payload && 'publicKey' in payload.nodeInfo
-}
-
 // Validate the payload of a gossip message that contains a sign object and check if the node is in Q1 or Q2
 export function checkGossipPayload<T extends GossipPayload>(
   payload: T | JoinRequest,
@@ -39,24 +34,13 @@ export function checkGossipPayload<T extends GossipPayload>(
     // count the event if the current quarter is not 1 or 2
     nestedCountersInstance.countEvent('p2p', `${logContext}-reject: not in Q1 or Q2. currentCycle: ${CycleCreator.currentCycle} `)
 
-    const isJoinReq = isJoinRequest(payload)
-
     // Log warnings if error logging is enabled
     if (logFlags.error) {
-      if (isJoinReq) {
-        warn(
-          `${logContext}-reject: not in Q1 or Q2 currentQuarter: ${
-            CycleCreator.currentQuarter
-          } payload publicKey: ${payload.nodeInfo.publicKey || undefined}`
-        )
-      } else {
-        warn(
-          `${logContext}-reject: not in Q1 or Q2 currentQuarter: ${CycleCreator.currentQuarter} payload id: ${
-            (payload as GossipPayload).nodeId || undefined
-          } payload cycle: ${(payload as GossipPayload).cycleNumber || undefined}`
-        )
-      }
+      warn(
+        `${logContext}-reject: not in Q1 or Q2, currentQuarter: ${CycleCreator.currentQuarter}`
+      )
     }
+    
     return false
   }
 
@@ -70,7 +54,7 @@ export function checkGossipPayload<T extends GossipPayload>(
   // Only accept original transactions in quarter 1
   const isOrig = signer.id === sender
   if (isOrig && CycleCreator.currentQuarter > 1) {
-    if (logFlags.error) nestedCountersInstance.countEvent('p2p', `${logContext}-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
+    if (logFlags.error) nestedCountersInstance.countEvent('p2p', `${logContext}-reject: CycleCreator.currentQuarter > 1, currentQuarter: ${CycleCreator.currentQuarter}`)
     return false
   }
 
