@@ -6,7 +6,7 @@ import {
 } from '../../../../src/types/ApoptosisProposalReq'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
-import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils as StringUtils } from '@shardus/types'
 
 describe('ApoptosisProposalReq Serialization', () => {
   describe('Data validation Cases', () => {
@@ -22,7 +22,7 @@ describe('ApoptosisProposalReq Serialization', () => {
     test.each(incompleteObjects)(
       'should throw error if field is improper during serialization',
       ({ data }) => {
-        const dataClone = safeJsonParse(StringUtils.safeStringify(data))
+        const dataClone = StringUtils.safeJsonParse(StringUtils.safeStringify(data))
         if (dataClone.id === 'null') {
           dataClone.id = null // we have added this for custom validation purposes
         }
