@@ -4,7 +4,7 @@ export const schemaWrappedData = {
   type: 'object',
   properties: {
     accountId: { type: 'string' },
-    stateId: { type: 'string' }, // assuming hash of the data blob is a string
+    stateId: { type: 'string' },
     data: {}, // allowing any type since it's unknown
     timestamp: { type: 'number' },
     syncData: {

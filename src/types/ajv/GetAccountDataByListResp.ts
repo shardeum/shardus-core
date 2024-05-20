@@ -1,5 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
-import { schemaWrappedData } from './WrappedData' // Import the WrappedData schema
+import { schemaWrappedData } from './WrappedData'
 
 export const schemaGetAccountDataByListResp = {
   properties: {
