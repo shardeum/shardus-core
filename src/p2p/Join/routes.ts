@@ -472,21 +472,8 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeLi
   sender: P2P.NodeListTypes.Node['id'],
   tracker: string
 ) => {
-  // validate payload structure and ignore gossip outside of Q1 and Q2
-  // If the sender is the original sender check if in Q1 to accept the request
-  if (
-    !checkGossipPayload(
-      payload,
-      {
-        publicKey: 's',
-        sign: 'o',
-      },
-      'gossip-unjoin',
-      sender
-    )
-  ) {
-    return
-  }
+  // unjoin requests should be received at all quarters
+
   const processResult = processNewUnjoinRequest(payload)
   if (processResult.isErr()) {
     warn(`gossip-unjoin failed to process unjoin request: ${processResult.error}`)
