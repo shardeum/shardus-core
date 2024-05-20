@@ -47,7 +47,7 @@ export function deserializeGetAccountDataByListResp(stream: VectorBufferStream):
       accountData.push(deserializeWrappedData(stream))
     }
   }
-  
+
   const errors = verifyPayload('GetAccountDataByListResp', accountData)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')

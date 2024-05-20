@@ -1,15 +1,15 @@
-import { addSchema } from '../../utils/serialization/SchemaHelpers';
-import { schemaWrappedData } from './WrappedData'; // Import the WrappedData schema
+import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { schemaWrappedData } from './WrappedData' // Import the WrappedData schema
 
 export const schemaGetAccountDataByListResp = {
   properties: {
     accountData: {
       type: ['array', 'null'],
-      items: schemaWrappedData // using WrappedData schema here
+      items: schemaWrappedData,
     },
   },
-  required: ['accountData']
-};
+  required: ['accountData'],
+}
 
 export function initGetAccountDataByListResp(): void {
   addSchemaDependencies()
@@ -18,7 +18,7 @@ export function initGetAccountDataByListResp(): void {
 
 // Function to add schema dependencies
 function addSchemaDependencies(): void {
-  schemaWrappedData
+  addSchema('WrappedData', schemaWrappedData)
 }
 
 // Function to register the schema
