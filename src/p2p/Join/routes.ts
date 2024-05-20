@@ -22,7 +22,7 @@ import { isBogonIP } from '../../utils/functions/checkIP'
 import { isPortReachable } from '../../utils/isPortReachable'
 import { nestedCountersInstance } from '../../utils/nestedCounters'
 import { profilerInstance } from '../../utils/profiler'
-import { checkGossipPayload, verifyOriginalSenderAndQuarter } from '../../utils/GossipValidation'
+import { checkGossipPayload } from '../../utils/GossipValidation'
 import * as acceptance from './v2/acceptance'
 import { getStandbyNodesInfoMap, saveJoinRequest, isOnStandbyList } from './v2'
 import { addFinishedSyncing } from './v2/syncFinished'
@@ -377,6 +377,7 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
     profilerInstance.scopedProfileSectionStart('gossip-join')
     try {
       // validate payload structure and ignore gossip outside of Q1 and Q2
+      // If the sender is the original sender check if in Q1 to accept the request
       if (
         !checkGossipPayload(
           payload,
@@ -389,14 +390,10 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
             sign: 'o',
             appJoinData: 'o',
           },
-          'gossip-join'
+          'gossip-join',
+          sender
         )
       ) {
-        return
-      }
-
-      //  If sender is original sender, check if in Q1 to continue.
-      if (!verifyOriginalSenderAndQuarter(payload, sender, 'gossip-join')) {
         return
       }
 
@@ -417,6 +414,7 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
   P2P.NodeListTypes.Node['id']
 > = (payload: P2P.JoinTypes.JoinRequest, sender: P2P.NodeListTypes.Node['id'], tracker: string) => {
   // validate payload structure and ignore gossip outside of Q1 and Q2
+  // If the sender is the original sender check if in Q1 to accept the request
   if (
     !checkGossipPayload(
       payload,
@@ -429,7 +427,8 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
         sign: 'o',
         appJoinData: 'o',
       },
-      'gossip-ValidJoinRequest'
+      'gossip-ValidJoinRequest',
+      sender
     )
   ) {
     return
@@ -474,6 +473,7 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeLi
   tracker: string
 ) => {
   // validate payload structure and ignore gossip outside of Q1 and Q2
+  // If the sender is the original sender check if in Q1 to accept the request
   if (
     !checkGossipPayload(
       payload,
@@ -481,17 +481,12 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeLi
         publicKey: 's',
         sign: 'o',
       },
-      'gossip-unjoin'
+      'gossip-unjoin',
+      sender
     )
   ) {
     return
   }
-
-  //  Verify if sender is original signer . If so check if in Q1 to continue.
-  if (!verifyOriginalSenderAndQuarter(payload, sender, 'gossip-unjoin')) {
-    return
-  }
-
   const processResult = processNewUnjoinRequest(payload)
   if (processResult.isErr()) {
     warn(`gossip-unjoin failed to process unjoin request: ${processResult.error}`)
@@ -511,6 +506,7 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<SyncStarted, P2P.NodeLi
   /* prettier-ignore */ if (logFlags.verbose) console.log(`received gossip-sync-started`)
   try {
     // validate payload structure and ignore gossip outside of Q1 and Q2
+    // If the sender is the original sender check if in Q1 to accept the request
     if (
       !checkGossipPayload(
         payload,
@@ -519,14 +515,10 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<SyncStarted, P2P.NodeLi
           cycleNumber: 'n',
           sign: 'o',
         },
-        'gossip-sync-started'
+        'gossip-sync-started',
+        sender
       )
     ) {
-      return
-    }
-
-    //  Verify if sender is original signer . If so check if in Q1 to continue.
-    if (!verifyOriginalSenderAndQuarter(payload, sender, 'gossip-sync-started')) {
       return
     }
 
@@ -563,6 +555,7 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
 
   try {
     // validate payload structure and ignore gossip outside of Q1 and Q2
+    // If the sender is the original sender check if in Q1 to accept the request
     if (
       !checkGossipPayload(
         payload,
@@ -571,14 +564,10 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.Finished
           cycleNumber: 'n',
           sign: 'o',
         },
-        'gossip-sync-finished'
+        'gossip-sync-finished',
+        sender
       )
     ) {
-      return
-    }
-
-    //  If original sender check if in Q1 to continue.
-    if (!verifyOriginalSenderAndQuarter(payload, sender, 'gossip-sync-finished')) {
       return
     }
 
@@ -613,6 +602,7 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.KeepInStand
   /* prettier-ignore */ if (logFlags.verbose) console.log(`received gossip-standby-refresh`)
   try {
     // validate payload structure and ignore gossip outside of Q1 and Q2
+    //  If original sender check if in Q1 to continue.
     if (
       !checkGossipPayload(
         payload,
@@ -621,18 +611,14 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.KeepInStand
           cycleNumber: 'n',
           sign: 'o',
         },
-        'gossip-standby-refresh'
+        'gossip-standby-refresh',
+        sender
       )
     ) {
       return
     }
 
     //if (logFlags.p2pNonFatal) info(`Got scale request: ${JSON.stringify(payload)}`)
-
-    //  If original sender check if in Q1 to continue.
-    if (!verifyOriginalSenderAndQuarter(payload, sender, 'gossip-standby-refresh')) {
-      return
-    }
 
     const added = addStandbyRefresh(payload)
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `standby-refresh validation success: ${added.success}`)
@@ -645,6 +631,7 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.KeepInStand
     profilerInstance.scopedProfileSectionEnd('gossip-standby-refresh')
   }
 }
+
 
 export const routes = {
   external: [cycleMarkerRoute, joinRoute, joinedRoute, joinedV2Route, acceptedRoute, unjoinRoute, standbyRefreshRoute],

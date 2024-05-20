@@ -28,7 +28,7 @@ import { deserializeLostArchiverInvestigateReq } from '../../types/LostArchiverI
 import { getStreamWithTypeCheck } from '../../types/Helpers'
 import { TypeIdentifierEnum } from '../../types/enum/TypeIdentifierEnum'
 import { safeStringify } from '../../utils'
-import { checkGossipPayload, verifyOriginalSenderAndQuarter } from '../../utils/GossipValidation'
+import { checkGossipPayload } from '../../utils/GossipValidation'
 
 /** Gossip */
 
@@ -49,7 +49,8 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
     !checkGossipPayload(
       payload,
       { type: 's', downMsg: 'o', refuteMsg: 'o', cycle: 's', sign: 'o' },
-      'lostArchiverUpGossip'
+      'lostArchiverUpGossip',
+      sender
     )
   ) {
     return
@@ -64,13 +65,8 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
 
   const error = funcs.errorForArchiverUpMsg(payload)
   if (error) {
-    nestedCountersInstance.countEvent('lostArchivers', `lostArchiverUpGossip invalid payload ${error}`)
+    nestedCountersInstance.countEvent('lostArchivers', `lostArchiverUpGossip invalid payload ${error}`)      
     logging.warn(`lostArchiverUpGossip: invalid payload error: ${error}, payload: ${inspect(payload)}`)
-    return
-  }
-
-  // If original sender then check if in Q1 to continue
-  if (!verifyOriginalSenderAndQuarter(payload, sender, 'lostArchiverUpGossip')) {
     return
   }
 
@@ -117,7 +113,8 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
     !checkGossipPayload(
       payload,
       { type: 's', investigateMsg: 'o', cycle: 's', sign: 'o' },
-      'lostArchiverDownGossip'
+      'lostArchiverDownGossip',
+      sender
     )
   ) {
     return
@@ -128,16 +125,10 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
   // check args
   if (!sender) { logging.warn(`lostArchiverDownGossip: missing sender`); return }
   if (!tracker) { logging.warn(`lostArchiverDownGossip: missing tracker`); return }
-
   const error = funcs.errorForArchiverDownMsg(payload)
   if (error) {
     nestedCountersInstance.countEvent('lostArchivers', `lostArchiverDownGossip invalid payload ${error}`)      
     logging.warn(`lostArchiverDownGossip: invalid payload error: ${error}, payload: ${inspect(payload)}`)
-    return
-  }
-
-  // If original sender then check if in Q1 to continue
-  if (!verifyOriginalSenderAndQuarter(payload, sender, 'lostArchiverDownGossip')) {
     return
   }
 

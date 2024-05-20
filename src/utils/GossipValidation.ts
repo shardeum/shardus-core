@@ -3,7 +3,6 @@ import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { P2P } from '@shardus/types'
 import * as NodeList from '../p2p/NodeList'
 import * as CycleCreator from '../p2p/CycleCreator'
-import { config } from '../p2p/Context'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { logFlags } from '../logger'
 import * as utils from '../utils'
@@ -27,7 +26,8 @@ function isJoinRequest(payload: GossipPayload | JoinRequest): payload is JoinReq
 export function checkGossipPayload<T extends GossipPayload>(
   payload: T | JoinRequest,
   validationSchema: Record<string, string>,
-  logContext: string
+  logContext: string,
+  sender: unknown
 ): boolean {
   if (!payload) {
     if (logFlags.error) warn(`${logContext}-reject: missing payload`)
@@ -41,30 +41,9 @@ export function checkGossipPayload<T extends GossipPayload>(
 
     const isJoinReq = isJoinRequest(payload)
 
-    // Handle the case where the payload is a JoinRequest
-    if (isJoinReq) {
-      // Log debug information if enabled and the payload is a JoinRequest
-      if (config.debug.cycleRecordOOSDebugLogs) {
-        console.log(
-          `DEBUG CR-OOS: ${logContext}-reject: not in Q1 or Q2 currentQuarter: ${
-            CycleCreator.currentQuarter
-          } payload publicKey: ${payload.nodeInfo.publicKey || undefined}`
-        )
-      }
-    }
-    // Handle the case where the payload is not a JoinRequest
-    else if (!isJoinReq && config.debug.cycleRecordOOSDebugLogs) {
-      console.log(
-        `DEBUG CR-OOS: ${logContext}-reject: not in Q1 or Q2 currentQuarter: ${
-          CycleCreator.currentQuarter
-        } payload id: ${(payload as GossipPayload).nodeId || undefined} payload cycle: ${
-          (payload as GossipPayload).cycleNumber || undefined
-        }`
-      )
-    }
     // Log warnings if error logging is enabled
     if (logFlags.error) {
-      if (isJoinRequest(payload)) {
+      if (isJoinReq) {
         warn(
           `${logContext}-reject: not in Q1 or Q2 currentQuarter: ${
             CycleCreator.currentQuarter
@@ -102,27 +81,17 @@ export function checkGossipPayload<T extends GossipPayload>(
     return false
   }
 
-  return true
-}
-
-// If signer is original sender, check if in Q1 to continue
-export function verifyOriginalSenderAndQuarter(
-  payload: GossipPayload | JoinRequest,
-  sender: string,
-  context: string
-): boolean {
+  // Verify if the original sender is correct and if the transaction is in quarter 1
   const signer = NodeList.byPubKey.get(payload.sign.owner)
-  // if no signer warn and continue by returning true
   if (!signer) {
-    /* prettier-ignore */ if (logFlags.error) warn(`${context}: Got ${context} from unknown node`);
+    if (logFlags.error) warn(`${logContext}: Got ${logContext} from unknown node`)
     return true
   }
 
   const isOrig = signer.id === sender
-
   // Only accept original transactions in quarter 1
   if (isOrig && CycleCreator.currentQuarter > 1) {
-    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `${context}-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`);
+    if (logFlags.error) nestedCountersInstance.countEvent('p2p', `${logContext}-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
     return false
   }
 
