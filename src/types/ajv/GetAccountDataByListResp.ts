@@ -18,7 +18,7 @@ export function initGetAccountDataByListResp(): void {
 
 // Function to add schema dependencies
 function addSchemaDependencies(): void {
-  addSchema('WrappedData', schemaWrappedData)
+  // No dependencies
 }
 
 // Function to register the schema
