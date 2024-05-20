@@ -1214,6 +1214,8 @@ export interface ServerConfiguration {
     txStateMachineChanges: boolean
     // will a node attempt to request final data
     canRequestFinalData:boolean
+    // how many times a node should attempt to request final data
+    maxRetryRequestFinalData: number
     // how many node to re-inject the tx received from client
     numberOfReInjectNodes: number
     // max number of pending nonce tx for an account

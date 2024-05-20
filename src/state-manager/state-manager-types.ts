@@ -120,6 +120,7 @@ export type QueueEntry = {
   queryingRobustAccountData?: boolean
   queryingFinalData: boolean
   lastFinalDataRequestTimestamp: number
+  finalDataRequestCount: number
   topConfirmations: Set<string>
   topVoters: Set<string>
   almostExpired?: boolean

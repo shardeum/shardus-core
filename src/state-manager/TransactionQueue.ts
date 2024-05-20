@@ -1931,6 +1931,7 @@ class TransactionQueue {
         pendingDataRequest: false,
         queryingFinalData: false,
         lastFinalDataRequestTimestamp: 0,
+        finalDataRequestCount: 0,
         newVotes: false,
         fromClient: sendGossip,
         gossipedReceipt: false,
@@ -6110,6 +6111,16 @@ class TransactionQueue {
                 }
 
                 if (incomplete && missingAccounts.length > 0) {
+                  // mark the tx as fail and remove from queue if we have tried enough times
+                  if (queueEntry.finalDataRequestCount >= configContext.stateManager.maxRetryRequestFinalData) {
+                    /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_incomplete', `${shortID}`, `qId: ${queueEntry.entryID} skipped:${skipped}`)
+                    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_incomplete : ${queueEntry.logID} queueEntry.awaitFinalDataRetryCount > maxRetryRequestFinalData`)
+                    /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'maxRetryRequestFinalData reached')
+
+                    this.updateTxState(queueEntry, 'fail')
+                    this.removeFromQueue(queueEntry, currentIndex)
+                    continue
+                  }
 
                   // start request process for missing data if we waited long enough
                   let shouldStartFinalDataRequest = false
@@ -6128,6 +6139,7 @@ class TransactionQueue {
                     nestedCountersInstance.countEvent('stateManager', 'requestFinalData')
                     this.requestFinalData(queueEntry, missingAccounts)
                     queueEntry.lastFinalDataRequestTimestamp = shardusGetTime()
+                    queueEntry.finalDataRequestCount += 1
                     continue
                   }
                 }
@@ -6646,7 +6658,7 @@ class TransactionQueue {
     return [...this.forwardedReceiptsByTimestamp.values()]
   }
 
-  async requestFinalData(queueEntry: QueueEntry, accountIds: string[]) {
+  async requestFinalData(queueEntry: QueueEntry, accountIds: string[]): Promise<void> {
     profilerInstance.profileSectionStart('requestFinalData')
     this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} accountIds: ${utils.stringifyReduce(accountIds)}`);
     const message = { txid: queueEntry.acceptedTx.txId, accountIds }

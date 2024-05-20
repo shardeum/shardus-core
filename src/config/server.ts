@@ -305,6 +305,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     shareCompleteData: true,
     txStateMachineChanges: true,
     canRequestFinalData: true,
+    maxRetryRequestFinalData: 20,
     numberOfReInjectNodes: 5,
     maxPendingNonceTxs: 10,
     attachDataToReceipt: true,
