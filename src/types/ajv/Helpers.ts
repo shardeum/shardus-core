@@ -8,6 +8,8 @@ import { initGetTxTimestampReq } from './GetTxTimestampReq'
 import { initGetTxTimestampResp } from './GetTxTimestampResp'
 import { initGetAccountDataByListResp } from './GetAccountDataByListResp'
 import { initGetAccountDataByListReq } from './GetAccountDataByListReq'
+import { initGetAccountDataByHashesReq } from './GetAccountDataByHashesReq'
+import { initGetAccountDataByHashesResp } from './GetAccountDataByHashesResp'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -18,6 +20,8 @@ export function initAjvSchemas(): void {
   initGetTxTimestampResp()
   initGetAccountDataByListReq()
   initGetAccountDataByListResp()
+  initGetAccountDataByHashesReq()
+  initGetAccountDataByHashesResp()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {

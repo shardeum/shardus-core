@@ -5,7 +5,7 @@ export const schemaWrappedData = {
   properties: {
     accountId: { type: 'string' },
     stateId: { type: 'string' },
-    data: {}, // allowing any type since it's unknown
+    data: {}, // Opaque data blob, type not specified
     timestamp: { type: 'number' },
     syncData: {
       anyOf: [
