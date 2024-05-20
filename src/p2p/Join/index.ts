@@ -513,7 +513,6 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
     Self.updateNodeState(P2P.P2PTypes.NodeStatus.READY)
     /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:parseRecord node-selcted cycle: ${record.counter} updated self to ready`)
   }
-
   for (const node of finishedSyncing) {
     /* prettier-ignore */ if (logFlags.verbose) console.log(`parseRecord:FinishedSyncing: ${node}`)
     updated.push({
