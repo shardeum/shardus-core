@@ -60,6 +60,20 @@ export function checkGossipPayload<T extends GossipPayload>(
     return false
   }
 
+  // Verify if the original sender is correct and if the transaction is in quarter 1
+  const signer = NodeList.byPubKey.get(payload.sign.owner)
+  if (!signer) {
+    if (logFlags.error) warn(`${logContext}: Got ${logContext} from unknown node`)
+    return true
+  }
+
+  // Only accept original transactions in quarter 1
+  const isOrig = signer.id === sender
+  if (isOrig && CycleCreator.currentQuarter > 1) {
+    if (logFlags.error) nestedCountersInstance.countEvent('p2p', `${logContext}-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
+    return false
+  }
+
   let err = utils.validateTypes(payload, validationSchema)
   if (err) {
     if (logFlags.error) warn(`${logContext}-reject: bad input ${err}`)
@@ -78,20 +92,6 @@ export function checkGossipPayload<T extends GossipPayload>(
     }
   } else {
     if (logFlags.error) warn(`${logContext}-reject: missing sign`)
-    return false
-  }
-
-  // Verify if the original sender is correct and if the transaction is in quarter 1
-  const signer = NodeList.byPubKey.get(payload.sign.owner)
-  if (!signer) {
-    if (logFlags.error) warn(`${logContext}: Got ${logContext} from unknown node`)
-    return true
-  }
-
-  const isOrig = signer.id === sender
-  // Only accept original transactions in quarter 1
-  if (isOrig && CycleCreator.currentQuarter > 1) {
-    if (logFlags.error) nestedCountersInstance.countEvent('p2p', `${logContext}-reject: CycleCreator.currentQuarter > 1 ${CycleCreator.currentQuarter}`)
     return false
   }
 
