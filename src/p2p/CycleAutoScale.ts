@@ -368,8 +368,8 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
         if (active < desired) {
           /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: entered active < desired")
           let add = ~~(0.5 * active)
-          if (add < 7) {
-            add = 7
+          if (add < config.p2p.formingNodesPerCycle) {
+            add = config.p2p.formingNodesPerCycle
           }
           targetCount = active + add
           if (targetCount > desired) {
@@ -425,18 +425,18 @@ function setAndGetTargetCount(prevRecord: P2P.CycleCreatorTypes.CycleRecord): nu
       if (syncing < desired + config.p2p.extraNodesToAddInRestart) {
         /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: entered syncing < desired")
         let add = ~~(0.5 * syncing) // Add 50% more nodes on each cycle
-        if (add < 7) {
-          add = 7
+        if (add < config.p2p.formingNodesPerCycle) {
+          add = config.p2p.formingNodesPerCycle
         }
         targetCount = syncing + add
         if (targetCount > desired + config.p2p.extraNodesToAddInRestart) {
           targetCount = desired + config.p2p.extraNodesToAddInRestart
         }
       }
-    } else if (prevRecord.mode === 'shutdown') targetCount = 7
+    } else if (prevRecord.mode === 'shutdown') targetCount = config.p2p.formingNodesPerCycle
   } else if (Self.isFirst && active < 1) {
     /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: in Self.isFirst condition")
-    targetCount = 7
+    targetCount = config.p2p.formingNodesPerCycle
   }
   /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("CycleAutoScale: target count is ", targetCount)
   return targetCount
