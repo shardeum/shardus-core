@@ -1,5 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { WrappedData, deserializeWrappedData, serializeWrappedData } from './WrappedData'
+import { verifyPayload } from './ajv/Helpers'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export const cGetAccountDataByListRespVersion = 1
@@ -13,6 +14,10 @@ export function serializeGetAccountDataByListResp(
   obj: GetAccountDataByListResp,
   root = false
 ): void {
+  const errors = verifyPayload('GetAccountDataByListResp', obj)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cGetAccountDataByListResp)
   }
@@ -41,6 +46,11 @@ export function deserializeGetAccountDataByListResp(stream: VectorBufferStream):
     for (let i = 0; i < length; i++) {
       accountData.push(deserializeWrappedData(stream))
     }
+  }
+
+  const errors = verifyPayload('GetAccountDataByListResp', accountData)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
   }
   return {
     accountData,

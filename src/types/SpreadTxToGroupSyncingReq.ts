@@ -4,7 +4,7 @@ import {
   OpaqueTransaction,
   ShardusMemoryPatternsInput,
   TransactionKeys,
-  TimestampedTx
+  TimestampedTx,
 } from '../shardus/shardus-types'
 import { DeSerializeFromJsonString, SerializeToJsonString } from '../utils'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'

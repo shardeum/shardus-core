@@ -1,4 +1,5 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 type AccountIDAndHash = {
@@ -18,6 +19,10 @@ export const serializeGetAccountDataByHashesReq = (
   inp: GetAccountDataByHashesReq,
   root = false
 ): void => {
+  const errors = verifyPayload('GetAccountDataByHashesReq', inp)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cGetAccountDataByHashesReq)
   }
@@ -46,13 +51,17 @@ export const deserializeGetAccountDataByHashesReq = (
   const accountsLength = stream.readUInt32()
   const result: GetAccountDataByHashesReq = {
     cycle: cycleNumber,
-    accounts: new Array<AccountIDAndHash>(accountsLength),
+    accounts: [],
   }
   for (let i = 0; i < accountsLength; i++) {
     result.accounts.push({
       accountID: stream.readString(),
       hash: stream.readString(),
     })
+  }
+  const errors = verifyPayload('GetAccountDataByHashesReq', result)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
   }
   return result
 }
