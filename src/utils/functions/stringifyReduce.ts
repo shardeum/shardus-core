@@ -1,19 +1,6 @@
 import { Utils } from '@shardus/types'
 import { makeShortHash } from '../'
 
-function isBufferValue(toStr, val: Record<string, unknown>): boolean {
-  return (
-    toStr === '[object Object]' &&
-    objKeys(val).length == 2 &&
-    objKeys(val).includes('type') &&
-    val['type'] == 'Buffer'
-  )
-}
-
-function isUnit8Array(value: unknown): boolean {
-  return value instanceof Uint8Array
-}
-
 const objToString = Object.prototype.toString
 const objKeys =
   Object.keys ||

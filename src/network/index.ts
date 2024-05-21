@@ -64,14 +64,12 @@ export class NetworkClass extends EventEmitter {
   externalCatchAll: any
   debugNetworkDelay: number
   statisticsInstance: any
-  customStringifier?: (val: any) => string
   useLruCacheForSocketMgmt: boolean
   lruCacheSizeForSocketMgmt: number
 
   constructor(
     config: Shardus.StrictServerConfiguration,
     logger: Logger,
-    customStringifier?: (val: any) => string
   ) {
     super()
     this.app = express()
@@ -96,7 +94,6 @@ export class NetworkClass extends EventEmitter {
     }
 
     nestedCountersInstance.countEvent('network', 'init')
-    this.customStringifier = customStringifier
     this.useLruCacheForSocketMgmt = config.p2p.useLruCacheForSocketMgmt
     this.lruCacheSizeForSocketMgmt = config.p2p.lruCacheSizeForSocketMgmt
     this.shardusCryptoHashKey = config.crypto.hashKey
@@ -156,7 +153,8 @@ export class NetworkClass extends EventEmitter {
       headerOpts: {
         sendHeaderVersion: 1,
       },
-      customStringifier: this.customStringifier,
+      customStringifier: Utils.safeStringify,
+      customJsonParser: Utils.safeJsonParse,
       crypto: {
         hashKey: this.shardusCryptoHashKey,
         signingSecretKeyHex: this.signingSecretKeyHex,

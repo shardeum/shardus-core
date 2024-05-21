@@ -142,7 +142,6 @@ interface Shardus {
 class Shardus extends EventEmitter {
   constructor(
     { server: config, logs: logsConfig, storage: storageConfig }: ShardusTypes.StrictShardusConfiguration,
-    opts?: { customStringifier?: (val: any) => string }
   ) {
     super()
     this.debugForeverLoopsEnabled = true
@@ -183,7 +182,7 @@ class Shardus extends EventEmitter {
     Context.setStorageContext(this.storage)
     this.crypto = new Crypto(config.baseDir, this.config, this.logger, this.storage)
     Context.setCryptoContext(this.crypto)
-    this.network = new Network.NetworkClass(config, this.logger, opts?.customStringifier)
+    this.network = new Network.NetworkClass(config, this.logger)
     Context.setNetworkContext(this.network)
 
     // Set the old P2P to a Wrapper into the new P2P
@@ -1649,17 +1648,17 @@ class Shardus extends EventEmitter {
         }
         if (result && result.success === false) {
           this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_false_${context} ${activeIdToPartition.get(validator.id)}`)
-          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got unsuccessful response upon forwarding injected tx: ${validator.id}. ${message} ${utils.stringify(tx)}` )
+          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got unsuccessful response upon forwarding injected tx: ${validator.id}. ${message} ${Utils.safeStringify(tx)}` )
           continue
         }
         if (result && result.success === true) {
           this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_success_${context} ${activeIdToPartition.get(validator.id)}`)
-          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got successful response upon forwarding injected tx: ${validator.id}. ${message} ${utils.stringify(tx)}` )
+          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got successful response upon forwarding injected tx: ${validator.id}. ${message} ${Utils.safeStringify(tx)}` )
           return { success: true, reason: 'Transaction forwarded to validators', status: 200 }
         }
       } catch (e) {
         this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_ex_${context} ${activeIdToPartition.get(validator.id)}`)
-        /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx to ${validator.id} failed. ${message} ${utils.stringify(tx)} error: ${ e.stack }` )
+        /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx to ${validator.id} failed. ${message} ${Utils.safeStringify(tx)} error: ${ e.stack }` )
       }
     }
     nestedCountersInstance.countEvent('statistics', `forward failed: ${Utils.safeStringify(stats)}`)

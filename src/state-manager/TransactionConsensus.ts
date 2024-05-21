@@ -273,7 +273,7 @@ class TransactionConsenus {
           // remove the timestamp from the cache
           delete this.txTimestampCache[cycleCounter][txId]
           this.txTimestampCache[cycleCounter][txId] = null
-          this.mainLogger.debug(`Removed timestamp cache for txId: ${txId}, timestamp: ${JSON.stringify(this.txTimestampCache[cycleCounter][txId])}`)
+          /* prettier-ignore */ this.mainLogger.debug(`Removed timestamp cache for txId: ${txId}, timestamp: ${Utils.safeStringify(this.txTimestampCache[cycleCounter][txId])}`)
           nestedCountersInstance.countEvent('consensus', 'remove_timestamp_cache')
         }
         await respond(true)
@@ -309,7 +309,7 @@ class TransactionConsenus {
           ) {
             // eslint-disable-next-line security/detect-object-injection
             tsReceipt = this.txTimestampCache[readableReq.cycleCounter][readableReq.txId]
-            this.mainLogger.debug(`Found timestamp cache for txId: ${readableReq.txId}, timestamp: ${JSON.stringify(tsReceipt)}`)
+            /* prettier-ignore */ this.mainLogger.debug(`Found timestamp cache for txId: ${readableReq.txId}, timestamp: ${Utils.safeStringify(tsReceipt)}`)
             return respond(tsReceipt, serializeGetTxTimestampResp)
           } else {
             const tsReceipt: Shardus.TimestampReceipt = this.generateTimestampReceipt(

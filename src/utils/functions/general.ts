@@ -5,16 +5,6 @@ import { DevSecurityLevel } from '../../shardus/shardus-types'
 import { nestedCountersInstance } from '../nestedCounters'
 import { Utils } from '@shardus/types'
 
-const replacer = (key: string, value: any): any => {
-  if (typeof value === 'bigint') {
-    return { __BigInt__: value.toString() }
-  }
-  if (value instanceof Uint8Array) {
-    return { __Uint8Array__: Array.from(value) }
-  }
-  return value
-}
-
 /**
  * this helper replacer is lossy and only for logging
  * @param _key
@@ -43,21 +33,12 @@ export const appdata_replacer = <T, K, V>(
     return value as T
   }
 }
-const reviver = (key: string, value: any): any => {
-  if (value && value.__BigInt__) {
-    return BigInt(value.__BigInt__)
-  }
-  if (value && value.__Uint8Array__ instanceof Array) {
-    return new Uint8Array(value.__Uint8Array__)
-  }
-  return value
-}
 
 export const deepCopy = <T>(obj: T): T => {
   if (typeof obj !== 'object') {
     throw Error('Given element is not of type object.')
   }
-  return Utils.safeJsonParse(JSON.stringify(obj, replacer))
+  return Utils.safeJsonParse(Utils.safeStringify(obj))
 }
 
 export const mod = (n, m): number => {
