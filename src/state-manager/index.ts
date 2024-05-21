@@ -2251,6 +2251,14 @@ class StateManager {
       res.end()
     })
 
+    Context.network.registerExternalGet('debug-queue-item-by-txid', isDebugModeMiddleware, (req, res) => {
+      const txId = req.query.txId as string
+      if (txId == null) return res.send('txId parameter required')
+      let result = this.transactionQueue.getQueueEntryDebugInfoByTxId(txId)
+      res.write(utils.stringify(result))
+      res.end()
+    })
+
     Context.network.registerExternalGet('debug-queue-clear', isDebugModeMiddleware, (req, res) => {
       let result = this.transactionQueue.clearQueueItems()
       res.write(Utils.safeStringify(result))
