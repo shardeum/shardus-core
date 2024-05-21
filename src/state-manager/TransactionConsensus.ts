@@ -2272,7 +2272,8 @@ class TransactionConsenus {
             )
           }
         }
-        const shouldChallenge = queueEntry.ourVoteHash != null && queueEntry.ourVoteHash !== finalVoteHash
+        const shouldChallenge = queueEntry.ourVote != null && queueEntry.ourVoteHash != null && queueEntry.ourVoteHash !== finalVoteHash
+        if (shouldChallenge) nestedCountersInstance.countEvent('confirmOrChallenge', 'shouldChallenge: true')
 
         if (this.stateManager.consensusLog)
           this.mainLogger.debug(
@@ -2390,27 +2391,26 @@ class TransactionConsenus {
 
       // Should check account integrity only when before states are different from best vote
       let doStatesMatch = true
-      const voteBeforeStates = queueEntry.receivedBestVote.account_state_hash_before
-      const ourCollectedData = Object.values(queueEntry.collectedData)
-      if (voteBeforeStates.length !== ourCollectedData.length) {
-        doStatesMatch = false
-      }
-      for (let i = 0; i < voteBeforeStates.length; i++) {
-        if (ourCollectedData[i] == null) {
+      const beforeStatesFromRobustVote = queueEntry.receivedBestVote.account_state_hash_before
+
+      for (let i = 0; i < beforeStatesFromRobustVote.length; i++) {
+        const accountId = queueEntry.receivedBestVote.account_id[i]
+        const collectedData = queueEntry.collectedData[accountId]
+        if (collectedData == null) {
           doStatesMatch = false
           nestedCountersInstance.countEvent(
             'confirmOrChallenge',
             'tryChallengeVoteAndShare canceled because ourCollectedData is null'
           )
-          break
+          return // no need to integrity check
         }
-        if (voteBeforeStates[i] !== ourCollectedData[i].stateId) {
+        if (beforeStatesFromRobustVote[i] !== collectedData.stateId) {
           doStatesMatch = false
           nestedCountersInstance.countEvent(
             'confirmOrChallenge',
             'tryChallengeVoteAndShare states do not match'
           )
-          break
+          break // will do integrity check later
         }
       }
       if (this.produceBadChallenge) doStatesMatch = false
@@ -2429,7 +2429,7 @@ class TransactionConsenus {
           'confirmOrChallenge',
           'tryChallengeVoteAndShare account integrity not ok.'
         )
-        if (logFlags.verbose)
+        if (logFlags.debug)
           this.mainLogger.debug(`challengeVoteAndShare: ${queueEntry.logID} account integrity is not ok`)
         // we should not challenge or confirm if account integrity is not ok
         queueEntry.completedConfirmedOrChallenge = true
@@ -2495,8 +2495,7 @@ class TransactionConsenus {
         const collectedAccountData = queueEntry.collectedData[key]
         const robustQueryAccountData = results[i]
         if (
-          robustQueryAccountData.stateId === collectedAccountData.stateId &&
-          robustQueryAccountData.timestamp === collectedAccountData.timestamp
+          robustQueryAccountData.stateId === collectedAccountData.stateId
         ) {
           nestedCountersInstance.countEvent('checkAccountIntegrity', 'collected data and robust data match')
           if (logFlags.debug)
@@ -2516,6 +2515,7 @@ class TransactionConsenus {
               )} robustAccountData: ${utils.stringify(robustQueryAccountData)}`
             )
           }
+          break // no need to check other accounts
         }
       }
     } else {
