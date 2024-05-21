@@ -1168,6 +1168,20 @@ class AccountPatcher {
       }
       res.end()
     })
+    Context.network.registerExternalGet('debug-patcher-apply-fail', isDebugModeMiddleware, (_req, res) => {
+      try {
+        if (this.stateManager.applyFailChance === 0) {
+          this.stateManager.applyFailChance = 1
+        } else {
+          this.stateManager.applyFailChance = 0
+        }
+
+        res.write(`this.applyFailChance: ${this.stateManager.applyFailChance}\n`)
+      } catch (e) {
+        res.write(`${e}\n`)
+      }
+      res.end()
+    })
     Context.network.registerExternalGet('debug-patcher-toggle-skip', isDebugModeMiddleware, (_req, res) => {
       try {
         if (this.stateManager.debugSkipPatcherRepair === false) {

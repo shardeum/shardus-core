@@ -197,6 +197,7 @@ class StateManager {
   loseTxChance: number
   failReceiptChance: number
   voteFlipChance: number
+  applyFailChance: number
   failNoRepairTxChance: number
 
   syncSettleTime: number
@@ -523,10 +524,17 @@ class StateManager {
     }
 
     this.voteFlipChance = 0
+    this.applyFailChance = 0
     if (this.config && this.config.debug) {
       this.voteFlipChance = this.config.debug.voteFlipChance
       if (this.voteFlipChance == null) {
         this.voteFlipChance = 0
+      }
+    }
+    if (this.config && this.config.debug) {
+      this.applyFailChance = this.config.debug.applyFailChance
+      if (this.applyFailChance == null) {
+        this.applyFailChance = 0
       }
     }
 

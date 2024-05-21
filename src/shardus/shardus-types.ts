@@ -996,6 +996,8 @@ export interface ServerConfiguration {
     failReceiptChance?: number
     /** chance to flip our vote */
     voteFlipChance?: number
+    /** chance to fail the apply result */
+    applyFailChance?: number
     /** should skip patcher repair system */
     skipPatcherRepair?: boolean
     /** chance to fail a TX and the TX repair */

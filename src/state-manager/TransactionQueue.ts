@@ -5584,6 +5584,24 @@ class TransactionQueue {
                     'preApplyTransaction',
                     shardusGetTime() - awaitStart
                   )
+                  if (Math.random() < this.stateManager.applyFailChance) {
+                    this.mainLogger.debug(`processAcceptedTxQueue2 applyFailChance: ${this.stateManager.applyFailChance}`)
+                    nestedCountersInstance.countEvent('processing', 'applyFailChance')
+                    txResult = {
+                      applied: false,
+                      passed: false,
+                      applyResult: '',
+                      reason: 'preApplyTransaction pretest failed, TX rejected due to applyFailChance',
+                    }
+                  }
+                  if (txResult == null) {
+                    txResult = {
+                      applied: false,
+                      passed: false,
+                      applyResult: '',
+                      reason: 'preApplyTransaction returned null',
+                    }
+                  }
 
                   queueEntry.executionDebug.log3 = 'called pre apply'
                   queueEntry.executionDebug.txResult = txResult
