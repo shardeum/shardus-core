@@ -5,7 +5,7 @@ export type GetTrieHashesRequest = {
   radixList: string[]
 }
 
-export const cGetTrieHashesReqVersion = 1
+const cGetTrieHashesReqVersion = 1
 
 export function serializeGetTrieHashesReq(
   stream: VectorBufferStream,

@@ -2,20 +2,11 @@ import { VectorBufferStream } from '../../../../src'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import {
   GetTrieHashesResponse,
-  cGetTrieHashesRespVersion,
   deserializeGetTrieHashesResp,
   serializeGetTrieHashesResp,
 } from '../../../../src/types/GetTrieHashesResp'
 
-/*
-
-export type GetTrieHashesResponse = {
-  nodeHashes: { radix: string; hash: string }[]
-  nodeId?: string
-}
-
-
-*/
+const cGetTrieHashesRespVersion = 1 // taken from getTrieHashesResponse
 
 describe('GetTrieHashesResponse Serialization & Deserialization', () => {
   describe('GetTrieHashesResponse Serialization', () => {
