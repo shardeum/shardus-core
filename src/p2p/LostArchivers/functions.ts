@@ -29,7 +29,7 @@ import {
 } from '../../types/LostArchiverInvestigateReq'
 import { InternalRouteEnum } from '../../types/enum/InternalRouteEnum'
 import { tellBinary } from '../Comms'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 /** Lost Archivers Functions */
 
@@ -207,7 +207,7 @@ export function tellNetworkArchiverIsDown(record: LostArchiverRecord): void {
     cycle: CycleChain.getCurrentCycleMarker(),
     investigateMsg: record.investigateMsg,
   })
-  info(`tellNetworkArchiverIsDown: downMsg: ${safeStringify(downMsg)}`)
+  info(`tellNetworkArchiverIsDown: downMsg: ${Utils.safeStringify(downMsg)}`)
   record.archiverDownMsg = downMsg
   Comms.sendGossip('lost-archiver-down', downMsg, '', null, NodeList.byIdOrder, /* isOrigin */ true)
   // This is to inform the rest of the network that the Archiver is down
@@ -227,7 +227,7 @@ export function tellNetworkArchiverIsUp(record: LostArchiverRecord): void {
   })
   record.archiverUpMsg = upMsg
   // Gossip the ArchiverUpMsg to the rest of the network
-  info(`tellNetworkArchiverIsUp: upMsg: ${safeStringify(upMsg)}`)
+  info(`tellNetworkArchiverIsUp: upMsg: ${Utils.safeStringify(upMsg)}`)
   Comms.sendGossip('lost-archiver-up', upMsg, '', null, NodeList.byIdOrder, /* isOrigin */ true)
 }
 

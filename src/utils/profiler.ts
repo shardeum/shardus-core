@@ -8,7 +8,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import { memoryReportingInstance } from '../utils/memoryReporting'
 import { shardusGetTime, getNetworkTimeOffset } from '../network'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 const cDefaultMin = 1e12
 const cDefaultMinBig = BigInt(cDefaultMin)
@@ -563,7 +563,7 @@ class Profiler {
             c: section.resp.c,
             avg: humanFileSize(Math.ceil(section.resp.total / section.resp.c)), //Math.round(100 * section.s.total / section.s.c) / 100
           }
-          line += ' resp:' + safeStringify(dataReport)
+          line += ' resp:' + Utils.safeStringify(dataReport)
         }
         const numberStat = section.req
         if (numberStat.c > 0) {
@@ -574,7 +574,7 @@ class Profiler {
             c: numberStat.c,
             avg: humanFileSize(Math.ceil(numberStat.total / numberStat.c)), //Math.round(100 * section.s.total / section.s.c) / 100
           }
-          line += ' req:' + safeStringify(dataReport)
+          line += ' req:' + Utils.safeStringify(dataReport)
         }
 
         lines.push({ line, avgMs })

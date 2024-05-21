@@ -1,7 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { ConfirmOrChallengeMessage } from '../state-manager/state-manager-types'
-import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 export type GetConfirmOrChallengeResp = {
   txId: string
@@ -25,7 +25,7 @@ export function serializeGetConfirmOrChallengeResp(
   stream.writeString(obj.appliedVoteHash)
   if (obj.result) {
     stream.writeUInt8(1)
-    stream.writeString(safeStringify(obj.result))
+    stream.writeString(Utils.safeStringify(obj.result))
   } else {
     stream.writeUInt8(0)
   }
@@ -42,7 +42,7 @@ export function deserializeGetConfirmOrChallengeResp(stream: VectorBufferStream)
   const hasResult = stream.readUInt8() === 1
   let result: ConfirmOrChallengeMessage | undefined
   if (hasResult) {
-    result = safeJsonParse(stream.readString())
+    result = Utils.safeJsonParse(stream.readString())
   }
   const uniqueCount = stream.readUInt32()
   return {

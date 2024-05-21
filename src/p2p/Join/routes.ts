@@ -32,7 +32,7 @@ import { logFlags } from '../../logger'
 import { SyncStarted } from '@shardus/types/build/src/p2p/JoinTypes'
 import { addSyncStarted } from './v2/syncStarted'
 import { addStandbyRefresh } from './v2/standbyRefresh'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 import { testFailChance } from '../../utils'
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
@@ -40,7 +40,7 @@ const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'cyclemarker',
   handler: (_req, res) => {
     const marker = CycleChain.newest ? CycleChain.newest.previous : '0'.repeat(64)
-    res.send(safeStringify(marker))
+    res.send(Utils.safeStringify(marker))
   },
 }
 
@@ -105,8 +105,8 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
 
     if (!externalPortReachable || !internalPortReachable) {
       /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-reject: !externalPortReachable || !internalPortReachable` )
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: !externalPortReachable || !internalPortReachable ${joinRequest.nodeInfo.publicKey} ${safeStringify({ host: externalIp, port: externalPort })}`)
-      return res.send(safeStringify({
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: !externalPortReachable || !internalPortReachable ${joinRequest.nodeInfo.publicKey} ${Utils.safeStringify({ host: externalIp, port: externalPort })}`)
+      return res.send(Utils.safeStringify({
         success: false,
         fatal: true,
         //the following message string is used by submitJoinV2.  if you change the string please update submitJoinV2
@@ -150,7 +150,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       const selectionNumResult = computeSelectionNum(joinRequest)
       if (selectionNumResult.isErr()) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: failed selection number ${selectionNumResult.error.reason}`)
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`, safeStringify(selectionNumResult.error) )
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`, Utils.safeStringify(selectionNumResult.error) )
         return res.status(500).json(selectionNumResult.error)
       }
       joinRequest.selectionNum = selectionNumResult.value
@@ -186,7 +186,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
         Comms.sendGossip('gossip-join', joinRequest, '', null, NodeList.byIdOrder, true)
         nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
       }
-      return res.send(safeStringify(joinRequestResponse))
+      return res.send(Utils.safeStringify(joinRequestResponse))
     }
   },
 }
@@ -245,13 +245,13 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
     let err = utils.validateTypes(req, { body: 'o' })
     if (err) {
       warn('/standby-refresh bad req ' + err)
-      // use res.send(safeStringify({ })) if returning an object
+      // use res.send(Utils.safeStringify({ })) if returning an object
       res.json()
     }
     err = utils.validateTypes(standbyRefreshRequest, { publicKey: 's', cycleNumber: 'n', sign: 'o' })
     if (err) {
       warn('/standby-refresh bad standby refresh request ' + err)
-      // use res.send(safeStringify({ })) if returning an object
+      // use res.send(Utils.safeStringify({ })) if returning an object
       res.json()
     }
 
@@ -273,18 +273,18 @@ const joinedV2Route: P2P.P2PTypes.Route<Handler> = {
     let err = utils.validateTypes(req, { params: 'o' })
     if (err) {
       warn('joined/:publicKey bad req ' + err)
-      // use res.send(safeStringify({ })) if returning an object
+      // use res.send(Utils.safeStringify({ })) if returning an object
       res.json()
     }
     err = utils.validateTypes(req.params, { publicKey: 's' })
     if (err) {
       warn('joined/:publicKey bad req.params ' + err)
-      // use res.send(safeStringify({ })) if returning an object
+      // use res.send(Utils.safeStringify({ })) if returning an object
       res.json()
     }
     const publicKey = req.params.publicKey
     const id = NodeList.byPubKey.get(publicKey)?.id || null
-    res.send(safeStringify({ id, isOnStandbyList: isOnStandbyList(publicKey) }))
+    res.send(Utils.safeStringify({ id, isOnStandbyList: isOnStandbyList(publicKey) }))
   },
 }
 
@@ -296,18 +296,18 @@ const joinedRoute: P2P.P2PTypes.Route<Handler> = {
     let err = utils.validateTypes(req, { params: 'o' })
     if (err) {
       warn('joined/:publicKey bad req ' + err)
-      // use res.send(safeStringify({ })) if returning an object
+      // use res.send(Utils.safeStringify({ })) if returning an object
       res.json()
     }
     err = utils.validateTypes(req.params, { publicKey: 's' })
     if (err) {
       warn('joined/:publicKey bad req.params ' + err)
-      // use res.send(safeStringify({ })) if returning an object
+      // use res.send(Utils.safeStringify({ })) if returning an object
       res.json()
     }
     const publicKey = req.params.publicKey
     const node = NodeList.byPubKey.get(publicKey)
-    res.send(safeStringify({ node }))
+    res.send(Utils.safeStringify({ node }))
   },
 }
 
@@ -420,7 +420,7 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
   const selectionNumResult = computeSelectionNum(payload)
   if (selectionNumResult.isErr()) {
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-gossip-reject:  node already standby` )
-    /* prettier-ignore */ if (logFlags.p2pNonFatal)console.error( `failed to compute selection number for node ${payload.nodeInfo.publicKey}:`, safeStringify(selectionNumResult.error) )
+    /* prettier-ignore */ if (logFlags.p2pNonFatal)console.error( `failed to compute selection number for node ${payload.nodeInfo.publicKey}:`, Utils.safeStringify(selectionNumResult.error) )
     return
   }
   payload.selectionNum = selectionNumResult.value

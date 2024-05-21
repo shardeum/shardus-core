@@ -11,7 +11,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { currentCycle } from './CycleCreator'
 import { getExpiredRemovedV2 } from './ModeSystemFuncs'
 import { logFlags } from '../logger'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 /** STATE */
 
@@ -158,7 +158,7 @@ export function getExpiredRemoved(
     lastLoggedCycle = cycle
     info(
       'scale down dump:' +
-        safeStringify({
+        Utils.safeStringify({
           cycle,
           scaleFactor: CycleCreator.scaleFactor,
           scaleDownRemove,

@@ -78,7 +78,7 @@ import {
   deserializeSignAppDataResp,
   serializeSignAppDataResp,
 } from '../types/SignAppDataResp'
-import { safeStringify, safeJsonParse } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 import { isNodeInRotationBounds } from '../p2p/Utils'
 import ShardFunctions from '../state-manager/shardFunctions'
 import SocketIO from 'socket.io'
@@ -1331,7 +1331,7 @@ class Shardus extends EventEmitter {
     if (!this.appProvided)
       throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
     if (logFlags.verbose)
-      this.mainLogger.debug(`Start of injectTransaction ${safeStringify(tx)} set:${set} global:${global}`) // not reducing tx here so we can get the long hashes
+      this.mainLogger.debug(`Start of injectTransaction ${Utils.safeStringify(tx)} set:${set} global:${global}`) // not reducing tx here so we can get the long hashes
     if (!this.stateManager.accountSync.dataSyncMainPhaseComplete) {
       this.statistics.incrementCounter('txRejected')
       nestedCountersInstance.countEvent('rejected', '!dataSyncMainPhaseComplete')
@@ -1352,7 +1352,7 @@ class Shardus extends EventEmitter {
           // This ok because we are initializing a global at the set time period
         } else {
           if (logFlags.verbose)
-            this.mainLogger.debug(`txRejected ${safeStringify(tx)} set:${set} global:${global}`)
+            this.mainLogger.debug(`txRejected ${Utils.safeStringify(tx)} set:${set} global:${global}`)
 
           this.statistics.incrementCounter('txRejected')
           nestedCountersInstance.countEvent('rejected', '!allowTransactions')
@@ -1578,7 +1578,7 @@ class Shardus extends EventEmitter {
     if (homeNode == null) {
       return { success: false, reason: `Home node not found for account ${senderAddress}`, status: 500 }
     }
-    /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `forwardTransactionToLuckyNodes: homeNode: ${homeNode.node.id} closetNodeIds: ${safeStringify( closetNodeIds.sort() )}` )
+    /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `forwardTransactionToLuckyNodes: homeNode: ${homeNode.node.id} closetNodeIds: ${Utils.safeStringify( closetNodeIds.sort() )}` )
 
     let selectedValidators = []
     if (Self.id != homeNode.node.id)
@@ -1633,10 +1633,10 @@ class Shardus extends EventEmitter {
         this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_req_${context} ${activeIdToPartition.get(validator.id)}`)
 
         if (validator.id === homeNode.node.id) {
-          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to home node ${validator.id} reason: ${message} ${safeStringify(tx)}` )
+          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to home node ${validator.id} reason: ${message} ${Utils.safeStringify(tx)}` )
           nestedCountersInstance.countEvent('statistics', `forwardTxToHomeNode: ${message}`)
         } else {
-          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to consensus group. reason: ${message} ${safeStringify(tx)}` )
+          /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to consensus group. reason: ${message} ${Utils.safeStringify(tx)}` )
           nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: ${message}`)
         }
         
@@ -1662,8 +1662,8 @@ class Shardus extends EventEmitter {
         /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx to ${validator.id} failed. ${message} ${utils.stringify(tx)} error: ${ e.stack }` )
       }
     }
-    nestedCountersInstance.countEvent('statistics', `forward failed: ${safeStringify(stats)}`)
-    /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx out of tries. ${safeStringify(stats)} ${safeStringify(tx)} ` )
+    nestedCountersInstance.countEvent('statistics', `forward failed: ${Utils.safeStringify(stats)}`)
+    /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx out of tries. ${Utils.safeStringify(stats)} ${Utils.safeStringify(tx)} ` )
     return { success: false, reason: 'No validators found to forward the transaction', status: 500 }
   }
 
@@ -2144,7 +2144,7 @@ class Shardus extends EventEmitter {
       if (req.query.set) {
         this.debugForeverLoopsEnabled = req.query.set === 'true'
       }
-      res.send(safeStringify(`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`))
+      res.send(Utils.safeStringify(`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`))
     })
   }
 
@@ -2679,7 +2679,7 @@ class Shardus extends EventEmitter {
       } else {
         console.log('binarySerializeObject not implemented')
         applicationInterfaceImpl.binarySerializeObject = (identifier: string, obj: any): Buffer => {
-          return Buffer.from(safeStringify(obj), 'utf8')
+          return Buffer.from(Utils.safeStringify(obj), 'utf8')
         }
       }
       if (typeof application.binaryDeserializeObject === 'function') {
@@ -2692,7 +2692,7 @@ class Shardus extends EventEmitter {
       } else {
         console.log('binaryDeserializeObject not implemented')
         applicationInterfaceImpl.binaryDeserializeObject = (identifier: string, buffer: Buffer): any => {
-          return safeJsonParse(buffer.toString('utf8'))
+          return Utils.safeJsonParse(buffer.toString('utf8'))
         }
       }
       if (typeof application.getTxSenderAddress === 'function') {
@@ -2727,20 +2727,20 @@ class Shardus extends EventEmitter {
   _registerRoutes() {
     // DEBUG routes
     this.network.registerExternalPost('exit', isDebugModeMiddlewareHigh, async (req, res) => {
-      res.send(safeStringify({ success: true }))
+      res.send(Utils.safeStringify({ success: true }))
       await this.shutdown()
     })
     // TODO elevate security beyond high when we get multi sig.  or is that too slow when needed?
     this.network.registerExternalPost('exit-apop', isDebugModeMiddlewareHigh, async (req, res) => {
       apoptosizeSelf('Apoptosis called at exit-apop route')
-      res.send(safeStringify({ success: true }))
+      res.send(Utils.safeStringify({ success: true }))
     })
 
     this.network.registerExternalGet('config', isDebugModeMiddlewareLow, async (req, res) => {
-      res.send(safeStringify({ config: this.config }))
+      res.send(Utils.safeStringify({ config: this.config }))
     })
     this.network.registerExternalGet('netconfig', async (req, res) => {
-      res.send(safeStringify({ config: netConfig }))
+      res.send(Utils.safeStringify({ config: netConfig }))
     })
 
     this.network.registerExternalGet('nodeInfo', async (req, res) => {
@@ -2761,7 +2761,7 @@ class Shardus extends EventEmitter {
           lostArchiversMap: lostArchiversMap,
         }
       }
-      res.send(safeStringify(result))
+      res.send(Utils.safeStringify(result))
     })
 
     this.network.registerExternalGet('joinInfo', isDebugModeMiddlewareMedium, async (req, res) => {
@@ -2782,7 +2782,7 @@ class Shardus extends EventEmitter {
         getLastHashedStandbyList: JoinV2.getLastHashedStandbyList(),
         getSortedStandbyNodeList: JoinV2.getSortedStandbyJoinRequests(),
       }
-      res.send(safeStringify(deepReplace(result, undefined, '__undefined__')))
+      res.send(Utils.safeStringify(deepReplace(result, undefined, '__undefined__')))
     })
 
     this.network.registerExternalGet('standby-list-debug', isDebugModeMiddlewareLow, async (req, res) => {
@@ -2792,21 +2792,21 @@ class Shardus extends EventEmitter {
         ip: node.nodeInfo.externalIp,
         port: node.nodeInfo.externalPort,
       }))
-      res.send(safeStringify(result))
+      res.send(Utils.safeStringify(result))
     })
 
     this.network.registerExternalGet('status-history', isDebugModeMiddlewareLow, async (req, res) => {
       let result = Self.getStatusHistoryCopy()
-      res.send(safeStringify(deepReplace(result, undefined, '__undefined__')))
+      res.send(Utils.safeStringify(deepReplace(result, undefined, '__undefined__')))
     })
 
     this.network.registerExternalGet('socketReport', isDebugModeMiddlewareLow, async (req, res) => {
-      res.send(safeStringify(await getSocketReport()))
+      res.send(Utils.safeStringify(await getSocketReport()))
     })
     this.network.registerExternalGet('forceCycleSync', isDebugModeMiddleware, async (req, res) => {
       let enable = req.query.enable === 'true' || false
       config.p2p.hackForceCycleSyncComplete = enable
-      res.send(safeStringify(await getSocketReport()))
+      res.send(Utils.safeStringify(await getSocketReport()))
     })
 
     this.p2p.registerInternal(
@@ -2874,7 +2874,7 @@ class Shardus extends EventEmitter {
         this.mainLogger.debug(`testGlobalAccountTX: req:${utils.stringifyReduce(req.body)}`)
         const tx = req.body.tx
         this.put(tx, false, true)
-        res.send(safeStringify({ success: true }))
+        res.send(Utils.safeStringify({ success: true }))
       } catch (ex) {
         this.mainLogger.debug('testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.shardus_fatal(
@@ -2889,7 +2889,7 @@ class Shardus extends EventEmitter {
         this.mainLogger.debug(`testGlobalAccountTXSet: req:${utils.stringifyReduce(req.body)}`)
         const tx = req.body.tx
         this.put(tx, true, true)
-        res.send(safeStringify({ success: true }))
+        res.send(Utils.safeStringify({ success: true }))
       } catch (ex) {
         this.mainLogger.debug('testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.shardus_fatal(
@@ -3060,7 +3060,7 @@ class Shardus extends EventEmitter {
       scopedReport.cycle = lastCycle.counter
       scopedReport.node = `${Self.ip}:${Self.port}`
       scopedReport.id = utils.makeShortHash(Self.id)
-      nestedCountersInstance.countRareEvent('scopedTimeReport', safeStringify(scopedReport))
+      nestedCountersInstance.countRareEvent('scopedTimeReport', Utils.safeStringify(scopedReport))
     }
   }
 

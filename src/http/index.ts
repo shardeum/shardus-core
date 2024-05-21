@@ -1,7 +1,7 @@
 import { parse as parseUrl } from 'url'
 import got from 'got'
 import { logFlags } from '../logger'
-import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 import { stringifyReduceLimit } from '../utils'
 
 let _logger = null
@@ -27,7 +27,7 @@ async function _get(host, logIndex, timeout = 1000) {
       retry: 0, // Omar - setting this to 0.
       json: true,
     })
-    return { ...res, body: safeJsonParse(safeStringify(res.body)) }
+    return { ...res, body: Utils.safeJsonParse(Utils.safeStringify(res.body)) }
   } catch (error) {
     if (logFlags.playback === false && logFlags.verbose === false) {
       throw error
@@ -76,7 +76,7 @@ async function _post(host, payload, logIndex, timeout = 1000) {
 
     //if (getResponseObj) return res
     //return res.body
-    return { ...res, body: safeJsonParse(safeStringify(res.body)) }
+    return { ...res, body: Utils.safeJsonParse(Utils.safeStringify(res.body)) }
   } catch (error) {
     if (logFlags.playback === false && logFlags.verbose === false) {
       throw error
@@ -114,20 +114,20 @@ function logError(method: string, error: any, host: any, logIndex: any) {
   if (error.code === 'ETIMEDOUT') {
     /* prettier-ignore */ if (logFlags.verbose) console.error(`${method}: HTTP request timed out:`, error)
     if (_logger) {
-      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-timeout', host.pathname, logIndex, safeStringify(error))
+      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-timeout', host.pathname, logIndex, Utils.safeStringify(error))
     }
     throw error
   } else if (error.response && error.response.statusCode === 400) {
     /* prettier-ignore */ if (logFlags.verbose) console.error(`${method}: Bad Request:`, error.message, ' ', error)
     if (_logger) {
-      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-400', host.pathname, logIndex, safeStringify(error))
+      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-400', host.pathname, logIndex, Utils.safeStringify(error))
     }
     throw error
   } else {
     // Handle other errors
     /* prettier-ignore */ if (logFlags.verbose) console.error(`${method}: An unexpected error occurred:`, error)
     if (_logger) {
-      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-err', host.pathname, logIndex, safeStringify(error))
+      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-err', host.pathname, logIndex, Utils.safeStringify(error))
     }
     throw error
   }

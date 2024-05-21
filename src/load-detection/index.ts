@@ -6,7 +6,7 @@ import { profilerInstance, NodeLoad } from '../utils/profiler'
 import * as Context from '../p2p/Context'
 import { memoryReportingInstance } from '../utils/memoryReporting'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 interface LoadDetection {
   highThreshold: number /** if load > highThreshold, then scale up request */
@@ -73,7 +73,7 @@ class LoadDetection extends EventEmitter {
         // todo: reject if request is not coming from node operator dashboard
         const load = this.getCurrentLoad()
         const nodeLoad = this.getCurrentNodeLoad()
-        return res.send(safeStringify({load, nodeLoad}))
+        return res.send(Utils.safeStringify({load, nodeLoad}))
       } catch (e) {
         console.log(`Error getting load: ${e.message}`);
       }

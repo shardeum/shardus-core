@@ -1,4 +1,4 @@
-import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 import { stateManager } from '../p2p/Context'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { AppObjEnum } from './enum/AppObjEnum'
@@ -24,7 +24,7 @@ export function serializeWrappedData(stream: VectorBufferStream, obj: WrappedDat
   stream.writeBigUInt64(BigInt(obj.timestamp))
   if (obj.syncData !== undefined) {
     stream.writeUInt8(1)
-    stream.writeString(safeStringify(obj.syncData))
+    stream.writeString(Utils.safeStringify(obj.syncData))
   } else {
     stream.writeUInt8(0)
   }
@@ -40,6 +40,6 @@ export function deserializeWrappedData(stream: VectorBufferStream): WrappedData 
     stateId: stream.readString(),
     data: stateManager.app.binaryDeserializeObject(AppObjEnum.AppData, stream.readBuffer()),
     timestamp: Number(stream.readBigUInt64()),
-    syncData: stream.readUInt8() === 1 ? safeJsonParse(stream.readString()) : undefined,
+    syncData: stream.readUInt8() === 1 ? Utils.safeJsonParse(stream.readString()) : undefined,
   }
 }

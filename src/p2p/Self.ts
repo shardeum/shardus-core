@@ -32,7 +32,7 @@ import { insertSyncStarted } from './Join/v2/syncStarted'
 import { submitStandbyRefresh } from './Join/v2/standbyRefresh'
 import { getNumArchivers } from './Archivers'
 import { currentQuarter } from './CycleCreator'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 /** STATE */
 
@@ -324,7 +324,7 @@ export function startupV2(): Promise<boolean> {
         // Query network for node status
         const resp = await Join.fetchJoinedV2(activeNodes)
 
-        info(`startupV2: resp ${safeStringify(resp)}`)
+        info(`startupV2: resp ${Utils.safeStringify(resp)}`)
         nestedCountersInstance.countEvent('p2p', `fetchJoinedV2: isOnStandbyList: ${resp.isOnStandbyList} id: ${resp.id}`)
 
         // note the list below is in priority order of what operation is the most important
@@ -940,7 +940,7 @@ async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
         activeNodesSigned.nodeList.length === 0
       ) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: no nodes in nodelist yet. ${dbgContex}`, 1)
-        info(`contactArchiver: no nodes in nodelist yet, or seedlist null ${safeStringify(activeNodesSigned)}`)
+        info(`contactArchiver: no nodes in nodelist yet, or seedlist null ${Utils.safeStringify(activeNodesSigned)}`)
         await utils.sleep(1000) // no nodes in nodelist yet so please take a breather. would be smarter to ask each archiver only once but 
                                 // but do not want to refactor that much right now
         if (retry === 1) {
@@ -953,7 +953,7 @@ async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
       }
       if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: verify failed. ${dbgContex}`, 1)
-        info(`contactArchiver:  seedlist failed verification ${safeStringify(activeNodesSigned)}`)
+        info(`contactArchiver:  seedlist failed verification ${Utils.safeStringify(activeNodesSigned)}`)
         throw Error(
           `Fatal: _getSeedNodes seed list was not signed by archiver!. Archiver: ${archiver.ip}:${archiver.port}, signature: ${activeNodesSigned.sign}`
         )
@@ -974,7 +974,7 @@ async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
 
   info(`contactArchiver: passed ${archiver.ip} retry:${retry}`)
 
-  info(`contactArchiver: activeNodesSigned:${safeStringify(activeNodesSigned?.joinRequest)} restartCycleRecord:${safeStringify(activeNodesSigned?.restartCycleRecord)}`)
+  info(`contactArchiver: activeNodesSigned:${Utils.safeStringify(activeNodesSigned?.joinRequest)} restartCycleRecord:${Utils.safeStringify(activeNodesSigned?.restartCycleRecord)}`)
 
   const joinRequest: P2P.ArchiversTypes.Request | undefined = activeNodesSigned.joinRequest as
     | P2P.ArchiversTypes.Request
@@ -1085,7 +1085,7 @@ async function getActiveNodesFromArchiver(
   }
 
   const seedListSigned = seedListResult.value
-  if (logFlags.p2pNonFatal) info(`Got signed seed list: ${safeStringify(seedListSigned)}`)
+  if (logFlags.p2pNonFatal) info(`Got signed seed list: ${Utils.safeStringify(seedListSigned)}`)
   return seedListSigned
 }
 
@@ -1106,7 +1106,7 @@ export async function getFullNodesFromArchiver(
   }
 
   const fullNodeList = fullNodeListResult.value
-  if (logFlags.p2pNonFatal) info(`Got signed full node list: ${safeStringify(fullNodeList)}`)
+  if (logFlags.p2pNonFatal) info(`Got signed full node list: ${Utils.safeStringify(fullNodeList)}`)
   return fullNodeList
 }
 
@@ -1173,7 +1173,7 @@ export function getThisNodeInfo(): P2P.P2PTypes.P2PNode {
     syncingTimestamp,
     readyTimestamp,
   }
-  if (logFlags.p2pNonFatal) info(`Node info of this node: ${safeStringify(nodeInfo)}`)
+  if (logFlags.p2pNonFatal) info(`Node info of this node: ${Utils.safeStringify(nodeInfo)}`)
   return nodeInfo
 }
 

@@ -13,7 +13,7 @@ import rfdc from 'rfdc'
 import { logFlags } from '../logger'
 import { nestedCountersInstance } from '..'
 import { shardusGetTime } from '../network'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 const clone = rfdc()
 
@@ -53,14 +53,14 @@ export function init() {
         standby: Join.getNodeRequestingJoin().length,
         desired: CycleChain.newest.desired,
       }
-      return res.send(safeStringify(networkStats))
+      return res.send(Utils.safeStringify(networkStats))
     } catch (e) {
       console.log(`Error getting load: ${e.message}`)
     }
   })
   network.registerExternalGet('age-index', isDebugModeMiddlewareLow, (req, res) => {
     try {
-      return res.send(safeStringify(getAgeIndex()))
+      return res.send(Utils.safeStringify(getAgeIndex()))
     } catch (e) {
       console.log(`Error getting age index: ${e.message}`)
     }
@@ -95,7 +95,7 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
 
   // Don't add duplicates
   if (nodes.has(node.id)) {
-    warn(`NodeList.addNode: tried to add duplicate ${node.externalPort}: ${safeStringify(node)}\n` + `${caller}`)
+    warn(`NodeList.addNode: tried to add duplicate ${node.externalPort}: ${Utils.safeStringify(node)}\n` + `${caller}`)
 
     return
   }
@@ -383,8 +383,8 @@ export function getDebug() {
       `
   if (VERBOSE)
     output += `
-    NODELIST:   ${safeStringify(byJoinOrder)}
-    CYCLECHAIN: ${safeStringify(CycleChain.cycles)}
+    NODELIST:   ${Utils.safeStringify(byJoinOrder)}
+    CYCLECHAIN: ${Utils.safeStringify(CycleChain.cycles)}
   `
   return output
 }
@@ -416,7 +416,7 @@ export function computeNewNodeListHash(): hexstring {
   // deep cloning is necessary as validator information may be mutated by
   // reference.
   lastHashedList = clone(byJoinOrder)
-  /* prettier-ignore */ if (logFlags.verbose) info('hashing validator list:', safeStringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.verbose) info('hashing validator list:', Utils.safeStringify(lastHashedList))
   let hash = crypto.hash(lastHashedList)
   /* prettier-ignore */ if (logFlags.verbose) info('the new validator list hash is', hash)
   return hash
@@ -443,7 +443,7 @@ let lastHashedList: P2P.NodeListTypes.Node[] = []
 
 /** Returns the last list of nodes that had its hash computed. */
 export function getLastHashedNodeList(): P2P.NodeListTypes.Node[] {
-  /* prettier-ignore */ if (logFlags.verbose) info('returning last hashed validator list:', safeStringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.verbose) info('returning last hashed validator list:', Utils.safeStringify(lastHashedList))
   return lastHashedList
 }
 

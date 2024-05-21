@@ -27,7 +27,7 @@ import { profilerInstance } from '../../utils/profiler'
 import { deserializeLostArchiverInvestigateReq } from '../../types/LostArchiverInvestigateReq'
 import { getStreamWithTypeCheck } from '../../types/Helpers'
 import { TypeIdentifierEnum } from '../../types/enum/TypeIdentifierEnum'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 /** Gossip */
 
@@ -265,7 +265,7 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
       logging.warn(
         `refuteLostArchiverRoute: invalid archiver up message error: ${error}, payload: ${inspect(req.body)}`
       )
-      res.send(safeStringify({ status: 'failure', message: error }))
+      res.send(Utils.safeStringify({ status: 'failure', message: error }))
       return
     }
     const refuteMsg = req.body as SignedObject<ArchiverRefutesLostMsg>
@@ -278,7 +278,7 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
     }
     if (record.status !== 'up') record.status = 'up'
     if (!record.archiverRefuteMsg) record.archiverRefuteMsg = refuteMsg
-    res.send(safeStringify({ status: 'success' }))
+    res.send(Utils.safeStringify({ status: 'success' }))
   },
 }
 
@@ -301,7 +301,7 @@ const reportFakeLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
     if (archiver) {
       funcs.reportLostArchiver(archiver.publicKey, 'fake lost archiver report')
       res.send(
-        safeStringify(
+        Utils.safeStringify(
           crypto.sign({
             status: 'accepted',
             pick,
@@ -312,7 +312,7 @@ const reportFakeLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
       )
     } else {
       res.send(
-        safeStringify(
+        Utils.safeStringify(
           crypto.sign({
             status: 'failed',
             pick,

@@ -1,4 +1,4 @@
-import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 import { AcceptedTx, WrappedResponses } from '../state-manager/state-manager-types'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import {
@@ -54,11 +54,11 @@ export function serializeRequestTxAndStateResp(
 
   stream.writeUInt8(obj.acceptedTX !== undefined ? 1 : 0)
   if (obj.acceptedTX !== undefined) {
-    stream.writeString(safeStringify(obj.acceptedTX))
+    stream.writeString(Utils.safeStringify(obj.acceptedTX))
   }
   stream.writeUInt8(obj.originalData !== undefined ? 1 : 0)
   if (obj.originalData !== undefined) {
-    stream.writeString(safeStringify(obj.originalData))
+    stream.writeString(Utils.safeStringify(obj.originalData))
   }
 }
 
@@ -101,11 +101,11 @@ export function deserializeRequestTxAndStateResp(stream: VectorBufferStream): Re
 
   if (stream.readUInt8() === 1) {
     // Check if acceptedTX is present
-    result.acceptedTX = safeJsonParse(stream.readString())
+    result.acceptedTX = Utils.safeJsonParse(stream.readString())
   }
   if (stream.readUInt8() === 1) {
     // Check if originalData is present
-    result.originalData = safeJsonParse(stream.readString())
+    result.originalData = Utils.safeJsonParse(stream.readString())
   }
 
   return result

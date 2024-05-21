@@ -89,7 +89,7 @@ import {
   serializeGetTrieAccountHashesResp,
 } from '../types/GetTrieAccountHashesResp'
 import { BadRequest, InternalError, serializeResponseError } from '../types/ResponseError'
-import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 type Line = {
   raw: string
@@ -1195,7 +1195,7 @@ class AccountPatcher {
 
           //strip noisy fields
           const tempString = JSON.stringify(trieRoot, utils.debugReplacer)
-          const processedObject = safeJsonParse(tempString)
+          const processedObject = Utils.safeJsonParse(tempString)
 
           // use stringify to put a stable sort on the object keys (important for comparisons)
           const finalStr = utils.stringifyReduce(processedObject)
@@ -1223,12 +1223,12 @@ class AccountPatcher {
           let hashTrieNode = layerMap.get(radix.toLowerCase())
           if (!subTree) {
             // deep clone the trie node before removing children property
-            hashTrieNode = safeJsonParse(safeStringify(hashTrieNode))
+            hashTrieNode = Utils.safeJsonParse(Utils.safeStringify(hashTrieNode))
             delete hashTrieNode.children
           }
           //strip noisy fields
           const tempString = JSON.stringify(hashTrieNode, utils.debugReplacer)
-          const processedObject = safeJsonParse(tempString)
+          const processedObject = Utils.safeJsonParse(tempString)
 
           // use stringify to put a stable sort on the object keys (important for comparisons)
           const finalStr = utils.stringifyReduce(processedObject)
@@ -1257,7 +1257,7 @@ class AccountPatcher {
           const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
           if (!hashTrieSyncConsensus) {
-            return res.send(safeStringify({ error: `Unable to find hashTrieSyncConsensus for last cycle ${lastCycle}` }))
+            return res.send(Utils.safeStringify({ error: `Unable to find hashTrieSyncConsensus for last cycle ${lastCycle}` }))
           }
 
           for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
@@ -1287,7 +1287,7 @@ class AccountPatcher {
               if (!isRadixInSync) outOfSyncRadix[radix] = simpleMap // eslint-disable-line security/detect-object-injection
             }
           }
-          return res.send(safeStringify({
+          return res.send(Utils.safeStringify({
             cycle,
             notEnoughVotesRadix,
             outOfSyncRadix,
@@ -1373,9 +1373,9 @@ class AccountPatcher {
         const accountHash = this.stateManager.accountCache.getAccountHash(id)
         const accountHashFull = this.stateManager.accountCache.getAccountDebugObject(id) //this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(id)
         const accountData = await this.app.getAccountDataByList([id])
-        res.write(`trieAccount: ${safeStringify(trieAccount)} \n`)
-        res.write(`accountHash: ${safeStringify(accountHash)} \n`)
-        res.write(`accountHashFull: ${safeStringify(accountHashFull)} \n`)
+        res.write(`trieAccount: ${Utils.safeStringify(trieAccount)} \n`)
+        res.write(`accountHash: ${Utils.safeStringify(accountHash)} \n`)
+        res.write(`accountHashFull: ${Utils.safeStringify(accountHashFull)} \n`)
         res.write(`accountData: ${JSON.stringify(accountData, appdata_replacer)} \n\n`)
         res.write(`tests: \n`)
         if (accountData != null && accountData.length === 1 && accountHash != null) {
@@ -1429,7 +1429,7 @@ class AccountPatcher {
 
         if (possibleAccountsIds.length === 0) {
           res.write(
-            safeStringify({
+            Utils.safeStringify({
               success: false,
               error: 'could not find account',
             })
@@ -1463,7 +1463,7 @@ class AccountPatcher {
             }
           }
           res.write(
-            safeStringify({
+            Utils.safeStringify({
               success: true,
               result: resObj,
             })
@@ -1471,7 +1471,7 @@ class AccountPatcher {
         }
       } catch (e) {
         res.write(
-          safeStringify({
+          Utils.safeStringify({
             success: false,
             error: e,
           })
@@ -2412,7 +2412,7 @@ class AccountPatcher {
     for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
       const votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
       const ourTrieNode = this.shardTrie.layerMaps[this.treeSyncDepth].get(radix)
-      if (logFlags.debug) this.mainLogger.debug(`Checking isInSync ${radix}, cycle: ${cycle}, ${safeStringify(votesMap)}`);
+      if (logFlags.debug) this.mainLogger.debug(`Checking isInSync ${radix}, cycle: ${cycle}, ${Utils.safeStringify(votesMap)}`);
 
       const nonConsensusRanges = this.getNonConsensusRanges(cycle)
       const nonStorageRanges = this.getNonStoredRanges(cycle)
@@ -2684,13 +2684,13 @@ class AccountPatcher {
       const remoteChildrenToDiff: RadixAndHashWithNodeId[] = await this.getChildrenOf(toFix, cycle)
 
       if (remoteChildrenToDiff == null) {
-        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts remoteChildrenToDiff == null for radixes: ${safeStringify(toFix)}, cycle: ${cycle}`, 1)
+        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts remoteChildrenToDiff == null for radixes: ${Utils.safeStringify(toFix)}, cycle: ${cycle}`, 1)
       }
       if (remoteChildrenToDiff.length === 0) {
-        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts remoteChildrenToDiff.length = 0 for radixes: ${safeStringify(toFix)}, cycle: ${cycle}`, 1)
+        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts remoteChildrenToDiff.length = 0 for radixes: ${Utils.safeStringify(toFix)}, cycle: ${cycle}`, 1)
       }
 
-      this.mainLogger.debug(`findBadAccounts ${cycle}: level: ${level}, toFix: ${toFix.length}, childrenToDiff: ${safeStringify(remoteChildrenToDiff)}, badLayerMap: ${safeStringify(badLayerMap)}`)
+      this.mainLogger.debug(`findBadAccounts ${cycle}: level: ${level}, toFix: ${toFix.length}, childrenToDiff: ${Utils.safeStringify(remoteChildrenToDiff)}, badLayerMap: ${Utils.safeStringify(badLayerMap)}`)
       toFix = this.diffConsenus(remoteChildrenToDiff, badLayerMap)
 
       stats.subHashesTested += toFix.length
@@ -3348,7 +3348,7 @@ class AccountPatcher {
 
     let isInsyncResult = this.isInSync(cycle)
     this.lastInSyncResult = isInsyncResult
-    if (logFlags.debug) this.mainLogger.debug(`isInSync: cycle: ${cycle}, isInsyncResult: ${safeStringify(isInsyncResult)}`)
+    if (logFlags.debug) this.mainLogger.debug(`isInSync: cycle: ${cycle}, isInsyncResult: ${Utils.safeStringify(isInsyncResult)}`)
     if (isInsyncResult == null || isInsyncResult.insync === false) {
       let failHistoryObject: { repaired: number; s: number; e: number; cycles: number }
       if (lastFail === false) {
@@ -3371,14 +3371,14 @@ class AccountPatcher {
       /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `accountHashesChecked c:${cycle}`, results.accountHashesChecked)
 
       if (logFlags.debug) {
-        this.mainLogger.debug(`badAccounts cycle: ${cycle}, ourBadAccounts: ${results.badAccounts.length}, ourBadAccounts: ${safeStringify(results.badAccounts)}`)
+        this.mainLogger.debug(`badAccounts cycle: ${cycle}, ourBadAccounts: ${results.badAccounts.length}, ourBadAccounts: ${Utils.safeStringify(results.badAccounts)}`)
       }
       if (results.accountsTheyNeedToRepair.length > 0 || results.extraBadAccounts.length > 0) {
         let accountsTheyNeedToRepair = [...results.accountsTheyNeedToRepair]
         if (results.extraBadAccounts.length > 0) {
           accountsTheyNeedToRepair = accountsTheyNeedToRepair.concat(results.extraBadAccounts)
         }
-        this.mainLogger.debug(`badAccounts cycle: ${cycle}, accountsTheyNeedToRepair: ${accountsTheyNeedToRepair.length}, accountsTheyNeedToRepair: ${safeStringify(accountsTheyNeedToRepair)}`)
+        this.mainLogger.debug(`badAccounts cycle: ${cycle}, accountsTheyNeedToRepair: ${accountsTheyNeedToRepair.length}, accountsTheyNeedToRepair: ${Utils.safeStringify(accountsTheyNeedToRepair)}`)
         this.requestOtherNodesToRepair(accountsTheyNeedToRepair)
       }
 
@@ -3400,7 +3400,7 @@ class AccountPatcher {
       if (results.extraBadKeys.length > 0) {
         this.statemanager_fatal(
           'checkAndSetAccountData extra bad keys',
-          `c:${cycle} extra bad keys: ${safeStringify(results.extraBadKeys)}  `
+          `c:${cycle} extra bad keys: ${Utils.safeStringify(results.extraBadKeys)}  `
         )
       }
 
@@ -3704,10 +3704,10 @@ class AccountPatcher {
         failHistoryObject.e = this.failEndCycle
         failHistoryObject.cycles = this.failEndCycle - this.failStartCycle
 
-        /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `inSync again. ${safeStringify(this.syncFailHistory[this.syncFailHistory.length -1])}`)
+        /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `inSync again. ${Utils.safeStringify(this.syncFailHistory[this.syncFailHistory.length -1])}`)
 
         //this is not really a fatal log so should be removed eventually. is is somewhat usefull context though when debugging.
-        this.statemanager_fatal(`inSync again`, safeStringify(this.syncFailHistory))
+        this.statemanager_fatal(`inSync again`, Utils.safeStringify(this.syncFailHistory))
       }
     }
   }
@@ -3967,7 +3967,7 @@ class AccountPatcher {
         //this.generalLog(string)
         let partitionObj: { cycle: number; owner: string }
         try {
-          partitionObj = safeJsonParse(partitionStr)
+          partitionObj = Utils.safeJsonParse(partitionStr)
         } catch (error) {
           this.mainLogger.error('error parsing partitionObj', error, partitionStr)
           continue
@@ -4045,7 +4045,7 @@ class AccountPatcher {
         const voteEntry = votes[key2] // eslint-disable-line security/detect-object-injection
         let voters = ''
         if (key2 !== '[]') {
-          voters = `---voters:${safeStringify(voteEntry.ownerIds)}`
+          voters = `---voters:${Utils.safeStringify(voteEntry.ownerIds)}`
         }
 
         stream.write(`partition: ${key}  votes: ${voteEntry.voteCount} values: ${key2} \t\t\t${voters}\n`)
@@ -4093,7 +4093,7 @@ class AccountPatcher {
         const voteEntry = votes[key2] // eslint-disable-line security/detect-object-injection
         let voters = ''
         if (key2 !== '[]') {
-          voters = `---voters:${safeStringify(voteEntry.ownerIds)}`
+          voters = `---voters:${Utils.safeStringify(voteEntry.ownerIds)}`
         }
 
         stream.write(
@@ -4179,7 +4179,7 @@ class AccountPatcher {
       stream.write(
         `node: ${range.id} ${range.ipPort}\tgraph: ${partitionGraph}\thome: ${
           range.hP
-        }   data:${safeStringify(range)}\n`
+        }   data:${Utils.safeStringify(range)}\n`
       )
     }
     stream.write(`\n\n`)
@@ -4216,12 +4216,12 @@ class AccountPatcher {
       stream.write(
         `node: ${nodesCovered.id} ${nodesCovered.ipPort}\tgraph: ${partitionGraph}\thome: ${
           nodesCovered.hP
-        } data:${safeStringify(nodesCovered)}\n`
+        } data:${Utils.safeStringify(nodesCovered)}\n`
       )
     }
     stream.write(`\n\n`)
     for (const list of nodeLists) {
-      stream.write(`${safeStringify(list)} \n`)
+      stream.write(`${Utils.safeStringify(list)} \n`)
     }
 
     return { allPassed, allPassed2 }

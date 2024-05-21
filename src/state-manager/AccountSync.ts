@@ -54,7 +54,7 @@ import {
   deserializeGlobalAccountReportResp,
 } from '../types/GlobalAccountReportResp'
 import { BadRequest, InternalError, serializeResponseError } from '../types/ResponseError'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 const REDUNDANCY = 3
 
@@ -742,8 +742,8 @@ class AccountSync {
             this.createSyncTrackerByRange(range, cycle, true)
             newTrackers++
           }
-          /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: lastCycle: ${lastCycle} cycle: ${cycle} ${safeStringify({keptGlobal, addedGlobal, cleared, kept, newTrackers })}`)
-          /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: RETRYSYNC lastCycle: lastCycle: ${lastCycle} cycle: ${cycle} ${safeStringify({keptGlobal, addedGlobal, cleared, kept, newTrackers })}`)
+          /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: lastCycle: ${lastCycle} cycle: ${cycle} ${Utils.safeStringify({keptGlobal, addedGlobal, cleared, kept, newTrackers })}`)
+          /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: RETRYSYNC lastCycle: lastCycle: ${lastCycle} cycle: ${cycle} ${Utils.safeStringify({keptGlobal, addedGlobal, cleared, kept, newTrackers })}`)
           continue //resume loop at top!
         } else {
           /* prettier-ignore */ this.statemanager_fatal( `initialSyncMain unhandledEX`, 'initialSyncMain unhandledEX:' + errorToStringFull(error) )
@@ -1338,7 +1338,7 @@ class AccountSync {
       const cycle = this.stateManager.currentCycleShardData.cycleNumber
       const lastCycle = cycle - 1
 
-      /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: runtime. lastCycle: ${lastCycle} cycle: ${cycle} ${safeStringify({ cleared, kept, newTrackers })}`)
+      /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: runtime. lastCycle: ${lastCycle} cycle: ${cycle} ${Utils.safeStringify({ cleared, kept, newTrackers })}`)
 
       // clear all sync trackers.
       this.clearSyncTrackers()

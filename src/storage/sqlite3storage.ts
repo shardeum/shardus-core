@@ -1,5 +1,5 @@
 /* eslint-disable no-empty */
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 import fs from 'fs'
 import Log4js from 'log4js'
 import path from 'path'
@@ -265,7 +265,7 @@ class Sqlite3Storage {
 
         // eslint-disable-next-line security/detect-object-injection
         if (table.isColumnJSON[column]) {
-          value = safeStringify(value)
+          value = Utils.safeStringify(value)
         }
         // if (logFlags.console) console.log(`column: ${column}  ${value}`)
         inputs.push(value)
@@ -481,7 +481,7 @@ class Sqlite3Storage {
           paramEntry.sql = `${paramEntry.name} ${paramEntry.type} ?`
 
           if (table.isColumnJSON[paramEntry.name]) {
-            paramEntry.v1 = safeStringify(paramEntry.v1)
+            paramEntry.v1 = Utils.safeStringify(paramEntry.v1)
           }
           paramEntry.vals = [paramEntry.v1]
         }

@@ -3,7 +3,7 @@ import { Ordering } from '..'
 import { Response } from 'express-serve-static-core'
 import { DevSecurityLevel } from '../../shardus/shardus-types'
 import { nestedCountersInstance } from '../nestedCounters'
-import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 const replacer = (key: string, value: any): any => {
   if (typeof value === 'bigint') {
@@ -57,7 +57,7 @@ export const deepCopy = <T>(obj: T): T => {
   if (typeof obj !== 'object') {
     throw Error('Given element is not of type object.')
   }
-  return safeJsonParse(JSON.stringify(obj, replacer))
+  return Utils.safeJsonParse(JSON.stringify(obj, replacer))
 }
 
 export const mod = (n, m): number => {
@@ -370,7 +370,7 @@ export function compareObjectShape(
   }
   const admirer_schema = generateObjectSchema(admirer, { arrTypeDiversity: true })
 
-  if (safeStringify(idol_schema) === safeStringify(admirer_schema)) {
+  if (Utils.safeStringify(idol_schema) === Utils.safeStringify(admirer_schema)) {
     isValid = true
     return { isValid, error }
   }
@@ -379,7 +379,7 @@ export function compareObjectShape(
   // this function is not meant to be call outside of this block
   const smartComparator = (idol_type, admirer_type): boolean => {
     if (typeof idol_type === 'object' && idol_type.constructor === Object) {
-      return safeStringify(idol_type) === safeStringify(admirer_type)
+      return Utils.safeStringify(idol_type) === Utils.safeStringify(admirer_type)
     } else {
       return idol_type === admirer_type
     }
@@ -526,7 +526,7 @@ export function formatErrorMessage(err: unknown, printStack: boolean = true): st
     //     errMsg += `${key}: ${errObj[key]}\n`
     //   }
     // } else {
-    errMsg = `Unknown error: ${safeStringify(err)}`
+    errMsg = `Unknown error: ${Utils.safeStringify(err)}`
     // }
   } else {
     errMsg = `Unknown error: ${err}`
@@ -563,7 +563,7 @@ export function jsonHttpResWithSize(
 ): number {
   // res.setHeader('Content-Length', str.length)
   // res.setHeader('Content-Type', 'application/json')
-  const str = safeStringify(obj)
+  const str = Utils.safeStringify(obj)
   res.write(str)
   res.end()
   return str.length
@@ -591,16 +591,16 @@ export function stringForKeys(obj: unknown, keys: ArrayLike<string> | string | n
     else if (typeof keys == 'string') keys = keys.split(/[ ,]+/)
     // justification for the suppression below: the keys are not originated by user input, but developer source code
     const items = Array.from(keys)
-      .map((key) => (obj[key] === undefined ? 'undefined' : safeStringify(obj[key]))) // eslint-disable-line security/detect-object-injection
+      .map((key) => (obj[key] === undefined ? 'undefined' : Utils.safeStringify(obj[key]))) // eslint-disable-line security/detect-object-injection
       .join(', ')
     return `{${items}}`
   } catch (e) {
     // throwing an exception would be bad for logging/debugging, so we just return a string
     let objStr: string
     try {
-      objStr = safeStringify(obj)
+      objStr = Utils.safeStringify(obj)
     } catch (e) {
-      objStr = '(stringForKeys(): exception for safeStringify())'
+      objStr = '(stringForKeys(): exception for Utils.safeStringify())'
     }
     return `(stringForKeys(): exception: ${e}, obj: ${objStr})`
   }

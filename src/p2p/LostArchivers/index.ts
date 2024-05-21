@@ -15,7 +15,7 @@ import { ArchiverDownMsg, ArchiverUpMsg } from '@shardus/types/build/src/p2p/Los
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import { inspect } from 'util'
 import { logFlags } from '../../logger'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 /** CycleCreator Functions */
 
@@ -125,7 +125,7 @@ export function updateRecord(
     if(target) {
       insertSorted(lostArchivers, target)
     } else {
-      /* prettier-ignore */ if (logFlags.debug) console.log(`publicKey undefined for tx: ${safeStringify(tx)} in lostArchivers`)
+      /* prettier-ignore */ if (logFlags.debug) console.log(`publicKey undefined for tx: ${Utils.safeStringify(tx)} in lostArchivers`)
     }
   }
   // add all txs.refutedArchivers publicKeys to record.refutedArchivers
@@ -134,7 +134,7 @@ export function updateRecord(
     if(target) {
       insertSorted(refutedArchivers, target)
     } else {
-      /* prettier-ignore */ if (logFlags.debug) console.log(`publicKey undefined for tx: ${safeStringify(tx)} in refutedArchivers`)
+      /* prettier-ignore */ if (logFlags.debug) console.log(`publicKey undefined for tx: ${Utils.safeStringify(tx)} in refutedArchivers`)
     }
   }
 

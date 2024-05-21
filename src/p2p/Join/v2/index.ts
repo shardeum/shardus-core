@@ -16,7 +16,7 @@ import { ResultAsync } from 'neverthrow'
 import { reset as resetAcceptance } from './acceptance'
 import { stringifyReduce } from '../../../utils/functions/stringifyReduce'
 import { logFlags } from '../../../logger'
-import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 const clone = rfdc()
 
@@ -119,7 +119,7 @@ export function addStandbyJoinRequests(nodes: JoinRequest[], logErrors = false):
       continue
     }
     if (joinRequest.nodeInfo == null) {
-      /* prettier-ignore */ if (logErrors && logFlags.important_as_fatal) console.error('null node.nodeInfo in standby list: ' + safeStringify(joinRequest))
+      /* prettier-ignore */ if (logErrors && logFlags.important_as_fatal) console.error('null node.nodeInfo in standby list: ' + Utils.safeStringify(joinRequest))
       continue
     }
     addJoinRequestToStandbyMap(joinRequest)
@@ -205,8 +205,8 @@ export function updateStandbyRefreshCounter(updatedJoinRequest: JoinRequest): vo
 
 function areJoinRequestsIdenticalExceptRefreshCounter(original: JoinRequest, updated: JoinRequest): boolean {
   // Clone the objects to avoid mutating the original ones
-  const originalCopy = safeJsonParse(safeStringify(original));
-  const updatedCopy = safeJsonParse(safeStringify(updated));
+  const originalCopy = Utils.safeJsonParse(Utils.safeStringify(original));
+  const updatedCopy = Utils.safeJsonParse(Utils.safeStringify(updated));
 
   delete originalCopy.refreshedCounter
   delete updatedCopy.refreshedCounter

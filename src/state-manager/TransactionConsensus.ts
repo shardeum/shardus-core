@@ -84,7 +84,7 @@ import {
 } from '../types/GetAppliedVoteResp'
 import { BadRequest, InternalError, NotFound, serializeResponseError } from '../types/ResponseError'
 import { randomUUID } from 'crypto'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -231,12 +231,12 @@ class TransactionConsenus {
 
     Context.network.registerExternalGet('debug-produceBadVote', isDebugModeMiddleware, (req, res) => {
       this.produceBadVote = !this.produceBadVote
-      res.send(safeStringify({ status: 'ok', produceBadVote: this.produceBadVote }))
+      res.send(Utils.safeStringify({ status: 'ok', produceBadVote: this.produceBadVote }))
     })
 
     Context.network.registerExternalGet('debug-produceBadChallenge', isDebugModeMiddleware, (req, res) => {
       this.produceBadChallenge = !this.produceBadChallenge
-      res.send(safeStringify({ status: 'ok', produceBadChallenge: this.produceBadChallenge }))
+      res.send(Utils.safeStringify({ status: 'ok', produceBadChallenge: this.produceBadChallenge }))
     })
 
     this.p2p.registerInternal(
@@ -363,7 +363,7 @@ class TransactionConsenus {
               'consensus',
               'get_confirm_or_challenge no confirmation or challenge'
             )
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no confirmation or challenge for ${queueEntry.logID}, bestVote: ${safeStringify(queueEntry.receivedBestVote)},  bestConfirmation: ${safeStringify(queueEntry.receivedBestConfirmation)}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no confirmation or challenge for ${queueEntry.logID}, bestVote: ${Utils.safeStringify(queueEntry.receivedBestVote)},  bestConfirmation: ${Utils.safeStringify(queueEntry.receivedBestConfirmation)}`)
             await respond(confirmOrChallengeResult)
           }
 
@@ -422,7 +422,7 @@ class TransactionConsenus {
               'consensus',
               'get_confirm_or_challenge no confirmation or challenge'
             )
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no confirmation or challenge for ${queueEntry.logID}, bestVote: ${safeStringify(queueEntry.receivedBestVote)},  bestConfirmation: ${safeStringify(queueEntry.receivedBestConfirmation)}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`get_confirm_or_challenge no confirmation or challenge for ${queueEntry.logID}, bestVote: ${Utils.safeStringify(queueEntry.receivedBestVote)},  bestConfirmation: ${Utils.safeStringify(queueEntry.receivedBestConfirmation)}`)
             respond(confirmOrChallengeResult, serializeGetConfirmOrChallengeResp)
             return
           }
@@ -1101,7 +1101,7 @@ class TransactionConsenus {
 
       const isValid = this.crypto.verify(timestampReceipt, homeNode.node.publicKey)
       if (isValid) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Timestamp receipt received from home node. TxId: ${txId} isValid: ${isValid}, timestampReceipt: ${safeStringify(timestampReceipt)}`)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Timestamp receipt received from home node. TxId: ${txId} isValid: ${isValid}, timestampReceipt: ${Utils.safeStringify(timestampReceipt)}`)
         return timestampReceipt
       } else {
         /* prettier-ignore */ if (logFlags.fatal) this.mainLogger.fatal(`Timestamp receipt received from home node ${homeNode.node.publicKey} is not valid. ${utils.stringifyReduce(timestampReceipt)}`)
@@ -1615,7 +1615,7 @@ class TransactionConsenus {
                 this.mainLogger.debug(
                   `tryProduceReceipt: ${
                     queueEntry.logID
-                  } challenge from robust query is better than our challenge. robustQueryConfirmOrChallenge: ${safeStringify(
+                  } challenge from robust query is better than our challenge. robustQueryConfirmOrChallenge: ${Utils.safeStringify(
                     robustConfirmOrChallenge
                   )}`
                 )
@@ -1762,11 +1762,11 @@ class TransactionConsenus {
                 this.mainLogger.debug(
                   `tryProduceReceipt: ${
                     queueEntry.logID
-                  } confirmation from robust query is better than our confirm. bestNodeFromRobust?Query: ${safeStringify(
+                  } confirmation from robust query is better than our confirm. bestNodeFromRobust?Query: ${Utils.safeStringify(
                     bestNodeFromRobustQuery
-                  )}, queueEntry.receivedBestVoter: ${safeStringify(
+                  )}, queueEntry.receivedBestVoter: ${Utils.safeStringify(
                     queueEntry.receivedBestVoter
-                  )}, robustQueryConfirmOrChallenge: ${safeStringify(robustConfirmOrChallenge)}`
+                  )}, robustQueryConfirmOrChallenge: ${Utils.safeStringify(robustConfirmOrChallenge)}`
                 )
               const robustReceipt: AppliedReceipt = {
                 txid: robustConfirmOrChallenge.appliedVote.txid,
@@ -2187,7 +2187,7 @@ class TransactionConsenus {
       }
       if (logFlags.debug)
         this.mainLogger.debug(
-          `confirmOrChallenge: ${queueEntry.logID}  receivedBestVote: ${safeStringify(
+          `confirmOrChallenge: ${queueEntry.logID}  receivedBestVote: ${Utils.safeStringify(
             queueEntry.receivedBestVote
           )}} `
         )
@@ -2443,7 +2443,7 @@ class TransactionConsenus {
       const signedChallengeMessage = this.crypto.sign(challengeMessage)
       if (logFlags.debug)
         this.mainLogger.debug(
-          `challengeVoteAndShare: ${queueEntry.logID}  ${safeStringify(signedChallengeMessage)}}`
+          `challengeVoteAndShare: ${queueEntry.logID}  ${Utils.safeStringify(signedChallengeMessage)}}`
         )
 
       //Share message to tx group
@@ -2509,9 +2509,9 @@ class TransactionConsenus {
             this.mainLogger.debug(
               `checkAccountIntegrity: ${
                 queueEntry.logID
-              } key: ${key} failed. collectedAccountData: ${safeStringify(
+              } key: ${key} failed. collectedAccountData: ${Utils.safeStringify(
                 collectedAccountData
-              )} robustAccountData: ${safeStringify(robustQueryAccountData)}`
+              )} robustAccountData: ${Utils.safeStringify(robustQueryAccountData)}`
             )
           }
         }
@@ -2839,7 +2839,7 @@ class TransactionConsenus {
     /* prettier-ignore */
     if (logFlags.playback) this.logger.playbackLogNote("tryAppendMessage", `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`);
     /* prettier-ignore */
-    if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID}   ${safeStringify(confirmOrChallenge)} `);
+    if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID}   ${Utils.safeStringify(confirmOrChallenge)} `);
     // check if the node is in the execution group
     const isMessageFromExecutionNode = queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)
 
@@ -2881,7 +2881,7 @@ class TransactionConsenus {
       this.mainLogger.error(
         `tryAppendMessage: ${
           queueEntry.logID
-        } confirmOrChallenge is not for the same vote that was finalized in the previous phase, queueEntry.receivedBestVote: ${safeStringify(
+        } confirmOrChallenge is not for the same vote that was finalized in the previous phase, queueEntry.receivedBestVote: ${Utils.safeStringify(
           queueEntry.receivedBestVote
         )}`
       )
@@ -2953,7 +2953,7 @@ class TransactionConsenus {
         this.mainLogger.debug(
           `tryAppendMessage: ${
             queueEntry.logID
-          } confirmation received and processed. queueEntry.receivedBestConfirmation: ${safeStringify(
+          } confirmation received and processed. queueEntry.receivedBestConfirmation: ${Utils.safeStringify(
             queueEntry.receivedBestConfirmation
           )}, receivedBestConfirmedNode: ${queueEntry.receivedBestConfirmedNode}`
         )
@@ -2968,7 +2968,7 @@ class TransactionConsenus {
         queueEntry.uniqueChallengesCount++
         if (this.stateManager.consensusLog)
           this.mainLogger.debug(
-            `tryAppendMessage: ${queueEntry.logID} unique challenge added. ${safeStringify(
+            `tryAppendMessage: ${queueEntry.logID} unique challenge added. ${Utils.safeStringify(
               queueEntry.uniqueChallenges
             )}`
           )
@@ -2977,7 +2977,7 @@ class TransactionConsenus {
       this.mainLogger.debug(
         `tryAppendMessage: ${
           queueEntry.logID
-        } challenge received and processing. queueEntry.receivedBestChallenge: ${safeStringify(
+        } challenge received and processing. queueEntry.receivedBestChallenge: ${Utils.safeStringify(
           queueEntry.receivedBestChallenge
         )}`
       )
@@ -3017,7 +3017,7 @@ class TransactionConsenus {
         this.mainLogger.debug(
           `tryAppendMessage: ${
             queueEntry.logID
-          } challenge received and processed. queueEntry.receivedBestChallenge: ${safeStringify(
+          } challenge received and processed. queueEntry.receivedBestChallenge: ${Utils.safeStringify(
             queueEntry.receivedBestChallenge
           )}, receivedBestChallenger: ${queueEntry.receivedBestChallenger}`
         )
@@ -3077,9 +3077,9 @@ class TransactionConsenus {
           this.mainLogger.debug(
             `tryAppendVote: logId:${
               queueEntry.logID
-            } received node is not part of eligible nodes to vote, vote: ${safeStringify(
+            } received node is not part of eligible nodes to vote, vote: ${Utils.safeStringify(
               vote
-            )}, eligibleNodesToVote: ${safeStringify(queueEntry.eligibleNodeIdsToVote)}`
+            )}, eligibleNodesToVote: ${Utils.safeStringify(queueEntry.eligibleNodeIdsToVote)}`
           )
         }
         return

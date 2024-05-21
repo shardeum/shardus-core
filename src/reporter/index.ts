@@ -20,7 +20,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { memoryReportingInstance } from '../utils/memoryReporting'
 import { getLinearGossipBurstList } from '../utils'
 import { getSocketReport } from '../utils/debugUtils'
-import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
@@ -405,9 +405,9 @@ class Reporter {
     this.socketReportInterval = setInterval(async () => {
       if (this.config.logSocketReports) {
         const report = await getSocketReport()
-        this.mainLogger.info(safeStringify(report))
+        this.mainLogger.info(Utils.safeStringify(report))
         const networkReport = memoryReportingInstance.getShardusNetReport()
-        this.mainLogger.info(safeStringify(networkReport))
+        this.mainLogger.info(Utils.safeStringify(networkReport))
         if (report.error === true) {
           clearInterval(self.socketReportInterval)
         }
