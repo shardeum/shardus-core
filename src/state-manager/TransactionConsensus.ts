@@ -1185,7 +1185,7 @@ class TransactionConsenus {
         const applyResponse = queueEntry.preApplyTXResult.applyResponse
         let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
         const writtenAccountsMap: WrappedResponses = {}
-        if (applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+        if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
           for (const writtenAccount of applyResponse.accountWrites) {
             writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
             writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId]
@@ -1219,6 +1219,10 @@ class TransactionConsenus {
    * @param queueEntry
    */
   hasAppliedReceiptMatchingPreApply(queueEntry: QueueEntry, appliedReceipt: AppliedReceipt): boolean {
+    if (queueEntry.preApplyTXResult == null || queueEntry.preApplyTXResult.applyResponse == null) {
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} preApplyTXResult == null or applyResponse == null`)
+      return false
+    }
     // This is much easier than the old way
     if (queueEntry.ourVote) {
       const receipt = queueEntry.appliedReceipt2 ?? queueEntry.recievedAppliedReceipt2
@@ -2582,7 +2586,7 @@ class TransactionConsenus {
         ourVote.transaction_result = !ourVote.transaction_result
       }
 
-      ourVote.app_data_hash = queueEntry?.preApplyTXResult?.applyResponse.appReceiptDataHash
+      ourVote.app_data_hash = queueEntry?.preApplyTXResult?.applyResponse?.appReceiptDataHash || ''
 
       if (queueEntry.debugFail_voteFlip === true) {
         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
