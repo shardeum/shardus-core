@@ -28,7 +28,6 @@ import {
   serializeLostArchiverInvestigateReq,
 } from '../../types/LostArchiverInvestigateReq'
 import { InternalRouteEnum } from '../../types/enum/InternalRouteEnum'
-import { tellBinary } from '../Comms'
 
 /** Lost Archivers Functions */
 
@@ -180,10 +179,10 @@ export function informInvestigator(target: publicKey): void {
 
     // Send message to investigator
     info(`informInvestigator: sending InvestigateArchiverMsg: ${inspect(investigateMsg)}`)
-    if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.lostArchiverInvestigateBinary) {
+    if (Context.config.p2p.useBinarySerializedEndpoints && Context.config.p2p.lostArchiverInvestigateBinary) {
       Comms.tellBinary<LostArchiverInvestigateReq>(
         [investigator],
-        InternalRouteEnum.binary_broadcast_state,
+        InternalRouteEnum.binary_lost_archiver_investigate,
         investigateMsg,
         serializeLostArchiverInvestigateReq,
         {}
