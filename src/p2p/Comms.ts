@@ -832,7 +832,8 @@ export async function sendGossip(
   // send to ourself
   isOrigin = false,
   factor = -1,
-  txId = ''
+  txId = '',
+  context = ''
 ) {
   //console.log('entered sendGossip gossiping ', type)
   let msgSize = cUninitializedSize
@@ -895,12 +896,22 @@ export async function sendGossip(
 
   //console.log('originIdx ', originIdx)
 
+  if (context != '')
+    seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipContext:${context}`)
   if (originIdx !== undefined && originIdx >= 0) {
     // If it is protocol tx signed by a node in the network
     recipientIdxs = utils.getLinearGossipBurstList(nodeIdxs.length, gossipFactor, myIdx, originIdx)
+    if (logFlags.seqdiagram && txId != '') {
+      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipBin:${nodeIdxs.length},${gossipFactor},${myIdx},${originIdx}`)
+      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipBout:${recipientIdxs}`)
+    }
   } else {
     // If it is app tx which is not signed by a node in the network
     recipientIdxs = utils.getLinearGossipList(nodeIdxs.length, gossipFactor, myIdx, isOrigin)
+    if (logFlags.seqdiagram && txId != '') {
+      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipLin:${nodeIdxs.length},${gossipFactor},${myIdx},${isOrigin}`)
+      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipLout:${recipientIdxs}`)
+    }
   }
 
   //console.log('recipientIdxs ', recipientIdxs)
@@ -952,6 +963,7 @@ export async function sendGossip(
         } else {
           /* prettier-ignore */ nestedCountersInstance.countEvent('p2p-skip-send', 'skipping gossip')
           /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p-skip-send', `skipping gossip ${node.internalIp}:${node.externalPort}` )
+          seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipSkip:${NodeList.activeIdToPartition.get(node.id)}`)
         }
       })
       const newCount = recipients.length
@@ -967,10 +979,13 @@ export async function sendGossip(
     //recipients.forEach(node => console.log(node.externalPort))
     if (logFlags.seqdiagram && txId != '') {
       let prefix = ''
+      let suffix = ''
       if (isOrigin)
         prefix = 'orig:'
+      if (context != '')
+        suffix = `:${suffix}`
       for (const node of recipients) {        
-        seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: g:${prefix}${type}`)
+        seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: g:${prefix}${type}${suffix}`)
       }
     }
     
