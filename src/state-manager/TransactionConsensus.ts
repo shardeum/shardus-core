@@ -557,12 +557,14 @@ class TransactionConsenus {
         try {
           const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
           if (queueEntry == null) {
+            this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${payload.txid} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:noTX`)
             return
           }
           const newVote = payload as AppliedVote
           const appendSuccessful = this.stateManager.transactionConsensus.tryAppendVote(queueEntry, newVote)
 
           if (appendSuccessful) {
+            this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${payload.txid} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:appended`)
             const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
             if (gossipGroup.length > 1) {
               // should consider only forwarding in some cases?
@@ -3064,7 +3066,13 @@ class TransactionConsenus {
 
       return true
     } else {
-      if (queueEntry.acceptVoteMessage === false || queueEntry.appliedReceipt2 != null) return false
+      if (queueEntry.acceptVoteMessage === false || queueEntry.appliedReceipt2 != null) {
+        if (queueEntry.acceptVoteMessage === false)
+          this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f no_accept`)
+        if (queueEntry.appliedReceipt2 != null)
+          this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f applied2_not_null`)
+        return false
+      }
       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `vote: ${utils.stringifyReduce(vote)}`)
       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   vote: ${utils.stringifyReduce(vote)}`)
 
@@ -3073,6 +3081,7 @@ class TransactionConsenus {
         this.crypto.verify(vote as SignedObject, queueEntry.executionGroupMap.get(vote.node_id).publicKey)
 
       if (!isEligibleToVote) {
+        this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f not_eligible`)
         if (logFlags.debug) {
           this.mainLogger.debug(
             `tryAppendVote: logId:${
@@ -3099,7 +3108,7 @@ class TransactionConsenus {
       let isBetterThanCurrentVote
       let receivedVoter: Shardus.NodeWithRank
       if (!queueEntry.receivedBestVote) isBetterThanCurrentVote = true
-      else if (queueEntry.receivedBestVoteHash === this.calculateVoteHash(vote))
+      else if (queueEntry.receivedBestVoteHash === this.calculateVoteHash(vote))        
         isBetterThanCurrentVote = false
       else {
         // Compare ranks
@@ -3115,6 +3124,7 @@ class TransactionConsenus {
             `tryAppendVote: ${queueEntry.logID} received vote is NOT better than current vote. lastReceivedVoteTimestamp: ${queueEntry.lastVoteReceivedTimestamp}`
           )
         }
+        this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter`)
         return false
       }
 
@@ -3128,14 +3138,18 @@ class TransactionConsenus {
       }
       if (receivedVoter) {
         queueEntry.receivedBestVoter = receivedVoter
+        this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:t receivedVoter`)
         return true
       } else {
         if (queueEntry.executionGroupMap.has(vote.node_id)) {
           queueEntry.receivedBestVoter = queueEntry.executionGroupMap.get(
             vote.node_id
           ) as Shardus.NodeWithRank
+          this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:t receivedVoter2`)
           return true
         }
+        this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f no_receivedVoter`)
+        return false
       }
       // No need to forward the gossip here as it's being done in the gossip handler
     }
