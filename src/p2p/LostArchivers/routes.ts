@@ -200,7 +200,7 @@ const investigateLostArchiverRouteBinary: Route<InternalBinaryHandler<Buffer>> =
     profilerInstance.scopedProfileSectionStart(route, false, payload.length)
 
     try {
-      const reqStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAccountDataReq)
+      const reqStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cLostArchiverInvestigateReq)
       if (!reqStream) {
         nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
         logging.warn(`${route}: Invalid request stream`)
