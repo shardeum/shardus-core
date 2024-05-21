@@ -42,7 +42,7 @@ export function insertSorted<T>(arr: T[], item: T, comparator?: Comparator<T>): 
 }
 
 
-export function linearInsertSorted<T>(arr: T[], item: T, comparator?: Comparator<T>): void {
+export function linearInsertSorted<T>(arr: T[], item: T, comparator: Comparator<T>): void {
   let i = 0
   while (i < arr.length) {
     if (comparator(item, arr[i]) < 0) {
