@@ -3116,6 +3116,8 @@ class TransactionConsenus {
           receivedVoter = queueEntry.executionGroupMap.get(vote.node_id) as Shardus.NodeWithRank
         }
         isBetterThanCurrentVote = receivedVoter.rank > queueEntry.receivedBestVoter.rank
+        this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV ${receivedVoter.rank} > ${queueEntry.receivedBestVoter.rank}`)
+        this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV ${NodeList.activeIdToPartition.get(receivedVoter.id)} : ${NodeList.activeIdToPartition.get(queueEntry.receivedBestVoter.id)}`)
       }
 
       if (!isBetterThanCurrentVote) {

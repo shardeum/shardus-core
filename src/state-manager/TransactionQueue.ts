@@ -2104,7 +2104,7 @@ class TransactionQueue {
             txQueueEntry.executionGroupMap.set(node.id, node)
             if (node.id === ourID) {
               txQueueEntry.ourExGroupIndex = idx
-              this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: index ${txQueueEntry.ourExGroupIndex}`)
+              this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: index ${txQueueEntry.ourExGroupIndex}:${node.rank}`)
             }            
           }
           if (txQueueEntry.eligibleNodeIdsToConfirm.has(Self.id)) {
