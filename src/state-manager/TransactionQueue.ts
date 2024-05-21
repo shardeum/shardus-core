@@ -5902,8 +5902,8 @@ class TransactionQueue {
                       /* prettier-ignore */ this.statemanager_fatal(`processAcceptedTxQueue2`, `tryProduceReceipt failed result: false : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
                     }
                     nestedCountersInstance.countEvent('consensus', 'consensed on failed result')
-                    this.removeFromQueue(queueEntry, currentIndex)
                     this.updateTxState(queueEntry, 'fail')
+                    this.removeFromQueue(queueEntry, currentIndex)
                     continue
                   }
                   didNotMatchReceipt = true
