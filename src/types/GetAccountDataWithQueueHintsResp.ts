@@ -6,7 +6,7 @@ import {
   WrappedDataFromQueueSerializable,
 } from './WrappedDataFromQueue'
 
-export const cGetAccountDataWithQueueHintsRespVersion = 1
+const cGetAccountDataWithQueueHintsRespVersion = 1
 
 export type GetAccountDataWithQueueHintsRespSerializable = {
   accountData: WrappedDataFromQueueSerializable[] | null

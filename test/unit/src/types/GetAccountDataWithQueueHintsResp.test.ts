@@ -3,7 +3,6 @@ import {
   GetAccountDataWithQueueHintsRespSerializable,
   serializeGetAccountDataWithQueueHintsResp,
   deserializeGetAccountDataWithQueueHintsResp,
-  cGetAccountDataWithQueueHintsRespVersion,
 } from '../../../../src/types/GetAccountDataWithQueueHintsResp'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import {
@@ -11,13 +10,8 @@ import {
   serializeWrappedDataFromQueue,
 } from '../../../../src/types/WrappedDataFromQueue'
 
-/*
 
-export type GetAccountDataWithQueueHintsRespSerializable = {
-  accountData: WrappedDataFromQueueSerializable[] | null
-}
-
-*/
+const cGetAccountDataWithQueueHintsRespVersion = 1 // taken from GetAccountDataWithQueueHintsResp
 
 // Mocking the WrappedDataFromQueue methods to serialize and deserialize to
 jest.mock('../../../../src/types/WrappedDataFromQueue', () => ({
@@ -223,7 +217,9 @@ describe('GetAccountDataWithQueueHintsResp Serialization and Deserialization', (
       stream.writeUInt8(cGetAccountDataWithQueueHintsRespVersion + 1) // Incorrect version
       stream.position = 0 // Reset position for reading
 
-      expect(() => deserializeGetAccountDataWithQueueHintsResp(stream)).toThrow('GetAccountDataWithQueueHintsResp version mismatch')
+      expect(() => deserializeGetAccountDataWithQueueHintsResp(stream)).toThrow(
+        'GetAccountDataWithQueueHintsResp version mismatch'
+      )
     })
   })
 

@@ -3,17 +3,10 @@ import {
   GetAccountDataWithQueueHintsReqSerializable,
   serializeGetAccountDataWithQueueHintsReq,
   deserializeGetAccountDataWithQueueHintsReq,
-  cGetAccountDataWithQueueHintsReqVersion,
 } from '../../../../src/types/GetAccountDataWithQueueHintsReq'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 
-/*
-
-export type GetAccountDataWithQueueHintsReqSerializable = {
-  accountIds: string[]
-}
-
-*/
+const cGetAccountDataWithQueueHintsReqVersion = 1 // taken from GetAccountDataWithQueueHintsReq
 
 describe('GetAccountDataWithQueueHintsReq Serialization and Deserialization', () => {
   describe('Serialization', () => {
