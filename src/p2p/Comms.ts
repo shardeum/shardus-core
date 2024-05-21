@@ -963,7 +963,7 @@ export async function sendGossip(
         } else {
           /* prettier-ignore */ nestedCountersInstance.countEvent('p2p-skip-send', 'skipping gossip')
           /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p-skip-send', `skipping gossip ${node.internalIp}:${node.externalPort}` )
-          seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipSkip:${NodeList.activeIdToPartition.get(node.id)}`)
+          seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipSkip:${NodeList.activeIdToPartition.get(node.id)}:${node.internalIp}:${node.externalPort}`)
         }
       })
       const newCount = recipients.length
