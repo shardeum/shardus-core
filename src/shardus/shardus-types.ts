@@ -1238,6 +1238,8 @@ export interface ServerConfiguration {
     receiptRemoveFix: boolean
     // fix for stuck txs in the queue
     stuckTxQueueFix: boolean
+    // force vote for failed preApply
+    forceVoteForFailedPreApply: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

@@ -5606,7 +5606,7 @@ class TransactionQueue {
                   queueEntry.executionDebug.log3 = 'called pre apply'
                   queueEntry.executionDebug.txResult = txResult
 
-                  if (txResult != null && txResult.applied === true) {
+                  if (configContext.stateManager.forceVoteForFailedPreApply || (txResult && txResult.applied === true)) {
                     this.updateTxState(queueEntry, 'consensing')
 
                     queueEntry.preApplyTXResult = txResult
