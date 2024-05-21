@@ -2368,6 +2368,8 @@ class TransactionConsenus {
       const signedConfirmMessage = this.crypto.sign(confirmMessage)
       if (this.stateManager.consensusLog) this.mainLogger.debug(`confirmVoteAndShare: ${queueEntry.logID}`)
 
+      queueEntry.ourConfirmOrChallenge = signedConfirmMessage
+
       //Share message to tx group
       const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
       Comms.sendGossip('spread_confirmOrChallenge', signedConfirmMessage, '', Self.id, gossipGroup, true, 10, queueEntry.acceptedTx.txId, `confirmVote_${NodeList.activeIdToPartition.get(signedConfirmMessage.appliedVote?.node_id)}`)
@@ -2447,6 +2449,7 @@ class TransactionConsenus {
         this.mainLogger.debug(
           `challengeVoteAndShare: ${queueEntry.logID}  ${JSON.stringify(signedChallengeMessage)}}`
         )
+      queueEntry.ourConfirmOrChallenge = signedChallengeMessage
 
       //Share message to tx group
       const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)

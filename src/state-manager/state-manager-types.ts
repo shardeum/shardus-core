@@ -89,6 +89,7 @@ export type QueueEntry = {
   // Consensus tracking:
   ourVote?: AppliedVote
   ourVoteHash?: string
+  ourConfirmOrChallenge?: ConfirmOrChallengeMessage
   collectedVotes: AppliedVote[]
   collectedVoteHashes: AppliedVoteHash[]
   pendingVotes: Map<string, AppliedVote>,

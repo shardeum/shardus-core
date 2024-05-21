@@ -7522,36 +7522,58 @@ class TransactionQueue {
     }
     return this._transactionQueue.length
   }
+  extractDebugInfoFromQueueEntry(queueEntry: QueueEntry): any {
+    return {
+      logID: queueEntry.logID,
+      state: queueEntry.state,
+      hasAll: queueEntry.hasAll,
+      isExecutionNode: queueEntry.isInExecutionHome,
+      globalModification: queueEntry.globalModification,
+      entryID: queueEntry.entryID,
+      collectedData: queueEntry.collectedData,
+      finalData: queueEntry.collectedFinalData,
+      preApplyResult: queueEntry.preApplyTXResult,
+      txAge: shardusGetTime() - queueEntry.acceptedTx.timestamp,
+      lastFinalDataRequestTimestamp: queueEntry.lastFinalDataRequestTimestamp,
+      dataSharedTimestamp: queueEntry.dataSharedTimestamp,
+      firstVoteTimestamp: queueEntry.firstVoteReceivedTimestamp,
+      firstConfirmationsTimestamp: queueEntry.firstConfirmOrChallengeTimestamp,
+      robustBestConfirmation: queueEntry.receivedBestConfirmation,
+      robustBestVote: queueEntry.receivedBestVote,
+      robustBestChallenge: queueEntry.receivedBestChallenge,
+      completedRobustVote: queueEntry.robustQueryVoteCompleted,
+      completedRobustChallenge: queueEntry.robustQueryConfirmOrChallengeCompleted,
+      eligibleToVote: queueEntry.eligibleNodeIdsToVote.has(Self.id),
+      eligibleToConfirm: queueEntry.eligibleNodeIdsToConfirm.has(Self.id),
+      txDebug: queueEntry.txDebug,
+      executionDebug: queueEntry.executionDebug,
+      waitForReceiptOnly: queueEntry.waitForReceiptOnly,
+      ourVote: queueEntry.ourVote || null,
+      receipt2: this.stateManager.getReceipt2(queueEntry) || null,
+      uniqueChallenges: queueEntry.uniqueChallengesCount
+    }
+  }
   getQueueItems(): any[] {
-    return this._transactionQueue.map((queueEntry) => {
-      return {
-        logID: queueEntry.logID,
-        state: queueEntry.state,
-        hasAll: queueEntry.hasAll,
-        isExecutionNode: queueEntry.isInExecutionHome,
-        globalModification: queueEntry.globalModification,
-        entryID: queueEntry.entryID,
-        collectedData: queueEntry.collectedData,
-        finalData: queueEntry.collectedFinalData,
-        preApplyResult: queueEntry.preApplyTXResult,
-        txAge: shardusGetTime() - queueEntry.acceptedTx.timestamp,
-        lastFinalDataRequestTimestamp: queueEntry.lastFinalDataRequestTimestamp,
-        dataSharedTimestamp: queueEntry.dataSharedTimestamp,
-        firstVoteTimestamp: queueEntry.firstVoteReceivedTimestamp,
-        firstConfirmationsTimestamp: queueEntry.firstConfirmOrChallengeTimestamp,
-        robustBestConfirmation: queueEntry.receivedBestConfirmation,
-        robustBestVote: queueEntry.receivedBestVote,
-        robustBestChallenge: queueEntry.receivedBestChallenge,
-        completedRobustVote: queueEntry.robustQueryVoteCompleted,
-        completedRobustChallenge: queueEntry.robustQueryConfirmOrChallengeCompleted,
-        txDebug: queueEntry.txDebug,
-        executionDebug: queueEntry.executionDebug,
-        waitForReceiptOnly: queueEntry.waitForReceiptOnly,
-        ourVote: queueEntry.ourVote || null,
-        receipt2: this.stateManager.getReceipt2(queueEntry) || null,
-        uniqueChallenges: queueEntry.uniqueChallengesCount
+    return this._transactionQueue.map((queueEntry => {
+      return this.extractDebugInfoFromQueueEntry(queueEntry)
+    }))
+  }
+  getQueueEntryDebugInfoByTxId(txId: string): any {
+    const queueEntries: QueueEntry[] = []
+    for (const queueEntry of this._transactionQueue) {
+      if (queueEntry.acceptedTx.txId === txId) {
+        queueEntries.push(queueEntry)
       }
+    }
+    // also lookup the entry from archived queue
+    const archivedQueueEntry = this.archivedQueueEntriesByID.get(txId)
+    if (archivedQueueEntry) {
+      queueEntries.push(archivedQueueEntry)
+    }
+    const queueEntryDebugInfo = queueEntries.map((queueEntry) => {
+      return this.extractDebugInfoFromQueueEntry(queueEntry)
     })
+    return queueEntryDebugInfo
   }
   removeTxFromArchivedQueue(txId: string) {
     // remove from the archived queue array and map by txId
