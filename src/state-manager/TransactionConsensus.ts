@@ -583,7 +583,7 @@ class TransactionConsenus {
                 false,
                 -1,
                 queueEntry.acceptedTx.txId,
-                newVote.node_id
+                `${NodeList.activeIdToPartition.get(newVote.node_id)}`
               )
             }
           }
@@ -1007,7 +1007,7 @@ class TransactionConsenus {
             // Gossip further
             const sender = null
             const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-            Comms.sendGossip('spread_confirmOrChallenge', payload, '', sender, gossipGroup, false, 10, queueEntry.acceptedTx.txId, `handler_${payload.appliedVote?.node_id}`)
+            Comms.sendGossip('spread_confirmOrChallenge', payload, '', sender, gossipGroup, false, 10, queueEntry.acceptedTx.txId, `handler_${NodeList.activeIdToPartition.get(payload.appliedVote?.node_id)}`)
             queueEntry.gossipedConfirmOrChallenge = true
           }
         } catch (e) {
@@ -2369,7 +2369,7 @@ class TransactionConsenus {
 
       //Share message to tx group
       const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-      Comms.sendGossip('spread_confirmOrChallenge', signedConfirmMessage, '', Self.id, gossipGroup, true, 10, queueEntry.acceptedTx.txId, `confirmVote_${signedConfirmMessage.appliedVote?.node_id}`)
+      Comms.sendGossip('spread_confirmOrChallenge', signedConfirmMessage, '', Self.id, gossipGroup, true, 10, queueEntry.acceptedTx.txId, `confirmVote_${NodeList.activeIdToPartition.get(signedConfirmMessage.appliedVote?.node_id)}`)
       this.tryAppendMessage(queueEntry, signedConfirmMessage)
       queueEntry.gossipedConfirmOrChallenge = true
       queueEntry.completedConfirmedOrChallenge = true
@@ -2450,7 +2450,7 @@ class TransactionConsenus {
 
       //Share message to tx group
       const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-      Comms.sendGossip('spread_confirmOrChallenge', signedChallengeMessage, '', null, gossipGroup, true, 10, queueEntry.acceptedTx.txId, `challengeVote_${signedChallengeMessage.appliedVote?.node_id}`)
+      Comms.sendGossip('spread_confirmOrChallenge', signedChallengeMessage, '', null, gossipGroup, true, 10, queueEntry.acceptedTx.txId, `challengeVote_${NodeList.activeIdToPartition.get(signedChallengeMessage.appliedVote?.node_id)}`)
       this.tryAppendMessage(queueEntry, signedChallengeMessage)
       queueEntry.gossipedConfirmOrChallenge = true
       queueEntry.completedConfirmedOrChallenge = true
@@ -2757,7 +2757,7 @@ class TransactionConsenus {
 
         if (this.stateManager.transactionQueue.useNewPOQ) {
           // Gossip the vote to the entire consensus group
-          Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4, queueEntry.acceptedTx.txId, ourVote.node_id)
+          Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4, queueEntry.acceptedTx.txId, `${NodeList.activeIdToPartition.get(ourVote.node_id)}`)
         } else {
           this.profiler.profileSectionStart('createAndShareVote-tell')
           if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.spreadAppliedVoteHashBinary) {
