@@ -10,7 +10,6 @@ import {
   serializeWrappedDataFromQueue,
 } from '../../../../src/types/WrappedDataFromQueue'
 
-
 const cGetAccountDataWithQueueHintsRespVersion = 1 // taken from GetAccountDataWithQueueHintsResp
 
 // Mocking the WrappedDataFromQueue methods to serialize and deserialize to
