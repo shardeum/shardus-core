@@ -318,7 +318,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     receiptRemoveFix: true,
     stuckTxQueueFix: true,
     singleAccountStuckFix: true,
-    stuckTxMoveTime: 60000
+    stuckTxMoveTime: 60000,
+    forceVoteForFailedPreApply: true
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

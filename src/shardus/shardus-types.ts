@@ -1238,6 +1238,8 @@ export interface ServerConfiguration {
     receiptRemoveFix: boolean
     // fix for stuck txs in the queue
     stuckTxQueueFix: boolean
+    // force vote for failed preApply
+    forceVoteForFailedPreApply: boolean
     // fix for stuck txs for single account tests
     singleAccountStuckFix: boolean
     // wait time before moving stuck "consensing" tx to "await final data"
