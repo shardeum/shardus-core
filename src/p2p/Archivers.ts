@@ -939,7 +939,7 @@ export function registerRoutes() {
       }
       if (!accepted.success) return warn('Archiver join request not accepted.')
       if (logFlags.p2pNonFatal) info('Archiver join request accepted!')
-      Comms.sendGossip('joinarchiver', payload, tracker, sender, NodeList.byIdOrder, false)
+      Comms.sendGossip('joinarchiver', payload, tracker, sender, nodeListFromStates(['active', 'ready', 'syncing']), false)
     } finally {
       profilerInstance.scopedProfileSectionEnd('joinarchiver')
     }

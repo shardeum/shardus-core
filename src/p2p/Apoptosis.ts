@@ -41,7 +41,7 @@ import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import * as Comms from './Comms'
 import { crypto, logger, network } from './Context'
 import { currentCycle, currentQuarter } from './CycleCreator'
-import { activeByIdOrder, byIdOrder, byPubKey, nodes } from './NodeList'
+import { activeByIdOrder, byPubKey, nodes } from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
@@ -49,6 +49,7 @@ import { SQLDataTypes } from '../storage/utils/schemaDefintions'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { Utils } from '@shardus/types'
 
+import { nodeListFromStates } from './Join'
 
 /** STATE */
 
@@ -188,7 +189,7 @@ const apoptosisGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ApoptosisTypes.Signed
     }
     if ([1, 2].includes(currentQuarter)) {
       if (addProposal(payload)) {
-        Comms.sendGossip(gossipRouteName, payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
+        Comms.sendGossip(gossipRouteName, payload, tracker, Self.id, nodeListFromStates(['active', 'ready', 'syncing']), false) // use Self.id so we don't gossip to ourself
       }
     }
   } finally {
@@ -299,7 +300,7 @@ export function sendRequests() {
     // make sure node is still in the network, since it might
     //   have already been removed
     if (nodes.get(id)) {
-      Comms.sendGossip(gossipRouteName, proposals[id], '', null, byIdOrder, true)
+      Comms.sendGossip(gossipRouteName, proposals[id], '', null, nodeListFromStates(['active', 'ready', 'syncing']), true)
     }
   }
 }
