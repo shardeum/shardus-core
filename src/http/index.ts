@@ -70,8 +70,10 @@ async function _post(host, payload, logIndex, timeout = 1000) {
     const res = await got.post(host, {
       timeout: timeout, // Omar - set this to 1 sec
       retry: 0, // Omar - set this to 0
-      json: true,
-      body: payload,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: Utils.safeStringify(payload),
     })
 
     //if (getResponseObj) return res
