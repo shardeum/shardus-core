@@ -621,7 +621,11 @@ export function sendRequests(): void {
         syncStartedTx,
         '',
         null,
-        nodeListFromStates(['active', 'ready', 'syncing']),
+        nodeListFromStates([
+          P2P.P2PTypes.NodeStatus.ACTIVE,
+          P2P.P2PTypes.NodeStatus.READY,
+          P2P.P2PTypes.NodeStatus.SYNCING,
+        ]),
         true
       )
     } else {
@@ -644,11 +648,18 @@ export function sendRequests(): void {
         syncFinishedTx,
         '',
         null,
-        nodeListFromStates(['active', 'ready', 'syncing']),
+        nodeListFromStates([
+          P2P.P2PTypes.NodeStatus.ACTIVE,
+          P2P.P2PTypes.NodeStatus.READY,
+          P2P.P2PTypes.NodeStatus.SYNCING,
+        ]),
         true
       )
     } else {
-      nestedCountersInstance.countEvent('p2p', `join:sendRequests failed to add our own sync-finished message`)
+      nestedCountersInstance.countEvent(
+        'p2p',
+        `join:sendRequests failed to add our own sync-finished message`
+      )
       /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequests failed to add our own sync-finished message`)
     }
   }
@@ -668,7 +679,11 @@ export function sendRequests(): void {
           standbyRefreshTx,
           '',
           null,
-          nodeListFromStates(['active', 'ready', 'syncing']),
+          nodeListFromStates([
+            P2P.P2PTypes.NodeStatus.ACTIVE,
+            P2P.P2PTypes.NodeStatus.READY,
+            P2P.P2PTypes.NodeStatus.SYNCING,
+          ]),
           true
         )
       } else {
@@ -696,7 +711,6 @@ export function sendRequests(): void {
       }
       joinRequest.selectionNum = selectionNumResult.value
 
-
       // its possible that we have already seen this join request via gossip before we send it
       if (seen.has(joinRequest.nodeInfo.publicKey) === false) {
         // since join request was already validated last cycle, we can just set seen to true directly
@@ -708,7 +722,11 @@ export function sendRequests(): void {
         joinRequest,
         '',
         null,
-        nodeListFromStates(['active', 'ready', 'syncing']),
+        nodeListFromStates([
+          P2P.P2PTypes.NodeStatus.ACTIVE,
+          P2P.P2PTypes.NodeStatus.READY,
+          P2P.P2PTypes.NodeStatus.SYNCING,
+        ]),
         true
       )
       nestedCountersInstance.countEvent('p2p', `saved join request and gossiped to network`)
@@ -1524,22 +1542,23 @@ function decideNodeSelection(joinRequest: P2P.JoinTypes.JoinRequest): JoinReques
   }
 }
 
-export function nodeListFromStates(states: string[]): P2P.NodeListTypes.Node[] {
-  const stateMappings: { [key: string]: P2P.NodeListTypes.Node[] } = {
-    active: NodeList.activeByIdOrder,
-    ready: NodeList.readyByTimeAndIdOrder,
-    syncing: NodeList.syncingByIdOrder,
-    standby: NodeList.standbyByIdOrder,
-    selected: NodeList.selectedByIdOrder,
+export function nodeListFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeListTypes.Node[] {
+  const { NodeStatus } = P2P.P2PTypes
+  const stateMappings: { [key in P2P.P2PTypes.NodeStatus]?: P2P.NodeListTypes.Node[] } = {
+    [NodeStatus.ACTIVE]: NodeList.activeByIdOrder,
+    [NodeStatus.READY]: NodeList.readyByTimeAndIdOrder,
+    [NodeStatus.SYNCING]: NodeList.syncingByIdOrder,
+    [NodeStatus.STANDBY]: NodeList.standbyByIdOrder,
+    [NodeStatus.SELECTED]: NodeList.selectedByIdOrder,
   }
 
-  // Collect arrays from requested states
-  const result = states.reduce((acc, state) => {
+  const result: P2P.NodeListTypes.Node[] = []
+
+  for (const state of states) {
     if (stateMappings[state]) {
-      acc.push(...stateMappings[state])
+      result.push(...stateMappings[state])
     }
-    return acc
-  }, [] as P2P.NodeListTypes.Node[])
+  }
 
   const self = NodeList.byJoinOrder.find((node) => node.id === Self.id)
   if (self) {

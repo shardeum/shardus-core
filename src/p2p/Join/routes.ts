@@ -196,7 +196,11 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
           joinRequest,
           '',
           null,
-          nodeListFromStates(['active', 'ready', 'syncing']),
+          nodeListFromStates([
+            P2P.P2PTypes.NodeStatus.ACTIVE,
+            P2P.P2PTypes.NodeStatus.READY,
+            P2P.P2PTypes.NodeStatus.SYNCING,
+          ]),
           true
         )
         nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
@@ -221,7 +225,11 @@ const unjoinRoute: P2P.P2PTypes.Route<Handler> = {
       joinRequest,
       '',
       null,
-      nodeListFromStates(['active', 'ready', 'syncing']),
+      nodeListFromStates([
+        P2P.P2PTypes.NodeStatus.ACTIVE,
+        P2P.P2PTypes.NodeStatus.READY,
+        P2P.P2PTypes.NodeStatus.SYNCING,
+      ]),
       true
     )
   },
@@ -402,7 +410,11 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
           payload,
           tracker,
           sender,
-          nodeListFromStates(['active', 'ready', 'syncing']),
+          nodeListFromStates([
+            P2P.P2PTypes.NodeStatus.ACTIVE,
+            P2P.P2PTypes.NodeStatus.READY,
+            P2P.P2PTypes.NodeStatus.SYNCING,
+          ]),
           false
         )
     } finally {
@@ -418,7 +430,6 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
   P2P.JoinTypes.JoinRequest,
   P2P.NodeListTypes.Node['id']
 > = (payload: P2P.JoinTypes.JoinRequest, sender: P2P.NodeListTypes.Node['id'], tracker: string) => {
-
   // do not forward gossip after quarter 2
   if (CycleCreator.currentQuarter > 2) {
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-gossip-reject: late-request > Q2:  ${CycleCreator.currentQuarter}` )
@@ -461,7 +472,11 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
     payload,
     tracker,
     sender,
-    nodeListFromStates(['active', 'ready', 'syncing']),
+    nodeListFromStates([
+      P2P.P2PTypes.NodeStatus.ACTIVE,
+      P2P.P2PTypes.NodeStatus.READY,
+      P2P.P2PTypes.NodeStatus.SYNCING,
+    ]),
     false
   )
 }
@@ -482,7 +497,11 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeLi
     payload,
     tracker,
     sender,
-    nodeListFromStates(['active', 'ready', 'syncing']),
+    nodeListFromStates([
+      P2P.P2PTypes.NodeStatus.ACTIVE,
+      P2P.P2PTypes.NodeStatus.READY,
+      P2P.P2PTypes.NodeStatus.SYNCING,
+    ]),
     false
   )
 }
@@ -526,7 +545,11 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<
         payload,
         tracker,
         sender,
-        nodeListFromStates(['active', 'ready', 'syncing']),
+        nodeListFromStates([
+          P2P.P2PTypes.NodeStatus.ACTIVE,
+          P2P.P2PTypes.NodeStatus.READY,
+          P2P.P2PTypes.NodeStatus.SYNCING,
+        ]),
         false
       )
   } finally {
@@ -578,7 +601,11 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<
         payload,
         tracker,
         sender,
-        nodeListFromStates(['active', 'ready', 'syncing']),
+        nodeListFromStates([
+          P2P.P2PTypes.NodeStatus.ACTIVE,
+          P2P.P2PTypes.NodeStatus.READY,
+          P2P.P2PTypes.NodeStatus.SYNCING,
+        ]),
         false
       )
     } else {
@@ -616,7 +643,11 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<
         payload,
         tracker,
         sender,
-        nodeListFromStates(['active', 'ready', 'syncing']),
+        nodeListFromStates([
+          P2P.P2PTypes.NodeStatus.ACTIVE,
+          P2P.P2PTypes.NodeStatus.READY,
+          P2P.P2PTypes.NodeStatus.SYNCING,
+        ]),
         false
       )
   } finally {
