@@ -724,12 +724,12 @@ export function queueRequest(): void {
   return
 }
 
-export function queueStartedSyncingRequest(nodeId: string): void {
-  queuedStartedSyncingId = nodeId
+export function queueStartedSyncingRequest(): void {
+  queuedStartedSyncingId = Self.id
 }
 
-export function queueFinishedSyncingRequest(nodeId: string): void {
-  queuedFinishedSyncingId = nodeId
+export function queueFinishedSyncingRequest(): void {
+  queuedFinishedSyncingId = Self.id
 }
 
 export function queueStandbyRefreshRequest(publicKey: string): void {
