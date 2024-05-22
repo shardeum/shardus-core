@@ -1,4 +1,4 @@
-import { Utils as StringUtils } from '@shardus/types'
+import { safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
 import { compareObjectShape, generateArraySchema, generateObjectSchema } from '../../../../src/utils'
 
 test('compareObjectShape() > two identical object should return true', () => {
@@ -122,7 +122,7 @@ test('compareObjectShape() > should detect missing property', () => {
   }
 
   expect(isValid).toBe(false)
-  expect(StringUtils.safeStringify(expectedError) === StringUtils.safeStringify(error)).toBe(true)
+  expect(safeStringify(expectedError) === safeStringify(error)).toBe(true)
 })
 
 test('compareObjectShape() > should detect extra props', () => {
@@ -165,7 +165,7 @@ test('compareObjectShape() > should detect extra props', () => {
     defectiveChain: ['nestedObj', 'extraProp'],
   }
   expect(isValid).toBe(false)
-  expect(StringUtils.safeStringify(expectedError) === StringUtils.safeStringify(error)).toBe(true)
+  expect(safeStringify(expectedError) === safeStringify(error)).toBe(true)
 })
 
 test('compareObjectShape() > should return error object on property type mismatch', () => {
@@ -209,7 +209,7 @@ test('compareObjectShape() > should return error object on property type mismatc
   }
 
   expect(isValid).toBe(false)
-  expect(StringUtils.safeStringify(expectedError) === StringUtils.safeStringify(error)).toBe(true)
+  expect(safeStringify(expectedError) === safeStringify(error)).toBe(true)
 })
 
 test('compareObjectShape() > should return error object on array type mismatch', () => {
@@ -251,7 +251,7 @@ test('compareObjectShape() > should return error object on array type mismatch',
   }
 
   expect(isValid).toBe(false)
-  expect(StringUtils.safeStringify(expectedError) === StringUtils.safeStringify(error)).toBe(true)
+  expect(safeStringify(expectedError) === safeStringify(error)).toBe(true)
 })
 
 test('compareObjectShape() > should not fail when property possess falsy value', () => {
@@ -358,7 +358,7 @@ test('generateObjectSchema() > should generate proper object schema', () => {
 
   const generatedSchema = generateObjectSchema(obj, { arrTypeDiversity: true })
 
-  const isEqual = StringUtils.safeStringify(generatedSchema) === StringUtils.safeStringify(expectedSchema)
+  const isEqual = safeStringify(generatedSchema) === safeStringify(expectedSchema)
 
   expect(isEqual).toBe(true)
 })
