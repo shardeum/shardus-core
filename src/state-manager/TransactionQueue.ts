@@ -140,9 +140,7 @@ class TransactionQueue {
   _transactionQueueByID: Map<string, QueueEntry> //old name: newAcceptedTxQueueByID
   pendingTransactionQueueByID: Map<string, QueueEntry> //old name: newAcceptedTxQueueTempInjestByID
   archivedQueueEntriesByID: Map<string, QueueEntry>
-  receiptsToForward: ArchiverReceipt[]
   forwardedReceiptsByTimestamp: Map<number, ArchiverReceipt>
-  receiptsBundleByInterval: Map<number, ArchiverReceipt[]>
   receiptsForwardedTimestamp: number
 
   queueStopped: boolean
@@ -231,9 +229,7 @@ class TransactionQueue {
     this.archivedQueueEntries = []
     this.nonceQueue = new Map()
     this.txDebugStatList = new Map()
-    this.receiptsToForward = []
     this.forwardedReceiptsByTimestamp = new Map()
-    this.receiptsBundleByInterval = new Map()
     this.receiptsForwardedTimestamp = shardusGetTime()
 
     this._transactionQueueByID = new Map()
@@ -6625,6 +6621,7 @@ class TransactionQueue {
     }
     // const signedOriginalTxData: any = this.crypto.sign(originalTxData) // maybe we don't need to send by signing it
     Archivers.instantForwardOriginalTxData(originalTxData)
+    this.receiptsForwardedTimestamp = shardusGetTime()
   }
 
   addReceiptToForward(queueEntry: QueueEntry, debugString = ''): void {
@@ -6639,7 +6636,6 @@ class TransactionQueue {
     Archivers.instantForwardReceipts([archiverReceipt])
     this.receiptsForwardedTimestamp = shardusGetTime()
     this.forwardedReceiptsByTimestamp.set(this.receiptsForwardedTimestamp, archiverReceipt)
-    // this.receiptsToForward.push(archiverReceipt)
   }
 
   getReceiptsToForward(): ArchiverReceipt[] {
@@ -6733,7 +6729,7 @@ class TransactionQueue {
   }
 
   resetReceiptsToForward(): void {
-    const MAX_RECEIPT_AGE_MS = 25000 // 25s
+    const MAX_RECEIPT_AGE_MS = 20000 // 20s
     const now = shardusGetTime()
     // Clear receipts that are older than MAX_RECEIPT_AGE_MS
     for (const [key] of this.forwardedReceiptsByTimestamp) {
