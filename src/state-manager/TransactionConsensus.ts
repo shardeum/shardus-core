@@ -3107,10 +3107,12 @@ class TransactionConsenus {
       // Compare with existing vote. Skip we already have it or node rank is lower than ours
       let isBetterThanCurrentVote
       let receivedVoter: Shardus.NodeWithRank
-      if (!queueEntry.receivedBestVote) isBetterThanCurrentVote = true
-      else if (queueEntry.receivedBestVoteHash === this.calculateVoteHash(vote))        
-        isBetterThanCurrentVote = false
-      else {
+      if (!queueEntry.receivedBestVote){
+        isBetterThanCurrentVote = true
+        //do not compare the hash we still need to allow gossip to flow if the hash is the 
+        //same but the vote is better.
+      //else if (queueEntry.receivedBestVoteHash === this.calculateVoteHash(vote)){
+      } else {
         // Compare ranks
         if (queueEntry.executionGroupMap.has(vote.node_id)) {
           receivedVoter = queueEntry.executionGroupMap.get(vote.node_id) as Shardus.NodeWithRank
