@@ -665,7 +665,7 @@ export function sendRequests(): void {
       /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequests failed to add our own sync-finished message`)
     }
   }
-  if (queuedStandbyRefreshPubKeys?.length > 0) {
+  if (queuedStandbyRefreshPubKeys.length > 0) {
     for (const standbyRefreshPubKey of queuedStandbyRefreshPubKeys) {
       const standbyRefreshTx: P2P.JoinTypes.StandbyRefreshRequest = crypto.sign({
         publicKey: standbyRefreshPubKey,
@@ -699,7 +699,7 @@ export function sendRequests(): void {
     queuedStandbyRefreshPubKeys = []
   }
 
-  if (queuedJoinRequestsForGossip?.length > 0) {
+  if (queuedJoinRequestsForGossip.length > 0) {
     for (const joinRequest of queuedJoinRequestsForGossip) {
       // TODO: may need to check if node is on standby and maybe validate the request again
       // need to think about this more
