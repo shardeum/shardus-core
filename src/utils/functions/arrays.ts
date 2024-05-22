@@ -32,12 +32,13 @@ export function getRandom<T>(arr: T[], n: number): T[] {
   return result
 }
 
-export function insertSorted<T>(arr: T[], item: T, comparator?: Comparator<T>): void {
+export function insertSorted<T>(arr: T[], item: T, comparator?: Comparator<T>): number {
   let i = binarySearch(arr, item, comparator)
   if (i < 0) {
     i = -1 - i
   }
   arr.splice(i, 0, item)
+  return i
 }
 
 /**

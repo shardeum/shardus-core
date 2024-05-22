@@ -4,6 +4,7 @@ import {
   OpaqueTransaction,
   ShardusMemoryPatternsInput,
   TransactionKeys,
+  TimestampedTx,
 } from '../shardus/shardus-types'
 import { DeSerializeFromJsonString, SerializeToJsonString } from '../utils'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
@@ -14,7 +15,7 @@ export type SpreadTxToGroupSyncingReq = {
   timestamp: number
   txId: string
   keys: TransactionKeys
-  data: OpaqueTransaction
+  data: TimestampedTx
   appData: unknown
   shardusMemoryPatterns: ShardusMemoryPatternsInput
 }
