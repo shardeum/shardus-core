@@ -12,7 +12,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as NodeList from '../p2p/NodeList'
 import * as Context from '../p2p/Context'
 import * as Self from '../p2p/Self'
-import * as Wrapper from '../p2p/Wrapper'
+import { SignedObject } from '@shardus/crypto-utils'
 import {
   AccountHashCache,
   AccountHashCacheHistory,
@@ -29,7 +29,6 @@ import {
   HashTrieSyncConsensus,
   HashTrieSyncTell,
   HashTrieUpdateStats,
-  RadixAndChildHashes,
   RadixAndHashWithNodeId,
   RadixAndChildHashesWithNodeId,
   RadixAndHash,
@@ -451,7 +450,7 @@ class AccountPatcher {
 
         try {
           for (const repairInstruction of payload?.repairInstructions) {
-            const { accountID, txId, hash, accountData, targetNodeId } = repairInstruction
+            const { accountID, txId, hash, accountData, targetNodeId, receipt2 } = repairInstruction
 
             // check if we are the target node
             if (targetNodeId !== Self.id) {
@@ -486,26 +485,39 @@ class AccountPatcher {
             }
 
             // check the vote and confirmation status of the tx
-            let bestConfirmation = archivedQueueEntry.receivedBestConfirmation
-            let receivedBestVote = archivedQueueEntry.receivedBestVote
-            if (bestConfirmation != null) {
-              if (bestConfirmation.message === 'challenge') {
-                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: challenge for txId: ${txId}`)
-                // continue
-              }
-              if (receivedBestVote == null) {
-                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: no vote for txId: ${txId}`)
+            const bestMessage = receipt2.confirmOrChallenge
+            const receivedBestVote = receipt2.appliedVote
+
+            if (receivedBestVote != null) {
+              // Check if vote is from eligible list of voters for this TX
+              if(!archivedQueueEntry.eligibleNodeIdsToVote.has(receivedBestVote.node_id)) {
+                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: vote from ineligible node for txId: ${txId}`)
                 continue
               }
-              if (receivedBestVote.cant_apply === true || receivedBestVote.transaction_result === false) {
-                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: vote failed for txId: ${txId}`)
+
+              // Check signature of the vote
+              if (!this.crypto.verify(
+                receivedBestVote as SignedObject,
+                archivedQueueEntry.executionGroupMap.get(receivedBestVote.node_id).publicKey
+              )) {
+                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: vote signature invalid for txId: ${txId}`)
                 continue
               }
+
+              // Check transaction result from vote
+              if (!receivedBestVote.transaction_result) {
+                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: vote result not true for txId ${txId}`)
+                continue
+              }
+
+              // Check account hash. Calculate account hash of account given in instruction
+              // and compare it with the account hash in the vote.
+              const calculatedAccountHash = this.app.calculateAccountHash(accountData.data)
               let accountHashMatch = false
               for (let i = 0; i < receivedBestVote.account_id.length; i++) {
                 if (receivedBestVote.account_id[i] === accountID) {
-                  if (receivedBestVote.account_state_hash_after[i] !== hash) {
-                    nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: vote hash mismatch for txId: ${txId}`)
+                  if (receivedBestVote.account_state_hash_after[i] !== calculatedAccountHash) {
+                    nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: account hash mismatch for txId: ${txId}`)
                     accountHashMatch = false
                   } else {
                     accountHashMatch = true
@@ -517,12 +529,36 @@ class AccountPatcher {
                 nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: vote account hash mismatch for txId: ${txId}`)
                 continue
               }
+            } else {
+              // Skip this account apply as we were not able to get the best vote for this tx
+              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: no vote for txId: ${txId}`)
+              continue
             }
 
-            // check the account Data
-            const calculatedAccountHash = this.app.calculateAccountHash(accountData.data)
-            if (calculatedAccountHash !== hash) {
-              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: hash mismatch between calculated account and provided hash ${txId}`)
+            if (bestMessage != null) {
+              // Skip if challenge receipt
+              if (bestMessage.message === 'challenge') {
+                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: challenge for txId: ${txId}`)
+                continue
+              }
+
+              // Check if mesasge is from eligible list of responders for this TX
+              if(!archivedQueueEntry.eligibleNodeIdsToConfirm.has(bestMessage.nodeId)) {
+                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: confirmation from ineligible node for txId: ${txId}`)
+                continue
+              }
+
+              // Check signature of the message
+              if(!this.crypto.verify(
+                bestMessage as SignedObject,
+                archivedQueueEntry.executionGroupMap.get(bestMessage.nodeId).publicKey
+              )) {
+                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: confirmation signature invalid for txId: ${txId}`)
+                continue
+              }
+            } else {
+              // Skip this account apply as we were not able to get the best confirmation for this tx
+              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: no confirmation for txId: ${txId}`)
               continue
             }
 
@@ -3272,6 +3308,7 @@ class AccountPatcher {
           txId: archivedQueueEntry.acceptedTx.txId,
           accountData,
           targetNodeId: accountToFix.targetNodeId,
+          receipt2: archivedQueueEntry.appliedReceipt2
         }
         if (repairInstructionMap.has(repairInstruction.targetNodeId)) {
           repairInstructionMap.get(repairInstruction.targetNodeId).push(repairInstruction)
@@ -4274,6 +4311,7 @@ type AccountRepairInstruction = {
   txId: string
   accountData: Shardus.WrappedData
   targetNodeId: string
+  receipt2: AppliedReceipt2
 }
 
 export default AccountPatcher
