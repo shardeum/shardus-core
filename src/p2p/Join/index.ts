@@ -1561,7 +1561,6 @@ export function nodeListFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeL
   }
 
   const self = NodeList.byJoinOrder.find((node) => node.id === Self.id)
-  if (self) {
   if (self && !result.some((node) => node.id === self.id)) {
     result.push(self)
   }
@@ -1569,17 +1568,17 @@ export function nodeListFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeL
   return result
 }
 
-function info(...msg: string[]): void {
-  const entry = `Join: ${msg.join(' ')}`
-  p2pLogger.info(entry)
-}
+  function info(...msg: string[]): void {
+    const entry = `Join: ${msg.join(' ')}`
+    p2pLogger.info(entry)
+  }
 
-export function warn(...msg: string[]): void {
-  const entry = `Join: ${msg.join(' ')}`
-  p2pLogger.warn(entry)
-}
+  export function warn(...msg: string[]): void {
+    const entry = `Join: ${msg.join(' ')}`
+    p2pLogger.warn(entry)
+  }
 
-export function error(...msg: string[]): void {
-  const entry = `Join: ${msg.join(' ')}`
-  p2pLogger.error(entry)
-}
+  export function error(...msg: string[]): void {
+    const entry = `Join: ${msg.join(' ')}`
+    p2pLogger.error(entry)
+  }
