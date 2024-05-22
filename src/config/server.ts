@@ -239,6 +239,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     cycleRecordOOSDebugLogs: false,
     enableTestMode: false,
     highResolutionProfiling: true,
+    randomCycleData: true,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {

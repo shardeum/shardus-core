@@ -1073,6 +1073,8 @@ export interface ServerConfiguration {
     enableTestMode: boolean
     /** Whether to enable high-resolution profiling */
     highResolutionProfiling: boolean
+    /** Flag to enable/disbale adding random data to cycle record */
+    randomCycleData: boolean
   }
   /** Options for the statistics module */
   statistics?: {
