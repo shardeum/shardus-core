@@ -716,7 +716,7 @@ class Shardus extends EventEmitter {
       console.log('restore - startCatchUpQueue')
       nestedCountersInstance.countEvent('restore', `restore event: finished startCatchUpQueue. ${shardusGetTime()}`)
 
-      queueFinishedSyncingRequest(Self.id)
+      queueFinishedSyncingRequest()
       console.log('syncAppData - queueFinishedSyncingRequest')
       nestedCountersInstance.countEvent('restore', `restore event: queue finished-syncing-request ${shardusGetTime()}`)
 
@@ -1178,7 +1178,7 @@ class Shardus extends EventEmitter {
       // the following comment of delay is probably not relavent now as we are using cycle txs
       // we don't have a delay here as there's practically no time between sync-started and sync-finished for the first node
       // since we already wait fro sync-finished, its very unlikely we'll be in the wrong quarter
-      queueFinishedSyncingRequest(Self.id)
+      queueFinishedSyncingRequest()
       console.log('syncAppData - queueFinishedSyncingRequest')
       nestedCountersInstance.countEvent('p2p', `queue finished-syncing-request ${shardusGetTime()}`)
       await this.stateManager.waitForShardCalcs()
@@ -1195,7 +1195,7 @@ class Shardus extends EventEmitter {
       Self.setp2pIgnoreJoinRequests(false)
       console.log('p2pIgnoreJoinRequests = false')
 
-      queueFinishedSyncingRequest(Self.id)
+      queueFinishedSyncingRequest()
       console.log('syncAppData - queueFinishedSyncingRequest')
       nestedCountersInstance.countEvent('p2p', `queue finished-syncing-request ${shardusGetTime()}`)
       this.stateManager.appFinishedSyncing = true

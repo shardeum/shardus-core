@@ -205,7 +205,7 @@ export function startupV2(): Promise<boolean> {
           /* prettier-ignore */ if (logFlags.verbose) console.log(`in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
         }
 
-        Join.queueStartedSyncingRequest(id)
+        Join.queueStartedSyncingRequest()
 
         // Enable internal routes
         Comms.setAcceptInternal(true)
