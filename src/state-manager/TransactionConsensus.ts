@@ -3126,7 +3126,10 @@ class TransactionConsenus {
             `tryAppendVote: ${queueEntry.logID} received vote is NOT better than current vote. lastReceivedVoteTimestamp: ${queueEntry.lastVoteReceivedTimestamp}`
           )
         }
-        this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter`)
+        if (receivedVoter)
+          this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter ${NodeList.activeIdToPartition.get(receivedVoter.id)}`)
+        else
+          this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter`)
         return false
       }
 
@@ -3140,14 +3143,14 @@ class TransactionConsenus {
       }
       if (receivedVoter) {
         queueEntry.receivedBestVoter = receivedVoter
-        this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:t receivedVoter`)
+        this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:t receivedVoter ${NodeList.activeIdToPartition.get(receivedVoter.id)}`)
         return true
       } else {
         if (queueEntry.executionGroupMap.has(vote.node_id)) {
           queueEntry.receivedBestVoter = queueEntry.executionGroupMap.get(
             vote.node_id
           ) as Shardus.NodeWithRank
-          this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:t receivedVoter2`)
+          this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:t receivedVoter2 ${NodeList.activeIdToPartition.get(queueEntry.receivedBestVoter.id)}`)
           return true
         }
         this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f no_receivedVoter`)
