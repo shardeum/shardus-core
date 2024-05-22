@@ -1564,6 +1564,7 @@ export function nodeListFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeL
 
   const self = NodeList.byJoinOrder.find((node) => node.id === Self.id)
   if (self) {
+  if (self && !result.some((node) => node.id === self.id)) {
     result.push(self)
   }
 
