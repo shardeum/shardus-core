@@ -84,6 +84,7 @@ import ShardFunctions from '../state-manager/shardFunctions'
 import SocketIO from 'socket.io'
 import { nodeListFromStates, queueFinishedSyncingRequest } from '../p2p/Join'
 import * as NodeList from '../p2p/NodeList'
+import { P2P } from '@shardus/types'
 
 
 // the following can be removed now since we are not using the old p2p code
@@ -1150,7 +1151,11 @@ class Shardus extends EventEmitter {
         readyPayload,
         undefined,
         undefined,
-        nodeListFromStates(['active', 'ready', 'syncing'])
+        nodeListFromStates([
+          P2P.P2PTypes.NodeStatus.ACTIVE,
+          P2P.P2PTypes.NodeStatus.READY,
+          P2P.P2PTypes.NodeStatus.SYNCING,
+        ])
       )
       if (this.stateManager) {
         this.stateManager.appFinishedSyncing = true

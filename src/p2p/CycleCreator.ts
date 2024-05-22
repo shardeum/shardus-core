@@ -1288,7 +1288,11 @@ async function gossipCycleCert(sender: P2P.NodeListTypes.Node['id'], tracker?: s
     signedCertGossip,
     tracker,
     sender,
-    nodeListFromStates(['active', 'ready', 'syncing']),
+    nodeListFromStates([
+      P2P.P2PTypes.NodeStatus.ACTIVE,
+      P2P.P2PTypes.NodeStatus.READY,
+      P2P.P2PTypes.NodeStatus.SYNCING,
+    ]),
     true
   )
 }
