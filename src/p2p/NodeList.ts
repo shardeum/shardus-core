@@ -28,7 +28,6 @@ export let byJoinOrder: P2P.NodeListTypes.Node[] // In order of joinRequestTimes
 export let byIdOrder: P2P.NodeListTypes.Node[]
 export let othersByIdOrder: P2P.NodeListTypes.Node[] // used by sendGossipIn
 export let activeByIdOrder: P2P.NodeListTypes.Node[]
-export let activeIdToPartition: Map<string, number>
 export let syncingByIdOrder: P2P.NodeListTypes.Node[]
 export let readyByTimeAndIdOrder: P2P.NodeListTypes.Node[]
 export let activeOthersByIdOrder: P2P.NodeListTypes.Node[]
@@ -78,7 +77,6 @@ export function reset(caller: string) {
   byIdOrder = []
   othersByIdOrder = []
   activeByIdOrder = []
-  activeIdToPartition = new Map()
   syncingByIdOrder = []
   readyByTimeAndIdOrder = []
   activeOthersByIdOrder = []
@@ -131,14 +129,11 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
   // If node is READY status, insert sorted by readyTimestamp and id to tiebreak into readyByTimeAndIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.READY) {
     insertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
-  }  
+  }
 
   // If active, insert sorted by id into activeByIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
     insertSorted(activeByIdOrder, node, propComparator('id'))
-    for (let i = 0; i < activeByIdOrder.length; i++) {
-      activeIdToPartition.set(activeByIdOrder[i].id, i)
-    }    
 
     // Dont insert yourself into activeOthersByIdOrder
     if (node.id !== id) {
@@ -197,10 +192,7 @@ export function removeNode(
   if (idx >= 0) activeOthersByIdOrder.splice(idx, 1)
 
   idx = binarySearch(activeByIdOrder, { id }, propComparator('id'))
-  if (idx >= 0) {
-    activeByIdOrder.splice(idx, 1)
-    activeIdToPartition.delete(id)
-  }
+  if (idx >= 0) activeByIdOrder.splice(idx, 1)
 
   idx = binarySearch(othersByIdOrder, { id }, propComparator('id'))
   if (idx >= 0) othersByIdOrder.splice(idx, 1)
@@ -307,9 +299,6 @@ export function updateNode(
       // Add the node to active arrays, if needed
       if (update.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
         insertSorted(activeByIdOrder, node, propComparator('id'))
-        for (let i = 0; i < activeByIdOrder.length; i++) {
-          activeIdToPartition.set(activeByIdOrder[i].id, i)
-        }
         // Don't add yourself to activeOthersByIdOrder
         if (node.id !== id) {
           insertSorted(activeOthersByIdOrder, node, propComparator('id'))

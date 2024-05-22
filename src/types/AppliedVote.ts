@@ -47,12 +47,13 @@ export function serializeAppliedVote(
     stream.writeUInt8(0) // Indicate that sign is not present
   }
 
-  if (obj.app_data_hash) {
+  if (obj.app_data_hash){
     stream.writeUInt8(1)
     stream.writeString(obj.app_data_hash)
   } else {
     stream.writeUInt8(0)
   }
+
 }
 
 export function deserializeAppliedVote(stream: VectorBufferStream): AppliedVoteSerializable {

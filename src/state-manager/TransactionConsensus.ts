@@ -17,7 +17,6 @@ import { Ordering } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions'
-import * as NodeList from '../p2p/NodeList'
 import {
   AppliedReceipt,
   AppliedReceipt2,
@@ -34,7 +33,6 @@ import {
   RequestReceiptForTxReq,
   RequestReceiptForTxResp,
   WrappedResponses,
-  TimestampRemoveRequest
 } from './state-manager-types'
 import { ipInfo, shardusGetTime } from '../network'
 import { robustQuery } from '../p2p/Utils'
@@ -260,25 +258,6 @@ class TransactionConsenus {
       }
     )
 
-    this.p2p.registerInternal(
-      'remove_timestamp_cache',
-      async (
-        payload: TimestampRemoveRequest,
-        respond: (result: boolean) => unknown
-      ) => {
-        const { txId, receipt2, cycleCounter } = payload
-        /* eslint-disable security/detect-object-injection */
-        if (this.txTimestampCache[cycleCounter] && this.txTimestampCache[cycleCounter][txId]) {
-          // remove the timestamp from the cache
-          delete this.txTimestampCache[cycleCounter][txId]
-          this.txTimestampCache[cycleCounter][txId] = null
-          this.mainLogger.debug(`Removed timestamp cache for txId: ${txId}, timestamp: ${JSON.stringify(this.txTimestampCache[cycleCounter][txId])}`)
-          nestedCountersInstance.countEvent('consensus', 'remove_timestamp_cache')
-        }
-        await respond(true)
-      }
-    )
-
     const getTxTimestampBinary: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_get_tx_timestamp,
       handler: async (payload, respond, header) => {
@@ -308,7 +287,6 @@ class TransactionConsenus {
           ) {
             // eslint-disable-next-line security/detect-object-injection
             tsReceipt = this.txTimestampCache[readableReq.cycleCounter][readableReq.txId]
-            this.mainLogger.debug(`Found timestamp cache for txId: ${readableReq.txId}, timestamp: ${JSON.stringify(tsReceipt)}`)
             return respond(tsReceipt, serializeGetTxTimestampResp)
           } else {
             const tsReceipt: Shardus.TimestampReceipt = this.generateTimestampReceipt(
@@ -453,7 +431,7 @@ class TransactionConsenus {
 
     this.p2p.registerInternal(
       'get_applied_vote',
-      async (payload: AppliedVoteQuery, respond: (arg0: AppliedVoteQueryResponse) => unknown) => {        
+      async (payload: AppliedVoteQuery, respond: (arg0: AppliedVoteQueryResponse) => unknown) => {
         nestedCountersInstance.countEvent('consensus', 'get_applied_vote')
         const { txId } = payload
         let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId)
@@ -725,7 +703,6 @@ class TransactionConsenus {
           }
 
           if (receivedAppliedReceipt2 == null || receivedAppliedReceipt2.confirmOrChallenge == null) {
-            /* prettier-ignore */ this.mainLogger.error(`spread_appliedReceipt2 ${txId} received null receipt`)
             nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null receipt`)
             return
           }
@@ -748,7 +725,9 @@ class TransactionConsenus {
               /* prettier-ignore */
               if (logFlags.error || this.stateManager.consensusLog)
                 this.mainLogger.error(
-                  `spread_appliedReceipt no queue entry for ${txId} txId:${txId}`
+                  `spread_appliedReceipt no queue entry for ${txId} dbg:${
+                    this.stateManager.debugTXHistory[utils.stringifyReduce(txId)]
+                  }`
                 )
               // NEW start repair process that will find the TX then apply repairs
               // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(receivedAppliedReceipt2)
@@ -799,29 +778,18 @@ class TransactionConsenus {
           }
 
           // decide whether we should store and forward the receipt
-          let shouldStore = false
-          let shouldForward = false
-          if (Context.config.stateManager.stuckTxQueueFix) {
-            // queueEntry.gossipedReceipt will decide the actual forwarding
-            shouldForward = true
-          }
+          let shouldStoreAndForward = false
           if (this.config.stateManager.useNewPOQ === false) {
-            shouldStore = queueEntry.gossipedReceipt === false
+            shouldStoreAndForward = queueEntry.gossipedReceipt === false
           } else {
             const localAppliedReceipt2 = queueEntry.appliedReceipt2
             if (localAppliedReceipt2) {
               const localReceiptConfirmNode = localAppliedReceipt2.confirmOrChallenge.nodeId
               const receivedReceiptConfirmNode = receivedAppliedReceipt2.confirmOrChallenge.nodeId
               if (localReceiptConfirmNode === receivedReceiptConfirmNode) {
-                if (Context.config.stateManager.stuckTxQueueFix) {
-                  // we should not care about the rank for receipt2+data gossips
-                  shouldForward = true
-                } else {
-                  shouldForward = false
-                }
                 if (logFlags.debug)
                   this.mainLogger.debug(
-                    `spread_appliedReceipt2 ${queueEntry.logID} we have the same receipt. We do not need to store but we will forward`
+                    `spread_appliedReceipt2 ${queueEntry.logID} we have the same receipt. We do not need to store and forward`
                   )
               } else {
                 if (logFlags.debug)
@@ -843,16 +811,14 @@ class TransactionConsenus {
                   queueEntry.acceptedTx.timestamp
                 )
                 if (receivedReceiptRank < localReceiptRank) {
-                  shouldStore = true
-                  shouldForward = true
+                  shouldStoreAndForward = true
                   this.mainLogger.debug(
-                    `spread_appliedReceipt2 ${queueEntry.logID} received receipt is better. we will store and forward`
+                    `spread_appliedReceipt2 ${queueEntry.logID} received receipt is better`
                   )
                 }
               }
             } else {
-              shouldStore = true
-              shouldForward = true
+              shouldStoreAndForward = true
               if (logFlags.debug)
                 this.mainLogger.debug(
                   `spread_appliedReceipt2 ${queueEntry.logID} we do not have a local or received receipt generated. will store and forward`
@@ -860,20 +826,19 @@ class TransactionConsenus {
             }
           }
           // if we are tx group node and haven't got data yet, we should store and forward the receipt
-          if (queueEntry.isInExecutionHome === false) {
+          if (shouldStoreAndForward === false) {
             if (queueEntry.accountDataSet === false || Object.keys(queueEntry.collectedFinalData).length === 0) {
-              shouldStore = true
-              shouldForward = true
+              shouldStoreAndForward = true
               if (logFlags.debug)
                 this.mainLogger.debug(
-                  `spread_appliedReceipt2 ${queueEntry.logID} we are tx group node and do not have receipt2 yet. will store and forward`
+                  `spread_appliedReceipt2 ${queueEntry.logID} we do not have account data yet. will store and forward`
                 )
             }
           }
-          this.mainLogger.debug(`spread_appliedReceipt2 ${queueEntry.logID} shouldStore:${shouldStore}, shouldForward:${shouldForward} isInExecutionHome:${queueEntry.isInExecutionHome}, accountDataSet:${queueEntry.accountDataSet}, collectedFinalData:${Object.keys(queueEntry.collectedFinalData).length}`)
 
           // process, store and forward the receipt
-          if (shouldStore === true && queueEntry.gossipedReceipt === false) {
+          if (shouldStoreAndForward === true && queueEntry.gossipedReceipt === false) {
+            queueEntry.gossipedReceipt = true
             /* prettier-ignore */
             if (logFlags.debug || this.stateManager.consensusLog)
               this.mainLogger.debug(
@@ -952,12 +917,11 @@ class TransactionConsenus {
                 -1,
                 queueEntry.acceptedTx.txId
               )
-              queueEntry.gossipedReceipt = true
               nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 gossip forwarded')
             }
           } else {
             // we get here if the receipt has already been shared
-            /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared or shouldStoreAndForward:${shouldStore}`)
+            /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared or shouldStoreAndForward:${shouldStoreAndForward}`)
           }
         } catch (ex) {
           this.statemanager_fatal(
@@ -1029,7 +993,7 @@ class TransactionConsenus {
       timestamp: shardusGetTime(),
     }
     const signedTsReceipt = this.crypto.sign(tsReceipt)
-    /* prettier-ignore */ this.mainLogger.debug(`Timestamp receipt generated for txId ${txId}: ${utils.stringifyReduce(signedTsReceipt)}`)
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`Timestamp receipt generated for txId ${txId}: ${utils.stringifyReduce(signedTsReceipt)}`)
 
     // caching ts receipt for later nodes
     if (!this.txTimestampCache[signedTsReceipt.cycleCounter]) {
@@ -1067,7 +1031,7 @@ class TransactionConsenus {
       let timestampReceipt
       try {
         if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getTxTimestampBinary) {
-          if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(homeNode.node.id)}: ${'get_tx_timestamp'}`)
+          if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${ipInfo.internalIp}-->>${homeNode.node.internalIp}: ${'get_tx_timestamp'}`)
           const serialized_res = await this.p2p.askBinary<getTxTimestampReq, getTxTimestampResp>(
             homeNode.node,
             InternalRouteEnum.binary_get_tx_timestamp,
@@ -1168,11 +1132,6 @@ class TransactionConsenus {
         gossipGroup
       )
       let payload: any = queueEntry.appliedReceipt2
-      const receipt2 = this.stateManager.getReceipt2(queueEntry)
-      if (receipt2 == null) {
-        nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-receipt2 == null')
-        return
-      }
 
       if (Context.config.stateManager.attachDataToReceipt) {
         // Report data to corresponding nodes
@@ -1194,9 +1153,6 @@ class TransactionConsenus {
           }
           //override wrapped states with writtenAccountsMap which should be more complete if it included
           wrappedStates = writtenAccountsMap
-        }
-        if (receipt2.confirmOrChallenge.message === 'challenge') {
-          wrappedStates = {}
         }
         payload = { receipt: queueEntry.appliedReceipt2, wrappedStates }
       }
@@ -1363,7 +1319,6 @@ class TransactionConsenus {
 
       if (queueEntry.appliedReceipt != null) {
         nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt appliedReceipt != null')
-        if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt ${queueEntry.logID} appliedReceipt != null`)
         return queueEntry.appliedReceipt
       }
 
@@ -1485,7 +1440,7 @@ class TransactionConsenus {
         }
       } else {
         if (queueEntry.completedConfirmedOrChallenge === false && queueEntry.isInExecutionHome) {
-          if (this.stateManager.consensusLog || logFlags.debug)
+          if (this.stateManager.consensusLog)
             this.mainLogger.info(
               `tryProduceReceipt ${queueEntry.logID} completedConfirmedOrChallenge === false and isInExecutionHome`
             )
@@ -1519,7 +1474,18 @@ class TransactionConsenus {
               `tryProduceReceipt: ${queueEntry.logID} stopped accepting confirm/challenge messages`
             )
 
-          if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} ready to decide final receipt. bestReceivedChallenge: ${utils.stringifyReduce(queueEntry.receivedBestChallenge)}, bestReceivedConfirmation: ${utils.stringifyReduce(queueEntry.receivedBestConfirmation)}, receivedBestConfirmedNode: ${utils.stringifyReduce(queueEntry.receivedBestConfirmedNode)}`) // prettier-ignore
+          if (logFlags.debug) {
+            this.mainLogger.debug(
+              `tryProduceReceipt: ${
+                queueEntry.logID
+              } ready to decide final receipt. bestReceivedChallenge: ${utils.stringifyReduce(
+                queueEntry.receivedBestChallenge
+              )}, bestReceivedConfirmation: ${utils.stringifyReduce(
+                queueEntry.receivedBestConfirmation
+              )}, receivedBestConfirmedNode: ${utils.stringifyReduce(queueEntry.receivedBestConfirmedNode)}`
+            )
+          }
+
           if (this.stateManager.consensusLog) {
             this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} ready to decide final receipt.`)
             this.mainLogger.debug(
@@ -1533,7 +1499,6 @@ class TransactionConsenus {
             queueEntry.receivedBestChallenger &&
             queueEntry.uniqueChallengesCount >= this.config.stateManager.minRequiredChallenges
           ) {
-            nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt producing fail receipt from unique challenges')
             const appliedReceipt: AppliedReceipt = {
               txid: queueEntry.receivedBestChallenge.appliedVote.txid,
               result: false,
@@ -1558,7 +1523,6 @@ class TransactionConsenus {
                 )}`
               )
 
-            // todo: we still need to check if we have a better challenge receipt from robust query ??
             const robustQueryResult = await this.robustQueryConfirmOrChallenge(queueEntry)
             const robustConfirmOrChallenge = robustQueryResult?.result
             const robustUniqueCount = robustQueryResult?.uniqueCount
@@ -1572,15 +1536,14 @@ class TransactionConsenus {
             if (robustConfirmOrChallenge == null) {
               nestedCountersInstance.countEvent(
                 'consensus',
-                'tryProduceReceipt robust query for challenge failed'
+                'tryProduceReceipt robustQueryConfirmOrChallenge challenge failed'
               )
               if (logFlags.debug)
                 this.mainLogger.debug(
-                  `tryProduceReceipt: ${queueEntry.logID} failed to query robust challenge`
+                  `tryProduceReceipt: ${queueEntry.logID} failed to query robust confirm/challenge`
                 )
               return
             }
-            queueEntry.robustQueryConfirmOrChallengeCompleted = true
 
             // Received a confrim receipt. We have a challenge receipt which is better.
             if (robustConfirmOrChallenge && robustConfirmOrChallenge.message === 'confirm') {
@@ -1588,27 +1551,27 @@ class TransactionConsenus {
                 this.mainLogger.debug(
                   `tryProduceReceipt: ${queueEntry.logID} received a confirm message. We have enough challenge messages which is better`
                 )
-              // just use our challenge receipt and return
               queueEntry.appliedReceipt = appliedReceipt
               queueEntry.appliedReceipt2 = appliedReceipt2
               return appliedReceipt
             }
 
-            // Received another challenge receipt. Compare ranks. Lower is better
+            // Received another challenge receipt. Compare ranks
             let bestNodeFromRobustQuery: Shardus.NodeWithRank
             if (queueEntry.executionGroupMap.has(robustConfirmOrChallenge.nodeId)) {
               bestNodeFromRobustQuery = queueEntry.executionGroupMap.get(
                 robustConfirmOrChallenge.nodeId
               ) as Shardus.NodeWithRank
             }
-            const isRobustQueryNodeBetter = bestNodeFromRobustQuery.rank < queueEntry.receivedBestChallenger.rank
+            const isRobustQueryNodeBetter =
+              bestNodeFromRobustQuery.rank < queueEntry.receivedBestChallenger.rank
             if (
               isRobustQueryNodeBetter &&
               robustUniqueCount >= this.config.stateManager.minRequiredChallenges
             ) {
               nestedCountersInstance.countEvent(
                 'consensus',
-                'tryProduceReceipt challenge from network is better than our challenge'
+                'tryProduceReceipt robustQueryConfirmOrChallenge is better'
               )
               if (logFlags.debug)
                 this.mainLogger.debug(
@@ -1641,7 +1604,6 @@ class TransactionConsenus {
                 'consensus',
                 'tryProduceReceipt robustQueryConfirmOrChallenge is NOT better'
               )
-              /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} challenge from robust query is not better than our challenge. use our challenge: ${utils.stringifyReduce(appliedReceipt2)}`)
               queueEntry.appliedReceipt = appliedReceipt
               queueEntry.appliedReceipt2 = appliedReceipt2
               return appliedReceipt
@@ -1705,7 +1667,6 @@ class TransactionConsenus {
                 )
               return // this will prevent OOS
             }
-            queueEntry.robustQueryConfirmOrChallengeCompleted = true
 
             // Received challenge receipt, we have confirm receipt which is not as strong as challenge receipt
             if (robustConfirmOrChallenge.message === 'challenge') {
@@ -1811,7 +1772,7 @@ class TransactionConsenus {
       }
       return null
     } catch (e) {
-      this.mainLogger.error(`tryProduceReceipt: error ${queueEntry.logID} error: ${e.message}`)
+      this.mainLogger.error(`tryProduceReceipt: ${queueEntry.logID} error: ${e.message}`)
     } finally {
       if (logFlags.profiling_verbose) this.profiler.scopedProfileSectionEnd('tryProduceReceipt')
       this.profiler.profileSectionEnd('tryProduceReceipt')
@@ -1919,7 +1880,7 @@ class TransactionConsenus {
           const queryData: AppliedVoteQuery = { txId: queueEntry.acceptedTx.txId }
           if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAppliedVoteBinary) {
             const req = queryData as GetAppliedVoteReq
-            if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'get_applied_vote'}`)
+            if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${ipInfo.internalIp}-->>${node.internalIp}: ${'get_applied_vote'}`)
             const rBin = await Comms.askBinary<GetAppliedVoteReq, GetAppliedVoteResp>(
               node,
               InternalRouteEnum.binary_get_applied_vote,
@@ -1932,7 +1893,7 @@ class TransactionConsenus {
             )
             return rBin
           }
-          return await Comms.ask(node, 'get_applied_vote', queryData)          
+          return await Comms.ask(node, 'get_applied_vote', queryData)
         } catch (e) {
           this.mainLogger.error(`robustQueryBestVote: Failed query to node ${node.id} error: ${e.message}`)
           return {
@@ -1986,7 +1947,7 @@ class TransactionConsenus {
       const queryFn = async (node: Shardus.Node): Promise<ConfirmOrChallengeQueryResponse> => {
         if (node.externalIp === Self.ip && node.externalPort === Self.port) return null
         const queryData = { txId: queueEntry.acceptedTx.txId }
-        if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queryData.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'get_confirm_or_challenge'}`)
+        if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queryData.txId} ${ipInfo.internalIp}-->>${node.internalIp}: ${'get_confirm_or_challenge'}`)
         return this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getConfirmOrChallengeBinary
           ? await Comms.askBinary<GetConfirmOrChallengeReq, GetConfirmOrChallengeResp>(
               node,
@@ -2108,7 +2069,7 @@ class TransactionConsenus {
       try {
         if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountDataBinary) {
           const req = message as GetAccountDataReqSerializable
-          if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'get_account_data3'}`)
+          if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${txId} ${ipInfo.internalIp}-->>${node.internalIp}: ${'get_account_data3'}`)
           const rBin = await Comms.askBinary<GetAccountDataReqSerializable, GetAccountDataRespSerializable>(
             node,
             InternalRouteEnum.binary_get_account_data,
@@ -2164,6 +2125,10 @@ class TransactionConsenus {
   }
 
   async confirmOrChallenge(queueEntry: QueueEntry): Promise<void> {
+    if (this.stateManager.consensusLog)
+      this.mainLogger.debug(
+        `confirmOrChallenge: ${queueEntry.logID} isInExecutionHome: ${queueEntry.isInExecutionHome} completedConfirmedOrChallenge: ${queueEntry.completedConfirmedOrChallenge}`
+      )
     try {
       if (queueEntry.ourVote == null && queueEntry.isInExecutionHome) {
         nestedCountersInstance.countEvent('confirmOrChallenge', 'ourVote == null and isInExecutionHome')
@@ -2203,7 +2168,7 @@ class TransactionConsenus {
       // check if last confirm/challenge received is 1s ago
       const hasWaitedLongEnough = timeSinceLastVoteMessage >= this.config.stateManager.waitTimeBeforeConfirm
       const hasWaitLimitReached = timeSinceFirstVote >= this.config.stateManager.waitLimitAfterFirstVote
-      if (logFlags.verbose && this.stateManager.consensusLog)
+      if (logFlags.debug)
         this.mainLogger.debug(
           `confirmOrChallenge: ${queueEntry.logID} hasWaitedLongEnough: ${hasWaitedLongEnough}, hasWaitLimitReached: ${hasWaitLimitReached}, timeSinceLastVoteMessage: ${timeSinceLastVoteMessage} ms, timeSinceFirstVote: ${timeSinceFirstVote} ms`
         )
@@ -2212,10 +2177,9 @@ class TransactionConsenus {
         // stop accepting the vote messages for this tx
         queueEntry.acceptVoteMessage = false
         const eligibleToConfirm = queueEntry.eligibleNodeIdsToConfirm.has(Self.id)
-        const eligibleToChallenge = true
-        if (this.stateManager.consensusLog || logFlags.debug) {
+        if (this.stateManager.consensusLog) {
           this.mainLogger.info(
-            `confirmOrChallenge: ${queueEntry.logID} hasWaitedLongEnough: true. Now we will try to confirm or challenge. eligibleToConfirm: ${eligibleToConfirm}, eligibleToChallenge: ${eligibleToChallenge}`
+            `confirmOrChallenge: ${queueEntry.logID} hasWaitedLongEnough: true. Now we will try to confirm or challenge. eligibleToConfirm: ${eligibleToConfirm}`
           )
         }
 
@@ -2227,7 +2191,6 @@ class TransactionConsenus {
           nestedCountersInstance.countEvent('confirmOrChallenge', 'cannot get robust vote from network')
           return
         }
-        /* prettier ignore */if (this.mainLogger.debug || this.stateManager.consensusLog) this.mainLogger.debug(`confirmOrChallenge: ${queueEntry.logID} voteFromRobustQuery: ${utils.stringifyReduce(voteFromRobustQuery)}`)
         let bestVoterFromRobustQuery: Shardus.NodeWithRank
         for (let i = 0; i < queueEntry.executionGroup.length; i++) {
           const node = queueEntry.executionGroup[i]
@@ -2244,7 +2207,6 @@ class TransactionConsenus {
           nestedCountersInstance.countEvent('confirmOrChallenge', 'cannot get robust voter from network')
           return
         }
-        queueEntry.robustQueryVoteCompleted = true
 
         // if vote from robust is better than our received vote, use it as final vote
         const isRobustQueryVoteBetter = bestVoterFromRobustQuery.rank > queueEntry.receivedBestVoter.rank
@@ -2388,20 +2350,12 @@ class TransactionConsenus {
       // Should check account integrity only when before states are different from best vote
       let doStatesMatch = true
       const voteBeforeStates = queueEntry.receivedBestVote.account_state_hash_before
-      const ourCollectedData = Object.values(queueEntry.collectedData)
-      if (voteBeforeStates.length !== ourCollectedData.length) {
+      const ourBeforeStates = Object.values(queueEntry.collectedData)
+      if (voteBeforeStates.length !== ourBeforeStates.length) {
         doStatesMatch = false
       }
       for (let i = 0; i < voteBeforeStates.length; i++) {
-        if (ourCollectedData[i] == null) {
-          doStatesMatch = false
-          nestedCountersInstance.countEvent(
-            'confirmOrChallenge',
-            'tryChallengeVoteAndShare canceled because ourCollectedData is null'
-          )
-          break
-        }
-        if (voteBeforeStates[i] !== ourCollectedData[i].stateId) {
+        if (voteBeforeStates[i] !== ourBeforeStates[i].stateId) {
           doStatesMatch = false
           nestedCountersInstance.countEvent(
             'confirmOrChallenge',
@@ -2535,7 +2489,6 @@ class TransactionConsenus {
 
     if (queueEntry.isInExecutionHome === false) {
       //we are not in the execution home, so we can't create or share a vote
-      if (logFlags.debug) this.mainLogger.debug(`createAndShareVote: ${queueEntry.logID} not in execution home`)
       return
     }
     if (Context.config.debug.forcedExpiration) {
@@ -2655,7 +2608,7 @@ class TransactionConsenus {
       }
       queueEntry.ourVoteHash = voteHash
 
-      if (logFlags.debug || this.stateManager.consensusLog)
+      if (logFlags.verbose || this.stateManager.consensusLog)
         this.mainLogger.debug(
           `createAndShareVote ${queueEntry.logID} created ourVote: ${utils.stringifyReduce(
             ourVote
@@ -2810,20 +2763,6 @@ class TransactionConsenus {
    * @param confirmOrChallenge
    */
   tryAppendMessage(queueEntry: QueueEntry, confirmOrChallenge: ConfirmOrChallengeMessage): boolean {
-    if (queueEntry.acceptVoteMessage === true) {
-      /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID} we are still accepting vote messages. Not ready`)
-      if (queueEntry.pendingConfirmOrChallenge.has(confirmOrChallenge.nodeId) === false) {
-        queueEntry.pendingConfirmOrChallenge.set(confirmOrChallenge.nodeId, confirmOrChallenge)
-      }
-      return false
-    }
-    if (queueEntry.robustQueryVoteCompleted === false) {
-      /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID} robustQueryVoteCompleted: ${queueEntry.robustQueryVoteCompleted}. Not ready`)
-      if (queueEntry.pendingConfirmOrChallenge.has(confirmOrChallenge.nodeId) === false) {
-        queueEntry.pendingConfirmOrChallenge.set(confirmOrChallenge.nodeId, confirmOrChallenge)
-      }
-      return false
-    }
     if (queueEntry.acceptConfirmOrChallenge === false || queueEntry.appliedReceipt2 != null) {
       this.mainLogger.debug(
         `tryAppendMessage: ${
@@ -2884,7 +2823,6 @@ class TransactionConsenus {
           queueEntry.receivedBestVote
         )}`
       )
-      nestedCountersInstance.countEvent('confirmOrChallenge', 'not same vote as finalized vote')
       return false
     }
 
@@ -2904,7 +2842,7 @@ class TransactionConsenus {
       let receivedConfirmedNode: Shardus.NodeWithRank
 
       queueEntry.topConfirmations.add(confirmOrChallenge.nodeId)
-      if (this.stateManager.consensusLog) this.mainLogger.info(
+      this.mainLogger.info(
         `tryAppendMessage: ${queueEntry.logID} current topConfirmations: ${queueEntry.topConfirmations.size}`
       )
 
@@ -3169,7 +3107,6 @@ class TransactionConsenus {
 
     return true
   }
-
 }
 
 export default TransactionConsenus

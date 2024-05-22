@@ -7,7 +7,7 @@ const LOGS_CONFIG: StrictLogsConfiguration = {
   options: {
     appenders: {
       out: { type: 'console', maxLogSize: 10000000, backups: 10 },
-      seq: { type: 'file', maxLogSize: 1000000000, backups: 10 },
+      seq: { type: 'file', maxLogSize: 10000000, backups: 10 },
       main: { type: 'file', maxLogSize: 10000000, backups: 10 },
       app: { type: 'file', maxLogSize: 10000000, backups: 10 },
       p2p: { type: 'file', maxLogSize: 10000000, backups: 10 },

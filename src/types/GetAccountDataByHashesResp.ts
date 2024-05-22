@@ -1,5 +1,4 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
-import { verifyPayload } from './ajv/Helpers'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { deserializeWrappedData, serializeWrappedData, WrappedData } from './WrappedData'
 
@@ -23,10 +22,6 @@ export const serializeGetAccountDataByHashesResp = (
   inp: GetAccountDataByHashesResp,
   root = false
 ): void => {
-  const errors = verifyPayload('GetAccountDataByHashesResp', inp)
-  if (errors && errors.length > 0) {
-    throw new Error('Data validation error')
-  }
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cGetAccountDataByHashesResp)
   }
@@ -74,10 +69,6 @@ export const deserializeGetAccountDataByHashesResp = (
       stateBefore: stream.readString(),
       stateAfter: stream.readString(),
     })
-  }
-  const errors = verifyPayload('GetAccountDataByHashesResp', result)
-  if (errors && errors.length > 0) {
-    throw new Error('Data validation error')
   }
   return result
 }

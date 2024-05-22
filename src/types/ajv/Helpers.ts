@@ -6,11 +6,6 @@ import { initSpreadTxToGroupSyncingReq } from './SpreadTxToGroupSyncingReq'
 import { initApoptosisProposal } from './ApoptosisProposalResp'
 import { initGetTxTimestampReq } from './GetTxTimestampReq'
 import { initGetTxTimestampResp } from './GetTxTimestampResp'
-import { initGetAccountDataByListResp } from './GetAccountDataByListResp'
-import { initGetAccountDataByListReq } from './GetAccountDataByListReq'
-import { initGetAccountDataByHashesReq } from './GetAccountDataByHashesReq'
-import { initGetAccountDataByHashesResp } from './GetAccountDataByHashesResp'
-import { initWrappedData } from './WrappedData'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -19,11 +14,6 @@ export function initAjvSchemas(): void {
   initApoptosisProposal()
   initGetTxTimestampReq()
   initGetTxTimestampResp()
-  initWrappedData()
-  initGetAccountDataByListReq()
-  initGetAccountDataByListResp()
-  initGetAccountDataByHashesReq()
-  initGetAccountDataByHashesResp()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {

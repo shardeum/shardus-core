@@ -73,7 +73,6 @@ import {
   QueueCountsResponse,
   QueueCountsResult,
   ConfirmOrChallengeMessage,
-  TimestampRemoveRequest
 } from './state-manager-types'
 import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
@@ -255,7 +254,6 @@ class StateManager {
   lastActiveCount: number
 
   useAccountWritesOnly: boolean
-  reinjectTxsMap: Map<string, number>
   /***
    *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########
    *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ##
@@ -439,7 +437,6 @@ class StateManager {
     this.superLargeNetworkDebugReduction = true
 
     this.lastActiveCount = -1
-    this.reinjectTxsMap = new Map()
   }
 
   renewState() {
@@ -4278,34 +4275,6 @@ class StateManager {
   getTxRepair(): TransactionRepair {
     if (this.transactionRepair) {
       return this.transactionRepair
-    }
-  }
-  async askToRemoveTimestampCache(acceptedTx: QueueEntry['acceptedTx'], receipt2: AppliedReceipt2) {
-    const homeNode = ShardFunctions.findHomeNode(
-      Context.stateManager.currentCycleShardData.shardGlobals,
-      acceptedTx.txId,
-      Context.stateManager.currentCycleShardData.parititionShardDataMap
-    )
-    if (receipt2 == null) {
-      this.mainLogger.error(`askToRemoveTimestampCache receipt2 == null ${utils.stringifyReduce(acceptedTx)}`)
-      return
-    }
-    if (receipt2.confirmOrChallenge.message !== 'challenge') {
-      this.mainLogger.error(`askToRemoveTimestampCache receipt2.confirmOrChallenge.message !== 'challenge' ${utils.stringifyReduce(acceptedTx)}`)
-      return
-    }
-    if (acceptedTx.data.timestampReceipt == null) {
-      this.mainLogger.error(`askToRemoveTimestampCache queueEntry.acceptedTx.data.timestampReceipt == null ${utils.stringifyReduce(acceptedTx)}`)
-      return
-    }
-    const cycleCounter = acceptedTx.data.timestampReceipt.cycleCounter
-    // attach challenge receipt to payload
-    const payload: TimestampRemoveRequest = {txId: acceptedTx.txId, receipt2, cycleCounter}
-    try {
-      await this.p2p.tell([homeNode.node], 'remove_timestamp_cache', payload)
-    } catch (e) {
-      nestedCountersInstance.countEvent('askToRemoveTimestampCache', `error: ${e.message}`)
-      this.mainLogger.error(`askToRemoveTimestampCache error: ${e.message}`)
     }
   }
 

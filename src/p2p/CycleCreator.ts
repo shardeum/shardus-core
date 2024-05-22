@@ -815,7 +815,7 @@ async function fetchLatestRecord(): Promise<P2P.CycleCreatorTypes.CycleRecord> {
       fetchLatestRecordFails++
       if (fetchLatestRecordFails > maxFetchLatestRecordFails) {
         /* prettier-ignore */ error( 'CycleCreator: fetchLatestRecord_A: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf ' )
-        fatal(
+        this.fatalLogger.fatal(
           'CycleCreator: fetchLatestRecord_A: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf '
         )
         nestedCountersInstance.countEvent('fetchLatestRecord', `fetchLatestRecord_A fail and apop self. ${shardusGetTime()}`)
@@ -829,7 +829,7 @@ async function fetchLatestRecord(): Promise<P2P.CycleCreatorTypes.CycleRecord> {
     fetchLatestRecordFails++
     if (fetchLatestRecordFails > maxFetchLatestRecordFails) {
       /* prettier-ignore */ error( 'CycleCreator: fetchLatestRecord_B: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf ' )
-      fatal(
+      this.fatalLogger.fatal(
         'CycleCreator: fetchLatestRecord_B: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf ',
         utils.formatErrorMessage(err)
       )
@@ -1308,8 +1308,4 @@ function warn(...msg) {
 function error(...msg) {
   const entry = `CycleCreator: ${msg.join(' ')}`
   p2pLogger.error(entry)
-}
-function fatal(...msg) {
-  const entry = `CycleCreator: ${msg.join(' ')}`
-  p2pLogger.fatal(entry)
 }

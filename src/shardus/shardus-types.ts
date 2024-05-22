@@ -511,11 +511,6 @@ export interface TimestampReceipt {
   timestamp: number
 }
 
-export interface TimestampedTx {
-  tx: OpaqueTransaction
-  timestampReceipt?: TimestampReceipt
-}
-
 export interface AccountData2 {
   /** Account ID */
   accountId: string
@@ -1184,10 +1179,8 @@ export interface ServerConfiguration {
     minRequiredChallenges: number
     // turn on the improved Proof of Quorum for large shards sizes
     useNewPOQ: boolean
-    // should the network forward TXs to lucky nodes?  (does not impact nonce queue, that is the flag below)
+    // should the network forward TXs to lucky nodes?  (does not impact nonce queue, that will still forward)
     forwardToLuckyNodes: boolean
-    // should the network forward TXs to lucky nodes?  (only for the nonce queue)
-    forwardToLuckyNodesNonceQueue: boolean
     /// check rotation bounds when forwarding to lucky nodes
     forwardToLuckyNodesCheckRotation: boolean
     // whether the node should verify its data against the network before challenging
@@ -1211,7 +1204,7 @@ export interface ServerConfiguration {
     // state machine chages updateTxState in several places from 'consensing' to 'await final data'
     txStateMachineChanges: boolean
     // will a node attempt to request final data
-    canRequestFinalData:boolean
+    canRequestFinalData: boolean
     // how many node to re-inject the tx received from client
     numberOfReInjectNodes: number
     // max number of pending nonce tx for an account
@@ -1224,14 +1217,8 @@ export interface ServerConfiguration {
     disableTxExpiration: boolean
     // whether to remove the tx from the queue if it stuck for X min
     removeStuckTxsFromQueue: boolean
-    // how long to wait before removing the tx from the queue
+    // time to wait before removing the tx from the queue
     stuckTxRemoveTime: number
-    // remove a stuck challenged tx
-    removeStuckChallengedTXs: boolean
-    // receipt remove fix
-    receiptRemoveFix: boolean
-    // fix for stuck txs in the queue
-    stuckTxQueueFix: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
@@ -1447,7 +1434,7 @@ export interface AcceptedTx {
   timestamp: number
   txId: string
   keys: TransactionKeys
-  data: TimestampedTx
+  data: OpaqueTransaction
   appData: any
   shardusMemoryPatterns: ShardusMemoryPatternsInput
 }
