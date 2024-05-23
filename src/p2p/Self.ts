@@ -934,11 +934,6 @@ async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
       }
 
       activeNodesSigned = await getActiveNodesFromArchiver(archiver)
-      console.log('RED - active nodes signed', typeof activeNodesSigned)
-      console.log('RED - activeNodesSigned.nodeList', activeNodesSigned?.nodeList);
-      console.log('RED - activeNodesSigned == null', activeNodesSigned == null)
-      console.log('RED - activeNodesSigned.nodeList == null', activeNodesSigned?.nodeList == null)
-      console.log('RED - activeNodesSigned.nodeList.length === 0', activeNodesSigned?.nodeList?.length === 0)
       if (
         activeNodesSigned == null ||
         activeNodesSigned.nodeList == null ||
@@ -965,7 +960,6 @@ async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
       }
       break // To stop this loop if it gets the response without failing
     } catch (e) {
-      console.error('RED - actual errror', e)
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: out of retries. ${dbgContex}`, 1)
       info(`contactArchiver: failed ${archiver.ip} ${utils.formatErrorMessage(e)} retry:${retry}`)
       if (retry === 1) {
