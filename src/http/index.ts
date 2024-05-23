@@ -103,8 +103,6 @@ async function _post(host, payload, logIndex, timeout = 1000) {
         throw parseError;
       }
     }
-    // console.log('RED - parsed typeof', typeof Utils.safeJsonParse(Utils.safeStringify(res.body)))
-    // console.log('RED - Response Headers:', res.headers);
     return { ...res, body: responseBody }
   } catch (error) {
     if (logFlags.playback === false && logFlags.verbose === false) {
