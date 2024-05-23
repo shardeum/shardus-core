@@ -117,12 +117,12 @@ class Debug {
     this.network.registerExternalGet('debug-clearlog', isDebugModeMiddlewareMedium, (req, res) => {
       const requestedFile = req.query.file;
       if (typeof requestedFile !== 'string' || !requestedFile) {
-        return res.send({ success: false, error: 'Invalid file parameter' });
+        return res.status(400).send({ success: false, error: 'Invalid file parameter' });
       }
     
       const logsAbsolutePath = Object.keys(this.files).find(key => this.files[key] === './logs');
       if (!logsAbsolutePath) {
-        return res.send({ success: false, error: 'Logs directory not found' });
+        return res.status(404).send({ success: false, error: 'Logs directory not found' });
       }
     
       try {
@@ -137,13 +137,13 @@ class Debug {
           const normalizedFile = path.normalize(requestedFile).replace(/^(\.\.[/\\])+/, '');
           const filePath = path.join(logsAbsolutePath, normalizedFile);
           if (!filePath.startsWith(logsAbsolutePath) || !fs.existsSync(filePath)) {
-            return res.send({ success: false, error: 'File not found' });
+            return res.status(404).send({ success: false, error: 'File not found' });
           }
           fs.unlinkSync(filePath);
         }
-        res.send({ success: true });
+        res.status(200).send({ success: true });
       } catch (error) {
-        res.send({ success: false, error: `Error clearing log ${requestedFile}` });
+        res.status(500).send({ success: false, error: `Error clearing log ${requestedFile}` });
       }
     })
   }
