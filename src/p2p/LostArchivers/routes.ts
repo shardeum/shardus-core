@@ -65,8 +65,19 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
   }
 
   const upMsg = payload as SignedObject<ArchiverUpMsg>
-  const target = upMsg.downMsg.investigateMsg.target
+  const target = upMsg?.downMsg?.investigateMsg?.target
   // to-do: check target is a string or hexstring and min length
+  if (!target) {
+    logging.warn(`lostArchiverUpGossip: missing target in upMsg: ${inspect(upMsg)}`)
+    return
+  }
+
+  // verify refute crypto token
+  if (!crypto.verify(upMsg.refuteMsg, upMsg.refuteMsg.archiver)) {
+    console.log(':>> invalid signature in lostArchiverUpGossip')
+    return 'invalid signature'
+  }
+
   const record = lostArchiversMap.get(target)
   if (!record) {
     // nothing to do
