@@ -734,7 +734,7 @@ function makeCycleRecord(
     archiverListHash: '',
     standbyNodeListHash: '',
     random: config.debug.randomCycleData ? Math.floor(Math.random() * 1000) + 1 : 0,
-  }) as P2P.CycleCreatorTypes.CycleRecord & { random: number }
+  }) as P2P.CycleCreatorTypes.CycleRecord
 
   submodules.map((submodule) => submodule.updateRecord(cycleTxs, cycleRecord, prevRecord))
   //Updating Cycle Record if network has entered 'Shutdown' Mode
