@@ -188,23 +188,6 @@ export function startupV2(): Promise<boolean> {
         nestedCountersInstance.countEvent('p2p', 'joined')
         // Sync cycle chain from network
         await syncCycleChain(id)
-
-        let waited = false
-        // if syncCycleChain takes really long time and its not q1 anymore, wait till next cycle's q1 to send sync-started gossip
-        if (currentQuarter > 1) {
-          nestedCountersInstance.countEvent('p2p', `not in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
-          /* prettier-ignore */ if (logFlags.verbose) console.log(`not is Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
-          waited = true
-        }
-        if(currentQuarter > 0){
-          await waitForQ1SendRequests()
-        }
-
-        if(waited) {
-          nestedCountersInstance.countEvent('p2p', `in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
-          /* prettier-ignore */ if (logFlags.verbose) console.log(`in Q1 after waiting. Current quarter: ${CycleCreator.currentQuarter}`)
-        }
-
         Join.queueStartedSyncingRequest()
 
         // Enable internal routes
