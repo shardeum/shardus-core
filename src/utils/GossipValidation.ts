@@ -48,7 +48,7 @@ export function checkGossipPayload<T extends GossipPayload>(
   const signer = NodeList.byPubKey.get(payload.sign.owner)
   if (!signer) {
     if (logFlags.error) warn(`${logContext}: Got ${logContext} from unknown node`)
-    return true
+    return false
   }
 
   // Only accept original transactions in quarter 1
