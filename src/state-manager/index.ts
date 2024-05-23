@@ -2170,7 +2170,7 @@ class StateManager {
       }
 
       const blob = this.partitionStats.dumpLogsForCycle(cycle, false, cycleShardValues)
-      res.send(Utils.safeStringify({ cycle, blob }))
+      res.send(({ cycle, blob }))
     })
 
     Context.network.registerExternalGet('debug_stats2', isDebugModeMiddleware, (_req, res) => {
@@ -2182,12 +2182,12 @@ class StateManager {
         cycleShardValues = this.shardValuesByCycle.get(cycle)
         blob = this.partitionStats.buildStatsReport(cycleShardValues)
       }
-      res.send(Utils.safeStringify({ cycle, blob }))
+      res.send(({ cycle, blob }))
     })
 
     Context.network.registerExternalGet('clear_tx_debug', isDebugModeMiddlewareLow, (_req, res) => {
       this.transactionQueue.clearTxDebugStatList()
-      res.send(Utils.safeStringify({ success: true }))
+      res.send(({ success: true }))
     })
 
     Context.network.registerExternalGet('print_tx_debug', isDebugModeMiddlewareLow, (_req, res) => {
@@ -2230,7 +2230,7 @@ class StateManager {
         }
         debugNodeList.push(nodeEntry)
       }
-      res.send(Utils.safeStringify(debugNodeList))
+      res.send((debugNodeList))
     })
 
     Context.network.registerExternalGet('debug-consensus-log', isDebugModeMiddleware, (req, res) => {
@@ -2258,7 +2258,7 @@ class StateManager {
     })
 
     Context.network.registerExternalGet('debug-stuck-processing', isDebugModeMiddleware, (_req, res) => {
-      res.send(Utils.safeStringify(this.transactionQueue.getDebugProccessingStatus()))
+      res.send((this.transactionQueue.getDebugProccessingStatus()))
     })
 
     Context.network.registerExternalGet('debug-fix-stuck-processing', isDebugModeMiddleware, (req, res) => {

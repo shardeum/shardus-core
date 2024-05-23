@@ -904,12 +904,12 @@ class TransactionQueue {
           full_receipt: 'b',
           sign: 'o',
         })
-        if (error) return res.send(Utils.safeStringify((result = { success: false, reason: error })))
+        if (error) return res.send(((result = { success: false, reason: error })))
         error = utils.validateTypes(req.body.sign, {
           owner: 's',
           sig: 's',
         })
-        if (error) return res.send(Utils.safeStringify((result = { success: false, reason: error })))
+        if (error) return res.send(((result = { success: false, reason: error })))
 
         const { txId, timestamp, full_receipt, sign } = req.body
         const isReqFromArchiver = Archivers.archivers.has(sign.owner)
@@ -945,10 +945,10 @@ class TransactionQueue {
             result = { success: false, reason: 'Invalid Signature.' }
           }
         }
-        res.send(Utils.safeStringify(result))
+        res.send((result))
       } catch (e) {
         console.log('Error caught in /get-tx-receipt: ', e)
-        res.send(Utils.safeStringify((result = { success: false, reason: e })))
+        res.send(((result = { success: false, reason: e })))
       }
     })
   }

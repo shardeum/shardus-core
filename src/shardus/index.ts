@@ -1435,7 +1435,7 @@ class Shardus extends EventEmitter {
         }
       }
 
-      // we are consensus lucky node for this tx      
+      // we are consensus lucky node for this tx
       let shouldAddToNonceQueue = false;
       let txNonce;
       if (internalTx === false) {
@@ -1540,7 +1540,7 @@ class Shardus extends EventEmitter {
             success: true,
             reason: `Transaction added to pending nonce queue.`,
             status: 200
-          }            
+          }
         }
       } else {
         // tx nonce is equal to account nonce
@@ -1603,13 +1603,13 @@ class Shardus extends EventEmitter {
       if (id === homeNode.node.id){
         stats.skippedHome++
         continue // we already added the home node
-      } 
+      }
       let node = nodes.get(id)
 
       //is this node safe in terms of rotation
-      let rotationCheckPassed = true 
+      let rotationCheckPassed = true
       if(Context.config.stateManager.forwardToLuckyNodesCheckRotation) {
-        //is in rotation means it in the edge 
+        //is in rotation means it in the edge
         rotationCheckPassed = isNodeInRotationBounds(id) === false
       }
 
@@ -1638,7 +1638,7 @@ class Shardus extends EventEmitter {
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to consensus group. reason: ${message} ${Utils.safeStringify(tx)}` )
           nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: ${message}`)
         }
-        
+
         const result: ShardusTypes.InjectTxResponse = await this.app.injectTxToConsensor([validator], tx)
 
         if (result == null) {
@@ -2143,7 +2143,7 @@ class Shardus extends EventEmitter {
       if (req.query.set) {
         this.debugForeverLoopsEnabled = req.query.set === 'true'
       }
-      res.send(Utils.safeStringify(`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`))
+      res.send((`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`))
     })
   }
 
@@ -2726,20 +2726,20 @@ class Shardus extends EventEmitter {
   _registerRoutes() {
     // DEBUG routes
     this.network.registerExternalPost('exit', isDebugModeMiddlewareHigh, async (req, res) => {
-      res.send(Utils.safeStringify({ success: true }))
+      res.send(({ success: true }))
       await this.shutdown()
     })
     // TODO elevate security beyond high when we get multi sig.  or is that too slow when needed?
     this.network.registerExternalPost('exit-apop', isDebugModeMiddlewareHigh, async (req, res) => {
       apoptosizeSelf('Apoptosis called at exit-apop route')
-      res.send(Utils.safeStringify({ success: true }))
+      res.send(({ success: true }))
     })
 
     this.network.registerExternalGet('config', isDebugModeMiddlewareLow, async (req, res) => {
-      res.send(Utils.safeStringify({ config: this.config }))
+      res.send(({ config: this.config }))
     })
     this.network.registerExternalGet('netconfig', async (req, res) => {
-      res.send(Utils.safeStringify({ config: netConfig }))
+      res.send(({ config: netConfig }))
     })
 
     this.network.registerExternalGet('nodeInfo', async (req, res) => {
@@ -2760,7 +2760,7 @@ class Shardus extends EventEmitter {
           lostArchiversMap: lostArchiversMap,
         }
       }
-      res.send(Utils.safeStringify(result))
+      res.send((result))
     })
 
     this.network.registerExternalGet('joinInfo', isDebugModeMiddlewareMedium, async (req, res) => {
@@ -2781,7 +2781,7 @@ class Shardus extends EventEmitter {
         getLastHashedStandbyList: JoinV2.getLastHashedStandbyList(),
         getSortedStandbyNodeList: JoinV2.getSortedStandbyJoinRequests(),
       }
-      res.send(Utils.safeStringify(deepReplace(result, undefined, '__undefined__')))
+      res.send((deepReplace(result, undefined, '__undefined__')))
     })
 
     this.network.registerExternalGet('standby-list-debug', isDebugModeMiddlewareLow, async (req, res) => {
@@ -2791,21 +2791,21 @@ class Shardus extends EventEmitter {
         ip: node.nodeInfo.externalIp,
         port: node.nodeInfo.externalPort,
       }))
-      res.send(Utils.safeStringify(result))
+      res.send((result))
     })
 
     this.network.registerExternalGet('status-history', isDebugModeMiddlewareLow, async (req, res) => {
       let result = Self.getStatusHistoryCopy()
-      res.send(Utils.safeStringify(deepReplace(result, undefined, '__undefined__')))
+      res.send((deepReplace(result, undefined, '__undefined__')))
     })
 
     this.network.registerExternalGet('socketReport', isDebugModeMiddlewareLow, async (req, res) => {
-      res.send(Utils.safeStringify(await getSocketReport()))
+      res.send((await getSocketReport()))
     })
     this.network.registerExternalGet('forceCycleSync', isDebugModeMiddleware, async (req, res) => {
       let enable = req.query.enable === 'true' || false
       config.p2p.hackForceCycleSyncComplete = enable
-      res.send(Utils.safeStringify(await getSocketReport()))
+      res.send((await getSocketReport()))
     })
 
     this.p2p.registerInternal(
@@ -2873,7 +2873,7 @@ class Shardus extends EventEmitter {
         this.mainLogger.debug(`testGlobalAccountTX: req:${utils.stringifyReduce(req.body)}`)
         const tx = req.body.tx
         this.put(tx, false, true)
-        res.send(Utils.safeStringify({ success: true }))
+        res.send(({ success: true }))
       } catch (ex) {
         this.mainLogger.debug('testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.shardus_fatal(
@@ -2888,7 +2888,7 @@ class Shardus extends EventEmitter {
         this.mainLogger.debug(`testGlobalAccountTXSet: req:${utils.stringifyReduce(req.body)}`)
         const tx = req.body.tx
         this.put(tx, true, true)
-        res.send(Utils.safeStringify({ success: true }))
+        res.send(({ success: true }))
       } catch (ex) {
         this.mainLogger.debug('testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.shardus_fatal(

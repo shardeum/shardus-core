@@ -108,7 +108,7 @@ export function init() {
 
   network.registerExternalGet('debug-neverGoActive', isDebugModeMiddleware, (req, res) => {
     neverGoActive = !neverGoActive
-    res.send(Utils.safeStringify({ status: 'ok', neverGoActive: neverGoActive }))
+    res.send(({ status: 'ok', neverGoActive: neverGoActive }))
   })
 }
 

@@ -199,7 +199,7 @@ export function startupV2(): Promise<boolean> {
           waited = true
         }
         if(currentQuarter > 0){
-          await waitForQ1SendRequests()          
+          await waitForQ1SendRequests()
         }
 
         if(waited) {
@@ -355,7 +355,7 @@ export function startupV2(): Promise<boolean> {
                 message,
                 false //force shutdown for now in a way that requires the user to restart again
               )
-            }) 
+            })
 
             attemptJoiningRunning = false
             return
@@ -396,7 +396,7 @@ export function startupV2(): Promise<boolean> {
               submitStandbyRefresh(payload)
               nestedCountersInstance.countEvent('p2p', `submitted KeepInStandby request`)
             }
-          }  
+          }
           */
 
           if (isFirstRefresh) {
@@ -703,11 +703,11 @@ async function joinNetworkV2(activeNodes): Promise<void> {
       throw new Error('Node not ready to join')
     } else {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `joinNetworkV2:isReadyToJoin:true`)
-    }    
+    }
   } catch(ex){
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `joinNetworkV2:isReadyToJoin:crashed: ${ex?.message}`)
     warn(`joinNetworkV2: isReadyToJoin crashed :${utils.formatErrorMessage(ex)}`)
-    return 
+    return
   }
 
   // Create join request from latest cycle
@@ -930,10 +930,15 @@ async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
       info(`contactArchiver: communicate with:${archiver?.ip}`)
 
       if (!failArchivers.includes(archiver.ip + ':' + archiver.port)){
-        failArchivers.push(archiver.ip + ':' + archiver.port)        
+        failArchivers.push(archiver.ip + ':' + archiver.port)
       }
 
       activeNodesSigned = await getActiveNodesFromArchiver(archiver)
+      console.log('RED - active nodes signed', typeof activeNodesSigned)
+      console.log('RED - activeNodesSigned.nodeList', activeNodesSigned?.nodeList);
+      console.log('RED - activeNodesSigned == null', activeNodesSigned == null)
+      console.log('RED - activeNodesSigned.nodeList == null', activeNodesSigned?.nodeList == null)
+      console.log('RED - activeNodesSigned.nodeList.length === 0', activeNodesSigned?.nodeList?.length === 0)
       if (
         activeNodesSigned == null ||
         activeNodesSigned.nodeList == null ||
@@ -941,7 +946,7 @@ async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
       ) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: no nodes in nodelist yet. ${dbgContex}`, 1)
         info(`contactArchiver: no nodes in nodelist yet, or seedlist null ${Utils.safeStringify(activeNodesSigned)}`)
-        await utils.sleep(1000) // no nodes in nodelist yet so please take a breather. would be smarter to ask each archiver only once but 
+        await utils.sleep(1000) // no nodes in nodelist yet so please take a breather. would be smarter to ask each archiver only once but
                                 // but do not want to refactor that much right now
         if (retry === 1) {
           /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: no nodes in nodelist yet out of retries. ${dbgContex}`, 1)
@@ -960,6 +965,7 @@ async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
       }
       break // To stop this loop if it gets the response without failing
     } catch (e) {
+      console.error('RED - actual errror', e)
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: out of retries. ${dbgContex}`, 1)
       info(`contactArchiver: failed ${archiver.ip} ${utils.formatErrorMessage(e)} retry:${retry}`)
       if (retry === 1) {
@@ -1220,11 +1226,11 @@ function acceptedTrigger(): Promise<void> {
 
 /**
  * Wait for currentQuarter to equal 1 and q1SendRequests to be true
- * 
- * q1SendRequests is a flag that has a slight delay at the start of q1 to make sure 
+ *
+ * q1SendRequests is a flag that has a slight delay at the start of q1 to make sure
  * that requests are not impacted by timestamp variation which could cause half of the network
  * to think it is still Q4
- * @returns 
+ * @returns
  */
 export function waitForQ1SendRequests(): Promise<void> {
   return new Promise(resolve => {

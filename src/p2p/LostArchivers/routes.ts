@@ -265,7 +265,7 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
       logging.warn(
         `refuteLostArchiverRoute: invalid archiver up message error: ${error}, payload: ${inspect(req.body)}`
       )
-      res.send(Utils.safeStringify({ status: 'failure', message: error }))
+      res.send(({ status: 'failure', message: error }))
       return
     }
     const refuteMsg = req.body as SignedObject<ArchiverRefutesLostMsg>
@@ -278,7 +278,7 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
     }
     if (record.status !== 'up') record.status = 'up'
     if (!record.archiverRefuteMsg) record.archiverRefuteMsg = refuteMsg
-    res.send(Utils.safeStringify({ status: 'success' }))
+    res.send(({ status: 'success' }))
   },
 }
 

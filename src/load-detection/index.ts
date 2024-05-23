@@ -73,7 +73,7 @@ class LoadDetection extends EventEmitter {
         // todo: reject if request is not coming from node operator dashboard
         const load = this.getCurrentLoad()
         const nodeLoad = this.getCurrentNodeLoad()
-        return res.send(Utils.safeStringify({load, nodeLoad}))
+        return res.send(({load, nodeLoad}))
       } catch (e) {
         console.log(`Error getting load: ${e.message}`);
       }

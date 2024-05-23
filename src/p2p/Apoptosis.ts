@@ -71,7 +71,7 @@ const stopExternalRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'stop',
   handler: (_req, res) => {
     if (isDebugMode()) {
-      res.send(Utils.safeStringify({ status: 'goodbye cruel world' }))
+      res.send(({ status: 'goodbye cruel world' }))
       apoptosizeSelf('Apoptosis called at stopExternalRoute => src/p2p/Apoptosis.ts')
     }
   },

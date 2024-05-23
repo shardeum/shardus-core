@@ -53,14 +53,14 @@ export function init() {
         standby: Join.getNodeRequestingJoin().length,
         desired: CycleChain.newest.desired,
       }
-      return res.send(Utils.safeStringify(networkStats))
+      return res.send((networkStats))
     } catch (e) {
       console.log(`Error getting load: ${e.message}`)
     }
   })
   network.registerExternalGet('age-index', isDebugModeMiddlewareLow, (req, res) => {
     try {
-      return res.send(Utils.safeStringify(getAgeIndex()))
+      return res.send((getAgeIndex()))
     } catch (e) {
       console.log(`Error getting age index: ${e.message}`)
     }
