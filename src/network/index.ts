@@ -107,6 +107,26 @@ export class NetworkClass extends EventEmitter {
     this.statisticsInstance = statistics
   }
 
+  customSendJsonMiddleware(req, res, next) {
+    const originalSend = res.send;
+    res.send = function (data) {
+      if (typeof data === 'object' && data !== null) {
+        const jsonString = Utils.safeStringify(data)
+        res.setHeader('Content-Type', 'application/json')
+        return originalSend.call(this, jsonString)
+      }
+      return originalSend.call(this, data)
+    };
+
+    res.json = function (data) {
+      const jsonString = Utils.safeStringify(data)
+      res.setHeader('Content-Type', 'application/json')
+      return originalSend.call(this, jsonString)
+    }
+
+    next()
+  }
+
   // TODO: Allow for binding to a specified network interface
   _setupExternal() {
     return new Promise((resolve, reject) => {
@@ -129,32 +149,28 @@ export class NetworkClass extends EventEmitter {
 
       // Custom middleware to handle raw payload and parse it
       const rawBodyParser = (req, res, next) => {
-        if (req.headers['content-type'] !== 'application/json') {
-          return res.status(415).send('Unsupported Media Type')
-        }
-
         let data = '';
-        req.on('data', chunk => {
-          data += chunk;
-        });
+        req.on('data', (chunk) => (data += chunk))
 
         req.on('end', () => {
           try {
-            req.body = Utils.safeJsonParse(data)
+            if (data && data.length > 0) {
+              req.body = Utils.safeJsonParse(data)
+            }
             next()
           } catch (err) {
+            console.error('Invalid JSON', data)
             res.status(400).send('Invalid JSON payload')
           }
         });
 
-        req.on('error', (err) => {
-          res.status(500).send('Internal Server Error')
-        });
+        req.on('error', (err) => res.status(500).send('Internal Server Error'))
       };
       this.app.use(bodyParser.json({ limit: '50mb' }))
       this.app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }))
       this.app.use(cors())
-      this.app.use(rawBodyParser);
+      this.app.use(this.customSendJsonMiddleware)
+      this.app.use(rawBodyParser)
       this.app.use(storeRequests)
       this._applyExternal()
       this.extServer = this.app.listen(this.ipInfo.externalPort, () => {
@@ -180,6 +196,7 @@ export class NetworkClass extends EventEmitter {
         sendHeaderVersion: 1,
       },
       customStringifier: Utils.safeStringify,
+      // @ts-ignore
       customJsonParser: Utils.safeJsonParse,
       crypto: {
         hashKey: this.shardusCryptoHashKey,
