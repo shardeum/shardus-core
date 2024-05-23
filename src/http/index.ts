@@ -25,9 +25,23 @@ async function _get(host, logIndex, timeout = 1000) {
     const res = await got.get(host, {
       timeout: timeout, //  Omar - setting this to 1 sec
       retry: 0, // Omar - setting this to 0.
-      json: true,
+      headers: {
+        'Content-Type': 'application/json'
+      }
     })
-    return { ...res, body: Utils.safeJsonParse(Utils.safeStringify(res.body)) }
+
+    // Explicitly parse the response body as JSON if it's not already parsed
+    let responseBody = res.body
+    if (typeof responseBody === 'string' && res.headers['content-type']?.includes('application/json')) {
+      try {
+        responseBody = Utils.safeJsonParse(responseBody)
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', parseError)
+        throw parseError
+      }
+    }
+
+    return { ...res, body: responseBody as any }
   } catch (error) {
     if (logFlags.playback === false && logFlags.verbose === false) {
       throw error
@@ -78,7 +92,20 @@ async function _post(host, payload, logIndex, timeout = 1000) {
 
     //if (getResponseObj) return res
     //return res.body
-    return { ...res, body: Utils.safeJsonParse(Utils.safeStringify(res.body)) }
+
+    // Explicitly parse the response body as JSON if it's not already parsed
+    let responseBody = res.body;
+    if (typeof responseBody === 'string' && res.headers['content-type']?.includes('application/json')) {
+      try {
+        responseBody = Utils.safeJsonParse(responseBody);
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', parseError);
+        throw parseError;
+      }
+    }
+    // console.log('RED - parsed typeof', typeof Utils.safeJsonParse(Utils.safeStringify(res.body)))
+    // console.log('RED - Response Headers:', res.headers);
+    return { ...res, body: responseBody }
   } catch (error) {
     if (logFlags.playback === false && logFlags.verbose === false) {
       throw error
@@ -109,7 +136,7 @@ async function post(givenHost, body, getResponseObj = false, timeout = 1000) {
   }
 
   if (getResponseObj) return res
-  return res.body
+  return res.body as any
 }
 
 function logError(method: string, error: any, host: any, logIndex: any) {
