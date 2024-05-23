@@ -4,6 +4,7 @@ import * as crypto from '@shardus/crypto-utils'
 import { DevSecurityLevel } from '../shardus/shardus-types'
 import SERVER_CONFIG from '../config/server'
 
+const MAX_COUNTER_BUFFER_MILLISECONDS = 10000
 let lastCounter = 0
 let multiSigLstCounter = 0
 
@@ -22,12 +23,14 @@ function handleDebugAuth(_req, res, next, authLevel) {
           sign: { owner: ownerPk, sig: requestSig },
         }
         //reguire a larger counter than before. This prevents replay attacks
-        if (parseInt(sigObj.count) > lastCounter) {
+        const currentCounter = parseInt(sigObj.count)
+        const currentTime = new Date().getTime()
+        if (currentCounter > lastCounter && currentCounter <= currentTime + MAX_COUNTER_BUFFER_MILLISECONDS) {
           let verified = Context.crypto.verify(sigObj, ownerPk)
           if (verified === true) {
-            lastCounter = parseInt(sigObj.count) // Update counter
             const authorized = ensureKeySecurity(ownerPk, authLevel)
             if (authorized) {
+              lastCounter = currentCounter
               next()
               return
             } else {
@@ -37,10 +40,15 @@ function handleDebugAuth(_req, res, next, authLevel) {
               })
             }
           } else {
-            console.log('Signature is not correct', sigObj, lastCounter)
+            console.log('Signature is not correct')
           }
         } else {
-          console.log('Counter is not larger than last counter', sigObj.count, lastCounter)
+          console.log(
+            'Counter is more than 10 seconds old or less than last counter. Counter: ',
+            currentCounter,
+            'last counter:',
+            lastCounter
+          )
         }
       }
     }
