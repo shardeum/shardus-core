@@ -1552,14 +1552,13 @@ export function nodeListFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeL
     [NodeStatus.SELECTED]: NodeList.selectedByIdOrder,
   }
 
-  const result: P2P.NodeListTypes.Node[] = []
+  let result: P2P.NodeListTypes.Node[] = []
 
   for (const state of states) {
     if (stateMappings[state]) {
-      result.push(...stateMappings[state])
+      result = result.concat(stateMappings[state])
     }
   }
-
   const self = NodeList.byJoinOrder.find((node) => node.id === Self.id)
   if (self && !result.some((node) => node.id === self.id)) {
     result.push(self)
