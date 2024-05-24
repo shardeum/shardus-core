@@ -163,7 +163,7 @@ export const selectNeighbors = (array: any[], ourIndex: number, neighborsOnEachS
   const neighbors = [];
 
   if (length === 0) return neighbors;
-  if (length < neighborsOnEachSide * 2 + 1) return array.slice(0, length);
+  if (length <= neighborsOnEachSide * 2) return array.slice();
 
   try {
     for (let i = 1; i <= neighborsOnEachSide; i++) {
