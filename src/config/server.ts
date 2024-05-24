@@ -311,6 +311,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     maxPendingNonceTxs: 10,
     attachDataToReceipt: true,
     nodesToGossipAppliedReceipt: 10,
+    useCopiedWrappedStateForApply: true,
     disableTxExpiration: true,
     removeStuckTxsFromQueue: false,
     stuckTxRemoveTime: 1000 * 60 * 2, // 2 minutes

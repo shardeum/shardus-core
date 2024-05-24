@@ -1226,6 +1226,8 @@ export interface ServerConfiguration {
     attachDataToReceipt: boolean
     // number of execution nodes to gossip appliedReceipt
     nodesToGossipAppliedReceipt: number
+    // should we use deep copied wrapped state for apply
+    useCopiedWrappedStateForApply: boolean
     // set "true" will prevent tx from expiring
     disableTxExpiration: boolean
     // whether to remove the tx from the queue if it stuck for X min
