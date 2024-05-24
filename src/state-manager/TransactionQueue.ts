@@ -1277,8 +1277,11 @@ class TransactionQueue {
       this.profiler.profileSectionStart('process-dapp.apply')
       this.profiler.scopedProfileSectionStart('apply_duration')
 
+      // deep copy the wrappedStates so that the app can't mess with them when we later share coplete data to neighbors
+      const deepCopyWrappedStates = utils.deepCopy(wrappedStates)
+
       /* prettier-ignore */ this.setDebugLastAwaitedCallInner('stateManager.transactionQueue.app.apply(tx)')
-      applyResponse = await this.app.apply(tx as Shardus.OpaqueTransaction, wrappedStates, appData)
+      applyResponse = await this.app.apply(tx as Shardus.OpaqueTransaction, deepCopyWrappedStates, appData)
       /* prettier-ignore */ this.setDebugLastAwaitedCallInner('stateManager.transactionQueue.app.apply(tx)', DebugComplete.Completed)
       this.profiler.scopedProfileSectionEnd('apply_duration')
       this.profiler.profileSectionEnd('process-dapp.apply')
