@@ -2555,6 +2555,7 @@ class TransactionQueue {
       )
     }
     if (queueEntry.collectedData[data.accountId] != null) {
+      if (logFlags.verbose) this.mainLogger.debug(`queueEntryAddData: data already collected for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} data: ${utils.stringify(data)}`)
       // we have already collected this data
       return
     }
@@ -2604,7 +2605,7 @@ class TransactionQueue {
       if (queueEntry.executionGroup && queueEntry.executionGroup.length > 1) this.shareCompleteDataToNeighbours(queueEntry)
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
-          `queueEntryAddData hasAll: true for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id}`
+          `queueEntryAddData hasAll: true for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id}, data: ${utils.stringify(queueEntry.collectedData)}`
         )
       }
     }
@@ -2628,6 +2629,11 @@ class TransactionQueue {
     if (queueEntry.isInExecutionHome === false) {
       return
     }
+    // do not share again if we have shared via tellCorresponding
+    if (queueEntry.dataSharedTimestamp > 0) {
+      if (logFlags.verbose) this.mainLogger.debug(`shareCompleteDataToNeighbours: already shared data for txId ${queueEntry.logID} through tellCorresponding at timestamp: ${queueEntry.dataSharedTimestamp}`)
+      return
+    }
     const dataToShare: WrappedResponses = {}
     const stateList: Shardus.WrappedResponse[] = []
     for (const accountId in queueEntry.collectedData) {
@@ -2643,6 +2649,7 @@ class TransactionQueue {
     }
     const payload = {txid: queueEntry.acceptedTx.txId, stateList}
     const neighboursNodes = utils.selectNeighbors(queueEntry.executionGroup, queueEntry.ourExGroupIndex, 2)
+    if (logFlags.verbose) this.mainLogger.debug(`shareCompleteDataToNeighbours complete data for txId ${queueEntry.logID} ourNodeId: ${Self.id} OurExeIndex: ${queueEntry.ourExGroupIndex} neighbours: ${JSON.stringify(neighboursNodes.map((node) => node.id))}, ${utils.stringify(payload)}`);
     if (stateList.length > 0) {
       this.broadcastState(neighboursNodes, payload, "shareCompleteDataToNeighbours")
 
@@ -4199,7 +4206,7 @@ class TransactionQueue {
   }
 
   validateCorrespondingTellSender(queueEntry: QueueEntry, dataKey: string, senderNodeId: string): boolean {
-    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`validateCorrespondingTellSender: data key: ${dataKey} sender node id: ${senderNodeId}`)
+    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`validateCorrespondingTellSender: ${queueEntry.logID} data key: ${dataKey} sender node id: ${senderNodeId}`)
     const receiverNode = this.stateManager.currentCycleShardData.nodeShardData
     if (receiverNode == null) return false
 
@@ -4210,21 +4217,20 @@ class TransactionQueue {
 
     const senderHasAddress = ShardFunctions.testAddressInRange(dataKey, senderNode.storedPartitions)
 
-    if (configContext.stateManager.shareCompleteData){
+    if (configContext.stateManager.shareCompleteData) {
       const senderIsInExecutionGroup = queueEntry.executionGroupMap.has(senderNodeId)
+      const senderExecutionIndex = queueEntry.executionGroup.findIndex((node) => node.id === senderNodeId)
 
-      // check if sender is an execution neighouring node
+      // check if sender is an execution neighouring node if it does not have the address
       const neighbourNodes = utils.selectNeighbors(queueEntry.executionGroup, queueEntry.ourExGroupIndex, 2) as Shardus.Node[]
       const neighbourNodeIds = neighbourNodes.map((node) => node.id)
-      if (senderIsInExecutionGroup && neighbourNodeIds.includes(senderNodeId) === false) {
-        this.mainLogger.error(`validateCorrespondingTellSender: sender is an execution node but not a neighbour node`)
+      const isSenderOurNeighbour = neighbourNodeIds.includes(senderNodeId)
+      if (senderHasAddress === false && senderIsInExecutionGroup && isSenderOurNeighbour === false) {
+        this.mainLogger.error(`validateCorrespondingTellSender: ${queueEntry.logID} sender ${senderNodeId} ${senderExecutionIndex} does not cover this account, is an execution node but not a neighbour node. Our index: ${queueEntry.ourExGroupIndex}`)
         return false
       }
-      if (senderIsInExecutionGroup) nestedCountersInstance.countEvent('stateManager', 'validateCorrespondingTellSender: sender is an execution node')
-      else nestedCountersInstance.countEvent('stateManager', 'validateCorrespondingTellSender: sender is not an execution node')
-
       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`validateCorrespondingTellSender: data key: ${dataKey} sender node id: ${senderNodeId} senderHasAddress: ${senderHasAddress} receiverIsInExecutionGroup: ${receiverIsInExecutionGroup} senderIsInExecutionGroup: ${senderIsInExecutionGroup}`)
-      if (receiverIsInExecutionGroup === true || senderHasAddress === true || senderIsInExecutionGroup === true) {
+      if (receiverIsInExecutionGroup === true || senderHasAddress === true) {
         return true
       }
     } else {
