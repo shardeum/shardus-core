@@ -2025,35 +2025,9 @@ class TransactionConsenus {
         } finally {
         }
       }
-      // const nodesToAsk = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-      let nodesToAsk = []
-
-      // for (const key of Object.keys(queueEntry.localKeys)) {
-      //   if (queueEntry.localKeys[key] === true) {
-      //     const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
-      //       this.stateManager.currentCycleShardData.nodeShardData
-      //
-      //     const homeNode = ShardFunctions.findHomeNode(
-      //       Context.stateManager.currentCycleShardData.shardGlobals,
-      //       key,
-      //       Context.stateManager.currentCycleShardData.parititionShardDataMap
-      //     )
-      //     const storageNodes = homeNode.nodeThatStoreOurParitionFull
-      //     const storageNodesIdSet = new Set(storageNodes.map(node => node.id))
-      //     for (const node of queueEntry.transactionGroup) {
-      //       if (storageNodesIdSet.has(node.id)) {
-      //         nodesToAsk.push(node)
-      //       }
-      //     }
-      //   }
-      // }
+      const nodesToAsk = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
 
       nestedCountersInstance.countEvent('robustQueryConfirmOrChallenge', `nodesToAsk:${nodesToAsk.length}`)
-
-      if (nodesToAsk.length === 0) {
-        nestedCountersInstance.countEvent('robustQueryConfirmOrChallenge', `nodesToAsk is 0`)
-        nodesToAsk = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-      }
 
       const redundancy = 3
       const maxRetry = 10
