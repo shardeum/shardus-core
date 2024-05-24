@@ -3968,7 +3968,22 @@ class StateManager {
         // or see if we got one
         finalReceipt = queueEntry.recievedAppliedReceipt2
       } else if (queueEntry.appliedReceipt2 && queueEntry.recievedAppliedReceipt2) {
-        // we have 2 receipts, use a better one
+        // if we have 2 receipts, use a challenge one if there is any
+        const isOurReceiptChallenge = queueEntry.appliedReceipt2.confirmOrChallenge && queueEntry.appliedReceipt2.confirmOrChallenge.message === 'challenge'
+        const isReceivedReceiptChallenge = queueEntry.recievedAppliedReceipt2.confirmOrChallenge && queueEntry.recievedAppliedReceipt2.confirmOrChallenge.message === 'challenge'
+        if (isOurReceiptChallenge && !isReceivedReceiptChallenge) {
+          nestedCountersInstance.countEvent('stateManager', 'getReceipt2: isOurReceiptChallenge: true')
+          if (logFlags.verbose) this.mainLogger.debug(`getReceipt2: isOurReceiptChallenge: true`)
+          finalReceipt = queueEntry.appliedReceipt2
+          return finalReceipt
+        } else if (!isOurReceiptChallenge && isReceivedReceiptChallenge) {
+          nestedCountersInstance.countEvent('stateManager', 'getReceipt2: isReceivedReceiptChallenge: true')
+          if (logFlags.verbose) this.mainLogger.debug(`getReceipt2: isReceivedReceiptChallenge: true`)
+          finalReceipt = queueEntry.recievedAppliedReceipt2
+          return finalReceipt
+        }
+
+        // we have 2 receipts. Could be both challenges or confirmation, use a better one
         const localReceiptNodeId = queueEntry.appliedReceipt2.confirmOrChallenge.nodeId
         const receivedReceiptNodeId = queueEntry.recievedAppliedReceipt2.confirmOrChallenge.nodeId
 
@@ -4005,6 +4020,16 @@ class StateManager {
     const receipt = this.getReceipt2(queueEntry)
     if (receipt) {
       return receipt.result
+    }
+    return false
+  }
+  getReceiptConfirmation(queueEntry: QueueEntry) {
+    const receipt = this.getReceipt2(queueEntry)
+    if (receipt) {
+      return receipt.result
+    }
+    if (receipt.confirmOrChallenge && receipt.confirmOrChallenge.message === 'confirm') {
+      return true
     }
     return false
   }

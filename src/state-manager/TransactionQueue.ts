@@ -5845,7 +5845,8 @@ class TransactionQueue {
                   //also check if failed votes will work...?
                   if (
                     this.stateManager.getReceiptVote(queueEntry).cant_apply === false &&
-                    this.stateManager.getReceiptResult(queueEntry) === true
+                    this.stateManager.getReceiptResult(queueEntry) === true &&
+                    this.stateManager.getReceiptConfirmation(queueEntry) === true
                   ) {
                     this.updateTxState(queueEntry, 'commiting')
                     queueEntry.hasValidFinalData = true
@@ -5857,7 +5858,8 @@ class TransactionQueue {
                       /* prettier-ignore */ this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt failed result: false : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
                       /* prettier-ignore */ this.statemanager_fatal(`processAcceptedTxQueue2`, `tryProduceReceipt failed result: false : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
                     }
-                    nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt failed result = false')
+                    nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt failed result = false or' +
+                      ' challenged')
                     this.updateTxState(queueEntry, 'fail')
                     this.removeFromQueue(queueEntry, currentIndex)
                     continue
