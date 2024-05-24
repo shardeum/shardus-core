@@ -309,7 +309,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     numberOfReInjectNodes: 5,
     maxPendingNonceTxs: 10,
     attachDataToReceipt: true,
-    nodesToGossipAppliedReceipt: 5,
+    nodesToGossipAppliedReceipt: 10,
+    useCopiedWrappedStateForApply: true,
     disableTxExpiration: true,
     removeStuckTxsFromQueue: false,
     stuckTxRemoveTime: 1000 * 60 * 2, // 2 minutes
