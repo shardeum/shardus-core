@@ -2785,6 +2785,11 @@ class TransactionConsenus {
       return this.crypto.hash(voteToHash)
     }
   }
+  addPendingConfirmOrChallenge(queueEntry: QueueEntry, confirmOrChallenge: ConfirmOrChallengeMessage): void {
+    if (queueEntry.pendingConfirmOrChallenge.has(confirmOrChallenge.nodeId) === false) {
+      queueEntry.pendingConfirmOrChallenge.set(confirmOrChallenge.nodeId, confirmOrChallenge)
+    }
+  }
 
   /**
    * tryAppendMessage
@@ -2794,18 +2799,13 @@ class TransactionConsenus {
    * @param confirmOrChallenge
    */
   tryAppendMessage(queueEntry: QueueEntry, confirmOrChallenge: ConfirmOrChallengeMessage): boolean {
-    if (queueEntry.acceptVoteMessage === true) {
-      /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID} we are still accepting vote messages. Not ready`)
-      if (queueEntry.pendingConfirmOrChallenge.has(confirmOrChallenge.nodeId) === false) {
-        queueEntry.pendingConfirmOrChallenge.set(confirmOrChallenge.nodeId, confirmOrChallenge)
-      }
+    if (queueEntry.acceptVoteMessage === true) { /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID} we are still accepting vote messages. Not ready`)
+      this.addPendingConfirmOrChallenge(queueEntry, confirmOrChallenge)
       return false
     }
     if (queueEntry.robustQueryVoteCompleted === false) {
       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID} robustQueryVoteCompleted: ${queueEntry.robustQueryVoteCompleted}. Not ready`)
-      if (queueEntry.pendingConfirmOrChallenge.has(confirmOrChallenge.nodeId) === false) {
-        queueEntry.pendingConfirmOrChallenge.set(confirmOrChallenge.nodeId, confirmOrChallenge)
-      }
+      this.addPendingConfirmOrChallenge(queueEntry, confirmOrChallenge)
       return false
     }
     if (queueEntry.acceptConfirmOrChallenge === false || queueEntry.appliedReceipt2 != null) {
@@ -2856,6 +2856,7 @@ class TransactionConsenus {
       this.mainLogger.error(
         `tryAppendMessage: ${queueEntry.logID} confirm/challenge is too early. Not finalized best vote yet`
       )
+      this.addPendingConfirmOrChallenge(queueEntry, confirmOrChallenge)
       return false
     }
 
