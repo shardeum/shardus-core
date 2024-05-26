@@ -737,7 +737,7 @@ class TransactionConsenus {
             if (queueEntry == null) {
               // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
               queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
-                payload.txid as string,
+                txId,
                 'spread_appliedReceipt2'
               ) // , payload.timestamp)
               if (queueEntry != null) {
