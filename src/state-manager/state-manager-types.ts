@@ -113,6 +113,7 @@ export type QueueEntry = {
   acceptVoteMessage: boolean
   acceptConfirmOrChallenge: boolean
   uniqueChallenges: { [key: string]: ConfirmOrChallengeMessage }
+  bestKeptChallenges: ConfirmOrChallengeMessage[]
   uniqueChallengesCount: number
   robustAccountDataPromises?: { [key: string]: Promise<Shardus.WrappedData> }
   queryingRobustVote?: boolean

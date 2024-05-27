@@ -1245,6 +1245,8 @@ export interface ServerConfiguration {
     singleAccountStuckFix: boolean
     // wait time before moving stuck "consensing" tx to "await final data"
     stuckTxMoveTime: number
+    // how many challenges a node should keep
+    keepMultipleBestChallenges: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

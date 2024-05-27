@@ -318,8 +318,9 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     removeStuckChallengedTXs: true,
     receiptRemoveFix: true,
     stuckTxQueueFix: true,
+    forceVoteForFailedPreApply: true,
+    keepMultipleBestChallenges: true
     singleAccountStuckFix: true,
-    stuckTxMoveTime: 60000,
     forceVoteForFailedPreApply: true
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },

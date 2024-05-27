@@ -7541,6 +7541,39 @@ class TransactionQueue {
     }
     return this._transactionQueue.length
   }
+  extractDebugInfoFromQueueEntry(queueEntry: QueueEntry): any {
+    return {
+      nodeId: Self.id,
+      logID: queueEntry.logID,
+      state: queueEntry.state,
+      hasAll: queueEntry.hasAll,
+      isExecutionNode: queueEntry.isInExecutionHome,
+      globalModification: queueEntry.globalModification,
+      entryID: queueEntry.entryID,
+      collectedData: queueEntry.collectedData,
+      finalData: queueEntry.collectedFinalData,
+      preApplyResult: queueEntry.preApplyTXResult,
+      txAge: shardusGetTime() - queueEntry.acceptedTx.timestamp,
+      lastFinalDataRequestTimestamp: queueEntry.lastFinalDataRequestTimestamp,
+      dataSharedTimestamp: queueEntry.dataSharedTimestamp,
+      firstVoteTimestamp: queueEntry.firstVoteReceivedTimestamp,
+      firstConfirmationsTimestamp: queueEntry.firstConfirmOrChallengeTimestamp,
+      robustBestConfirmation: queueEntry.receivedBestConfirmation,
+      robustBestVote: queueEntry.receivedBestVote,
+      robustBestChallenge: queueEntry.receivedBestChallenge,
+      completedRobustVote: queueEntry.robustQueryVoteCompleted,
+      completedRobustChallenge: queueEntry.robustQueryConfirmOrChallengeCompleted,
+      eligibleToVote: queueEntry.eligibleNodeIdsToVote.has(Self.id),
+      eligibleToConfirm: queueEntry.eligibleNodeIdsToConfirm.has(Self.id),
+      txDebug: queueEntry.txDebug,
+      executionDebug: queueEntry.executionDebug,
+      waitForReceiptOnly: queueEntry.waitForReceiptOnly,
+      ourVote: queueEntry.ourVote || null,
+      receipt2: this.stateManager.getReceipt2(queueEntry) || null,
+      uniqueChallenges: queueEntry.uniqueChallengesCount,
+      bestKeptChallenges: queueEntry.bestKeptChallenges || null,
+    }
+  }
   getQueueItems(): any[] {
     return this._transactionQueue.map((queueEntry) => {
       return {
