@@ -1949,6 +1949,7 @@ class TransactionQueue {
         completedConfirmedOrChallenge: false,
         uniqueChallengesCount: 0,
         uniqueChallenges: {},
+        bestKeptChallenges: [],
         archived: false,
         ourTXGroupIndex: -1,
         ourExGroupIndex: -1,
