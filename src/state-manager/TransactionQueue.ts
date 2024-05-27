@@ -5120,7 +5120,8 @@ class TransactionQueue {
               }
             }
           }
-          const hasSeenVote = queueEntry.receivedBestVote != null
+          // check  if we seen a vote or has a vote
+          const hasSeenVote = queueEntry.receivedBestVote != null || queueEntry.ourVote != null
           const hasSeenConfirmation = queueEntry.receivedBestConfirmation != null
 
           // remove TXs that are stuck in the processing queue for 2 min
