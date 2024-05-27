@@ -7548,6 +7548,7 @@ class TransactionQueue {
   }
   extractDebugInfoFromQueueEntry(queueEntry: QueueEntry): any {
     return {
+      nodeId: Self.id,
       logID: queueEntry.logID,
       state: queueEntry.state,
       hasAll: queueEntry.hasAll,
@@ -7574,7 +7575,8 @@ class TransactionQueue {
       waitForReceiptOnly: queueEntry.waitForReceiptOnly,
       ourVote: queueEntry.ourVote || null,
       receipt2: this.stateManager.getReceipt2(queueEntry) || null,
-      uniqueChallenges: queueEntry.uniqueChallengesCount
+      uniqueChallenges: queueEntry.uniqueChallengesCount,
+      bestKeptChallenges: queueEntry.bestKeptChallenges || null,
     }
   }
   getQueueItems(): any[] {

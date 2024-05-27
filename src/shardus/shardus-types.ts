@@ -1242,6 +1242,8 @@ export interface ServerConfiguration {
     stuckTxQueueFix: boolean
     // force vote for failed preApply
     forceVoteForFailedPreApply: boolean
+    // how many challenges a node should keep
+    keepMultipleBestChallenges: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
