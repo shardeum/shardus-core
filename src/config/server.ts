@@ -171,6 +171,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     requestStateForTxBinary: true,
     requestReceiptForTxBinary: true,
     lostReportBinary: true,
+    repairMissingAccountsBinary: true,
     rotationEdgeToAvoid: 3,
     forcedMode: '',
     delayZombieRestartSec: 180,

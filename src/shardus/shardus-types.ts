@@ -929,6 +929,7 @@ export interface ServerConfiguration {
     broadcastStateBinary: boolean
     broadcastFinalStateBinary: boolean
     lostReportBinary: boolean
+    repairMissingAccountsBinary: boolean
     /** number of nodes on both ends of the rotationIndex
      *  that will not respond to queries like account data, inject etc
      *  is only activated when more than 10 nodes active  */

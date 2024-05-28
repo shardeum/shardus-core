@@ -57,4 +57,7 @@ export enum TypeIdentifierEnum {
   cLostReportReq,
   cGossipReq,
   cResponseError,
+  cConfirmOrChallengeMessage,
+  cAppliedReceipt2,
+  cRepairMissingAccountsReq
 }
