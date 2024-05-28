@@ -1,11 +1,7 @@
+import { AccountIDAndHash } from '../state-manager/state-manager-types'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { verifyPayload } from './ajv/Helpers'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
-
-type AccountIDAndHash = {
-  accountID: string
-  hash: string
-}
 
 export type GetAccountDataByHashesReq = {
   cycle: number

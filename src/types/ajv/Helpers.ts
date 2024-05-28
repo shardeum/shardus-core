@@ -12,6 +12,7 @@ import { initGetAccountDataByHashesReq } from './GetAccountDataByHashesReq'
 import { initGetAccountDataByHashesResp } from './GetAccountDataByHashesResp'
 import { initWrappedData } from './WrappedData'
 import { Utils } from '@shardus/types'
+import { initRepairMissingAccountsReq } from './RepairMissingAccountsReq'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -25,6 +26,7 @@ export function initAjvSchemas(): void {
   initGetAccountDataByListResp()
   initGetAccountDataByHashesReq()
   initGetAccountDataByHashesResp()
+  initRepairMissingAccountsReq()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {

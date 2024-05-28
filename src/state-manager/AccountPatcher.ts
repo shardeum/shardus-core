@@ -89,6 +89,8 @@ import {
 } from '../types/GetTrieAccountHashesResp'
 import { BadRequest, InternalError, serializeResponseError } from '../types/ResponseError'
 import { Utils } from '@shardus/types'
+import { RepairMissingAccountsReq, deserializeRepairMissingAccountsReq, serializeRepairMissingAccountsReq } from '../types/RepairMissingAccountsReq'
+import { verifyPayload } from '../types/ajv/Helpers'
 
 type Line = {
   raw: string
@@ -628,6 +630,160 @@ class AccountPatcher {
       }
     )
 
+    const repairMissingAccountsBinary: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_repair_missing_accounts,
+      handler: async (payloadBuffer, respond, header, sign) => {
+        const route = InternalRouteEnum.binary_repair_missing_accounts
+        nestedCountersInstance.countEvent('internal', route)
+        this.profiler.scopedProfileSectionStart(route, false, payloadBuffer.length)
+        try {
+          const requestStream = getStreamWithTypeCheck(payloadBuffer, TypeIdentifierEnum.cRepairMissingAccountsReq)
+          if (!requestStream) {
+            return
+          }
+          // (Optional) Check verification data in the header
+          const payload = deserializeRepairMissingAccountsReq(requestStream)
+          verifyPayload('RepairMissingAccountsReq', payload)
+          for (const repairInstruction of payload?.repairInstructions) {
+            const { accountID, txId, hash, accountData, targetNodeId, receipt2 } = repairInstruction
+
+            // check if we are the target node
+            if (targetNodeId !== Self.id) {
+              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: not target node for txId: ${txId}`)
+              continue
+            }
+
+            // check if we cover this accountId
+            const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(accountID)
+            const isInStorageGroup = storageNodes.map((node) => node.id).includes(Self.id)
+            if (!isInStorageGroup) {
+              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: not in storage group for account: ${accountID}`)
+              continue
+            }
+            // check if we have already repaired this account
+            const accountHashCache = this.stateManager.accountCache.getAccountHash(accountID)
+            if (accountHashCache != null && accountHashCache.h === hash) {
+              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: already repaired account: ${accountID}`)
+              continue
+            }
+            if (accountHashCache != null && accountHashCache.t > accountData.timestamp) {
+              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: we have newer account: ${accountID}`)
+              continue
+            }
+
+            const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, 'repair_missing_accounts')
+
+            if (archivedQueueEntry == null) {
+              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: no archivedQueueEntry for txId: ${txId}`)
+              this.mainLogger.debug(`repair_missing_accounts: no archivedQueueEntry for txId: ${txId}`)
+              continue
+            }
+
+            // check the vote and confirmation status of the tx
+            const bestMessage = receipt2.confirmOrChallenge
+            const receivedBestVote = receipt2.appliedVote
+
+            if (receivedBestVote != null) {
+              // Check if vote is from eligible list of voters for this TX
+              if(!archivedQueueEntry.eligibleNodeIdsToVote.has(receivedBestVote.node_id)) {
+                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: vote from ineligible node for txId: ${txId}`)
+                continue
+              }
+
+              // Check signature of the vote
+              if (!this.crypto.verify(
+                receivedBestVote as SignedObject,
+                archivedQueueEntry.executionGroupMap.get(receivedBestVote.node_id).publicKey
+              )) {
+                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: vote signature invalid for txId: ${txId}`)
+                continue
+              }
+
+              // Check transaction result from vote
+              if (!receivedBestVote.transaction_result) {
+                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: vote result not true for txId ${txId}`)
+                continue
+              }
+
+              // Check account hash. Calculate account hash of account given in instruction
+              // and compare it with the account hash in the vote.
+              const calculatedAccountHash = this.app.calculateAccountHash(accountData.data)
+              let accountHashMatch = false
+              for (let i = 0; i < receivedBestVote.account_id.length; i++) {
+                if (receivedBestVote.account_id[i] === accountID) {
+                  if (receivedBestVote.account_state_hash_after[i] !== calculatedAccountHash) {
+                    nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: account hash mismatch for txId: ${txId}`)
+                    accountHashMatch = false
+                  } else {
+                    accountHashMatch = true
+                  }
+                  break
+                }
+              }
+              if (accountHashMatch === false) {
+                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: vote account hash mismatch for txId: ${txId}`)
+                continue
+              }
+            } else {
+              // Skip this account apply as we were not able to get the best vote for this tx
+              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: no vote for txId: ${txId}`)
+              continue
+            }
+
+            if (bestMessage != null) {
+              // Skip if challenge receipt
+              if (bestMessage.message === 'challenge') {
+                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: challenge for txId: ${txId}`)
+                continue
+              }
+
+              // Check if mesasge is from eligible list of responders for this TX
+              if(!archivedQueueEntry.eligibleNodeIdsToConfirm.has(bestMessage.nodeId)) {
+                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: confirmation from ineligible node for txId: ${txId}`)
+                continue
+              }
+
+              // Check signature of the message
+              if(!this.crypto.verify(
+                bestMessage as SignedObject,
+                archivedQueueEntry.executionGroupMap.get(bestMessage.nodeId).publicKey
+              )) {
+                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: confirmation signature invalid for txId: ${txId}`)
+                continue
+              }
+            } else {
+              // Skip this account apply as we were not able to get the best confirmation for this tx
+              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts: no confirmation for txId: ${txId}`)
+              continue
+            }
+
+            // update the account data (and cache?)
+            const updatedAccounts: string[] = []
+            //save the account data.  note this will make sure account hashes match the wrappers and return failed
+            // hashes  that don't match
+            const failedHashes = await this.stateManager.checkAndSetAccountData(
+              [accountData],
+              `binary/repair_missing_accounts:${txId}`,
+              true,
+              updatedAccounts
+            )
+            if (logFlags.debug) this.mainLogger.debug(`binary/repair_missing_accounts: ${updatedAccounts.length} updated, ${failedHashes.length} failed`)
+            nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts:${updatedAccounts.length} updated, accountId: ${utils.makeShortHash(accountID)}, cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
+            if (failedHashes.length > 0) nestedCountersInstance.countEvent('accountPatcher', `binary/repair_missing_accounts:${failedHashes.length} failed`)
+            let success = false
+            if (updatedAccounts.length > 0 && failedHashes.length === 0) {
+              success = true
+            }
+          }
+        } catch (e) {
+          // Error handling
+          console.error(`Error in repairMissingAccountsBinary handler: ${e.message}`)
+        } finally {
+          this.profiler.scopedProfileSectionEnd(route)
+        }
+      },
+    }
+
     const getTrieHashesBinary: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_get_trie_hashes,
       handler: async (payloadBuffer, respond, header, sign) => {
@@ -677,6 +833,7 @@ class AccountPatcher {
     }
 
     this.p2p.registerInternalBinary(getTrieHashesBinary.name, getTrieHashesBinary.handler)
+    this.p2p.registerInternalBinary(repairMissingAccountsBinary.name, repairMissingAccountsBinary.handler)
 
     this.p2p.registerInternal(
       'sync_trie_hashes',
@@ -3366,7 +3523,19 @@ class AccountPatcher {
           const message = {
             repairInstructions
           }
-          this.p2p.tell([node], 'repair_missing_accounts', message)
+          if(this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+            this.stateManager.config.p2p.repairMissingAccountsBinary
+          ) {
+            this.p2p.tellBinary<RepairMissingAccountsReq>(
+              [node],
+              InternalRouteEnum.binary_repair_missing_accounts,
+              message,
+              serializeRepairMissingAccountsReq,
+              {}
+            )
+          } else {
+            this.p2p.tell([node], 'repair_missing_accounts', message)
+          }
         }
       }
     } catch (e) {
@@ -4345,7 +4514,7 @@ type BadAccountsInfo = {
   accountsTheyNeedToRepair: AccountIdAndHashToRepair[]
 }
 
-type AccountRepairInstruction = {
+export type AccountRepairInstruction = {
   accountID: string
   hash: string
   txId: string
