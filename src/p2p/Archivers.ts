@@ -111,10 +111,11 @@ export function init() {
           if (stopped) {
             const msg = 'checkNetworkStopped: Network has stopped. Initiating apoptosis'
             /* prettier-ignore */ if (logFlags.important_as_fatal) info(msg)
-            this.fatalLogger.fatal(
-              'checkNetworkStopped: Network has stopped. Initiating apoptosis'
+            this.fatalLogger.fatal('checkNetworkStopped: Network has stopped. Initiating apoptosis')
+            nestedCountersInstance.countEvent(
+              'checkNetworkStopped',
+              `Network has stopped: apop self. ${shardusGetTime()}`
             )
-            nestedCountersInstance.countEvent('checkNetworkStopped', `Network has stopped: apop self. ${shardusGetTime()}`)
             apoptosizeSelf(msg)
           }
         })
@@ -575,7 +576,7 @@ async function forwardDataToSubscribedArchivers(responses, publicKey, recipient)
     if (io.sockets.sockets[connectedSockets[publicKey]]) {
       if (logFlags.console)
         console.log('Forwarded Archiver', recipient.nodeInfo.ip + ':' + recipient.nodeInfo.port)
-      io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
+      io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', Utils.safeStringify(taggedDataResponse))
     } else {
       warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
       // Call into LostArchivers to report Archiver as lost
@@ -674,7 +675,7 @@ export async function forwardAccounts(data: InitialAccountsData) {
     if (logFlags.console) console.log('Sending accounts to archivers', taggedDataResponse)
     try {
       if (io.sockets.sockets[connectedSockets[publicKey]]) {
-        io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
+        io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', Utils.safeStringify(taggedDataResponse))
         console.log(`forward Accounts Successfully`)
       }
     } catch (e) {
@@ -731,7 +732,10 @@ export function sendData() {
       try {
         // console.log('connected socketes', publicKey, connectedSockets)
         if (io.sockets.sockets[connectedSockets[publicKey]])
-          io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
+          io.sockets.sockets[connectedSockets[publicKey]].emit(
+            'DATA',
+            Utils.safeStringify(taggedDataResponse)
+          )
         else {
           warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
           // Call into LostArchivers to report Archiver as lost
@@ -823,7 +827,7 @@ export function sendData() {
     try {
       // console.log('connected socketes', publicKey, connectedSockets)
       if (io.sockets.sockets[connectedSockets[publicKey]])
-        io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
+        io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', Utils.safeStringify(taggedDataResponse))
       else {
         warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
         // Call into LostArchivers to report Archiver as lost
@@ -1081,9 +1085,9 @@ export function registerRoutes() {
     res.send(Utils.safeStringify({ archivers }))
   })
 
-  network.registerExternalGet('joinedArchiver/:publicKey', ({params: {publicKey}}, res) => {
+  network.registerExternalGet('joinedArchiver/:publicKey', ({ params: { publicKey } }, res) => {
     const isJoined = archivers.has(publicKey)
-    res.json({ isJoined });
+    res.json({ isJoined })
   })
 
   network.registerExternalGet('datarecipients', (req, res) => {
