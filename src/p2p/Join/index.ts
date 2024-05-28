@@ -977,7 +977,7 @@ export async function submitJoinV2(
     }
   }
 
-  console.log('submitJoinV2: selectedNodes', selectedNodes.map((n) => `${n.port}`))
+  /* prettier-ignore */ if (logFlags.important_as_fatal) info(`submitJoinV2: selectedNodes ${selectedNodes.map((n) => `${n.ip}:${n.port}`).join(', ')}`)
 
   for (const node of selectedNodes) {
     try {
