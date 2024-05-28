@@ -1,4 +1,4 @@
-import { publicKey } from '@shardus/types'
+import { publicKey, P2P } from '@shardus/types'
 import { CycleMarker } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
 import {
   ArchiverDownMsg,
@@ -210,7 +210,11 @@ export function tellNetworkArchiverIsDown(record: LostArchiverRecord): void {
   })
   info(`tellNetworkArchiverIsDown: downMsg: ${Utils.safeStringify(downMsg)}`)
   record.archiverDownMsg = downMsg
-  Comms.sendGossip('lost-archiver-down', downMsg, '', null, nodeListFromStates(['active', 'ready', 'syncing']), /* isOrigin */ true)
+  Comms.sendGossip('lost-archiver-down', downMsg, '', null, nodeListFromStates([
+    P2P.P2PTypes.NodeStatus.ACTIVE,
+    P2P.P2PTypes.NodeStatus.READY,
+    P2P.P2PTypes.NodeStatus.SYNCING,
+  ]), /* isOrigin */ true)
   // This is to inform the rest of the network that the Archiver is down
 }
 
@@ -229,7 +233,11 @@ export function tellNetworkArchiverIsUp(record: LostArchiverRecord): void {
   record.archiverUpMsg = upMsg
   // Gossip the ArchiverUpMsg to the rest of the network
   info(`tellNetworkArchiverIsUp: upMsg: ${Utils.safeStringify(upMsg)}`)
-  Comms.sendGossip('lost-archiver-up', upMsg, '', null, NodeList.byIdOrder, /* isOrigin */ true)
+  Comms.sendGossip('lost-archiver-up', upMsg, '', null, nodeListFromStates([
+    P2P.P2PTypes.NodeStatus.ACTIVE,
+    P2P.P2PTypes.NodeStatus.READY,
+    P2P.P2PTypes.NodeStatus.SYNCING,
+  ]), /* isOrigin */ true)
 }
 
 /**

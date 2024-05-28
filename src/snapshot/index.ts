@@ -355,7 +355,11 @@ export function startSnapshotting() {
         }
         const signedMessage = Context.crypto.sign(message)
 
-        Comms.sendGossip('snapshot_gossip', signedMessage, '', null, nodeListFromStates(['active', 'ready', 'syncing']), true)
+        Comms.sendGossip('snapshot_gossip', signedMessage, '', null, nodeListFromStates([
+          P2P.P2PTypes.NodeStatus.ACTIVE,
+          P2P.P2PTypes.NodeStatus.READY,
+          P2P.P2PTypes.NodeStatus.SYNCING,
+        ]), true)
         partitionGossip.forwardedGossips.set(message.sender, true)
         collector.process([message])
 
