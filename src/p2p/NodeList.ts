@@ -126,7 +126,7 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
     insertSorted(othersByIdOrder, node, propComparator('id'))
   }
 
-  // If selected, insert into standbyByIdOrder
+  // If standby, insert into standbyByIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.STANDBY) {
     insertSorted(standbyByIdOrder, node, propComparator('id'))
   }
