@@ -953,7 +953,7 @@ export async function submitJoinV2(
   const selectedNodes = utils.getRandom(nodes, Math.min(nodes.length, 5))
 
   const promises = []
-  /* prettier-ignore */ if (logFlags.important_as_fatal) info(`Sending join request to ${selectedNodes.map((n) => `${n.ip}:${n.port}`)}`)
+  /* prettier-ignore */ if (logFlags.important_as_fatal) info(`submitJoinV2: selectedNodes: Sent join request to ${selectedNodes.map((n) => `${n.ip}:${n.port}`)}`)
 
   // Check if network allows bogon IPs, set our own flag accordingly
   if (config.p2p.dynamicBogonFiltering && config.p2p.forceBogonFilteringOn === false) {
@@ -978,8 +978,6 @@ export async function submitJoinV2(
       }
     }
   }
-
-  /* prettier-ignore */ if (logFlags.important_as_fatal) info(`submitJoinV2: selectedNodes ${selectedNodes.map((n) => `${n.ip}:${n.port}`).join(', ')}`)
 
   for (const node of selectedNodes) {
     try {
