@@ -8,6 +8,7 @@ import * as NodeList from '../../NodeList'
 import { deleteStandbyNodeFromMap, getStandbyNodesInfoMap } from '.'
 import { getActiveNodesFromArchiver, getRandomAvailableArchiver } from '../../Utils'
 import { logFlags } from '../../../logger'
+import * as CycleChain from '../../CycleChain'
 
 /**
  * A request to leave the network's standby node list.
@@ -34,6 +35,12 @@ export async function submitUnjoin(): Promise<Result<void, Error>> {
       return err(new Error(`couldn't get active nodes: ${activeNodesResult.error}`))
     }
     const activeNodes = activeNodesResult.value
+    // If we submit to a node that is about to be rotated out, then that node will queue our request for the next cycle
+    // but will not send it since it will be removed from the network. Since we are a standby node, we dont have access
+    // to the potentiallyRemoved list, so I dont think there's an easy solution to this. We need to think if this is even
+    // worth solving. In a live network with a 1000 nodes, the chances of this happening are 1/1000. having 0.1% of standby
+    // not being properly removed isn't that big a deal. Standby refresh will take care of them anyways.
+    // If we really want to solve this, can do so by sending request to numRotatedOut + 1 nodes.
     const node = utils.getRandom(activeNodes.nodeList, 1)[0]
     await http.post(`${node.ip}:${node.port}/unjoin`, unjoinRequest)
     return ok(void 0)
@@ -66,9 +73,16 @@ export function validateUnjoinRequest(unjoinRequest: UnjoinRequest): Result<void
     return err(new Error(`unjoin request from ${unjoinRequest.publicKey} already exists`))
   }
 
+  const wasSelectedLastCycle = CycleChain.newest.joinedConsensors.find(
+    (node) => node.publicKey === unjoinRequest.publicKey
+  )
+    ? true
+    : false
+
   // ignore if the unjoin request is from a node that is active
+  // only exception is if it was selected last cycle
   const foundInActiveNodes = NodeList.byPubKey.has(unjoinRequest.publicKey)
-  if (foundInActiveNodes) {
+  if (foundInActiveNodes && wasSelectedLastCycle === false) {
     return err(
       new Error(`unjoin request from ${unjoinRequest.publicKey} is from an active node that can't unjoin`)
     )
@@ -76,7 +90,7 @@ export function validateUnjoinRequest(unjoinRequest: UnjoinRequest): Result<void
 
   // ignore if the unjoin request is from a node that is not in standby
   const foundInStandbyNodes = getStandbyNodesInfoMap().has(unjoinRequest.publicKey)
-  if (!foundInStandbyNodes) {
+  if (!foundInStandbyNodes && wasSelectedLastCycle === false) {
     return err(
       new Error(
         `unjoin request from ${unjoinRequest.publicKey} is from a node not in standby (doesn't exist?)`
@@ -104,4 +118,8 @@ export function deleteStandbyNode(publicKey: hexstring): void {
   } else {
     console.log(`--failed to remove standby node ${publicKey} count: ${getStandbyNodesInfoMap().size}`)
   }
+}
+
+export function removeUnjoinRequest(publicKey: hexstring): void {
+  newUnjoinRequests.delete(publicKey)
 }

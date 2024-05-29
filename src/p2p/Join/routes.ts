@@ -18,8 +18,9 @@ import {
   warn,
   queueStandbyRefreshRequest,
   queueJoinRequest,
+  queueUnjoinRequest,
   verifyJoinRequestTypes,
-  nodeListFromStates,
+  nodeListFromStates
 } from '.'
 import { config } from '../Context'
 import { isBogonIP } from '../../utils/functions/checkIP'
@@ -30,7 +31,7 @@ import * as acceptance from './v2/acceptance'
 import { attempt } from '../Utils'
 import { getStandbyNodesInfoMap, saveJoinRequest, isOnStandbyList } from './v2'
 import { addFinishedSyncing } from './v2/syncFinished'
-import { processNewUnjoinRequest, UnjoinRequest } from './v2/unjoin'
+import { processNewUnjoinRequest, UnjoinRequest, removeUnjoinRequest } from './v2/unjoin'
 import { isActive } from '../Self'
 import { logFlags } from '../../logger'
 import { JoinRequest, StartedSyncingRequest } from '@shardus/types/build/src/p2p/JoinTypes'
@@ -212,25 +213,19 @@ const unjoinRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'unjoin',
   handler: (req, res) => {
-    const joinRequest = req.body
-    const processResult = processNewUnjoinRequest(joinRequest)
+    const unjoinRequest = req.body
+    const processResult = processNewUnjoinRequest(unjoinRequest)
     if (processResult.isErr()) {
       return res.status(500).send(processResult.error)
     }
 
-    Comms.sendGossip(
-      'gossip-unjoin',
-      joinRequest,
-      '',
-      null,
-      nodeListFromStates([
-        P2P.P2PTypes.NodeStatus.ACTIVE,
-        P2P.P2PTypes.NodeStatus.READY,
-        P2P.P2PTypes.NodeStatus.SYNCING,
-      ]),
-      true
-    )
-  },
+    // we need to remove the unjoin request this cycle since we are waiting until next cycle to gossip it to the network
+    // processNewUnjoinRequest automatically adds the unjoin request to newUnjoinRequests it will be added back to our list
+    // once we process the queued request next cycle
+    removeUnjoinRequest(unjoinRequest.publicKey)
+
+    queueUnjoinRequest(unjoinRequest)
+  }
 }
 
 /*
