@@ -431,6 +431,8 @@ async function cycleCreator() {
 
     /* prettier-ignore */ if (logFlags.verbose) info(`cc: current cycle and quarter updated C${currentCycle} Q${currentQuarter} ${callTag}`)
 
+    Join.swapUnjoinRequestQueues()
+
     const { quarterDuration, startQ1, startQ2, startQ3, startQ4, end } = calcIncomingTimes(prevRecord)
 
     nextQ1Start = end
@@ -1290,7 +1292,7 @@ async function gossipCycleCert(sender: P2P.NodeListTypes.Node['id'], tracker?: s
     signedCertGossip,
     tracker,
     sender,
-    nodeListFromStates([
+    Join.nodeListFromStates([
       P2P.P2PTypes.NodeStatus.ACTIVE,
       P2P.P2PTypes.NodeStatus.READY,
       P2P.P2PTypes.NodeStatus.SYNCING,

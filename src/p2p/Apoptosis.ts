@@ -277,7 +277,7 @@ export function updateRecord(txs: P2P.ApoptosisTypes.Txs, record: P2P.ApoptosisT
       apoptosized.push(node.id)
     }
   }
-  record.apoptosized = apoptosized.sort()
+  record.apoptosized = [...record.apoptosized, ...apoptosized].sort()
 }
 
 export function parseRecord(record: P2P.ApoptosisTypes.Record): P2P.CycleParserTypes.Change {
