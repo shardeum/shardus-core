@@ -542,9 +542,9 @@ export function jsonHttpResWithSize(
   res: Response<unknown, Record<string, unknown>, number>,
   obj: object
 ): number {
-  // res.setHeader('Content-Length', str.length)
-  // res.setHeader('Content-Type', 'application/json')
   const str = Utils.safeStringify(obj)
+  res.setHeader('Content-Length', str.length)
+  res.setHeader('Content-Type', 'application/json')
   res.write(str)
   res.end()
   return str.length

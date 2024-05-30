@@ -147,30 +147,10 @@ export class NetworkClass extends EventEmitter {
         next()
       }
 
-      // Custom middleware to handle raw payload and parse it
-      const rawBodyParser = (req, res, next) => {
-        let data = '';
-        req.on('data', (chunk) => (data += chunk))
-
-        req.on('end', () => {
-          try {
-            if (data && data.length > 0) {
-              req.body = Utils.safeJsonParse(data)
-            }
-            next()
-          } catch (err) {
-            console.error('Invalid JSON', data)
-            res.status(400).send('Invalid JSON payload')
-          }
-        });
-
-        req.on('error', (err) => res.status(500).send('Internal Server Error'))
-      };
-      this.app.use(bodyParser.json({ limit: '50mb' }))
+      this.app.use(bodyParser.json({ limit: '50mb', reviver: Utils.typeReviver}))
       this.app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }))
       this.app.use(cors())
       this.app.use(this.customSendJsonMiddleware)
-      this.app.use(rawBodyParser)
       this.app.use(storeRequests)
       this._applyExternal()
       this.extServer = this.app.listen(this.ipInfo.externalPort, () => {
