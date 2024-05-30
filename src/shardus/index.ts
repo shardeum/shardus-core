@@ -614,7 +614,7 @@ class Shardus extends EventEmitter {
 
     if (!isServiceMode()) this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
 
-    this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection)
+    this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection, this.seqLogger)
 
     if (this.app) {
       this._createAndLinkStateManager()
@@ -1374,7 +1374,7 @@ class Shardus extends EventEmitter {
         }
       }
     }
-    if (this.rateLimiting.isOverloaded()) {
+    if (this.rateLimiting.isOverloaded(txId)) {
       this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: reject_overload`)
       this.statistics.incrementCounter('txRejected')
       nestedCountersInstance.countEvent('rejected', 'isOverloaded')
@@ -1588,6 +1588,7 @@ class Shardus extends EventEmitter {
         port: homeNode.node.externalPort,
         publicKey: homeNode.node.publicKey,
       })
+    this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_homenode_${context} ${activeIdToPartition.get(homeNode.node.id)}`)
 
     let  stats ={
       skippedSelf:0,

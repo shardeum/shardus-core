@@ -685,10 +685,12 @@ export function isNodeValidForInternalMessage(
   checkForNodeDown = true,
   checkForNodeLost = true,
   checkIsUpRecent = true,
-  checkNodesRotationBounds = false
+  checkNodesRotationBounds = false,
+  txId: string = 'N/A'
 ): boolean {
   const logErrors = logFlags.debug
   if (node == null) {
+    seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} null`)
     if (logErrors)
       if (logFlags.error)
         /* prettier-ignore */ error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(node.id)} ${debugMsg}`)
@@ -698,6 +700,7 @@ export function isNodeValidForInternalMessage(
   // Some modes are not compatible with doing a valid node check for outgoing messages
   // if that is the case just return true and allow the message
   if (modeAllowsValidNodeChecks() === false) {
+    seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} nochecks`)
     return true
   }
 
@@ -714,6 +717,12 @@ export function isNodeValidForInternalMessage(
   // each calling site (or site that calls the gossip, yay more parameters)
 
   // Also may add a flag to change if we also allow other statuses
+  if (nodeStatus != 'active') {
+    seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} notactive`)
+  }
+  if (NodeList.potentiallyRemoved.has(node.id)) {
+    seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} remove`)
+  }
   if (nodeStatus != 'active' || NodeList.potentiallyRemoved.has(node.id)) {
     if (logErrors)
       if (logFlags.error)
@@ -723,6 +732,7 @@ export function isNodeValidForInternalMessage(
 
   const isInRotationBounds = checkNodesRotationBounds && isNodeInRotationBounds(node.id)
   if (isInRotationBounds) {
+    seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} rotation`)    
     return false
   }
 
@@ -767,6 +777,7 @@ export function isNodeValidForInternalMessage(
       if (logErrors)
         if (logFlags.error)
           /* prettier-ignore */ error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(node.id)} ${debugMsg}`)
+      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} down`)    
       return false
     }
   }
@@ -775,6 +786,7 @@ export function isNodeValidForInternalMessage(
       if (logErrors)
         if (logFlags.error)
           /* prettier-ignore */ error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(node.id)} ${debugMsg}`)
+      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} lost`)    
       return false
     }
   }
@@ -914,6 +926,7 @@ export async function sendGossip(
     }
   }
 
+
   //console.log('recipientIdxs ', recipientIdxs)
 
   // Map back recipient idxs to node objects
@@ -956,7 +969,9 @@ export async function sendGossip(
             'sendGossip',
             config.p2p.preGossipDownCheck,
             config.p2p.preGossipLostCheck,
-            config.p2p.preGossipRecentCheck
+            config.p2p.preGossipRecentCheck,
+            false,
+            txId
           )
         ) {
           return true

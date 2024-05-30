@@ -1,18 +1,24 @@
 import LoadDetection from '../load-detection'
 import { NodeLoad } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import Log4js from 'log4js'
+import { shardusGetTime } from '../network'
+import { activeIdToPartition } from '../p2p/NodeList'
+import * as Self from '../p2p/Self'
 
 interface RateLimiting {
   loadDetection: LoadDetection
   limitRate: boolean
   loadLimit: NodeLoad
+  seqLogger: Log4js.Logger
 }
 
 class RateLimiting {
-  constructor(config, loadDetection) {
+  constructor(config, loadDetection, seqLogger) {
     this.loadDetection = loadDetection
     this.limitRate = config.limitRate
     this.loadLimit = config.loadLimit
+    this.seqLogger = seqLogger
   }
 
   calculateThrottlePropotion(load, limit) {
@@ -40,7 +46,7 @@ class RateLimiting {
       }
     }
 
-    if (loadType) {
+    if (loadType) {      
       nestedCountersInstance.countEvent('loadRelated', `ratelimit winning load factor: ${loadType}`)
     }
 
@@ -50,7 +56,7 @@ class RateLimiting {
     }
   }
 
-  isOverloaded() {
+  isOverloaded(txId: string) {
     if (!this.limitRate) return false
     const nodeLoad = this.loadDetection.getCurrentNodeLoad()
     const queueLoad = this.loadDetection.getQueueLoad()
@@ -63,6 +69,9 @@ class RateLimiting {
     let overloaded = Math.random() < throttle
 
     if(overloaded){
+      this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: overloaded_type ${loadType}:${throttle}`)
+      this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: overloaded_node ${nodeLoad.internal}/${nodeLoad.external}`)      
+      this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: overloaded_queue ${queueLoad.txTimeInQueue}/${queueLoad.queueLength}}/${queueLoad.executeQueueLength}`)
       nestedCountersInstance.countEvent('loadRelated', 'txRejected:' + loadType)
     }
 

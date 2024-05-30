@@ -22,6 +22,7 @@ const clone = rfdc()
 /** STATE */
 
 let p2pLogger: Logger
+let mainLogger: Logger
 
 export let nodes: Map<P2P.NodeListTypes.Node['id'], P2P.NodeListTypes.Node> // In order of joinRequestTimestamp [OLD, ..., NEW]
 export let byPubKey: Map<P2P.NodeListTypes.Node['publicKey'], P2P.NodeListTypes.Node>
@@ -45,6 +46,7 @@ reset('init')
 
 export function init() {
   p2pLogger = logger.getLogger('p2p')
+  mainLogger = logger.getLogger('main')
   network.registerExternalGet('network-stats', (req, res) => {
     try {
       // todo: reject if request is not coming from node operator dashboard
