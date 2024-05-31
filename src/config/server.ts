@@ -176,6 +176,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     delayZombieRestartSec: 180,
     resumbitStandbyRefreshWaitDuration: 1000, // 1 second in ms
     formingNodesPerCycle: 7,
+    downNodeFilteringEnabled: false,
   },
   ip: {
     externalIp: '0.0.0.0',

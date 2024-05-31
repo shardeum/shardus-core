@@ -941,6 +941,8 @@ export interface ServerConfiguration {
     resumbitStandbyRefreshWaitDuration: number
     // /** The number of nodes to attemp joining per cycle during forming mode */
     formingNodesPerCycle: number
+    // /** Enables or disables filtering nodes from internal gossip if they are marked down. */
+    downNodeFilteringEnabled: boolean
   }
   /** Server IP configuration */
   ip?: {

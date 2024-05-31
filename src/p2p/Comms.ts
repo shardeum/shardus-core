@@ -771,7 +771,7 @@ export function isNodeValidForInternalMessage(
     }
   }
 
-  if (checkForNodeDown) {
+  if (config.p2p.downNodeFilteringEnabled && checkForNodeDown) {
     const { down, state } = isNodeDown(node.id)
     if (down === true) {
       if (logErrors)

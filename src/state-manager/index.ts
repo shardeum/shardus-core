@@ -4212,7 +4212,7 @@ class StateManager {
         if (upRecent === true) {
           filteredNodes.push(node)
 
-          if (checkForNodeDown) {
+          if (this.config.p2p.downNodeFilteringEnabled && checkForNodeDown) {
             const { down, state } = isNodeDown(nodeId)
             if (down === true) {
               if (logErrors)
@@ -4242,7 +4242,7 @@ class StateManager {
         }
       }
 
-      if (checkForNodeDown) {
+      if (this.config.p2p.downNodeFilteringEnabled && checkForNodeDown) {
         const { down, state } = isNodeDown(nodeId)
         if (down === true) {
           if (logErrors)
