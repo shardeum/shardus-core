@@ -4200,13 +4200,18 @@ class StateManager {
             /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
         continue
       }
-      const nodeStatus = node.status
-      if (nodeStatus != 'active' || potentiallyRemoved.has(node.id)) {
-        if (logErrors)
-          if (logFlags.error)
-            /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
-        continue
-      }
+      // This is turned off and likely to be deleted.
+      // This is because filtering gossip nodes after sending the list is causing holes to appear in gossip and some nodes do not get the gossip at all which causes stuck txn.
+      // Do not turn this back on without talking to Andrew.
+      // Note will also likely create an investigation task to see if this will cause any issues.
+      //
+      //const nodeStatus = node.status
+      //if (nodeStatus != 'active' || potentiallyRemoved.has(node.id)) {
+      //  if (logErrors)
+      //    if (logFlags.error)
+      //      /* prettier-ignore */ this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+      //  continue
+      //}
       if (checkIsUpRecent) {
         const { upRecent, age } = isNodeUpRecent(nodeId, 5000)
         if (upRecent === true) {
