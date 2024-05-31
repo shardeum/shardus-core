@@ -26,7 +26,7 @@ async function _get(host, logIndex, timeout = 1000) {
       timeout: timeout, //  Omar - setting this to 1 sec
       retry: 0, // Omar - setting this to 0.
       headers: {
-        'Content-Type': 'application/json'
+        'Accept': 'application/json',
       }
     })
 
@@ -37,7 +37,6 @@ async function _get(host, logIndex, timeout = 1000) {
         responseBody = Utils.safeJsonParse(responseBody)
       } catch (parseError) {
         console.error('Failed to parse JSON response:', parseError)
-        throw parseError
       }
     }
 
@@ -86,6 +85,7 @@ async function _post(host, payload, logIndex, timeout = 1000) {
       retry: 0, // Omar - set this to 0
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: Utils.safeStringify(payload),
     })
@@ -94,13 +94,12 @@ async function _post(host, payload, logIndex, timeout = 1000) {
     //return res.body
 
     // Explicitly parse the response body as JSON if it's not already parsed
-    let responseBody = res.body;
+    let responseBody = res.body
     if (typeof responseBody === 'string' && res.headers['content-type']?.includes('application/json')) {
       try {
-        responseBody = Utils.safeJsonParse(responseBody);
+        responseBody = Utils.safeJsonParse(responseBody)
       } catch (parseError) {
-        console.error('Failed to parse JSON response:', parseError);
-        throw parseError;
+        console.error('Failed to parse JSON response:', parseError)
       }
     }
     return { ...res, body: responseBody }
