@@ -76,18 +76,7 @@ export class Collector extends EventEmitter {
       // forward snapshot gossip if gossip cycle is same as current cycle
       if (this.shard.cycleNumber === message.cycle) {
         if (!forwardedGossips.has(message.sender)) {
-          Comm.sendGossip(
-            'snapshot_gossip',
-            message,
-            '',
-            null,
-            nodelistFromStates([
-              P2P.P2PTypes.NodeStatus.ACTIVE,
-              P2P.P2PTypes.NodeStatus.READY,
-              P2P.P2PTypes.NodeStatus.SYNCING,
-            ]),
-            false
-          )
+          Comm.sendGossip('snapshot_gossip', message, '', null, NodeList.byIdOrder, false)
           forwardedGossips.set(message.sender, true)
         } else if (forwardedGossips.has(message.sender)) {
           continue

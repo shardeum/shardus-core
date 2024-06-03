@@ -862,11 +862,7 @@ export async function sendGossip(
   payload,
   tracker = '',
   sender = null,
-  inpNodes: Shardus.Node[] | Shardus.NodeWithRank[] = nodelistFromStates([
-    P2P.P2PTypes.NodeStatus.ACTIVE,
-    P2P.P2PTypes.NodeStatus.READY,
-    P2P.P2PTypes.NodeStatus.SYNCING,
-  ]), // Joining nodes need gossip too; we don't
+  inpNodes: Shardus.Node[] | Shardus.NodeWithRank[] = NodeList.byIdOrder, // Joining nodes need gossip too; we don't
   // send to ourself
   isOrigin = false,
   factor = -1,
@@ -1063,11 +1059,7 @@ export async function sendGossipAll(
   payload,
   tracker = '',
   sender = null,
-  inpNodes = nodelistFromStates([
-    P2P.P2PTypes.NodeStatus.ACTIVE,
-    P2P.P2PTypes.NodeStatus.READY,
-    P2P.P2PTypes.NodeStatus.SYNCING,
-  ]) // Joining nodes need gossip too; we don't send to ourself
+  inpNodes = NodeList.byIdOrder // Joining nodes need gossip too; we don't send to ourself
 ) {
   let msgSize = cUninitializedSize
 
