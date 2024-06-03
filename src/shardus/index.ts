@@ -959,6 +959,17 @@ class Shardus extends EventEmitter {
   }
 
   async _timestampAndQueueTransaction(tx: ShardusTypes.OpaqueTransaction, appData: any, global = false, noConsensus = false) {
+    // Give the dapp an opportunity to do some up front work and generate
+    // appData metadata for the applied TX
+    const { status: preCrackSuccess, reason } = await this.app.txPreCrackData(tx, appData)
+    if (this.config.stateManager.checkPrecrackStatus === true && preCrackSuccess === false) {
+      return {
+        success: false,
+        reason: `PreCrack has failed. ${reason}`,
+        status: 500,
+      }
+    }
+    
     const injectedTimestamp = this.app.getTimestampFromTransaction(tx, appData);
 
     const txId = this.app.calculateTxId(tx);
@@ -1448,16 +1459,6 @@ class Shardus extends EventEmitter {
         }
       }
 
-      // Give the dapp an opportunity to do some up front work and generate
-      // appData metadata for the applied TX
-      const { status: preCrackSuccess, reason } = await this.app.txPreCrackData(tx, appData)
-      if (this.config.stateManager.checkPrecrackStatus === true && preCrackSuccess === false) {
-        return {
-          success: false,
-          reason: `PreCrack has failed. ${reason}`,
-          status: 500,
-        }
-      }
       const shouldQueueNonceButPoolIsFull =
         shouldAddToNonceQueue &&
         this.config.stateManager.maxNonceQueueSize <= this.stateManager.transactionQueue.nonceQueue.size;
