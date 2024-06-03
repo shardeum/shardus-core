@@ -176,7 +176,6 @@ export class NetworkClass extends EventEmitter {
         sendHeaderVersion: 1,
       },
       customStringifier: Utils.safeStringify,
-      // @ts-ignore
       customJsonParser: Utils.safeJsonParse,
       crypto: {
         hashKey: this.shardusCryptoHashKey,
