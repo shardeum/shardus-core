@@ -128,21 +128,24 @@ class Debug {
       if (!logsAbsolutePath) {
         return res.status(404).send({ success: false, error: 'Logs directory not found' })
       }
+      const logsDirectory = path.resolve(logsAbsolutePath);
 
       try {
         if (requestedFile === 'all') {
           // Deletes all files in the directory
-          const files = fs.readdirSync(logsAbsolutePath)
+          // TODO: restric to only predefined log files, flag to delete backup logs
+          const files = fs.readdirSync(logsDirectory)
           for (const file of files) {
-            fs.unlinkSync(path.join(logsAbsolutePath, file))
+            fs.unlinkSync(path.join(logsDirectory, file))
           }
         } else {
-          // Deletes the specified file and its related files
+          // Deletes the specified file and its rotated files (i.e. file.log, file1.log, file2.log, ...) 
           const normalizedFile = path.normalize(requestedFile).replace(/^(\.\.[/\\])+/, '')
-          const baseFileName = path.basename(normalizedFile, path.extname(normalizedFile))
-          const filePattern = new RegExp(`^${baseFileName}(\\d*)\\.log$`);
+          const fileExtension = path.extname(normalizedFile);
+          const baseFileName = path.basename(normalizedFile, fileExtension)
+          const filePattern = new RegExp(`^${baseFileName}(\\d*)\\${fileExtension}$`);
 
-          const files = fs.readdirSync(logsAbsolutePath)
+          const files = fs.readdirSync(logsDirectory)
           const matchedFiles = files.filter((file) => filePattern.test(file))
 
           if (matchedFiles.length === 0) {
@@ -150,8 +153,8 @@ class Debug {
           }
 
           for (const file of matchedFiles) {
-            const filePath = path.join(logsAbsolutePath, file)
-            if (filePath.startsWith(logsAbsolutePath) && fs.existsSync(filePath)) {
+            const filePath = path.join(logsDirectory, file)
+            if (filePath.startsWith(logsDirectory) && fs.existsSync(filePath)) {
               fs.unlinkSync(filePath)
             }
           }
