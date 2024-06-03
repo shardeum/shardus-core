@@ -26,7 +26,7 @@ import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { InternalError, ResponseError, serializeResponseError } from '../types/ResponseError'
 import { Utils } from '@shardus/types'
-import { nodeListFromStates } from './Join'
+import { nodelistFromStates } from './Join'
 
 /** ROUTES */
 
@@ -862,7 +862,7 @@ export async function sendGossip(
   payload,
   tracker = '',
   sender = null,
-  inpNodes: Shardus.Node[] | Shardus.NodeWithRank[] = nodeListFromStates([
+  inpNodes: Shardus.Node[] | Shardus.NodeWithRank[] = nodelistFromStates([
     P2P.P2PTypes.NodeStatus.ACTIVE,
     P2P.P2PTypes.NodeStatus.READY,
     P2P.P2PTypes.NodeStatus.SYNCING,
@@ -1063,7 +1063,7 @@ export async function sendGossipAll(
   payload,
   tracker = '',
   sender = null,
-  inpNodes = nodeListFromStates([
+  inpNodes = nodelistFromStates([
     P2P.P2PTypes.NodeStatus.ACTIVE,
     P2P.P2PTypes.NodeStatus.READY,
     P2P.P2PTypes.NodeStatus.SYNCING,

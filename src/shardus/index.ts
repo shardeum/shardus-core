@@ -90,7 +90,7 @@ import { Utils } from '@shardus/types'
 import { getOurNodeIndex, isNodeInRotationBounds } from '../p2p/Utils'
 import ShardFunctions from '../state-manager/shardFunctions'
 import SocketIO from 'socket.io'
-import { nodeListFromStates, queueFinishedSyncingRequest } from '../p2p/Join'
+import { nodelistFromStates, queueFinishedSyncingRequest } from '../p2p/Join'
 import * as NodeList from '../p2p/NodeList'
 import { P2P } from '@shardus/types'
 
@@ -1257,7 +1257,7 @@ class Shardus extends EventEmitter {
         readyPayload,
         undefined,
         undefined,
-        nodeListFromStates([
+        nodelistFromStates([
           P2P.P2PTypes.NodeStatus.ACTIVE,
           P2P.P2PTypes.NodeStatus.READY,
           P2P.P2PTypes.NodeStatus.SYNCING,

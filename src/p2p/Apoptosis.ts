@@ -52,7 +52,7 @@ import { BadRequest, serializeResponseError } from '../types/ResponseError'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 
-import { nodeListFromStates } from './Join'
+import { nodelistFromStates } from './Join'
 
 /** STATE */
 
@@ -196,11 +196,18 @@ const apoptosisGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ApoptosisTypes.Signed
     }
     if ([1, 2].includes(currentQuarter)) {
       if (addProposal(payload)) {
-        Comms.sendGossip(gossipRouteName, payload, tracker, Self.id, nodeListFromStates([
-          P2P.P2PTypes.NodeStatus.ACTIVE,
-          P2P.P2PTypes.NodeStatus.READY,
-          P2P.P2PTypes.NodeStatus.SYNCING,
-        ]), false) // use Self.id so we don't gossip to ourself
+        Comms.sendGossip(
+          gossipRouteName,
+          payload,
+          tracker,
+          Self.id,
+          nodelistFromStates([
+            P2P.P2PTypes.NodeStatus.ACTIVE,
+            P2P.P2PTypes.NodeStatus.READY,
+            P2P.P2PTypes.NodeStatus.SYNCING,
+          ]),
+          false
+        ) // use Self.id so we don't gossip to ourself
       }
     }
   } finally {
@@ -311,11 +318,18 @@ export function sendRequests() {
     // make sure node is still in the network, since it might
     //   have already been removed
     if (nodes.get(id)) {
-      Comms.sendGossip(gossipRouteName, proposals[id], '', null, nodeListFromStates([
-        P2P.P2PTypes.NodeStatus.ACTIVE,
-        P2P.P2PTypes.NodeStatus.READY,
-        P2P.P2PTypes.NodeStatus.SYNCING,
-      ]), true)
+      Comms.sendGossip(
+        gossipRouteName,
+        proposals[id],
+        '',
+        null,
+        nodelistFromStates([
+          P2P.P2PTypes.NodeStatus.ACTIVE,
+          P2P.P2PTypes.NodeStatus.READY,
+          P2P.P2PTypes.NodeStatus.SYNCING,
+        ]),
+        true
+      )
     }
   }
 }

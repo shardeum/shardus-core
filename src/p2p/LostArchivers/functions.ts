@@ -30,7 +30,7 @@ import {
 import { InternalRouteEnum } from '../../types/enum/InternalRouteEnum'
 import { tellBinary } from '../Comms'
 import { Utils } from '@shardus/types'
-import { nodeListFromStates } from '../Join'
+import { nodelistFromStates } from '../Join'
 
 /** Lost Archivers Functions */
 
@@ -210,11 +210,18 @@ export function tellNetworkArchiverIsDown(record: LostArchiverRecord): void {
   })
   info(`tellNetworkArchiverIsDown: downMsg: ${Utils.safeStringify(downMsg)}`)
   record.archiverDownMsg = downMsg
-  Comms.sendGossip('lost-archiver-down', downMsg, '', null, nodeListFromStates([
-    P2P.P2PTypes.NodeStatus.ACTIVE,
-    P2P.P2PTypes.NodeStatus.READY,
-    P2P.P2PTypes.NodeStatus.SYNCING,
-  ]), /* isOrigin */ true)
+  Comms.sendGossip(
+    'lost-archiver-down',
+    downMsg,
+    '',
+    null,
+    nodelistFromStates([
+      P2P.P2PTypes.NodeStatus.ACTIVE,
+      P2P.P2PTypes.NodeStatus.READY,
+      P2P.P2PTypes.NodeStatus.SYNCING,
+    ]),
+    /* isOrigin */ true
+  )
   // This is to inform the rest of the network that the Archiver is down
 }
 
@@ -233,11 +240,18 @@ export function tellNetworkArchiverIsUp(record: LostArchiverRecord): void {
   record.archiverUpMsg = upMsg
   // Gossip the ArchiverUpMsg to the rest of the network
   info(`tellNetworkArchiverIsUp: upMsg: ${Utils.safeStringify(upMsg)}`)
-  Comms.sendGossip('lost-archiver-up', upMsg, '', null, nodeListFromStates([
-    P2P.P2PTypes.NodeStatus.ACTIVE,
-    P2P.P2PTypes.NodeStatus.READY,
-    P2P.P2PTypes.NodeStatus.SYNCING,
-  ]), /* isOrigin */ true)
+  Comms.sendGossip(
+    'lost-archiver-up',
+    upMsg,
+    '',
+    null,
+    nodelistFromStates([
+      P2P.P2PTypes.NodeStatus.ACTIVE,
+      P2P.P2PTypes.NodeStatus.READY,
+      P2P.P2PTypes.NodeStatus.SYNCING,
+    ]),
+    /* isOrigin */ true
+  )
 }
 
 /**

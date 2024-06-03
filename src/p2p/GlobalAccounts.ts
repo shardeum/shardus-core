@@ -23,7 +23,7 @@ import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { MakeReceiptReq, deserializeMakeReceiptReq, serializeMakeReceiptReq } from '../types/MakeReceipReq'
 import { Utils } from '@shardus/types'
-import { nodeListFromStates } from './Join'
+import { nodelistFromStates } from './Join'
 
 /** ROUTES */
 // [TODO] - need to add validattion of types to the routes
@@ -81,11 +81,18 @@ const setGlobalGossipRoute: P2P.P2PTypes.Route<P2P.P2PTypes.GossipHandler<P2P.Gl
         if (processReceipt(payload) === false) return
         /** [TODO] [AS] Replace with Comms.sendGossip() */
         // p2p.sendGossipIn('set-global', payload)
-        Comms.sendGossip('set-global', payload, tracker, sender, nodeListFromStates([
-          P2P.P2PTypes.NodeStatus.ACTIVE,
-          P2P.P2PTypes.NodeStatus.READY,
-          P2P.P2PTypes.NodeStatus.SYNCING,
-        ]), false)
+        Comms.sendGossip(
+          'set-global',
+          payload,
+          tracker,
+          sender,
+          nodelistFromStates([
+            P2P.P2PTypes.NodeStatus.ACTIVE,
+            P2P.P2PTypes.NodeStatus.READY,
+            P2P.P2PTypes.NodeStatus.SYNCING,
+          ]),
+          false
+        )
       } finally {
         profilerInstance.scopedProfileSectionEnd('set-global')
       }
@@ -172,11 +179,18 @@ export function setGlobal(address, value, when, source) {
     if (processReceipt(receipt) === false) return
     /** [TODO] [AS] Replace with Comms.sendGossip */
     // p2p.sendGossipIn('set-global', receipt)
-    Comms.sendGossip('set-global', receipt, '', null, nodeListFromStates([
-      P2P.P2PTypes.NodeStatus.ACTIVE,
-      P2P.P2PTypes.NodeStatus.READY,
-      P2P.P2PTypes.NodeStatus.SYNCING,
-    ]), true)
+    Comms.sendGossip(
+      'set-global',
+      receipt,
+      '',
+      null,
+      nodelistFromStates([
+        P2P.P2PTypes.NodeStatus.ACTIVE,
+        P2P.P2PTypes.NodeStatus.READY,
+        P2P.P2PTypes.NodeStatus.SYNCING,
+      ]),
+      true
+    )
   }
   /** [TODO] [AS] Replace with Self.emitter.on() */
   // p2p.on(handle, onReceipt)

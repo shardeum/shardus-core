@@ -20,7 +20,7 @@ import {
   queueJoinRequest,
   queueUnjoinRequest,
   verifyJoinRequestTypes,
-  nodeListFromStates
+  nodelistFromStates,
 } from '.'
 import { config } from '../Context'
 import { isBogonIP } from '../../utils/functions/checkIP'
@@ -214,7 +214,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
             joinRequest,
             '',
             null,
-            nodeListFromStates([
+            nodelistFromStates([
               P2P.P2PTypes.NodeStatus.ACTIVE,
               P2P.P2PTypes.NodeStatus.READY,
               P2P.P2PTypes.NodeStatus.SYNCING,
@@ -269,7 +269,7 @@ const syncStartedRoute: P2P.P2PTypes.Route<Handler> = {
     if (processResult.success === false) {
       return res.status(500).send(processResult.reason)
     }
-    Comms.sendGossip('gossip-sync-started', syncStarted, '', null, nodeListFromStates([
+    Comms.sendGossip('gossip-sync-started', syncStarted, '', null, nodelistFromStates([
           P2P.P2PTypes.NodeStatus.ACTIVE,
           P2P.P2PTypes.NodeStatus.READY,
           P2P.P2PTypes.NodeStatus.SYNCING,
@@ -454,7 +454,7 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
           payload,
           tracker,
           sender,
-          nodeListFromStates([
+          nodelistFromStates([
             P2P.P2PTypes.NodeStatus.ACTIVE,
             P2P.P2PTypes.NodeStatus.READY,
             P2P.P2PTypes.NodeStatus.SYNCING,
@@ -568,7 +568,7 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
     payload,
     tracker,
     sender,
-    nodeListFromStates([
+    nodelistFromStates([
       P2P.P2PTypes.NodeStatus.ACTIVE,
       P2P.P2PTypes.NodeStatus.READY,
       P2P.P2PTypes.NodeStatus.SYNCING,
@@ -600,7 +600,7 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<SignedUnjoinRequest, P2P.
     payload,
     tracker,
     sender,
-    nodeListFromStates([
+    nodelistFromStates([
       P2P.P2PTypes.NodeStatus.ACTIVE,
       P2P.P2PTypes.NodeStatus.READY,
       P2P.P2PTypes.NodeStatus.SYNCING,
@@ -648,7 +648,7 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<
         payload,
         tracker,
         sender,
-        nodeListFromStates([
+        nodelistFromStates([
           P2P.P2PTypes.NodeStatus.ACTIVE,
           P2P.P2PTypes.NodeStatus.READY,
           P2P.P2PTypes.NodeStatus.SYNCING,
@@ -703,7 +703,7 @@ const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<
         payload,
         tracker,
         sender,
-        nodeListFromStates([
+        nodelistFromStates([
           P2P.P2PTypes.NodeStatus.ACTIVE,
           P2P.P2PTypes.NodeStatus.READY,
           P2P.P2PTypes.NodeStatus.SYNCING,
@@ -752,7 +752,7 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<
         payload,
         tracker,
         sender,
-        nodeListFromStates([
+        nodelistFromStates([
           P2P.P2PTypes.NodeStatus.ACTIVE,
           P2P.P2PTypes.NodeStatus.READY,
           P2P.P2PTypes.NodeStatus.SYNCING,
