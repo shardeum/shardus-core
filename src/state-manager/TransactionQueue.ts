@@ -5339,10 +5339,8 @@ class TransactionQueue {
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           }
           if (queueEntry.state === 'processing') {
-            this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: atProcessing:start`)
             ////////////////////////////////////////--processing--///////////////////////////////////////////////////////////////////
             if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
-              this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: atProcessing:notLocked`)
               // Processing is when we start doing real work.  the task is to read and share the correct account data to the correct
               // corresponding nodes and then move into awaiting data phase
 
@@ -5354,14 +5352,12 @@ class TransactionQueue {
                 const awaitStart = shardusGetTime()
 
                 if (this.executeInOneShard === true) {
-                  this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: atProcessing:executeInOneShard`)
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodes(queueEntry)')
                   profilerInstance.scopedProfileSectionStart(`scoped-tellCorrespondingNodes`)
                   await this.tellCorrespondingNodes(queueEntry)
                   profilerInstance.scopedProfileSectionEnd(`scoped-tellCorrespondingNodes`)
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodes(queueEntry)', DebugComplete.Completed)
                 } else {
-                  this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: atProcessing:notExecuteInOneShard`)
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodesOld(queueEntry)')
                   //specific fixes were needed for tellCorrespondingNodes.  tellCorrespondingNodesOld is the old version before fixes
                   await this.tellCorrespondingNodes(queueEntry)
@@ -5375,12 +5371,10 @@ class TransactionQueue {
                   'tellCorrespondingNodes',
                   shardusGetTime() - awaitStart
                 )
-                this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: atProcessing:end`)
 
                 /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_processing', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${this.processQueue_debugAccountData(queueEntry, app)}`)
                 //}
               } catch (ex) {
-                this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: atProcessing:catch`)
                 /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
                 this.statemanager_fatal(
                   `processAcceptedTxQueue2_ex`,
@@ -5396,7 +5390,6 @@ class TransactionQueue {
 
                 queueEntry.executionDebug.process1 = 'tell fail'
               } finally {
-                this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: atProcessing:finally`)
                 this.updateTxState(queueEntry, 'awaiting data', 'mainLoop')
 
                 //if we are not going to execute the TX go strait to consensing
@@ -5405,26 +5398,24 @@ class TransactionQueue {
                   this.executeInOneShard &&
                   queueEntry.isInExecutionHome === false
                 ) {
-                  this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: atProcessing:toConensing`)
                   //is there a way to preemptively forward data without there being tons of repair..
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 isInExecutionHome === false. set state = 'consensing' tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp}`)
-                  this.updateTxState(queueEntry, 'consensing')
+                  this.updateTxState(queueEntry, 'consensing','fromProcessing')
                 }
               }
               queueEntry.executionDebug.processElapsed = shardusGetTime() - time
             } else {
-              this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: atProcessing:locked`)
               const upstreamTx = this.processQueue_getUpstreamTx(seenAccounts, queueEntry)
               if (upstreamTx == null) {
-                this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: atProcessing:noUpstream`)
+                if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: upstream:null`)
                 nestedCountersInstance.countEvent('processing', 'busy waiting the upstream tx.' +
                   ' but it is null')
               } else {                
                 if (upstreamTx.logID === queueEntry.logID) {
-                  this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: atProcessing:upstreamSameTx`)
+                  if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: upstream:same`)
                   nestedCountersInstance.countEvent('processing', 'busy waiting the upstream tx but it is same txId')
                 } else {
-                  this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: atProcessing:wait ${upstreamTx.logID}`)
+                  if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: upstream:${upstreamTx.logID}`)
                   nestedCountersInstance.countEvent('processing', `busy waiting the upstream tx to complete. state ${queueEntry.state}`)
                 }
               }
@@ -6798,6 +6789,7 @@ class TransactionQueue {
     }
     for (const key of queueEntry.uniqueKeys) {
       // eslint-disable-next-line security/detect-object-injection
+      if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: seenAccount:${key}`)
       if (seenAccounts[key] != null) {
         return true
       }
