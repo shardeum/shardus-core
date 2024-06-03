@@ -21,6 +21,11 @@ export async function submitUnjoin(): Promise<Result<void, Error>> {
     publicKey: crypto.keypair.publicKey,
   })
 
+  const foundInStandbyNodes = getStandbyNodesInfoMap().has(unjoinRequest.publicKey)
+  if (!foundInStandbyNodes) {
+    return err(new Error('node is not in standby. Do not send unjoin request'))
+  }
+
   const archiver = getRandomAvailableArchiver()
   try {
     const activeNodesResult = await getActiveNodesFromArchiver(archiver)
