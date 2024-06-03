@@ -1541,6 +1541,7 @@ function decideNodeSelection(joinRequest: P2P.JoinTypes.JoinRequest): JoinReques
 }
 
 export function nodeListFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeListTypes.Node[] {
+  if (Self.isRestartNetwork) return NodeList.byIdOrder
   const { NodeStatus } = P2P.P2PTypes
   const stateMappings: { [key in P2P.P2PTypes.NodeStatus]?: P2P.NodeListTypes.Node[] } = {
     [NodeStatus.ACTIVE]: NodeList.activeByIdOrder,
