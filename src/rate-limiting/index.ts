@@ -8,7 +8,6 @@ import * as Self from '../p2p/Self'
 import * as Context from '../p2p/Context'
 
 interface RateLimiting {
-  loadDetection: LoadDetection
   limitRate: boolean
   loadLimit: NodeLoad
   seqLogger: Log4js.Logger
@@ -16,7 +15,6 @@ interface RateLimiting {
 
 class RateLimiting {
   constructor(config, seqLogger) {
-    this.loadDetection = Context.shardus.loadDetection
     this.limitRate = config.limitRate
     this.loadLimit = config.loadLimit
     this.seqLogger = seqLogger
@@ -59,8 +57,8 @@ class RateLimiting {
 
   isOverloaded(txId: string) {
     if (!this.limitRate) return false
-    const nodeLoad = this.loadDetection.getCurrentNodeLoad()
-    const queueLoad = this.loadDetection.getQueueLoad()
+    const nodeLoad = Context.shardus.loadDetection.getCurrentNodeLoad()
+    const queueLoad = Context.shardus.loadDetection.getQueueLoad()
 
     let { throttle, loadType } = this.getWinningLoad(nodeLoad, queueLoad)
 
@@ -69,10 +67,24 @@ class RateLimiting {
     }
     let overloaded = Math.random() < throttle
 
-    if(overloaded){
-      this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: overloaded_type ${loadType}:${throttle}`)
-      this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: overloaded_node ${nodeLoad.internal}/${nodeLoad.external}`)      
-      this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: overloaded_queue ${queueLoad.txTimeInQueue}/${queueLoad.queueLength}}/${queueLoad.executeQueueLength}`)
+    if (overloaded) {
+      this.seqLogger.info(
+        `0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(
+          Self.id
+        )}: overloaded_type ${loadType}:${throttle}`
+      )
+      this.seqLogger.info(
+        `0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(
+          Self.id
+        )}: overloaded_node ${nodeLoad.internal}/${nodeLoad.external}`
+      )
+      this.seqLogger.info(
+        `0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(
+          Self.id
+        )}: overloaded_queue ${queueLoad.txTimeInQueue}/${queueLoad.queueLength}}/${
+          queueLoad.executeQueueLength
+        }`
+      )
       nestedCountersInstance.countEvent('loadRelated', 'txRejected:' + loadType)
     }
 
