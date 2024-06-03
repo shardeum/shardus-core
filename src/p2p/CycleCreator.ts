@@ -47,7 +47,7 @@ import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { BadRequest, InternalError, NotFound, serializeResponseError } from '../types/ResponseError'
 import { Utils } from '@shardus/types'
-import { nodeListFromStates } from './Join'
+import { nodelistFromStates } from './Join'
 
 /** CONSTANTS */
 
@@ -1288,7 +1288,7 @@ async function gossipCycleCert(sender: P2P.NodeListTypes.Node['id'], tracker?: s
     signedCertGossip,
     tracker,
     sender,
-    nodeListFromStates([
+    nodelistFromStates([
       P2P.P2PTypes.NodeStatus.ACTIVE,
       P2P.P2PTypes.NodeStatus.READY,
       P2P.P2PTypes.NodeStatus.SYNCING,

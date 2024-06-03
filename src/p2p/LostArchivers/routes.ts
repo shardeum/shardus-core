@@ -27,7 +27,7 @@ import { deserializeLostArchiverInvestigateReq } from '../../types/LostArchiverI
 import { getStreamWithTypeCheck } from '../../types/Helpers'
 import { TypeIdentifierEnum } from '../../types/enum/TypeIdentifierEnum'
 import { Utils } from '@shardus/types'
-import { nodeListFromStates } from '../Join'
+import { nodelistFromStates } from '../Join'
 
 /** Gossip */
 
@@ -86,11 +86,18 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
   // or even:
   // record.updated.push({source: 'lostArchiverUpGossip', cycle: currentCycle, quarter: currentQuarter, what: 'up'})
   // ... is LostArchiverRecord in the cycle record? if not, we're good to add this debugging info
-  Comms.sendGossip('lost-archiver-up', payload, tracker, id, nodeListFromStates([
-    P2P.P2PTypes.NodeStatus.ACTIVE,
-    P2P.P2PTypes.NodeStatus.READY,
-    P2P.P2PTypes.NodeStatus.SYNCING,
-  ]), false) // isOrigin: false
+  Comms.sendGossip(
+    'lost-archiver-up',
+    payload,
+    tracker,
+    id,
+    nodelistFromStates([
+      P2P.P2PTypes.NodeStatus.ACTIVE,
+      P2P.P2PTypes.NodeStatus.READY,
+      P2P.P2PTypes.NodeStatus.SYNCING,
+    ]),
+    false
+  ) // isOrigin: false
   record.gossippedUpMsg = true
 }
 
@@ -145,11 +152,18 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
     record.status = 'down'
     record.archiverDownMsg = downMsg
   }
-  Comms.sendGossip('lost-archiver-down', payload, tracker, id, nodeListFromStates([
-    P2P.P2PTypes.NodeStatus.ACTIVE,
-    P2P.P2PTypes.NodeStatus.READY,
-    P2P.P2PTypes.NodeStatus.SYNCING,
-  ]), false) // isOrigin: false
+  Comms.sendGossip(
+    'lost-archiver-down',
+    payload,
+    tracker,
+    id,
+    nodelistFromStates([
+      P2P.P2PTypes.NodeStatus.ACTIVE,
+      P2P.P2PTypes.NodeStatus.READY,
+      P2P.P2PTypes.NodeStatus.SYNCING,
+    ]),
+    false
+  ) // isOrigin: false
   record.gossippedDownMsg = true
   // to-do: idea: record the update
 }

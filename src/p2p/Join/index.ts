@@ -617,7 +617,7 @@ export function sendRequests(): void {
         syncStartedTx,
         '',
         null,
-        nodeListFromStates([
+        nodelistFromStates([
           P2P.P2PTypes.NodeStatus.ACTIVE,
           P2P.P2PTypes.NodeStatus.READY,
           P2P.P2PTypes.NodeStatus.SYNCING,
@@ -644,7 +644,7 @@ export function sendRequests(): void {
         syncFinishedTx,
         '',
         null,
-        nodeListFromStates([
+        nodelistFromStates([
           P2P.P2PTypes.NodeStatus.ACTIVE,
           P2P.P2PTypes.NodeStatus.READY,
           P2P.P2PTypes.NodeStatus.SYNCING,
@@ -675,7 +675,7 @@ export function sendRequests(): void {
           standbyRefreshTx,
           '',
           null,
-          nodeListFromStates([
+          nodelistFromStates([
             P2P.P2PTypes.NodeStatus.ACTIVE,
             P2P.P2PTypes.NodeStatus.READY,
             P2P.P2PTypes.NodeStatus.SYNCING,
@@ -718,7 +718,7 @@ export function sendRequests(): void {
         joinRequest,
         '',
         null,
-        nodeListFromStates([
+        nodelistFromStates([
           P2P.P2PTypes.NodeStatus.ACTIVE,
           P2P.P2PTypes.NodeStatus.READY,
           P2P.P2PTypes.NodeStatus.SYNCING,
@@ -1536,8 +1536,7 @@ function decideNodeSelection(joinRequest: P2P.JoinTypes.JoinRequest): JoinReques
   }
 }
 
-export function nodeListFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeListTypes.Node[] {
-  if (Self.isRestartNetwork) return NodeList.byIdOrder
+export function nodelistFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeListTypes.Node[] {
   const { NodeStatus } = P2P.P2PTypes
   const stateMappings: { [key in P2P.P2PTypes.NodeStatus]?: P2P.NodeListTypes.Node[] } = {
     [NodeStatus.ACTIVE]: NodeList.activeByIdOrder,

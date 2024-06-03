@@ -43,7 +43,7 @@ import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { LostReportReq, deserializeLostReportReq, serializeLostReportReq } from '../types/LostReportReq'
 import { isDebugModeMiddlewareHigh } from '../network/debugMiddleware'
-import { nodeListFromStates } from './Join'
+import { nodelistFromStates } from './Join'
 
 /** TYPES */
 
@@ -619,11 +619,18 @@ export function sendRequests() {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'send-lost-down', 1)
       //this next line is probably too spammy to leave in forever (but ok to comment out and keep)
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `send-lost-down c:${currentCycle}`, 1)
-      Comms.sendGossip('lost-down', msg, '', null, nodeListFromStates([
-        P2P.P2PTypes.NodeStatus.ACTIVE,
-        P2P.P2PTypes.NodeStatus.READY,
-        P2P.P2PTypes.NodeStatus.SYNCING,
-      ]), true)
+      Comms.sendGossip(
+        'lost-down',
+        msg,
+        '',
+        null,
+        nodelistFromStates([
+          P2P.P2PTypes.NodeStatus.ACTIVE,
+          P2P.P2PTypes.NodeStatus.READY,
+          P2P.P2PTypes.NodeStatus.SYNCING,
+        ]),
+        true
+      )
       // we add to our own map
       if (!receivedLostRecordMap.has(key)) {
         receivedLostRecordMap.set(key, new Map<string, P2P.LostTypes.LostRecord>())
@@ -645,11 +652,18 @@ export function sendRequests() {
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'self-refute', 1)
     //this next line is probably too spammy to leave in forever (but ok to comment out and keep)
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-refute c:${currentCycle}`, 1)
-    Comms.sendGossip('lost-up', signedUpGossipMsg, '', null, nodeListFromStates([
-      P2P.P2PTypes.NodeStatus.ACTIVE,
-      P2P.P2PTypes.NodeStatus.READY,
-      P2P.P2PTypes.NodeStatus.SYNCING,
-    ]), true)
+    Comms.sendGossip(
+      'lost-up',
+      signedUpGossipMsg,
+      '',
+      null,
+      nodelistFromStates([
+        P2P.P2PTypes.NodeStatus.ACTIVE,
+        P2P.P2PTypes.NodeStatus.READY,
+        P2P.P2PTypes.NodeStatus.SYNCING,
+      ]),
+      true
+    )
     upGossipMap.set(`${Self.id}-${currentCycle}`, signedUpGossipMsg)
   }
 }
@@ -843,11 +857,18 @@ function removeByApp(target: P2P.NodeListTypes.Node, certificate: P2P.LostTypes.
   const removedRec = appRemoved.get(target.id)
   if (removedRec) return // we have already removed this node for this cycle
   appRemoved.set(target.id, { certificate, target: target.id })
-  Comms.sendGossip('remove-by-app', certificate, '', Self.id, nodeListFromStates([
-    P2P.P2PTypes.NodeStatus.ACTIVE,
-    P2P.P2PTypes.NodeStatus.READY,
-    P2P.P2PTypes.NodeStatus.SYNCING,
-  ]), true)
+  Comms.sendGossip(
+    'remove-by-app',
+    certificate,
+    '',
+    Self.id,
+    nodelistFromStates([
+      P2P.P2PTypes.NodeStatus.ACTIVE,
+      P2P.P2PTypes.NodeStatus.READY,
+      P2P.P2PTypes.NodeStatus.SYNCING,
+    ]),
+    true
+  )
 }
 
 function getCheckerNode(id, cycle) {
@@ -1362,11 +1383,18 @@ function downGossipHandler(payload: P2P.LostTypes.SignedDownGossipMessage, sende
       } is processed. Total received: ${receivedLostRecordMap.get(key).size}`
     )
   /* prettier-ignore */ if (logFlags.lost) console.log('downGossipHandler: sending gossip')
-  Comms.sendGossip('lost-down', payload, tracker, Self.id, nodeListFromStates([
-    P2P.P2PTypes.NodeStatus.ACTIVE,
-    P2P.P2PTypes.NodeStatus.READY,
-    P2P.P2PTypes.NodeStatus.SYNCING,
-  ]), false)
+  Comms.sendGossip(
+    'lost-down',
+    payload,
+    tracker,
+    Self.id,
+    nodelistFromStates([
+      P2P.P2PTypes.NodeStatus.ACTIVE,
+      P2P.P2PTypes.NodeStatus.READY,
+      P2P.P2PTypes.NodeStatus.SYNCING,
+    ]),
+    false
+  )
   // After message has been gossiped in Q1 and Q2 we wait for getTxs() to be invoked in Q3
 }
 
@@ -1417,11 +1445,18 @@ function upGossipHandler(payload, sender, tracker) {
     return
   }
   upGossipMap.set(key, payload)
-  Comms.sendGossip('lost-up', payload, tracker, Self.id, nodeListFromStates([
-    P2P.P2PTypes.NodeStatus.ACTIVE,
-    P2P.P2PTypes.NodeStatus.READY,
-    P2P.P2PTypes.NodeStatus.SYNCING,
-  ]), false)
+  Comms.sendGossip(
+    'lost-up',
+    payload,
+    tracker,
+    Self.id,
+    nodelistFromStates([
+      P2P.P2PTypes.NodeStatus.ACTIVE,
+      P2P.P2PTypes.NodeStatus.READY,
+      P2P.P2PTypes.NodeStatus.SYNCING,
+    ]),
+    false
+  )
   // the getTxs() function will loop through the lost object to make txs in Q3 and build the cycle record from them
 }
 
@@ -1441,11 +1476,18 @@ function removeByAppHandler(payload: P2P.LostTypes.RemoveCertificate, sender, tr
     return
   }
   appRemoved.set(target, { target: target, certificate: payload })
-  Comms.sendGossip('remove-by-app', payload, tracker, Self.id, nodeListFromStates([
-    P2P.P2PTypes.NodeStatus.ACTIVE,
-    P2P.P2PTypes.NodeStatus.READY,
-    P2P.P2PTypes.NodeStatus.SYNCING,
-  ]), false)
+  Comms.sendGossip(
+    'remove-by-app',
+    payload,
+    tracker,
+    Self.id,
+    nodelistFromStates([
+      P2P.P2PTypes.NodeStatus.ACTIVE,
+      P2P.P2PTypes.NodeStatus.READY,
+      P2P.P2PTypes.NodeStatus.SYNCING,
+    ]),
+    false
+  )
 }
 
 function checkUpMsg(payload: P2P.LostTypes.SignedUpGossipMessage, expectedCycle) {
