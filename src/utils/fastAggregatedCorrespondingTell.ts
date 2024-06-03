@@ -86,3 +86,26 @@ export function getCorrespondingNodes(
   return destinationNodes
 }
 
+export function verifyCorrespondingSender(
+  receivingNodeIndex: number,
+  sendingNodeIndex: number,
+  globalOffset: number,
+  receiverGroupSize: number,
+  sendGroupSize: number
+): boolean {
+  //note, in the gather case, we need to check the address range of the sender node also, to prove
+  //that it does cover the given account range
+
+  const targetIndex = ((receivingNodeIndex + globalOffset) % receiverGroupSize) % sendGroupSize
+  const targetIndex2 = sendingNodeIndex % sendGroupSize
+  if (targetIndex === targetIndex2) {
+    if (verbose)
+      console.log(
+        `verification passed ${targetIndex} === ${targetIndex2}  ${sendingNodeIndex}->${receivingNodeIndex}`
+      )
+    return true
+  } else {
+    console.log(`X verification failed ${targetIndex} !== ${targetIndex2} `)
+    return false
+  }
+}
