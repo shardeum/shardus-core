@@ -22,7 +22,7 @@ const validatorListHashRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'validator-list-hash',
   handler: (_req, res) => {
     const nextCycleTimestamp = CycleCreator.nextQ1Start
-    res.send(({ nodeListHash: NodeList.getNodeListHash(), nextCycleTimestamp }))
+    res.send({ nodeListHash: NodeList.getNodeListHash(), nextCycleTimestamp })
   },
 }
 
@@ -31,7 +31,7 @@ const archiverListHashRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'archiver-list-hash',
   handler: (_req, res) => {
-    res.send(({ archiverListHash: Archivers.getArchiverListHash() }))
+    res.send({ archiverListHash: Archivers.getArchiverListHash() })
   },
 }
 
@@ -40,7 +40,7 @@ const standbyListHashRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'standby-list-hash',
   handler: (_req, res) => {
-    res.send(({ standbyNodeListHash: JoinV2.getStandbyListHash() }))
+    res.send({ standbyNodeListHash: JoinV2.getStandbyListHash() })
   },
 }
 
@@ -49,7 +49,7 @@ const newestCycleHashRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'current-cycle-hash',
   handler: (_req, res) => {
-    res.send((CycleChain.getCurrentCycleMarker()))
+    res.send(CycleChain.getCurrentCycleMarker())
   },
 }
 
@@ -90,7 +90,7 @@ const archiverListRoute: P2P.P2PTypes.Route<Handler> = {
 
     // return the archiver list if the hash from the requester matches
     if (expectedHash && expectedHash === Archivers.getArchiverListHash()) {
-      res.send((Archivers.getLastHashedArchiverList()))
+      res.send(Archivers.getLastHashedArchiverList())
     } else {
       /* prettier-ignore */ if (logFlags.debug) console.error( `rejecting archiver list request: expected '${expectedHash}' != '${Archivers.getArchiverListHash()}'` )
       res.status(404).send(`archiver list with hash '${expectedHash}' not found`)
@@ -142,7 +142,7 @@ const cycleByMarkerRoute: P2P.P2PTypes.Route<Handler> = {
     // otherwise return an error.
     const cycle = CycleChain.cyclesByMarker[req.query.marker as string]
     if (cycle) {
-      res.send((cycle))
+      res.send(cycle)
     } else {
       res.status(404).send(`cycle with marker '${req.query.marker}' not found`)
     }
@@ -155,7 +155,7 @@ const newestCycleRecordRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'newest-cycle-record',
   handler: (_req, res) => {
     profilerInstance.scopedProfileSectionStart('newest-cycle-record', false)
-    res.send((CycleChain.newest))
+    res.send(CycleChain.newest)
     profilerInstance.scopedProfileSectionEnd('newest-cycle-record')
   },
 }

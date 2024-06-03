@@ -43,7 +43,7 @@ const newestCycleRoute: P2P.P2PTypes.Route<Handler> = {
   handler: (_req, res) => {
     profilerInstance.scopedProfileSectionStart('sync-newest-cycle')
     const newestCycle = CycleChain.newest || null
-    res.send(({ newestCycle }))
+    res.send({ newestCycle })
     profilerInstance.scopedProfileSectionEnd('sync-newest-cycle')
   },
 }
@@ -57,14 +57,14 @@ const cyclesRoute: P2P.P2PTypes.Route<Handler> = {
       let err = validateTypes(req, { body: 'o' })
       if (err) {
         warn('sync-cycles bad req ' + err)
-        // use res.send(({ })) if returning an object
+        // use res.send({ }) if returning an object
         res.json([])
         return
       }
       err = validateTypes(req.body, { start: 'n?', end: 'n?' })
       if (err) {
         warn('sync-cycles bad req.body ' + err)
-        // use res.send(({ })) if returning an object
+        // use res.send({ }) if returning an object
         res.json([])
         return
       }
@@ -72,7 +72,7 @@ const cyclesRoute: P2P.P2PTypes.Route<Handler> = {
       const end = req.body.end
       // const cycles = p2p.state.getCycles(start, end)
       const cycles = CycleChain.getCycleChain(start, end)
-      res.send((cycles))
+      res.send(cycles)
     } catch (e) {
       warn('sync-cycles', e)
     } finally {
@@ -323,7 +323,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
       cycle.standbyNodeListHash = JoinV2.computeNewStandbyListHash()
     }
   }
-  
+
   if (config.debug.enableCycleRecordDebugTool || config.debug.localEnableCycleRecordDebugTool) {
     if (Self.isActive) {
       const cycleData =

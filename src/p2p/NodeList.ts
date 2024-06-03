@@ -53,14 +53,14 @@ export function init() {
         standby: Join.getNodeRequestingJoin().length,
         desired: CycleChain.newest.desired,
       }
-      return res.send((networkStats))
+      return res.send(networkStats)
     } catch (e) {
       console.log(`Error getting load: ${e.message}`)
     }
   })
   network.registerExternalGet('age-index', isDebugModeMiddlewareLow, (req, res) => {
     try {
-      return res.send((getAgeIndex()))
+      return res.send(getAgeIndex())
     } catch (e) {
       console.log(`Error getting age index: ${e.message}`)
     }
@@ -131,14 +131,14 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
   // If node is READY status, insert sorted by readyTimestamp and id to tiebreak into readyByTimeAndIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.READY) {
     insertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
-  }  
+  }
 
   // If active, insert sorted by id into activeByIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
     insertSorted(activeByIdOrder, node, propComparator('id'))
     for (let i = 0; i < activeByIdOrder.length; i++) {
       activeIdToPartition.set(activeByIdOrder[i].id, i)
-    }    
+    }
 
     // Dont insert yourself into activeOthersByIdOrder
     if (node.id !== id) {

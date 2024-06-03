@@ -40,7 +40,7 @@ const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'cyclemarker',
   handler: (_req, res) => {
     const marker = CycleChain.newest ? CycleChain.newest.previous : '0'.repeat(64)
-    res.send((marker))
+    res.send(marker)
   },
 }
 
@@ -106,12 +106,12 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
     if (!externalPortReachable || !internalPortReachable) {
       /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-reject: !externalPortReachable || !internalPortReachable` )
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: !externalPortReachable || !internalPortReachable ${joinRequest.nodeInfo.publicKey} ${Utils.safeStringify({ host: externalIp, port: externalPort })}`)
-      return res.send(({
+      return res.send({
         success: false,
         fatal: true,
         //the following message string is used by submitJoinV2.  if you change the string please update submitJoinV2
         reason: `IP or Port is not reachable. ext:${externalIp}:${externalPort} int:${internalIp}:${internalPort}}`,
-      }))
+      })
     }
 
     // if the port of the join request was reachable, this join request is free to be
@@ -186,7 +186,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
         Comms.sendGossip('gossip-join', joinRequest, '', null, NodeList.byIdOrder, true)
         nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
       }
-      return res.send((joinRequestResponse))
+      return res.send(joinRequestResponse)
     }
   },
 }
@@ -245,13 +245,13 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
     let err = utils.validateTypes(req, { body: 'o' })
     if (err) {
       warn('/standby-refresh bad req ' + err)
-      // use res.send(({ })) if returning an object
+      // use res.send({ }) if returning an object
       res.json()
     }
     err = utils.validateTypes(standbyRefreshRequest, { publicKey: 's', cycleNumber: 'n', sign: 'o' })
     if (err) {
       warn('/standby-refresh bad standby refresh request ' + err)
-      // use res.send(({ })) if returning an object
+      // use res.send({ }) if returning an object
       res.json()
     }
 
@@ -273,18 +273,18 @@ const joinedV2Route: P2P.P2PTypes.Route<Handler> = {
     let err = utils.validateTypes(req, { params: 'o' })
     if (err) {
       warn('joined/:publicKey bad req ' + err)
-      // use res.send(({ })) if returning an object
+      // use res.send({ }) if returning an object
       res.json()
     }
     err = utils.validateTypes(req.params, { publicKey: 's' })
     if (err) {
       warn('joined/:publicKey bad req.params ' + err)
-      // use res.send(({ })) if returning an object
+      // use res.send({ }) if returning an object
       res.json()
     }
     const publicKey = req.params.publicKey
     const id = NodeList.byPubKey.get(publicKey)?.id || null
-    res.send(({ id, isOnStandbyList: isOnStandbyList(publicKey) }))
+    res.send({ id, isOnStandbyList: isOnStandbyList(publicKey) })
   },
 }
 
@@ -296,18 +296,18 @@ const joinedRoute: P2P.P2PTypes.Route<Handler> = {
     let err = utils.validateTypes(req, { params: 'o' })
     if (err) {
       warn('joined/:publicKey bad req ' + err)
-      // use res.send(({ })) if returning an object
+      // use res.send({ }) if returning an object
       res.json()
     }
     err = utils.validateTypes(req.params, { publicKey: 's' })
     if (err) {
       warn('joined/:publicKey bad req.params ' + err)
-      // use res.send(({ })) if returning an object
+      // use res.send({ }) if returning an object
       res.json()
     }
     const publicKey = req.params.publicKey
     const node = NodeList.byPubKey.get(publicKey)
-    res.send(({ node }))
+    res.send({ node })
   },
 }
 
@@ -478,7 +478,7 @@ const gossipSyncStartedRoute: P2P.P2PTypes.GossipHandler<SyncStarted, P2P.NodeLi
 }
 
 /**
- * Handler for syncing finished gossip. Gossip coming from Join Protocol v2 in `enterSyncingState()` of startupV2 in Self.ts and the function below. 
+ * Handler for syncing finished gossip. Gossip coming from Join Protocol v2 in `enterSyncingState()` of startupV2 in Self.ts and the function below.
  */
 const gossipSyncFinishedRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.FinishedSyncingRequest, P2P.NodeListTypes.Node['id']> = (
   payload: P2P.JoinTypes.FinishedSyncingRequest,
