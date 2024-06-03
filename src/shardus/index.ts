@@ -614,7 +614,7 @@ class Shardus extends EventEmitter {
 
     if (!isServiceMode()) this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
 
-    this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection, this.seqLogger)
+    this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.seqLogger)
 
     if (this.app) {
       this._createAndLinkStateManager()
@@ -3009,6 +3009,7 @@ class Shardus extends EventEmitter {
 
       this.p2p.configUpdated()
       this.loadDetection.configUpdated()
+      this.rateLimiting.configUpdated()
     }
   }
 

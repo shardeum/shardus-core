@@ -5,6 +5,7 @@ import Log4js from 'log4js'
 import { shardusGetTime } from '../network'
 import { activeIdToPartition } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
+import * as Context from '../p2p/Context'
 
 interface RateLimiting {
   loadDetection: LoadDetection
@@ -14,8 +15,8 @@ interface RateLimiting {
 }
 
 class RateLimiting {
-  constructor(config, loadDetection, seqLogger) {
-    this.loadDetection = loadDetection
+  constructor(config, seqLogger) {
+    this.loadDetection = Context.shardus.loadDetection
     this.limitRate = config.limitRate
     this.loadLimit = config.loadLimit
     this.seqLogger = seqLogger
@@ -46,7 +47,7 @@ class RateLimiting {
       }
     }
 
-    if (loadType) {      
+    if (loadType) {
       nestedCountersInstance.countEvent('loadRelated', `ratelimit winning load factor: ${loadType}`)
     }
 
@@ -76,6 +77,23 @@ class RateLimiting {
     }
 
     return overloaded
+  }
+
+  configUpdated() {
+    try {
+      if (this.limitRate !== Context.config.rateLimiting.limitRate) {
+        this.limitRate = Context.config.rateLimiting.limitRate
+        console.log('Config updated for rateLimiting.limitRate', this.limitRate)
+        nestedCountersInstance.countEvent('RateLimiting', 'limitRate config updated')
+      }
+      if (JSON.stringify(this.loadLimit) !== JSON.stringify(Context.config.rateLimiting.loadLimit)) {
+        this.loadLimit = Context.config.rateLimiting.loadLimit
+        console.log('Config updated for rateLimiting.loadLimit', this.loadLimit)
+        nestedCountersInstance.countEvent('RateLimiting', 'loadLimit config updated')
+      }
+    } catch (e) {
+      nestedCountersInstance.countEvent('RateLimiting', 'config update failed')
+    }
   }
 }
 
