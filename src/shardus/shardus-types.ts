@@ -945,6 +945,8 @@ export interface ServerConfiguration {
     formingNodesPerCycle: number
     // /** Enables or disables filtering nodes from internal gossip if they are marked down. */
     downNodeFilteringEnabled: boolean
+    /** Whether to use upgraded FACT corresponding tell algorithm */
+    useFactCorrespondingTell: boolean
     // /** The number of ms to wait to resubmit a standby add request to an active node if we get an error */
     resubmitStandbyAddWaitDuration: number
     // /** The percentage of votes required to confirm transaction*/
