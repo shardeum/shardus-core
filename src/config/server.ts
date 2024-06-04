@@ -181,6 +181,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     useFactCorrespondingTell: true,
     resubmitStandbyAddWaitDuration: 1000, // 1 second in ms
     requiredVotesPercentage: 2 / 3.0,
+    useFactCorrespondingTell: true
   },
   ip: {
     externalIp: '0.0.0.0',
