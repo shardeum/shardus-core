@@ -78,6 +78,7 @@ export type QueueEntry = {
   transactionGroup?: Shardus.Node[]
   executionGroup?: Shardus.NodeWithRank[] | Shardus.Node[] //List of nodes that are in the execution group
   executionGroupMap?: Map<string, Shardus.NodeWithRank | Shardus.Node>
+  executionNodeIdSorted: string[]
   txGroupCycle: number
   updatedTransactionGroup?: Shardus.Node[]
   updatedTxGroupCycle: number
@@ -164,6 +165,9 @@ export type QueueEntry = {
   //short copy of the hash
   shortReceiptHash: string
   // receipt status is in the receipt
+
+  // FACT algorithm
+  correspondingGlobalOffset: number
 
   requestingReceiptFailed: boolean
 
