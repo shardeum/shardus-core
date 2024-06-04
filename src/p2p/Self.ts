@@ -32,6 +32,7 @@ import { insertSyncStarted } from './Join/v2/syncStarted'
 import { submitStandbyRefresh } from './Join/v2/standbyRefresh'
 import { getNumArchivers } from './Archivers'
 import { currentQuarter } from './CycleCreator'
+import { Utils } from '@shardus/types'
 
 /** STATE */
 
@@ -198,7 +199,7 @@ export function startupV2(): Promise<boolean> {
           waited = true
         }
         if(currentQuarter > 0){
-          await waitForQ1SendRequests()          
+          await waitForQ1SendRequests()
         }
 
         if(waited) {
@@ -323,7 +324,7 @@ export function startupV2(): Promise<boolean> {
         // Query network for node status
         const resp = await Join.fetchJoinedV2(activeNodes)
 
-        info(`startupV2: resp ${JSON.stringify(resp)}`)
+        info(`startupV2: resp ${Utils.safeStringify(resp)}`)
         nestedCountersInstance.countEvent('p2p', `fetchJoinedV2: isOnStandbyList: ${resp.isOnStandbyList} id: ${resp.id}`)
 
         // note the list below is in priority order of what operation is the most important
@@ -354,7 +355,7 @@ export function startupV2(): Promise<boolean> {
                 message,
                 false //force shutdown for now in a way that requires the user to restart again
               )
-            }) 
+            })
 
             attemptJoiningRunning = false
             return
@@ -395,7 +396,7 @@ export function startupV2(): Promise<boolean> {
               submitStandbyRefresh(payload)
               nestedCountersInstance.countEvent('p2p', `submitted KeepInStandby request`)
             }
-          }  
+          }
           */
 
           if (isFirstRefresh) {
@@ -702,11 +703,11 @@ async function joinNetworkV2(activeNodes): Promise<void> {
       throw new Error('Node not ready to join')
     } else {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `joinNetworkV2:isReadyToJoin:true`)
-    }    
+    }
   } catch(ex){
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `joinNetworkV2:isReadyToJoin:crashed: ${ex?.message}`)
     warn(`joinNetworkV2: isReadyToJoin crashed :${utils.formatErrorMessage(ex)}`)
-    return 
+    return
   }
 
   // Create join request from latest cycle
@@ -929,7 +930,7 @@ async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
       info(`contactArchiver: communicate with:${archiver?.ip}`)
 
       if (!failArchivers.includes(archiver.ip + ':' + archiver.port)){
-        failArchivers.push(archiver.ip + ':' + archiver.port)        
+        failArchivers.push(archiver.ip + ':' + archiver.port)
       }
 
       activeNodesSigned = await getActiveNodesFromArchiver(archiver)
@@ -939,8 +940,8 @@ async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
         activeNodesSigned.nodeList.length === 0
       ) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: no nodes in nodelist yet. ${dbgContex}`, 1)
-        info(`contactArchiver: no nodes in nodelist yet, or seedlist null ${JSON.stringify(activeNodesSigned)}`)
-        await utils.sleep(1000) // no nodes in nodelist yet so please take a breather. would be smarter to ask each archiver only once but 
+        info(`contactArchiver: no nodes in nodelist yet, or seedlist null ${Utils.safeStringify(activeNodesSigned)}`)
+        await utils.sleep(1000) // no nodes in nodelist yet so please take a breather. would be smarter to ask each archiver only once but
                                 // but do not want to refactor that much right now
         if (retry === 1) {
           /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: no nodes in nodelist yet out of retries. ${dbgContex}`, 1)
@@ -952,7 +953,7 @@ async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
       }
       if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `contactArchiver: verify failed. ${dbgContex}`, 1)
-        info(`contactArchiver:  seedlist failed verification ${JSON.stringify(activeNodesSigned)}`)
+        info(`contactArchiver:  seedlist failed verification ${Utils.safeStringify(activeNodesSigned)}`)
         throw Error(
           `Fatal: _getSeedNodes seed list was not signed by archiver!. Archiver: ${archiver.ip}:${archiver.port}, signature: ${activeNodesSigned.sign}`
         )
@@ -973,7 +974,7 @@ async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
 
   info(`contactArchiver: passed ${archiver.ip} retry:${retry}`)
 
-  info(`contactArchiver: activeNodesSigned:${JSON.stringify(activeNodesSigned?.joinRequest)} restartCycleRecord:${JSON.stringify(activeNodesSigned?.restartCycleRecord)}`)
+  info(`contactArchiver: activeNodesSigned:${Utils.safeStringify(activeNodesSigned?.joinRequest)} restartCycleRecord:${Utils.safeStringify(activeNodesSigned?.restartCycleRecord)}`)
 
   const joinRequest: P2P.ArchiversTypes.Request | undefined = activeNodesSigned.joinRequest as
     | P2P.ArchiversTypes.Request
@@ -1084,7 +1085,7 @@ async function getActiveNodesFromArchiver(
   }
 
   const seedListSigned = seedListResult.value
-  if (logFlags.p2pNonFatal) info(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
+  if (logFlags.p2pNonFatal) info(`Got signed seed list: ${Utils.safeStringify(seedListSigned)}`)
   return seedListSigned
 }
 
@@ -1105,7 +1106,7 @@ export async function getFullNodesFromArchiver(
   }
 
   const fullNodeList = fullNodeListResult.value
-  if (logFlags.p2pNonFatal) info(`Got signed full node list: ${JSON.stringify(fullNodeList)}`)
+  if (logFlags.p2pNonFatal) info(`Got signed full node list: ${Utils.safeStringify(fullNodeList)}`)
   return fullNodeList
 }
 
@@ -1172,7 +1173,7 @@ export function getThisNodeInfo(): P2P.P2PTypes.P2PNode {
     syncingTimestamp,
     readyTimestamp,
   }
-  if (logFlags.p2pNonFatal) info(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
+  if (logFlags.p2pNonFatal) info(`Node info of this node: ${Utils.safeStringify(nodeInfo)}`)
   return nodeInfo
 }
 
@@ -1219,11 +1220,11 @@ function acceptedTrigger(): Promise<void> {
 
 /**
  * Wait for currentQuarter to equal 1 and q1SendRequests to be true
- * 
- * q1SendRequests is a flag that has a slight delay at the start of q1 to make sure 
+ *
+ * q1SendRequests is a flag that has a slight delay at the start of q1 to make sure
  * that requests are not impacted by timestamp variation which could cause half of the network
  * to think it is still Q4
- * @returns 
+ * @returns
  */
 export function waitForQ1SendRequests(): Promise<void> {
   return new Promise(resolve => {

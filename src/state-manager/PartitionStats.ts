@@ -1,6 +1,6 @@
 import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
-import {stringify} from '../utils'
+import { Utils } from '@shardus/types'
 
 import Profiler from '../utils/profiler'
 import Crypto from '../crypto'
@@ -160,7 +160,7 @@ class PartitionStats {
 
       const blob = this.dumpLogsForCycle(cycle, false, cycleShardValues)
 
-      res.write(stringify(blob) + '\n')
+      res.write(Utils.safeStringify(blob) + '\n')
       res.end()
     })
 
@@ -189,7 +189,7 @@ class PartitionStats {
           }
           //raw dump or compute?
           if (raw === 'true') {
-            res.write(JSON.stringify(lines))
+            res.write(Utils.safeStringify(lines))
           } else {
             {
               const {
@@ -443,7 +443,7 @@ class PartitionStats {
       this.mainLogger.debug(
         `statData enter:statsDataSummaryInit op:${opCounter} c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(
           accountId
-        )}  inputs:${JSON.stringify({ accountDataRaw })}`
+        )}  inputs:${Utils.safeStringify({ accountDataRaw })}`
       )
 
     const blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountId)
@@ -537,7 +537,7 @@ class PartitionStats {
       this.mainLogger.debug(
         `statData enter:statsDataSummaryUpdate op:${opCounter} c:${cycle} ${debugMsg}  accForBin:${utils.makeShortHash(
           accountDataAfter.accountId
-        )}   inputs:${JSON.stringify({
+        )}   inputs:${Utils.safeStringify({
           accountDataBefore,
           accountDataAfter,
         })}`
@@ -750,7 +750,7 @@ class PartitionStats {
         continue
       }
       if (excludeEmpty === false || summaryBlob.counter > 0) {
-        const cloneSummaryBlob = JSON.parse(JSON.stringify(summaryBlob))
+        const cloneSummaryBlob = Utils.safeJsonParse(Utils.safeStringify(summaryBlob))
         statsDump.dataStats.push(cloneSummaryBlob)
       }
       coveredParitionCount++
@@ -871,7 +871,7 @@ class PartitionStats {
         //this.generalLog(string)
         let statsObj: { cycle: number; owner: string }
         try {
-          statsObj = JSON.parse(statsStr)
+          statsObj = Utils.safeJsonParse(statsStr)
         } catch (err) {
           if (logFlags.error) this.mainLogger.error(`Fail to parse statsObj: ${statsStr}`, err)
           continue
@@ -927,7 +927,7 @@ class PartitionStats {
             dataByParition.set(partition, dataTally)
           }
 
-          const dataString = stringify(dataStatsObj.opaqueBlob)
+          const dataString = Utils.safeStringify(dataStatsObj.opaqueBlob)
           dataTally = dataByParition.get(partition)
 
           dataTally.data.push(dataStatsObj)
@@ -1018,7 +1018,7 @@ class PartitionStats {
         //this.generalLog(string)
         let statsObj: { cycle: number; owner: string }
         try {
-          statsObj = JSON.parse(statsStr)
+          statsObj = Utils.safeJsonParse(statsStr)
         } catch (err) {
           if (logFlags.error) this.mainLogger.error(`Fail to parse statsObj: ${statsStr}`, err)
           continue
@@ -1077,7 +1077,7 @@ class PartitionStats {
           dataByParition.set(partition, dataTally)
         }
 
-        const dataString = stringify(txStatsObj.opaqueBlob)
+        const dataString = Utils.safeStringify(txStatsObj.opaqueBlob)
         dataTally = dataByParition.get(partition)
 
         dataTally.data.push(txStatsObj)
@@ -1145,7 +1145,7 @@ class PartitionStats {
         for (const [, value] of Object.entries(statsObj.cycleDebugNotes)) {
           const valueNum = value as number
           if (valueNum >= 1) {
-            stream.write(`${statsObj.owner} : ${JSON.stringify(statsObj.cycleDebugNotes)}`)
+            stream.write(`${statsObj.owner} : ${Utils.safeStringify(statsObj.cycleDebugNotes)}`)
             break
           }
         }

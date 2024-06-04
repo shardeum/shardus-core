@@ -3,7 +3,7 @@ import { Logger } from 'log4js'
 import util from 'util'
 import * as http from '../http'
 import { P2P } from '@shardus/types'
-import { safeStringify, reversed, validateTypes, logSafeStringify } from '../utils'
+import { reversed, validateTypes } from '../utils'
 import { config, logger, network } from './Context'
 import * as Archivers from './Archivers'
 import * as CycleChain from './CycleChain'
@@ -28,6 +28,7 @@ import { logFlags } from '../logger'
 import { currentQuarter } from './CycleCreator'
 import fs from 'fs'
 import path from 'path'
+import { Utils } from '@shardus/types'
 
 /** STATE */
 
@@ -42,7 +43,7 @@ const newestCycleRoute: P2P.P2PTypes.Route<Handler> = {
   handler: (_req, res) => {
     profilerInstance.scopedProfileSectionStart('sync-newest-cycle')
     const newestCycle = CycleChain.newest || null
-    res.send(safeStringify({ newestCycle }))
+    res.send({ newestCycle })
     profilerInstance.scopedProfileSectionEnd('sync-newest-cycle')
   },
 }
@@ -56,14 +57,14 @@ const cyclesRoute: P2P.P2PTypes.Route<Handler> = {
       let err = validateTypes(req, { body: 'o' })
       if (err) {
         warn('sync-cycles bad req ' + err)
-        // use res.send(safeStringify({ })) if returning an object
+        // use res.send({ }) if returning an object
         res.json([])
         return
       }
       err = validateTypes(req.body, { start: 'n?', end: 'n?' })
       if (err) {
         warn('sync-cycles bad req.body ' + err)
-        // use res.send(safeStringify({ })) if returning an object
+        // use res.send({ }) if returning an object
         res.json([])
         return
       }
@@ -71,7 +72,7 @@ const cyclesRoute: P2P.P2PTypes.Route<Handler> = {
       const end = req.body.end
       // const cycles = p2p.state.getCycles(start, end)
       const cycles = CycleChain.getCycleChain(start, end)
-      res.send(safeStringify(cycles))
+      res.send(cycles)
     } catch (e) {
       warn('sync-cycles', e)
     } finally {
@@ -122,8 +123,8 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
     info(`Getting cycles ${start} - ${end}...`)
     nestedCountersInstance.countEvent('p2p', `sync-getting-cycles ${start} - ${end}`)
     const prevCycles = await getCycles(activeNodes, start, end)
-    info(`Got cycles ${JSON.stringify(prevCycles.map((cycle) => cycle.counter))}`)
-    info(`  ${logSafeStringify(prevCycles)}`)
+    info(`Got cycles ${Utils.safeStringify(prevCycles.map((cycle) => cycle.counter))}`)
+    info(`  ${Utils.safeStringify(prevCycles)}`)
 
     // If prevCycles is empty, start over
     if (prevCycles.length < 1) {
@@ -150,11 +151,11 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
 
       let missingStr = 'none detected'
       if (missingListCount > 0) {
-        missingStr = JSON.stringify(missingList[0])
+        missingStr = Utils.safeStringify(missingList[0])
       }
 
       /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `sync-getting-cycles failed to get ${start} - ${end}  expectedMissing:${expectedMissing} missingListCount:${missingListCount} missing:${missingStr}` )
-      /* prettier-ignore */ error( `sync-getting-cycles failed to get ${start} - ${end}  expectedMissing:${expectedMissing} missingListCount:${missingListCount}` + JSON.stringify(missingList) )
+      /* prettier-ignore */ error( `sync-getting-cycles failed to get ${start} - ${end}  expectedMissing:${expectedMissing} missingListCount:${missingListCount}` + Utils.safeStringify(missingList) )
 
       if (config.p2p.hackForceCycleSyncComplete === true && missingListCount === 0) {
         /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `hack-fix: go active missing count is 0`)
@@ -239,15 +240,15 @@ export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
 
   info('Synced to cycle', cycleToSyncTo.counter)
   info(`Sync complete; ${NodeList.activeByIdOrder.length} active nodes; ${CycleChain.cycles.length} cycles`)
-  info(`NodeList after sync: ${JSON.stringify([...NodeList.nodes.entries()])}`)
-  info(`CycleChain after sync: ${logSafeStringify(CycleChain.cycles)}`)
+  info(`NodeList after sync: ${Utils.safeStringify([...NodeList.nodes.entries()])}`)
+  info(`CycleChain after sync: ${Utils.safeStringify(CycleChain.cycles)}`)
 
   const p2pSyncReport = {
     cycle: cycleToSyncTo.counter,
     activeNodes: NodeList.activeByIdOrder.length,
     cyclesSynced: CycleChain.cycles.length,
   }
-  nestedCountersInstance.countEvent('p2p', `Sync cyclechain complete; ${logSafeStringify(p2pSyncReport)}`)
+  nestedCountersInstance.countEvent('p2p', `Sync cyclechain complete; ${Utils.safeStringify(p2pSyncReport)}`)
 
   return true
 }
@@ -279,9 +280,9 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
         info(`syncNewCycles: digested nextCycle=${nextCycle.counter}`)
       } else {
         /* prettier-ignore */ error(
-          `syncNewCycles: next record does not fit with prev record.\nnext: ${logSafeStringify(
+          `syncNewCycles: next record does not fit with prev record.\nnext: ${Utils.safeStringify(
             CycleChain.newest
-          )}\nprev: ${logSafeStringify(newestCycle)}`
+          )}\nprev: ${Utils.safeStringify(newestCycle)}`
         )
 
         //20230730: comment below is from 3 years ago, is it something that needs to be handled.
@@ -322,11 +323,11 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
       cycle.standbyNodeListHash = JoinV2.computeNewStandbyListHash()
     }
   }
-  
+
   if (config.debug.enableCycleRecordDebugTool || config.debug.localEnableCycleRecordDebugTool) {
     if (Self.isActive) {
       const cycleData =
-        logSafeStringify({
+        Utils.safeStringify({
           port: Self.port,
           cycleNumber: cycle.counter,
           cycleRecord: cycle,
@@ -341,15 +342,15 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
 
   const marker = CycleCreator.makeCycleMarker(cycle)
   if (CycleChain.cyclesByMarker[marker]) {
-    warn(`Tried to digest cycle record twice: ${logSafeStringify(cycle)}\n` + `${new Error().stack}`)
+    warn(`Tried to digest cycle record twice: ${Utils.safeStringify(cycle)}\n` + `${new Error().stack}`)
     return
   }
 
   /* prettier-ignore */ if (logFlags.important_as_error)
     info(
-      `digestCycle ${logSafeStringify(
+      `digestCycle ${Utils.safeStringify(
         cycle
-      )} from ${source}... note: CycleChain.newest.counter: ${logSafeStringify(
+      )} from ${source}... note: CycleChain.newest.counter: ${Utils.safeStringify(
         CycleChain.newest
       )} CycleCreator.currentCycle: ${CycleCreator.currentCycle}`
     )
@@ -391,18 +392,18 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
     /* prettier-ignore */ if (logFlags.important_as_error) {
     info(`
       Digested C${cycle.counter}
-        cycle record: ${logSafeStringify(cycle)}
-        cycle changes: ${JSON.stringify(changes)}
-        node list: ${JSON.stringify([...NodeList.nodes.values()])}
-        active nodes: ${JSON.stringify(NodeList.activeByIdOrder)}
+        cycle record: ${Utils.safeStringify(cycle)}
+        cycle changes: ${Utils.safeStringify(changes)}
+        node list: ${Utils.safeStringify([...NodeList.nodes.values()])}
+        active nodes: ${Utils.safeStringify(NodeList.activeByIdOrder)}
     `)
     }
   } else {
     /* prettier-ignore */ if (logFlags.important_as_error) {
     info(`
     Digested C${cycle.counter}
-      cycle record: ${logSafeStringify(cycle)}
-      cycle changes: ${JSON.stringify(changes)}
+      cycle record: ${Utils.safeStringify(cycle)}
+      cycle changes: ${Utils.safeStringify(changes)}
       node list: too many to list: ${NodeList.nodes.size}
       active nodes: too many to list: ${NodeList.activeByIdOrder.length}
     `)
@@ -436,7 +437,7 @@ export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.Cycle
     return resp
   }
   const eqFn = (item1, item2) => {
-    /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`getNewestCycle: eqFn: item1 is: ${utils.stringify(item1)}`)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`getNewestCycle: eqFn: item1 is: ${Utils.safeStringify(item1)}`)
     try {
       if (item1.newestCycle.counter === item2.newestCycle.counter) return true
       return false
@@ -454,7 +455,7 @@ export async function getNewestCycle(activeNodes: SyncNode[]): Promise<P2P.Cycle
     redundancy,
     true
   )
-  /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`getNewestCycle: robustQuery response is: ${JSON.stringify(response)}`)
+  /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`getNewestCycle: robustQuery response is: ${Utils.safeStringify(response)}`)
 
   // [TODO] Validate response
   if (!response?.newestCycle) throw new Error('warning: getNewestCycle: no newestCycle yet')

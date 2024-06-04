@@ -46,6 +46,7 @@ import path from 'path'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { BadRequest, InternalError, NotFound, serializeResponseError } from '../types/ResponseError'
+import { Utils } from '@shardus/types'
 
 /** CONSTANTS */
 
@@ -432,7 +433,7 @@ async function cycleCreator() {
     nextQ1Start = end
 
     // make some more logging .. posibly even to cycle log with a timestamp also.
-    /* prettier-ignore */ if (logFlags.verbose) info(`cc: inc times ${JSON.stringify({ quarterDuration, startQ1, startQ2, startQ3, startQ4, end })}  ${callTag}`)
+    /* prettier-ignore */ if (logFlags.verbose) info(`cc: inc times ${Utils.safeStringify({ quarterDuration, startQ1, startQ2, startQ3, startQ4, end })}  ${callTag}`)
 
     // Reset cycle marker and cycle certificate creation state
     reset()
@@ -571,7 +572,7 @@ async function runQ3() {
   if (config.debug.enableCycleRecordDebugTool || config.debug.localEnableCycleRecordDebugTool) {
     if (currentQuarter === 3 && Self.isActive) {
       const cycleData =
-        utils.safeStringify({
+        Utils.safeStringify({
           port: Self.port,
           cycleNumber: record.counter,
           cycleRecord: record,
@@ -672,12 +673,12 @@ async function runQ4() {
 
     if (logFlags.p2pNonFatal)
       info(`
-    Certified cycle record: ${utils.logSafeStringify(record)}
-    Certified cycle marker: ${JSON.stringify(marker)}
-    Certified cycle cert: ${JSON.stringify(cert)}
+    Certified cycle record: ${Utils.safeStringify(record)}
+    Certified cycle marker: ${Utils.safeStringify(marker)}
+    Certified cycle cert: ${Utils.safeStringify(cert)}
   `)
   } finally {
-    /* prettier-ignore */ info( `Q4: END: myC:${myC}  C${currentCycle} Q${currentQuarter} Certified cycle record: ${JSON.stringify(record.counter)}` )
+    /* prettier-ignore */ info( `Q4: END: myC:${myC}  C${currentCycle} Q${currentQuarter} Certified cycle record: ${Utils.safeStringify(record.counter)}` )
     // Dont need this any more since we are not doing anything after this
     // if (cycleQuarterChanged(myC, myQ)) return
     profilerInstance.profileSectionEnd('CycleCreator-runQ4')
@@ -968,14 +969,14 @@ function validateCertSign(certs: P2P.CycleCreatorTypes.CycleCert[], sender: P2P.
 function validateCerts(certs: P2P.CycleCreatorTypes.CycleCert[], record, sender, callerTag) {
   if (!certs || !Array.isArray(certs) || certs.length <= 0) {
     /* prettier-ignore */ warn(`validateCerts: bad certificate format;  ${callerTag}`)
-    /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify(sender)}` )
+    /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${Utils.safeStringify(sender)}` )
     return false
   }
   if (!record || record === null || typeof record !== 'object') return false
   //  make sure the cycle counter is what we expect
   if (record.counter !== CycleChain.newest.counter + 1) {
     /* prettier-ignore */ warn( `validateCerts: bad cycle record counter; ${callerTag} expected ${CycleChain.newest.counter + 1} but got ${ record.counter } ` )
-    /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify(sender)}` )
+    /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${Utils.safeStringify(sender)}` )
     return false
   }
   // make sure all the certs are for the same cycle marker
@@ -983,7 +984,7 @@ function validateCerts(certs: P2P.CycleCreatorTypes.CycleCert[], record, sender,
   for (let i = 1; i < certs.length; i++) {
     if (inpMarker !== certs[i].marker) {
       /* prettier-ignore */ warn(`validateCerts: certificates marker does not match hash of record;  ${callerTag}`)
-      /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify( sender )}` )
+      /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${Utils.safeStringify( sender )}` )
       return false
     }
   }
@@ -991,16 +992,16 @@ function validateCerts(certs: P2P.CycleCreatorTypes.CycleCert[], record, sender,
   const seen = {}
   for (let i = 0; i < certs.length; i++) {
     if (seen[certs[i].sign.owner]) {
-      /* prettier-ignore */ warn(`validateCerts: multiple certificate from same owner; ${callerTag} certs: ${JSON.stringify(certs)}`)
-      /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify( sender )}` )
+      /* prettier-ignore */ warn(`validateCerts: multiple certificate from same owner; ${callerTag} certs: ${Utils.safeStringify(certs)}`)
+      /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${Utils.safeStringify( sender )}` )
       return false
     }
     seen[certs[i].sign.owner] = true
   }
   //  checks signatures; more expensive
   if (!validateCertSign(certs, sender)) {
-    /* prettier-ignore */ warn(`validateCerts: certificate has bad sign;  ${callerTag} certs:${JSON.stringify(certs)}`)
-    /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${JSON.stringify(sender)}` )
+    /* prettier-ignore */ warn(`validateCerts: certificate has bad sign;  ${callerTag} certs:${Utils.safeStringify(certs)}`)
+    /* prettier-ignore */ warn( `validateCerts:   sent by: port:${NodeList.nodes.get(sender).externalPort} id:${Utils.safeStringify(sender)}` )
     return false
   }
   return true
@@ -1009,7 +1010,7 @@ function validateCerts(certs: P2P.CycleCreatorTypes.CycleCert[], record, sender,
 function validateCertsRecordTypes(inp, caller) {
   let err = utils.validateTypes(inp, { certs: 'a', record: 'o' })
   if (err) {
-    warn(caller + ' bad input: ' + err + ' ' + JSON.stringify(inp))
+    warn(caller + ' bad input: ' + err + ' ' + Utils.safeStringify(inp))
     return false
   }
   for (const cert of inp.certs) {
@@ -1236,7 +1237,7 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
   )
 
   if (errors.length > 0) {
-    warn(`compareCycleCertEndpoint: errors: ${JSON.stringify(errors)}`)
+    warn(`compareCycleCertEndpoint: errors: ${Utils.safeStringify(errors)}`)
   }
 
   // Anything that's not an error, either matched us or compared worse than us

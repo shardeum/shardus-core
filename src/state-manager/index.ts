@@ -10,7 +10,7 @@ import ShardFunctions from './shardFunctions'
 import EventEmitter from 'events'
 import * as utils from '../utils'
 
-import { stringify } from '../utils'
+import { Utils } from '@shardus/types'
 
 // not sure about this.
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
@@ -1103,7 +1103,7 @@ class StateManager {
       // comparison safe against timing attacks
       if (stateId.length !== hash.length || !timingSafeEqual(Buffer.from(stateId), Buffer.from(hash))) {
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`testAccountDataWrapped hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
-        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('testAccountDataWrapped hash test failed: details: ' + stringify(recordData))
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('testAccountDataWrapped hash test failed: details: ' + Utils.safeStringify(recordData))
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('testAccountDataWrapped hash test failed: wrappedData.stateId: ' + utils.makeShortHash(wrappedData.stateId))
         const stack = new Error().stack
         if (logFlags.error) this.mainLogger.error(`stack: ${stack}`)
@@ -1739,7 +1739,7 @@ class StateManager {
             }
           }
           response.success = true
-          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state success: ${queueEntry.logID}  ${response.stateList.length}  ${utils.stringify(response)}`)
+          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state success: ${queueEntry.logID}  ${response.stateList.length}  ${Utils.safeStringify(response)}`)
           responseSize = await respond(response)
         } finally {
           profilerInstance.scopedProfileSectionEnd('request_tx_and_state', responseSize)
@@ -1841,7 +1841,7 @@ class StateManager {
             }
           }
           response.success = true
-          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state success: ${queueEntry.logID}  ${response.stateList.length}  ${utils.stringify(response)}`)
+          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state success: ${queueEntry.logID}  ${response.stateList.length}  ${Utils.safeStringify(response)}`)
           respond(response, serializeRequestTxAndStateResp)
         } catch (e) {
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
@@ -2170,7 +2170,7 @@ class StateManager {
       }
 
       const blob = this.partitionStats.dumpLogsForCycle(cycle, false, cycleShardValues)
-      res.send(utils.safeStringify({ cycle, blob }))
+      res.send({ cycle, blob })
     })
 
     Context.network.registerExternalGet('debug_stats2', isDebugModeMiddleware, (_req, res) => {
@@ -2182,12 +2182,12 @@ class StateManager {
         cycleShardValues = this.shardValuesByCycle.get(cycle)
         blob = this.partitionStats.buildStatsReport(cycleShardValues)
       }
-      res.send(utils.safeStringify({ cycle, blob }))
+      res.send({ cycle, blob })
     })
 
     Context.network.registerExternalGet('clear_tx_debug', isDebugModeMiddlewareLow, (_req, res) => {
       this.transactionQueue.clearTxDebugStatList()
-      res.send(utils.safeStringify({ success: true }))
+      res.send({ success: true })
     })
 
     Context.network.registerExternalGet('print_tx_debug', isDebugModeMiddlewareLow, (_req, res) => {
@@ -2230,7 +2230,7 @@ class StateManager {
         }
         debugNodeList.push(nodeEntry)
       }
-      res.send(utils.safeStringify(debugNodeList))
+      res.send(debugNodeList)
     })
 
     Context.network.registerExternalGet('debug-consensus-log', isDebugModeMiddleware, (req, res) => {
@@ -2247,18 +2247,18 @@ class StateManager {
 
     Context.network.registerExternalGet('debug-queue-items', isDebugModeMiddleware, (req, res) => {
       let result = this.transactionQueue.getQueueItems()
-      res.write(utils.stringify(result))
+      res.write(Utils.safeStringify(result))
       res.end()
     })
 
     Context.network.registerExternalGet('debug-queue-clear', isDebugModeMiddleware, (req, res) => {
       let result = this.transactionQueue.clearQueueItems()
-      res.write(utils.stringify(result))
+      res.write(Utils.safeStringify(result))
       res.end()
     })
 
     Context.network.registerExternalGet('debug-stuck-processing', isDebugModeMiddleware, (_req, res) => {
-      res.send(utils.safeStringify(this.transactionQueue.getDebugProccessingStatus()))
+      res.send(this.transactionQueue.getDebugProccessingStatus())
     })
 
     Context.network.registerExternalGet('debug-fix-stuck-processing', isDebugModeMiddleware, (req, res) => {
@@ -2269,7 +2269,7 @@ class StateManager {
 
       const isStuck = this.transactionQueue.isStuckProcessing
       if (isStuck) {
-        response = JSON.stringify(this.transactionQueue.getDebugProccessingStatus())
+        response = Utils.safeStringify(this.transactionQueue.getDebugProccessingStatus())
         this.transactionQueue.fixStuckProcessing(clear)
       }
       res.write(response)
@@ -3212,7 +3212,7 @@ class StateManager {
         // make sure the data is not a json string
         if (utils.isString(accountData.data)) {
           try {
-            accountData.data = JSON.parse(accountData.data as string)
+            accountData.data = Utils.safeJsonParse(accountData.data as string)
           } catch (error) {
             /* prettier-ignore */ this.mainLogger.error(` _commitAccountCopies fail to parse accountData.data: ${accountData.data} data: ${utils.stringifyReduce(accountData)}`)
           }
@@ -3269,7 +3269,7 @@ class StateManager {
           //Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
           await this.storage.createOrReplaceAccountCopy(backupObj)
         } catch (error) {
-          /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` _commitAccountCopies storage: ${JSON.stringify(error)}}`)
+          /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` _commitAccountCopies storage: ${Utils.safeStringify(error)}}`)
           nestedCountersInstance.countEvent('_commitAccountCopies', `_commitAccountCopies fail`)
         }
       }
@@ -3802,7 +3802,7 @@ class StateManager {
     // Get the receipt map to send as a report
     if (this.feature_receiptMapResults === true) {
       receiptMapResults = this.generateReceiptMapResults(cycle)
-      if (logFlags.verbose) this.mainLogger.debug(`receiptMapResults: ${stringify(receiptMapResults)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`receiptMapResults: ${Utils.safeStringify(receiptMapResults)}`)
     }
     this.profiler.profileSectionEnd('stateManager_processPreviousCycleSummaries_generateReceiptMapResults')
 

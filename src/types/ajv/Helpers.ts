@@ -11,6 +11,7 @@ import { initGetAccountDataByListReq } from './GetAccountDataByListReq'
 import { initGetAccountDataByHashesReq } from './GetAccountDataByHashesReq'
 import { initGetAccountDataByHashesResp } from './GetAccountDataByHashesResp'
 import { initWrappedData } from './WrappedData'
+import { Utils } from '@shardus/types'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -42,7 +43,7 @@ function parseAjvErrors(errors: Array<ErrorObject> | null): string[] | null {
   return errors.map((error) => {
     let errorMsg = `${error.message}`
     if (error.params && Object.keys(error.params).length > 0) {
-      errorMsg += `: ${JSON.stringify(error.params)}`
+      errorMsg += `: ${Utils.safeStringify(error.params)}`
     }
     return errorMsg
   })

@@ -1,4 +1,4 @@
-import { hexstring, stringify } from '@shardus/crypto-utils'
+import { hexstring } from '@shardus/crypto-utils'
 import { P2P } from '@shardus/types'
 import { Logger } from 'log4js'
 import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
@@ -13,9 +13,9 @@ import rfdc from 'rfdc'
 import { logFlags } from '../logger'
 import { nestedCountersInstance } from '..'
 import { shardusGetTime } from '../network'
-import { safeStringify } from '../utils'
 import { getStandbyNodesInfoMap, standbyNodesInfo } from "./Join/v2";
 import { getDesiredCount } from "./CycleAutoScale";
+import { Utils } from '@shardus/types'
 
 const clone = rfdc()
 
@@ -57,14 +57,14 @@ export function init() {
         standby: getStandbyNodesInfoMap().size,
         desired: getDesiredCount(),
       }
-      return res.send(safeStringify(networkStats))
+      return res.send(networkStats)
     } catch (e) {
       console.log(`Error getting load: ${e.message}`)
     }
   })
   network.registerExternalGet('age-index', isDebugModeMiddlewareLow, (req, res) => {
     try {
-      return res.send(safeStringify(getAgeIndex()))
+      return res.send(getAgeIndex())
     } catch (e) {
       console.log(`Error getting age index: ${e.message}`)
     }
@@ -99,7 +99,7 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
 
   // Don't add duplicates
   if (nodes.has(node.id)) {
-    warn(`NodeList.addNode: tried to add duplicate ${node.externalPort}: ${stringify(node)}\n` + `${caller}`)
+    warn(`NodeList.addNode: tried to add duplicate ${node.externalPort}: ${Utils.safeStringify(node)}\n` + `${caller}`)
 
     return
   }
@@ -135,14 +135,14 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
   // If node is READY status, insert sorted by readyTimestamp and id to tiebreak into readyByTimeAndIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.READY) {
     insertSorted(readyByTimeAndIdOrder, node, propComparator2('readyTimestamp', 'id'))
-  }  
+  }
 
   // If active, insert sorted by id into activeByIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
     insertSorted(activeByIdOrder, node, propComparator('id'))
     for (let i = 0; i < activeByIdOrder.length; i++) {
       activeIdToPartition.set(activeByIdOrder[i].id, i)
-    }    
+    }
 
     // Dont insert yourself into activeOthersByIdOrder
     if (node.id !== id) {
@@ -387,8 +387,8 @@ export function getDebug() {
       `
   if (VERBOSE)
     output += `
-    NODELIST:   ${stringify(byJoinOrder)}
-    CYCLECHAIN: ${stringify(CycleChain.cycles)}
+    NODELIST:   ${Utils.safeStringify(byJoinOrder)}
+    CYCLECHAIN: ${Utils.safeStringify(CycleChain.cycles)}
   `
   return output
 }
@@ -420,7 +420,7 @@ export function computeNewNodeListHash(): hexstring {
   // deep cloning is necessary as validator information may be mutated by
   // reference.
   lastHashedList = clone(byJoinOrder)
-  /* prettier-ignore */ if (logFlags.verbose) info('hashing validator list:', JSON.stringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.verbose) info('hashing validator list:', Utils.safeStringify(lastHashedList))
   let hash = crypto.hash(lastHashedList)
   /* prettier-ignore */ if (logFlags.verbose) info('the new validator list hash is', hash)
   return hash
@@ -447,7 +447,7 @@ let lastHashedList: P2P.NodeListTypes.Node[] = []
 
 /** Returns the last list of nodes that had its hash computed. */
 export function getLastHashedNodeList(): P2P.NodeListTypes.Node[] {
-  /* prettier-ignore */ if (logFlags.verbose) info('returning last hashed validator list:', JSON.stringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.verbose) info('returning last hashed validator list:', Utils.safeStringify(lastHashedList))
   return lastHashedList
 }
 

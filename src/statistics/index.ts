@@ -6,6 +6,7 @@ import * as utils from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { CountedEvent, CountedEventMap } from './countedEvents'
 import { shardusGetTime } from '../network'
+import { Utils } from '@shardus/types'
 
 interface Statistics {
   intervalDuration: number
@@ -93,9 +94,9 @@ class Statistics extends EventEmitter {
         stats.txRejected += this.getPreviousElement('txRejected') || 0
         stats.txExpired += this.getPreviousElement('txExpired') || 0
         stats.txProcessed += this.getPreviousElement('txProcessed') || 0
-        return res.send(utils.safeStringify(stats))
+        return res.send(stats)
       } catch (e) {
-        console.log(`Error getting stats: ${JSON.stringify(e)}`)
+        console.log(`Error getting stats: ${Utils.safeStringify(e)}`)
       }
     })
   }
