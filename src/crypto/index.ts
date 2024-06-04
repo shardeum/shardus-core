@@ -8,7 +8,6 @@ import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import { Utils } from '@shardus/types'
 
-
 export type HashableObject = (object | string) & { sign?: Shardus.Sign }
 
 interface Keypair {
@@ -44,7 +43,7 @@ class Crypto {
 
   async init(): Promise<void> {
     crypto.init(this.config.crypto.hashKey)
-    crypto.setCustomStringifier(Utils.safeStringify, 'shardus_safeStringify')
+    crypto.setCustomStringifier(Utils.safeStringify, 'shardus_types_safeStringify')
 
     try {
       this.storage._checkInit()
@@ -56,7 +55,8 @@ class Crypto {
         return
       }
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(`error fetching keypair from database ${Utils.safeStringify(e)}`)
+      if (logFlags.error)
+        this.mainLogger.error(`error fetching keypair from database ${Utils.safeStringify(e)}`)
     }
 
     if (this.config.crypto.keyPairConfig.useKeyPairFromFile) {
