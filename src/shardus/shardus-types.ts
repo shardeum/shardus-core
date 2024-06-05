@@ -1236,6 +1236,8 @@ export interface ServerConfiguration {
     receiptRemoveFix: boolean
     // fix for stuck txs in the queue
     stuckTxQueueFix: boolean
+    // just use old tx state changes
+    oldTXStateChanges: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
