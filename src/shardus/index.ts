@@ -149,9 +149,9 @@ class Shardus extends EventEmitter {
     this.debugForeverLoopCounter = 0
     this.nestedCounters = nestedCountersInstance
     this.memoryReporting = new MemoryReporting(this)
-    this.profiler = new Profiler()
     this.config = config
     Context.setConfig(this.config)
+    this.profiler = new Profiler()
     logFlags.verbose = false
 
     let startInFatalsLogMode = config && config.debug && config.debug.startInFatalsLogMode ? true : false
