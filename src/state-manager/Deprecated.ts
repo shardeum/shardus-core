@@ -6887,6 +6887,150 @@ class Deprecated {
   //   }
   //   return true
   // }
+
+  // this.p2p.registerInternal(
+    //   'repair_too_old_account_data',
+    //   async (
+    //     payload: TooOldAccountUpdateRequest,
+    //     respond: (arg0: boolean) => Promise<boolean>,
+    //     _sender: unknown,
+    //     _tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     profilerInstance.scopedProfileSectionStart('repair_too_old_account_data', false, msgSize)
+    //     let { accountID, txId, appliedReceipt2, updatedAccountData } = payload
+    //     const hash = updatedAccountData.stateId
+    //     const accountData = updatedAccountData
+
+    //     // check if we cover this accountId
+    //     const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(accountID)
+    //     const isInStorageGroup = storageNodes.map((node) => node.id).includes(Self.id)
+    //     if (!isInStorageGroup) {
+    //       nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: not in storage group for account: ${accountID}`)
+    //       await respond(false)
+    //       return
+    //     }
+    //     // check if we have already repaired this account
+    //     const accountHashCache = this.stateManager.accountCache.getAccountHash(accountID)
+    //     if (accountHashCache != null && accountHashCache.h === hash) {
+    //       nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: already repaired account: ${accountID}`)
+    //       await respond(false)
+    //       return
+    //     }
+    //     if (accountHashCache != null && accountHashCache.t > accountData.timestamp) {
+    //       nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: we have newer account: ${accountID}`)
+    //       await respond(false)
+    //       return
+    //     }
+
+    //     const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, 'repair_too_old_account_data')
+
+    //     if (archivedQueueEntry == null) {
+    //       nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: no archivedQueueEntry for txId: ${txId}`)
+    //       this.mainLogger.debug(`repair_too_old_account_data: no archivedQueueEntry for txId: ${txId}`)
+    //       await respond(false)
+    //       return
+    //     }
+
+    //     // check the vote and confirmation status of the tx
+    //     const bestMessage = appliedReceipt2.confirmOrChallenge
+    //     const receivedBestVote = appliedReceipt2.appliedVote
+    //     if (receivedBestVote != null) {
+    //       // Check if vote is from eligible list of voters for this TX
+    //       if(!archivedQueueEntry.eligibleNodeIdsToVote.has(receivedBestVote.node_id)) {
+    //         nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: vote from ineligible node for txId: ${txId}`)
+    //         return
+    //       }
+
+    //       // Check signature of the vote
+    //       if (!this.crypto.verify(
+    //         receivedBestVote as SignedObject,
+    //         archivedQueueEntry.executionGroupMap.get(receivedBestVote.node_id).publicKey
+    //       )) {
+    //         nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: vote signature invalid for txId: ${txId}`)
+    //         return
+    //       }
+
+    //       // Check transaction result from vote
+    //       if (!receivedBestVote.transaction_result) {
+    //         nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: vote result not true for txId ${txId}`)
+    //         return
+    //       }
+
+    //       // Check account hash. Calculate account hash of account given in instruction
+    //       // and compare it with the account hash in the vote.
+    //       const calculatedAccountHash = this.app.calculateAccountHash(accountData.data)
+    //       let accountHashMatch = false
+    //       for (let i = 0; i < receivedBestVote.account_id.length; i++) {
+    //         if (receivedBestVote.account_id[i] === accountID) {
+    //           if (receivedBestVote.account_state_hash_after[i] !== calculatedAccountHash) {
+    //             nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: account hash mismatch for txId: ${txId}`)
+    //             accountHashMatch = false
+    //           } else {
+    //             accountHashMatch = true
+    //           }
+    //           break
+    //         }
+    //       }
+    //       if (accountHashMatch === false) {
+    //         nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: vote account hash mismatch for txId: ${txId}`)
+    //         return
+    //       }
+    //     } else {
+    //       // Skip this account apply as we were not able to get the best vote for this tx
+    //       nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: no vote for txId: ${txId}`)
+    //       return
+    //     }
+
+    //     if (bestMessage != null) {
+    //       // Skip if challenge receipt
+    //       if (bestMessage.message === 'challenge') {
+    //         nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: challenge for txId: ${txId}`)
+    //         return
+    //       }
+
+    //       // Check if mesasge is from eligible list of responders for this TX
+    //       if(!archivedQueueEntry.eligibleNodeIdsToConfirm.has(bestMessage.nodeId)) {
+    //         nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: confirmation from ineligible node for txId: ${txId}`)
+    //         return
+    //       }
+
+    //       // Check signature of the message
+    //       if(!this.crypto.verify(
+    //         bestMessage as SignedObject,
+    //         archivedQueueEntry.executionGroupMap.get(bestMessage.nodeId).publicKey
+    //       )) {
+    //         nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: confirmation signature invalid for txId: ${txId}`)
+    //         return
+    //       }
+    //     } else {
+    //       // Skip this account apply as we were not able to get the best confirmation for this tx
+    //       nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: no confirmation for txId: ${txId}`)
+    //       return
+    //     }
+
+    //     // update the account data (and cache?)
+    //     const updatedAccounts: string[] = []
+    //     //save the account data.  note this will make sure account hashes match the wrappers and return failed
+    //     // hashes  that don't match
+    //     const failedHashes = await this.stateManager.checkAndSetAccountData(
+    //       [accountData],
+    //       `repair_too_old_account_data:${txId}`,
+    //       true,
+    //       updatedAccounts
+    //     )
+    //     if (logFlags.debug) this.mainLogger.debug(`repair_too_old_account_data: ${updatedAccounts.length} updated, ${failedHashes.length} failed`)
+    //     nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data:${updatedAccounts.length} updated, accountId: ${utils.makeShortHash(accountID)}, cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
+    //     if (failedHashes.length > 0) nestedCountersInstance.countEvent('accountPatcher', `update_too_old_account_data:${failedHashes.length} failed`)
+    //     let success = false
+    //     if (updatedAccounts.length > 0 && failedHashes.length === 0) {
+    //       success = true
+    //     }
+    //     await respond(success)
+
+    //     profilerInstance.scopedProfileSectionEnd('repair_too_old_account_data')
+    //   }
+    // )
 }
 
 export default Deprecated
