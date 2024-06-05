@@ -136,7 +136,9 @@ class Debug {
           // TODO: restric to only predefined log files, flag to delete backup logs
           const files = fs.readdirSync(logsDirectory)
           for (const file of files) {
-            fs.unlinkSync(path.join(logsDirectory, file))
+            // Delete files of pattern file1.log, file2.log, ... and empty file.log
+            const shouldDeleteFile = /\d/.test(file)
+            shouldDeleteFile ? fs.unlinkSync(path.join(logsDirectory, file)): fs.writeFileSync(path.join(logsDirectory, file), "")
           }
         } else {
           // Deletes the specified file and its rotated files (i.e. file.log, file1.log, file2.log, ...) 
@@ -151,11 +153,13 @@ class Debug {
           if (matchedFiles.length === 0) {
             return res.status(404).send({ success: false, error: 'File not found' })
           }
-
+          
           for (const file of matchedFiles) {
+            // Delete files of pattern file1.log, file2.log, ... and empty file.log
+            const shouldDeleteFile = /\d/.test(file);
             const filePath = path.join(logsDirectory, file)
             if (filePath.startsWith(logsDirectory) && fs.existsSync(filePath)) {
-              fs.unlinkSync(filePath)
+              shouldDeleteFile ? fs.unlinkSync(filePath) : fs.writeFileSync(filePath, "");
             }
           }
         }
