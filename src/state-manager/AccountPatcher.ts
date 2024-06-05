@@ -127,7 +127,6 @@ interface TooOldAccountRecord {
 }
 interface TooOldAccountUpdateRequest {
   accountID: string
-  tooOldAccountRecord: TooOldAccountRecord
   txId: string
   appliedReceipt2: AppliedReceipt2
   updatedAccountData: Shardus.WrappedData
@@ -345,7 +344,7 @@ class AccountPatcher {
         msgSize: number
       ) => {
         profilerInstance.scopedProfileSectionStart('repair_too_old_account_data', false, msgSize)
-        let { accountID, tooOldAccountRecord, txId, appliedReceipt2, updatedAccountData } = payload
+        let { accountID, txId, appliedReceipt2, updatedAccountData } = payload
         const hash = updatedAccountData.stateId
         const accountData = updatedAccountData
 
@@ -3526,7 +3525,7 @@ class AccountPatcher {
           if(this.stateManager.config.p2p.useBinarySerializedEndpoints &&
             this.stateManager.config.p2p.repairMissingAccountsBinary
           ) {
-            this.p2p.tellBinary<RepairMissingAccountsReq>(
+            await this.p2p.tellBinary<RepairMissingAccountsReq>(
               [node],
               InternalRouteEnum.binary_repair_missing_accounts,
               message,
@@ -3820,12 +3819,33 @@ class AccountPatcher {
           }
           const accountDataRequest: TooOldAccountUpdateRequest = {
             accountID: accountId,
-            tooOldAccountRecord: tooOldRecord,
             txId: archivedQueueEntry.acceptedTx.txId,
             appliedReceipt2: this.stateManager.getReceipt2(archivedQueueEntry),
             updatedAccountData: updatedAccountData
           }
-          await this.p2p.tell([tooOldRecord.node], 'repair_too_old_account_data', accountDataRequest)
+          if (this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+            this.stateManager.config.p2p.repairMissingAccountsBinary
+          ) {
+            const message: RepairMissingAccountsReq = {
+              repairInstructions: [{
+                accountID: accountId,
+                hash: updatedAccountData.stateId,
+                txId: archivedQueueEntry.acceptedTx.txId,
+                accountData: updatedAccountData,
+                targetNodeId: tooOldRecord.node.id,
+                receipt2: this.stateManager.getReceipt2(archivedQueueEntry)
+              }]
+            }
+            await this.p2p.tellBinary<RepairMissingAccountsReq>(
+              [tooOldRecord.node],
+              InternalRouteEnum.binary_repair_missing_accounts,
+              message,
+              serializeRepairMissingAccountsReq,
+              {}
+            )
+          } else {
+            await this.p2p.tell([tooOldRecord.node], 'repair_too_old_account_data', accountDataRequest)
+          }
           let shortAccountId = utils.makeShortHash(accountId)
           let shortNodeId = utils.makeShortHash(tooOldRecord.node.id)
           nestedCountersInstance.countEvent('accountPatcher', `too_old_account repair requested. account: ${shortAccountId}, node: ${shortNodeId} c:${cycle}:`)
