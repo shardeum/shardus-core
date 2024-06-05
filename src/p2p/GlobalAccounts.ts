@@ -23,7 +23,6 @@ import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { MakeReceiptReq, deserializeMakeReceiptReq, serializeMakeReceiptReq } from '../types/MakeReceipReq'
 import { Utils } from '@shardus/types'
-import { nodelistFromStates } from './Join'
 
 /** ROUTES */
 // [TODO] - need to add validattion of types to the routes
