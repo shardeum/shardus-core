@@ -28,7 +28,6 @@ import {
   serializeLostArchiverInvestigateReq,
 } from '../../types/LostArchiverInvestigateReq'
 import { InternalRouteEnum } from '../../types/enum/InternalRouteEnum'
-import { tellBinary } from '../Comms'
 
 /** Lost Archivers Functions */
 
@@ -144,12 +143,17 @@ export function getInvestigator(target: publicKey, marker: CycleMarker): Node {
   let idx = binarySearch(activeByIdOrder, near, (i, r) => i.localeCompare(r.id))
   if (idx < 0) idx = (-1 - idx) % activeByIdOrder.length
   // eslint-disable-next-line security/detect-object-injection
-  const foundNode = activeByIdOrder[idx]
+  let foundNode = activeByIdOrder[idx]
+  if (foundNode == null || foundNode.id === id) {
+    // skip to next node if the selected node is null or youself
+    idx = (idx + 1) % activeByIdOrder.length
+    // eslint-disable-next-line security/detect-object-injection
+    foundNode = activeByIdOrder[idx]
+  }
   // eslint-disable-next-line security/detect-object-injection
   if (foundNode == null) {
     throw new Error(`activeByIdOrder idx:${idx} length: ${activeByIdOrder.length}`)
   }
-  if (foundNode.id === id) idx = (idx + 1) % activeByIdOrder.length // skip to next node if the selected node is target
   return foundNode
 }
 
@@ -180,10 +184,10 @@ export function informInvestigator(target: publicKey): void {
 
     // Send message to investigator
     info(`informInvestigator: sending InvestigateArchiverMsg: ${inspect(investigateMsg)}`)
-    if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.lostArchiverInvestigateBinary) {
+    if (Context.config.p2p.useBinarySerializedEndpoints && Context.config.p2p.lostArchiverInvestigateBinary) {
       Comms.tellBinary<LostArchiverInvestigateReq>(
         [investigator],
-        InternalRouteEnum.binary_broadcast_state,
+        InternalRouteEnum.binary_lost_archiver_investigate,
         investigateMsg,
         serializeLostArchiverInvestigateReq,
         {}
@@ -321,7 +325,27 @@ export function errorForArchiverRefutesLostMsg(
   if (msg.sign == null) return 'no signature'
   const missing = missingProperties(msg, 'archiver cycle')
   if (missing.length) return `missing properties: ${missing.join(', ')}`
-  // to-do: check for valid signature
+
+  // check if provided archiver is present in Archivers list or not
+  const archiver = Archivers.archivers.get(msg.archiver)
+  if (!archiver) {
+    warn(
+      `refuteLostArchiverRoute: provided archiver '${msg.archiver}' is not in the archivers list`
+    )
+    return 'provided archiver is unknown'
+  }
+
+  // check cycle marker of req.body
+  if(msg.cycle !== CycleChain.getCurrentCycleMarker()) {
+    warn(`refuteLostArchiverRoute: cycle marker mismatch`)
+    return 'cycle marker mismatch'
+  }
+
+  // verify crypto token
+  if (!Context.crypto.verify(msg, msg.archiver)) {
+    return 'invalid signature'
+  }
+
   return null
 }
 

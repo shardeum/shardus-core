@@ -65,8 +65,19 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
   }
 
   const upMsg = payload as SignedObject<ArchiverUpMsg>
-  const target = upMsg.downMsg.investigateMsg.target
+  const target = upMsg?.downMsg?.investigateMsg?.target
   // to-do: check target is a string or hexstring and min length
+  if (!target) {
+    logging.warn(`lostArchiverUpGossip: missing target in upMsg: ${inspect(upMsg)}`)
+    return
+  }
+
+  // verify refute crypto token
+  if (!crypto.verify(upMsg.refuteMsg, upMsg.refuteMsg.archiver)) {
+    console.log(':>> invalid signature in lostArchiverUpGossip')
+    return 'invalid signature'
+  }
+
   const record = lostArchiversMap.get(target)
   if (!record) {
     // nothing to do
@@ -200,7 +211,7 @@ const investigateLostArchiverRouteBinary: Route<InternalBinaryHandler<Buffer>> =
     profilerInstance.scopedProfileSectionStart(route, false, payload.length)
 
     try {
-      const reqStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAccountDataReq)
+      const reqStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cLostArchiverInvestigateReq)
       if (!reqStream) {
         nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
         logging.warn(`${route}: Invalid request stream`)
@@ -268,7 +279,9 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
       res.send(safeStringify({ status: 'failure', message: error }))
       return
     }
-    const refuteMsg = req.body as SignedObject<ArchiverRefutesLostMsg>
+
+    const { archiver, cycle, sign } = req.body
+    const refuteMsg: SignedObject<ArchiverRefutesLostMsg> = { archiver, cycle, sign }
     const target = refuteMsg.archiver
     // to-do: check target is a string or hexstring and min length
     let record = lostArchiversMap.get(target)
