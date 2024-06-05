@@ -66,9 +66,9 @@ export const deserializeRepairMissingAccountsReq = (stream: VectorBufferStream):
       receipt2: deserializeAppliedReceipt2(stream),
     })
   }
-  const errors = verifyPayload('RepairMissingAccountsReq', result)
-  if (errors && errors.length > 0) {
-    throw new Error('Data validation error')
-  }
+  // const errors = verifyPayload('RepairMissingAccountsReq', result)
+  // if (errors && errors.length > 0) {
+  //   throw new Error('Data validation error')
+  // }
   return result
 }
