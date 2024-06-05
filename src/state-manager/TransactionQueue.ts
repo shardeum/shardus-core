@@ -10,6 +10,7 @@ import { nodes, byPubKey, potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import * as utils from '../utils'
+import { getCorrespondingNodes, verifyCorrespondingSender } from '../utils/fastAggregatedCorrespondingTell'
 import {Signature, SignedObject} from '@shardus/crypto-utils'
 import {
   errorToStringFull,
@@ -2105,7 +2106,8 @@ class TransactionQueue {
 
           // calculate globalOffset for FACT
           // take last 2 bytes of the txId and convert it to an integer
-          txQueueEntry.correspondingGlobalOffset = parseInt(txId.slice(-4), 16)
+          // txQueueEntry.correspondingGlobalOffset = parseInt(txId.slice(-4), 16)
+          txQueueEntry.correspondingGlobalOffset = 0
 
           const ourID = this.stateManager.currentCycleShardData.ourNode.id
           for (let idx = 0; idx < txQueueEntry.executionGroup.length; idx++) {
@@ -4315,6 +4317,7 @@ class TransactionQueue {
     console.log(`thant: exe group size`, queueEntry.executionNodeIdSorted.length, queueEntry.executionNodeIdSorted);
     console.log(`thant: tx group size`, queueEntry.transactionGroup.length, queueEntry.transactionGroup.map(n => n.id));
     console.log(`thant: getting corresponding indices for tx: ${queueEntry.logID}`, ourIndexInTxGroup, targetIndices.startIndex, targetIndices.endIndex, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, queueEntry.transactionGroup.length);
+    console.log(`thant: target group indices`, targetIndices)
 
     const correspondingIndices = getCorrespondingNodes(
       ourIndexInTxGroup,
@@ -4328,6 +4331,10 @@ class TransactionQueue {
     console.log(`thant: correspondingIndices ${queueEntry.logID}`, ourIndexInTxGroup, correspondingIndices);
     const correspondingNodes = []
     for (const index of correspondingIndices) {
+      if (index === ourIndexInTxGroup) {
+        console.log(`thant: skip our node`, queueEntry.logID, ourIndexInTxGroup, index);
+        continue
+      }
       const targetNode = queueEntry.transactionGroup[index]
       let targetHasOurData = true
       for (const wrappedResponse of signedPayload.stateList) {
@@ -4343,14 +4350,25 @@ class TransactionQueue {
           break
         }
       }
+      console.log(`thant: targetHasOurData`, queueEntry.logID, ourIndexInTxGroup, index, targetNode.id, targetHasOurData);
       // send only if target needs our data
-      if (targetHasOurData === false) correspondingNodes.push(targetNode)
+      if (targetHasOurData === false) {
+        console.log(`thant: target needs our data`, queueEntry.logID, ourIndexInTxGroup, index, targetNode.id);
+        correspondingNodes.push(targetNode)
+      }
+    }
+    if (correspondingNodes.length === 0) {
+      console.log(`thant: factTellCorrespondingNodes: no corresponding nodes`);
+      nestedCountersInstance.countEvent('stateManager', 'factTellCorrespondingNodes: no corresponding nodes needed to send')
+      return
+    } else {
+      console.log(`thant: factTellCorrespondingNodes: corresponding nodes`, Self.id, correspondingNodes.map(n => n.id), payload);
     }
 
     // Filter nodes before we send tell()
     const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
-      correspondingAccNodes,
-      'tellCorrespondingNodes',
+      correspondingNodes,
+      'factTellCorrespondingNodes',
       true,
       true
     )
@@ -4402,7 +4420,8 @@ class TransactionQueue {
   }
 
   factValidateCorrespondingTellSender(queueEntry: QueueEntry, dataKey: string, senderNodeId: string): boolean {
-    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`validateCorrespondingTellSender: txId: ${queueEntry.acceptedTx.txId} sender node id: ${senderNodeId}`)
+    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`validateCorrespondingTellSender: txId: ${queueEntry.acceptedTx.txId} sender node id: ${senderNodeId}, receiver id: ${Self.id}`)
+    console.log(`thant: factValidateCorrespondingTellSender: txId: ${queueEntry.acceptedTx.txId} sender node id: ${senderNodeId}, receiver id: ${Self.id}`)
     const receiverNode = this.stateManager.currentCycleShardData.nodeShardData
     if (receiverNode == null) return false
 
@@ -4412,7 +4431,7 @@ class TransactionQueue {
     if (senderNode === null) return false
     const senderHasAddress = ShardFunctions.testAddressInRange(dataKey, senderNode.storedPartitions)
 
-    const receivingNodeIndex = queueEntry.ourTXGroupIndex
+    const receivingNodeIndex = queueEntry.transactionGroup.findIndex((node) => node.id === receiverNode.node.id)
     const senderNodeIndex = queueEntry.transactionGroup.findIndex((node) => node.id === senderNodeId)
     const receiverGroupSize = queueEntry.executionNodeIdSorted.length
     const senderGroupSize = queueEntry.executionNodeIdSorted.length
@@ -4462,6 +4481,7 @@ class TransactionQueue {
         targetIndexes.push(i)
       }
     }
+    console.log(`thant: all target indexes`, targetIndexes);
     const n = targetIndexes.length
     let startIndex = targetIndexes[0]
     // Find the pivot where the circular array starts

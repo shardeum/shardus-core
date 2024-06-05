@@ -12,7 +12,7 @@ export function getCorrespondingNodes(
   receiverGroupSize: number,
   sendGroupSize: number,
   transactionGroupSize: number
-): Shardus.Node[] {
+): number[] {
   let wrappedIndex: number
   let targetNumber: number
   let found = false
@@ -23,6 +23,7 @@ export function getCorrespondingNodes(
     unWrappedEndIndex = endTargetIndex
     endTargetIndex = endTargetIndex + transactionGroupSize
   }
+  console.log(`thant: unWrappedEndIndex ${unWrappedEndIndex} startTargetIndex ${startTargetIndex} endTargetIndex ${endTargetIndex}`);
 
   //wrap our index to the send group size
   ourIndex = ourIndex % sendGroupSize
@@ -44,7 +45,7 @@ export function getCorrespondingNodes(
     return []
   }
 
-  const destinationNodes = []
+  const destinationNodes: number[] = []
   //this loop is at most O(k) where k is  receiverGroupSize / sendGroupSize
   //effectively it is constant time it is required so that a smaller
   //group can send to a larger group
@@ -85,6 +86,7 @@ export function getCorrespondingNodes(
       wrappedIndex = startTargetIndex + howFarPastUnWrapped
     }
   }
+  console.log(`ourIndex in sender group ${ourIndex} destinationNodes ${destinationNodes}`);
   return destinationNodes
 }
 
@@ -95,6 +97,7 @@ export function verifyCorrespondingSender(
   receiverGroupSize: number,
   sendGroupSize: number
 ): boolean {
+  console.log(`thant: running FACT verifyCorrespondingSender sendingNodeIndex ${sendingNodeIndex} receivingNodeIndex ${receivingNodeIndex}  globalOffset ${globalOffset} receiverGroupSize ${receiverGroupSize} sendGroupSize ${sendGroupSize}`);
   //note, in the gather case, we need to check the address range of the sender node also, to prove
   //that it does cover the given account range
 
@@ -107,7 +110,7 @@ export function verifyCorrespondingSender(
       )
     return true
   } else {
-    console.log(`X verification failed ${targetIndex} !== ${targetIndex2} `)
+    console.log(`X verification failed ${targetIndex} !== ${targetIndex2} sender: ${sendingNodeIndex} receiver: ${receivingNodeIndex}`)
     return false
   }
 }
