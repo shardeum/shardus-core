@@ -98,7 +98,7 @@ export function deserializeAppliedVote(stream: VectorBufferStream): AppliedVoteS
     app_data_hash = stream.readString()
   }
 
-  return {
+  const result: AppliedVoteSerializable = {
     txid,
     transaction_result,
     account_id,
@@ -106,7 +106,14 @@ export function deserializeAppliedVote(stream: VectorBufferStream): AppliedVoteS
     account_state_hash_before,
     cant_apply,
     node_id,
-    sign,
-    app_data_hash,
   }
+
+  if (sign) {
+    result.sign = sign
+  }
+  if (app_data_hash) {
+    result.app_data_hash = app_data_hash
+  }
+
+  return result
 }
