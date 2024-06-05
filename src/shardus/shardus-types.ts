@@ -1236,6 +1236,8 @@ export interface ServerConfiguration {
     receiptRemoveFix: boolean
     // fix for stuck txs in the queue
     stuckTxQueueFix: boolean
+    // fix for stuck txs for single account tests
+    singleAccountStuckFix: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

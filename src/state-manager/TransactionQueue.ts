@@ -5130,9 +5130,14 @@ class TransactionQueue {
               nestedCountersInstance.countEvent('txExpired', `> timeM3 + confirmSeenExpirationTime state: ${queueEntry.state} hasSeenVote: ${hasSeenVote} hasSeenConfirmation: ${hasSeenConfirmation} waitForReceiptOnly: ${queueEntry.waitForReceiptOnly}`)
               if(this.config.stateManager.txStateMachineChanges){
                 if (configContext.stateManager.stuckTxQueueFix) {
-                  // make sure we are not resetting the state and causing state start timestamp to be updated repeatedly
-                  if (queueEntry.state !== 'await final data' && queueEntry.state !== 'await repair') this.updateTxState(queueEntry, 'await' +
-                    ' final data')
+                  if (configContext.stateManager.singleAccountStuckFix) {
+                    const timeSinceVoteSeen = shardusGetTime() - queueEntry.firstVoteReceivedTimestamp
+                    // if we has seenVote but still stuck in consensing state, we should go to await final data and ask receipt+data
+                    if (queueEntry.state === 'consensing' && timeSinceVoteSeen > 10000) this.updateTxState(queueEntry, 'await final data')
+                  } else {
+                    // make sure we are not resetting the state and causing state start timestamp to be updated repeatedly
+                    if (queueEntry.state !== 'await final data' && queueEntry.state !== 'await repair') this.updateTxState(queueEntry, 'await final data')
+                  }
                 } else {
                   this.updateTxState(queueEntry, 'await final data', 'processTx4')
                 }
