@@ -720,26 +720,6 @@ export function isNodeValidForInternalMessage(
   if (nodeStatus != 'active') {
     seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} notactive`)
   }
-  if (NodeList.potentiallyRemoved.has(node.id)) {
-    seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} remove`)
-  }
-
-  // This is turned off and likely to be deleted.
-  // This is because filtering gossip nodes after sending the list is causing holes to appear in gossip and some nodes do not get the gossip at all which causes stuck txn.
-  // Do not turn this back on without talking to Andrew.
-  //
-  //if (nodeStatus != 'active' || NodeList.potentiallyRemoved.has(node.id)) {
-  //  if (logErrors)
-  //    if (logFlags.error)
-  //      /* prettier-ignore */ error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(node.id)} ${debugMsg}`)
-  //  return false
-  //}
-  //
-  //const isInRotationBounds = checkNodesRotationBounds && isNodeInRotationBounds(node.id)
-  //if (isInRotationBounds) {
-  //  seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} rotation`)    
-  //  return false
-  //}
 
   // check up recent first which will tell us if we have gossip from this node in the last 5 seconds
   // consider a larger amount of time
@@ -782,7 +762,7 @@ export function isNodeValidForInternalMessage(
       if (logErrors)
         if (logFlags.error)
           /* prettier-ignore */ error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(node.id)} ${debugMsg}`)
-      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} down`)    
+      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} down`)
       return false
     }
   }
@@ -791,7 +771,7 @@ export function isNodeValidForInternalMessage(
       if (logErrors)
         if (logFlags.error)
           /* prettier-ignore */ error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(node.id)} ${debugMsg}`)
-      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} lost`)    
+      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} lost`)
       return false
     }
   }
@@ -1004,11 +984,11 @@ export async function sendGossip(
         prefix = 'orig:'
       if (context != '')
         suffix = `:${suffix}`
-      for (const node of recipients) {        
+      for (const node of recipients) {
         seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: g:${prefix}${type}${suffix}`)
       }
     }
-    
+
     if (config.p2p.useBinarySerializedEndpoints === true) {
       msgSize = await tellBinary<GossipReqBinary>(
         recipients,
