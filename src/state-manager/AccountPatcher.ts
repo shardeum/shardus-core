@@ -89,8 +89,7 @@ import {
 } from '../types/GetTrieAccountHashesResp'
 import { BadRequest, InternalError, serializeResponseError } from '../types/ResponseError'
 import { Utils } from '@shardus/types'
-import { RepairMissingAccountsReq, deserializeRepairMissingAccountsReq, serializeRepairMissingAccountsReq } from '../types/RepairMissingAccountsReq'
-import { verifyPayload } from '../types/ajv/Helpers'
+import { RepairOOSAccountsReq, deserializeRepairOOSAccountsReq, serializeRepairOOSAccountsReq } from '../types/RepairOOSAccountsReq'
 
 type Line = {
   raw: string
@@ -630,19 +629,19 @@ class AccountPatcher {
     )
 
     const repairMissingAccountsBinary: Route<InternalBinaryHandler<Buffer>> = {
-      name: InternalRouteEnum.binary_repair_missing_accounts,
+      name: InternalRouteEnum.binary_repair_oos_accounts,
       handler: async (payloadBuffer, respond, header, sign) => {
-        const route = InternalRouteEnum.binary_repair_missing_accounts
+        const route = InternalRouteEnum.binary_repair_oos_accounts
         nestedCountersInstance.countEvent('internal', route)
         this.profiler.scopedProfileSectionStart(route, false, payloadBuffer.length)
         try {
-          const requestStream = getStreamWithTypeCheck(payloadBuffer, TypeIdentifierEnum.cRepairMissingAccountsReq)
+          const requestStream = getStreamWithTypeCheck(payloadBuffer, TypeIdentifierEnum.cRepairOOSAccountsReq)
           if (!requestStream) {
             return
           }
           // (Optional) Check verification data in the header 
-          const payload = deserializeRepairMissingAccountsReq(requestStream)
-          // verifyPayload('RepairMissingAccountsReq', payload)
+          const payload = deserializeRepairOOSAccountsReq(requestStream)
+          // verifyPayload('RepairOOSAccountsReq', payload)
           for (const repairInstruction of payload?.repairInstructions) {
             const { accountID, txId, hash, accountData, targetNodeId, receipt2 } = repairInstruction
 
@@ -3525,11 +3524,11 @@ class AccountPatcher {
           if(this.stateManager.config.p2p.useBinarySerializedEndpoints &&
             this.stateManager.config.p2p.repairMissingAccountsBinary
           ) {
-            await this.p2p.tellBinary<RepairMissingAccountsReq>(
+            await this.p2p.tellBinary<RepairOOSAccountsReq>(
               [node],
-              InternalRouteEnum.binary_repair_missing_accounts,
+              InternalRouteEnum.binary_repair_oos_accounts,
               message,
-              serializeRepairMissingAccountsReq,
+              serializeRepairOOSAccountsReq,
               {}
             )
           } else {
@@ -3826,7 +3825,7 @@ class AccountPatcher {
           if (this.stateManager.config.p2p.useBinarySerializedEndpoints &&
             this.stateManager.config.p2p.repairMissingAccountsBinary
           ) {
-            const message: RepairMissingAccountsReq = {
+            const message: RepairOOSAccountsReq = {
               repairInstructions: [{
                 accountID: accountId,
                 hash: updatedAccountData.stateId,
@@ -3836,11 +3835,11 @@ class AccountPatcher {
                 receipt2: this.stateManager.getReceipt2(archivedQueueEntry)
               }]
             }
-            await this.p2p.tellBinary<RepairMissingAccountsReq>(
+            await this.p2p.tellBinary<RepairOOSAccountsReq>(
               [tooOldRecord.node],
-              InternalRouteEnum.binary_repair_missing_accounts,
+              InternalRouteEnum.binary_repair_oos_accounts,
               message,
-              serializeRepairMissingAccountsReq,
+              serializeRepairOOSAccountsReq,
               {}
             )
           } else {
