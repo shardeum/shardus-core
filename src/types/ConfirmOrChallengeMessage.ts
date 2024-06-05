@@ -3,7 +3,7 @@ import { AppliedVoteSerializable, deserializeAppliedVote, serializeAppliedVote }
 import { SignSerializable, deserializeSign, serializeSign } from './Sign'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
-const cConfirmOrChallengeMessageVersion = 1
+export const cConfirmOrChallengeMessageVersion = 1
 
 export type ConfirmOrChallengeMessageSerializable = {
   message: string
