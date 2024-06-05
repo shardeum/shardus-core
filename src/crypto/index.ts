@@ -44,7 +44,7 @@ class Crypto {
 
   async init(): Promise<void> {
     crypto.init(this.config.crypto.hashKey)
-    crypto.setCustomStringifier(Utils.safeStringify, 'shardus_types_safeStringify')
+    crypto.setCustomStringifier(Utils.safeStringify, 'shardus_safeStringify')
 
     try {
       this.storage._checkInit()
