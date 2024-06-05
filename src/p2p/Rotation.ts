@@ -122,7 +122,6 @@ export function getExpiredRemoved(
 ): { expired: number; removed: string[] } {
   let expired = 0
   const removed = []
-  NodeList.potentiallyRemoved.clear()
 
   // Don't expire/remove any if nodeExpiryAge is negative
   if (config.p2p.nodeExpiryAge < 0) return { expired, removed }
@@ -214,14 +213,12 @@ export function getExpiredRemoved(
     if (config.p2p.uniqueRemovedIds) {
       // Limit the number of nodes that can be removed by removed + apoptosized
       if (removed.length + apoptosizedNodesList.length < maxRemove) {
-        NodeList.potentiallyRemoved.add(node.id)
         if (!apoptosizedNodesList.includes(node.id)) {
           insertSorted(removed, node.id)
         }
       } else break
     } else {
       if (removed.length < maxRemove) {
-        NodeList.potentiallyRemoved.add(node.id)
         insertSorted(removed, node.id)
       }
     }
