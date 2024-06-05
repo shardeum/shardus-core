@@ -5712,7 +5712,14 @@ class TransactionQueue {
                 if (queueEntry.pendingConfirmOrChallenge.size > 0 && queueEntry.robustQueryVoteCompleted === true && queueEntry.acceptVoteMessage === false) {
                   this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} pendingConfirmOrChallenge.size = ${queueEntry.pendingConfirmOrChallenge.size}`)
                   for (const [nodeId, confirmOrChallenge] of queueEntry.pendingConfirmOrChallenge) {
-                    this.stateManager.transactionConsensus.tryAppendMessage(queueEntry, confirmOrChallenge)
+                    const appendSuccessful = this.stateManager.transactionConsensus.tryAppendMessage(queueEntry, confirmOrChallenge)
+                    if (appendSuccessful) {
+                      // we need forward the message to other nodes if append is successful
+                      const payload  = confirmOrChallenge
+                      const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+                      Comms.sendGossip('spread_confirmOrChallenge', payload, '', null, gossipGroup, false, 10, queueEntry.acceptedTx.txId)
+                      queueEntry.gossipedConfirmOrChallenge = true
+                    }
                   }
                   queueEntry.pendingConfirmOrChallenge = new Map()
                   this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} reset pendingConfirmOrChallenge.size = ${queueEntry.pendingConfirmOrChallenge.size}`)
