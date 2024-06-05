@@ -18,7 +18,6 @@ import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
 import { getNewestCycle } from '../p2p/Sync'
 import { Utils } from '@shardus/types'
-import { nodelistFromStates } from '../p2p/Join'
 
 console.log('StateManager', StateManager)
 console.log('StateManager type', StateManager.StateManagerTypes)
