@@ -8,7 +8,7 @@ import {
 import { SignSerializable, deserializeSign, serializeSign } from './Sign'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
-const cAppliedReceipt2Version = 1
+export const cAppliedReceipt2Version = 1
 
 export type AppliedReceipt2Serializable = {
   txid: string
@@ -36,6 +36,7 @@ export function serializeAppliedReceipt2(
   serializeAppliedVote(stream, obj.appliedVote)
   serializeConfirmOrChallengeMessage(stream, obj.confirmOrChallenge)
   stream.writeUInt16(obj.signatures.length)
+  // TODO: Convert to for loop
   obj.signatures.forEach((sig) => serializeSign(stream, sig))
   stream.writeString(obj.app_data_hash)
 }
