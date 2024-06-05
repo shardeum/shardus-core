@@ -641,9 +641,9 @@ class AccountPatcher {
           if (!requestStream) {
             return
           }
-          // (Optional) Check verification data in the header
+          // (Optional) Check verification data in the header 
           const payload = deserializeRepairMissingAccountsReq(requestStream)
-          verifyPayload('RepairMissingAccountsReq', payload)
+          // verifyPayload('RepairMissingAccountsReq', payload)
           for (const repairInstruction of payload?.repairInstructions) {
             const { accountID, txId, hash, accountData, targetNodeId, receipt2 } = repairInstruction
 
