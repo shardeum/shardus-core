@@ -103,7 +103,7 @@ export type LogFlags = {
   dapp_verbose: boolean //the dapp using this library will read this flag and log more info if true
   profiling_verbose: boolean
 
-  aalg:boolean //details on automatic access list generation
+  aalg: boolean //details on automatic access list generation
   shardedCache: boolean //details on the sharded cache
 
   lost: boolean // extra logging for the lost system
@@ -145,7 +145,7 @@ export let logFlags: LogFlags = {
   shardedCache: false,
   lost: false,
   rotation: false,
-  seqdiagram: false
+  seqdiagram: false,
 }
 
 const filePath1 = path.join(process.cwd(), 'data-logs', 'cycleRecords1.txt')
@@ -497,6 +497,59 @@ class Logger {
         })
       }
     )
+    Context.network.registerExternalGet('debug-clearlog', isDebugModeMiddlewareMedium, async (req, res) => {
+      const requestedFileName = req.query.file
+
+      if (!requestedFileName) {
+        res.status(400).send('No log file specified')
+        return
+      }
+
+      // Get the basename of the requested file to ensure no directory paths are included.
+      const sanitizedFileName = path.basename(requestedFileName)
+
+      // Retrieve valid filenames from the logger configuration
+      const validFileNames = this.log4Conf.appenders
+        .filter((appender) => appender.type === 'file')
+        .map((appender) => path.basename(appender.filename))
+
+      // If 'all' is requested, set to clear all files, otherwise sanitize the input file name.
+      let filesToClear = []
+      if (requestedFileName.toLowerCase() === 'all') {
+        filesToClear = validFileNames
+      } else {
+        const sanitizedFileName = path.basename(requestedFileName)
+        if (!validFileNames.includes(sanitizedFileName)) {
+          res.status(400).send('Invalid log file specified')
+          return
+        }
+        filesToClear.push(sanitizedFileName)
+      }
+
+      try {
+        // Retrieve and filter all log files and their rotated versions in the directory.
+        // including rotated versions (e.g., out.log.1, out.log.2, etc.)
+        const filesInDir = await fs.promises.readdir(this.logDir)
+        const filesToDelete = filesInDir.filter((file) =>
+          filesToClear.some((f) => file === f || file.startsWith(f + '.'))
+        )
+
+        // Clear the original log files without deleting them
+        const truncatePromises = filesToClear.map((file) =>
+          fs.promises.truncate(path.join(this.logDir, file), 0)
+        )
+        await Promise.all(truncatePromises)
+
+        // Delete rotated versions
+        const deletePromises = filesToDelete.map((file) => fs.promises.unlink(path.join(this.logDir, file)))
+        await Promise.all(deletePromises)
+
+        res.status(200).send({ success: true })
+      } catch (error) {
+        console.error('Error clearing log files:', error)
+        res.status(500).send(`Failed to clearing log files with input ${requestedFileName}`)
+      }
+    })
   }
 
   _containsProtocol(url: string) {

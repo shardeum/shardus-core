@@ -118,52 +118,6 @@ class Debug {
       }
       return res.send({ success: true })
     })
-    this.network.registerExternalGet('debug-clearlog', isDebugModeMiddlewareMedium, (req, res) => {
-      const requestedFile = req.query.file
-      if (typeof requestedFile !== 'string' || !requestedFile) {
-        return res.status(400).send({ success: false, error: 'Invalid file parameter' })
-      }
-
-      const logsAbsolutePath = Object.keys(this.files).find((key) => this.files[key] === './logs')
-      if (!logsAbsolutePath) {
-        return res.status(404).send({ success: false, error: 'Logs directory not found' })
-      }
-      const logsDirectory = path.resolve(logsAbsolutePath);
-
-      try {
-        if (requestedFile === 'all') {
-          // Deletes all files in the directory
-          // TODO: restric to only predefined log files, flag to delete backup logs
-          const files = fs.readdirSync(logsDirectory)
-          for (const file of files) {
-            fs.unlinkSync(path.join(logsDirectory, file))
-          }
-        } else {
-          // Deletes the specified file and its rotated files (i.e. file.log, file1.log, file2.log, ...) 
-          const normalizedFile = path.normalize(requestedFile).replace(/^(\.\.[/\\])+/, '')
-          const fileExtension = path.extname(normalizedFile);
-          const baseFileName = path.basename(normalizedFile, fileExtension)
-          const filePattern = new RegExp(`^${baseFileName}(\\d*)\\${fileExtension}$`);
-
-          const files = fs.readdirSync(logsDirectory)
-          const matchedFiles = files.filter((file) => filePattern.test(file))
-
-          if (matchedFiles.length === 0) {
-            return res.status(404).send({ success: false, error: 'File not found' })
-          }
-
-          for (const file of matchedFiles) {
-            const filePath = path.join(logsDirectory, file)
-            if (filePath.startsWith(logsDirectory) && fs.existsSync(filePath)) {
-              fs.unlinkSync(filePath)
-            }
-          }
-        }
-        res.status(200).send({ success: true })
-      } catch (error) {
-        res.status(500).send({ success: false, error: `Error clearing log ${requestedFile}` })
-      }
-    })
   }
 }
 
