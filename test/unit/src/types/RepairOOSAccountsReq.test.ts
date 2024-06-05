@@ -1,10 +1,10 @@
 import { serializeAppliedReceipt2 } from '../../../../src/types/AppliedReceipt2'
 import {
-  serializeRepairMissingAccountsReq,
-  RepairMissingAccountsReq,
-  cRepairMissingAccountsReqVersion,
-  deserializeRepairMissingAccountsReq,
-} from '../../../../src/types/RepairMissingAccountsReq'
+  serializeRepairOOSAccountsReq,
+  RepairOOSAccountsReq,
+  cRepairOOSAccountsReqVersion,
+  deserializeRepairOOSAccountsReq,
+} from '../../../../src/types/RepairOOSAccountsReq'
 import { serializeWrappedData } from '../../../../src/types/WrappedData'
 import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
@@ -34,7 +34,7 @@ describe('RepairMissingAccountReq Serialization', () => {
   })
 
   test('Should serialize with root true', () => {
-    const obj: RepairMissingAccountsReq = {
+    const obj: RepairOOSAccountsReq = {
       repairInstructions: [
         {
           accountID: 'test',
@@ -89,11 +89,11 @@ describe('RepairMissingAccountReq Serialization', () => {
     }
 
     const stream = new VectorBufferStream(0)
-    serializeRepairMissingAccountsReq(stream, obj, true)
+    serializeRepairOOSAccountsReq(stream, obj, true)
 
     const expectedStream = new VectorBufferStream(0)
-    expectedStream.writeUInt16(TypeIdentifierEnum.cRepairMissingAccountsReq)
-    expectedStream.writeUInt8(cRepairMissingAccountsReqVersion)
+    expectedStream.writeUInt16(TypeIdentifierEnum.cRepairOOSAccountsReq)
+    expectedStream.writeUInt8(cRepairOOSAccountsReqVersion)
     expectedStream.writeUInt32(1) // repairInstructions length
     for (let i = 0; i < obj.repairInstructions.length; i++) {
       // eslint-disable-next-line security/detect-object-injection
@@ -114,7 +114,7 @@ describe('RepairMissingAccountReq Serialization', () => {
   })
 
   test('Should serialize with root false', () => {
-    const obj: RepairMissingAccountsReq = {
+    const obj: RepairOOSAccountsReq = {
       repairInstructions: [
         {
           accountID: 'test',
@@ -219,10 +219,10 @@ describe('RepairMissingAccountReq Serialization', () => {
     }
 
     const stream = new VectorBufferStream(0)
-    serializeRepairMissingAccountsReq(stream, obj, false)
+    serializeRepairOOSAccountsReq(stream, obj, false)
 
     const expectedStream = new VectorBufferStream(0)
-    expectedStream.writeUInt8(cRepairMissingAccountsReqVersion)
+    expectedStream.writeUInt8(cRepairOOSAccountsReqVersion)
     expectedStream.writeUInt32(2) // repairInstructions length
     for (let i = 0; i < obj.repairInstructions.length; i++) {
       // eslint-disable-next-line security/detect-object-injection
@@ -241,7 +241,7 @@ describe('RepairMissingAccountReq Serialization', () => {
   })
 
   test('Should serialize with empty string', () => {
-    const obj: RepairMissingAccountsReq = {
+    const obj: RepairOOSAccountsReq = {
       repairInstructions: [
         {
           accountID: '',
@@ -346,10 +346,10 @@ describe('RepairMissingAccountReq Serialization', () => {
     }
 
     const stream = new VectorBufferStream(0)
-    serializeRepairMissingAccountsReq(stream, obj, false)
+    serializeRepairOOSAccountsReq(stream, obj, false)
 
     const expectedStream = new VectorBufferStream(0)
-    expectedStream.writeUInt8(cRepairMissingAccountsReqVersion)
+    expectedStream.writeUInt8(cRepairOOSAccountsReqVersion)
     expectedStream.writeUInt32(2) // repairInstructions length
     for (let i = 0; i < obj.repairInstructions.length; i++) {
       // eslint-disable-next-line security/detect-object-injection
@@ -370,7 +370,7 @@ describe('RepairMissingAccountReq Serialization', () => {
 
 describe('RepairMissingAccountReq Deserialization', () => {
   test('Should deserialize successfully', () => {
-    const data: RepairMissingAccountsReq = {
+    const data: RepairOOSAccountsReq = {
       repairInstructions: [
         {
           accountID: 'test',
@@ -425,7 +425,7 @@ describe('RepairMissingAccountReq Deserialization', () => {
       ],
     }
     const stream = new VectorBufferStream(0)
-    stream.writeUInt8(cRepairMissingAccountsReqVersion)
+    stream.writeUInt8(cRepairOOSAccountsReqVersion)
     stream.writeUInt32(1) // repairInstructions length
     stream.writeString(data.repairInstructions[0].accountID) // accountID
     stream.writeString(data.repairInstructions[0].hash) // hash
@@ -435,7 +435,7 @@ describe('RepairMissingAccountReq Deserialization', () => {
     serializeAppliedReceipt2(stream, data.repairInstructions[0].receipt2) // receipt2
     stream.position = 0
 
-    const obj = deserializeRepairMissingAccountsReq(stream)
+    const obj = deserializeRepairOOSAccountsReq(stream)
     expect(obj).toEqual(data)
   })
 })
