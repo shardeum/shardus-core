@@ -1,7 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
-const cSignVersion = 1
+export const cSignVersion = 1
 
 export interface SignSerializable {
   owner: string // The key of the owner
