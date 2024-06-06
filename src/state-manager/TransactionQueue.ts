@@ -7514,9 +7514,9 @@ class TransactionQueue {
   }
   clearQueueItems(): number {
     try {
-      for (const queueEntry of this._transactionQueue) {
-        const currentIndex = this._transactionQueue.indexOf(queueEntry)
-        this.removeFromQueue(queueEntry, currentIndex)
+      for(let i = this._transactionQueue.length-1; i>=0; i--){
+        const queueEntry = this._transactionQueue[i]
+        this.removeFromQueue(queueEntry, i)
       }
     } catch (e) {
       console.error('clearQueueItems error:', e)
