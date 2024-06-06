@@ -1257,7 +1257,9 @@ class ShardFunctions {
     if (partitionShard.homeNodes.length === 0) {
       return null
     }
-    return partitionShard.homeNodes[0]
+    const len = partitionShard.homeNodes.length
+    const randomNo = Math.floor(Math.random() * len)
+    return partitionShard.homeNodes[randomNo]
   }
 
   static circularDistance(a: number, b: number, max: number): number {
