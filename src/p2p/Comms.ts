@@ -690,7 +690,7 @@ export function isNodeValidForInternalMessage(
 ): boolean {
   const logErrors = logFlags.debug
   if (node == null) {
-    seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} null`)
+    /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} null`)
     if (logErrors)
       if (logFlags.error)
         /* prettier-ignore */ error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(node.id)} ${debugMsg}`)
@@ -700,7 +700,7 @@ export function isNodeValidForInternalMessage(
   // Some modes are not compatible with doing a valid node check for outgoing messages
   // if that is the case just return true and allow the message
   if (modeAllowsValidNodeChecks() === false) {
-    seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} nochecks`)
+    /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} nochecks`)
     return true
   }
 
@@ -718,10 +718,10 @@ export function isNodeValidForInternalMessage(
 
   // Also may add a flag to change if we also allow other statuses
   if (nodeStatus != 'active') {
-    seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} notactive`)
+    /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} notactive`)
   }
   if (NodeList.potentiallyRemoved.has(node.id)) {
-    seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} remove`)
+    /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} remove`)
   }
 
   // This is turned off and likely to be deleted.
@@ -737,7 +737,7 @@ export function isNodeValidForInternalMessage(
   //
   //const isInRotationBounds = checkNodesRotationBounds && isNodeInRotationBounds(node.id)
   //if (isInRotationBounds) {
-  //  seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} rotation`)    
+  //  /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} rotation`)    
   //  return false
   //}
 
@@ -782,7 +782,7 @@ export function isNodeValidForInternalMessage(
       if (logErrors)
         if (logFlags.error)
           /* prettier-ignore */ error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(node.id)} ${debugMsg}`)
-      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} down`)    
+      /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} down`)    
       return false
     }
   }
@@ -791,7 +791,7 @@ export function isNodeValidForInternalMessage(
       if (logErrors)
         if (logFlags.error)
           /* prettier-ignore */ error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(node.id)} ${debugMsg}`)
-      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} lost`)    
+      /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: validnode ${NodeList.activeIdToPartition.get(node.id)} lost`)    
       return false
     }
   }
@@ -914,20 +914,20 @@ export async function sendGossip(
   //console.log('originIdx ', originIdx)
 
   if (context != '')
-    seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipContext:${context}`)
+    /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipContext:${context}`)
   if (originIdx !== undefined && originIdx >= 0) {
     // If it is protocol tx signed by a node in the network
     recipientIdxs = utils.getLinearGossipBurstList(nodeIdxs.length, gossipFactor, myIdx, originIdx)
     if (logFlags.seqdiagram && txId != '') {
-      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipBin:${nodeIdxs.length},${gossipFactor},${myIdx},${originIdx}`)
-      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipBout:${recipientIdxs}`)
+      /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipBin:${nodeIdxs.length},${gossipFactor},${myIdx},${originIdx}`)
+      /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipBout:${recipientIdxs}`)
     }
   } else {
     // If it is app tx which is not signed by a node in the network
     recipientIdxs = utils.getLinearGossipList(nodeIdxs.length, gossipFactor, myIdx, isOrigin)
     if (logFlags.seqdiagram && txId != '') {
-      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipLin:${nodeIdxs.length},${gossipFactor},${myIdx},${isOrigin}`)
-      seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipLout:${recipientIdxs}`)
+      /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipLin:${nodeIdxs.length},${gossipFactor},${myIdx},${isOrigin}`)
+      /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipLout:${recipientIdxs}`)
     }
   }
 
@@ -983,7 +983,7 @@ export async function sendGossip(
         } else {
           /* prettier-ignore */ nestedCountersInstance.countEvent('p2p-skip-send', 'skipping gossip')
           /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p-skip-send', `skipping gossip ${node.internalIp}:${node.externalPort}` )
-          seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipSkip:${NodeList.activeIdToPartition.get(node.id)}:${node.internalIp}:${node.externalPort}`)
+          /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipSkip:${NodeList.activeIdToPartition.get(node.id)}:${node.internalIp}:${node.externalPort}`)
         }
       })
       const newCount = recipients.length
@@ -1005,7 +1005,7 @@ export async function sendGossip(
       if (context != '')
         suffix = `:${suffix}`
       for (const node of recipients) {        
-        seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: g:${prefix}${type}${suffix}`)
+        /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: g:${prefix}${type}${suffix}`)
       }
     }
     

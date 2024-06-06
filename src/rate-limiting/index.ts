@@ -6,6 +6,7 @@ import { shardusGetTime } from '../network'
 import { activeIdToPartition } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as Context from '../p2p/Context'
+import { logFlags } from '../logger'
 
 interface RateLimiting {
   limitRate: boolean
@@ -68,17 +69,17 @@ class RateLimiting {
     let overloaded = Math.random() < throttle
 
     if (overloaded) {
-      this.seqLogger.info(
+      /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(
         `0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(
           Self.id
         )}: overloaded_type ${loadType}:${throttle}`
       )
-      this.seqLogger.info(
+      /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(
         `0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(
           Self.id
         )}: overloaded_node ${nodeLoad.internal}/${nodeLoad.external}`
       )
-      this.seqLogger.info(
+      /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(
         `0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(
           Self.id
         )}: overloaded_queue ${queueLoad.txTimeInQueue}/${queueLoad.queueLength}}/${
