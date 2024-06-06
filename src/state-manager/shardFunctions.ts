@@ -3,6 +3,7 @@ import * as Shardus from '../shardus/shardus-types'
 import { StateManager, P2P } from '@shardus/types'
 import log4js from 'log4js'
 import { Ordering, stringify } from '../utils'
+import * as crypto from 'crypto'
 
 type ShardGlobals = StateManager.shardFunctionTypes.ShardGlobals
 type ShardInfo = StateManager.shardFunctionTypes.ShardInfo
@@ -1257,8 +1258,9 @@ class ShardFunctions {
     if (partitionShard.homeNodes.length === 0) {
       return null
     }
-    const len = partitionShard.homeNodes.length
-    const randomNo = Math.floor(Math.random() * len)
+    const max = partitionShard.homeNodes.length
+    // randomInt return random number < max
+    const randomNo = crypto.randomInt(max)
     return partitionShard.homeNodes[randomNo]
   }
 
