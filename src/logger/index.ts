@@ -493,32 +493,38 @@ class Logger {
       }
     )
     Context.network.registerExternalGet('debug-clearlog', isDebugModeMiddlewareMedium, async (req, res) => {
-      const requestedFileName = req.query.file
-
-      if (!requestedFileName) {
-        res.status(400).send('No log file specified')
-        return
-      }
-
-      // Get the basename of the requested file to ensure no directory paths are included.
-      const sanitizedFileName = path.basename(requestedFileName)
-
-      // Retrieve valid filenames from the logger configuration
-      const validFileNames = this.log4Conf.appenders
-        .filter((appender) => appender.type === 'file')
-        .map((appender) => path.basename(appender.filename))
-
-      // If 'all' is requested, set to clear all files, otherwise sanitize the input file name.
-      let filesToClear = []
-      if (requestedFileName.toLowerCase() === 'all') {
-        filesToClear = validFileNames
-      } else {
-        const sanitizedFileName = path.basename(requestedFileName)
-        if (!validFileNames.includes(sanitizedFileName)) {
-          res.status(400).send('Invalid log file specified')
+      const requestedFileName = req?.query?.file
+      let filesToClear = []      
+      try {
+        if (!requestedFileName) {
+          res.status(400).send('No log file specified')
           return
         }
-        filesToClear.push(sanitizedFileName)
+
+        // Get the basename of the requested file to ensure no directory paths are included.
+        const sanitizedFileName = path.basename(requestedFileName)
+
+        // Retrieve valid filenames from the logger configuration
+        const validFileNames = this.log4Conf.appenders
+          .filter((appender) => appender.type === 'file')
+          .map((appender) => path.basename(appender.filename))
+
+        // If 'all' is requested, set to clear all files, otherwise sanitize the input file name.
+
+        if (requestedFileName.toLowerCase() === 'all') {
+          filesToClear = validFileNames
+        } else {
+          const sanitizedFileName = path.basename(requestedFileName)
+          if (!validFileNames.includes(sanitizedFileName)) {
+            res.status(400).send('Invalid log file specified')
+            return
+          }
+          filesToClear.push(sanitizedFileName)
+        }
+
+      } catch (error) {
+        console.error('Error clearing log files 1:', error)
+        res.status(500).send(`Failed to clearing log files with input 1 ${requestedFileName}`)
       }
 
       try {
@@ -541,8 +547,8 @@ class Logger {
 
         res.status(200).send({ success: true })
       } catch (error) {
-        console.error('Error clearing log files:', error)
-        res.status(500).send(`Failed to clearing log files with input ${requestedFileName}`)
+        console.error('Error clearing log files 2:', error)
+        res.status(500).send(`Failed to clearing log files with input 2 ${requestedFileName}`)
       }
     })
   }
