@@ -1,4 +1,4 @@
-import { safeJsonParse, safeStringify } from '@shardus/types/build/src/utils/functions/stringify'
+import { Utils } from '@shardus/types'
 import { VectorBufferStream } from '../../../../src'
 import {
   deserializeGetTxTimestampResp,
@@ -37,7 +37,7 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
       test.each(invalidObjects)(
         'should throw error if field is improper during serialization',
         ({ data }) => {
-          const dataClone = safeJsonParse(safeStringify(data))
+          const dataClone = Utils.safeJsonParse(Utils.safeStringify(data))
           const stream = new VectorBufferStream(0)
           expect(() => serializeGetTxTimestampResp(stream, dataClone)).toThrow('Data validation error')
         }
