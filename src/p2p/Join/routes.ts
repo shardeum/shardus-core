@@ -66,7 +66,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'join',
   handler: async (req, res) => {
-    const joinRequest: JoinRequest = DeSerializeFromJsonString(utils.stringify(req.body))
+    const joinRequest: JoinRequest = Utils.safeJsonParse(Utils.safeStringify(req.body))
 
     if (!isActive && !Self.isRestartNetwork) {
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: not-active`)

@@ -4,11 +4,7 @@ import * as http from '../../http'
 import { logFlags } from '../../logger'
 import { hexstring, P2P } from '@shardus/types'
 import * as utils from '../../utils'
-import {
-  validateTypes,
-  isEqualOrNewerVersion,
-  DeSerializeFromJsonString
-} from "../../utils";
+import { validateTypes, isEqualOrNewerVersion } from '../../utils'
 import * as Comms from '../Comms'
 import { config, crypto, logger, network, shardus } from '../Context'
 import * as CycleChain from '../CycleChain'
