@@ -2677,6 +2677,9 @@ class TransactionConsenus {
 
       // save our vote to our queueEntry
       queueEntry.ourVote = ourVote
+      if (queueEntry.firstVoteReceivedTimestamp === 0) {
+        queueEntry.firstVoteReceivedTimestamp = shardusGetTime()
+      }
 
       if (this.stateManager.transactionQueue.useNewPOQ) {
         if (isEligibleToShareVote === false) {

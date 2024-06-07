@@ -5132,14 +5132,18 @@ class TransactionQueue {
             nestedCountersInstance.countEvent('txExpired', `txAge > timeM3 + confirmSeenExpirationTime + 10s`)
             // maybe we missed the spread_appliedReceipt2 gossip, go to await final data if we have a confirmation
             // we will request the final data (and probably receipt2)
-            if (configContext.stateManager.disableTxExpiration && hasSeenVote) {
+            if (configContext.stateManager.disableTxExpiration && hasSeenVote && queueEntry.firstVoteReceivedTimestamp > 0) {
               nestedCountersInstance.countEvent('txExpired', `> timeM3 + confirmSeenExpirationTime state: ${queueEntry.state} hasSeenVote: ${hasSeenVote} hasSeenConfirmation: ${hasSeenConfirmation} waitForReceiptOnly: ${queueEntry.waitForReceiptOnly}`)
               if(this.config.stateManager.txStateMachineChanges){
                 if (configContext.stateManager.stuckTxQueueFix) {
                   if (configContext.stateManager.singleAccountStuckFix) {
                     const timeSinceVoteSeen = shardusGetTime() - queueEntry.firstVoteReceivedTimestamp
                     // if we has seenVote but still stuck in consensing state, we should go to await final data and ask receipt+data
-                    if (queueEntry.state === 'consensing' && timeSinceVoteSeen > configContext.stateManager.stuckTxMoveTime) this.updateTxState(queueEntry, 'await final data')
+                    if (queueEntry.state === 'consensing' && timeSinceVoteSeen > configContext.stateManager.stuckTxMoveTime) {
+                      if (logFlags.debug) this.mainLogger.debug(`txId ${queueEntry.logID} move stuck consensing tx to await final data. timeSinceVoteSeen: ${timeSinceVoteSeen} ms`)
+                      nestedCountersInstance.countEvent('consensus', `move stuck consensing tx to await final data.`)
+                      this.updateTxState(queueEntry, 'await final data')
+                    }
                   } else {
                     // make sure we are not resetting the state and causing state start timestamp to be updated repeatedly
                     if (queueEntry.state !== 'await final data' && queueEntry.state !== 'await repair') this.updateTxState(queueEntry, 'await final data')
