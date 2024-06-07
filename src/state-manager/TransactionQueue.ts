@@ -4852,7 +4852,7 @@ class TransactionQueue {
         // eslint-disable-next-line security/detect-object-injection
         const queueEntry: QueueEntry = this._transactionQueue[currentIndex]
 
-        // This scenario happened in big networks and this check is to avoid the nod from dying
+        // This scenario happened in big networks and this check is to avoid the node from dying
         // this probably happened due to debug-queue-clear endpoint usage in the network
         if (!!queueEntry) {
           if (!!queueEntry.acceptedTx) {
