@@ -1240,6 +1240,8 @@ export interface ServerConfiguration {
     stuckTxQueueFix: boolean
     // fix for stuck txs for single account tests
     singleAccountStuckFix: boolean
+    // wait time before moving stuck "consensing" tx to "await final data"
+    stuckTxMoveTime: number
   }
   /** Options for sharding calculations */
   sharding?: {
