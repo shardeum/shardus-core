@@ -1,4 +1,4 @@
-import { Node } from "../../shardus/shardus-types"
+import { Node } from '../../shardus/shardus-types'
 
 export function removeNodesByID(nodes, ids): Node[] {
   if (!Array.isArray(ids)) {

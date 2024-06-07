@@ -122,7 +122,7 @@ export function updateRecord(
   // add all txs.lostArchivers publicKeys to record.lostArchivers
   for (const tx of txs.lostArchivers) {
     const target = tx.investigateMsg?.target
-    if(target) {
+    if (target) {
       insertSorted(lostArchivers, target)
     } else {
       /* prettier-ignore */ if (logFlags.debug) console.log(`publicKey undefined for tx: ${Utils.safeStringify(tx)} in lostArchivers`)
@@ -131,7 +131,7 @@ export function updateRecord(
   // add all txs.refutedArchivers publicKeys to record.refutedArchivers
   for (const tx of txs.refutedArchivers) {
     const target = tx.downMsg?.investigateMsg?.target
-    if(target) {
+    if (target) {
       insertSorted(refutedArchivers, target)
     } else {
       /* prettier-ignore */ if (logFlags.debug) console.log(`publicKey undefined for tx: ${Utils.safeStringify(tx)} in refutedArchivers`)
@@ -229,7 +229,7 @@ export function sendRequests(): void {
     }
     if (record.status === 'up' && !record.gossippedUpMsg) {
       // Create ArchiverUpMsg and gossip it on the lostArchiverUpGossip route
-      tellNetworkArchiverIsUp(record) 
+      tellNetworkArchiverIsUp(record)
       // set gossiped to true
       record.gossippedUpMsg = true
       continue

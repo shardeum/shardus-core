@@ -539,8 +539,8 @@ export function totalNodeCount(cycle: P2P.CycleCreatorTypes.CycleRecord) {
     cycle.active +
     //    cycle.activated.length -      // don't count activated because it was already counted in syncing
     -cycle.apoptosized.length +
-    -cycle.removed.length
-    -cycle.appRemoved.length
+    -cycle.removed.length -
+    cycle.appRemoved.length
     // -cycle.lost.length
   )
 }

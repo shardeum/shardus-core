@@ -67,10 +67,7 @@ export class NetworkClass extends EventEmitter {
   useLruCacheForSocketMgmt: boolean
   lruCacheSizeForSocketMgmt: number
 
-  constructor(
-    config: Shardus.StrictServerConfiguration,
-    logger: Logger,
-  ) {
+  constructor(config: Shardus.StrictServerConfiguration, logger: Logger) {
     super()
     this.app = express()
     this.sn = null
@@ -108,7 +105,7 @@ export class NetworkClass extends EventEmitter {
   }
 
   customSendJsonMiddleware(req, res, next) {
-    const originalSend = res.send;
+    const originalSend = res.send
     res.send = function (data) {
       if (typeof data === 'object' && data !== null) {
         const jsonString = Utils.safeStringify(data)
@@ -116,7 +113,7 @@ export class NetworkClass extends EventEmitter {
         return originalSend.call(this, jsonString)
       }
       return originalSend.call(this, data)
-    };
+    }
 
     res.json = function (data) {
       const jsonString = Utils.safeStringify(data)
@@ -147,7 +144,7 @@ export class NetworkClass extends EventEmitter {
         next()
       }
 
-      this.app.use(bodyParser.json({ limit: '50mb', reviver: Utils.typeReviver}))
+      this.app.use(bodyParser.json({ limit: '50mb', reviver: Utils.typeReviver }))
       this.app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }))
       this.app.use(cors())
       this.app.use(this.customSendJsonMiddleware)

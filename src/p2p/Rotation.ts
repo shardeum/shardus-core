@@ -78,14 +78,28 @@ export function updateRecord(
 
   {
     const { expired, removed } = getExpiredRemoved(prev.start, prev.desired, txs)
-    nestedCountersInstance.countEvent('p2p', `results of getExpiredRemoved: expired: ${expired} removed: ${removed.length}`, 1)
-    if (logFlags && logFlags.verbose) console.log(`results of getExpiredRemoved: expired: ${expired} removed: ${removed.length} array: ${removed}`)
+    nestedCountersInstance.countEvent(
+      'p2p',
+      `results of getExpiredRemoved: expired: ${expired} removed: ${removed.length}`,
+      1
+    )
+    if (logFlags && logFlags.verbose)
+      console.log(
+        `results of getExpiredRemoved: expired: ${expired} removed: ${removed.length} array: ${removed}`
+      )
   }
 
   // Allow the autoscale module to set this value
   const { expired, removed } = getExpiredRemovedV2(prev, lastLoggedCycle, txs, info)
-  nestedCountersInstance.countEvent('p2p', `results of getExpiredRemovedV2: expired: ${expired} removed: ${removed.length}`, 1)
-  if (logFlags && logFlags.verbose) console.log(`results of getExpiredRemovedV2: expired: ${expired} removed: ${removed.length} array: ${removed}`)
+  nestedCountersInstance.countEvent(
+    'p2p',
+    `results of getExpiredRemovedV2: expired: ${expired} removed: ${removed.length}`,
+    1
+  )
+  if (logFlags && logFlags.verbose)
+    console.log(
+      `results of getExpiredRemovedV2: expired: ${expired} removed: ${removed.length} array: ${removed}`
+    )
 
   record.expired = expired
   record.removed = removed // already sorted
@@ -247,8 +261,8 @@ function error(...msg: string[]): void {
 }
 
 /** Returns a linearly interpolated value between `amountToShrink` and the same
-* multiplied by a `scaleFactor`. The result depends on the
-* `scaleInfluenceForShrink` */
+ * multiplied by a `scaleFactor`. The result depends on the
+ * `scaleInfluenceForShrink` */
 function getScaledAmountToShrink(): number {
   const nonScaledAmount = config.p2p.amountToShrink
   const scaledAmount = config.p2p.amountToShrink * CycleCreator.scaleFactor

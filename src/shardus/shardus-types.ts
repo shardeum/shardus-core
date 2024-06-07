@@ -170,7 +170,10 @@ export interface InjectTxResponse {
 }
 
 export interface App {
-  injectTxToConsensor(consensor: ValidatorNodeDetails[], tx: OpaqueTransaction): Promise<InjectTxResponse | null>
+  injectTxToConsensor(
+    consensor: ValidatorNodeDetails[],
+    tx: OpaqueTransaction
+  ): Promise<InjectTxResponse | null>
   getNonceFromTx(tx: OpaqueTransaction): bigint
   getAccountNonce(accountId: string, wrappedData?: WrappedData): Promise<bigint>
   getTxSenderAddress(tx: OpaqueTransaction): string
@@ -486,7 +489,6 @@ export interface WrappedResponse extends WrappedData {
   prevDataCopy?: any
   sign?: Sign
 }
-
 
 // old version:
 // export interface WrappedResponse {
@@ -1215,7 +1217,7 @@ export interface ServerConfiguration {
     // state machine chages updateTxState in several places from 'consensing' to 'await final data'
     txStateMachineChanges: boolean
     // will a node attempt to request final data
-    canRequestFinalData:boolean
+    canRequestFinalData: boolean
     // how many node to re-inject the tx received from client
     numberOfReInjectNodes: number
     // max number of pending nonce tx for an account

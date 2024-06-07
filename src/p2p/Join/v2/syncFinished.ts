@@ -23,7 +23,6 @@ export interface FinishedSyncingRequestResponse {
 export function addFinishedSyncing(
   finishedSyncRequest: FinishedSyncingRequest
 ): FinishedSyncingRequestResponse {
-
   const node = NodeList.byIdOrder.find((node) => node.id === finishedSyncRequest.nodeId)
   // validate
   // lookup node by id in payload and use pubkey and compare to sig.owner
@@ -123,9 +122,10 @@ export function insertSyncFinished(nodeId: string): void {
 export function isNodeSelectedReadyList(nodeId: string): boolean {
   const mode = CycleChain.getNewest().mode
   // Adjust the list based on the mode
-  const listToCheck = mode === 'processing' 
-    ? NodeList.readyByTimeAndIdOrder.slice(0, config.p2p.allowActivePerCycle)
-    : NodeList.readyByTimeAndIdOrder;
+  const listToCheck =
+    mode === 'processing'
+      ? NodeList.readyByTimeAndIdOrder.slice(0, config.p2p.allowActivePerCycle)
+      : NodeList.readyByTimeAndIdOrder
 
   // Check if nodeId is in listToCheck
   return listToCheck.some((readyNode) => readyNode.id === nodeId)

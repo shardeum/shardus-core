@@ -601,7 +601,8 @@ class CachedAppDataManager {
           r = await this.p2p.ask(randomConsensusNode, 'get_cached_app_data', message)
         }
       } catch (e) {
-        if (logFlags.error) this.mainLogger.error(`cachedAppData: ASK exception getLocalOrRemoteCachedAppData`, e)
+        if (logFlags.error)
+          this.mainLogger.error(`cachedAppData: ASK exception getLocalOrRemoteCachedAppData`, e)
         nestedCountersInstance.countEvent('cached-app-data', 'ask exception')
         return null
       }

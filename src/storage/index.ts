@@ -16,8 +16,8 @@ import P2PApoptosis = require('../p2p/Apoptosis')
 import { config } from '../p2p/Context'
 import { ColumnDescription } from './utils/schemaDefintions'
 import { Op } from './utils/sqlOpertors'
-import { nestedCountersInstance } from "../utils/nestedCounters";
-import { shardusGetTime } from "../network";
+import { nestedCountersInstance } from '../utils/nestedCounters'
+import { shardusGetTime } from '../network'
 import { Utils } from '@shardus/types'
 
 /** A type alias to avoid both `any` and having to spell this type out any time
@@ -660,7 +660,10 @@ class Storage {
           ' ' +
           Utils.safeStringify(accountStates)
       )
-      nestedCountersInstance.countEvent('addAccountStates', `addAccountStates fail and apop self. ${shardusGetTime()}`)
+      nestedCountersInstance.countEvent(
+        'addAccountStates',
+        `addAccountStates fail and apop self. ${shardusGetTime()}`
+      )
       this.stateManager.initApoptosisAndQuitSyncing('addAccountStates')
     }
   }

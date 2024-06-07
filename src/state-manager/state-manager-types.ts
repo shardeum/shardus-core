@@ -17,8 +17,8 @@ export type TxDebug = {
 }
 
 export type QueueEntry = {
-  gossipedCompleteData: boolean;
-  sharedCompleteData: boolean;
+  gossipedCompleteData: boolean
+  sharedCompleteData: boolean
   eligibleNodeIdsToVote: Set<string>
   eligibleNodeIdsToConfirm: Set<string>
   acceptedTx: Shardus.AcceptedTx
@@ -91,7 +91,7 @@ export type QueueEntry = {
   ourVoteHash?: string
   collectedVotes: AppliedVote[]
   collectedVoteHashes: AppliedVoteHash[]
-  pendingVotes: Map<string, AppliedVote>,
+  pendingVotes: Map<string, AppliedVote>
   pendingConfirmOrChallenge: Map<string, ConfirmOrChallengeMessage>
   receivedBestVote?: AppliedVote
   receivedBestVoteHash?: string

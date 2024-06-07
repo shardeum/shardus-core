@@ -1,4 +1,4 @@
-import Random from './index';
+import Random from './index'
 
 const random = Random()
 

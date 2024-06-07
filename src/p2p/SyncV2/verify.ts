@@ -26,9 +26,9 @@ function verify(
   expectedHash: hexstring,
   objectName = 'some object'
 ): Result<boolean, Error> {
-  console.log(`hashing ${objectName}:`, Utils.safeStringify(object));
+  console.log(`hashing ${objectName}:`, Utils.safeStringify(object))
   const newHash = crypto.hash(object)
-  console.log(`got ${newHash}`);
+  console.log(`got ${newHash}`)
   return newHash === expectedHash
     ? ok(true)
     : err(new Error(`hash mismatch for ${objectName}: expected ${expectedHash}, got ${newHash}`))

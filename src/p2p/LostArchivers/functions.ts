@@ -188,7 +188,6 @@ export function informInvestigator(target: publicKey): void {
     } else {
       Comms.tell([investigator], 'lost-archiver-investigate', investigateMsg)
     }
-    
   } catch (ex) {
     nestedCountersInstance.countEvent('p2p', `informInvestigator error ${shardusGetTime()}`)
     error('informInvestigator: ' + formatErrorMessage(ex))

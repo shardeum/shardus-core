@@ -23,11 +23,11 @@ export function isServiceMode(): boolean {
 }
 
 export function getHashedDevKey(): string {
-  return config?.debug?.hashedDevAuth || '';
+  return config?.debug?.hashedDevAuth || ''
 }
 
 export function getDevPublicKeys(): DebugConfigurations['devPublicKeys'] {
-  return config?.debug?.devPublicKeys || {};
+  return config?.debug?.devPublicKeys || {}
 }
 
 export function ensureKeySecurity(pubKey: string, level: DevSecurityLevel): boolean {

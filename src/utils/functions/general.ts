@@ -140,29 +140,29 @@ export const debugExpand = (value: string): string => {
 }
 
 export const selectNeighbors = (array: any[], ourIndex: number, neighborsOnEachSide: number): any[] => {
-  const length = array.length;
-  const neighbors = [];
+  const length = array.length
+  const neighbors = []
 
-  if (length === 0) return neighbors;
-  if (length < neighborsOnEachSide * 2 + 1) return array.slice(0, length);
+  if (length === 0) return neighbors
+  if (length < neighborsOnEachSide * 2 + 1) return array.slice(0, length)
 
   try {
     for (let i = 1; i <= neighborsOnEachSide; i++) {
-      const leftIndex = (ourIndex - i + length) % length;
-      const rightIndex = (ourIndex + i) % length;
+      const leftIndex = (ourIndex - i + length) % length
+      const rightIndex = (ourIndex + i) % length
 
       if (leftIndex !== ourIndex) {
-        neighbors.push(array[leftIndex]);
+        neighbors.push(array[leftIndex])
       }
 
       if (rightIndex !== ourIndex && rightIndex !== leftIndex) {
-        neighbors.push(array[rightIndex]);
+        neighbors.push(array[rightIndex])
       }
     }
   } catch (e) {
-    console.error(`Error selecting neighbors nodes: ${e.message}`);
+    console.error(`Error selecting neighbors nodes: ${e.message}`)
   }
-  return neighbors;
+  return neighbors
 }
 
 /*
@@ -593,17 +593,17 @@ export function getPrefixInt(hexAddress: string, length = 8): number {
   // }
 
   if (length < 1 || length > 8) {
-    throw new Error("Length parameter should be between 1 and 8.");
+    throw new Error('Length parameter should be between 1 and 8.')
   }
 
-  const prefixHex = hexAddress.slice(0, length);
-  const prefixInt = parseInt(prefixHex, 16);
+  const prefixHex = hexAddress.slice(0, length)
+  const prefixInt = parseInt(prefixHex, 16)
 
   if (isNaN(prefixInt)) {
-    throw new Error("Invalid hex characters in the input.");
+    throw new Error('Invalid hex characters in the input.')
   }
 
-  return prefixInt;
+  return prefixInt
 }
 
 /**

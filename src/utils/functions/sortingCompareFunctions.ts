@@ -1,4 +1,4 @@
-import { Ordering } from '..';
+import { Ordering } from '..'
 
 export const sortAsc = (a, b): Ordering => {
   return a === b ? 0 : a < b ? -1 : 1

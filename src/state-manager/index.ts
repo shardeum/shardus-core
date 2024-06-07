@@ -73,7 +73,7 @@ import {
   QueueCountsResponse,
   QueueCountsResult,
   ConfirmOrChallengeMessage,
-  TimestampRemoveRequest
+  TimestampRemoveRequest,
 } from './state-manager-types'
 import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
@@ -2915,8 +2915,7 @@ class StateManager {
           this.mainLogger.error(
             `ASK FAIL getRemoteAccount exception: ResponseError encountered. Code: ${er.Code}, AppCode: ${er.AppCode}, Message: ${er.Message}`
           )
-        }
-        else if (logFlags.verbose) this.mainLogger.error('ASK FAIL getRemoteAccount exception:', er)
+        } else if (logFlags.verbose) this.mainLogger.error('ASK FAIL getRemoteAccount exception:', er)
         return null
       }
     } else {
@@ -3246,7 +3245,14 @@ class StateManager {
           globalAccountKeyMap[accountId] = true
         }
 
-        const backupObj: ShardusTypes.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
+        const backupObj: ShardusTypes.AccountsCopy = {
+          accountId,
+          data,
+          timestamp,
+          hash,
+          cycleNumber,
+          isGlobal,
+        }
 
         /* prettier-ignore */ if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
@@ -3802,7 +3808,8 @@ class StateManager {
     // Get the receipt map to send as a report
     if (this.feature_receiptMapResults === true) {
       receiptMapResults = this.generateReceiptMapResults(cycle)
-      if (logFlags.verbose) this.mainLogger.debug(`receiptMapResults: ${Utils.safeStringify(receiptMapResults)}`)
+      if (logFlags.verbose)
+        this.mainLogger.debug(`receiptMapResults: ${Utils.safeStringify(receiptMapResults)}`)
     }
     this.profiler.profileSectionEnd('stateManager_processPreviousCycleSummaries_generateReceiptMapResults')
 
@@ -3887,7 +3894,10 @@ class StateManager {
       await this.accountPatcher.testAndPatchAccounts(lastCycle.counter)
     } catch (e) {
       this.statemanager_fatal('processPreviousCycleSummaries', `testAndPatchAccounts ${e.message}`)
-      nestedCountersInstance.countEvent('processPreviousCycleSummaries', `testAndPatchAccounts fail with exception: ${e.message}`)
+      nestedCountersInstance.countEvent(
+        'processPreviousCycleSummaries',
+        `testAndPatchAccounts fail with exception: ${e.message}`
+      )
     }
   }
 
@@ -4082,7 +4092,8 @@ class StateManager {
     const netId = '123abc'
     //go over the save list..
     for (const queueEntry of queueEntriesToSave) {
-      const accountData: ShardusTypes.WrappedResponse[] = queueEntry?.preApplyTXResult?.applyResponse?.accountData
+      const accountData: ShardusTypes.WrappedResponse[] =
+        queueEntry?.preApplyTXResult?.applyResponse?.accountData
       if (accountData == null) {
         /* prettier-ignore */ nestedCountersInstance.countRareEvent('generateReceiptMapResults' , `accountData==null tests: ${queueEntry?.preApplyTXResult == null} ${queueEntry?.preApplyTXResult?.applyResponse == null} ${queueEntry?.preApplyTXResult?.applyResponse?.accountData == null}` )
       }
@@ -4296,16 +4307,24 @@ class StateManager {
       return
     }
     if (receipt2.confirmOrChallenge.message !== 'challenge') {
-      this.mainLogger.error(`askToRemoveTimestampCache receipt2.confirmOrChallenge.message !== 'challenge' ${utils.stringifyReduce(acceptedTx)}`)
+      this.mainLogger.error(
+        `askToRemoveTimestampCache receipt2.confirmOrChallenge.message !== 'challenge' ${utils.stringifyReduce(
+          acceptedTx
+        )}`
+      )
       return
     }
     if (acceptedTx.data.timestampReceipt == null) {
-      this.mainLogger.error(`askToRemoveTimestampCache queueEntry.acceptedTx.data.timestampReceipt == null ${utils.stringifyReduce(acceptedTx)}`)
+      this.mainLogger.error(
+        `askToRemoveTimestampCache queueEntry.acceptedTx.data.timestampReceipt == null ${utils.stringifyReduce(
+          acceptedTx
+        )}`
+      )
       return
     }
     const cycleCounter = acceptedTx.data.timestampReceipt.cycleCounter
     // attach challenge receipt to payload
-    const payload: TimestampRemoveRequest = {txId: acceptedTx.txId, receipt2, cycleCounter}
+    const payload: TimestampRemoveRequest = { txId: acceptedTx.txId, receipt2, cycleCounter }
     try {
       await this.p2p.tell([homeNode.node], 'remove_timestamp_cache', payload)
     } catch (e) {

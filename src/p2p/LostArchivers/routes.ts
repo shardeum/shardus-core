@@ -54,12 +54,21 @@ const lostArchiverUpGossip: GossipHandler<SignedObject<ArchiverUpMsg>, Node['id'
   logging.info(`lostArchiverUpGossip: payload: ${inspect(payload)}, sender: ${sender}, tracker: ${tracker}`)
 
   // check args
-  if (!payload) { logging.warn(`lostArchiverUpGossip: missing payload`); return }
-  if (!sender) { logging.warn(`lostArchiverUpGossip: missing sender`); return }
-  if (!tracker) { logging.warn(`lostArchiverUpGossip: missing tracker`); return }
+  if (!payload) {
+    logging.warn(`lostArchiverUpGossip: missing payload`)
+    return
+  }
+  if (!sender) {
+    logging.warn(`lostArchiverUpGossip: missing sender`)
+    return
+  }
+  if (!tracker) {
+    logging.warn(`lostArchiverUpGossip: missing tracker`)
+    return
+  }
   const error = funcs.errorForArchiverUpMsg(payload)
   if (error) {
-    nestedCountersInstance.countEvent('lostArchivers', `lostArchiverUpGossip invalid payload ${error}`)      
+    nestedCountersInstance.countEvent('lostArchivers', `lostArchiverUpGossip invalid payload ${error}`)
     logging.warn(`lostArchiverUpGossip: invalid payload error: ${error}, payload: ${inspect(payload)}`)
     return
   }
@@ -111,12 +120,21 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
   logging.info(`lostArchiverDownGossip: payload: ${inspect(payload)}, sender: ${sender}, tracker: ${tracker}`)
 
   // check args
-  if (!payload) { logging.warn(`lostArchiverDownGossip: missing payload`); return }
-  if (!sender) { logging.warn(`lostArchiverDownGossip: missing sender`); return }
-  if (!tracker) { logging.warn(`lostArchiverDownGossip: missing tracker`); return }
+  if (!payload) {
+    logging.warn(`lostArchiverDownGossip: missing payload`)
+    return
+  }
+  if (!sender) {
+    logging.warn(`lostArchiverDownGossip: missing sender`)
+    return
+  }
+  if (!tracker) {
+    logging.warn(`lostArchiverDownGossip: missing tracker`)
+    return
+  }
   const error = funcs.errorForArchiverDownMsg(payload)
   if (error) {
-    nestedCountersInstance.countEvent('lostArchivers', `lostArchiverDownGossip invalid payload ${error}`)      
+    nestedCountersInstance.countEvent('lostArchivers', `lostArchiverDownGossip invalid payload ${error}`)
     logging.warn(`lostArchiverDownGossip: invalid payload error: ${error}, payload: ${inspect(payload)}`)
     return
   }
@@ -162,12 +180,24 @@ const investigateLostArchiverRoute: Route<InternalHandler<SignedObject<Investiga
     logging.info(`investigateLostArchiverRoute: payload: ${inspect(payload)}, sender: ${sender}`)
 
     // check args
-    if (!payload) { logging.warn(`investigateLostArchiverRoute: missing payload`); return }
-    if (!response) { logging.warn(`investigateLostArchiverRoute: missing response`); return }
-    if (!sender) { logging.warn(`investigateLostArchiverRoute: missing sender`); return }
+    if (!payload) {
+      logging.warn(`investigateLostArchiverRoute: missing payload`)
+      return
+    }
+    if (!response) {
+      logging.warn(`investigateLostArchiverRoute: missing response`)
+      return
+    }
+    if (!sender) {
+      logging.warn(`investigateLostArchiverRoute: missing sender`)
+      return
+    }
     const error = funcs.errorForInvestigateArchiverMsg(payload)
     if (error) {
-      nestedCountersInstance.countEvent('lostArchivers', `investigateLostArchiverRoute invalid payload ${error}`)       
+      nestedCountersInstance.countEvent(
+        'lostArchivers',
+        `investigateLostArchiverRoute invalid payload ${error}`
+      )
       logging.warn(
         `investigateLostArchiverRoute: invalid payload error: ${error}, payload: ${inspect(payload)}`
       )
@@ -214,13 +244,25 @@ const investigateLostArchiverRouteBinary: Route<InternalBinaryHandler<Buffer>> =
       )
 
       // Basic argument checks
-      if (!deserializedPayload) { logging.warn(`${route}: Missing payload`); return }
-      if (!respond) { logging.warn(`${route}: Missing response method`); return }
-      if (!header.sender_id) { logging.warn(`${route}: Missing sender ID`); return }
+      if (!deserializedPayload) {
+        logging.warn(`${route}: Missing payload`)
+        return
+      }
+      if (!respond) {
+        logging.warn(`${route}: Missing response method`)
+        return
+      }
+      if (!header.sender_id) {
+        logging.warn(`${route}: Missing sender ID`)
+        return
+      }
 
       const error = funcs.errorForInvestigateArchiverMsg(deserializedPayload)
       if (error) {
-        nestedCountersInstance.countEvent('lostArchivers', `investigateLostArchiverRouteBinary invalid payload ${error}`)
+        nestedCountersInstance.countEvent(
+          'lostArchivers',
+          `investigateLostArchiverRouteBinary invalid payload ${error}`
+        )
         logging.warn(`${route}: Invalid payload error: ${error}, payload: ${inspect(payload)}`)
         return
       }

@@ -13,8 +13,8 @@ import rfdc from 'rfdc'
 import { logFlags } from '../logger'
 import { nestedCountersInstance } from '..'
 import { shardusGetTime } from '../network'
-import { getStandbyNodesInfoMap, standbyNodesInfo } from "./Join/v2";
-import { getDesiredCount } from "./CycleAutoScale";
+import { getStandbyNodesInfoMap, standbyNodesInfo } from './Join/v2'
+import { getDesiredCount } from './CycleAutoScale'
 import { Utils } from '@shardus/types'
 
 const clone = rfdc()
@@ -99,7 +99,10 @@ export function addNode(node: P2P.NodeListTypes.Node, caller: string) {
 
   // Don't add duplicates
   if (nodes.has(node.id)) {
-    warn(`NodeList.addNode: tried to add duplicate ${node.externalPort}: ${Utils.safeStringify(node)}\n` + `${caller}`)
+    warn(
+      `NodeList.addNode: tried to add duplicate ${node.externalPort}: ${Utils.safeStringify(node)}\n` +
+        `${caller}`
+    )
 
     return
   }

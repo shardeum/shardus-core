@@ -213,7 +213,7 @@ function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedSc
     return false
   }
 
-  // TODO need to verify if the node was a valid sender in the sub commitee 
+  // TODO need to verify if the node was a valid sender in the sub commitee
 
   // Return false if fails validation for signature
   if (!crypto.verify(scalingRequest, node.publicKey)) {

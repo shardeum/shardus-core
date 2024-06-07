@@ -62,7 +62,7 @@ export class P2P extends EventEmitter {
     payload: any,
     tracker?: string,
     sender?: any,
-    inpNodes?:  Shardus.NodeWithRank[] | Shardus.Node[],
+    inpNodes?: Shardus.NodeWithRank[] | Shardus.Node[],
     isOrigin?: boolean,
     factor?: number,
     txId?: string

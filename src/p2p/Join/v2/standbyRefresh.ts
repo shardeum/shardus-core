@@ -17,50 +17,53 @@ type publickey = JoinRequest['nodeInfo']['publicKey']
 let newStandbyRefreshRequests: Map<publickey, KeepInStandby> = new Map()
 //let lastCycleStandbyRefreshRequests: Map<publickey, KeepInStandby> = new Map()
 
-export async function submitStandbyRefresh(publicKey: string, cycleNumber: number): Promise<Result<void, Error>> {
+export async function submitStandbyRefresh(
+  publicKey: string,
+  cycleNumber: number
+): Promise<Result<void, Error>> {
   const archiver = getRandomAvailableArchiver()
   try {
-    const activeNodesResult = await getActiveNodesFromArchiver(archiver);
+    const activeNodesResult = await getActiveNodesFromArchiver(archiver)
     if (activeNodesResult.isErr()) {
-      throw Error(`couldn't get active nodes: ${activeNodesResult.error}`);
+      throw Error(`couldn't get active nodes: ${activeNodesResult.error}`)
     }
-    const activeNodes = activeNodesResult.value;
+    const activeNodes = activeNodesResult.value
 
     let payload = {
       publicKey: publicKey,
       cycleNumber: cycleNumber,
-    };
-    payload = crypto.sign(payload);
+    }
+    payload = crypto.sign(payload)
 
-    const maxRetries = 3;
-    let attempts = 0;
+    const maxRetries = 3
+    let attempts = 0
     const queriedNodesPKs = []
 
     while (attempts < maxRetries) {
       try {
-        let node;
+        let node
         let pickNodeAttempts = 5
         do {
-          if (pickNodeAttempts === 0) throw Error('submitStandbyRefresh: No active nodes to query');
-          node = utils.getRandom(activeNodes.nodeList, 1)[0];
+          if (pickNodeAttempts === 0) throw Error('submitStandbyRefresh: No active nodes to query')
+          node = utils.getRandom(activeNodes.nodeList, 1)[0]
           pickNodeAttempts--
-        } while(queriedNodesPKs.includes(node.publicKey));
-        queriedNodesPKs.push(node.publicKey);
+        } while (queriedNodesPKs.includes(node.publicKey))
+        queriedNodesPKs.push(node.publicKey)
 
-        await http.post(`${node.ip}:${node.port}/standby-refresh`, payload);
-        return ok(void 0); // Success, exit the function
+        await http.post(`${node.ip}:${node.port}/standby-refresh`, payload)
+        return ok(void 0) // Success, exit the function
       } catch (e) {
-        console.error(`Attempt ${attempts + 1} failed: ${e}`);
-        attempts++;
-        utils.sleep(config.p2p.resumbitStandbyRefreshWaitDuration); // Sleep for 1 second before retrying
+        console.error(`Attempt ${attempts + 1} failed: ${e}`)
+        attempts++
+        utils.sleep(config.p2p.resumbitStandbyRefreshWaitDuration) // Sleep for 1 second before retrying
       }
     }
 
     // If the code reaches this point, all retries have failed
-    throw Error('All attempts to post standbyRefresh request failed');
+    throw Error('All attempts to post standbyRefresh request failed')
   } catch (e) {
     // This catch block will handle errors from getActiveNodesFromArchiver and if all retries fail
-    throw Error(`submitStandbyRefresh: Error posting standbyRefresh request: ${e}`);
+    throw Error(`submitStandbyRefresh: Error posting standbyRefresh request: ${e}`)
   }
 }
 

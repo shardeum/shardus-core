@@ -41,11 +41,11 @@ export function randomShifted<T>(thing: Iterable<T>): Iterable<T> {
 /**
  * Creates a generator that yields the values of a given Map in random order.
  *
- * The function first creates an array of keys from the map, then shuffles 
+ * The function first creates an array of keys from the map, then shuffles
  * this array using the Fisher-Yates algorithm. Finally, it yields the map's
  * values in the order of the shuffled keys. The original Map is not modified.
  *
- * Note: This function is not space efficient for large maps as it creates 
+ * Note: This function is not space efficient for large maps as it creates
  * an additional array for the keys.
  *
  * @template K - The type of the keys of the map.
@@ -66,16 +66,16 @@ export function randomShifted<T>(thing: Iterable<T>): Iterable<T> {
  */
 export function* shuffleMapIterator<K, V>(map: Map<K, V>): IterableIterator<V> {
   // Create an array of keys from the map
-  const keys = Array.from(map.keys());
+  const keys = Array.from(map.keys())
 
   // Shuffle the keys array
   for (let i = keys.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [keys[i], keys[j]] = [keys[j], keys[i]];
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[keys[i], keys[j]] = [keys[j], keys[i]]
   }
 
   // Yield values from the map in the order of the shuffled keys
   for (const key of keys) {
-      yield map.get(key);
+    yield map.get(key)
   }
 }

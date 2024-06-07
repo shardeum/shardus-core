@@ -5,7 +5,7 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger from '../logger'
 import StateManager from '.'
-import {Logger as log4jsLogger} from 'log4js'
+import { Logger as log4jsLogger } from 'log4js'
 
 // const cHashSetStepSize = 4
 // const cHashSetTXStepSize = 2
@@ -127,7 +127,6 @@ class Deprecated {
     //     let responseSize = cUninitializedSize
     //     try {
     //       const result = {} as AccountStateHashResp
-
     //       if (this.softSync_checkInitialFlag && this.initalSyncFinished === false) {
     //         //not ready?
     //         result.ready = false
@@ -135,7 +134,6 @@ class Deprecated {
     //         await respond(result)
     //         return
     //       }
-
     //       // yikes need to potentially hash only N records at a time and return an array of hashes
     //       const stateHash = await this.stateManager.transactionQueue.getAccountsStateHash(
     //         payload.accountStart,
@@ -153,7 +151,6 @@ class Deprecated {
     //     }
     //   }
     // )
-
     // //    /get_account_state (Acc_start, Acc_end, Ts_start, Ts_end)
     // // Acc_start - get data for accounts starting with this account id; inclusive
     // // Acc_end - get data for accounts up to this account id; inclusive
@@ -175,7 +172,6 @@ class Deprecated {
     //     }
     //     this.profiler.scopedProfileSectionStart('get_account_state', false, msgSize)
     //     const result = {} as { accountStates: Shardus.StateTableObject[] }
-
     //     // max records set artificially low for better test coverage
     //     // todo m11: make configs for how many records to query
     //     const accountStates = await this.storage.queryAccountStateTable(
@@ -190,7 +186,6 @@ class Deprecated {
     //     this.profiler.scopedProfileSectionEnd('get_account_state', responseSize)
     //   }
     // )
-
     // // /get_account_data (Acc_start, Acc_end)
     // // Acc_start - get data for accounts starting with this account id; inclusive
     // // Acc_end - get data for accounts up to this account id; inclusive

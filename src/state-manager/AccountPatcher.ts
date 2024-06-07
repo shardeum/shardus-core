@@ -36,8 +36,9 @@ import {
   ShardedHashTrie,
   TrieAccount,
   IsInsyncResult,
-  CycleShardData, AppliedReceipt2
-} from "./state-manager-types";
+  CycleShardData,
+  AppliedReceipt2,
+} from './state-manager-types'
 import {
   isDebugModeMiddleware,
   isDebugModeMiddlewareLow,
@@ -116,8 +117,8 @@ type AccountStats = {
 }
 
 interface AccountRepairDataResponse {
-  nodes: Shardus.Node[],
-  wrappedDataList: Shardus.WrappedData[],
+  nodes: Shardus.Node[]
+  wrappedDataList: Shardus.WrappedData[]
 }
 interface TooOldAccountRecord {
   wrappedData: Shardus.WrappedData
@@ -352,24 +353,39 @@ class AccountPatcher {
         const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(accountID)
         const isInStorageGroup = storageNodes.map((node) => node.id).includes(Self.id)
         if (!isInStorageGroup) {
-          nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: not in storage group for account: ${accountID}`)
+          nestedCountersInstance.countEvent(
+            'accountPatcher',
+            `repair_too_old_account_data: not in storage group for account: ${accountID}`
+          )
           await respond(false)
         }
         // check if we have already repaired this account
         const accountHashCache = this.stateManager.accountCache.getAccountHash(accountID)
         if (accountHashCache != null && accountHashCache.h === hash) {
-          nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: already repaired account: ${accountID}`)
+          nestedCountersInstance.countEvent(
+            'accountPatcher',
+            `repair_too_old_account_data: already repaired account: ${accountID}`
+          )
           await respond(false)
         }
         if (accountHashCache != null && accountHashCache.t > accountData.timestamp) {
-          nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: we have newer account: ${accountID}`)
+          nestedCountersInstance.countEvent(
+            'accountPatcher',
+            `repair_too_old_account_data: we have newer account: ${accountID}`
+          )
           await respond(false)
         }
 
-        const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, 'repair_too_old_account_data')
+        const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
+          txId,
+          'repair_too_old_account_data'
+        )
 
         if (archivedQueueEntry == null) {
-          nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: no archivedQueueEntry for txId: ${txId}`)
+          nestedCountersInstance.countEvent(
+            'accountPatcher',
+            `repair_too_old_account_data: no archivedQueueEntry for txId: ${txId}`
+          )
           this.mainLogger.debug(`repair_too_old_account_data: no archivedQueueEntry for txId: ${txId}`)
           await respond(false)
         }
@@ -379,22 +395,34 @@ class AccountPatcher {
         let receivedBestVote = archivedQueueEntry.receivedBestVote
         if (bestConfirmation != null) {
           if (bestConfirmation.message === 'challenge') {
-            nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: challenge for txId: ${txId}`)
+            nestedCountersInstance.countEvent(
+              'accountPatcher',
+              `repair_too_old_account_data: challenge for txId: ${txId}`
+            )
             // continue
           }
           if (receivedBestVote == null) {
-            nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: no vote for txId: ${txId}`)
+            nestedCountersInstance.countEvent(
+              'accountPatcher',
+              `repair_too_old_account_data: no vote for txId: ${txId}`
+            )
             await respond(false)
           }
           if (receivedBestVote.cant_apply === true || receivedBestVote.transaction_result === false) {
-            nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: vote failed for txId: ${txId}`)
+            nestedCountersInstance.countEvent(
+              'accountPatcher',
+              `repair_too_old_account_data: vote failed for txId: ${txId}`
+            )
             await respond(false)
           }
           let accountHashMatch = false
           for (let i = 0; i < receivedBestVote.account_id.length; i++) {
             if (receivedBestVote.account_id[i] === accountID) {
               if (receivedBestVote.account_state_hash_after[i] !== hash) {
-                nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: vote hash mismatch for txId: ${txId}`)
+                nestedCountersInstance.countEvent(
+                  'accountPatcher',
+                  `repair_too_old_account_data: vote hash mismatch for txId: ${txId}`
+                )
                 accountHashMatch = false
               } else {
                 accountHashMatch = true
@@ -403,7 +431,10 @@ class AccountPatcher {
             }
           }
           if (accountHashMatch === false) {
-            nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: vote account hash mismatch for txId: ${txId}`)
+            nestedCountersInstance.countEvent(
+              'accountPatcher',
+              `repair_too_old_account_data: vote account hash mismatch for txId: ${txId}`
+            )
             await respond(false)
           }
         }
@@ -411,7 +442,10 @@ class AccountPatcher {
         // check the account Data
         const calculatedAccountHash = this.app.calculateAccountHash(accountData.data)
         if (calculatedAccountHash !== hash) {
-          nestedCountersInstance.countEvent('accountPatcher', `repair_too_old_account_data: hash mismatch between calculated account and provided hash ${txId}`)
+          nestedCountersInstance.countEvent(
+            'accountPatcher',
+            `repair_too_old_account_data: hash mismatch between calculated account and provided hash ${txId}`
+          )
           await respond(false)
         }
 
@@ -425,9 +459,21 @@ class AccountPatcher {
           true,
           updatedAccounts
         )
-        if (logFlags.debug) this.mainLogger.debug(`update_too_old_account_data: ${updatedAccounts.length} updated, ${failedHashes.length} failed`)
-        nestedCountersInstance.countEvent('accountPatcher', `update_too_old_account_data:${updatedAccounts.length} updated, accountId: ${utils.makeShortHash(accountID)}, cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
-        if (failedHashes.length > 0) nestedCountersInstance.countEvent('accountPatcher', `update_too_old_account_data:${failedHashes.length} failed`)
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `update_too_old_account_data: ${updatedAccounts.length} updated, ${failedHashes.length} failed`
+          )
+        nestedCountersInstance.countEvent(
+          'accountPatcher',
+          `update_too_old_account_data:${updatedAccounts.length} updated, accountId: ${utils.makeShortHash(
+            accountID
+          )}, cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`
+        )
+        if (failedHashes.length > 0)
+          nestedCountersInstance.countEvent(
+            'accountPatcher',
+            `update_too_old_account_data:${failedHashes.length} failed`
+          )
         let success = false
         if (updatedAccounts.length > 0 && failedHashes.length === 0) {
           success = true
@@ -441,7 +487,7 @@ class AccountPatcher {
     this.p2p.registerInternal(
       'repair_missing_accounts',
       async (
-        payload: {repairInstructions: AccountRepairInstruction[]},
+        payload: { repairInstructions: AccountRepairInstruction[] },
         respond: (arg0: boolean) => Promise<boolean>,
         _sender: unknown,
         _tracker: string,
@@ -455,7 +501,10 @@ class AccountPatcher {
 
             // check if we are the target node
             if (targetNodeId !== Self.id) {
-              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: not target node for txId: ${txId}`)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `repair_missing_accounts: not target node for txId: ${txId}`
+              )
               continue
             }
 
@@ -463,24 +512,39 @@ class AccountPatcher {
             const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(accountID)
             const isInStorageGroup = storageNodes.map((node) => node.id).includes(Self.id)
             if (!isInStorageGroup) {
-              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: not in storage group for account: ${accountID}`)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `repair_missing_accounts: not in storage group for account: ${accountID}`
+              )
               continue
             }
             // check if we have already repaired this account
             const accountHashCache = this.stateManager.accountCache.getAccountHash(accountID)
             if (accountHashCache != null && accountHashCache.h === hash) {
-              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: already repaired account: ${accountID}`)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `repair_missing_accounts: already repaired account: ${accountID}`
+              )
               continue
             }
             if (accountHashCache != null && accountHashCache.t > accountData.timestamp) {
-              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: we have newer account: ${accountID}`)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `repair_missing_accounts: we have newer account: ${accountID}`
+              )
               continue
             }
 
-            const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, 'repair_missing_accounts')
+            const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
+              txId,
+              'repair_missing_accounts'
+            )
 
             if (archivedQueueEntry == null) {
-              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: no archivedQueueEntry for txId: ${txId}`)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `repair_missing_accounts: no archivedQueueEntry for txId: ${txId}`
+              )
               this.mainLogger.debug(`repair_missing_accounts: no archivedQueueEntry for txId: ${txId}`)
               continue
             }
@@ -490,22 +554,34 @@ class AccountPatcher {
             let receivedBestVote = archivedQueueEntry.receivedBestVote
             if (bestConfirmation != null) {
               if (bestConfirmation.message === 'challenge') {
-                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: challenge for txId: ${txId}`)
+                nestedCountersInstance.countEvent(
+                  'accountPatcher',
+                  `repair_missing_accounts: challenge for txId: ${txId}`
+                )
                 // continue
               }
               if (receivedBestVote == null) {
-                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: no vote for txId: ${txId}`)
+                nestedCountersInstance.countEvent(
+                  'accountPatcher',
+                  `repair_missing_accounts: no vote for txId: ${txId}`
+                )
                 continue
               }
               if (receivedBestVote.cant_apply === true || receivedBestVote.transaction_result === false) {
-                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: vote failed for txId: ${txId}`)
+                nestedCountersInstance.countEvent(
+                  'accountPatcher',
+                  `repair_missing_accounts: vote failed for txId: ${txId}`
+                )
                 continue
               }
               let accountHashMatch = false
               for (let i = 0; i < receivedBestVote.account_id.length; i++) {
                 if (receivedBestVote.account_id[i] === accountID) {
                   if (receivedBestVote.account_state_hash_after[i] !== hash) {
-                    nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: vote hash mismatch for txId: ${txId}`)
+                    nestedCountersInstance.countEvent(
+                      'accountPatcher',
+                      `repair_missing_accounts: vote hash mismatch for txId: ${txId}`
+                    )
                     accountHashMatch = false
                   } else {
                     accountHashMatch = true
@@ -514,7 +590,10 @@ class AccountPatcher {
                 }
               }
               if (accountHashMatch === false) {
-                nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: vote account hash mismatch for txId: ${txId}`)
+                nestedCountersInstance.countEvent(
+                  'accountPatcher',
+                  `repair_missing_accounts: vote account hash mismatch for txId: ${txId}`
+                )
                 continue
               }
             }
@@ -522,7 +601,10 @@ class AccountPatcher {
             // check the account Data
             const calculatedAccountHash = this.app.calculateAccountHash(accountData.data)
             if (calculatedAccountHash !== hash) {
-              nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts: hash mismatch between calculated account and provided hash ${txId}`)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `repair_missing_accounts: hash mismatch between calculated account and provided hash ${txId}`
+              )
               continue
             }
 
@@ -536,17 +618,28 @@ class AccountPatcher {
               true,
               updatedAccounts
             )
-            if (logFlags.debug) this.mainLogger.debug(`repair_missing_accounts: ${updatedAccounts.length} updated, ${failedHashes.length} failed`)
-            nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts:${updatedAccounts.length} updated, accountId: ${utils.makeShortHash(accountID)}, cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
-            if (failedHashes.length > 0) nestedCountersInstance.countEvent('accountPatcher', `repair_missing_accounts:${failedHashes.length} failed`)
+            if (logFlags.debug)
+              this.mainLogger.debug(
+                `repair_missing_accounts: ${updatedAccounts.length} updated, ${failedHashes.length} failed`
+              )
+            nestedCountersInstance.countEvent(
+              'accountPatcher',
+              `repair_missing_accounts:${updatedAccounts.length} updated, accountId: ${utils.makeShortHash(
+                accountID
+              )}, cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`
+            )
+            if (failedHashes.length > 0)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `repair_missing_accounts:${failedHashes.length} failed`
+              )
             let success = false
             if (updatedAccounts.length > 0 && failedHashes.length === 0) {
               success = true
             }
           }
           await respond(true)
-        } catch (e) {
-        }
+        } catch (e) {}
 
         profilerInstance.scopedProfileSectionEnd('repair_missing_accounts')
       }
@@ -771,7 +864,7 @@ class AccountPatcher {
         const result = {
           nodeChildHashes: [],
           stats: { matched: 0, visisted: 0, empty: 0, childCount: 0 },
-          nodeId: Self.id
+          nodeId: Self.id,
         } as HashTrieAccountsResp
 
         const patcherMaxChildHashResponses = this.config.stateManager.patcherMaxChildHashResponses
@@ -820,7 +913,7 @@ class AccountPatcher {
         const result = {
           nodeChildHashes: [],
           stats: { matched: 0, visisted: 0, empty: 0, childCount: 0 },
-          nodeId: Self.id
+          nodeId: Self.id,
         } as HashTrieAccountsResp
         try {
           const stream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAccountTrieHashesReq)
@@ -1305,11 +1398,15 @@ class AccountPatcher {
       res.end()
     })
 
-    Context.network.registerExternalGet('get-tree-last-insync-detail', isDebugModeMiddlewareLow, (_req, res) => {
-      let prettyJSON = JSON.stringify(this.lastInSyncResult, null, 2)
-      res.write(`${prettyJSON}\n`)
-      res.end()
-    })
+    Context.network.registerExternalGet(
+      'get-tree-last-insync-detail',
+      isDebugModeMiddlewareLow,
+      (_req, res) => {
+        let prettyJSON = JSON.stringify(this.lastInSyncResult, null, 2)
+        res.write(`${prettyJSON}\n`)
+        res.end()
+      }
+    )
 
     Context.network.registerExternalGet('trie-repair-dump', isDebugModeMiddleware, (_req, res) => {
       res.write(`${utils.stringifyReduce(this.lastRepairInfo)}\n`)
@@ -2009,7 +2106,10 @@ class AccountPatcher {
    * @param localLayerMap
    * @returns
    */
-  findExtraBadKeys(consensusArray: RadixAndHashWithNodeId[], localLayerMap: Map<string, HashTrieNode>): RadixAndHashWithNodeId[] {
+  findExtraBadKeys(
+    consensusArray: RadixAndHashWithNodeId[],
+    localLayerMap: Map<string, HashTrieNode>
+  ): RadixAndHashWithNodeId[] {
     const extraBadRadixes: RadixAndHashWithNodeId[] = []
     if (consensusArray == null) {
       this.statemanager_fatal(
@@ -2018,12 +2118,12 @@ class AccountPatcher {
       )
       return []
     }
-    const parentKeys: Set<{parentKey: string, nodeId: string}> = new Set()
+    const parentKeys: Set<{ parentKey: string; nodeId: string }> = new Set()
     const goodKeys: Set<string> = new Set()
     //build sets of parents and good keys
     for (const value of consensusArray) {
       const parentKey = value.radix.slice(0, value.radix.length - 1)
-      parentKeys.add({parentKey, nodeId: value.nodeId})
+      parentKeys.add({ parentKey, nodeId: value.nodeId })
       goodKeys.add(value.radix)
     }
 
@@ -2035,7 +2135,11 @@ class AccountPatcher {
         if (weHaveKey) {
           const theyHaveKey = goodKeys.has(childKey)
           if (theyHaveKey === false) {
-            extraBadRadixes.push({radix: localLayerMap.get(childKey).radix, hash: localLayerMap.get(childKey).hash, nodeId: item.nodeId})
+            extraBadRadixes.push({
+              radix: localLayerMap.get(childKey).radix,
+              hash: localLayerMap.get(childKey).hash,
+              nodeId: item.nodeId,
+            })
           }
         }
       }
@@ -2211,15 +2315,15 @@ class AccountPatcher {
       const trieHashesResponses: GetTrieHashesResponse[] = await Promise.all(promises)
       for (const response of trieHashesResponses) {
         if (response != null && response.nodeHashes != null) {
-          let data:  RadixAndHashWithNodeId[] = response.nodeHashes.map(nodeHash => {
+          let data: RadixAndHashWithNodeId[] = response.nodeHashes.map((nodeHash) => {
             let item: RadixAndHash = {
               radix: nodeHash.radix,
-              hash: nodeHash.hash
+              hash: nodeHash.hash,
             }
             return {
               radix: item.radix,
               hash: item.hash,
-              nodeId: response.nodeId
+              nodeId: response.nodeId,
             }
           })
           results = results.concat(data)
@@ -2249,7 +2353,10 @@ class AccountPatcher {
   async getChildAccountHashes(
     radixHashEntries: RadixAndHash[],
     cycle: number
-  ): Promise<{ radixAndChildHashes: RadixAndChildHashesWithNodeId[]; getAccountHashStats: AccountHashStats }> {
+  ): Promise<{
+    radixAndChildHashes: RadixAndChildHashesWithNodeId[]
+    getAccountHashStats: AccountHashStats
+  }> {
     let nodeChildHashes: RadixAndChildHashesWithNodeId[] = []
     const requestMap: Map<Shardus.Node, HashTrieReq> = new Map()
     let actualRadixRequests = 0
@@ -2393,8 +2500,8 @@ class AccountPatcher {
       stats: {
         good: 0,
         bad: 0,
-        total: 0
-      }
+        total: 0,
+      },
     }
 
     if (hashTrieSyncConsensus == null) {
@@ -2412,7 +2519,8 @@ class AccountPatcher {
     for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
       const votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
       const ourTrieNode = this.shardTrie.layerMaps[this.treeSyncDepth].get(radix)
-      if (logFlags.debug) this.mainLogger.debug(`Checking isInSync ${radix}, cycle: ${cycle}, ${Utils.safeStringify(votesMap)}`);
+      if (logFlags.debug)
+        this.mainLogger.debug(`Checking isInSync ${radix}, cycle: ${cycle}, ${Utils.safeStringify(votesMap)}`)
 
       const nonConsensusRanges = this.getNonConsensusRanges(cycle)
       const nonStorageRanges = this.getNonStoredRanges(cycle)
@@ -2448,7 +2556,7 @@ class AccountPatcher {
       if (ourTrieNode == null) {
         /* prettier-ignore */ nestedCountersInstance.countRareEvent(`accountPatcher`, `isInSync ${radix} our trieNode === null`, 1)
         if (logFlags.debug) this.mainLogger.debug(`isInSync ${radix} our trieNode === null, cycle: ${cycle}`)
-        isInsyncResult.radixes.push({radix, insync: false, inConsensusRange, inEdgeRange})
+        isInsyncResult.radixes.push({ radix, insync: false, inConsensusRange, inEdgeRange })
         isInsyncResult.insync = false
         isInsyncResult.stats.bad++
         isInsyncResult.stats.total++
@@ -2491,11 +2599,11 @@ class AccountPatcher {
           )
         }
         isInsyncResult.insync = false
-        isInsyncResult.radixes.push({radix, insync: false, inConsensusRange, inEdgeRange})
+        isInsyncResult.radixes.push({ radix, insync: false, inConsensusRange, inEdgeRange })
         isInsyncResult.stats.bad++
         isInsyncResult.stats.total++
       } else if (ourTrieNode.hash === votesMap.bestHash) {
-        isInsyncResult.radixes.push({radix, insync: true, inConsensusRange, inEdgeRange})
+        isInsyncResult.radixes.push({ radix, insync: true, inConsensusRange, inEdgeRange })
         isInsyncResult.stats.good++
         isInsyncResult.stats.total++
       }
@@ -2658,11 +2766,11 @@ class AccountPatcher {
         }
         this.statemanager_fatal(
           'debug findBadAccounts',
-          `debug findBadAccounts ${cycle}: ${radixToFix.radix} isInNonConsensusRange: ${hasNonConsensusRange} isInNonStorageRange: ${hasNonStorageRange} bestVotes ${
+          `debug findBadAccounts ${cycle}: ${
+            radixToFix.radix
+          } isInNonConsensusRange: ${hasNonConsensusRange} isInNonStorageRange: ${hasNonStorageRange} bestVotes ${
             votesMap.bestVotes
-          } minVotes:${minVotes} uniqueVotes: ${votesMap.allVotes.size} ${utils.stringifyReduce(
-            simpleMap
-          )}`
+          } minVotes:${minVotes} uniqueVotes: ${votesMap.allVotes.size} ${utils.stringifyReduce(simpleMap)}`
         )
       }
     }
@@ -2684,13 +2792,31 @@ class AccountPatcher {
       const remoteChildrenToDiff: RadixAndHashWithNodeId[] = await this.getChildrenOf(toFix, cycle)
 
       if (remoteChildrenToDiff == null) {
-        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts remoteChildrenToDiff == null for radixes: ${Utils.safeStringify(toFix)}, cycle: ${cycle}`, 1)
+        nestedCountersInstance.countEvent(
+          `accountPatcher`,
+          `findBadAccounts remoteChildrenToDiff == null for radixes: ${Utils.safeStringify(
+            toFix
+          )}, cycle: ${cycle}`,
+          1
+        )
       }
       if (remoteChildrenToDiff.length === 0) {
-        nestedCountersInstance.countEvent(`accountPatcher`, `findBadAccounts remoteChildrenToDiff.length = 0 for radixes: ${Utils.safeStringify(toFix)}, cycle: ${cycle}`, 1)
+        nestedCountersInstance.countEvent(
+          `accountPatcher`,
+          `findBadAccounts remoteChildrenToDiff.length = 0 for radixes: ${Utils.safeStringify(
+            toFix
+          )}, cycle: ${cycle}`,
+          1
+        )
       }
 
-      this.mainLogger.debug(`findBadAccounts ${cycle}: level: ${level}, toFix: ${toFix.length}, childrenToDiff: ${Utils.safeStringify(remoteChildrenToDiff)}, badLayerMap: ${Utils.safeStringify(badLayerMap)}`)
+      this.mainLogger.debug(
+        `findBadAccounts ${cycle}: level: ${level}, toFix: ${
+          toFix.length
+        }, childrenToDiff: ${Utils.safeStringify(remoteChildrenToDiff)}, badLayerMap: ${Utils.safeStringify(
+          badLayerMap
+        )}`
+      )
       toFix = this.diffConsenus(remoteChildrenToDiff, badLayerMap)
 
       stats.subHashesTested += toFix.length
@@ -2698,7 +2824,6 @@ class AccountPatcher {
       if (toFix.length === 0) {
         stats.trailColdLevel = level
         extraBadKeys = this.findExtraBadKeys(remoteChildrenToDiff, badLayerMap)
-
 
         let result = {
           nodeChildHashes: [],
@@ -2728,7 +2853,11 @@ class AccountPatcher {
               result.nodeChildHashes.push({ radix: radixAndHash.radix, childAccounts })
               for (const account of hashTrieNode.accounts) {
                 childAccounts.push({ accountID: account.accountID, hash: account.hash })
-                extraBadAccounts.push({ accountID: account.accountID, hash: account.hash, targetNodeId: radixAndHash.nodeId })
+                extraBadAccounts.push({
+                  accountID: account.accountID,
+                  hash: account.hash,
+                  targetNodeId: radixAndHash.nodeId,
+                })
                 result.stats.childCount++
               }
               if (hashTrieNode.accounts.length === 0) {
@@ -2757,7 +2886,11 @@ class AccountPatcher {
               result.nodeChildHashes.push({ radix, childAccounts })
               for (const account of leaf.accounts) {
                 childAccounts.push({ accountID: account.accountID, hash: account.hash })
-                extraBadAccounts.push({ accountID: account.accountID, hash: account.hash, targetNodeId: radixAndHash.nodeId })
+                extraBadAccounts.push({
+                  accountID: account.accountID,
+                  hash: account.hash,
+                  targetNodeId: radixAndHash.nodeId,
+                })
                 result.stats.childCount++
               }
               if (leaf.accounts.length === 0) {
@@ -2803,14 +2936,23 @@ class AccountPatcher {
           }
         }
         for (let account of radixAndChildHash.childAccounts) {
-          remoteAccountsMap.set(account.accountID, {account, nodeId: radixAndChildHash.nodeId})
+          remoteAccountsMap.set(account.accountID, { account, nodeId: radixAndChildHash.nodeId })
         }
         if (radixAndChildHash.childAccounts.length > localAccountsMap.size) {
-          nestedCountersInstance.countEvent(`accountPatcher`, `remote trie node has more accounts, radix: ${radixAndChildHash.radix}`)
+          nestedCountersInstance.countEvent(
+            `accountPatcher`,
+            `remote trie node has more accounts, radix: ${radixAndChildHash.radix}`
+          )
         } else if (radixAndChildHash.childAccounts.length < localAccountsMap.size) {
-          nestedCountersInstance.countEvent(`accountPatcher`, `remote trie node has less accounts than local trie node, radix: ${radixAndChildHash.radix}`)
+          nestedCountersInstance.countEvent(
+            `accountPatcher`,
+            `remote trie node has less accounts than local trie node, radix: ${radixAndChildHash.radix}`
+          )
         } else if (radixAndChildHash.childAccounts.length === localAccountsMap.size) {
-          nestedCountersInstance.countEvent(`accountPatcher`, `remote trie node has same number of accounts as local trie node, radix: ${radixAndChildHash.radix}`)
+          nestedCountersInstance.countEvent(
+            `accountPatcher`,
+            `remote trie node has same number of accounts as local trie node, radix: ${radixAndChildHash.radix}`
+          )
         }
         for (let i = 0; i < radixAndChildHash.childAccounts.length; i++) {
           const potentalGoodAcc = radixAndChildHash.childAccounts[i] // eslint-disable-line security/detect-object-injection
@@ -2873,9 +3015,9 @@ class AccountPatcher {
             accountsWeNeedToRepair.push(localAccount)
             continue
           }
-          const {account: remoteAccount, nodeId: targetNodeId} = remoteNodeItem
+          const { account: remoteAccount, nodeId: targetNodeId } = remoteNodeItem
           if (remoteAccount == null) {
-            accountsTheyNeedToRepair.push({...localAccount, targetNodeId})
+            accountsTheyNeedToRepair.push({ ...localAccount, targetNodeId })
           }
         }
       } else {
@@ -2883,7 +3025,11 @@ class AccountPatcher {
       }
     }
     if (accountsTheyNeedToRepair.length > 0) {
-      nestedCountersInstance.countEvent(`accountPatcher`, `accountsTheyNeedToRepair`, accountsTheyNeedToRepair.length)
+      nestedCountersInstance.countEvent(
+        `accountPatcher`,
+        `accountsTheyNeedToRepair`,
+        accountsTheyNeedToRepair.length
+      )
     }
     return {
       badAccounts,
@@ -2895,32 +3041,32 @@ class AccountPatcher {
       stats,
       extraBadAccounts,
       extraBadKeys,
-      accountsTheyNeedToRepair
+      accountsTheyNeedToRepair,
     }
   }
 
   extractLeafNodes(rootNode: HashTrieNode): HashTrieNode[] {
-    const leafNodes: HashTrieNode[] = [];
+    const leafNodes: HashTrieNode[] = []
 
     function traverse(node: HashTrieNode) {
       if (node == null) {
         return
       }
       if (node.children && node.children.length === 0) {
-        leafNodes.push(node);
-        return;
+        leafNodes.push(node)
+        return
       }
 
       if (node.children && node.children.length > 0) {
         for (const childNode of node.children) {
           if (childNode) {
-            traverse(childNode);
+            traverse(childNode)
           }
         }
       }
     }
-    traverse(rootNode);
-    return leafNodes;
+    traverse(rootNode)
+    return leafNodes
   }
   //big todo .. be able to test changes on a temp tree and validate the hashed before we commit updates
   //also need to actually update the full account data and not just our tree!!
@@ -3056,10 +3202,15 @@ class AccountPatcher {
       }
 
       if (hasNonConsensusRange) {
-        if (lastCycleNonConsensus === false && hasNonStorageRange === false) { // lastCycleConsensus && hasStorageRange
+        if (lastCycleNonConsensus === false && hasNonStorageRange === false) {
+          // lastCycleConsensus && hasStorageRange
           //we can share this data, may be a pain for nodes to verify..
           //todo include last cycle syncing..
-          nestedCountersInstance.countEvent(`accountPatcher`, `broadcast nonConsensus because lastCycleNonConsensus === false`, 1)
+          nestedCountersInstance.countEvent(
+            `accountPatcher`,
+            `broadcast nonConsensus because lastCycleNonConsensus === false`,
+            1
+          )
         } else {
           //we cant send this data
           nestedCountersInstance.countEvent('accountPatcher', 'broadcast skip nonConsensus', 1)
@@ -3252,18 +3403,34 @@ class AccountPatcher {
         let accountData = accountDataMap.get(accountToFix.accountID)
         if (accountData == null) {
           this.mainLogger.debug(`requestOtherNodesToRepair: accountData is null`)
-          nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair accountData == null`, 1)
+          nestedCountersInstance.countEvent(
+            `accountPatcher`,
+            `requestOtherNodesToRepair accountData == null`,
+            1
+          )
           continue
         }
         if (accountData.stateId !== accountToFix.hash) {
           this.mainLogger.debug(`requestOtherNodesToRepair: accountData.stateId !== accountToFix.hash`)
-          nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair accountData.stateId !== accountToFix.hash`, 1)
+          nestedCountersInstance.countEvent(
+            `accountPatcher`,
+            `requestOtherNodesToRepair accountData.stateId !== accountToFix.hash`,
+            1
+          )
           continue
         }
-        const archivedQueueEntry = this.stateManager.transactionQueue.getArchivedQueueEntryByAccountIdAndHash(accountToFix.accountID, accountToFix.hash, 'requestOtherNodesToRepair')
+        const archivedQueueEntry = this.stateManager.transactionQueue.getArchivedQueueEntryByAccountIdAndHash(
+          accountToFix.accountID,
+          accountToFix.hash,
+          'requestOtherNodesToRepair'
+        )
         if (archivedQueueEntry == null) {
           this.mainLogger.debug(`requestOtherNodesToRepair: archivedQueueEntry is null`)
-          nestedCountersInstance.countEvent(`accountPatcher`, `requestOtherNodesToRepair archivedQueueEntry == null`, 1)
+          nestedCountersInstance.countEvent(
+            `accountPatcher`,
+            `requestOtherNodesToRepair archivedQueueEntry == null`,
+            1
+          )
           continue
         }
         const repairInstruction: AccountRepairInstruction = {
@@ -3287,7 +3454,7 @@ class AccountPatcher {
             this.mainLogger.debug(`requestOtherNodesToRepair: node == null`)
           }
           const message = {
-            repairInstructions
+            repairInstructions,
           }
           this.p2p.tell([node], 'repair_missing_accounts', message)
         }
@@ -3348,7 +3515,10 @@ class AccountPatcher {
 
     let isInsyncResult = this.isInSync(cycle)
     this.lastInSyncResult = isInsyncResult
-    if (logFlags.debug) this.mainLogger.debug(`isInSync: cycle: ${cycle}, isInsyncResult: ${Utils.safeStringify(isInsyncResult)}`)
+    if (logFlags.debug)
+      this.mainLogger.debug(
+        `isInSync: cycle: ${cycle}, isInsyncResult: ${Utils.safeStringify(isInsyncResult)}`
+      )
     if (isInsyncResult == null || isInsyncResult.insync === false) {
       let failHistoryObject: { repaired: number; s: number; e: number; cycles: number }
       if (lastFail === false) {
@@ -3371,14 +3541,22 @@ class AccountPatcher {
       /* prettier-ignore */ nestedCountersInstance.countEvent(`accountPatcher`, `accountHashesChecked c:${cycle}`, results.accountHashesChecked)
 
       if (logFlags.debug) {
-        this.mainLogger.debug(`badAccounts cycle: ${cycle}, ourBadAccounts: ${results.badAccounts.length}, ourBadAccounts: ${Utils.safeStringify(results.badAccounts)}`)
+        this.mainLogger.debug(
+          `badAccounts cycle: ${cycle}, ourBadAccounts: ${
+            results.badAccounts.length
+          }, ourBadAccounts: ${Utils.safeStringify(results.badAccounts)}`
+        )
       }
       if (results.accountsTheyNeedToRepair.length > 0 || results.extraBadAccounts.length > 0) {
         let accountsTheyNeedToRepair = [...results.accountsTheyNeedToRepair]
         if (results.extraBadAccounts.length > 0) {
           accountsTheyNeedToRepair = accountsTheyNeedToRepair.concat(results.extraBadAccounts)
         }
-        this.mainLogger.debug(`badAccounts cycle: ${cycle}, accountsTheyNeedToRepair: ${accountsTheyNeedToRepair.length}, accountsTheyNeedToRepair: ${Utils.safeStringify(accountsTheyNeedToRepair)}`)
+        this.mainLogger.debug(
+          `badAccounts cycle: ${cycle}, accountsTheyNeedToRepair: ${
+            accountsTheyNeedToRepair.length
+          }, accountsTheyNeedToRepair: ${Utils.safeStringify(accountsTheyNeedToRepair)}`
+        )
         this.requestOtherNodesToRepair(accountsTheyNeedToRepair)
       }
 
@@ -3432,7 +3610,7 @@ class AccountPatcher {
         tsFix3: 0,
       }
 
-      let tooOldAccountsMap : Map<string, TooOldAccountRecord> = new Map()
+      let tooOldAccountsMap: Map<string, TooOldAccountRecord> = new Map()
       let wrappedDataList = repairDataResponse.wrappedDataList
 
       // build a list of data that is good to use in this repair operation
@@ -3461,7 +3639,7 @@ class AccountPatcher {
             tooOldAccountsMap.set(wrappedData.accountId, {
               wrappedData,
               accountMemData,
-              node: nodeWeAsked
+              node: nodeWeAsked,
             })
             continue
           }
@@ -3533,14 +3711,25 @@ class AccountPatcher {
       }
 
       if (tooOldAccountsMap.size > 0) {
-        if (logFlags.debug) this.mainLogger.debug(`too_old_account detected: ${tooOldAccountsMap.size}, ${utils.stringifyReduce(tooOldAccountsMap)}`)
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `too_old_account detected: ${tooOldAccountsMap.size}, ${utils.stringifyReduce(tooOldAccountsMap)}`
+          )
         nestedCountersInstance.countEvent('accountPatcher', `too_old_account detected c:${cycle}`)
         // ask the remote node to repair their data
         for (let [accountId, tooOldRecord] of tooOldAccountsMap) {
           // const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchivedByTimestamp(tooOldRecord.accountMemData.t, 'too_old_account repair')
-          const archivedQueueEntry = this.stateManager.transactionQueue.getArchivedQueueEntryByAccountIdAndHash(accountId, tooOldRecord.accountMemData.h, 'too_old_account repair')
+          const archivedQueueEntry =
+            this.stateManager.transactionQueue.getArchivedQueueEntryByAccountIdAndHash(
+              accountId,
+              tooOldRecord.accountMemData.h,
+              'too_old_account repair'
+            )
           if (archivedQueueEntry == null) {
-            nestedCountersInstance.countEvent('accountPatcher', `too_old_account repair archivedQueueEntry null c:${cycle}`)
+            nestedCountersInstance.countEvent(
+              'accountPatcher',
+              `too_old_account repair archivedQueueEntry null c:${cycle}`
+            )
             continue
           }
 
@@ -3557,19 +3746,28 @@ class AccountPatcher {
               const accountHash = this.app.calculateAccountHash(recordData)
               if (tooOldRecord.accountMemData.h !== accountHash) {
                 skippedAccounts.push({ accountID: accountId, hash: stateId })
-                nestedCountersInstance.countEvent(`accountPatcher`, `too_old_account repair account hash mismatch skipped c:${cycle}`)
+                nestedCountersInstance.countEvent(
+                  `accountPatcher`,
+                  `too_old_account repair account hash mismatch skipped c:${cycle}`
+                )
                 continue
               }
               accountDataFinal.push(wrappedAccount)
             }
           }
           if (accountDataFinal.length === 0) {
-            nestedCountersInstance.countEvent('accountPatcher', `too_old_account repair accountDataFinal empty c:${cycle}`)
+            nestedCountersInstance.countEvent(
+              'accountPatcher',
+              `too_old_account repair accountDataFinal empty c:${cycle}`
+            )
             continue
           }
           let updatedAccountData = accountDataFinal[0]
           if (updatedAccountData == null || updatedAccountData.timestamp != tooOldRecord.accountMemData.t) {
-            nestedCountersInstance.countEvent('accountPatcher', `too_old_account repair archivedQueueEntry account data not found or timestamp mismatch c:${cycle}`)
+            nestedCountersInstance.countEvent(
+              'accountPatcher',
+              `too_old_account repair archivedQueueEntry account data not found or timestamp mismatch c:${cycle}`
+            )
             continue
           }
           const accountDataRequest: TooOldAccountUpdateRequest = {
@@ -3577,13 +3775,19 @@ class AccountPatcher {
             tooOldAccountRecord: tooOldRecord,
             txId: archivedQueueEntry.acceptedTx.txId,
             appliedReceipt2: this.stateManager.getReceipt2(archivedQueueEntry),
-            updatedAccountData: updatedAccountData
+            updatedAccountData: updatedAccountData,
           }
           await this.p2p.tell([tooOldRecord.node], 'repair_too_old_account_data', accountDataRequest)
           let shortAccountId = utils.makeShortHash(accountId)
           let shortNodeId = utils.makeShortHash(tooOldRecord.node.id)
-          nestedCountersInstance.countEvent('accountPatcher', `too_old_account repair requested. account: ${shortAccountId}, node: ${shortNodeId} c:${cycle}:`)
-          if (logFlags.debug) this.mainLogger.debug(`too_old_account repair requested: account: ${shortAccountId}, node: ${shortNodeId}, cycle: ${cycle}`)
+          nestedCountersInstance.countEvent(
+            'accountPatcher',
+            `too_old_account repair requested. account: ${shortAccountId}, node: ${shortNodeId} c:${cycle}:`
+          )
+          if (logFlags.debug)
+            this.mainLogger.debug(
+              `too_old_account repair requested: account: ${shortAccountId}, node: ${shortNodeId}, cycle: ${cycle}`
+            )
         }
       }
 
@@ -3767,10 +3971,7 @@ class AccountPatcher {
     getAccountStats: AccountStats
   }> {
     //pick which nodes to ask! /    //build up requests
-    const nodesBySyncRadix: Map<
-      string,
-      RequestEntry
-    > = new Map()
+    const nodesBySyncRadix: Map<string, RequestEntry> = new Map()
     const accountHashMap = new Map()
 
     const wrappedDataList: Shardus.WrappedData[] = []

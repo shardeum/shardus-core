@@ -49,7 +49,6 @@ import { SQLDataTypes } from '../storage/utils/schemaDefintions'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { Utils } from '@shardus/types'
 
-
 /** STATE */
 
 // [TODO] - need to remove this after removing sequalize

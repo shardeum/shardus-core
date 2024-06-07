@@ -580,10 +580,7 @@ export async function getActiveNodesFromArchiver(
   })
 }
 
-function isNodeRecentlyRotatedIn(
-  idx: number,
-  numActiveNodes: number
-): boolean {
+function isNodeRecentlyRotatedIn(idx: number, numActiveNodes: number): boolean {
   return (
     numActiveNodes >= 10 + config.p2p.rotationEdgeToAvoid &&
     config.p2p.rotationEdgeToAvoid &&
@@ -591,10 +588,7 @@ function isNodeRecentlyRotatedIn(
   )
 }
 
-function isNodeNearRotatingOut(
-  idx: number,
-  numActiveNodes: number
-): boolean {
+function isNodeNearRotatingOut(idx: number, numActiveNodes: number): boolean {
   return (
     numActiveNodes >= 10 + config.p2p.rotationEdgeToAvoid &&
     config.p2p.rotationEdgeToAvoid &&
@@ -603,10 +597,10 @@ function isNodeNearRotatingOut(
 }
 
 /**
- * Returns true if a node was recently rotate in or 
+ * Returns true if a node was recently rotate in or
  * will be rotated out soon
- * @param nodeId 
- * @returns 
+ * @param nodeId
+ * @returns
  */
 export function isNodeInRotationBounds(nodeId: string): boolean {
   const { idx, total } = NodeList.getAgeIndexForNodeId(nodeId)

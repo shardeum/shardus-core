@@ -798,7 +798,10 @@ function getMultipleCheckerNodes(
     let attempts = 0
 
     // Ensure we do not select the reporter, target, or a duplicate, and handle loop limits
-    while ((currentNode.id === reporter || currentNode.id === target || checkerNodes.has(currentNode.id)) && attempts < attemptLimit) {
+    while (
+      (currentNode.id === reporter || currentNode.id === target || checkerNodes.has(currentNode.id)) &&
+      attempts < attemptLimit
+    ) {
       pickedIndex = (pickedIndex + 1) % activeByIdOrder.length
       currentNode = activeByIdOrder[pickedIndex]
       attempts++

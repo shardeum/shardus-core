@@ -26,8 +26,8 @@ async function _get(host, logIndex, timeout = 1000) {
       timeout: timeout, //  Omar - setting this to 1 sec
       retry: 0, // Omar - setting this to 0.
       headers: {
-        'Accept': 'application/json',
-      }
+        Accept: 'application/json',
+      },
     })
 
     // Explicitly parse the response body as JSON if it's not already parsed
@@ -85,7 +85,7 @@ async function _post(host, payload, logIndex, timeout = 1000) {
       retry: 0, // Omar - set this to 0
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
       body: Utils.safeStringify(payload),
     })
