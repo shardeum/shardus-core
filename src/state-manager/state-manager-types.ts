@@ -190,6 +190,8 @@ export type QueueEntry = {
   txSieveTime: number
   accountDataSet: boolean
 
+  upStreamBlocker?: string
+
   /** todo start migrating stuff that is truely debug only into this object */
   debug: {
     /** Final data that we are waiting for */
