@@ -4856,10 +4856,10 @@ class TransactionQueue {
         // this probably happened due to debug-queue-clear endpoint usage in the network
         if (!!queueEntry) {
           if (!!queueEntry.acceptedTx) {
-            nestedCountersInstance.countEvent('processing', 'no expected acceptedTx in _transactionQueue queue entry')
+            nestedCountersInstance.countEvent('processing', 'no acceptedTx in _transactionQueue queue entry')
             break
           }
-          nestedCountersInstance.countEvent('processing', 'no expected queueEntry in _transactionQueue')
+          nestedCountersInstance.countEvent('processing', 'no queueEntry in _transactionQueue')
           break
         }
 
