@@ -18,6 +18,7 @@ import { ColumnDescription } from './utils/schemaDefintions'
 import { Op } from './utils/sqlOpertors'
 import { nestedCountersInstance } from "../utils/nestedCounters";
 import { shardusGetTime } from "../network";
+import { Utils } from '@shardus/types'
 
 /** A type alias to avoid both `any` and having to spell this type out any time
  * we want to use it. */
@@ -450,7 +451,7 @@ class Storage {
     const addNodeToList = (node) => {
       if (!node.id) {
         if (logFlags.error)
-          this.mainLogger.error(`Node attempted to be deleted without ID: ${JSON.stringify(node)}`)
+          this.mainLogger.error(`Node attempted to be deleted without ID: ${Utils.safeStringify(node)}`)
         return
       }
       nodeIds.push(node.id)
@@ -514,7 +515,7 @@ class Storage {
       throw new Error(e)
     }
     if (prop && prop.value) {
-      return JSON.parse(prop.value)
+      return Utils.safeJsonParse(prop.value)
     }
     return null
   }
@@ -655,9 +656,9 @@ class Storage {
     } catch (e) {
       this.fatalLogger.fatal(
         'addAccountStates db failure.  start apoptosis ' +
-          JSON.stringify(e.message) +
+          Utils.safeStringify(e.message) +
           ' ' +
-          JSON.stringify(accountStates)
+          Utils.safeStringify(accountStates)
       )
       nestedCountersInstance.countEvent('addAccountStates', `addAccountStates fail and apop self. ${shardusGetTime()}`)
       this.stateManager.initApoptosisAndQuitSyncing('addAccountStates')

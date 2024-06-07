@@ -10,6 +10,7 @@ import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debu
 import * as NodeList from '../p2p/NodeList'
 import { spawn } from 'child_process'
 import { getLastNTPObject, getNetworkTimeOffset, shardusGetTime } from '../network'
+import { Utils } from '@shardus/types'
 
 type CounterMap = Map<string, CounterNode>
 interface CounterNode {
@@ -148,7 +149,7 @@ class MemoryReporting {
       try {
         res.write(`CycleAutoScale.  ${CycleCreator.scaleFactor}`)
       } catch (e) {
-        res.write(JSON.stringify(e))
+        res.write(Utils.safeStringify(e))
       }
       res.end()
     })
@@ -248,7 +249,7 @@ class MemoryReporting {
       this.addToReport(
         'Patcher',
         'history',
-        JSON.stringify(this.shardus.stateManager.accountPatcher.syncFailHistory),
+        Utils.safeStringify(this.shardus.stateManager.accountPatcher.syncFailHistory),
         1
       )
 
@@ -329,7 +330,7 @@ class MemoryReporting {
     multiStats.max = this.roundTo3decimals(multiStats.max * 100)
     multiStats.avg = this.roundTo3decimals(multiStats.avg * 100)
 
-    this.addToReport('Process', 'CPU', `cpu: ${JSON.stringify(multiStats)}`, 1)
+    this.addToReport('Process', 'CPU', `cpu: ${Utils.safeStringify(multiStats)}`, 1)
 
     const report = resourceUsage()
     for (const [key, value] of Object.entries(report)) {

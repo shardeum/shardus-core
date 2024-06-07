@@ -22,6 +22,7 @@ import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
 import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { MakeReceiptReq, deserializeMakeReceiptReq, serializeMakeReceiptReq } from '../types/MakeReceipReq'
+import { Utils } from '@shardus/types'
 
 /** ROUTES */
 // [TODO] - need to add validattion of types to the routes
@@ -160,7 +161,7 @@ export function setGlobal(address, value, when, source) {
   const timer = setTimeout(onTimeout, timeout)
 
   const onReceipt = (receipt) => {
-    if (logFlags.console) console.log(`SETGLOBAL: GOT RECEIPT: ${txHash} ${JSON.stringify(receipt)}`)
+    if (logFlags.console) console.log(`SETGLOBAL: GOT RECEIPT: ${txHash} ${Utils.safeStringify(receipt)}`)
     clearTimeout(timer)
     // Gossip receipt to every node in network to apply to global account
     if (processReceipt(receipt) === false) return
@@ -224,7 +225,7 @@ export function makeReceipt(
     receipts.set(txHash, receipt)
     if (logFlags.console)
       console.log(
-        `SETGLOBAL: MAKERECEIPT CONSENSUS GROUP FOR ${txHash.substring(0, 5)}: ${JSON.stringify(
+        `SETGLOBAL: MAKERECEIPT CONSENSUS GROUP FOR ${txHash.substring(0, 5)}: ${Utils.safeStringify(
           [...receipt.consensusGroup].map((id) => id.substring(0, 5))
         )}`
       )
@@ -249,7 +250,7 @@ export function makeReceipt(
   // When a majority (%60) is reached, emit the completion event for this txHash
   if (logFlags.console)
     console.log(
-      `SETGLOBAL: GOT SIGNED_SET_GLOBAL_TX FROM ${sender.substring(0, 5)}: ${txHash} ${JSON.stringify(
+      `SETGLOBAL: GOT SIGNED_SET_GLOBAL_TX FROM ${sender.substring(0, 5)}: ${txHash} ${Utils.safeStringify(
         signedTx
       )}`
     )
@@ -271,7 +272,7 @@ export function processReceipt(receipt: P2P.GlobalAccountsTypes.Receipt) {
   tracker.timestamp = receipt.tx.when
   if (tracker.gossiped) return false
   Context.shardus.put(receipt.tx.value as OpaqueTransaction, false, true)
-  /* prettier-ignore */ if (logFlags.console) console.log(`Processed set-global receipt: ${JSON.stringify(receipt)} now:${shardusGetTime()}`)
+  /* prettier-ignore */ if (logFlags.console) console.log(`Processed set-global receipt: ${Utils.safeStringify(receipt)} now:${shardusGetTime()}`)
   tracker.gossiped = true
   attemptCleanup()
   return true

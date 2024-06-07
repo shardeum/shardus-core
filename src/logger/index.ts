@@ -7,7 +7,7 @@ import * as http from '../http'
 import * as Shardus from '../shardus/shardus-types'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-const { stringify } = require('../utils')
+import { Utils } from '@shardus/types'
 const log4jsExtend = require('log4js-extend')
 import got from 'got'
 import { parse as parseUrl } from 'url'
@@ -220,7 +220,7 @@ class Logger {
       console.log('startInErrorLogMode=true!')
       this.setErrorFlags()
     }
-    console.log(`logFlags: ` + stringify(logFlags))
+    console.log(`logFlags: ` + Utils.safeStringify(logFlags))
 
     this._seenAddresses = {}
     this._shortStrings = {}
@@ -281,7 +281,7 @@ class Logger {
         this._nodeInfos[input.id] = { node: input, out, shorthash }
         return out
       }
-      return stringify(input)
+      return Utils.safeStringify(input)
     }
   }
 
@@ -307,7 +307,7 @@ class Logger {
     to = this.identifyNode(to)
 
     if (utils.isObject(id)) {
-      id = stringify(id)
+      id = Utils.safeStringify(id)
     } else {
       id = utils.makeShortHash(id)
     }
@@ -656,7 +656,7 @@ class Logger {
 
     this.backupLogFlags = utils.deepCopy(logFlags)
 
-    console.log(`base logFlags: ` + stringify(logFlags))
+    console.log(`base logFlags: ` + Utils.safeStringify(logFlags))
   }
 }
 

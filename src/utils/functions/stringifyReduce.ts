@@ -1,17 +1,5 @@
+import { Utils } from '@shardus/types'
 import { makeShortHash } from '../'
-
-function isBufferValue(toStr, val: Record<string, unknown>): boolean {
-  return (
-    toStr === '[object Object]' &&
-    objKeys(val).length == 2 &&
-    objKeys(val).includes('type') &&
-    val['type'] == 'Buffer'
-  )
-}
-
-function isUnit8Array(value: unknown): boolean {
-  return value instanceof Uint8Array
-}
 
 const objToString = Object.prototype.toString
 const objKeys =
@@ -79,13 +67,13 @@ export const stringifyReduce = (val, isArrayProp?: boolean): string => {
               if (str) {
                 str += ','
               }
-              str += JSON.stringify(key) + ':' + propVal
+              str += Utils.safeStringify(key) + ':' + propVal
             }
             i++
           }
           return '{' + str + '}'
         } else {
-          return JSON.stringify(val)
+          return Utils.safeStringify(val)
         }
       }
     case 'function':
@@ -93,12 +81,12 @@ export const stringifyReduce = (val, isArrayProp?: boolean): string => {
       return isArrayProp ? null : undefined
     case 'string': {
       const reduced = makeShortHash(val)
-      return JSON.stringify(reduced)
+      return Utils.safeStringify(reduced)
     }
     case 'bigint':
       // Add some special identifier for bigint
       // return JSON.stringify({__BigInt__: val.toString()})
-      return JSON.stringify(val.toString(16))
+      return Utils.safeStringify(val.toString(16))
     default:
       if (typeof val === 'bigint') {
         val = val.toString(16)
@@ -156,7 +144,7 @@ export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean): s
               if (str) {
                 str += ','
               }
-              str += JSON.stringify(key) + ':' + propVal
+              str += Utils.safeStringify(key) + ':' + propVal
             }
             i++
 
@@ -166,7 +154,7 @@ export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean): s
           }
           return '{' + str + '}'
         } else {
-          return JSON.stringify(val)
+          return Utils.safeStringify(val)
         }
       }
     case 'function':
@@ -174,7 +162,7 @@ export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean): s
       return isArrayProp ? null : undefined
     case 'string': {
       const reduced = makeShortHash(val)
-      return JSON.stringify(reduced)
+      return Utils.safeStringify(reduced)
     }
     default:
       if (typeof val === 'bigint') {

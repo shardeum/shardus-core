@@ -6,7 +6,8 @@ import path from 'path'
 import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
-import { cryptoStringify } from '../utils'
+import { Utils } from '@shardus/types'
+
 
 export type HashableObject = (object | string) & { sign?: Shardus.Sign }
 
@@ -43,7 +44,7 @@ class Crypto {
 
   async init(): Promise<void> {
     crypto.init(this.config.crypto.hashKey)
-    crypto.setCustomStringifier(cryptoStringify, 'shardus_crypto_stringify')
+    crypto.setCustomStringifier(Utils.safeStringify, 'shardus_safeStringify')
 
     try {
       this.storage._checkInit()
@@ -55,7 +56,7 @@ class Crypto {
         return
       }
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(`error fetching keypair from database ${JSON.stringify(e)}`)
+      if (logFlags.error) this.mainLogger.error(`error fetching keypair from database ${Utils.safeStringify(e)}`)
     }
 
     if (this.config.crypto.keyPairConfig.useKeyPairFromFile) {
@@ -76,7 +77,7 @@ class Crypto {
       this.mainLogger.info('New keypair successfully generated and saved to database.')
       this.setCurveKeyPair(this.keypair)
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(`error ${JSON.stringify(e)}`)
+      if (logFlags.error) this.mainLogger.error(`error ${Utils.safeStringify(e)}`)
     }
   }
 
@@ -96,7 +97,7 @@ class Crypto {
   writeKeypairToFile(keypair: Keypair): void {
     // probably safe; accesses keypair defined by config
     // eslint-disable-next-line security/detect-non-literal-fs-filename
-    fs.writeFileSync(this.getKeyPairFile(), JSON.stringify(keypair))
+    fs.writeFileSync(this.getKeyPairFile(), Utils.safeStringify(keypair))
   }
 
   readKeypairFromFile(): crypto.Keypair {
@@ -105,7 +106,7 @@ class Crypto {
     if (fs.existsSync(this.getKeyPairFile())) {
       // eslint-disable-next-line security/detect-non-literal-fs-filename
       const fileData = fs.readFileSync(this.getKeyPairFile())
-      return JSON.parse(fileData.toString())
+      return Utils.safeJsonParse(fileData.toString())
     }
     return null
   }
@@ -140,7 +141,7 @@ class Crypto {
   }
 
   tag<T>(obj: T, recipientCurvePk: crypto.curvePublicKey): T & crypto.TaggedObject {
-    const objCopy = JSON.parse(crypto.stringify(obj))
+    const objCopy = Utils.safeJsonParse(Utils.safeStringify(obj))
     const sharedKey = this.getSharedKey(recipientCurvePk)
     crypto.tagObj(objCopy, sharedKey)
     return objCopy
@@ -160,9 +161,9 @@ class Crypto {
     obj: T,
     recipientCurvePk: crypto.curvePublicKey
   ): T & { msgSize: number } & crypto.TaggedObject {
-    const strEncoded = crypto.stringify(obj)
+    const strEncoded = Utils.safeStringify(obj)
     const msgSize = strEncoded.length //get the message size
-    const objCopy = JSON.parse(strEncoded)
+    const objCopy = Utils.safeJsonParse(strEncoded)
     objCopy.msgSize = msgSize // set the size
     const sharedKey = this.getSharedKey(recipientCurvePk)
     crypto.tagObj(objCopy, sharedKey)
@@ -170,7 +171,7 @@ class Crypto {
   }
 
   signWithSize<T>(obj: T): T & crypto.SignedObject {
-    const wrappedMsgStr = crypto.stringify(obj)
+    const wrappedMsgStr = Utils.safeStringify(obj)
     const msgLength = wrappedMsgStr.length
     // What the linter wants:
     // const newObj = {
@@ -194,7 +195,7 @@ class Crypto {
   }
 
   sign<T>(obj: T): T & crypto.SignedObject {
-    const objCopy = JSON.parse(crypto.stringify(obj))
+    const objCopy = Utils.safeJsonParse(Utils.safeStringify(obj))
     crypto.signObj(objCopy, this.keypair.secretKey, this.keypair.publicKey)
     return objCopy
   }
@@ -206,7 +207,7 @@ class Crypto {
       }
       return crypto.verifyObj(obj)
     } catch (e) {
-      this.mainLogger.error(`Error in verifying object ${JSON.stringify(obj)}`, e)
+      this.mainLogger.error(`Error in verifying object ${Utils.safeStringify(obj)}`, e)
       return false
     }
   }

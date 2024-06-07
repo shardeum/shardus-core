@@ -1,5 +1,5 @@
+import { Utils } from '@shardus/types'
 import { AppliedReceipt2 } from '../state-manager/state-manager-types'
-import { DeSerializeFromJsonString, SerializeToJsonString } from '../utils'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
@@ -23,7 +23,7 @@ export function serializeRequestReceiptForTxResp(
 
   if (inp.receipt === null) {
     stream.writeUInt8(0)
-    stream.writeString(SerializeToJsonString(inp.receipt))
+    stream.writeString(Utils.safeStringify(inp.receipt))
   } else {
     stream.writeUInt8(1)
   }
@@ -43,7 +43,7 @@ export function deserializeRequestReceiptForTxResp(
     const success = stream.readUInt8() === 1
     return { receipt: null, note, success }
   }
-  const receipt = DeSerializeFromJsonString(stream.readString()) as AppliedReceipt2
+  const receipt = Utils.safeJsonParse(stream.readString()) as AppliedReceipt2
   const note = stream.readString()
   const success = stream.readUInt8() === 1
   return { receipt, note, success }

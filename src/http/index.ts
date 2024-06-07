@@ -1,7 +1,8 @@
 import { parse as parseUrl } from 'url'
 import got from 'got'
 import { logFlags } from '../logger'
-import { safeParser, safeStringify, stringifyReduceLimit } from '../utils'
+import { Utils } from '@shardus/types'
+import { stringifyReduceLimit } from '../utils'
 
 let _logger = null
 let getIndex = 1
@@ -24,9 +25,22 @@ async function _get(host, logIndex, timeout = 1000) {
     const res = await got.get(host.href, {
       timeout: timeout, //  Omar - setting this to 1 sec
       retry: 0, // Omar - setting this to 0.
-      responseType: 'json',
+      headers: {
+        'Accept': 'application/json',
+      }
     })
-    return { ...res, body: safeParser(safeStringify(res.body)) }
+
+    // Explicitly parse the response body as JSON if it's not already parsed
+    let responseBody = res.body
+    if (typeof responseBody === 'string' && res.headers['content-type']?.includes('application/json')) {
+      try {
+        responseBody = Utils.safeJsonParse(responseBody)
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', parseError)
+      }
+    }
+
+    return { ...res, body: responseBody as any }
   } catch (error) {
     if (logFlags.playback === false && logFlags.verbose === false) {
       throw error
@@ -68,14 +82,27 @@ async function _post(host, payload, logIndex, timeout = 1000) {
   try {
     const res = await got.post(host.href, {
       timeout: timeout, // Omar - set this to 1 sec
-      retry: 0, // Omar - set this to 0      
-      responseType: 'json',
-      json: payload,
+      retry: 0, // Omar - set this to 0
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: Utils.safeStringify(payload),
     })
 
     //if (getResponseObj) return res
     //return res.body
-    return { ...res, body: safeParser(safeStringify(res.body))}
+
+    // Explicitly parse the response body as JSON if it's not already parsed
+    let responseBody = res.body
+    if (typeof responseBody === 'string' && res.headers['content-type']?.includes('application/json')) {
+      try {
+        responseBody = Utils.safeJsonParse(responseBody)
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', parseError)
+      }
+    }
+    return { ...res, body: responseBody }
   } catch (error) {
     if (logFlags.playback === false && logFlags.verbose === false) {
       throw error
@@ -105,27 +132,27 @@ async function post(givenHost, body, getResponseObj = false, timeout = 1000) {
   }
 
   if (getResponseObj) return res
-  return res.body
+  return res.body as any
 }
 
 function logError(method: string, error: any, host: any, logIndex: any) {
   if (error.code === 'ETIMEDOUT') {
     /* prettier-ignore */ if (logFlags.verbose) console.error(`${method}: HTTP request timed out:`, error)
     if (_logger) {
-      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-timeout', host.pathname, logIndex, JSON.stringify(error))
+      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-timeout', host.pathname, logIndex, Utils.safeStringify(error))
     }
     throw error
   } else if (error.response && error.response.statusCode === 400) {
     /* prettier-ignore */ if (logFlags.verbose) console.error(`${method}: Bad Request:`, error.message, ' ', error)
     if (_logger) {
-      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-400', host.pathname, logIndex, JSON.stringify(error))
+      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-400', host.pathname, logIndex, Utils.safeStringify(error))
     }
     throw error
   } else {
     // Handle other errors
     /* prettier-ignore */ if (logFlags.verbose) console.error(`${method}: An unexpected error occurred:`, error)
     if (_logger) {
-      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-err', host.pathname, logIndex, JSON.stringify(error))
+      /* prettier-ignore */ if (logFlags.playback) _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv-err', host.pathname, logIndex, Utils.safeStringify(error))
     }
     throw error
   }

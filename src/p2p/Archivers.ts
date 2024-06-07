@@ -32,7 +32,7 @@ import { shardusGetTime } from '../network'
 import { reportLostArchiver } from '../p2p/LostArchivers/functions'
 import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
 import { Result, ResultAsync } from 'neverthrow'
-import { safeStringify } from '../utils'
+import { Utils } from '@shardus/types'
 import { arch } from 'os'
 
 const clone = rfdc()
@@ -111,10 +111,11 @@ export function init() {
           if (stopped) {
             const msg = 'checkNetworkStopped: Network has stopped. Initiating apoptosis'
             /* prettier-ignore */ if (logFlags.important_as_fatal) info(msg)
-            this.fatalLogger.fatal(
-              'checkNetworkStopped: Network has stopped. Initiating apoptosis'
+            this.fatalLogger.fatal('checkNetworkStopped: Network has stopped. Initiating apoptosis')
+            nestedCountersInstance.countEvent(
+              'checkNetworkStopped',
+              `Network has stopped: apop self. ${shardusGetTime()}`
             )
-            nestedCountersInstance.countEvent('checkNetworkStopped', `Network has stopped: apop self. ${shardusGetTime()}`)
             apoptosizeSelf(msg)
           }
         })
@@ -575,7 +576,7 @@ async function forwardDataToSubscribedArchivers(responses, publicKey, recipient)
     if (io.sockets.sockets[connectedSockets[publicKey]]) {
       if (logFlags.console)
         console.log('Forwarded Archiver', recipient.nodeInfo.ip + ':' + recipient.nodeInfo.port)
-      io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
+      io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', Utils.safeStringify(taggedDataResponse))
     } else {
       warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
       // Call into LostArchivers to report Archiver as lost
@@ -674,7 +675,7 @@ export async function forwardAccounts(data: InitialAccountsData) {
     if (logFlags.console) console.log('Sending accounts to archivers', taggedDataResponse)
     try {
       if (io.sockets.sockets[connectedSockets[publicKey]]) {
-        io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
+        io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', Utils.safeStringify(taggedDataResponse))
         console.log(`forward Accounts Successfully`)
       }
     } catch (e) {
@@ -731,7 +732,10 @@ export function sendData() {
       try {
         // console.log('connected socketes', publicKey, connectedSockets)
         if (io.sockets.sockets[connectedSockets[publicKey]])
-          io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
+          io.sockets.sockets[connectedSockets[publicKey]].emit(
+            'DATA',
+            Utils.safeStringify(taggedDataResponse)
+          )
         else {
           warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
           // Call into LostArchivers to report Archiver as lost
@@ -823,7 +827,7 @@ export function sendData() {
     try {
       // console.log('connected socketes', publicKey, connectedSockets)
       if (io.sockets.sockets[connectedSockets[publicKey]])
-        io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', taggedDataResponse)
+        io.sockets.sockets[connectedSockets[publicKey]].emit('DATA', Utils.safeStringify(taggedDataResponse))
       else {
         warn(`Subscribed Archiver ${publicKey} is not connected over socket connection`)
         // Call into LostArchivers to report Archiver as lost
@@ -886,42 +890,42 @@ export function registerRoutes() {
     const err = validateTypes(req, { body: 'o' })
     if (err) {
       warn(`joinarchiver: bad req ${err}`)
-      return res.send(safeStringify({ success: false, error: err }))
+      return res.send({ success: false, error: err })
     }
 
     const joinRequest = req.body
-    if (logFlags.p2pNonFatal) info(`Archiver join request received: ${JSON.stringify(joinRequest)}`)
+    if (logFlags.p2pNonFatal) info(`Archiver join request received: ${Utils.safeStringify(joinRequest)}`)
 
     const accepted = await addArchiverJoinRequest(joinRequest)
     if (!accepted.success) {
       warn('Archiver join request not accepted.')
       return res.send(
-        safeStringify({ success: false, error: `Archiver join request rejected! ${accepted.reason}` })
+        Utils.safeStringify({ success: false, error: `Archiver join request rejected! ${accepted.reason}` })
       )
     }
     if (logFlags.p2pNonFatal) info('Archiver join request accepted!')
-    return res.send(safeStringify({ success: true }))
+    return res.send({ success: true })
   })
 
   network.registerExternalPost('leavingarchivers', async (req, res) => {
     const err = validateTypes(req, { body: 'o' })
     if (err) {
       warn(`leavingarchivers: bad req ${err}`)
-      return res.send(safeStringify({ success: false, error: err }))
+      return res.send({ success: false, error: err })
     }
 
     const leaveRequest = req.body
-    if (logFlags.p2pNonFatal) info(`Archiver leave request received: ${JSON.stringify(leaveRequest)}`)
+    if (logFlags.p2pNonFatal) info(`Archiver leave request received: ${Utils.safeStringify(leaveRequest)}`)
 
     const accepted = await addLeaveRequest(leaveRequest)
     if (!accepted.success) {
       warn('Archiver leave request not accepted.')
       return res.send(
-        safeStringify({ success: false, error: `Archiver leave request rejected! ${accepted.reason}` })
+        Utils.safeStringify({ success: false, error: `Archiver leave request rejected! ${accepted.reason}` })
       )
     }
     if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')
-    return res.send(safeStringify({ success: true }))
+    return res.send({ success: true })
   })
   Comms.registerGossipHandler('joinarchiver', async (payload, sender, tracker) => {
     profilerInstance.scopedProfileSectionStart('joinarchiver')
@@ -963,32 +967,32 @@ export function registerRoutes() {
     let err = validateTypes(req, { body: 'o' })
     if (err) {
       /* prettier-ignore */ if (logFlags.error) warn(`requestdata: bad req ${err}`)
-      return res.send(safeStringify({ success: false, error: err }))
+      return res.send({ success: false, error: err })
     }
     err = validateTypes(req.body, {
       tag: 's',
     })
     if (err) {
       /* prettier-ignore */ if (logFlags.error) warn(`requestdata: bad req.body ${err}`)
-      return res.send(safeStringify({ success: false, error: err }))
+      return res.send({ success: false, error: err })
     }
 
     const dataRequest = req.body
-    if (logFlags.p2pNonFatal) info('dataRequest received', JSON.stringify(dataRequest))
+    if (logFlags.p2pNonFatal) info('dataRequest received', Utils.safeStringify(dataRequest))
 
     const foundArchiver = archivers.get(dataRequest.publicKey)
 
     if (!foundArchiver) {
       const archiverNotFoundErr = 'Archiver not found in list'
       /* prettier-ignore */ if (logFlags.error) warn(archiverNotFoundErr)
-      return res.send(safeStringify({ success: false, error: archiverNotFoundErr }))
+      return res.send({ success: false, error: archiverNotFoundErr })
     }
 
     const invalidTagErr = 'Tag is invalid'
     const archiverCurvePk = crypto.convertPublicKeyToCurve(foundArchiver.publicKey)
     if (!crypto.authenticate(dataRequest, archiverCurvePk)) {
       /* prettier-ignore */ if (logFlags.error) warn(invalidTagErr)
-      return res.send(safeStringify({ success: false, error: invalidTagErr }))
+      return res.send({ success: false, error: invalidTagErr })
     }
 
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info('Tag in data request is valid')
@@ -1002,7 +1006,7 @@ export function registerRoutes() {
         if (recipients.size >= config.p2p.maxArchiversSubscriptionPerNode) {
           const maxArchiversSupportErr = 'Max archivers support reached'
           warn(maxArchiversSupportErr)
-          return res.send(safeStringify({ success: false, error: maxArchiversSupportErr }))
+          return res.send({ success: false, error: maxArchiversSupportErr })
         }
         addDataRecipient(dataRequest.nodeInfo, dataRequest)
       }
@@ -1010,7 +1014,7 @@ export function registerRoutes() {
         removeDataRecipient(dataRequest.publicKey)
         removeArchiverConnection(dataRequest.publicKey)
       }
-      return res.send(safeStringify({ success: true }))
+      return res.send({ success: true })
     }
 
     delete dataRequest.publicKey
@@ -1029,14 +1033,14 @@ export function registerRoutes() {
     if (dataRequests.length > 0) {
       addDataRecipient(dataRequest.nodeInfo, dataRequests)
     }
-    res.send(safeStringify({ success: true }))
+    res.send({ success: true })
   })
 
   network.registerExternalPost('querydata', (req, res) => {
     let err = validateTypes(req, { body: 'o' })
     if (err) {
       warn(`querydata: bad req ${err}`)
-      return res.send(safeStringify({ success: false, error: err }))
+      return res.send({ success: false, error: err })
     }
     err = validateTypes(req.body, {
       publicKey: 's',
@@ -1045,18 +1049,18 @@ export function registerRoutes() {
     })
     if (err) {
       warn(`querydata: bad req.body ${err}`)
-      return res.send(safeStringify({ success: false, error: err }))
+      return res.send({ success: false, error: err })
     }
     // [TODO] Authenticate tag
 
     const queryRequest = req.body
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) info('queryRequest received', JSON.stringify(queryRequest))
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info('queryRequest received', Utils.safeStringify(queryRequest))
 
     const foundArchiver = archivers.get(queryRequest.publicKey)
     if (!foundArchiver) {
       const archiverNotFoundErr = 'Archiver not found in list'
       warn(archiverNotFoundErr)
-      return res.send(safeStringify({ success: false, error: archiverNotFoundErr }))
+      return res.send({ success: false, error: archiverNotFoundErr })
     }
     delete queryRequest.publicKey
     delete queryRequest.tag
@@ -1071,23 +1075,23 @@ export function registerRoutes() {
       data = getSummaryBlob(queryRequest.lastData)
       // console.log('Summary blob to send', data)
     }
-    res.send(safeStringify({ success: true, data: data }))
+    res.send({ success: true, data: data })
   })
 
   network.registerExternalGet('archivers', (req, res) => {
     let archivers = getArchiversList()
     // In restart network, when there is only one node, we just send the first archiver which is serving as data recipient
     if (Self.isFirst && Self.isRestartNetwork && NodeList.nodes.size < 2) archivers = [...recipients.values()]
-    res.send(safeStringify({ archivers }))
+    res.send({ archivers })
   })
 
-  network.registerExternalGet('joinedArchiver/:publicKey', ({params: {publicKey}}, res) => {
+  network.registerExternalGet('joinedArchiver/:publicKey', ({ params: { publicKey } }, res) => {
     const isJoined = archivers.has(publicKey)
-    res.json({ isJoined });
+    res.json({ isJoined })
   })
 
   network.registerExternalGet('datarecipients', (req, res) => {
-    res.send(safeStringify({ dataRecipients: [...recipients.values()] }))
+    res.send({ dataRecipients: [...recipients.values()] })
   })
 }
 
@@ -1106,7 +1110,7 @@ export function computeNewArchiverListHash(): hexstring {
   // deep cloning is necessary as archiver information may be mutated by
   // reference.
   lastHashedList = clone(sortedByPubKey())
-  /* prettier-ignore */ if (logFlags.p2pNonFatal) info('hashing archiver list:', JSON.stringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) info('hashing archiver list:', Utils.safeStringify(lastHashedList))
   const hash = crypto.hash(lastHashedList)
   /* prettier-ignore */ if (logFlags.p2pNonFatal) info('the new archiver list hash is', hash)
   return hash
@@ -1132,7 +1136,7 @@ let lastHashedList: P2P.ArchiversTypes.JoinedArchiver[] = []
 
 /** Returns the last list of archivers that had its hash computed. */
 export function getLastHashedArchiverList(): P2P.ArchiversTypes.JoinedArchiver[] {
-  /* prettier-ignore */ if (logFlags.p2pNonFatal) info('returning last hashed archiver list:', JSON.stringify(lastHashedList))
+  /* prettier-ignore */ if (logFlags.p2pNonFatal) info('returning last hashed archiver list:', Utils.safeStringify(lastHashedList))
   return lastHashedList
 }
 

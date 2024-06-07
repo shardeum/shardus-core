@@ -19,6 +19,7 @@ import { formatErrorMessage } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
+import { Utils } from '@shardus/types'
 
 /** TYPES */
 export interface IPInfo {
@@ -63,14 +64,12 @@ export class NetworkClass extends EventEmitter {
   externalCatchAll: any
   debugNetworkDelay: number
   statisticsInstance: any
-  customStringifier?: (val: any) => string
   useLruCacheForSocketMgmt: boolean
   lruCacheSizeForSocketMgmt: number
 
   constructor(
     config: Shardus.StrictServerConfiguration,
     logger: Logger,
-    customStringifier?: (val: any) => string
   ) {
     super()
     this.app = express()
@@ -95,7 +94,6 @@ export class NetworkClass extends EventEmitter {
     }
 
     nestedCountersInstance.countEvent('network', 'init')
-    this.customStringifier = customStringifier
     this.useLruCacheForSocketMgmt = config.p2p.useLruCacheForSocketMgmt
     this.lruCacheSizeForSocketMgmt = config.p2p.lruCacheSizeForSocketMgmt
     this.shardusCryptoHashKey = config.crypto.hashKey
@@ -109,6 +107,26 @@ export class NetworkClass extends EventEmitter {
     this.statisticsInstance = statistics
   }
 
+  customSendJsonMiddleware(req, res, next) {
+    const originalSend = res.send;
+    res.send = function (data) {
+      if (typeof data === 'object' && data !== null) {
+        const jsonString = Utils.safeStringify(data)
+        res.setHeader('Content-Type', 'application/json')
+        return originalSend.call(this, jsonString)
+      }
+      return originalSend.call(this, data)
+    };
+
+    res.json = function (data) {
+      const jsonString = Utils.safeStringify(data)
+      res.setHeader('Content-Type', 'application/json')
+      return originalSend.call(this, jsonString)
+    }
+
+    next()
+  }
+
   // TODO: Allow for binding to a specified network interface
   _setupExternal() {
     return new Promise((resolve, reject) => {
@@ -118,7 +136,7 @@ export class NetworkClass extends EventEmitter {
           if (self.verboseLogsNet) {
             self.netLogger.debug(
               'External\t' +
-                JSON.stringify({
+                Utils.safeStringify({
                   url: req.url,
                   method: req.method,
                   body: req.body,
@@ -128,9 +146,11 @@ export class NetworkClass extends EventEmitter {
         }
         next()
       }
-      this.app.use(bodyParser.json({ limit: '50mb' }))
+
+      this.app.use(bodyParser.json({ limit: '50mb', reviver: Utils.typeReviver}))
       this.app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }))
       this.app.use(cors())
+      this.app.use(this.customSendJsonMiddleware)
       this.app.use(storeRequests)
       this._applyExternal()
       this.extServer = this.app.listen(this.ipInfo.externalPort, () => {
@@ -155,7 +175,8 @@ export class NetworkClass extends EventEmitter {
       headerOpts: {
         sendHeaderVersion: 1,
       },
-      customStringifier: this.customStringifier,
+      customStringifier: Utils.safeStringify,
+      customJsonParser: Utils.safeJsonParse,
       crypto: {
         hashKey: this.shardusCryptoHashKey,
         signingSecretKeyHex: this.signingSecretKeyHex,
@@ -180,7 +201,7 @@ export class NetworkClass extends EventEmitter {
         }
 
         if (!route) {
-          /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug( 'Network: ' + `Unable to read request, payload of received message: ${JSON.stringify(data)}` )
+          /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug( 'Network: ' + `Unable to read request, payload of received message: ${Utils.safeStringify(data)}` )
           throw new Error('Unable to read request, no route specified.')
         }
         if (!this.internalRoutes[route]) throw new Error('Unable to handle request, invalid route.')
@@ -200,7 +221,7 @@ export class NetworkClass extends EventEmitter {
         if (logFlags.net_trace) {
           this.netLogger.debug(
             'Internal\t' +
-              JSON.stringify({
+              Utils.safeStringify({
                 url: route,
                 body: payload,
               })
@@ -827,7 +848,7 @@ export async function checkAndUpdateTimeSyncedOffset(timeServers) {
         ntpOffsetMs = 0
       }
 
-      /* prettier-ignore */ console.log(`ntpOffset ${ntpOffsetMs} Offset is in range: ${isInRange} time:${JSON.stringify(time)} host:${host}}`)
+      /* prettier-ignore */ console.log(`ntpOffset ${ntpOffsetMs} Offset is in range: ${isInRange} time:${Utils.safeStringify(time)} host:${host}}`)
       return isInRange
     } catch (e) {
       mainLogger.warn(`Couldn't fetch ntp time from server at ${host}`)

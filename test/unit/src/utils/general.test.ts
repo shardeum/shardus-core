@@ -1,3 +1,4 @@
+import { Utils } from '@shardus/types'
 import { compareObjectShape, generateArraySchema, generateObjectSchema } from '../../../../src/utils'
 
 test('compareObjectShape() > two identical object should return true', () => {
@@ -121,7 +122,7 @@ test('compareObjectShape() > should detect missing property', () => {
   }
 
   expect(isValid).toBe(false)
-  expect(JSON.stringify(expectedError) === JSON.stringify(error)).toBe(true)
+  expect(Utils.safeStringify(expectedError) === Utils.safeStringify(error)).toBe(true)
 })
 
 test('compareObjectShape() > should detect extra props', () => {
@@ -164,7 +165,7 @@ test('compareObjectShape() > should detect extra props', () => {
     defectiveChain: ['nestedObj', 'extraProp'],
   }
   expect(isValid).toBe(false)
-  expect(JSON.stringify(expectedError) === JSON.stringify(error)).toBe(true)
+  expect(Utils.safeStringify(expectedError) === Utils.safeStringify(error)).toBe(true)
 })
 
 test('compareObjectShape() > should return error object on property type mismatch', () => {
@@ -208,7 +209,7 @@ test('compareObjectShape() > should return error object on property type mismatc
   }
 
   expect(isValid).toBe(false)
-  expect(JSON.stringify(expectedError) === JSON.stringify(error)).toBe(true)
+  expect(Utils.safeStringify(expectedError) === Utils.safeStringify(error)).toBe(true)
 })
 
 test('compareObjectShape() > should return error object on array type mismatch', () => {
@@ -250,7 +251,7 @@ test('compareObjectShape() > should return error object on array type mismatch',
   }
 
   expect(isValid).toBe(false)
-  expect(JSON.stringify(expectedError) === JSON.stringify(error)).toBe(true)
+  expect(Utils.safeStringify(expectedError) === Utils.safeStringify(error)).toBe(true)
 })
 
 test('compareObjectShape() > should not fail when property possess falsy value', () => {
@@ -357,7 +358,7 @@ test('generateObjectSchema() > should generate proper object schema', () => {
 
   const generatedSchema = generateObjectSchema(obj, { arrTypeDiversity: true })
 
-  const isEqual = JSON.stringify(generatedSchema) === JSON.stringify(expectedSchema)
+  const isEqual = Utils.safeStringify(generatedSchema) === Utils.safeStringify(expectedSchema)
 
   expect(isEqual).toBe(true)
 })

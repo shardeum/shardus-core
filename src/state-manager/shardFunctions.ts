@@ -2,7 +2,8 @@ import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
 import { StateManager, P2P } from '@shardus/types'
 import log4js from 'log4js'
-import { Ordering, stringify } from '../utils'
+import { Ordering } from '../utils'
+import { Utils } from '@shardus/types'
 
 type ShardGlobals = StateManager.shardFunctionTypes.ShardGlobals
 type ShardInfo = StateManager.shardFunctionTypes.ShardInfo
@@ -231,9 +232,9 @@ class ShardFunctions {
     ) {
       throw new Error(
         'this should never happen: ' +
-          stringify(wrappablePartitionRange) +
+          Utils.safeStringify(wrappablePartitionRange) +
           'globals: ' +
-          stringify(shardGlobals)
+          Utils.safeStringify(shardGlobals)
       )
     }
     if (wrappablePartitionRange.rangeIsSplit) {
@@ -269,7 +270,7 @@ class ShardFunctions {
         throw new Error(
           `missing ranges in partitionRange 2b  ${wrappablePartitionRange.partitionStart1} ${
             wrappablePartitionRange.partitionEnd1
-          } ${stringify(wrappablePartitionRange)}`
+          } ${Utils.safeStringify(wrappablePartitionRange)}`
         )
       }
     }
@@ -748,7 +749,7 @@ class ShardFunctions {
           message = `computeExtendedNodePartitionData: should never have extras. node:${nodeShardData.node.id.substring(
             0,
             5
-          )} ${stringify({
+          )} ${Utils.safeStringify({
             list1,
             list2,
             extraLists,

@@ -1,3 +1,4 @@
+import { Utils } from '@shardus/types'
 import {
   ApoptosisProposalResp,
   cApoptosisProposalRespVersion,
@@ -27,7 +28,7 @@ describe('ApoptosisProposalResp Serialization and Deserialization', () => {
       test.each(incompleteObjects)(
         'should throw error if field is improper during serialization',
         ({ data }) => {
-          const dataClone = JSON.parse(JSON.stringify(data))
+          const dataClone = Utils.safeJsonParse(Utils.safeStringify(data))
           if (dataClone.s === 'null') {
             dataClone.s = null // we have added this for custom validation purposes
           }

@@ -14,11 +14,10 @@ import {Signature, SignedObject} from '@shardus/crypto-utils'
 import {
   errorToStringFull,
   inRangeOfCurrentTime,
-  stringify,
   withTimeout,
   XOR,
-  selectIndexesWithOffeset,
 } from '../utils'
+import { Utils } from '@shardus/types'
 import * as Self from '../p2p/Self'
 import * as Comms from '../p2p/Comms'
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -451,7 +450,7 @@ class TransactionQueue {
             return
           }
           if (logFlags.debug)
-            this.mainLogger.debug(`broadcast_finalstate ${queueEntry.logID}, ${stringify(payload.stateList)}`)
+            this.mainLogger.debug(`broadcast_finalstate ${queueEntry.logID}, ${Utils.safeStringify(payload.stateList)}`)
           // add the data in
           const savedAccountIds: Set<string> = new Set()
           for (const data of payload.stateList) {
@@ -734,7 +733,7 @@ class TransactionQueue {
             return
           }
           if (logFlags.debug)
-            this.mainLogger.debug(`gossip-final-state ${queueEntry.logID}, ${stringify(payload.stateList)}`)
+            this.mainLogger.debug(`gossip-final-state ${queueEntry.logID}, ${Utils.safeStringify(payload.stateList)}`)
           // add the data in
           let saveSomething = false
           for (const data of payload.stateList) {
@@ -905,12 +904,12 @@ class TransactionQueue {
           full_receipt: 'b',
           sign: 'o',
         })
-        if (error) return res.send(utils.logSafeStringify((result = { success: false, reason: error })))
+        if (error) return res.send((result = { success: false, reason: error }))
         error = utils.validateTypes(req.body.sign, {
           owner: 's',
           sig: 's',
         })
-        if (error) return res.send(utils.logSafeStringify((result = { success: false, reason: error })))
+        if (error) return res.send((result = { success: false, reason: error }))
 
         const { txId, timestamp, full_receipt, sign } = req.body
         const isReqFromArchiver = Archivers.archivers.has(sign.owner)
@@ -938,7 +937,7 @@ class TransactionQueue {
             if (full_receipt) {
               const fullReceipt: ArchiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
               if (fullReceipt === null) return res.status(400).json({ success: false, reason: 'Receipt Not Found.' })
-              result = JSON.parse(utils.cryptoStringify({ success: true, receipt: fullReceipt }))
+              result = Utils.safeJsonParse(Utils.safeStringify({ success: true, receipt: fullReceipt }))
             } else {
               result = { success: true, receipt: this.stateManager.getReceipt2(queueEntry) }
             }
@@ -946,10 +945,10 @@ class TransactionQueue {
             result = { success: false, reason: 'Invalid Signature.' }
           }
         }
-        res.send(utils.safeStringify(result))
+        res.send(result)
       } catch (e) {
         console.log('Error caught in /get-tx-receipt: ', e)
-        res.send(utils.safeStringify((result = { success: false, reason: e })))
+        res.send((result = { success: false, reason: e }))
       }
     })
   }
@@ -2077,7 +2076,7 @@ class TransactionQueue {
               txQueueEntry.acceptedTx.txId,
               txQueueEntry.acceptedTx.timestamp
             )
-          }                    
+          }
 
           const minNodesToVote = 3
           const voterPercentage = configContext.stateManager.voterPercentage
@@ -2089,13 +2088,13 @@ class TransactionQueue {
           txQueueEntry.eligibleNodeIdsToVote = new Set(
             txQueueEntry.executionGroup.slice(0, numberOfVoters).map((node) => node.id)
           )
-          
+
           // confirm nodes are lowest ranked nodes
           txQueueEntry.eligibleNodeIdsToConfirm = new Set(
             txQueueEntry.executionGroup
               .slice(txQueueEntry.executionGroup.length - numberOfVoters)
               .map((node) => node.id)
-          )          
+          )
 
           const ourID = this.stateManager.currentCycleShardData.ourNode.id
           for (let idx = 0; idx < txQueueEntry.executionGroup.length; idx++) {
@@ -2305,7 +2304,7 @@ class TransactionQueue {
                         for (const node of this.stateManager.currentCycleShardData.syncingNeighborsTxGroup) {                
                           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'spread_tx_to_group_syncing'}`)
                         }
-                      }                      
+                      }
                       const request = acceptedTx as SpreadTxToGroupSyncingReq
                       this.p2p.tellBinary<SpreadTxToGroupSyncingReq>(
                         this.stateManager.currentCycleShardData.syncingNeighborsTxGroup,
@@ -2589,7 +2588,7 @@ class TransactionQueue {
     queueEntry.dataCollected++
 
     //make a deep copy of the data
-    queueEntry.originalData[data.accountId] = JSON.parse(stringify(data))
+    queueEntry.originalData[data.accountId] = Utils.safeJsonParse(Utils.safeStringify(data))
     queueEntry.beforeHashes[data.accountId] = data.stateId
 
     if (queueEntry.dataCollected === queueEntry.uniqueKeys.length) {
@@ -2645,7 +2644,7 @@ class TransactionQueue {
       nestedCountersInstance.countEvent(`queueEntryAddData`, `sharedCompleteData stateList: ${stateList.length} neighbours: ${neighboursNodes.length}`)
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
-          `shareCompleteDataToNeighbours: shared complete data for txId ${queueEntry.logID} at timestamp: ${shardusGetTime()} nodeId: ${Self.id} to neighbours: ${JSON.stringify(neighboursNodes.map((node) => node.id))}`
+          `shareCompleteDataToNeighbours: shared complete data for txId ${queueEntry.logID} at timestamp: ${shardusGetTime()} nodeId: ${Self.id} to neighbours: ${Utils.safeStringify(neighboursNodes.map((node) => node.id))}`
         )
       }
     }
@@ -3407,8 +3406,8 @@ class TransactionQueue {
             executionKeys.push(utils.makeShortHash(node.id) + `:${node.externalPort}`)
           }
         }
-        /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionGroup:${JSON.stringify(executionKeys)}`)
-        /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('queueEntryGetTransactionGroup', `queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionGroup:${JSON.stringify(executionKeys)}`)
+        /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionGroup:${Utils.safeStringify(executionKeys)}`)
+        /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('queueEntryGetTransactionGroup', `queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionGroup:${Utils.safeStringify(executionKeys)}`)
       }
 
       // if(queueEntry.globalModification === false && this.executeInOneShard && key === queueEntry.executionShardKey){
@@ -3896,20 +3895,20 @@ class TransactionQueue {
   async broadcastState(
     nodes: Shardus.Node[],
     message: { stateList: Shardus.WrappedResponse[]; txid: string },
-    context: string 
+    context: string
   ): Promise<void> {
     if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastStateBinary) {
       // convert legacy message to binary supported type
-      const request = message as BroadcastStateReq  
+      const request = message as BroadcastStateReq
       if (logFlags.seqdiagram) {
-        for (const node of nodes) {                        
+        for (const node of nodes) {
           if (context == "tellCorrespondingNodes") {
             /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_state_nodes'}`)
           } else {
             /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_state_neighbour'}`)
           }        
         }
-      }          
+      }
       this.p2p.tellBinary<BroadcastStateReq>(
         nodes,
         InternalRouteEnum.binary_broadcast_state,
@@ -4159,7 +4158,7 @@ class TransactionQueue {
               }
             }
 
-            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', queueEntry.logID, `tellCorrespondingNodes nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${JSON.stringify(indicies)} edgeIndicies:${JSON.stringify(edgeIndicies)} patchIndicies:${JSON.stringify(patchIndicies)}  doOnceNodeAccPair: ${JSON.stringify([...doOnceNodeAccPair.keys()])} ourLocalConsensusIndex:${ourLocalConsensusIndex} ourSendingGroupSize:${ourSendingGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} pachedListSize:${pachedListSize}`)
+            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', queueEntry.logID, `tellCorrespondingNodes nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${Utils.safeStringify(indicies)} edgeIndicies:${Utils.safeStringify(edgeIndicies)} patchIndicies:${Utils.safeStringify(patchIndicies)}  doOnceNodeAccPair: ${Utils.safeStringify([...doOnceNodeAccPair.keys()])} ourLocalConsensusIndex:${ourLocalConsensusIndex} ourSendingGroupSize:${ourSendingGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} pachedListSize:${pachedListSize}`)
 
             if (correspondingAccNodes.length > 0) {
               const remoteRelation = ShardFunctions.getNodeRelation(
@@ -4391,7 +4390,7 @@ class TransactionQueue {
         }
 
         //how can we be making so many calls??
-        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${JSON.stringify(indicies)} edgeIndicies:${JSON.stringify(edgeIndicies)} patchIndicies:${JSON.stringify(patchIndicies)}  doOnceNodeAccPair: ${JSON.stringify([...doOnceNodeAccPair.keys()])} ourLocalExecutionSetIndex:${ourLocalExecutionSetIndex} ourSendingGroupSize:${ourSendingGroupSize} consensusListSize:${consensusListSize} edgeListSize:${edgeListSize} pachedListSize:${pachedListSize}`)
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${Utils.safeStringify(indicies)} edgeIndicies:${Utils.safeStringify(edgeIndicies)} patchIndicies:${Utils.safeStringify(patchIndicies)}  doOnceNodeAccPair: ${Utils.safeStringify([...doOnceNodeAccPair.keys()])} ourLocalExecutionSetIndex:${ourLocalExecutionSetIndex} ourSendingGroupSize:${ourSendingGroupSize} consensusListSize:${consensusListSize} edgeListSize:${edgeListSize} pachedListSize:${pachedListSize}`)
 
         const dataToSend: Shardus.WrappedResponse[] = []
         // eslint-disable-next-line security/detect-object-injection
@@ -4433,7 +4432,7 @@ class TransactionQueue {
                 /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_finalstate'}`)
               }
             }
-            
+
             this.p2p.tellBinary<BroadcastFinalStateReq>(
               filterdCorrespondingAccNodes,
               InternalRouteEnum.binary_broadcast_finalstate,
@@ -4630,7 +4629,7 @@ class TransactionQueue {
   async processTransactions(firstTime = false): Promise<void> {
     const seenAccounts: SeenAccounts = {}
     let pushedProfilerTag = null
-    const startTime = shardusGetTime()        
+    const startTime = shardusGetTime()
 
     const processStats: ProcessQueueStats = {
       totalTime: 0,
@@ -5330,7 +5329,7 @@ class TransactionQueue {
                 // this.updateTxState(queueEntry, 'await final data')
               } else {
                 this.updateTxState(queueEntry, 'await final data', 'processTx5')
-              } 
+              }
             }
 
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
@@ -6494,20 +6493,20 @@ class TransactionQueue {
           `processAcceptedTxQueue excceded time ${processTime / 1000} firstTime:${firstTime}`,
           `processAcceptedTxQueue excceded time ${
             processTime / 1000
-          } firstTime:${firstTime} stats:${JSON.stringify(processStats)}`
+          } firstTime:${firstTime} stats:${Utils.safeStringify(processStats)}`
         )
         this.lastProcessStats['10+'] = processStats
       } else if (processTime > 5000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 5s')
-        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`processTime > 5s ${processTime / 1000} stats:${JSON.stringify(processStats)}`)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`processTime > 5s ${processTime / 1000} stats:${Utils.safeStringify(processStats)}`)
         this.lastProcessStats['5+'] = processStats
       } else if (processTime > 2000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 2s')
-        /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`processTime > 2s ${processTime / 1000} stats:${JSON.stringify(processStats)}`)
+        /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`processTime > 2s ${processTime / 1000} stats:${Utils.safeStringify(processStats)}`)
         this.lastProcessStats['2+'] = processStats
       } else if (processTime > 1000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 1s')
-        /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`processTime > 1s ${processTime / 1000} stats:${JSON.stringify(processStats)}`)
+        /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`processTime > 1s ${processTime / 1000} stats:${Utils.safeStringify(processStats)}`)
         this.lastProcessStats['1+'] = processStats
       }
 
@@ -7252,7 +7251,7 @@ class TransactionQueue {
     for (const queueEntry of this.pendingTransactionQueue) {
       if (queueEntry.txKeys.sourceKeys.length > 0 && accountID === queueEntry.txKeys.sourceKeys[0]) {
         const tx = queueEntry.acceptedTx
-        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the injested queue:', `appData: ${utils.logSafeStringify(tx.appData)}` )
+        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the injested queue:', `appData: ${Utils.safeStringify(tx.appData)}` )
         count++
       }
     }
@@ -7263,7 +7262,7 @@ class TransactionQueue {
           committingAppData.push(tx.appData)
           continue
         }
-        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the newAccepted queue:', `appData: ${utils.logSafeStringify(tx.appData)}` )
+        /* prettier-ignore */ if (logFlags.verbose) console.log( 'getAccountQueueCount: found upstream tx in the newAccepted queue:', `appData: ${Utils.safeStringify(tx.appData)}` )
         count++
       }
     }
@@ -7358,7 +7357,7 @@ class TransactionQueue {
 
       this.statemanager_fatal(
         `onProcesssingQueueStuck`,
-        `onProcesssingQueueStuck: ${JSON.stringify(this.getDebugProccessingStatus())}`
+        `onProcesssingQueueStuck: ${Utils.safeStringify(this.getDebugProccessingStatus())}`
       )
     }
 
@@ -7549,7 +7548,7 @@ class TransactionQueue {
     if (this.archivedQueueEntriesByID.has(txId)) delete this.archivedQueueEntriesByID[txId]
   }
   updateTxState(queueEntry: QueueEntry, nextState: string, context = ''): void {
-    if (logFlags.seqdiagram) 
+    if (logFlags.seqdiagram)
       if (context == '')
         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: ${queueEntry.state}-${nextState}`)
       else 

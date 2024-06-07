@@ -8,6 +8,7 @@ import { err, ok, Result } from 'neverthrow'
 import { HashableObject } from '../../crypto'
 import { crypto } from '../Context'
 import { makeCycleMarker } from '../CycleCreator'
+import { Utils } from '@shardus/types'
 
 /**
  * Verifies if the hash of a given object matches the expected hash.
@@ -25,7 +26,7 @@ function verify(
   expectedHash: hexstring,
   objectName = 'some object'
 ): Result<boolean, Error> {
-  console.log(`hashing ${objectName}:`, JSON.stringify(object));
+  console.log(`hashing ${objectName}:`, Utils.safeStringify(object));
   const newHash = crypto.hash(object)
   console.log(`got ${newHash}`);
   return newHash === expectedHash

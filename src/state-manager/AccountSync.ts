@@ -54,6 +54,7 @@ import {
   deserializeGlobalAccountReportResp,
 } from '../types/GlobalAccountReportResp'
 import { BadRequest, InternalError, serializeResponseError } from '../types/ResponseError'
+import { Utils } from '@shardus/types'
 
 const REDUNDANCY = 3
 
@@ -741,8 +742,8 @@ class AccountSync {
             this.createSyncTrackerByRange(range, cycle, true)
             newTrackers++
           }
-          /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({keptGlobal, addedGlobal, cleared, kept, newTrackers })}`)
-          /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: RETRYSYNC lastCycle: lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({keptGlobal, addedGlobal, cleared, kept, newTrackers })}`)
+          /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: lastCycle: ${lastCycle} cycle: ${cycle} ${Utils.safeStringify({keptGlobal, addedGlobal, cleared, kept, newTrackers })}`)
+          /* prettier-ignore */ this.mainLogger.debug(`DATASYNC: RETRYSYNC lastCycle: lastCycle: ${lastCycle} cycle: ${cycle} ${Utils.safeStringify({keptGlobal, addedGlobal, cleared, kept, newTrackers })}`)
           continue //resume loop at top!
         } else {
           /* prettier-ignore */ this.statemanager_fatal( `initialSyncMain unhandledEX`, 'initialSyncMain unhandledEX:' + errorToStringFull(error) )
@@ -1337,7 +1338,7 @@ class AccountSync {
       const cycle = this.stateManager.currentCycleShardData.cycleNumber
       const lastCycle = cycle - 1
 
-      /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: runtime. lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({ cleared, kept, newTrackers })}`)
+      /* prettier-ignore */ nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: runtime. lastCycle: ${lastCycle} cycle: ${cycle} ${Utils.safeStringify({ cleared, kept, newTrackers })}`)
 
       // clear all sync trackers.
       this.clearSyncTrackers()

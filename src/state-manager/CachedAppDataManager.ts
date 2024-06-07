@@ -46,6 +46,7 @@ import {
   deserializeGetCachedAppDataResp,
   serializeGetCachedAppDataResp,
 } from '../types/GetCachedAppDataResp'
+import { Utils } from '@shardus/types'
 
 class CachedAppDataManager {
   app: Shardus.App
@@ -102,7 +103,7 @@ class CachedAppDataManager {
     this.p2p.registerInternal('send_cachedAppData', async (payload: CacheAppDataResponse) => {
       profilerInstance.scopedProfileSectionStart('send_cachedAppData')
       try {
-        /* prettier-ignore */ if (logFlags.net_trace && logFlags.console) console.log(`send_cachedAppData full payload`, utils.SerializeToJsonString(payload));
+        /* prettier-ignore */ if (logFlags.net_trace && logFlags.console) console.log(`send_cachedAppData full payload`, Utils.safeStringify(payload));
         const cachedAppData = payload.cachedAppData
         const existingCachedAppData = this.getCachedItem(payload.topic, cachedAppData.dataID)
         if (existingCachedAppData) {
@@ -472,8 +473,8 @@ class CachedAppDataManager {
             }
           }
 
-          /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote( 'sendCorrespondingCachedAppData', dataID, `cachedAppData: sendCorrespondingCachedAppData nodesToSendTo:${ Object.keys(nodesToSendTo).length } doOnceNodeAccPair:${doOnceNodeAccPair.size} indices:${JSON.stringify( indices )} edgeIndicies:${JSON.stringify(edgeIndices)} patchIndicies:${JSON.stringify( patchIndices )}  doOnceNodeAccPair: ${JSON.stringify([ ...doOnceNodeAccPair.keys(), ])} ourLocalConsensusIndex:${ourLocalConsensusIndex} ourSendingGroupSize:${ourSendingGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} patchedListSize:${patchedListSize}` )
-          /* prettier-ignore */ if(logFlags.shardedCache) console.log( 'sendCorrespondingCachedAppData', dataID, `cachedAppData: sendCorrespondingCachedAppData nodesToSendTo:${ Object.keys(nodesToSendTo).length } doOnceNodeAccPair:${doOnceNodeAccPair.size} indices:${JSON.stringify( indices )} edgeIndicies:${JSON.stringify(edgeIndices)} patchIndicies:${JSON.stringify( patchIndices )}  doOnceNodeAccPair: ${JSON.stringify([ ...doOnceNodeAccPair.keys(), ])} ourLocalConsensusIndex:${ourLocalConsensusIndex} ourSendingGroupSize:${ourSendingGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} patchedListSize:${patchedListSize}` )
+          /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote( 'sendCorrespondingCachedAppData', dataID, `cachedAppData: sendCorrespondingCachedAppData nodesToSendTo:${ Object.keys(nodesToSendTo).length } doOnceNodeAccPair:${doOnceNodeAccPair.size} indices:${Utils.safeStringify( indices )} edgeIndicies:${Utils.safeStringify(edgeIndices)} patchIndicies:${Utils.safeStringify( patchIndices )}  doOnceNodeAccPair: ${Utils.safeStringify([ ...doOnceNodeAccPair.keys(), ])} ourLocalConsensusIndex:${ourLocalConsensusIndex} ourSendingGroupSize:${ourSendingGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} patchedListSize:${patchedListSize}` )
+          /* prettier-ignore */ if(logFlags.shardedCache) console.log( 'sendCorrespondingCachedAppData', dataID, `cachedAppData: sendCorrespondingCachedAppData nodesToSendTo:${ Object.keys(nodesToSendTo).length } doOnceNodeAccPair:${doOnceNodeAccPair.size} indices:${Utils.safeStringify( indices )} edgeIndicies:${Utils.safeStringify(edgeIndices)} patchIndicies:${Utils.safeStringify( patchIndices )}  doOnceNodeAccPair: ${Utils.safeStringify([ ...doOnceNodeAccPair.keys(), ])} ourLocalConsensusIndex:${ourLocalConsensusIndex} ourSendingGroupSize:${ourSendingGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} targetEdgeGroupSize:${targetEdgeGroupSize} patchedListSize:${patchedListSize}` )
 
           if (correspondingAccNodes.length > 0) {
             const remoteRelation = ShardFunctions.getNodeRelation(
@@ -620,7 +621,7 @@ class CachedAppDataManager {
         nestedCountersInstance.countEvent('cached-app-data', 'Remote Data: miss')
         if (logFlags.verbose)
           this.stateManager.getAccountFailDump(address, 'remote request missing data: result == null')
-        /* prettier-ignore */ if(logFlags.shardedCache) console.log(`cachedAppData: remote result failed: ${JSON.stringify(r)}`) //todo dont check in
+        /* prettier-ignore */ if(logFlags.shardedCache) console.log(`cachedAppData: remote result failed: ${Utils.safeStringify(r)}`) //todo dont check in
       }
     } else {
       // we are local!

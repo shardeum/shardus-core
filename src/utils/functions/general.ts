@@ -1,19 +1,9 @@
 import { P2P } from '@shardus/types'
-import { Ordering, safeStringify } from '..'
+import { Ordering } from '..'
 import { Response } from 'express-serve-static-core'
 import { DevSecurityLevel } from '../../shardus/shardus-types'
 import { nestedCountersInstance } from '../nestedCounters'
-import { logFlags } from '../../logger'
-
-const replacer = (key: string, value: any): any => {
-  if (typeof value === 'bigint') {
-    return { __BigInt__: value.toString() }
-  }
-  if (value instanceof Uint8Array) {
-    return { __Uint8Array__: Array.from(value) }
-  }
-  return value
-}
+import { Utils } from '@shardus/types'
 
 /**
  * this helper replacer is lossy and only for logging
@@ -43,21 +33,12 @@ export const appdata_replacer = <T, K, V>(
     return value as T
   }
 }
-const reviver = (key: string, value: any): any => {
-  if (value && value.__BigInt__) {
-    return BigInt(value.__BigInt__)
-  }
-  if (value && value.__Uint8Array__ instanceof Array) {
-    return new Uint8Array(value.__Uint8Array__)
-  }
-  return value
-}
 
 export const deepCopy = <T>(obj: T): T => {
   if (typeof obj !== 'object') {
     throw Error('Given element is not of type object.')
   }
-  return JSON.parse(JSON.stringify(obj, replacer), reviver)
+  return Utils.safeJsonParse(Utils.safeStringify(obj))
 }
 
 export const mod = (n, m): number => {
@@ -370,7 +351,7 @@ export function compareObjectShape(
   }
   const admirer_schema = generateObjectSchema(admirer, { arrTypeDiversity: true })
 
-  if (JSON.stringify(idol_schema) === JSON.stringify(admirer_schema)) {
+  if (Utils.safeStringify(idol_schema) === Utils.safeStringify(admirer_schema)) {
     isValid = true
     return { isValid, error }
   }
@@ -379,7 +360,7 @@ export function compareObjectShape(
   // this function is not meant to be call outside of this block
   const smartComparator = (idol_type, admirer_type): boolean => {
     if (typeof idol_type === 'object' && idol_type.constructor === Object) {
-      return JSON.stringify(idol_type) === JSON.stringify(admirer_type)
+      return Utils.safeStringify(idol_type) === Utils.safeStringify(admirer_type)
     } else {
       return idol_type === admirer_type
     }
@@ -526,7 +507,7 @@ export function formatErrorMessage(err: unknown, printStack: boolean = true): st
     //     errMsg += `${key}: ${errObj[key]}\n`
     //   }
     // } else {
-    errMsg = `Unknown error: ${JSON.stringify(err)}`
+    errMsg = `Unknown error: ${Utils.safeStringify(err)}`
     // }
   } else {
     errMsg = `Unknown error: ${err}`
@@ -561,9 +542,9 @@ export function jsonHttpResWithSize(
   res: Response<unknown, Record<string, unknown>, number>,
   obj: object
 ): number {
-  // res.setHeader('Content-Length', str.length)
-  // res.setHeader('Content-Type', 'application/json')
-  const str = safeStringify(obj)
+  const str = Utils.safeStringify(obj)
+  res.setHeader('Content-Length', str.length)
+  res.setHeader('Content-Type', 'application/json')
   res.write(str)
   res.end()
   return str.length
@@ -591,16 +572,16 @@ export function stringForKeys(obj: unknown, keys: ArrayLike<string> | string | n
     else if (typeof keys == 'string') keys = keys.split(/[ ,]+/)
     // justification for the suppression below: the keys are not originated by user input, but developer source code
     const items = Array.from(keys)
-      .map((key) => (obj[key] === undefined ? 'undefined' : JSON.stringify(obj[key]))) // eslint-disable-line security/detect-object-injection
+      .map((key) => (obj[key] === undefined ? 'undefined' : Utils.safeStringify(obj[key]))) // eslint-disable-line security/detect-object-injection
       .join(', ')
     return `{${items}}`
   } catch (e) {
     // throwing an exception would be bad for logging/debugging, so we just return a string
     let objStr: string
     try {
-      objStr = JSON.stringify(obj)
+      objStr = Utils.safeStringify(obj)
     } catch (e) {
-      objStr = '(stringForKeys(): exception for JSON.stringify())'
+      objStr = '(stringForKeys(): exception for Utils.safeStringify())'
     }
     return `(stringForKeys(): exception: ${e}, obj: ${objStr})`
   }
