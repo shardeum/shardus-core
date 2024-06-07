@@ -4854,7 +4854,11 @@ class TransactionQueue {
 
         // This scenario happened in big networks and this check is to avoid the nod from dying
         // this probably happened due to debug-queue-clear endpoint usage in the network
-        if (!!queueEntry || !!queueEntry.acceptedTx) {
+        if (!!queueEntry) {
+          if (!!queueEntry.acceptedTx) {
+            nestedCountersInstance.countEvent('processing', 'no expected acceptedTx in _transactionQueue queue entry')
+            break
+          }
           nestedCountersInstance.countEvent('processing', 'no expected queueEntry in _transactionQueue')
           break
         }
