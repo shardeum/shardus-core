@@ -24,7 +24,7 @@ interface Logger {
   baseDir: string
   config: Shardus.StrictLogsConfiguration
   logDir: string
-  log4Conf: any
+  log4Conf: log4js.Configuration
 
   _playbackLogger: any
 
@@ -501,13 +501,17 @@ class Logger {
           return
         }
 
-        // Get the basename of the requested file to ensure no directory paths are included.
-        const sanitizedFileName = path.basename(requestedFileName)
-
         // Retrieve valid filenames from the logger configuration
-        const validFileNames = this.log4Conf.appenders
-          .filter((appender) => appender.type === 'file')
-          .map((appender) => path.basename(appender.filename))
+      const validFileNames: string[] = []
+      for (const appender of Object.values(this.log4Conf.appenders)) {
+        if (appender.type === 'file') {
+          validFileNames.push(path.basename(appender.filename))
+        }
+      }
+      // explicitly add out.log since that is handled in saveConsoleOutput.ts
+      if (this.config.saveConsoleOutput) { 
+        validFileNames.push('out.log')
+      }
 
         // If 'all' is requested, set to clear all files, otherwise sanitize the input file name.
 
@@ -532,12 +536,12 @@ class Logger {
         // including rotated versions (e.g., out.log.1, out.log.2, etc.)
         const filesInDir = await fs.promises.readdir(this.logDir)
         const filesToDelete = filesInDir.filter((file) =>
-          filesToClear.some((f) => file === f || file.startsWith(f + '.'))
+          filesToClear.some((f) => file.startsWith(f + '.') && file !== f)
         )
 
-        // Clear the original log files without deleting them
+        // Clear the original log files without deleting them by opening them with 'w+' to truncate and allow read/write
         const truncatePromises = filesToClear.map((file) =>
-          fs.promises.truncate(path.join(this.logDir, file), 0)
+          fs.promises.open(path.join(this.logDir, file), 'w+').then((fileHandle) => fileHandle.close())
         )
         await Promise.all(truncatePromises)
 
