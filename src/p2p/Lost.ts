@@ -271,7 +271,9 @@ export function init() {
             {}
           )
         } else {
-          res = await Comms.ask(targetNode, payload.route, payload.message)
+          error(`proxy handler route is not get_trie_hashes`)
+          await respond(proxyRes)
+          return
         }
         proxyRes = {
           success: true,
