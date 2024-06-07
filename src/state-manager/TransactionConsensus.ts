@@ -454,7 +454,7 @@ class TransactionConsenus {
 
     this.p2p.registerInternal(
       'get_applied_vote',
-      async (payload: AppliedVoteQuery, respond: (arg0: AppliedVoteQueryResponse) => unknown) => {        
+      async (payload: AppliedVoteQuery, respond: (arg0: AppliedVoteQueryResponse) => unknown) => {
         nestedCountersInstance.countEvent('consensus', 'get_applied_vote')
         const { txId } = payload
         let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId)
@@ -749,20 +749,14 @@ class TransactionConsenus {
               }
             }
             if (queueEntry == null) {
-              /* prettier-ignore */
-              if (logFlags.error || this.stateManager.consensusLog)
-                this.mainLogger.error(
-                  `spread_appliedReceipt no queue entry for ${txId} txId:${txId}`
-                )
+              /* prettier-ignore */ if (logFlags.error || this.stateManager.consensusLog) this.mainLogger.error(`spread_appliedReceipt no queue entry for ${txId} txId:${txId}`)
               // NEW start repair process that will find the TX then apply repairs
               // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(receivedAppliedReceipt2)
               return
             }
           }
           if (queueEntry.hasValidFinalData || queueEntry.accountDataSet) {
-            /* prettier-ignore */
-            if (logFlags.debug || this.stateManager.consensusLog)
-              this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} Already Shared`)
+            /* prettier-ignore */ if (logFlags.debug || this.stateManager.consensusLog) this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} Already Shared`)
             nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 skipped Already Shared`)
             return
           }
@@ -1158,7 +1152,7 @@ class TransactionConsenus {
       //   let idxModEveryN = idxPlusNonce % everyN
       //   if(idxModEveryN > 0){
       //     nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped')
-      //     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shareAppliedReceipt-skipped', `${queueEntry.acceptedTx.txId}`, `ourIndex:${ourIndex} groupLength:${ourIndex} `)
+      //     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shareAppliedReceipt-skipped', `${queueEntry.acceptedTx.txId}`, `ourIndex:${ourIndex} groupLength:${ourIndex} `)
       //     return
       //   }
       // }
@@ -1302,11 +1296,11 @@ class TransactionConsenus {
       //     let finalAccount = queueEntry.collectedFinalData[key]
       //     let accountId = finalAccount.accountId
       //     let prevStateCalc = wrappedStates[accountId] ? wrappedStates[accountId].stateId : ''
-      //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply collectedFinalData tx:${queueEntry.logID} ts:${timestamp} ${utils.makeShortHash(finalAccount)} preveStateID: ${finalAccount.prevStateId } vs expected: ${prevStateCalc}`)
+      //     if (logFlags.verbose) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply collectedFinalData tx:${queueEntry.logID} ts:${timestamp} ${utils.makeShortHash(finalAccount)} preveStateID: ${finalAccount.prevStateId } vs expected: ${prevStateCalc}`)
 
       //     wrappedStates[key] = finalAccount
       //   }
-      //   /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply collectedFinalData tx:${queueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+      //   if (logFlags.verbose) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply collectedFinalData tx:${queueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
       // }
 
       for (let j = 0; j < vote.account_id.length; j++) {
@@ -1522,8 +1516,7 @@ class TransactionConsenus {
             this.mainLogger.debug(
               `tryProduceReceipt: ${queueEntry.logID} stopped accepting confirm/challenge messages`
             )
-
-          if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} ready to decide final receipt. bestReceivedChallenge: ${utils.stringifyReduce(queueEntry.receivedBestChallenge)}, bestReceivedConfirmation: ${utils.stringifyReduce(queueEntry.receivedBestConfirmation)}, receivedBestConfirmedNode: ${utils.stringifyReduce(queueEntry.receivedBestConfirmedNode)}`) // prettier-ignore
+          /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} ready to decide final receipt. bestReceivedChallenge: ${utils.stringifyReduce(queueEntry.receivedBestChallenge)}, bestReceivedConfirmation: ${utils.stringifyReduce(queueEntry.receivedBestConfirmation)}, receivedBestConfirmedNode: ${utils.stringifyReduce(queueEntry.receivedBestConfirmedNode)}`)
           if (this.stateManager.consensusLog) {
             this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} ready to decide final receipt.`)
             this.mainLogger.debug(
@@ -1936,7 +1929,7 @@ class TransactionConsenus {
             )
             return rBin
           }
-          return await Comms.ask(node, 'get_applied_vote', queryData)          
+          return await Comms.ask(node, 'get_applied_vote', queryData)
         } catch (e) {
           this.mainLogger.error(`robustQueryBestVote: Failed query to node ${node.id} error: ${e.message}`)
           return {
@@ -2356,8 +2349,7 @@ class TransactionConsenus {
   async confirmVoteAndShare(queueEntry: QueueEntry): Promise<void> {
     this.profiler.profileSectionStart('confirmVoteAndShare')
     try {
-      /* prettier-ignore */
-      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote("shrd_confirmOrChallengeVote", `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `);
+      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote("shrd_confirmOrChallengeVote", `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
 
       // podA: POQ3 create confirm message and share to tx group
       const confirmMessage: ConfirmOrChallengeMessage = {
@@ -2386,8 +2378,7 @@ class TransactionConsenus {
   async challengeVoteAndShare(queueEntry: QueueEntry): Promise<void> {
     this.profiler.profileSectionStart('challengeVoteAndShare')
     try {
-      /* prettier-ignore */
-      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote("shrd_confirmOrChallengeVote", `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `);
+      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote("shrd_confirmOrChallengeVote", `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `);
 
       // Should check account integrity only when before states are different from best vote
       let doStatesMatch = true
@@ -2839,10 +2830,8 @@ class TransactionConsenus {
       return false
     }
 
-    /* prettier-ignore */
-    if (logFlags.playback) this.logger.playbackLogNote("tryAppendMessage", `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`);
-    /* prettier-ignore */
-    if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID}   ${Utils.safeStringify(confirmOrChallenge)} `);
+    /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote("tryAppendMessage", `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`);
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID}   ${Utils.safeStringify(confirmOrChallenge)} `);
     // check if the node is in the execution group
     const isMessageFromExecutionNode = queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)
 
@@ -3046,8 +3035,7 @@ class TransactionConsenus {
       if (numVotes === 0) {
         queueEntry.collectedVotes.push(vote)
         queueEntry.newVotes = true
-        if (this.stateManager.consensusLog)
-          this.mainLogger.debug(`First vote appended for tx ${queueEntry.logID}}`)
+        /* prettier-ignore */ if (this.stateManager.consensusLog) this.mainLogger.debug(`First vote appended for tx ${queueEntry.logID}}`)
         return true
       }
 
@@ -3110,7 +3098,7 @@ class TransactionConsenus {
       let receivedVoter: Shardus.NodeWithRank
       if (!queueEntry.receivedBestVote){
         isBetterThanCurrentVote = true
-        //do not compare the hash we still need to allow gossip to flow if the hash is the 
+        //do not compare the hash we still need to allow gossip to flow if the hash is the
         //same but the vote is better.
       //else if (queueEntry.receivedBestVoteHash === this.calculateVoteHash(vote)){
       } else {
@@ -3129,10 +3117,10 @@ class TransactionConsenus {
             `tryAppendVote: ${queueEntry.logID} received vote is NOT better than current vote. lastReceivedVoteTimestamp: ${queueEntry.lastVoteReceivedTimestamp}`
           )
         }
-        if (receivedVoter)
-          /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter ${NodeList.activeIdToPartition.get(receivedVoter.id)}`)
-        else
-          /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter`)
+        if (logFlags.seqdiagram) {
+         /* prettier-ignore */ if (receivedVoter) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter ${NodeList.activeIdToPartition.get(receivedVoter.id)}`)
+         /* prettier-ignore */ else this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter`)
+        }
         return false
       }
 

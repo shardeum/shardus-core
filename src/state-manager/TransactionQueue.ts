@@ -2101,7 +2101,7 @@ class TransactionQueue {
             if (node.id === ourID) {
               txQueueEntry.ourExGroupIndex = idx
               /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: executor index ${txQueueEntry.ourExGroupIndex}:${(node as Shardus.NodeWithRank).rank}`)
-            }            
+            }
           }
           if (txQueueEntry.eligibleNodeIdsToConfirm.has(Self.id)) {
             /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: confirmator`)
@@ -2298,7 +2298,7 @@ class TransactionQueue {
                       this.stateManager.config.p2p.spreadTxToGroupSyncingBinary
                     ) {
                       if (logFlags.seqdiagram) {
-                        for (const node of this.stateManager.currentCycleShardData.syncingNeighborsTxGroup) {                
+                        for (const node of this.stateManager.currentCycleShardData.syncingNeighborsTxGroup) {
                           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'spread_tx_to_group_syncing'}`)
                         }
                       }
@@ -3903,7 +3903,7 @@ class TransactionQueue {
             /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_state_nodes'}`)
           } else {
             /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_state_neighbour'}`)
-          }        
+          }
         }
       }
       this.p2p.tellBinary<BroadcastStateReq>(
@@ -4425,7 +4425,7 @@ class TransactionQueue {
             // convert legacy message to binary supported type
             const request = message as BroadcastFinalStateReq
             if (logFlags.seqdiagram) {
-              for (const node of filterdCorrespondingAccNodes) {                
+              for (const node of filterdCorrespondingAccNodes) {
                 /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_finalstate'}`)
               }
             }
@@ -5411,7 +5411,7 @@ class TransactionQueue {
                 /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: upstream:null`)
                 nestedCountersInstance.countEvent('processing', 'busy waiting the upstream tx.' +
                   ' but it is null')
-              } else {                
+              } else {
                 if (upstreamTx.logID === queueEntry.logID) {
                   /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: upstream:same`)
                   nestedCountersInstance.countEvent('processing', 'busy waiting the upstream tx but it is same txId')
@@ -7545,11 +7545,10 @@ class TransactionQueue {
     if (this.archivedQueueEntriesByID.has(txId)) delete this.archivedQueueEntriesByID[txId]
   }
   updateTxState(queueEntry: QueueEntry, nextState: string, context = ''): void {
-    if (logFlags.seqdiagram)
-      if (context == '')
-        /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: ${queueEntry.state}-${nextState}`)
-      else 
-        /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: ${queueEntry.state}-${nextState}:${context}`)
+    if (logFlags.seqdiagram) {
+      /* prettier-ignore */ if (context == '') this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: ${queueEntry.state}-${nextState}`)
+      /* prettier-ignore */ else this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: ${queueEntry.state}-${nextState}:${context}`)
+    }
     const currentState = queueEntry.state
     this.txDebugMarkEndTime(queueEntry, currentState)
     queueEntry.state = nextState
