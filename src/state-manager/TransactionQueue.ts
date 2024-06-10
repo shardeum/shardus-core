@@ -988,7 +988,10 @@ class TransactionQueue {
       if (queue == null || (Array.isArray(queue) && queue.length === 0)) {
         queue = [nonceQueueEntry]
         this.nonceQueue.set(nonceQueueEntry.accountId, queue)
-        if (logFlags.debug) this.mainLogger.debug(`adding new nonce tx: ${nonceQueueEntry.txId} ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce}`)
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `adding new nonce tx: ${nonceQueueEntry.txId} ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce}`
+          )
       } else if (queue && queue.length > 0) {
         let index = utils.binarySearch(queue, nonceQueueEntry, (a, b) => Number(a.nonce) - Number(b.nonce))
         if (index != -1) {
@@ -996,11 +999,14 @@ class TransactionQueue {
           queue[index] = nonceQueueEntry
           this.nonceQueue.set(nonceQueueEntry.accountId, queue)
           nestedCountersInstance.countEvent('processing', 'replaceExistingNonceTx')
-          if (logFlags.debug) this.mainLogger.debug(`replace existing nonce tx ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce}, txId: ${nonceQueueEntry.txId}`)
+          if (logFlags.debug)
+            this.mainLogger.debug(
+              `replace existing nonce tx ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce}, txId: ${nonceQueueEntry.txId}`
+            )
           return { success: true, reason: 'Replace existing pending nonce tx' }
         }
         // add new item to the queue
-        utils.insertSorted(queue, nonceQueueEntry, (a, b) => Number(a.nonce) - Number(b.nonce));
+        utils.insertSorted(queue, nonceQueueEntry, (a, b) => Number(a.nonce) - Number(b.nonce))
         this.nonceQueue.set(nonceQueueEntry.accountId, queue)
       }
       /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${nonceQueueEntry.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: pause_nonceQ`)
