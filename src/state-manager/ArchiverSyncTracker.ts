@@ -12,6 +12,7 @@ import { SyncTrackerInterface } from './NodeSyncTracker'
 import ArchiverDataSourceHelper from './ArchiverDataSourceHelper'
 import { getArchiversList } from '../p2p/Archivers'
 import * as http from '../http'
+import { WrappedResponse } from '../shardus/shardus-types'
 
 export default class ArchiverSyncTracker implements SyncTrackerInterface {
   accountSync: AccountSync //parent sync manager
@@ -287,7 +288,9 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
           const signedMessage = crypto.sign(message)
           console.log('getAccountDataByListFromArchiver message', signedMessage)
 
-          const getAccountDataByListFromArchiver = async (payload) => {
+          const getAccountDataByListFromArchiver = async (
+            payload
+          ): Promise<{ success: boolean; accountData: WrappedResponse[] }> => {
             const dataSourceArchiver = this.archiverDataSourceHelper.dataSourceArchiver
             const accountDataByListArchiverUrl = `http://${dataSourceArchiver.ip}:${dataSourceArchiver.port}/get_account_data_by_list_archiver`
             try {
@@ -481,7 +484,7 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
 
     let receivedBusyMessageTimes = 0
 
-    const retryWithNextArchiver = async (debugMessage: string, errorString: string) => {
+    const retryWithNextArchiver = async (debugMessage: string, errorString: string): Promise<void> => {
       if (this.archiverDataSourceHelper.tryNextDataSourceArchiver(debugMessage) == false) {
         // If we have received busy message from more than half of the archivers, then try again from the start of the list of archivers after waiting for 10 seconds
         if (receivedBusyMessageTimes > this.archiverDataSourceHelper.getNumberArchivers() / 2) {
@@ -498,12 +501,12 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
     //only available when ther is a small number of archivers.
     //we clear this if we get a good response from any archiver, so to fail we have to
     //get this many loop fails without any good responses
-    let restartListRetriesLeft = 5
-    let totalRestartList = 0
+    // let restartListRetriesLeft = 5
+    // let totalRestartList = 0
 
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
-      let moreAskTime = 0
+      const moreAskTime = 0
       // We might not need this for data syncing from archivers. but some kind of archiver precheck would be still good to have.
       // // Node Precheck!
       // if (
@@ -602,8 +605,6 @@ export default class ArchiverSyncTracker implements SyncTrackerInterface {
         }
         continue
       }
-
-      restartListRetriesLeft = 5
 
       if (result.data == null) {
         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result.data == null archiver:${this.archiverDataSourceHelper.dataSourceArchiver.publicKey}`)

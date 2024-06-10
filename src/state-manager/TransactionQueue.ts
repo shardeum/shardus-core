@@ -993,7 +993,7 @@ class TransactionQueue {
             `adding new nonce tx: ${nonceQueueEntry.txId} ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce}`
           )
       } else if (queue && queue.length > 0) {
-        let index = utils.binarySearch(queue, nonceQueueEntry, (a, b) => Number(a.nonce) - Number(b.nonce))
+        const index = utils.binarySearch(queue, nonceQueueEntry, (a, b) => Number(a.nonce) - Number(b.nonce))
         if (index != -1) {
           // there is existing item with the same nonce. replace it with the new one
           queue[index] = nonceQueueEntry
@@ -6867,7 +6867,7 @@ class TransactionQueue {
     return [...this.forwardedReceiptsByTimestamp.values()]
   }
 
-  async requestFinalData(queueEntry: QueueEntry, accountIds: string[]) {
+  async requestFinalData(queueEntry: QueueEntry, accountIds: string[]): Promise<void> {
     profilerInstance.profileSectionStart('requestFinalData')
     this.mainLogger.debug(
       `requestFinalData: txid: ${queueEntry.logID} accountIds: ${utils.stringifyReduce(accountIds)}`
@@ -6899,7 +6899,7 @@ class TransactionQueue {
         throw new Error('requestFinalData: could not find node from execution group')
       }
 
-      if (true)
+      if (logFlags.debug)
         this.mainLogger.debug(
           `requestFinalData: txid: ${queueEntry.acceptedTx.txId} accountIds: ${utils.stringifyReduce(
             accountIds
@@ -6940,7 +6940,7 @@ class TransactionQueue {
           queueEntry.collectedFinalData[data.accountId] = data
           successCount++
           /* prettier-ignore */
-          if (true) this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} success accountId: ${data.accountId} stateId: ${data.stateId}`);
+          if (logFlags.debug) this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} success accountId: ${data.accountId} stateId: ${data.stateId}`);
         }
       }
       if (successCount === accountIds.length) {
@@ -7750,7 +7750,7 @@ class TransactionQueue {
       }
     })
   }
-  removeTxFromArchivedQueue(txId: string) {
+  removeTxFromArchivedQueue(txId: string): void {
     // remove from the archived queue array and map by txId
     const index = this.archivedQueueEntries.findIndex((queueEntry) => queueEntry.acceptedTx.txId === txId)
     if (index !== -1) {

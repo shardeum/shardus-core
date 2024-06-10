@@ -280,7 +280,7 @@ class AccountGlobals {
    * sync requires having knowlege of what accounts are global very early in the process.
    * This will get an early global report (note does not have account data, just id,hash,timestamp)
    */
-  async getGlobalListEarly(syncFromArchiver: boolean = false): Promise<void> {
+  async getGlobalListEarly(syncFromArchiver = false): Promise<void> {
     let retriesLeft = 10
 
     //This will try up to 10 times to get the global list

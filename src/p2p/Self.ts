@@ -79,7 +79,7 @@ let cyclesElapsedSinceRefresh = 0
 
 const idErrorMessage = `id did not match the cycle record info`
 
-const nodeMatch = (node) =>
+const nodeMatch = (node): boolean =>
   node.externalIp === network.ipInfo.externalIp && node.externalPort === network.ipInfo.externalPort
 
 /** ROUTES */

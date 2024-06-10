@@ -928,7 +928,7 @@ class AccountSync {
    * @param tag a debug tag so that logs and counters will give more context
    * @returns GlobalAccountReportResp
    */
-  async getRobustGlobalReport(tag = '', syncFromArchiver: boolean = false): Promise<GlobalAccountReportResp> {
+  async getRobustGlobalReport(tag = '', syncFromArchiver = false): Promise<GlobalAccountReportResp> {
     console.log('getRobustGlobalReport start', tag, syncFromArchiver)
     if (!syncFromArchiver) {
       this.lastWinningGlobalReportNodes = []
@@ -1004,7 +1004,9 @@ class AccountSync {
       const signedPayload = this.crypto.sign(payload)
       console.log('getGlobalAccountReportFromArchiver messsage', signedPayload)
 
-      const getGlobalAccountReportFromArchiver = async () => {
+      const getGlobalAccountReportFromArchiver = async (): Promise<
+        Partial<GlobalAccountReportResp> & { msg: string }
+      > => {
         const globalAccountReportArchiverUrl = `http://${archiver.ip}:${archiver.port}/get_globalaccountreport_archiver`
 
         try {
@@ -1013,20 +1015,19 @@ class AccountSync {
           return r
         } catch (error) {
           console.error('getGlobalAccountReportFromArchiver error', error)
-          null
+          return null
         }
       }
 
-      let result: Partial<GlobalAccountReportResp> & { msg: string }
-      result = await getGlobalAccountReportFromArchiver()
+      const result = await getGlobalAccountReportFromArchiver()
       return checkResultFn(result, archiver.publicKey, true)
     }
 
     const checkResultFn = (
       result: (Partial<GlobalAccountReportResp> & { msg: string }) | boolean,
       nodeId: string,
-      resultFromArchiver: boolean = false
-    ) => {
+      resultFromArchiver = false
+    ): Partial<GlobalAccountReportResp> & { msg: string } => {
       // Various failure cases will alter the returned result so that it is tallied in a more orderly way.
       // The random numbers were kept to prevent the hash of results from being equal, but now custom equalFn takes care of this concern
       if (result === false) {
@@ -1362,13 +1363,15 @@ class AccountSync {
    * createSyncTrackerByRange
    * @param {StateManagerTypes.shardFunctionTypes.BasicAddressRange} range
    * @param {number} cycle
+   * @param initalSync
+   * @param syncFromArchiver
    * @return {SyncTracker}
    */
   createSyncTrackerByRange(
     range: StateManagerTypes.shardFunctionTypes.BasicAddressRange,
     cycle: number,
     initalSync = false,
-    syncFromArchiver: boolean = false
+    syncFromArchiver = false
   ): SyncTrackerInterface {
     const index = this.syncTrackerIndex++
 
@@ -1392,7 +1395,7 @@ class AccountSync {
   createSyncTrackerByForGlobals(
     cycle: number,
     initalSync = false,
-    syncFromArchiver: boolean = false
+    syncFromArchiver = false
   ): SyncTrackerInterface {
     const index = this.syncTrackerIndex++
 

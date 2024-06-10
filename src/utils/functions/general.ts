@@ -485,7 +485,7 @@ export function selectIndexesWithOffeset(arraySize: number, numberToPick: number
  * @param printStack
  * @returns
  */
-export function formatErrorMessage(err: unknown, printStack: boolean = true): string {
+export function formatErrorMessage(err: unknown, printStack = true): string {
   let errMsg = 'An error occurred'
 
   if (typeof err === 'string') {
