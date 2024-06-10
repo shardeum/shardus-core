@@ -2106,8 +2106,7 @@ class TransactionQueue {
 
           // calculate globalOffset for FACT
           // take last 2 bytes of the txId and convert it to an integer
-          // txQueueEntry.correspondingGlobalOffset = parseInt(txId.slice(-4), 16)
-          txQueueEntry.correspondingGlobalOffset = 0
+          txQueueEntry.correspondingGlobalOffset = parseInt(txId.slice(-4), 16)
 
           const ourID = this.stateManager.currentCycleShardData.ourNode.id
           for (let idx = 0; idx < txQueueEntry.executionGroup.length; idx++) {
