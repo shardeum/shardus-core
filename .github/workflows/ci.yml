@@ -26,6 +26,6 @@ permissions:
 
 jobs:
   ci-dev:
-    if: ${{ github.event.inputs.workflowBranch == 'dev' }}
+    if: ${{ github.event.inputs.workflowBranch == 'dev' || !github.event.inputs.workflowBranch }}
     uses: shardeum/github-automation/.github/workflows/node-ci-shared.yml@dev
     secrets: inherit
