@@ -14,7 +14,7 @@ on:
       workflowBranch:
         description: 'Branch of the reusable workflow. Defaults to main, select dev for testing only.'
         required: true
-        default: 'dev'
+        default: 'main'
         type: choice
         options:
           - dev
@@ -26,6 +26,11 @@ permissions:
 
 jobs:
   ci-dev:
-    if: ${{ github.event.inputs.workflowBranch == 'dev' || !github.event.inputs.workflowBranch }}
+    if: ${{ github.event.inputs.workflowBranch == 'dev' }}
     uses: shardeum/github-automation/.github/workflows/node-ci-shared.yml@dev
+    secrets: inherit
+
+  ci-main:
+    if: ${{ github.event.inputs.workflowBranch == 'main' || !github.event.inputs.workflowBranch }}
+    uses: shardeum/github-automation/.github/workflows/node-ci-shared.yml@main
     secrets: inherit
