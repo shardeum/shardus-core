@@ -6899,12 +6899,7 @@ class TransactionQueue {
         throw new Error('requestFinalData: could not find node from execution group')
       }
 
-      if (logFlags.debug)
-        this.mainLogger.debug(
-          `requestFinalData: txid: ${queueEntry.acceptedTx.txId} accountIds: ${utils.stringifyReduce(
-            accountIds
-          )}, asking node: ${nodeToAsk.id} ${nodeToAsk.externalPort} at timestamp ${shardusGetTime()}`
-        )
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.acceptedTx.txId} accountIds: ${utils.stringifyReduce(accountIds)}, asking node: ${nodeToAsk.id} ${nodeToAsk.externalPort} at timestamp ${shardusGetTime()}`)
 
       let response
       if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestTxAndStateBinary) {
