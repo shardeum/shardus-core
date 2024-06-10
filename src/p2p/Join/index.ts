@@ -36,7 +36,6 @@ import { addFinishedSyncing, drainFinishedSyncingRequest, newSyncFinishedNodes }
 //import { getLastCycleStandbyRefreshRequest, resetLastCycleStandbyRefreshRequests, drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
 import { drainNewStandbyRefreshRequests, addStandbyRefresh } from './v2/standbyRefresh'
 import rfdc from 'rfdc'
-import { addStandbyAdd, drainNewStandbyAddRequests } from './v2/standbyAdd'
 import { Utils } from '@shardus/types'
 
 /** STATE */
