@@ -1,7 +1,6 @@
 //get the target nodes for a given corresponding sender
-
-import * as Shardus from '../shardus/shardus-types'
-const verbose = false
+const verbose = true
+const proposedFix = true
 
 //this only has to be computed once time no matter how many facts are being shared
 export function getCorrespondingNodes(
@@ -23,8 +22,6 @@ export function getCorrespondingNodes(
     unWrappedEndIndex = endTargetIndex
     endTargetIndex = endTargetIndex + transactionGroupSize
   }
-  console.log(`thant: unWrappedEndIndex ${unWrappedEndIndex} startTargetIndex ${startTargetIndex} endTargetIndex ${endTargetIndex}`);
-
   //wrap our index to the send group size
   ourIndex = ourIndex % sendGroupSize
 
@@ -86,7 +83,6 @@ export function getCorrespondingNodes(
       wrappedIndex = startTargetIndex + howFarPastUnWrapped
     }
   }
-  console.log(`ourIndex in sender group ${ourIndex} destinationNodes ${destinationNodes}`);
   return destinationNodes
 }
 
@@ -95,13 +91,24 @@ export function verifyCorrespondingSender(
   sendingNodeIndex: number,
   globalOffset: number,
   receiverGroupSize: number,
-  sendGroupSize: number
+  sendGroupSize: number,
+  receiverStartIndex = 0,
+  receiverEndIndex = 0,
+  transactionGroupSize = 0
 ): boolean {
-  console.log(`thant: running FACT verifyCorrespondingSender sendingNodeIndex ${sendingNodeIndex} receivingNodeIndex ${receivingNodeIndex}  globalOffset ${globalOffset} receiverGroupSize ${receiverGroupSize} sendGroupSize ${sendGroupSize}`);
   //note, in the gather case, we need to check the address range of the sender node also, to prove
   //that it does cover the given account range
+  let unwrappedReceivingNodeIndex = receivingNodeIndex
 
-  const targetIndex = ((receivingNodeIndex + globalOffset) % receiverGroupSize) % sendGroupSize
+  // handle case where receiver group is split (wraps around)
+  if (proposedFix) {
+    if (receiverStartIndex > unwrappedReceivingNodeIndex) {
+      unwrappedReceivingNodeIndex = unwrappedReceivingNodeIndex + transactionGroupSize
+    }
+  }
+
+  // use unwrappedReceivingNodeIndex to calculate the target index
+  const targetIndex = ((unwrappedReceivingNodeIndex + globalOffset) % receiverGroupSize) % sendGroupSize
   const targetIndex2 = sendingNodeIndex % sendGroupSize
   if (targetIndex === targetIndex2) {
     if (verbose)
