@@ -4314,10 +4314,12 @@ class TransactionQueue {
     const targetIndices = this.getStartAndEndIndexOfTargetGroup(targetGroup, queueEntry.transactionGroup)
 
     // temp logs
-    // console.log(`thant: target group size`, targetGroup.length, targetGroup);
-    // console.log(`thant: tx group size`, queueEntry.transactionGroup.length, queueEntry.transactionGroup.map(n => n.id));
-    // console.log(`thant: getting corresponding indices for tx: ${queueEntry.logID}`, ourIndexInTxGroup, targetIndices.startIndex, targetIndices.endIndex, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, queueEntry.transactionGroup.length);
-    // console.log(`thant: target group indices`, targetIndices)
+    if (logFlags.verbose) {
+      this.mainLogger.debug(`factTellCorrespondingNodes: target group size`, targetGroup.length, targetGroup);
+      this.mainLogger.debug(`factTellCorrespondingNodes: tx group size`, queueEntry.transactionGroup.length, queueEntry.transactionGroup.map(n => n.id));
+      this.mainLogger.debug(`factTellCorrespondingNodes: getting corresponding indices for tx: ${queueEntry.logID}`, ourIndexInTxGroup, targetIndices.startIndex, targetIndices.endIndex, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, queueEntry.transactionGroup.length);
+      this.mainLogger.debug(`factTellCorrespondingNodes: target group indices`, targetIndices)
+    }
 
     const correspondingIndices = getCorrespondingNodes(
       ourIndexInTxGroup,
@@ -4328,17 +4330,19 @@ class TransactionQueue {
       senderGroupSize,
       queueEntry.transactionGroup.length
     )
-    // console.log(`thant: correspondingIndices ${queueEntry.logID}`, ourIndexInTxGroup, correspondingIndices);
+    if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodes: correspondingIndices ${queueEntry.logID}`, ourIndexInTxGroup, correspondingIndices);
 
-    //  debug verification code
     const validCorrespondingIndices = []
     for (const targetIndex of correspondingIndices) {
-      const isValid = verifyCorrespondingSender(targetIndex, ourIndexInTxGroup, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize)
-      // console.log(`thant: debug verifyCorrespondingSender`, ourIndexInTxGroup, '->', targetIndex, isValid);
-      if (isValid) {
-        validCorrespondingIndices.push(targetIndex)
+      validCorrespondingIndices.push(targetIndex)
+
+      if (logFlags.debug) {
+        //  debug verification code
+        const isValid = verifyCorrespondingSender(targetIndex, ourIndexInTxGroup, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, targetIndices.startIndex, targetIndices.endIndex, queueEntry.transactionGroup.length)
+        if (logFlags.debug) this.mainLogger.debug(`factTellCorrespondingNodes: debug verifyCorrespondingSender`, ourIndexInTxGroup, '->', targetIndex, isValid);
       }
     }
+
 
     const correspondingNodes = []
     for (const index of validCorrespondingIndices) {
@@ -4366,11 +4370,8 @@ class TransactionQueue {
       }
     }
     if (correspondingNodes.length === 0) {
-      // console.log(`thant: factTellCorrespondingNodes: no corresponding nodes`);
       nestedCountersInstance.countEvent('stateManager', 'factTellCorrespondingNodes: no corresponding nodes needed to send')
       return
-    } else {
-      // console.log(`thant: factTellCorrespondingNodes: corresponding nodes`, Self.id, correspondingNodes.map(n => n.id), payload);
     }
 
     // Filter nodes before we send tell()
@@ -4429,7 +4430,6 @@ class TransactionQueue {
 
   factValidateCorrespondingTellSender(queueEntry: QueueEntry, dataKey: string, senderNodeId: string): boolean {
     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factValidateCorrespondingTellSender: txId: ${queueEntry.acceptedTx.txId} sender node id: ${senderNodeId}, receiver id: ${Self.id}`)
-    // console.log(`thant: factValidateCorrespondingTellSender: txId: ${queueEntry.acceptedTx.txId} sender node id: ${senderNodeId}, receiver id: ${Self.id}`)
     const receiverNode = this.stateManager.currentCycleShardData.nodeShardData
     if (receiverNode == null) return false
 
@@ -4446,7 +4446,6 @@ class TransactionQueue {
       const neighbourNodeIds = neighbourNodes.map((node) => node.id)
       isSenderOurExeNeighbour = senderIsInExecutionGroup && neighbourNodeIds.includes(senderNodeId)
       if (isSenderOurExeNeighbour) {
-        // console.log(`thant: factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender is an execution node and a neighbour node`);
         nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellSender: sender is an execution node and a neighbour node')
         return true
       }
@@ -4458,16 +4457,13 @@ class TransactionQueue {
     const receiverGroupSize = queueEntry.executionNodeIdSorted.length
     const senderGroupSize = receiverGroupSize
 
-    const isValidFactSender = verifyCorrespondingSender(receivingNodeIndex, senderNodeIndex, queueEntry.correspondingGlobalOffset, receiverGroupSize, senderGroupSize)
-    // if (isValidFactSender) {
-    //   console.log(`thant: factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender is a valid sender`);
-    // } else {
-    //   console.log(`thant: factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender is not a valid sender`);
-    // }
+    const targetGroup = queueEntry.executionNodeIdSorted
+    const targetIndices = this.getStartAndEndIndexOfTargetGroup(targetGroup, queueEntry.transactionGroup)
+
+    const isValidFactSender = verifyCorrespondingSender(receivingNodeIndex, senderNodeIndex, queueEntry.correspondingGlobalOffset, receiverGroupSize, senderGroupSize, targetIndices.startIndex, targetIndices.endIndex, queueEntry.transactionGroup.length)
 
     // it maybe a FACT sender but sender does not cover the account
     if (senderHasAddress === false && isSenderOurExeNeighbour === false) {
-      // console.log(`thant: factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender does not have the address and is not a exe neighbour`);
       this.mainLogger.error(`factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender does not have the address and is not a exe neighbour`)
       nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellSender: sender does not have the address and is not a exe neighbour')
       return false
@@ -4475,7 +4471,6 @@ class TransactionQueue {
 
     // it is neither a FACT corresponding node nor an exe neighbour node
     if (isValidFactSender === false && isSenderOurExeNeighbour === false) {
-      // console.log(`thant: factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender is neither a valid sender nor a neighbour node isValidSender:  ${isValidFactSender} isSenderOurExeNeighbour: ${isSenderOurExeNeighbour}`);
       this.mainLogger.error(`factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender is neither a valid sender nor a neighbour node isValidSender:  ${isValidFactSender} isSenderOurExeNeighbour: ${isSenderOurExeNeighbour}`);
       nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellSender: sender is not a valid sender or a neighbour node')
       return false
@@ -4491,7 +4486,7 @@ class TransactionQueue {
         targetIndexes.push(i)
       }
     }
-    // console.log(`thant: all target indexes`, targetIndexes);
+    if (logFlags.verbose) this.mainLogger.debug(`getStartAndEndIndexOfTargetGroup: all target indexes`, targetIndexes);
     const n = targetIndexes.length
     let startIndex = targetIndexes[0]
     // Find the pivot where the circular array starts
