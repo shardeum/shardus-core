@@ -19,11 +19,18 @@ on:
         options:
           - dev
           - main
+
+permissions:
+  issues: write
+  pull-requests: write
+
 jobs:
   ci-dev:
     if: ${{ github.event.inputs.workflowBranch == 'dev' }}
     uses: shardeum/github-automation/.github/workflows/node-ci-shared.yml@dev
+    secrets: inherit
 
   ci-main:
     if: ${{ github.event.inputs.workflowBranch == 'main' || !github.event.inputs.workflowBranch }}
     uses: shardeum/github-automation/.github/workflows/node-ci-shared.yml@main
+    secrets: inherit
