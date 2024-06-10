@@ -208,7 +208,6 @@ export function getTxs(): P2P.JoinTypes.Txs {
     startedSyncing: [],
     finishedSyncing: [],
     standbyRefresh: [],
-    standbyAdd: [],
   }
 }
 
@@ -237,7 +236,7 @@ export function validateRecordTypes(rec: P2P.JoinTypes.Record): string {
 export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
   // TODO drop any invalid join requests. NOTE: this has never been implemented
   // yet, so this task is not a side effect of any work on join v2.
-  return { join: txs.join, startedSyncing: [], finishedSyncing: [], standbyRefresh: [], standbyAdd: [] }
+  return { join: txs.join, startedSyncing: [], finishedSyncing: [], standbyRefresh: [] }
 }
 
 export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
