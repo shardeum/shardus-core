@@ -44,7 +44,7 @@ export async function setupTestEnvironment(): Promise<{
   networkContext: NetworkClass
 }> {
   const logger = new Logger(defaultConfigs.server.baseDir, defaultConfigs.logs, 'fatal')
-  const networkContext = new NetworkClass(defaultConfigs.server, logger, undefined)
+  const networkContext = new NetworkClass(defaultConfigs.server, logger)
 
   // Fetch node list from the archiver endpoint
   const nodeListResponse = await http.get<NodeListResponse>('http://127.0.0.1:4000/nodelist')
