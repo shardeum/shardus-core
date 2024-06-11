@@ -8,6 +8,7 @@ import { NetworkClass } from '../../../src/network'
 import * as Context from '../../../src/p2p/Context'
 import { ShardusTypes } from '../../../src/shardus'
 import Profiler from '../../../src/utils/profiler'
+import { initAjvSchemas } from '../../../src/types/ajv/Helpers'
 
 const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG
 crypto.init('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
@@ -66,6 +67,7 @@ export async function setupTestEnvironment(): Promise<{
     keyPair.secretKey
   )
 
+  initAjvSchemas()
   new Profiler()
   Context.setNetworkContext(networkContext)
   Context.setConfig(defaultConfigs.server)
@@ -112,7 +114,7 @@ export async function setupTestEnvironment(): Promise<{
     syncingTimestamp: Date.now(),
     readyTimestamp: 0,
   }
-  
+
   const targetNode: ShardusTypes.Node = {
     publicKey: nodeInfo.publicKey,
     externalIp: nodeInfo.externalIp,
