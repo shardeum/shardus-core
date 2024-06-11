@@ -8,6 +8,7 @@ import { NetworkClass } from '../../../src/network'
 import * as Context from '../../../src/p2p/Context'
 import { ShardusTypes } from '../../../src/shardus'
 import Profiler from '../../../src/utils/profiler'
+import { initAjvSchemas } from '../../../src/types/ajv/Helpers'
 
 const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG
 crypto.init('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
@@ -39,11 +40,12 @@ const getNodeDetails = async (host: string, port: string) => {
 }
 
 export async function setupTestEnvironment(): Promise<{
-  node: ShardusTypes.Node
+  dummyNode: ShardusTypes.Node
+  targetNode: ShardusTypes.Node
   networkContext: NetworkClass
 }> {
   const logger = new Logger(defaultConfigs.server.baseDir, defaultConfigs.logs, 'fatal')
-  const networkContext = new NetworkClass(defaultConfigs.server, logger, undefined)
+  const networkContext = new NetworkClass(defaultConfigs.server, logger)
 
   // Fetch node list from the archiver endpoint
   const nodeListResponse = await http.get<NodeListResponse>('http://127.0.0.1:4000/nodelist')
@@ -65,6 +67,7 @@ export async function setupTestEnvironment(): Promise<{
     keyPair.secretKey
   )
 
+  initAjvSchemas()
   new Profiler()
   Context.setNetworkContext(networkContext)
   Context.setConfig(defaultConfigs.server)
@@ -94,7 +97,25 @@ export async function setupTestEnvironment(): Promise<{
   }
 
   // Create a node object
-  const node: ShardusTypes.Node = {
+  const dummyNode: ShardusTypes.Node = {
+    publicKey: keyPair.publicKey,
+    externalIp: '127.0.0.1',
+    externalPort: 1337,
+    internalIp: '127.0.0.1',
+    internalPort: 1337,
+    address: keyPair.publicKey,
+    joinRequestTimestamp: Date.now(),
+    activeTimestamp: Date.now(),
+    curvePublicKey: keyPair.publicKey,
+    status: NodeStatus.ACTIVE,
+    cycleJoined: '',
+    counterRefreshed: 0,
+    id: crypto.hashObj({ publicKey: keyPair.publicKey, cycleMarker: 'madeupcyclemarker' }),
+    syncingTimestamp: Date.now(),
+    readyTimestamp: 0,
+  }
+
+  const targetNode: ShardusTypes.Node = {
     publicKey: nodeInfo.publicKey,
     externalIp: nodeInfo.externalIp,
     externalPort: nodeInfo.externalPort,
@@ -111,5 +132,6 @@ export async function setupTestEnvironment(): Promise<{
     syncingTimestamp: Date.now(),
     readyTimestamp: 0,
   }
-  return { node, networkContext }
+
+  return { dummyNode, networkContext, targetNode }
 }

@@ -8,7 +8,7 @@ import {
 } from '../../../src/types/ApoptosisProposalResp'
 import { addResult } from '../RunIntegrationTests'
 
-export const ApopotosizeInternalApiTest = async (node: ShardusTypes.Node): Promise<void> => {
+export const ApopotosizeInternalApiTest = async (from: ShardusTypes.Node, to: ShardusTypes.Node): Promise<void> => {
   // tests
   try {
     const startTime = Date.now()
@@ -17,12 +17,12 @@ export const ApopotosizeInternalApiTest = async (node: ShardusTypes.Node): Promi
       r: 1,
     }
     const resp = await Comms.askBinary<ApoptosisProposalResp, ApoptosisProposalResp>(
-      node,
+      to,
       'apoptosize',
       obj,
       serializeApoptosisProposalResp,
       deserializeApoptosisProposalResp,
-      { sender_id: node.id },
+      { sender_id: to.id },
       '0x546567890ab'
     )
     const endTime = Date.now()
@@ -40,12 +40,12 @@ export const ApopotosizeInternalApiTest = async (node: ShardusTypes.Node): Promi
       when: 1,
     }
     const resp = await Comms.askBinary<ApoptosisProposalReq, ApoptosisProposalResp>(
-      node,
+      to,
       'apoptosize',
       obj,
       serializeApoptosisProposalReq,
       deserializeApoptosisProposalResp,
-      { sender_id: node.id },
+      { sender_id: from.id },
       '0x1234567890ab'
     )
     const endTime = Date.now()
@@ -63,12 +63,12 @@ export const ApopotosizeInternalApiTest = async (node: ShardusTypes.Node): Promi
       when: 3,
     }
     const resp = await Comms.askBinary<ApoptosisProposalReq, ApoptosisProposalResp>(
-      node,
+      to,
       'apoptosize',
       obj,
       serializeApoptosisProposalReq,
       deserializeApoptosisProposalResp,
-      { sender_id: node.id },
+      { sender_id: from.id },
       '0x2234567890ab'
     )
     const endTime = Date.now()
@@ -86,12 +86,12 @@ export const ApopotosizeInternalApiTest = async (node: ShardusTypes.Node): Promi
       when: 1,
     }
     await Comms.tellBinary<ApoptosisProposalReq>(
-      [node],
+      [to],
       'apoptosize',
       obj,
       serializeApoptosisProposalReq,
       {
-        sender_id: node.id,
+        sender_id: from.id,
         tracker_id: '0x11234567890ab',
       },
       false,

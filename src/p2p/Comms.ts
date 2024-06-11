@@ -633,8 +633,7 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
     /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) console.log('header:', header)
     /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternalBinary: request info: route: ${route} header: ${Utils.safeStringify(header)} sign: ${Utils.safeStringify(sign)}`)
     if (
-      !NodeList.byPubKey.has(sign.owner) &&
-      !NodeList.nodes.has(header.sender_id) &&
+      (!NodeList.byPubKey.has(sign.owner) || !NodeList.nodes.has(header.sender_id)) &&
       !config.debug.enableTestMode
     ) {
       warn('registerInternalBinary: internal routes can only be used by nodes in the network...')

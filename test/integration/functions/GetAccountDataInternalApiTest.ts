@@ -11,7 +11,7 @@ import {
 import { InternalRouteEnum } from '../../../src/types/enum/InternalRouteEnum'
 import { addResult } from '../RunIntegrationTests'
 
-export const GetAccountDataInternalApiTest = async (node: ShardusTypes.Node): Promise<void> => {
+export const GetAccountDataInternalApiTest = async (from: ShardusTypes.Node, to: ShardusTypes.Node): Promise<void> => {
   try {
     const startTime = Date.now()
     //dummy message
@@ -24,13 +24,13 @@ export const GetAccountDataInternalApiTest = async (node: ShardusTypes.Node): Pr
       accountOffset: '0x546567890ab',
     }
     const resp = await Comms.askBinary<GetAccountDataReqSerializable, GetAccountDataRespSerializable>(
-      node,
+      to,
       InternalRouteEnum.binary_get_account_data,
       message,
       serializeGetAccountDataReq,
       deserializeGetAccountDataResp,
       {
-        sender_id: node.id,
+        sender_id: from.id,
       },
       '0x546567890ab'
     )
