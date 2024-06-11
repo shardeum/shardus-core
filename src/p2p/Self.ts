@@ -33,6 +33,7 @@ import { submitStandbyRefresh } from './Join/v2/standbyRefresh'
 import { getNumArchivers } from './Archivers'
 import { currentQuarter } from './CycleCreator'
 import { Utils } from '@shardus/types'
+import { setStartedSyncing } from './Join'
 
 /** STATE */
 
@@ -188,7 +189,8 @@ export function startupV2(): Promise<boolean> {
         nestedCountersInstance.countEvent('p2p', 'joined')
         // Sync cycle chain from network
         await syncCycleChain(id)
-        Join.queueStartedSyncingRequest()
+        
+        setStartedSyncing()
 
         // Enable internal routes
         Comms.setAcceptInternal(true)

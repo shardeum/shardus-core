@@ -48,9 +48,12 @@ let requests: P2P.JoinTypes.JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
 let queuedReceivedJoinRequests: P2P.JoinTypes.JoinRequest[] = []
 let queuedJoinRequestsForGossip: JoinRequest[] = []
-let queuedStartedSyncingId: string
-let queuedFinishedSyncingId: string
 let queuedStandbyRefreshPubKeys: string[] = []
+
+export let startedSyncing: boolean = false
+export let finishedSyncing: boolean = false
+export let startedSyncingSent: boolean = false
+export let finishedSyncingSent: boolean = false
 
 // whats this for? I was just going to use newStandbyRefreshRequests
 //let keepInStandbyCollector: Map<string, StandbyRefreshRequest>
@@ -431,7 +434,6 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
         }
       }
 
-
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${standbyRemoved_Age}  removed list: ${record.standbyRemove} ` )
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList(standbyList, `join.updateRecord: last-hashed ${record.counter}`)
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList( Array.from(getStandbyNodesInfoMap().values()), `join.updateRecord: standby-map ${record.counter}` )
@@ -474,7 +476,6 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       queuedJoinRequestsForGossip = queuedReceivedJoinRequests
       queuedReceivedJoinRequests = []
     }
-
   } else {
     // old protocol handling
     record.joinedConsensors = txs.join
@@ -602,12 +603,11 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
 /** Not used by Join */
 export function sendRequests(): void {
-  if (queuedStartedSyncingId) {
+  if (startedSyncing && startedSyncingSent === false) {
     const syncStartedTx: P2P.JoinTypes.StartedSyncingRequest = crypto.sign({
-      nodeId: queuedStartedSyncingId,
+      nodeId: Self.id,
       cycleNumber: CycleChain.newest.counter,
     })
-    queuedStartedSyncingId = undefined
 
     if (addSyncStarted(syncStartedTx).success === true) {
       nestedCountersInstance.countEvent('p2p', `sending sync-started gossip to network`)
@@ -628,13 +628,16 @@ export function sendRequests(): void {
       nestedCountersInstance.countEvent('p2p', `join:sendRequests failed to add our own sync-started message`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequestsfailed to add our own sync-started message`)
     }
+
+    // if it failed the first time, I doubt it'll be able to send any other time
+    // so placing this outside if else so that we wont try to send every cycle
+    startedSyncingSent = true
   }
-  if (queuedFinishedSyncingId) {
+  if (finishedSyncing && finishedSyncingSent === false) {
     const syncFinishedTx: P2P.JoinTypes.FinishedSyncingRequest = crypto.sign({
-      nodeId: queuedFinishedSyncingId,
+      nodeId: Self.id,
       cycleNumber: CycleChain.newest.counter,
     })
-    queuedFinishedSyncingId = undefined
 
     if (addFinishedSyncing(syncFinishedTx).success === true) {
       nestedCountersInstance.countEvent('p2p', `sending sync-finished gossip to network`)
@@ -658,6 +661,10 @@ export function sendRequests(): void {
       )
       /* prettier-ignore */ if (logFlags.verbose) console.log(`join:sendRequests failed to add our own sync-finished message`)
     }
+
+    // if it failed the first time, I doubt it'll be able to send any other time
+    // so placing this outside if else so that we wont try to send every cycle
+    finishedSyncingSent = true
   }
   if (queuedStandbyRefreshPubKeys.length > 0) {
     for (const standbyRefreshPubKey of queuedStandbyRefreshPubKeys) {
@@ -738,12 +745,12 @@ export function queueRequest(): void {
   return
 }
 
-export function queueStartedSyncingRequest(): void {
-  queuedStartedSyncingId = Self.id
+export function setStartedSyncing(): void {
+  startedSyncing = true
 }
 
-export function queueFinishedSyncingRequest(): void {
-  queuedFinishedSyncingId = Self.id
+export function setFinishedSyncing(): void {
+  finishedSyncing = true
 }
 
 export function queueStandbyRefreshRequest(publicKey: string): void {
