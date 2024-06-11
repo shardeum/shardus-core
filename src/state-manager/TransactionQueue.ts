@@ -5801,17 +5801,22 @@ class TransactionQueue {
                 }
 
                 // we should send the receipt if we are in the top 5 nodes
-                const isConfirmedReceipt = receipt2.confirmOrChallenge.message === 'confirm'
-                const isChallengedReceipt = receipt2.confirmOrChallenge.message === 'challenge'
+                const isConfirmedReceipt = receipt2.confirmOrChallenge?.message === 'confirm'
+                const isChallengedReceipt = receipt2.confirmOrChallenge?.message === 'challenge'
                 let shouldSendReceipt = false
                 if (queueEntry.isInExecutionHome) {
-                  let numberOfSharingNodes = configContext.stateManager.nodesToGossipAppliedReceipt
-                  if (numberOfSharingNodes > queueEntry.executionGroup.length) numberOfSharingNodes = queueEntry.executionGroup.length
-                  const highestRankedNodeIds = queueEntry.executionGroup.slice(0, numberOfSharingNodes).map(n => n.id)
-                  if (highestRankedNodeIds.includes(Self.id)) {
-                    if (isChallengedReceipt) shouldSendReceipt = true
-                    else if (isConfirmedReceipt && isReceiptMatchPreApply) shouldSendReceipt = true
+                  if (this.useNewPOQ) {
+                    let numberOfSharingNodes = configContext.stateManager.nodesToGossipAppliedReceipt
+                    if (numberOfSharingNodes > queueEntry.executionGroup.length) numberOfSharingNodes = queueEntry.executionGroup.length
+                    const highestRankedNodeIds = queueEntry.executionGroup.slice(0, numberOfSharingNodes).map(n => n.id)
+                    if (highestRankedNodeIds.includes(Self.id)) {
+                      if (isChallengedReceipt) shouldSendReceipt = true
+                      else if (isConfirmedReceipt && isReceiptMatchPreApply) shouldSendReceipt = true
+                    }
+                  } else {
+                    shouldSendReceipt = true
                   }
+
                   if (shouldSendReceipt) {
                     // Broadcast the receipt, only if we made one (try produce can early out if we received one)
                     const awaitStart = shardusGetTime()
@@ -5828,24 +5833,13 @@ class TransactionQueue {
                 }
 
                 // remove from the queue if receipt2 is a challenged receipt
-                if (isChallengedReceipt) {
+                if (isChallengedReceipt && this.useNewPOQ) {
                   const txId = queueEntry.acceptedTx.txId
                   const logID = queueEntry.logID
                   this.updateTxState(queueEntry, 'fail')
                   this.removeFromQueue(queueEntry, currentIndex, true) // we don't want to archive this
                   nestedCountersInstance.countEvent('consensus', 'isChallengedReceipt: true removing from queue')
                   this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isChallengedReceipt : ${logID}. remove from queue`)
-
-                  // these are only for debugging
-
-                  // const checkQueueEntry = this._transactionQueueByID.get(txId)
-                  // const checkQueueEntry2 = this._transactionQueue.find(q => q.acceptedTx.txId === txId)
-                  // if (checkQueueEntry != null) {
-                  //   this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isChallengedReceipt : ${logID}. checkQueueEntry is not null. Remove from queue failed`)
-                  // }
-                  // if (checkQueueEntry2 != null) {
-                  //   this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isChallengedReceipt : ${logID}. checkQueueEntry2 is not null. Remove from queue failed`)
-                  // }
                   continue
                 }
 
@@ -6077,7 +6071,7 @@ class TransactionQueue {
               const timeSinceAwaitFinalStart = queueEntry.txDebug.startTimestamp['await final data'] > 0 ? shardusGetTime() - queueEntry.txDebug.startTimestamp['await final data'] : 0
               let vote: AppliedVote
 
-              if(configContext.stateManager.removeStuckChallengedTXs){
+              if(configContext.stateManager.removeStuckChallengedTXs && this.useNewPOQ) {
                 // first check if this is a challenge receipt
                 if (receipt2 && receipt2.confirmOrChallenge.message === 'challenge') {
                   if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} challenge from receipt2`)

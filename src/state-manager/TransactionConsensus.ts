@@ -727,10 +727,16 @@ class TransactionConsenus {
             receivedAppliedReceipt2 = payload as AppliedReceipt2
             txId = receivedAppliedReceipt2.txid
           }
-
-          if (receivedAppliedReceipt2 == null || receivedAppliedReceipt2.confirmOrChallenge == null) {
+          if (receivedAppliedReceipt2 == null) {
             /* prettier-ignore */ this.mainLogger.error(`spread_appliedReceipt2 ${txId} received null receipt`)
             nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null receipt`)
+            return
+          }
+
+          // we need confirmation in new POQ
+          if (this.stateManager.transactionQueue.useNewPOQ && receivedAppliedReceipt2.confirmOrChallenge == null) {
+            /* prettier-ignore */ this.mainLogger.error(`spread_appliedReceipt2 ${txId} received null receipt`)
+            nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null confirm message`)
             return
           }
 
@@ -1199,7 +1205,7 @@ class TransactionConsenus {
           //override wrapped states with writtenAccountsMap which should be more complete if it included
           wrappedStates = writtenAccountsMap
         }
-        if (receipt2.confirmOrChallenge.message === 'challenge') {
+        if (receipt2.confirmOrChallenge?.message === 'challenge') {
           wrappedStates = {}
         }
         payload = { receipt: queueEntry.appliedReceipt2, wrappedStates }
