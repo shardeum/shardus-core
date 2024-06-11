@@ -1375,7 +1375,7 @@ class AccountPatcher {
       isDebugModeMiddlewareMedium,
       (req, res) => {
         try {
-          const subTree: boolean = req.query.subtree === 'true' ? true : false
+          const subTree: boolean = req.query.subtree === 'true'
           let radix: string = req.query.radix as string
           if (radix.length > this.treeMaxDepth) radix = radix.slice(0, this.treeMaxDepth)
           const level = radix.length
@@ -1386,6 +1386,10 @@ class AccountPatcher {
             // deep clone the trie node before removing children property
             hashTrieNode = Utils.safeJsonParse(Utils.safeStringify(hashTrieNode))
             delete hashTrieNode.children
+          }
+          if (!hashTrieNode) {
+            console.error('debug-patcher-dumpTree-partial - Radix not found. Returning 404')
+            return res.status(404).json({error: 'Radix not found'})
           }
           //strip noisy fields
           const tempString = JSON.stringify(hashTrieNode, utils.debugReplacer)
