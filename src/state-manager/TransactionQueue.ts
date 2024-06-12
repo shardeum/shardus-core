@@ -4488,7 +4488,7 @@ class TransactionQueue {
     return true
   }
 
-  getStartAndEndIndexOfTargetGroup(targetGroup: string[], transactionGroup: Shardus.Node[]): { startIndex: number; endIndex: number } {
+  getStartAndEndIndexOfTargetGroup(targetGroup: string[], transactionGroup: (Shardus.NodeWithRank | P2PTypes.NodeListTypes.Node)[]): { startIndex: number; endIndex: number } {
     const targetIndexes: number[] = []
     for (let i = 0; i < transactionGroup.length; i++) {
       const nodeId = transactionGroup[i].id
