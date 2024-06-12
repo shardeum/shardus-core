@@ -4024,6 +4024,7 @@ class StateManager {
     return false
   }
   getReceiptConfirmation(queueEntry: QueueEntry) {
+    if (this.transactionQueue.useNewPOQ === false) return true
     const receipt = this.getReceipt2(queueEntry)
     if (receipt) {
       return receipt.result
