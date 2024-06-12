@@ -1,5 +1,5 @@
 import * as NodeList from '../../NodeList'
-import { FinishedSyncingRequest } from '@shardus/types/build/src/p2p/JoinTypes'
+import { FinishedSyncingRequest, JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { SignedObject } from '@shardus/crypto-utils'
 import * as CycleChain from '../../CycleChain'
 import { crypto } from '../../Context'
@@ -9,7 +9,7 @@ import { P2P } from '@shardus/types'
 import { logFlags } from '../../../logger'
 
 //** List of synced nodes */
-export let newSyncFinishedNodes: string[] = []
+export let newSyncFinishedNodes: Map<string, FinishedSyncingRequest> = new Map()
 
 export interface FinishedSyncingRequestResponse {
   success: boolean
@@ -59,7 +59,7 @@ export function addFinishedSyncing(
   }
 
   // return false if already in local list
-  if (newSyncFinishedNodes.includes(finishedSyncRequest.nodeId) === true) {
+  if (newSyncFinishedNodes.has(finishedSyncRequest.nodeId) === true) {
     if (logFlags.console)
       console.log(
         `addFinishedSyncing(): Node already in newSyncFinishedNodes list`,
@@ -84,7 +84,7 @@ export function addFinishedSyncing(
   }
 
   /* prettier-ignore */ if (logFlags.verbose) console.log(`addFinishedSyncing: ${finishedSyncRequest.nodeId} port:${node?.externalPort}`)
-  newSyncFinishedNodes.push(finishedSyncRequest.nodeId)
+  newSyncFinishedNodes.set(finishedSyncRequest.nodeId, finishedSyncRequest)
   /* prettier-ignore */ nestedCountersInstance.countEvent('syncFinished.ts', `addFinishedSyncing(): success` )
   return {
     success: true,
@@ -98,19 +98,10 @@ export function addFinishedSyncing(
  *
  * @returns SyncCompletedRequest[]
  */
-export function drainFinishedSyncingRequest(): string[] {
-  const tmp = newSyncFinishedNodes
-  newSyncFinishedNodes = []
-  return tmp
-}
-
-/**
- * Insert a node into newSyncFinishedNodes list
- */
-export function insertSyncFinished(nodeId: string): void {
-  console.log(`insertSyncFinished: ${nodeId}`)
-  newSyncFinishedNodes.push(nodeId)
-  /* prettier-ignore */ if (logFlags.verbose) console.log(`insertSyncFinished(): Node added to newSyncFinishedNodes list`)
+export function drainFinishedSyncingRequest(): FinishedSyncingRequest[] {
+  const tmp = Array.from(newSyncFinishedNodes.values());
+  newSyncFinishedNodes = new Map<string, FinishedSyncingRequest>();
+  return tmp;
 }
 
 /**
