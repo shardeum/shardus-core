@@ -210,10 +210,11 @@ export function calculateToAccept(): number {
 
 export function getTxs(): P2P.JoinTypes.Txs {
   return {
-    join: drainNewJoinRequests(),
+    standbyAdd: drainNewJoinRequests(),
     startedSyncing: drainSyncStarted(),
     finishedSyncing: drainFinishedSyncingRequest(),
     standbyRefresh: drainNewStandbyRefreshRequests(),
+    standbyRemove: drainNewUnjoinRequests(),
   }
 }
 
@@ -242,7 +243,13 @@ export function validateRecordTypes(rec: P2P.JoinTypes.Record): string {
 export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
   // TODO drop any invalid join requests. NOTE: this has never been implemented
   // yet, so this task is not a side effect of any work on join v2.
-  return { join: txs.join, startedSyncing: [], finishedSyncing: [], standbyRefresh: [] }
+  return {
+    standbyAdd: txs.standbyAdd,
+    startedSyncing: [],
+    finishedSyncing: [],
+    standbyRefresh: [],
+    standbyRemove: [],
+  }
 }
 
 export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord): void {
@@ -257,7 +264,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
   if (config.p2p.useJoinProtocolV2) {
     // for join v2, add new standby nodes to the standbyAdd field ...
-    for (const request of txs.join) {
+    for (const request of txs.standbyAdd) {
       const publicKey = request.sign.owner
       const node = NodeList.byPubKey.get(publicKey)
       if (node) {
@@ -268,8 +275,14 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     }
 
     // ... and unjoining nodes to the standbyRemove field ...
-    for (const publicKey of drainNewUnjoinRequests()) {
-      record.standbyRemove.push(publicKey)
+    for (const request of txs.standbyRemove) {
+      const publicKey = request.sign.owner
+      const node = NodeList.byPubKey.get(publicKey)
+      if (node) {
+        record.standbyRemove.push(publicKey)
+      } else {
+        /* prettier-ignore */ if(logFlags.important_as_error) warn(`join:updateRecord:standbyRemove: node not found: ${publicKey}`)
+      }
     }
 
     for (const request of txs.startedSyncing) {
@@ -526,7 +539,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     }
   } else {
     // old protocol handling
-    record.joinedConsensors = txs.join
+    record.joinedConsensors = txs.standbyAdd
       .map((joinRequest) => {
         const { nodeInfo, cycleMarker: cycleJoined } = joinRequest
         const id = computeNodeId(nodeInfo.publicKey, cycleJoined)

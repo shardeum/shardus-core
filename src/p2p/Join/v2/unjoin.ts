@@ -18,7 +18,7 @@ export type UnjoinRequest = SignedObject<{
 }>
 
 /** A Set of new public keys of nodes that have submitted unjoin requests. */
-const newUnjoinRequests: Set<hexstring> = new Set()
+const newUnjoinRequests: Set<UnjoinRequest> = new Set()
 
 /**
  * Submits a request to leave the network's standby node list.
@@ -60,7 +60,7 @@ export function processNewUnjoinRequest(unjoinRequest: UnjoinRequest): Result<vo
 
   // validate the unjoin request and then add it if it is valid
   return validateUnjoinRequest(unjoinRequest).map(() => {
-    newUnjoinRequests.add(unjoinRequest.publicKey)
+    newUnjoinRequests.add(unjoinRequest)
   })
 }
 
@@ -69,7 +69,7 @@ export function processNewUnjoinRequest(unjoinRequest: UnjoinRequest): Result<vo
  */
 export function validateUnjoinRequest(unjoinRequest: UnjoinRequest): Result<void, Error> {
   // ignore if the unjoin request already exists
-  if (newUnjoinRequests.has(unjoinRequest.publicKey)) {
+  if (newUnjoinRequests.has(unjoinRequest)) {
     return err(new Error(`unjoin request from ${unjoinRequest.publicKey} already exists`))
   }
 
@@ -106,7 +106,7 @@ export function validateUnjoinRequest(unjoinRequest: UnjoinRequest): Result<void
   return ok(void 0)
 }
 
-export function drainNewUnjoinRequests(): hexstring[] {
+export function drainNewUnjoinRequests(): UnjoinRequest[] {
   const drained = [...newUnjoinRequests.values()]
   newUnjoinRequests.clear()
   return drained
