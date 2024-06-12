@@ -1,4 +1,4 @@
-import { StateManager as StateManagerTypes } from '@shardus/types'
+import { StateManager as StateManagerTypes, P2P as P2PTypes } from '@shardus/types'
 import { Route } from '@shardus/types/build/src/p2p/P2PTypes'
 import { Logger as Log4jsLogger } from 'log4js'
 import StateManager from '.'
@@ -47,6 +47,7 @@ import {
   serializeGetCachedAppDataResp,
 } from '../types/GetCachedAppDataResp'
 import { Utils } from '@shardus/types'
+import { getCorrespondingNodes } from '../utils/fastAggregatedCorrespondingTell'
 
 class CachedAppDataManager {
   app: Shardus.App
@@ -315,6 +316,99 @@ class CachedAppDataManager {
     }
 
     cacheTopic.maxItemSize = maxItemSize
+  }
+
+  async factSendCorrespondingCachedAppData(
+    topic: string,
+    dataID: string,
+    appData: unknown,
+    cycle: number,
+    _formId: string,
+    txId: string
+  ): Promise<unknown> {
+    if (this.stateManager.currentCycleShardData == null) {
+      throw new Error('factSendCorrespondingCachedAppData: currentCycleShardData == null')
+    }
+    if (dataID == null) {
+      throw new Error('factSendCorrespondingCachedAppData: dataId == null')
+    }
+    const queueEntry: QueueEntry = this.stateManager.transactionQueue.getQueueEntry(txId)
+
+    const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
+
+    const senderGroup = queueEntry.executionGroup
+    const targetGroup = this.stateManager.transactionQueue.getStorageGroupForAccount(dataID)
+    const allNodes = [...senderGroup, ...targetGroup].sort((a, b) => a.id.localeCompare(b.id));
+    const senderIndexInTxGroup = allNodes.findIndex((node) => node.id === ourNodeData.node.id)
+    const senderGroupSize = senderGroup.length
+    const targetGroupSize = targetGroup.length
+    const {startIndex: targetStartIndex, endIndex: targetEndIndex} = 
+      this.stateManager.transactionQueue.getStartAndEndIndexOfTargetGroup(targetGroup.map(node => node.id), allNodes)
+
+
+    const correspondingIndices = getCorrespondingNodes(
+      senderIndexInTxGroup,
+      targetStartIndex,
+      targetEndIndex,
+      queueEntry.correspondingGlobalOffset,
+      targetGroupSize,
+      senderGroupSize,
+      queueEntry.transactionGroup.length
+    )
+
+    const correspondingNodes: P2PTypes.NodeListTypes.Node[] = []
+    for (const index of correspondingIndices) {
+      const node = allNodes[index]
+      if (targetGroup.includes(node as P2PTypes.NodeListTypes.Node)) {
+        correspondingNodes.push(node as P2PTypes.NodeListTypes.Node)
+      }
+    }
+
+    const cacheAppDataToSend: CachedAppData = {
+      dataID,
+      appData,
+      cycle,
+    }
+
+    const message: CacheAppDataResponse = { topic, cachedAppData: cacheAppDataToSend }
+
+    if (correspondingNodes.length > 0) {
+      // Filter nodes before we send tell()
+      const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
+        correspondingNodes,
+        'factSendCorrespondingCachedAppData',
+        true,
+        true
+      )
+      if (filteredNodes.length === 0) {
+        /* prettier-ignore */
+        if (logFlags.error) this.mainLogger.error("cachedAppData: factSendCorrespondingCachedAppData: filterValidNodesForInternalMessage no valid nodes left to try");
+        /* prettier-ignore */ if(logFlags.shardedCache) console.log("cachedAppData: factSendCorrespondingCachedAppData: filterValidNodesForInternalMessage no valid nodes left to try");
+        return null
+      }
+      const filteredCorrespondingAccNodes = filteredNodes
+
+      if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.sendCachedAppDataBinary) {
+        const sendCacheAppDataReq: SendCachedAppDataReq = {
+          topic,
+          cachedAppData: {
+            dataID: message.cachedAppData.dataID,
+            appData: message.cachedAppData.appData,
+            cycle: message.cachedAppData.cycle,
+          },
+        }
+        this.p2p.tellBinary<SendCachedAppDataReq>(
+          filteredCorrespondingAccNodes,
+          InternalRouteEnum.binary_send_cachedAppData,
+          sendCacheAppDataReq,
+          serializeSendCachedAppDataReq,
+          {}
+        )
+        return
+      }
+
+      this.p2p.tell(filteredCorrespondingAccNodes, 'send_cachedAppData', message)
+    }
   }
 
   async sendCorrespondingCachedAppData(
