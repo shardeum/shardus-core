@@ -35,7 +35,6 @@ import {
   drainLostAfterSelectionNodes,
   drainSyncStarted,
   lostAfterSelection,
-  insertSyncStarted,
   addSyncStarted,
 } from './v2/syncStarted'
 import { addFinishedSyncing, drainFinishedSyncingRequest, newSyncFinishedNodes } from './v2/syncFinished'
@@ -210,15 +209,11 @@ export function calculateToAccept(): number {
 }
 
 export function getTxs(): P2P.JoinTypes.Txs {
-  // Omar - maybe we don't have to make a copy
-  // [IMPORTANT] Must return a copy to avoid mutation
-  const requestsCopy = deepmerge({}, requests)
-  //const keepInStandbyCopy = [...Object.values(keepInStandbyCollector)]
   return {
-    join: requestsCopy,
-    startedSyncing: [],
-    finishedSyncing: [],
-    standbyRefresh: [],
+    join: drainNewJoinRequests(),
+    startedSyncing: drainSyncStarted(),
+    finishedSyncing: drainFinishedSyncingRequest(),
+    standbyRefresh: drainNewStandbyRefreshRequests(),
   }
 }
 
@@ -262,12 +257,29 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
   if (config.p2p.useJoinProtocolV2) {
     // for join v2, add new standby nodes to the standbyAdd field ...
-    for (const standbyNode of drainNewJoinRequests()) {
-      record.standbyAdd.push(standbyNode)
+    for (const request of txs.join) {
+      const publicKey = request.sign.owner
+      const node = NodeList.byPubKey.get(publicKey)
+      if (node) {
+        record.standbyAdd.push(request)
+      } else {
+        /* prettier-ignore */ if(logFlags.important_as_error) warn(`join:updateRecord:standbyAdd: node not found: ${publicKey}`)
+      }
     }
 
-    for (const nodeId of drainSyncStarted()) {
-      record.startedSyncing.push(nodeId)
+    // ... and unjoining nodes to the standbyRemove field ...
+    for (const publicKey of drainNewUnjoinRequests()) {
+      record.standbyRemove.push(publicKey)
+    }
+
+    for (const request of txs.startedSyncing) {
+      const publicKey = request.sign.owner
+      const node = NodeList.byPubKey.get(publicKey)
+      if (node) {
+        record.startedSyncing.push(request.nodeId)
+      } else {
+        /* prettier-ignore */ if(logFlags.important_as_error) warn(`join:updateRecord:startedSyncing: node not found: ${publicKey}`)
+      }
     }
 
     record.syncing += record.startedSyncing.length
@@ -282,9 +294,15 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     /* prettier-ignore */ if (logFlags.verbose) console.log('newSyncFinished nodes ', newSyncFinishedNodes)
 
     // add node id from newSyncFinishedNodes to the finishedSyncing list to update readyByTimeAndIdOrder when parsed
-    for (const nodeId of drainFinishedSyncingRequest()) {
-      /* prettier-ignore */ if (logFlags.verbose) console.log(`drainFinishedSyncingRequest: ${nodeId}`)
-      record.finishedSyncing.push(nodeId)
+    for (const request of txs.finishedSyncing) {
+      const publicKey = request.sign.owner
+      const node = NodeList.byPubKey.get(publicKey)
+      if (node) {
+        /* prettier-ignore */ if (logFlags.verbose) console.log(`drainFinishedSyncingRequest: ${request.nodeId}`)
+        record.finishedSyncing.push(request.nodeId)
+      } else {
+        /* prettier-ignore */ if(logFlags.important_as_error) warn(`join:updateRecord:finishedSyncing: node not found: ${publicKey}`)
+      }
     }
 
     // drain our list of standby refresh TXs to the list
@@ -292,8 +310,14 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     // what about TX sharing in cycle process?
     // the standby nodes would use a tell to get an active node to submit the tx?
     // only the node that the refresh request was posted to would have the tx?
-    for (const standbyRefresh of drainNewStandbyRefreshRequests()) {
-      record.standbyRefresh.push(standbyRefresh.publicKey)
+    for (const request of txs.standbyRefresh) {
+      const publicKey = request.sign.owner
+      const node = NodeList.byPubKey.get(publicKey)
+      if (node) {
+        record.standbyRefresh.push(request.publicKey)
+      } else {
+        /* prettier-ignore */ if(logFlags.important_as_error) warn(`join:updateRecord:standbyRefresh: node not found: ${publicKey}`)
+      }
     }
 
     let standbyRemoved_Age = 0

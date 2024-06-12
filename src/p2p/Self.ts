@@ -28,7 +28,6 @@ import { ActiveNode } from '@shardus/types/build/src/p2p/SyncTypes'
 import { Result } from 'neverthrow'
 const deepCopy = rfdc()
 import { isServiceMode } from '../debug'
-import { insertSyncStarted } from './Join/v2/syncStarted'
 import { submitStandbyRefresh } from './Join/v2/standbyRefresh'
 import { getNumArchivers } from './Archivers'
 import { currentQuarter } from './CycleCreator'

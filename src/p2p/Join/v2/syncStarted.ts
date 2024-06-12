@@ -12,7 +12,7 @@ import { currentQuarter } from '../../CycleCreator'
 
 export const nodesYetToStartSyncing: Map<string, number> = new Map()
 export let lostAfterSelection: string[] = []
-let newSyncStarted: string[] = []
+let newSyncStarted: Map<string, StartedSyncingRequest> = new Map()
 
 export interface SyncStartedRequestResponse {
   success: boolean
@@ -40,10 +40,6 @@ export async function submitSyncStarted(payload: SyncStarted): Promise<Result<vo
 }
 */
 
-export function insertSyncStarted(nodeId: string): void {
-  newSyncStarted.push(nodeId)
-}
-
 export function addSyncStarted(syncStarted: StartedSyncingRequest): SyncStartedRequestResponse {
   // lookup node by id in payload and use pubkey and compare to sig.owner
   const publicKeysMatch = ((NodeList.byIdOrder.find((node) => node.id === syncStarted.nodeId))?.publicKey) === syncStarted.sign.owner
@@ -66,7 +62,7 @@ export function addSyncStarted(syncStarted: StartedSyncingRequest): SyncStartedR
   }
 
   // return false if already in map
-  if (newSyncStarted.includes(syncStarted.nodeId) === true) {
+  if (newSyncStarted.has(syncStarted.nodeId) === true) {
     return {
       success: false,
       reason: 'node has already submitted syncStarted request',
@@ -82,7 +78,7 @@ export function addSyncStarted(syncStarted: StartedSyncingRequest): SyncStartedR
     }
   }
 
-  insertSyncStarted(syncStarted.nodeId)
+  newSyncStarted
 
   return {
     success: true,
@@ -95,12 +91,12 @@ export function addSyncStarted(syncStarted: StartedSyncingRequest): SyncStartedR
 /**
  * Returns the list of nodeIds of nodes that started syncing empties the map.
  */
-export function drainSyncStarted(): string[] {
+export function drainSyncStarted(): StartedSyncingRequest[] {
   if (currentQuarter === 3) {
     if (logFlags.verbose) console.log('draining new syncStarted info:', newSyncStarted)
     const tmp = newSyncStarted
-    newSyncStarted = []
-    return tmp.sort()
+    newSyncStarted = new Map<string, StartedSyncingRequest>()
+    return [...tmp.entries()].sort((a, b) => a[0].localeCompare(b[0])).map((entry) => entry[1])
   } else {
     return []
   }
