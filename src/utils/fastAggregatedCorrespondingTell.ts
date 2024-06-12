@@ -1,6 +1,5 @@
 //get the target nodes for a given corresponding sender
-const verbose = true
-const proposedFix = true
+const verbose = false
 
 //this only has to be computed once time no matter how many facts are being shared
 export function getCorrespondingNodes(
@@ -12,6 +11,9 @@ export function getCorrespondingNodes(
   sendGroupSize: number,
   transactionGroupSize: number
 ): number[] {
+  if (verbose) {
+    console.log(`getCorrespondingNodes ${ourIndex} ${startTargetIndex} ${endTargetIndex} ${globalOffset} ${receiverGroupSize} ${sendGroupSize} ${transactionGroupSize}`)
+  }
   let wrappedIndex: number
   let targetNumber: number
   let found = false
@@ -83,6 +85,9 @@ export function getCorrespondingNodes(
       wrappedIndex = startTargetIndex + howFarPastUnWrapped
     }
   }
+  if (verbose) {
+    console.log(`destinationNodes ${destinationNodes}`)
+  }
   return destinationNodes
 }
 
@@ -101,10 +106,8 @@ export function verifyCorrespondingSender(
   let unwrappedReceivingNodeIndex = receivingNodeIndex
 
   // handle case where receiver group is split (wraps around)
-  if (proposedFix) {
-    if (receiverStartIndex > unwrappedReceivingNodeIndex) {
-      unwrappedReceivingNodeIndex = unwrappedReceivingNodeIndex + transactionGroupSize
-    }
+  if (receiverStartIndex > unwrappedReceivingNodeIndex) {
+    unwrappedReceivingNodeIndex = unwrappedReceivingNodeIndex + transactionGroupSize
   }
 
   // use unwrappedReceivingNodeIndex to calculate the target index
