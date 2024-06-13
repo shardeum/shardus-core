@@ -3066,7 +3066,7 @@ class TransactionConsenus {
       if (Context.config.stateManager.keepMultipleBestChallenges) {
         // Add the new challenge
         queueEntry.bestKeptChallenges.push(confirmOrChallenge);
-        if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID} challenge added to bestKeptChallenges. ${utils.stringify(queueEntry.bestKeptChallenges)}`)
+        if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID} challenge added to bestKeptChallenges. ${utils.stringifyReduce(queueEntry.bestKeptChallenges)}`)
 
         // Sort the challenges by rank
         queueEntry.bestKeptChallenges.sort((a, b):  number => {

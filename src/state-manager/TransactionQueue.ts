@@ -2556,7 +2556,7 @@ class TransactionQueue {
       )
     }
     if (queueEntry.collectedData[data.accountId] != null) {
-      if (logFlags.verbose) this.mainLogger.debug(`queueEntryAddData: data already collected for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} data: ${utils.stringify(data)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`queueEntryAddData: data already collected for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} data: ${utils.stringifyReduce(data)}`)
       // we have already collected this data
       return
     }
@@ -2606,7 +2606,7 @@ class TransactionQueue {
       if (queueEntry.executionGroup && queueEntry.executionGroup.length > 1) this.shareCompleteDataToNeighbours(queueEntry)
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
-          `queueEntryAddData hasAll: true for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id}, data: ${utils.stringify(queueEntry.collectedData)}`
+          `queueEntryAddData hasAll: true for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id}, data: ${utils.stringifyReduce(queueEntry.collectedData)}`
         )
       }
     }
@@ -2650,7 +2650,7 @@ class TransactionQueue {
     }
     const payload = {txid: queueEntry.acceptedTx.txId, stateList}
     const neighboursNodes = utils.selectNeighbors(queueEntry.executionGroup, queueEntry.ourExGroupIndex, 2)
-    if (logFlags.verbose) this.mainLogger.debug(`shareCompleteDataToNeighbours complete data for txId ${queueEntry.logID} ourNodeId: ${Self.id} OurExeIndex: ${queueEntry.ourExGroupIndex} neighbours: ${JSON.stringify(neighboursNodes.map((node) => node.id))}, ${utils.stringify(payload)}`);
+    if (logFlags.verbose) this.mainLogger.debug(`shareCompleteDataToNeighbours complete data for txId ${queueEntry.logID} ourNodeId: ${Self.id} OurExeIndex: ${queueEntry.ourExGroupIndex} neighbours: ${JSON.stringify(neighboursNodes.map((node) => node.id))}, ${utils.stringifyReduce(payload)}`);
     if (stateList.length > 0) {
       this.broadcastState(neighboursNodes, payload, "shareCompleteDataToNeighbours")
 
