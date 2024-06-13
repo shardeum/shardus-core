@@ -4220,7 +4220,6 @@ class TransactionQueue {
       throw new Error('factTellCorrespondingNodes: queueEntry.uniqueKeys == null')
     }
     const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
-    let correspondingAccNodes: Shardus.Node[] = []
     const dataKeysWeHave = []
     const dataValuesWeHave = []
     const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
