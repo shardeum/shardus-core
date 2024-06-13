@@ -5,8 +5,9 @@ import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 const cSendCachedAppDataReqVersion = 1
 
 export type SendCachedAppDataReq = {
-  topic: string
-  cachedAppData: CachedAppDataSerializable
+  topic: string,
+  txId: string
+  cachedAppData: CachedAppDataSerializable,
 }
 
 export function serializeSendCachedAppDataReq(
@@ -19,6 +20,7 @@ export function serializeSendCachedAppDataReq(
   }
   stream.writeUInt8(cSendCachedAppDataReqVersion)
   stream.writeString(obj.topic)
+  stream.writeString(obj.txId)
   serializeCachedAppData(stream, obj.cachedAppData)
 }
 
@@ -29,6 +31,7 @@ export function deserializeSendCachedAppDataReq(stream: VectorBufferStream): Sen
   }
   return {
     topic: stream.readString(),
+    txId: stream.readString(),
     cachedAppData: deserializeCachedAppData(stream),
   }
 }
