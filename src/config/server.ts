@@ -315,13 +315,13 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     disableTxExpiration: true,
     removeStuckTxsFromQueue: false,
     stuckTxRemoveTime: 1000 * 60 * 2, // 2 minutes
+    stuckTxMoveTime: 5 * 60 * 1000, // 5 minute
     removeStuckChallengedTXs: true,
     receiptRemoveFix: true,
     stuckTxQueueFix: true,
     forceVoteForFailedPreApply: true,
-    keepMultipleBestChallenges: true
-    singleAccountStuckFix: true,
-    forceVoteForFailedPreApply: true
+    keepMultipleBestChallenges: true,
+    singleAccountStuckFix: true
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,
