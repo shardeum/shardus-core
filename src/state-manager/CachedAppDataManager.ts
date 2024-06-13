@@ -370,14 +370,14 @@ class CachedAppDataManager {
     return true
   }
 
-  async factSendCorrespondingCachedAppData(
+  factSendCorrespondingCachedAppData(
     topic: string,
     dataID: string,
     appData: unknown,
     cycle: number,
     _formId: string,
     txId: string
-  ): Promise<unknown> {
+  ): void {
     if (this.stateManager.currentCycleShardData == null) {
       throw new Error('factSendCorrespondingCachedAppData: currentCycleShardData == null')
     }

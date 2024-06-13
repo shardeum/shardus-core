@@ -4739,7 +4739,7 @@ class TransactionQueue {
     profilerInstance.profileSectionEnd('tellCorrespondingNodesFinalData', true)
   }
 
-  async factTellCorrespondingNodesFinalData(queueEntry: QueueEntry): Promise<void> {
+  factTellCorrespondingNodesFinalData(queueEntry: QueueEntry): void {
     profilerInstance.profileSectionStart('factTellCorrespondingNodesFinalData', true)
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('factTellCorrespondingNodesFinalData', queueEntry.logID, `factTellCorrespondingNodesFinalData - start: ${queueEntry.logID}`)
 
