@@ -47,7 +47,8 @@ import {
   serializeGetCachedAppDataResp,
 } from '../types/GetCachedAppDataResp'
 import { Utils } from '@shardus/types'
-import { getCorrespondingNodes } from '../utils/fastAggregatedCorrespondingTell'
+import { getCorrespondingNodes, verifyCorrespondingSender } from '../utils/fastAggregatedCorrespondingTell'
+import * as NodeList from '../p2p/NodeList'
 
 class CachedAppDataManager {
   app: Shardus.App
@@ -139,6 +140,12 @@ class CachedAppDataManager {
 
           const req = deserializeSendCachedAppDataReq(requestStream)
           const cachedAppData: CachedAppDataSerializable = req.cachedAppData
+
+          const isValidSender = this.factValidateCorrespondingCachedAppDataSender(cachedAppData.dataID, header.sender_id, req.txId)
+          if (isValidSender === false) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`send_cachedAppData invalid sender ${header.sender_id} for data: ${cachedAppData.dataID}`)
+            return
+          }
 
           if (cachedAppData == null) {
             return errorHandler(RequestErrorEnum.InvalidRequest)
@@ -318,6 +325,51 @@ class CachedAppDataManager {
     cacheTopic.maxItemSize = maxItemSize
   }
 
+  factValidateCorrespondingCachedAppDataSender(dataID: string, senderNodeId: string, txId: string) {
+    const queueEntry = this.stateManager.transactionQueue.getQueueEntry(txId)
+    const senderNode = NodeList.nodes.get(senderNodeId)
+    if (senderNode === null) {
+      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender node is null`)
+      return false
+    }
+    const senderIsInExecutionGroup = queueEntry.executionGroupMap.has(senderNodeId)
+
+    if (senderIsInExecutionGroup === false) {
+      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender is not in the execution group`)
+      return false
+    }
+
+    const senderGroup = queueEntry.executionGroup
+    const targetGroup = this.stateManager.transactionQueue.getStorageGroupForAccount(dataID)
+    const allNodes = [...senderGroup, ...targetGroup].sort((a, b) => a.id.localeCompare(b.id));
+    const senderIndexInTxGroup = allNodes.findIndex((node) => node.id === senderNodeId)
+    const senderGroupSize = senderGroup.length
+    const targetGroupSize = targetGroup.length
+    const {startIndex: targetStartIndex, endIndex: targetEndIndex} = 
+      this.stateManager.transactionQueue.getStartAndEndIndexOfTargetGroup(targetGroup.map(node => node.id), allNodes)
+
+
+    // check if it is a FACT sender
+    const isValidFactSender = verifyCorrespondingSender(
+      queueEntry.ourTXGroupIndex,
+      senderIndexInTxGroup,
+      queueEntry.correspondingGlobalOffset,
+      targetGroupSize,
+      senderGroupSize,
+      targetStartIndex,
+      targetEndIndex,
+      queueEntry.transactionGroup.length
+    )
+
+    // it is not a FACT corresponding node
+    if (isValidFactSender === false) {
+      this.mainLogger.error(`factValidateCorrespondingCachedAppDataSender: logId: ${queueEntry.logID} sender is not a valid sender isValidSender:  ${isValidFactSender}`);
+      nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingCachedAppDataSender: sender is not a valid sender or a neighbour node')
+      return false
+    }
+    return true
+  }
+
   async factSendCorrespondingCachedAppData(
     topic: string,
     dataID: string,
@@ -391,6 +443,7 @@ class CachedAppDataManager {
       if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.sendCachedAppDataBinary) {
         const sendCacheAppDataReq: SendCachedAppDataReq = {
           topic,
+          txId,
           cachedAppData: {
             dataID: message.cachedAppData.dataID,
             appData: message.cachedAppData.appData,
@@ -601,6 +654,7 @@ class CachedAppDataManager {
             if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.sendCachedAppDataBinary) {
               const sendCacheAppDataReq: SendCachedAppDataReq = {
                 topic,
+                txId,
                 cachedAppData: {
                   dataID: message.cachedAppData.dataID,
                   appData: message.cachedAppData.appData,
