@@ -291,7 +291,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     waitTimeBeforeReceipt: 200,
     waitLimitAfterFirstVote: 2000,
     waitLimitAfterFirstMessage: 2000,
-    minRequiredChallenges: 1,
+    minRequiredChallenges: 2,
     useNewPOQ: false,
     forwardToLuckyNodes: true,
     forwardToLuckyNodesNonceQueue: false,
