@@ -5,6 +5,7 @@ import { serializeAppliedVote } from '../../../../src/types/AppliedVote'
 import { serializeConfirmOrChallengeMessage } from '../../../../src/types/ConfirmOrChallengeMessage'
 import { cSignVersion } from '../../../../src/types/Sign'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
+import { Utils } from '@shardus/types'
 
 describe('AppliedReceipt2 Serialization', () => {
   test('Should serialization with root true', () => {
@@ -20,23 +21,6 @@ describe('AppliedReceipt2 Serialization', () => {
         cant_apply: false,
         node_id: 'node1',
       },
-      confirmOrChallenge: {
-        message: 'message',
-        nodeId: 'node1',
-        appliedVote: {
-          txid: 'txid',
-          transaction_result: true,
-          account_id: ['acc123'],
-          account_state_hash_after: ['state123'],
-          account_state_hash_before: ['state123'],
-          cant_apply: false,
-          node_id: 'node1',
-        },
-        sign: {
-          sig: 'sign',
-          owner: 'node1',
-        },
-      },
       signatures: [
         {
           sig: 'sign',
@@ -51,15 +35,8 @@ describe('AppliedReceipt2 Serialization', () => {
     const expectedStream = new VectorBufferStream(0)
     expectedStream.writeUInt16(TypeIdentifierEnum.cAppliedReceipt2)
     expectedStream.writeUInt8(cAppliedReceipt2Version)
-    expectedStream.writeString(obj.txid) // txid
-    expectedStream.writeUInt8(1) // transaction_result
-    serializeAppliedVote(expectedStream, obj.appliedVote) // appliedVote
-    serializeConfirmOrChallengeMessage(expectedStream, obj.confirmOrChallenge) // confirmOrChallenge
-    expectedStream.writeUInt16(obj.signatures.length)
-    expectedStream.writeUInt8(cSignVersion)
-    expectedStream.writeString(obj.signatures[0].owner)
-    expectedStream.writeString(obj.signatures[0].sig)
-    expectedStream.writeString(obj.app_data_hash)
+    const stringified = Utils.safeStringify(obj)
+    expectedStream.writeString(stringified)
 
     expect(stream.getBuffer()).toEqual(expectedStream.getBuffer())
   })
@@ -82,23 +59,7 @@ describe('AppliedReceipt2 Serialization', () => {
         },
         app_data_hash: 'hash',
       },
-      confirmOrChallenge: {
-        message: 'message',
-        nodeId: 'node1',
-        appliedVote: {
-          txid: 'txid',
-          transaction_result: true,
-          account_id: ['acc123'],
-          account_state_hash_after: ['state123'],
-          account_state_hash_before: ['state123'],
-          cant_apply: false,
-          node_id: 'node1',
-          sign: {
-            sig: 'sign',
-            owner: 'node1',
-          },
-        },
-      },
+      confirmOrChallenge: undefined,
       signatures: [
         {
           sig: 'sign',
@@ -116,18 +77,8 @@ describe('AppliedReceipt2 Serialization', () => {
 
     const expectedStream = new VectorBufferStream(0)
     expectedStream.writeUInt8(cAppliedReceipt2Version)
-    expectedStream.writeString(obj.txid) // txid
-    expectedStream.writeUInt8(0) // transaction_result
-    serializeAppliedVote(expectedStream, obj.appliedVote) // appliedVote
-    serializeConfirmOrChallengeMessage(expectedStream, obj.confirmOrChallenge) // confirmOrChallenge
-    expectedStream.writeUInt16(obj.signatures.length)
-    expectedStream.writeUInt8(cSignVersion)
-    expectedStream.writeString(obj.signatures[0].owner)
-    expectedStream.writeString(obj.signatures[0].sig)
-    expectedStream.writeUInt8(cSignVersion)
-    expectedStream.writeString(obj.signatures[1].owner)
-    expectedStream.writeString(obj.signatures[1].sig)
-    expectedStream.writeString(obj.app_data_hash)
+    const stringified = Utils.safeStringify(obj)
+    expectedStream.writeString(stringified)
 
     expect(stream.getBuffer()).toEqual(expectedStream.getBuffer())
   })
