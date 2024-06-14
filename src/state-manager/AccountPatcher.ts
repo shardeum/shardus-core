@@ -386,7 +386,7 @@ class AccountPatcher {
 
             if (receivedBestVote != null) {
               // Check if vote is from eligible list of voters for this TX
-              if(!archivedQueueEntry.eligibleNodeIdsToVote.has(receivedBestVote.node_id)) {
+              if(this.stateManager.transactionQueue.useNewPOQ && !archivedQueueEntry.eligibleNodeIdsToVote.has(receivedBestVote.node_id)) {
                 nestedCountersInstance.countEvent('accountPatcher', `repair_oos_accounts: vote from ineligible node for txId: ${txId}`)
                 continue
               }
@@ -431,31 +431,33 @@ class AccountPatcher {
               continue
             }
 
-            if (bestMessage != null) {
-              // Skip if challenge receipt
-              if (bestMessage.message === 'challenge') {
-                nestedCountersInstance.countEvent('accountPatcher', `repair_oos_accounts: challenge for txId: ${txId}`)
-                continue
-              }
+            if (this.stateManager.transactionQueue.useNewPOQ) {
+              if (bestMessage != null) {
+                // Skip if challenge receipt
+                if (bestMessage.message === 'challenge') {
+                  nestedCountersInstance.countEvent('accountPatcher', `repair_oos_accounts: challenge for txId: ${txId}`)
+                  continue
+                }
 
-              // Check if mesasge is from eligible list of responders for this TX
-              if(!archivedQueueEntry.eligibleNodeIdsToConfirm.has(bestMessage.nodeId)) {
-                nestedCountersInstance.countEvent('accountPatcher', `repair_oos_accounts: confirmation from ineligible node for txId: ${txId}`)
-                continue
-              }
+                // Check if mesasge is from eligible list of responders for this TX
+                if(!archivedQueueEntry.eligibleNodeIdsToConfirm.has(bestMessage.nodeId)) {
+                  nestedCountersInstance.countEvent('accountPatcher', `repair_oos_accounts: confirmation from ineligible node for txId: ${txId}`)
+                  continue
+                }
 
-              // Check signature of the message
-              if(!this.crypto.verify(
-                bestMessage as SignedObject,
-                archivedQueueEntry.executionGroupMap.get(bestMessage.nodeId).publicKey
-              )) {
-                nestedCountersInstance.countEvent('accountPatcher', `repair_oos_accounts: confirmation signature invalid for txId: ${txId}`)
+                // Check signature of the message
+                if(!this.crypto.verify(
+                  bestMessage as SignedObject,
+                  archivedQueueEntry.executionGroupMap.get(bestMessage.nodeId).publicKey
+                )) {
+                  nestedCountersInstance.countEvent('accountPatcher', `repair_oos_accounts: confirmation signature invalid for txId: ${txId}`)
+                  continue
+                }
+              } else {
+                // Skip this account apply as we were not able to get the best confirmation for this tx
+                nestedCountersInstance.countEvent('accountPatcher', `repair_oos_accounts: no confirmation for txId: ${txId}`)
                 continue
               }
-            } else {
-              // Skip this account apply as we were not able to get the best confirmation for this tx
-              nestedCountersInstance.countEvent('accountPatcher', `repair_oos_accounts: no confirmation for txId: ${txId}`)
-              continue
             }
 
             // update the account data (and cache?)
@@ -539,7 +541,7 @@ class AccountPatcher {
 
             if (receivedBestVote != null) {
               // Check if vote is from eligible list of voters for this TX
-              if(!archivedQueueEntry.eligibleNodeIdsToVote.has(receivedBestVote.node_id)) {
+              if(this.stateManager.transactionQueue.useNewPOQ && !archivedQueueEntry.eligibleNodeIdsToVote.has(receivedBestVote.node_id)) {
                 nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: vote from ineligible node for txId: ${txId}`)
                 continue
               }
@@ -584,31 +586,33 @@ class AccountPatcher {
               continue
             }
 
-            if (bestMessage != null) {
-              // Skip if challenge receipt
-              if (bestMessage.message === 'challenge') {
-                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: challenge for txId: ${txId}`)
-                continue
-              }
+            if (this.stateManager.transactionQueue.useNewPOQ) {
+              if (bestMessage != null) {
+                // Skip if challenge receipt
+                if (bestMessage.message === 'challenge') {
+                  nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: challenge for txId: ${txId}`)
+                  continue
+                }
 
-              // Check if mesasge is from eligible list of responders for this TX
-              if(!archivedQueueEntry.eligibleNodeIdsToConfirm.has(bestMessage.nodeId)) {
-                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: confirmation from ineligible node for txId: ${txId}`)
-                continue
-              }
+                // Check if mesasge is from eligible list of responders for this TX
+                if(!archivedQueueEntry.eligibleNodeIdsToConfirm.has(bestMessage.nodeId)) {
+                  nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: confirmation from ineligible node for txId: ${txId}`)
+                  continue
+                }
 
-              // Check signature of the message
-              if(!this.crypto.verify(
-                bestMessage as SignedObject,
-                archivedQueueEntry.executionGroupMap.get(bestMessage.nodeId).publicKey
-              )) {
-                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: confirmation signature invalid for txId: ${txId}`)
+                // Check signature of the message
+                if(!this.crypto.verify(
+                  bestMessage as SignedObject,
+                  archivedQueueEntry.executionGroupMap.get(bestMessage.nodeId).publicKey
+                )) {
+                  nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: confirmation signature invalid for txId: ${txId}`)
+                  continue
+                }
+              } else {
+                // Skip this account apply as we were not able to get the best confirmation for this tx
+                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: no confirmation for txId: ${txId}`)
                 continue
               }
-            } else {
-              // Skip this account apply as we were not able to get the best confirmation for this tx
-              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: no confirmation for txId: ${txId}`)
-              continue
             }
 
             // update the account data (and cache?)
