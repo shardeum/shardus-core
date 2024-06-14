@@ -6633,13 +6633,16 @@ class TransactionQueue {
       }
     }
 
-    const appliedReceipt = Utils.safeJsonParse(Utils.safeStringify(this.stateManager.getReceipt2(queueEntry))) || ({} as AppliedReceipt2)
+    const receipt2 = this.stateManager.getReceipt2(queueEntry)
+    const appliedReceipt = receipt2 ? Utils.safeJsonParse(Utils.safeStringify(receipt2)) : ({} as AppliedReceipt2)
     if (this.useNewPOQ === false) {
-      delete appliedReceipt.appliedVote.node_id
-      delete appliedReceipt.appliedVote.sign
-      delete appliedReceipt.confirmOrChallenge
-      // Update the app_data_hash with the app_data_hash from the appliedVote
-      appliedReceipt.app_data_hash = appliedReceipt.appliedVote.app_data_hash
+      if (appliedReceipt.appliedVote) {
+        delete appliedReceipt.appliedVote.node_id
+        delete appliedReceipt.appliedVote.sign
+        delete appliedReceipt.confirmOrChallenge
+        // Update the app_data_hash with the app_data_hash from the appliedVote
+        appliedReceipt.app_data_hash = appliedReceipt.appliedVote.app_data_hash
+      }
     }
 
     const archiverReceipt: ArchiverReceipt = {
