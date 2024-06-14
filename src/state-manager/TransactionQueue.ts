@@ -6633,7 +6633,7 @@ class TransactionQueue {
       }
     }
 
-    const appliedReceipt = {...this.stateManager.getReceipt2(queueEntry)} || ({} as AppliedReceipt2)
+    const appliedReceipt = Utils.safeJsonParse(Utils.safeStringify(this.stateManager.getReceipt2(queueEntry))) || ({} as AppliedReceipt2)
     if (this.useNewPOQ === false) {
       delete appliedReceipt.appliedVote.node_id
       delete appliedReceipt.appliedVote.sign
