@@ -683,7 +683,7 @@ export type AppliedReceipt2 = {
   result: boolean
   //single copy of vote
   appliedVote: AppliedVote
-  confirmOrChallenge: ConfirmOrChallengeMessage
+  confirmOrChallenge?: ConfirmOrChallengeMessage
   //all signatures for this vote
   signatures: Shardus.Sign[] //Could have all signatures or best N.  (lowest signature value?)
   // hash of app data
