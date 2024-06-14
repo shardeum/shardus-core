@@ -6633,6 +6633,15 @@ class TransactionQueue {
       }
     }
 
+    const appliedReceipt = {...this.stateManager.getReceipt2(queueEntry)} || ({} as AppliedReceipt2)
+    if (this.useNewPOQ === false) {
+      delete appliedReceipt.appliedVote.node_id
+      delete appliedReceipt.appliedVote.sign
+      delete appliedReceipt.confirmOrChallenge
+      // Update the app_data_hash with the app_data_hash from the appliedVote
+      appliedReceipt.app_data_hash = appliedReceipt.appliedVote.app_data_hash
+    }
+
     const archiverReceipt: ArchiverReceipt = {
       tx: {
         originalTxData: queueEntry.acceptedTx.data,
@@ -6643,7 +6652,7 @@ class TransactionQueue {
       beforeStateAccounts: [...Object.values(beforeAccountsToAdd)],
       accounts: [...Object.values(accountsToAdd)],
       appReceiptData: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
-      appliedReceipt: this.stateManager.getReceipt2(queueEntry) || ({} as AppliedReceipt2),
+      appliedReceipt,
       executionShardKey: queueEntry.executionShardKey || '',
       globalModification: queueEntry.globalModification,
     }
