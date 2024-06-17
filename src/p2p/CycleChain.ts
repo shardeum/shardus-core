@@ -31,6 +31,7 @@ export function reset() {
   cyclesByMarker = {}
   oldest = null
   newest = null
+  currentCycleMarker = null
 }
 
 export function getNewest() {
@@ -53,7 +54,10 @@ export function prepend(cycle: P2P.CycleCreatorTypes.CycleRecord) {
     cycles.unshift(cycle)
     cyclesByMarker[marker] = cycle
     oldest = cycle
-    if (!newest) newest = cycle
+    if (!newest){
+      newest = cycle
+      currentCycleMarker = marker
+    }
   }
 }
 export function validate(

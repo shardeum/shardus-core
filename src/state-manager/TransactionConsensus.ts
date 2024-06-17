@@ -1849,7 +1849,7 @@ class TransactionConsenus {
       txId,
       Context.stateManager.currentCycleShardData.parititionShardDataMap
     )
-    const cycleMarker = CycleChain.computeCycleMarker(CycleChain.newest)
+    const cycleMarker = CycleChain.getCurrentCycleMarker()
     const cycleCounter = CycleChain.newest.counter
     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('Asking timestamp from node', homeNode.node)
 
