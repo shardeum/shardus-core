@@ -110,6 +110,8 @@ export type LogFlags = {
 
   rotation: boolean // extra logging for the rotation system
   seqdiagram: boolean // logging for mermaid sequential diagrams
+
+  getLocalOrRemote: boolean // special logging for getLocalOrRemote
 }
 
 export let logFlags: LogFlags = {
@@ -146,6 +148,8 @@ export let logFlags: LogFlags = {
   lost: false,
   rotation: false,
   seqdiagram: false,
+
+  getLocalOrRemote: false,
 }
 
 const filePath1 = path.join(process.cwd(), 'data-logs', 'cycleRecords1.txt')
