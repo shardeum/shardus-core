@@ -2722,15 +2722,16 @@ class StateManager {
     if (this.accountGlobals.isGlobalAccount(address) || isServiceMode()) {
       forceLocalGlobalLookup = true
     }
+
+    //it seems backwards that isServiceMode would treat the account as always remote, as it has access to all data locally
     let accountIsRemote = isServiceMode() ? true : this.transactionQueue.isAccountRemote(address)
 
     // hack to say we have all the data
-    if (!isServiceMode())
-      if (
-        this.currentCycleShardData.nodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius
-      ) {
+    if (!isServiceMode()) {
+      if ( this.currentCycleShardData.nodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius ) {
         accountIsRemote = false
       }
+    }
     if (forceLocalGlobalLookup) {
       accountIsRemote = false
     }
@@ -2745,16 +2746,7 @@ class StateManager {
         }
         // Node Precheck!.  this check our internal records to find a good node to talk to.
         // it is worth it to look through the list if needed.
-        if (
-          this.isNodeValidForInternalMessage(
-            randomConsensusNode.id,
-            'getLocalOrRemoteAccount',
-            true,
-            true,
-            true,
-            true
-          ) === false
-        ) {
+        if ( this.isNodeValidForInternalMessage( randomConsensusNode.id, 'getLocalOrRemoteAccount', true, true, true, true ) === false ) {
           //we got to the end of our tries?
           if (i >= preCheckLimit - 1) {
             /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'getLocalOrRemoteAccount: isNodeValidForInternalMessage failed, no retry')

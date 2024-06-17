@@ -1462,7 +1462,7 @@ class Shardus extends EventEmitter {
             nestedCountersInstance.countEvent('rejected', 'txNonce < senderAccountNonce')
             return {
               success: false,
-              reason: `Transaction nonce is less than the account nonce. ${utils.stringifyReduce(tx)}`,
+              reason: `Transaction nonce is less than the account nonce. ${txNonce} < ${senderAccountNonce} ${utils.stringifyReduce(tx)}  `,
               status: 500
             };
           } else if (txNonce > senderAccountNonce) {

@@ -1025,6 +1025,10 @@ class TransactionQueue {
           // remove the item from the queue
           const index = queue.indexOf(item)
           queue.splice(index, 1)
+
+          //we should break here. we keep looking up account values after we go to the step needed.
+          //this assumes we will not put two TXs with the same nonce value in the queue.
+          break
         }
       }
     }
