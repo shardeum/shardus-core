@@ -2062,8 +2062,9 @@ class StateManager {
           }
           respond(resp, serializeGetAccountDataWithQueueHintsResp)
         } catch (e) {
-          if (logFlags.error) this.mainLogger.error(`${route} error: ${utils.errorToStringFull(e)}`)
+          if (logFlags.error || logFlags.getLocalOrRemote) this.mainLogger.error(`${route} error: ${utils.errorToStringFull(e)}`)
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          nestedCountersInstance.countEvent('getLocalOrRemoteAccount', `handler: ${e.message} `)  
           return respond(InternalError(`${route} exception executing request`), serializeResponseError)
         } finally {
           profilerInstance.scopedProfileSectionEnd(route, payload.length)
@@ -2742,6 +2743,7 @@ class StateManager {
       for (let i = 0; i < preCheckLimit; i++) {
         randomConsensusNode = this.transactionQueue.getRandomConsensusNodeForAccount(address)
         if (randomConsensusNode == null) {
+          nestedCountersInstance.countEvent('getLocalOrRemoteAccount', `precheck: no consensus node found`)  
           throw new Error(`getLocalOrRemoteAccount: no consensus node found`)
         }
         // Node Precheck!.  this check our internal records to find a good node to talk to.
@@ -2749,10 +2751,12 @@ class StateManager {
         if ( this.isNodeValidForInternalMessage( randomConsensusNode.id, 'getLocalOrRemoteAccount', true, true, true, true ) === false ) {
           //we got to the end of our tries?
           if (i >= preCheckLimit - 1) {
-            /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'getLocalOrRemoteAccount: isNodeValidForInternalMessage failed, no retry')
+            /* prettier-ignore */ if (logFlags.verbose || logFlags.getLocalOrRemote) this.getAccountFailDump(address, 'getLocalOrRemoteAccount: isNodeValidForInternalMessage failed, no retry')
             //return null   ....better to throw an error
-            if (opts.canThrowException)
+            if (opts.canThrowException){
+              nestedCountersInstance.countEvent('getLocalOrRemoteAccount', `precheck: out of nodes to try`)              
               throw new Error(`getLocalOrRemoteAccount: no consensus nodes worth asking`)
+            }
             else return null
           }
         } else {
@@ -2787,7 +2791,7 @@ class StateManager {
               `ASK FAIL getLocalOrRemoteAccount exception: ResponseError encountered. Code: ${er.Code}, AppCode: ${er.AppCode}, Message: ${er.Message}`
             )
           }
-          if (logFlags.verbose) this.mainLogger.error('askBinary', er)
+          if (logFlags.verbose || logFlags.getLocalOrRemote) this.mainLogger.error('askBinary', er)
           if (opts.canThrowException) {
             throw er
           } else {
@@ -2799,7 +2803,7 @@ class StateManager {
       }
 
       if (!r) {
-        if (logFlags.error) this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount r === false')
+        if (logFlags.error || logFlags.getLocalOrRemote) this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount r === false')
         if (opts.canThrowException) throw new Error(`getLocalOrRemoteAccount: remote node had an exception`)
       }
 
@@ -2807,18 +2811,23 @@ class StateManager {
       if (result != null && result.accountData != null && result.accountData.length > 0) {
         wrappedAccount = result.accountData[0]
         if (wrappedAccount == null) {
-          if (logFlags.verbose) this.getAccountFailDump(address, 'remote result.accountData[0] == null')
+          if (logFlags.verbose || logFlags.getLocalOrRemote) this.getAccountFailDump(address, 'remote result.accountData[0] == null')
+          nestedCountersInstance.countEvent('getLocalOrRemoteAccount', `remote result.accountData[0] == null`)
         }
         return wrappedAccount
       } else {
         //these cases probably should throw an error to, but dont wont to over prescribe the format yet
         //if the remote node has a major breakdown it should return false
         if (result == null) {
-          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data: result == null')
+          /* prettier-ignore */ if (logFlags.verbose || logFlags.getLocalOrRemote) this.getAccountFailDump(address, 'remote request missing data: result == null')
+          nestedCountersInstance.countEvent('getLocalOrRemoteAccount', `remote else.. result == null`)
         } else if (result.accountData == null) {
-          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data: result.accountData == null ' + utils.stringifyReduce(result))
+          /* prettier-ignore */ if (logFlags.verbose || logFlags.getLocalOrRemote) this.getAccountFailDump(address, 'remote request missing data: result.accountData == null ' + utils.stringifyReduce(result))
+          nestedCountersInstance.countEvent('getLocalOrRemoteAccount', `remote else.. result.accountData == null`)
         } else if (result.accountData.length <= 0) {
-          /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, 'remote request missing data: result.accountData.length <= 0 ' + utils.stringifyReduce(result))
+          /* prettier-ignore */ if (logFlags.verbose || logFlags.getLocalOrRemote) this.getAccountFailDump(address, 'remote request missing data: result.accountData.length <= 0 ' + utils.stringifyReduce(result))
+          nestedCountersInstance.countEvent('getLocalOrRemoteAccount', `remote else.. result.accountData.length <= 0 `)
+
         }
       }
     } else {
@@ -2841,15 +2850,18 @@ class StateManager {
       } else {
         //this should probably throw as we expect a [] for the real empty case
         //avoiding too many changes
-        if (logFlags.verbose) this.getAccountFailDump(address, 'getAccountDataByList() returned null')
+        if (logFlags.verbose || logFlags.getLocalOrRemote) this.getAccountFailDump(address, 'getAccountDataByList() returned null')
+        nestedCountersInstance.countEvent('getLocalOrRemoteAccount', `localload: getAccountDataByList() returned null`)
         return null
       }
       // there must have been an issue in the past, but for some reason we are checking the first element in the array now.
       if (accountData[0] == null) {
-        if (logFlags.verbose) this.getAccountFailDump(address, 'accountData[0] == null')
+        if (logFlags.verbose || logFlags.getLocalOrRemote) this.getAccountFailDump(address, 'accountData[0] == null')
+        nestedCountersInstance.countEvent('getLocalOrRemoteAccount', `localload: accountData[0] == null`)
       }
       if (accountData.length > 1 || accountData.length == 0) {
-        /* prettier-ignore */ if (logFlags.verbose) this.getAccountFailDump(address, `getAccountDataByList() returned wrong element count: ${accountData}`)
+        /* prettier-ignore */ if (logFlags.verbose || logFlags.getLocalOrRemote) this.getAccountFailDump(address, `getAccountDataByList() returned wrong element count: ${accountData}`)
+        nestedCountersInstance.countEvent('getLocalOrRemoteAccount', `localload: getAccountDataByList() returned wrong element count`)
       }
       return wrappedAccount
     }
