@@ -31,10 +31,14 @@ import { checkGossipPayload } from '../../utils/GossipValidation'
 import * as acceptance from './v2/acceptance'
 import { getStandbyNodesInfoMap, saveJoinRequest, isOnStandbyList } from './v2'
 import { addFinishedSyncing } from './v2/syncFinished'
-import { processNewUnjoinRequest, UnjoinRequest, removeUnjoinRequest } from './v2/unjoin'
+import { processNewUnjoinRequest } from './v2/unjoin'
 import { isActive } from '../Self'
 import { logFlags } from '../../logger'
-import { JoinRequest, StartedSyncingRequest } from '@shardus/types/build/src/p2p/JoinTypes'
+import {
+  JoinRequest,
+  SignedUnjoinRequest,
+  StartedSyncingRequest,
+} from '@shardus/types/build/src/p2p/JoinTypes'
 import { addSyncStarted } from './v2/syncStarted'
 import { addStandbyRefresh } from './v2/standbyRefresh'
 import { Utils } from '@shardus/types'
@@ -530,8 +534,8 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
   )
 }
 
-const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<UnjoinRequest, P2P.NodeListTypes.Node['id']> = (
-  payload: UnjoinRequest,
+const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<SignedUnjoinRequest, P2P.NodeListTypes.Node['id']> = (
+  payload: SignedUnjoinRequest,
   sender: P2P.NodeListTypes.Node['id'],
   tracker: string
 ) => {

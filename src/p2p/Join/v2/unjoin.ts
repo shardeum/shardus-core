@@ -1,4 +1,3 @@
-import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import { crypto } from '../../Context'
 import { err, ok, Result } from 'neverthrow'
 import { hexstring } from '@shardus/types'
@@ -9,16 +8,10 @@ import { deleteStandbyNodeFromMap, getStandbyNodesInfoMap } from '.'
 import { getActiveNodesFromArchiver, getRandomAvailableArchiver } from '../../Utils'
 import { logFlags } from '../../../logger'
 import * as CycleChain from '../../CycleChain'
-
-/**
- * A request to leave the network's standby node list.
- */
-export type UnjoinRequest = SignedObject<{
-  publicKey: hexstring
-}>
+import { SignedUnjoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 
 /** A Set of new public keys of nodes that have submitted unjoin requests. */
-const newUnjoinRequests: Set<UnjoinRequest> = new Set()
+const newUnjoinRequests: Set<SignedUnjoinRequest> = new Set()
 
 /**
  * Submits a request to leave the network's standby node list.
@@ -55,7 +48,7 @@ export async function submitUnjoin(): Promise<Result<void, Error>> {
  *
  * Returns with an error if the unjoin request is invalid.
  */
-export function processNewUnjoinRequest(unjoinRequest: UnjoinRequest): Result<void, Error> {
+export function processNewUnjoinRequest(unjoinRequest: SignedUnjoinRequest): Result<void, Error> {
   console.log('processing unjoin request for', unjoinRequest.publicKey)
 
   // validate the unjoin request and then add it if it is valid
@@ -67,7 +60,7 @@ export function processNewUnjoinRequest(unjoinRequest: UnjoinRequest): Result<vo
 /**
  * Validates an unjoin request by its signature.
  */
-export function validateUnjoinRequest(unjoinRequest: UnjoinRequest): Result<void, Error> {
+export function validateUnjoinRequest(unjoinRequest: SignedUnjoinRequest): Result<void, Error> {
   // ignore if the unjoin request already exists
   if (newUnjoinRequests.has(unjoinRequest)) {
     return err(new Error(`unjoin request from ${unjoinRequest.publicKey} already exists`))
@@ -106,7 +99,7 @@ export function validateUnjoinRequest(unjoinRequest: UnjoinRequest): Result<void
   return ok(void 0)
 }
 
-export function drainNewUnjoinRequests(): UnjoinRequest[] {
+export function drainNewUnjoinRequests(): SignedUnjoinRequest[] {
   const drained = [...newUnjoinRequests.values()]
   newUnjoinRequests.clear()
   return drained
