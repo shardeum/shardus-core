@@ -49,7 +49,7 @@ const newestCycleHashRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'current-cycle-hash',
   handler: (_req, res) => {
-    res.send(CycleChain.getCurrentCycleMarker())
+    res.send({ currentCycleHash: CycleChain.getCurrentCycleMarker() })
   },
 }
 

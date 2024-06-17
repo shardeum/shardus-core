@@ -117,7 +117,7 @@ function attemptSimpleFetch<T>(
 }
 
 /** Executes a robust query to retrieve the cycle marker from the network. */
-export function robustQueryForCycleRecordHash(nodes: ActiveNode[]): RobustQueryResultAsync<hexstring> {
+export function robustQueryForCycleRecordHash(nodes: ActiveNode[]): RobustQueryResultAsync<{ currentCycleHash: hexstring }> {
   return makeRobustQueryCall(nodes, 'current-cycle-hash')
 }
 
