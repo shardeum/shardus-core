@@ -2647,13 +2647,10 @@ class TransactionConsenus {
           // populate accountIds
           ourVote.account_id.push(wrappedState.accountId)
           // popoulate after state hashes
-          ourVote.account_state_hash_after.push(wrappedState.stateId)
-
-          if (this.stateManager.transactionQueue.useNewPOQ) {
-            const wrappedResponse = queueEntry.collectedData[wrappedState.accountId]
-            // populate before state hashes
-            if (wrappedResponse != null) ourVote.account_state_hash_before.push(wrappedResponse.stateId)
-          }
+          ourVote.account_state_hash_after.push(wrappedState.stateId) // account hash for nonce 100
+          const wrappedResponse = queueEntry.collectedData[wrappedState.accountId]
+          // populate before state hashes
+          if (wrappedResponse != null) ourVote.account_state_hash_before.push(wrappedResponse.stateId)
         }
       }
 
