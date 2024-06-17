@@ -422,7 +422,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
           }
         }
       }
-      
+
       
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${standbyRemoved_Age}  removed list: ${record.standbyRemove} ` )
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList(standbyList, `join.updateRecord: last-hashed ${record.counter}`)
@@ -1326,13 +1326,10 @@ export function computeSelectionNum(joinRequest: JoinRequest): Result<string, Jo
  */
 function decideNodeSelection(joinRequest: P2P.JoinTypes.JoinRequest): JoinRequestResponse {
   // Compute how many join request to accept
-  let toAccept = calculateToAccept() // I think we can remove this line; as toAccept would be overriden by calculateToAcceptV2 in the next line
-  nestedCountersInstance.countEvent('p2p', `results of calculateToAccept: toAccept: ${toAccept}`)
-  /* prettier-ignore */ if (logFlags && logFlags.verbose) console.log("results of calculateToAccept: ", toAccept)
   const { add, remove } = calculateToAcceptV2(CycleChain.newest)
   nestedCountersInstance.countEvent('p2p', `results of calculateToAcceptV2: add: ${add}, remove: ${remove}`)
   /* prettier-ignore */ if (logFlags && logFlags.verbose) { console.log(`results of calculateToAcceptV2: add: ${add}, remove: ${remove}`) }
-  toAccept = add
+  const toAccept = add
 
   // Check if we are better than the lowest selectionNum
   const last = requests.length > 0 ? requests[requests.length - 1] : undefined
