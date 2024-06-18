@@ -767,6 +767,8 @@ function makeNetworkConfigHash() {
     sharding: config.sharding,
     transactionExpireTime: config.transactionExpireTime,
     p2p: { ...config.p2p },
+    useNewPOQ: config.stateManager.useNewPOQ,
+    devPublicKeys: config.debug.devPublicKeys,
     // debug: config.debug,
   }
   delete netConfig.p2p.existingArchivers
