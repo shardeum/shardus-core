@@ -416,8 +416,8 @@ class Reporter {
       self.collectStatisticToReport()
 
       //temp mem debugging:
-      if (logFlags.debug) this.mainLogger.info(memoryReportingInstance.getMemoryStringBasic())
-    }, 1000)
+      if (logFlags.important_as_fatal) this.mainLogger.info(memoryReportingInstance.getMemoryStringBasic())
+    }, 300000)
 
     //log a socket report every 5 minutes
     this.socketReportInterval = setInterval(async () => {
