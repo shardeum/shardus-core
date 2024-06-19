@@ -6215,6 +6215,9 @@ class TransactionQueue {
                   )
                   /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.checkAndSetAccountData()', DebugComplete.Completed )
                   queueEntry.accountDataSet = true
+                  // endpoint to allow dapp to execute something that depends on a transaction being approved.
+                  this.app.transactionReceiptPass(queueEntry.acceptedTx.data, queueEntry.collectedFinalData, queueEntry?.preApplyTXResult?.applyResponse)
+                  /* prettier-ignore */ if (logFlags.verbose) console.log('transactionReceiptPass', queueEntry.acceptedTx.txId, queueEntry)
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
                     'checkAndSetAccountData',
