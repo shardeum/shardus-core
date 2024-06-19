@@ -1631,8 +1631,8 @@ class TransactionQueue {
       this.profiler.profileSectionEnd('commit-2-addAccountStatesAndTX')
       this.profiler.profileSectionStart('commit-3-transactionReceiptPass')
       // endpoint to allow dapp to execute something that depends on a transaction being approved.
-      this.app.transactionReceiptPass(acceptedTX.data, wrappedStates, applyResponse)
-      /* prettier-ignore */ if (logFlags.verbose) console.log('transactionReceiptPass', acceptedTX.txId, queueEntry)
+      this.app.transactionReceiptPass(acceptedTX.data, wrappedStates, applyResponse, true)
+      /* prettier-ignore */ if (logFlags.verbose) console.log('transactionReceiptPass 2', acceptedTX.txId, queueEntry)
 
       this.profiler.profileSectionEnd('commit-3-transactionReceiptPass')
     } catch (ex) {
@@ -6216,8 +6216,8 @@ class TransactionQueue {
                   /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.checkAndSetAccountData()', DebugComplete.Completed )
                   queueEntry.accountDataSet = true
                   // endpoint to allow dapp to execute something that depends on a transaction being approved.
-                  this.app.transactionReceiptPass(queueEntry.acceptedTx.data, queueEntry.collectedFinalData, queueEntry?.preApplyTXResult?.applyResponse)
-                  /* prettier-ignore */ if (logFlags.verbose) console.log('transactionReceiptPass', queueEntry.acceptedTx.txId, queueEntry)
+                  this.app.transactionReceiptPass(queueEntry.acceptedTx.data, queueEntry.collectedFinalData, queueEntry?.preApplyTXResult?.applyResponse, false)
+                  /* prettier-ignore */ if (logFlags.verbose) console.log('transactionReceiptPass 1', queueEntry.acceptedTx.txId, queueEntry)
                   this.updateSimpleStatsObject(
                     processStats.awaitStats,
                     'checkAndSetAccountData',

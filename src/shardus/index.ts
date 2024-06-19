@@ -2304,10 +2304,10 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.transactionReceiptPass === 'function') {
-        applicationInterfaceImpl.transactionReceiptPass = async (tx, wrappedStates, applyResponse) =>
-          application.transactionReceiptPass(tx, wrappedStates, applyResponse)
+        applicationInterfaceImpl.transactionReceiptPass = async (tx, wrappedStates, applyResponse, isExecutionGroup) =>
+          application.transactionReceiptPass(tx, wrappedStates, applyResponse, isExecutionGroup)
       } else {
-        applicationInterfaceImpl.transactionReceiptPass = async function (tx, wrappedStates, applyResponse) {}
+        applicationInterfaceImpl.transactionReceiptPass = async function (tx, wrappedStates, applyResponse, isExecutionGroup) {}
       }
 
       if (typeof application.transactionReceiptFail === 'function') {

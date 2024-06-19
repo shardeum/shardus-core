@@ -235,8 +235,9 @@ export interface App {
    * This is called after consensus has received or produced a receipt and the trasaction is approved.
    * Do not change any of the values passes in.
    * This is a place to generate other transactions, or do off chain work like send and email.
+   * isExecutionGroup: boolean  this is set to true if we are in the execution group
    */
-  transactionReceiptPass?: (inTx: OpaqueTransaction, wrappedStates: any, applyResponse: ApplyResponse) => void
+  transactionReceiptPass?: (inTx: OpaqueTransaction, wrappedStates: any, applyResponse: ApplyResponse, isExecutionGroup: boolean) => void
 
   /**
    * This is called after consensus has received or produced a receipt and the trasaction fails.
