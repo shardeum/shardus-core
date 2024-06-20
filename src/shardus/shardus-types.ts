@@ -1081,6 +1081,8 @@ export interface ServerConfiguration {
     highResolutionProfiling: boolean
     /** Flag to enable/disbale adding random data to cycle record */
     randomCycleData: boolean
+    // Maximum number of elements allowed in txDebugStatList map
+    debugStatListMaxSize: number
   }
   /** Options for the statistics module */
   statistics?: {

@@ -243,6 +243,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     enableTestMode: false,
     highResolutionProfiling: true,
     randomCycleData: false,
+    debugStatListMaxSize: 1000,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {

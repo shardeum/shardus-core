@@ -3672,6 +3672,7 @@ class StateManager {
       if (queueEntry.approximateCycleAge < oldestCycle - 3) {
         this.transactionQueue.archivedQueueEntries.shift()
         this.transactionQueue.archivedQueueEntriesByID.delete(queueEntry.acceptedTx.txId)
+        delete this.debugTXHistory[utils.stringifyReduce(queueEntry.logID)]
         archivedEntriesRemoved++
 
         //if (logFlags.verbose) this.mainLogger.log(`queue entry removed from archive ${queueEntry.logID} tx cycle: ${queueEntry.approximateCycleAge} cycle: ${this.currentCycleShardData.cycleNumber}`)

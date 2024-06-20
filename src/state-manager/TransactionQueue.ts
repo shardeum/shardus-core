@@ -134,7 +134,7 @@ class TransactionQueue {
   _transactionQueue: QueueEntry[] //old name: newAcceptedTxQueue
   pendingTransactionQueue: QueueEntry[] //old name: newAcceptedTxQueueTempInjest
   archivedQueueEntries: QueueEntry[]
-  txDebugStatList: Map<string, TxDebug>
+  txDebugStatList: utils.FIFOCache<string, TxDebug>
 
   _transactionQueueByID: Map<string, QueueEntry> //old name: newAcceptedTxQueueByID
   pendingTransactionQueueByID: Map<string, QueueEntry> //old name: newAcceptedTxQueueTempInjestByID
@@ -229,7 +229,7 @@ class TransactionQueue {
     this.pendingTransactionQueue = []
     this.archivedQueueEntries = []
     this.nonceQueue = new Map()
-    this.txDebugStatList = new Map()
+    this.txDebugStatList = new utils.FIFOCache<string, TxDebug>(this.config.debug.debugStatListMaxSize)
     this.receiptsToForward = []
     this.forwardedReceiptsByTimestamp = new Map()
     this.receiptsBundleByInterval = new Map()
@@ -4473,7 +4473,7 @@ class TransactionQueue {
   }
 
   clearTxDebugStatList(): void {
-    this.txDebugStatList = new Map()
+    this.txDebugStatList.clear()
   }
 
   printTxDebugByTxId(txId: string): string {
@@ -4491,7 +4491,7 @@ class TransactionQueue {
 
   printTxDebug(): string {
     const collector = {}
-    const totalTxCount = this.txDebugStatList.size
+    const totalTxCount = this.txDebugStatList.size()
 
     const indexes = [
       'aging',
