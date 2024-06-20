@@ -50,3 +50,7 @@ function parseAjvErrors(errors: Array<ErrorObject> | null): string[] | null {
     return errorMsg
   })
 }
+
+export enum AJV_IDENT {
+  COMPARE_CERT_REQ = 'compareCertReq'
+}

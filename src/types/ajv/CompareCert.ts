@@ -1,4 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { AJV_IDENT } from './Helpers'
 
 const schemaCompareCert = {
   type: 'object',
@@ -74,5 +75,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('CompareCertReq', schemaCompareCert)
+  addSchema(AJV_IDENT.COMPARE_CERT_REQ, schemaCompareCert)
 }
