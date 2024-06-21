@@ -1,7 +1,9 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { verifyPayload } from './ajv/Helpers'
+import { AJV_IDENT } from './ajv/Helpers'
 
-const cRequestStateForTxPostReqVersion = 1
+export const cRequestStateForTxPostReqVersion = 1
 
 export type RequestStateForTxPostReq = {
   txid: string
@@ -34,5 +36,9 @@ export function deserializeRequestStateForTxPostReq(stream: VectorBufferStream):
   const timestamp = Number(stream.readBigUInt64())
   const key = stream.readString()
   const hash = stream.readString()
+  const errors = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_POST_REQ, { txid, timestamp, key, hash })
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
   return { txid, timestamp, key, hash }
 }

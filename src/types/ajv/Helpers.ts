@@ -20,6 +20,10 @@ import { initGetAppliedVoteResp } from './GetAppliedVoteResp'
 import { initLostReportReq } from './LostReportReq'
 import { initRequestReceiptForTxReq } from './RequestReceiptForTxReq'
 import { initRequestReceiptForTxResp } from './RequestReceiptForTxResp'
+import { initRepairMissingAccountsReq } from './RepairMissingAccountsReq'
+import { initRequestStateForTxPostReq } from './RequestStateForTxPostReq'
+import { initRequestStateForTxPostResp } from './RequestStateForTxPostResp'
+import { initWrappedDataResponse } from './WrappedDataResponse'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -41,6 +45,10 @@ export function initAjvSchemas(): void {
   initGetAppliedVoteReq()
   initGetAppliedVoteResp()
   initLostReportReq()
+  initRepairMissingAccountsReq()
+  initRequestStateForTxPostReq()
+  initRequestStateForTxPostResp()
+  initWrappedDataResponse()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {
@@ -75,4 +83,7 @@ export enum AJV_IDENT {
   GET_APPLIED_VOTE_REQ = 'getAppliedVoteReq',
   GET_APPLIED_VOTE_RESP = 'getAppliedVoteResp',
   LOST_REPORT_REQ = 'lostReportReq',
+  REQUEST_STATE_FOR_TX_POST_REQ = 'requestStateForTxPostReq',
+  REQUEST_STATE_FOR_TX_POST_RESP = 'requestStateForTxPostResp',
+  WRAPPED_DATA_RESPONSE = 'wrappedDataResponse',
 }
