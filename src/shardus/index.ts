@@ -2021,14 +2021,25 @@ class Shardus extends EventEmitter {
     txId: string
   ) {
     try {
-      await this.stateManager.cachedAppDataManager.sendCorrespondingCachedAppData(
-        topic,
-        dataID,
-        appData,
-        cycle,
-        fromId,
-        txId
-      )
+      if (this.config.p2p.useFactCorrespondingTell) {
+        await this.stateManager.cachedAppDataManager.factSendCorrespondingCachedAppData(
+          topic,
+          dataID,
+          appData,
+          cycle,
+          fromId,
+          txId
+        )
+      } else {
+        await this.stateManager.cachedAppDataManager.sendCorrespondingCachedAppData(
+          topic,
+          dataID,
+          appData,
+          cycle,
+          fromId,
+          txId
+        )
+      }
     } catch (e) {
       this.mainLogger.error(`Error while sendCorrespondingCachedAppData`, e)
     }
