@@ -404,7 +404,21 @@ class TransactionQueue {
             const state = req.stateList[i];
             let isSenderValid = false
             if (configContext.p2p.useFactCorrespondingTell) {
-              isSenderValid = this.factValidateCorrespondingTellSender(queueEntry, state.accountId, header.sender_id)
+              let isSenderOurExeNeighbour = false
+              // check if it is a neighbour exe node sharing data
+              if (configContext.stateManager.shareCompleteData) {
+                const senderIsInExecutionGroup = queueEntry.executionGroupMap.has(senderNodeId)
+                const neighbourNodes = utils.selectNeighbors(queueEntry.executionGroup, queueEntry.ourExGroupIndex, 2) as Shardus.Node[]
+                const neighbourNodeIds = neighbourNodes.map((node) => node.id)
+                isSenderOurExeNeighbour = senderIsInExecutionGroup && neighbourNodeIds.includes(senderNodeId)
+                if (isSenderOurExeNeighbour) {
+                  nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellSender: sender is an execution node and a neighbour node')
+                  isSenderValid = true
+                } else {
+                  // check if it is a corresponding tell sender
+                  isSenderValid = this.factValidateCorrespondingTellSender(queueEntry, state.accountId, header.sender_id)
+                }
+              }
             } else {
               isSenderValid = this.validateCorrespondingTellSender(queueEntry, state.accountId, header.sender_id)
             }
@@ -4435,20 +4449,6 @@ class TransactionQueue {
     const senderNode = this.stateManager.currentCycleShardData.nodeShardDataMap.get(senderNodeId)
     if (senderNode === null) return false
     const senderHasAddress = ShardFunctions.testAddressInRange(dataKey, senderNode.storedPartitions)
-
-    // check if it is a neighbour exe node sharing data
-    let isSenderOurExeNeighbour = false
-    if (configContext.stateManager.shareCompleteData) {
-      const senderIsInExecutionGroup = queueEntry.executionGroupMap.has(senderNodeId)
-      // check if sender is an execution neighouring node
-      const neighbourNodes = utils.selectNeighbors(queueEntry.executionGroup, queueEntry.ourExGroupIndex, 2) as Shardus.Node[]
-      const neighbourNodeIds = neighbourNodes.map((node) => node.id)
-      isSenderOurExeNeighbour = senderIsInExecutionGroup && neighbourNodeIds.includes(senderNodeId)
-      if (isSenderOurExeNeighbour) {
-        nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellSender: sender is an execution node and a neighbour node')
-        return true
-      }
-    }
 
     // check if it is a FACT sender
     const receivingNodeIndex = queueEntry.transactionGroup.findIndex((node) => node.id === receiverNode.node.id)
