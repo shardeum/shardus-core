@@ -4767,8 +4767,26 @@ class TransactionQueue {
     let message: { stateList: Shardus.WrappedResponse[]; txid: string }
 
     let totalShares = 0
-    for (const key of keysToShare) {
+    const storageNodesForAccount = this.getStorageGroupForAccount(key)
+    const storageNodesAccountIds = new Set(storageNodesForAccount.map((node) => node.id))
 
+    const targetStartIndex = 0
+    const targetEndIndex = queueEntry.transactionGroup.length
+    const targetGroupSize = queueEntry.transactionGroup.length
+
+    const senderIndexInTxGroup = queueEntry.ourTXGroupIndex
+    const senderGroupSize = queueEntry.executionGroup.length
+
+    const correspondingIndices = getCorrespondingNodes(
+      senderIndexInTxGroup,
+      targetStartIndex,
+      targetEndIndex,
+      queueEntry.correspondingGlobalOffset,
+      targetGroupSize,
+      senderGroupSize,
+      queueEntry.transactionGroup.length
+    )
+    for (const key of keysToShare) {
       // eslint-disable-next-line security/detect-object-injection
       if (wrappedStates[key] != null) {
         if (queueEntry.ourExGroupIndex === -1) {
@@ -4776,26 +4794,6 @@ class TransactionQueue {
             'factTellCorrespondingNodesFinalData: should never get here.  our sending node must be in the execution group'
           )
         }
-
-        const storageNodesForAccount = this.getStorageGroupForAccount(key)
-        const storageNodesAccountIds = new Set(storageNodesForAccount.map((node) => node.id))
-
-        const targetStartIndex = 0
-        const targetEndIndex = queueEntry.transactionGroup.length
-        const targetGroupSize = queueEntry.transactionGroup.length
-
-        const senderIndexInTxGroup = queueEntry.ourTXGroupIndex
-        const senderGroupSize = queueEntry.executionGroup.length
-
-        const correspondingIndices = getCorrespondingNodes(
-          senderIndexInTxGroup,
-          targetStartIndex,
-          targetEndIndex,
-          queueEntry.correspondingGlobalOffset,
-          targetGroupSize,
-          senderGroupSize,
-          queueEntry.transactionGroup.length
-        )
 
         const correspondingNodes: P2PTypes.NodeListTypes.Node[] = []
         for (const index of correspondingIndices) {
