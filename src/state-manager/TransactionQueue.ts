@@ -72,7 +72,7 @@ import {
   deserializeBroadcastFinalStateReq,
   serializeBroadcastFinalStateReq,
 } from '../types/BroadcastFinalStateReq'
-import { verifyPayload } from '../types/ajv/Helpers'
+import { AJV_IDENT, verifyPayload } from '../types/ajv/Helpers'
 import {
   SpreadTxToGroupSyncingReq,
   deserializeSpreadTxToGroupSyncingReq,
@@ -95,7 +95,7 @@ import {
   serializeRequestReceiptForTxReq,
 } from '../types/RequestReceiptForTxReq'
 import { isNodeInRotationBounds } from '../p2p/Utils'
-import { ResponseError } from '../types/ResponseError'
+import { BadRequest, ResponseError, serializeResponseError } from '../types/ResponseError'
 import { error } from 'console'
 
 interface Receipt {
@@ -369,7 +369,12 @@ class TransactionQueue {
           if (!requestStream) {
             return errorHandler(RequestErrorEnum.InvalidRequest)
           }
-
+          // Use verifyPayload to check the request
+          const errors = verifyPayload(AJV_IDENT.BROADCAST_STATE_REQ, requestStream)
+          if (errors && errors.length > 0) {
+            this.mainLogger.error(`compbroadcast_stateareCert request validation errors: ${errors}`)
+            return respond(BadRequest('Request validation errors'), serializeResponseError)
+          }
           // verification data checks
           if (header.verification_data == null) {
             return errorHandler(RequestErrorEnum.MissingVerificationData)
