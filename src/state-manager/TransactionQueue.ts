@@ -403,6 +403,7 @@ class TransactionQueue {
             // eslint-disable-next-line security/detect-object-injection
             const state = req.stateList[i];
             let isSenderValid = false
+            const senderNodeId = header.sender_id
             if (configContext.p2p.useFactCorrespondingTell) {
               let isSenderOurExeNeighbour = false
               // check if it is a neighbour exe node sharing data
@@ -416,11 +417,15 @@ class TransactionQueue {
                   isSenderValid = true
                 } else {
                   // check if it is a corresponding tell sender
-                  isSenderValid = this.factValidateCorrespondingTellSender(queueEntry, state.accountId, header.sender_id)
+                  isSenderValid = this.factValidateCorrespondingTellSender(
+                    queueEntry,
+                    state.accountId,
+                    senderNodeId
+                  )
                 }
               }
             } else {
-              isSenderValid = this.validateCorrespondingTellSender(queueEntry, state.accountId, header.sender_id)
+              isSenderValid = this.validateCorrespondingTellSender(queueEntry, state.accountId, senderNodeId)
             }
 
             if (i !== 0 && isSenderValid === false) {
@@ -4448,19 +4453,36 @@ class TransactionQueue {
     const targetGroup = queueEntry.executionNodeIdSorted
     const targetIndices = this.getStartAndEndIndexOfTargetGroup(targetGroup, queueEntry.transactionGroup)
 
-    const isValidFactSender = verifyCorrespondingSender(receivingNodeIndex, senderNodeIndex, queueEntry.correspondingGlobalOffset, receiverGroupSize, senderGroupSize, targetIndices.startIndex, targetIndices.endIndex, queueEntry.transactionGroup.length)
-
-    // it maybe a FACT sender but sender does not cover the account
-    if (senderHasAddress === false && isSenderOurExeNeighbour === false) {
-      this.mainLogger.error(`factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender does not have the address and is not a exe neighbour`)
-      nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellSender: sender does not have the address and is not a exe neighbour')
+    const isValidFactSender = verifyCorrespondingSender(
+      receivingNodeIndex,
+      senderNodeIndex,
+      queueEntry.correspondingGlobalOffset,
+      receiverGroupSize,
+      senderGroupSize,
+      targetIndices.startIndex,
+      targetIndices.endIndex,
+      queueEntry.transactionGroup.length
+    ) // it maybe a FACT sender but sender does not cover the account
+    if (senderHasAddress === false) {
+      this.mainLogger.error(
+        `factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender does not have the address and is not a exe neighbour`
+      )
+      nestedCountersInstance.countEvent(
+        'stateManager',
+        'factValidateCorrespondingTellSender: sender does not have the address and is not a exe; neighbour'
+      )
       return false
     }
 
     // it is neither a FACT corresponding node nor an exe neighbour node
-    if (isValidFactSender === false && isSenderOurExeNeighbour === false) {
-      this.mainLogger.error(`factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender is neither a valid sender nor a neighbour node isValidSender:  ${isValidFactSender} isSenderOurExeNeighbour: ${isSenderOurExeNeighbour}`);
-      nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellSender: sender is not a valid sender or a neighbour node')
+    if (isValidFactSender === false) {
+      this.mainLogger.error(
+        `factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender is neither a valid sender nor a neighbour node isValidSender:  ${isValidFactSender}`
+      )
+      nestedCountersInstance.countEvent(
+        'stateManager',
+        'factValidateCorrespondingTellSender: sender is not a valid sender or a neighbour node'
+      )
       return false
     }
     return true
@@ -4767,9 +4789,6 @@ class TransactionQueue {
     let message: { stateList: Shardus.WrappedResponse[]; txid: string }
 
     let totalShares = 0
-    const storageNodesForAccount = this.getStorageGroupForAccount(key)
-    const storageNodesAccountIds = new Set(storageNodesForAccount.map((node) => node.id))
-
     const targetStartIndex = 0
     const targetEndIndex = queueEntry.transactionGroup.length
     const targetGroupSize = queueEntry.transactionGroup.length
@@ -4794,6 +4813,8 @@ class TransactionQueue {
             'factTellCorrespondingNodesFinalData: should never get here.  our sending node must be in the execution group'
           )
         }
+        const storageNodesForAccount = this.getStorageGroupForAccount(key)
+        const storageNodesAccountIds = new Set(storageNodesForAccount.map((node) => node.id))
 
         const correspondingNodes: P2PTypes.NodeListTypes.Node[] = []
         for (const index of correspondingIndices) {
