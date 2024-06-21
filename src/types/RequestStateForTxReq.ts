@@ -1,4 +1,5 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { AJV_IDENT, verifyPayload } from './ajv/Helpers';
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export type RequestStateForTxReq = { txid: string; timestamp: number; keys: string[] }
@@ -36,5 +37,11 @@ export function deserializeRequestStateForTxReq(stream: VectorBufferStream): Req
     // eslint-disable-next-line security/detect-object-injection
     keys[i] = stream.readString()
   }
+
+  const errors = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_REQ, { txid, timestamp, keys })
+  if(errors && errors.length > 0) {
+    throw new Error(`AJV: validation error -> ${errors.join(', ')}`)
+  }
+
   return { txid, timestamp, keys }
 }

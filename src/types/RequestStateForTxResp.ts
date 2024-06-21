@@ -1,4 +1,5 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { AJV_IDENT, verifyPayload } from './ajv/Helpers'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { deserializeWrappedData, serializeWrappedData, WrappedData } from './WrappedData'
 
@@ -64,5 +65,11 @@ export const deserializeRequestStateForTxResp = (
   }
   ret.note = stream.readString()
   ret.success = stream.readUInt8() !== 0
+
+  const errors = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_RESP, ret)
+  if (errors && errors.length > 0) {
+    throw new Error(`AJV: validation error -> ${errors.join(', ')}`)
+  }
+
   return ret
 }

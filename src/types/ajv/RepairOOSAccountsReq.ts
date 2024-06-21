@@ -1,5 +1,6 @@
 import { addSchema } from "../../utils/serialization/SchemaHelpers";
 import { InternalRouteEnum } from "../enum/InternalRouteEnum";
+import { AJV_IDENT } from "./Helpers";
 import { schemaWrappedData } from "./WrappedData";
 
 export const schemaSign = {
@@ -117,5 +118,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(InternalRouteEnum.binary_repair_oos_accounts, schemaRepairOOSAccountsReq)
+  addSchema(AJV_IDENT.REPAIR_OOS_ACCOUNTS_REQ, schemaRepairOOSAccountsReq)
 }

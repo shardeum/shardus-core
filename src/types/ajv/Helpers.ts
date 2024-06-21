@@ -12,7 +12,12 @@ import { initGetAccountDataByHashesReq } from './GetAccountDataByHashesReq'
 import { initGetAccountDataByHashesResp } from './GetAccountDataByHashesResp'
 import { initWrappedData } from './WrappedData'
 import { Utils } from '@shardus/types'
-import { initRepairMissingAccountsReq } from './RepairMissingAccountsReq'
+import { initRepairOOSAccountReq } from './RepairOOSAccountsReq'
+import { initRequestStateForTxReq } from './RequestStateForTxReq'
+import { initRequestStateForTxResp } from './RequestStateForTxResp'
+import { initGetAppliedVoteReq } from './GetAppliedVoteReq'
+import { initGetAppliedVoteResp } from './GetAppliedVoteResp'
+import { initLostReportReq } from './LostReportReq'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -26,7 +31,12 @@ export function initAjvSchemas(): void {
   initGetAccountDataByListResp()
   initGetAccountDataByHashesReq()
   initGetAccountDataByHashesResp()
-  initRepairMissingAccountsReq()
+  initRepairOOSAccountReq()
+  initRequestStateForTxReq()
+  initRequestStateForTxResp()
+  initGetAppliedVoteReq()
+  initGetAppliedVoteResp()
+  initLostReportReq()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {
@@ -52,5 +62,13 @@ function parseAjvErrors(errors: Array<ErrorObject> | null): string[] | null {
 }
 
 export enum AJV_IDENT {
-  COMPARE_CERT_REQ = 'compareCertReq'
+  COMPARE_CERT_REQ = 'compareCertReq',
+  REPAIR_OOS_ACCOUNTS_REQ = 'repairOOSAccountsReq',
+  REQUEST_STATE_FOR_TX_REQ = 'requestStateForTxReq',
+  REQUEST_STATE_FOR_TX_RESP = 'requestStateForTxResp',
+  REQUEST_RECEIPT_FOR_TX_REQ = 'requestReceiptForTxReq',
+  REQUEST_RECEIPT_FOR_TX_RESP = 'requestReceiptForTxReq',
+  GET_APPLIED_VOTE_REQ = 'getAppliedVoteReq',
+  GET_APPLIED_VOTE_RESP = 'getAppliedVoteResp',
+  LOST_REPORT_REQ = 'lostReportReq',
 }

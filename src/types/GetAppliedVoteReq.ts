@@ -1,4 +1,5 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { AJV_IDENT, verifyPayload } from './ajv/Helpers'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 const cGetAppliedVoteReqVersion = 1
@@ -24,7 +25,12 @@ export function deserializeGetAppliedVoteReq(stream: VectorBufferStream): GetApp
   if (version > cGetAppliedVoteReqVersion) {
     throw new Error('GetAppliedVoteReq version mismatch')
   }
-  return {
+  const result =  {
     txId: stream.readString(),
   }
+  const errors = verifyPayload(AJV_IDENT.GET_APPLIED_VOTE_REQ, result)
+  if (errors && errors.length > 0) {
+    throw new Error(`AJV: validation error -> ${errors.join(', ')}`)
+  }
+  return result
 }

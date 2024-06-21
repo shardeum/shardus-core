@@ -1,4 +1,5 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { AJV_IDENT, verifyPayload } from './ajv/Helpers'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export interface LostReportReq {
@@ -58,5 +59,12 @@ export function deserializeLostReportReq(stream: VectorBufferStream): LostReport
     // Check if killother is present
     obj.killother = stream.readUInt8() === 1
   }
+
+  const errors = verifyPayload(AJV_IDENT.LOST_REPORT_REQ, obj)
+  if (errors && errors.length > 0) {
+    throw new Error(`AJV: validation error -> ${errors.join(', ')}`)
+  }
+
+
   return obj
 }

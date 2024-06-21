@@ -1,4 +1,5 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { AJV_IDENT, verifyPayload } from './ajv/Helpers'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export type RequestReceiptForTxReqSerialized = {
@@ -31,5 +32,13 @@ export function deserializeRequestReceiptForTxReq(
 
   const txid = stream.readString()
   const timestamp = Number(stream.readString())
-  return { txid, timestamp }
+
+  const result =  { txid, timestamp }
+
+  const errors = verifyPayload(AJV_IDENT.REQUEST_RECEIPT_FOR_TX_REQ, result)
+  if (errors && errors.length > 0) {
+    throw new Error(`AJV: validation error -> ${errors.join(', ')}`)
+  }
+
+  return result
 }
