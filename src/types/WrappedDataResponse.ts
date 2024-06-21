@@ -1,6 +1,8 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { WrappedData, deserializeWrappedData, serializeWrappedData } from './WrappedData'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { verifyPayload } from './ajv/Helpers'
+import { AJV_IDENT } from './ajv/Helpers'
 
 export const cWrappedDataResponseVersion = 1
 
@@ -29,9 +31,19 @@ export function deserializeWrappedDataResponse(stream: VectorBufferStream): Wrap
     throw new Error('WrappedDataResponse version mismatch')
   }
   const wrappedData = deserializeWrappedData(stream)
+  const accountCreated = stream.readUInt8() !== 0
+  const isPartial = stream.readUInt8() !== 0
+  const errors = verifyPayload(AJV_IDENT.WRAPPED_DATA_RESPONSE, {
+    ...wrappedData,
+    accountCreated,
+    isPartial,
+  })
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
   return {
     ...wrappedData,
-    accountCreated: stream.readUInt8() !== 0,
-    isPartial: stream.readUInt8() !== 0,
+    accountCreated,
+    isPartial,
   }
 }
