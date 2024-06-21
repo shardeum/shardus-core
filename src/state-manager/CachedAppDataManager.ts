@@ -141,12 +141,14 @@ class CachedAppDataManager {
           const req = deserializeSendCachedAppDataReq(requestStream)
           const cachedAppData: CachedAppDataSerializable = req.cachedAppData
 
-          const isValidSender = this.factValidateCorrespondingCachedAppDataSender(cachedAppData.dataID, header.sender_id, req.executionShardKey, req.txId)
-          if (isValidSender === false) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`send_cachedAppData invalid sender ${header.sender_id} for data: ${cachedAppData.dataID}`)
-            return
+          if(this.config.p2p.useFactCorrespondingTell) {
+            const isValidSender = this.factValidateCorrespondingCachedAppDataSender(cachedAppData.dataID, header.sender_id, req.executionShardKey, req.txId)
+            if (isValidSender === false) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`send_cachedAppData invalid sender ${header.sender_id} for data: ${cachedAppData.dataID}`)
+              return
+            }
           }
-
+          
           if (cachedAppData == null) {
             return errorHandler(RequestErrorEnum.InvalidRequest)
           }
