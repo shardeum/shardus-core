@@ -141,7 +141,7 @@ class CachedAppDataManager {
           const req = deserializeSendCachedAppDataReq(requestStream)
           const cachedAppData: CachedAppDataSerializable = req.cachedAppData
 
-          const isValidSender = this.factValidateCorrespondingCachedAppDataSender(cachedAppData.dataID, header.sender_id, req.txId)
+          const isValidSender = this.factValidateCorrespondingCachedAppDataSender(cachedAppData.dataID, header.sender_id, req.executionShardKey, req.txId)
           if (isValidSender === false) {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`send_cachedAppData invalid sender ${header.sender_id} for data: ${cachedAppData.dataID}`)
             return
@@ -325,45 +325,45 @@ class CachedAppDataManager {
     cacheTopic.maxItemSize = maxItemSize
   }
 
-  factValidateCorrespondingCachedAppDataSender(dataID: string, senderNodeId: string, txId: string) {
-    const queueEntry = this.stateManager.transactionQueue.getQueueEntry(txId)
+  factValidateCorrespondingCachedAppDataSender(dataID: string, senderNodeId: string, executionShardKey : string, txId: string) {
+    const senderGroup = this.stateManager.transactionQueue.getConsenusGroupForAccount(executionShardKey)
     const senderNode = NodeList.nodes.get(senderNodeId)
+    const logID = utils.stringifyReduce(txId)
     if (senderNode === null) {
-      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender node is null`)
+      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${logID} sender node is null`)
       return false
     }
-    const senderIsInExecutionGroup = queueEntry.executionGroupMap.has(senderNodeId)
-
+    const senderIsInExecutionGroup = senderGroup.some((node) => node.id === senderNodeId)
     if (senderIsInExecutionGroup === false) {
-      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender is not in the execution group`)
+      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${logID} sender is not in the execution group`)
       return false
     }
 
-    const senderGroup = queueEntry.executionGroup
     const targetGroup = this.stateManager.transactionQueue.getStorageGroupForAccount(dataID)
     const allNodes = [...senderGroup, ...targetGroup].sort((a, b) => a.id.localeCompare(b.id));
     const senderIndexInTxGroup = allNodes.findIndex((node) => node.id === senderNodeId)
+    const ourIndexInTxGroup = allNodes.findIndex((node) => node.id === this.stateManager.currentCycleShardData.nodeShardData.node.id)
     const senderGroupSize = senderGroup.length
     const targetGroupSize = targetGroup.length
     const {startIndex: targetStartIndex, endIndex: targetEndIndex} = 
       this.stateManager.transactionQueue.getStartAndEndIndexOfTargetGroup(targetGroup.map(node => node.id), allNodes)
-
+    const globalOffset = parseInt(txId.slice(-4), 16)
 
     // check if it is a FACT sender
     const isValidFactSender = verifyCorrespondingSender(
-      queueEntry.ourTXGroupIndex,
+      ourIndexInTxGroup,
       senderIndexInTxGroup,
-      queueEntry.correspondingGlobalOffset,
+      globalOffset,
       targetGroupSize,
       senderGroupSize,
       targetStartIndex,
       targetEndIndex,
-      queueEntry.transactionGroup.length
+      allNodes.length
     )
 
     // it is not a FACT corresponding node
     if (isValidFactSender === false) {
-      this.mainLogger.error(`factValidateCorrespondingCachedAppDataSender: logId: ${queueEntry.logID} sender is not a valid sender isValidSender:  ${isValidFactSender}`);
+      this.mainLogger.error(`factValidateCorrespondingCachedAppDataSender: logId: logId: ${logID} sender is not a valid sender isValidSender:  ${isValidFactSender}`);
       nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingCachedAppDataSender: sender is not a valid sender or a neighbour node')
       return false
     }
@@ -444,6 +444,7 @@ class CachedAppDataManager {
         const sendCacheAppDataReq: SendCachedAppDataReq = {
           topic,
           txId,
+          executionShardKey: queueEntry.executionShardKey,
           cachedAppData: {
             dataID: message.cachedAppData.dataID,
             appData: message.cachedAppData.appData,
@@ -655,6 +656,7 @@ class CachedAppDataManager {
               const sendCacheAppDataReq: SendCachedAppDataReq = {
                 topic,
                 txId,
+                executionShardKey: queueEntry.executionShardKey,
                 cachedAppData: {
                   dataID: message.cachedAppData.dataID,
                   appData: message.cachedAppData.appData,
