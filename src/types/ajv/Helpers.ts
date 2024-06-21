@@ -3,7 +3,8 @@ import { getVerifyFunction } from '../../utils/serialization/SchemaHelpers'
 import { initGetAccountData3Req } from './GetAccountData3Req'
 import { initCompareCertReq } from './CompareCert'
 import { initSpreadTxToGroupSyncingReq } from './SpreadTxToGroupSyncingReq'
-import { initApoptosisProposal } from './ApoptosisProposalResp'
+import { initApoptosisProposalReq } from './ApoptosisProposalReq'
+import { initApoptosisProposalResp } from './ApoptosisProposalResp'
 import { initGetTxTimestampReq } from './GetTxTimestampReq'
 import { initGetTxTimestampResp } from './GetTxTimestampResp'
 import { initGetAccountDataByListResp } from './GetAccountDataByListResp'
@@ -27,11 +28,13 @@ import { initWrappedDataResponse } from './WrappedDataResponse'
 import { initBroadcastStateReq } from './BroadcastStateReq'
 import { initGetAccountDataRespSerializable } from './GetAccountDataResp'
 
+
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
   initCompareCertReq()
   initSpreadTxToGroupSyncingReq()
-  initApoptosisProposal()
+  initApoptosisProposalReq()
+  initApoptosisProposalResp()
   initGetTxTimestampReq()
   initGetTxTimestampResp()
   initWrappedData()
@@ -92,4 +95,6 @@ export enum AJV_IDENT {
   WRAPPED_DATA_RESPONSE = 'wrappedDataResponse',
   BROADCAST_STATE_REQ = 'BroadcastStateReq',
   GET_ACCOUNTDATA_RESPONSE = 'getAccountDataResp'
+  APOPTOSIS_REQ = 'ApoptosisProposalReq',
+  APOPTOSIS_RESP = 'ApoptosisProposalResp',
 }
