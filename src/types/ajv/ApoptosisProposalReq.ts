@@ -1,16 +1,16 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
 import { AJV_IDENT } from './Helpers'
 
-const schemaApoptosisResp = {
+const schemaApoptosisReq = {
   type: 'object',
   properties: {
-    s: { type: 'string' },
-    r: { type: 'number' },
+    id: { type: 'string' },
+    when: { type: 'number' },
   },
-  required: ['s', 'r'],
+  required: ['id', 'when'],
 }
 
-export function initApoptosisProposalResp(): void {
+export function initApoptosisProposalReq(): void {
   addSchemaDependencies()
   addSchemas()
 }
@@ -22,5 +22,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema(AJV_IDENT.APOPTOSIS_RESP, schemaApoptosisResp)
+  addSchema(AJV_IDENT.APOPTOSIS_REQ, schemaApoptosisReq)
 }
