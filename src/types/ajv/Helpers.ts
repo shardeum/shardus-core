@@ -24,6 +24,7 @@ import { initRepairMissingAccountsReq } from './RepairMissingAccountsReq'
 import { initRequestStateForTxPostReq } from './RequestStateForTxPostReq'
 import { initRequestStateForTxPostResp } from './RequestStateForTxPostResp'
 import { initWrappedDataResponse } from './WrappedDataResponse'
+import { initBroadcastStateReq } from './BroadcastStateReq'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -49,6 +50,7 @@ export function initAjvSchemas(): void {
   initRequestStateForTxPostReq()
   initRequestStateForTxPostResp()
   initWrappedDataResponse()
+  initBroadcastStateReq()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {
@@ -86,4 +88,5 @@ export enum AJV_IDENT {
   REQUEST_STATE_FOR_TX_POST_REQ = 'requestStateForTxPostReq',
   REQUEST_STATE_FOR_TX_POST_RESP = 'requestStateForTxPostResp',
   WRAPPED_DATA_RESPONSE = 'wrappedDataResponse',
+  BROADCAST_STATE_REQ = 'BroadcastStateReq',
 }

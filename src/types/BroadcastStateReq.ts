@@ -4,6 +4,7 @@ import {
   deserializeWrappedDataResponse,
   serializeWrappedDataResponse,
 } from './WrappedDataResponse'
+import { AJV_IDENT, verifyPayload } from './ajv/Helpers'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export const cBroadcastStateReqVersion = 1
@@ -35,5 +36,9 @@ export function deserializeBroadcastStateReq(stream: VectorBufferStream): Broadc
   const txid = stream.readString()
   const stateListLength = stream.readUInt16()
   const stateList = Array.from({ length: stateListLength }, () => deserializeWrappedDataResponse(stream))
+  const errors = verifyPayload(AJV_IDENT.BROADCAST_STATE_REQ, { txid, stateList })
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
   return { txid, stateList }
 }
