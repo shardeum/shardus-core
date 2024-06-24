@@ -24,6 +24,8 @@ import {
   getStandbyNodesInfoMap,
   saveJoinRequest,
   standbyNodesInfoHashes,
+  isOnStandbyList,
+  isInNewJoinRequests,
 } from './v2'
 import { err, ok, Result } from 'neverthrow'
 import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
@@ -44,10 +46,9 @@ let p2pLogger: Logger
 let mainLogger: Logger
 const clone = rfdc()
 
-let requests: P2P.JoinTypes.JoinRequest[]
+let requests: JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
-let queuedReceivedJoinRequests: P2P.JoinTypes.JoinRequest[] = []
-let queuedJoinRequestsForGossip: JoinRequest[] = []
+let queuedJoinRequests: JoinRequest[] = []
 let queuedStartedSyncingId: string
 let queuedFinishedSyncingId: string
 let queuedStandbyRefreshPubKeys: string[] = []
@@ -431,7 +432,6 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
         }
       }
 
-
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${standbyRemoved_Age}  removed list: ${record.standbyRemove} ` )
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList(standbyList, `join.updateRecord: last-hashed ${record.counter}`)
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList( Array.from(getStandbyNodesInfoMap().values()), `join.updateRecord: standby-map ${record.counter}` )
@@ -468,13 +468,6 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `standbyRemoved_Age: ${standbyRemoved_Age} standbyRemoved_App: ${standbyRemoved_App}` )
 
     record.joinedConsensors.sort()
-
-    if (CycleCreator.currentQuarter === 3) {
-      // transfer join requests received this cycle to queue for gossipping next cycle
-      queuedJoinRequestsForGossip = queuedReceivedJoinRequests
-      queuedReceivedJoinRequests = []
-    }
-
   } else {
     // old protocol handling
     record.joinedConsensors = txs.join
@@ -693,15 +686,22 @@ export function sendRequests(): void {
     queuedStandbyRefreshPubKeys = []
   }
 
-  if (queuedJoinRequestsForGossip.length > 0) {
-    for (const joinRequest of queuedJoinRequestsForGossip) {
+  if (queuedJoinRequests.length > 0) {
+    for (const joinRequest of queuedJoinRequests) {
       // TODO: may need to check if node is on standby and maybe validate the request again
       // need to think about this more
 
+      // check if the node is already in the standby list
+      if (isOnStandbyList(joinRequest.nodeInfo.publicKey)) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `Join:sendRequests: not sending joinRequest since node is already in standby list` )
+        continue
+      }
+
       // re-compute selection number for the join request for the current cycle
+      // since its possible that the join request was created in the previous cycle
       const selectionNumResult = computeSelectionNum(joinRequest)
       if (selectionNumResult.isErr()) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-route-reject: failed to compute selection number` )
+        /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `Join:sendRequests: failed to compute selection number` )
         /* prettier-ignore */ if (logFlags.p2pNonFatal)console.error( `failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`, JSON.stringify(selectionNumResult.error) )
         return
       }
@@ -712,7 +712,10 @@ export function sendRequests(): void {
         // since join request was already validated last cycle, we can just set seen to true directly
         seen.add(joinRequest.nodeInfo.publicKey)
         saveJoinRequest(joinRequest)
+      } else if (isInNewJoinRequests(joinRequest.nodeInfo.publicKey) === false) {
+        saveJoinRequest(joinRequest)
       }
+
       Comms.sendGossip(
         'gossip-valid-join-requests',
         joinRequest,
@@ -728,8 +731,9 @@ export function sendRequests(): void {
       nestedCountersInstance.countEvent('p2p', `saved join request and gossiped to network`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`saved join request and gossiped to network`)
     }
-    queuedJoinRequestsForGossip = []
+    queuedJoinRequests = []
   }
+
   return
 }
 
@@ -751,7 +755,7 @@ export function queueStandbyRefreshRequest(publicKey: string): void {
 }
 
 export function queueJoinRequest(joinRequest: JoinRequest): void {
-  queuedReceivedJoinRequests.push(joinRequest)
+  queuedJoinRequests.push(joinRequest)
 }
 
 /** Module Functions */
