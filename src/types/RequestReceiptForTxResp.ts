@@ -23,9 +23,9 @@ export function serializeRequestReceiptForTxResp(
 
   if (inp.receipt === null) {
     stream.writeUInt8(0)
-    stream.writeString(Utils.safeStringify(inp.receipt))
   } else {
     stream.writeUInt8(1)
+    stream.writeString(Utils.safeStringify(inp.receipt))
   }
   stream.writeString(inp.note)
   stream.writeUInt8(inp.success ? 1 : 0)
