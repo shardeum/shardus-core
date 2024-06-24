@@ -91,4 +91,5 @@ export enum AJV_IDENT {
   REQUEST_STATE_FOR_TX_POST_RESP = 'requestStateForTxPostResp',
   WRAPPED_DATA_RESPONSE = 'wrappedDataResponse',
   BROADCAST_STATE_REQ = 'BroadcastStateReq',
+  GET_ACCOUNTDATA_RESPONSE = 'getAccountDataResp'
 }
