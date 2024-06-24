@@ -369,12 +369,6 @@ class TransactionQueue {
           if (!requestStream) {
             return errorHandler(RequestErrorEnum.InvalidRequest)
           }
-          // Use verifyPayload to check the request
-          const errors = verifyPayload(AJV_IDENT.BROADCAST_STATE_REQ, requestStream)
-          if (errors && errors.length > 0) {
-            this.mainLogger.error(`compbroadcast_stateareCert request validation errors: ${errors}`)
-            return respond(BadRequest('Request validation errors'), serializeResponseError)
-          }
           // verification data checks
           if (header.verification_data == null) {
             return errorHandler(RequestErrorEnum.MissingVerificationData)
