@@ -25,6 +25,7 @@ import { initRequestStateForTxPostReq } from './RequestStateForTxPostReq'
 import { initRequestStateForTxPostResp } from './RequestStateForTxPostResp'
 import { initWrappedDataResponse } from './WrappedDataResponse'
 import { initBroadcastStateReq } from './BroadcastStateReq'
+import { initGetAccountDataRespSerializable } from './GetAccountDataResp'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -51,6 +52,7 @@ export function initAjvSchemas(): void {
   initRequestStateForTxPostResp()
   initWrappedDataResponse()
   initBroadcastStateReq()
+  initGetAccountDataRespSerializable()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {
