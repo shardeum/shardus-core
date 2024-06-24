@@ -117,11 +117,6 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> 
 
       const req = deserializeApoptosisProposalReq(requestStream)
 
-      const errors = verifyPayload(AJV_IDENT.APOPTOSIS_REQ, req)
-      if (errors && errors.length > 0) {
-        warn('apoptosisInternalRoute: bad request:', errors)
-        return response(BadRequest('Request validation errors'), serializeResponseError)
-      }
       const apopProposal: P2P.ApoptosisTypes.SignedApoptosisProposal = {
         id: req.id,
         when: req.when,
