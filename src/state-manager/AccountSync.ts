@@ -44,7 +44,7 @@ import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { deserializeGetAccountDataByListReq } from '../types/GetAccountDataByListReq'
 import { getStreamWithTypeCheck } from '../types/Helpers'
 import { GetAccountDataRespSerializable, serializeGetAccountDataResp } from '../types/GetAccountDataResp'
-import { deserializeGetAccountDataReq, verifyGetAccountDataReq } from '../types/GetAccountDataReq'
+import { deserializeGetAccountDataReq, verifyAddressRange } from '../types/GetAccountDataReq'
 import {
   GlobalAccountReportReqSerializable,
   serializeGlobalAccountReportReq,
@@ -341,8 +341,17 @@ class AccountSync {
           }
           const readableReq = deserializeGetAccountDataReq(reqStream)
 
-          // validate the request
-          const valid = verifyGetAccountDataReq(readableReq)
+          // validate the request payload
+          const errors = verifyPayload('GetAccountData3Req', payload)
+          if (errors && errors.length > 0) {
+            this.mainLogger.error(`get_account_data3: request validation errors: ${errors}`)
+            result.errors = errors
+            respond(result, serializeGetAccountDataResp)
+            return
+          }
+
+          // validate the addres range for shardus addresses
+          const valid = verifyAddressRange(readableReq)
           if (valid === false) {
             nestedCountersInstance.countEvent('internal', `${route}-invalid_account_ids`)
             result.errors.push(`request validation failed`)

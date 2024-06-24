@@ -46,7 +46,7 @@ export function deserializeGetAccountDataReq(stream: VectorBufferStream): GetAcc
   return obj
 }
 
-export function verifyGetAccountDataReq(obj: GetAccountDataReqSerializable): boolean {
+export function verifyAddressRange(obj: GetAccountDataReqSerializable): boolean {
   if (isValidShardusAddress([obj.accountStart, obj.accountEnd]) === false) {
     /* prettier-ignore */ console.log(`GetAccountDataReq: Invalid accountStart or accountEnd: ${obj.accountStart}, ${obj.accountEnd}`)
     return false
