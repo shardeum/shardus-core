@@ -5,9 +5,12 @@ import { schemaWrappedData } from "./WrappedData";
 export const schemaRequestStateForTxResp = {
   type: "object",
   properties: {
-    stateList: schemaWrappedData,
+    stateList: { type: "array", items: schemaWrappedData},
     beforeHashes: {
       type: "object",
+      additionalProperties: {
+        type: "string",
+      },
     },
     note: { type: "string" },
     success: { type: "boolean" }

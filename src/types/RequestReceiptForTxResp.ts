@@ -24,9 +24,9 @@ export function serializeRequestReceiptForTxResp(
 
   if (inp.receipt === null) {
     stream.writeUInt8(0)
-    stream.writeString(Utils.safeStringify(inp.receipt))
   } else {
     stream.writeUInt8(1)
+    stream.writeString(Utils.safeStringify(inp.receipt))
   }
   stream.writeString(inp.note)
   stream.writeUInt8(inp.success ? 1 : 0)
@@ -44,7 +44,8 @@ export function deserializeRequestReceiptForTxResp(
     const success = stream.readUInt8() === 1
     return { receipt: null, note, success }
   }
-  const receipt = Utils.safeJsonParse(stream.readString()) as AppliedReceipt2
+  const receipt_str = stream.readString()
+  const receipt = Utils.safeJsonParse(receipt_str) as AppliedReceipt2
   const note = stream.readString()
   const success = stream.readUInt8() === 1
   const errors = verifyPayload(AJV_IDENT.REQUEST_RECEIPT_FOR_TX_RESP, { receipt, note, success })

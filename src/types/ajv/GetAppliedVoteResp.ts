@@ -5,11 +5,11 @@ import { addSchema } from "../../utils/serialization/SchemaHelpers";
 export const schemaGetAppliedVoteResp = {
   type: "object",
   properties: {
-    vote: schemaAppliedVote,
-    note: { type: "string" },
-    success: { type: "boolean" }
+    txId: { type: "string" },
+    appliedVote: schemaAppliedVote,
+    appliedVoteHash: { type: "string" },
   },
-  required: ["vote", "note", "success"]
+  required: ["txId", "appliedVote", "appliedVoteHash"],
 };
 
 export function initGetAppliedVoteResp(): void {

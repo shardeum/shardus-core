@@ -18,6 +18,8 @@ import { initRequestStateForTxResp } from './RequestStateForTxResp'
 import { initGetAppliedVoteReq } from './GetAppliedVoteReq'
 import { initGetAppliedVoteResp } from './GetAppliedVoteResp'
 import { initLostReportReq } from './LostReportReq'
+import { initRequestReceiptForTxReq } from './RequestReceiptForTxReq'
+import { initRequestReceiptForTxResp } from './RequestReceiptForTxResp'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -34,6 +36,8 @@ export function initAjvSchemas(): void {
   initRepairOOSAccountReq()
   initRequestStateForTxReq()
   initRequestStateForTxResp()
+  initRequestReceiptForTxReq()
+  initRequestReceiptForTxResp()
   initGetAppliedVoteReq()
   initGetAppliedVoteResp()
   initLostReportReq()
@@ -67,7 +71,7 @@ export enum AJV_IDENT {
   REQUEST_STATE_FOR_TX_REQ = 'requestStateForTxReq',
   REQUEST_STATE_FOR_TX_RESP = 'requestStateForTxResp',
   REQUEST_RECEIPT_FOR_TX_REQ = 'requestReceiptForTxReq',
-  REQUEST_RECEIPT_FOR_TX_RESP = 'requestReceiptForTxReq',
+  REQUEST_RECEIPT_FOR_TX_RESP = 'requestReceiptForTxResp',
   GET_APPLIED_VOTE_REQ = 'getAppliedVoteReq',
   GET_APPLIED_VOTE_RESP = 'getAppliedVoteResp',
   LOST_REPORT_REQ = 'lostReportReq',

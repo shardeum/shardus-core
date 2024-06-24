@@ -45,18 +45,20 @@ export const deserializeRequestStateForTxResp = (
   }
   const stateListLen = stream.readUInt16()
 
-  const ret: RequestStateForTxRespSerialized = {
+  let ret: RequestStateForTxRespSerialized = {
     stateList: new Array<WrappedData>(stateListLen),
     beforeHashes: {},
     note: '',
     success: false,
   }
 
+  console.log('stateListLen', stateListLen)
   for (let i = 0; i < stateListLen; i++) {
-    ret.stateList.push(deserializeWrappedData(stream))
+    ret.stateList[i] = (deserializeWrappedData(stream))
   }
 
   const beforeHashesLen = stream.readUInt16()
+  console.log('beforeHashesLen', beforeHashesLen)
   for (let i = 0; i < beforeHashesLen; i++) {
     const key = stream.readString()
     const value = stream.readString()
@@ -66,6 +68,7 @@ export const deserializeRequestStateForTxResp = (
   ret.note = stream.readString()
   ret.success = stream.readUInt8() !== 0
 
+  console.log('ret', ret)
   const errors = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_RESP, ret)
   if (errors && errors.length > 0) {
     throw new Error(`AJV: validation error -> ${errors.join(', ')}`)

@@ -27,5 +27,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.REPAIR_OOS_ACCOUNTS_REQ, shcemaRequestStateForTxReq);
+  addSchema(AJV_IDENT.REQUEST_STATE_FOR_TX_REQ, shcemaRequestStateForTxReq);
 }
