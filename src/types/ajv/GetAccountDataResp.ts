@@ -1,4 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { AJV_IDENT } from './Helpers'
 import { schemaWrappedData } from './WrappedData'
 
 const schemaGetAccountDataResp = {
@@ -41,5 +42,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('GetAccountDataResp', schemaGetAccountDataResp)
+  addSchema(AJV_IDENT.GET_ACCOUNTDATA_RESPONSE, schemaGetAccountDataResp)
 }

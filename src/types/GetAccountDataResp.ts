@@ -1,7 +1,7 @@
 import { WrappedData, serializeWrappedData, deserializeWrappedData } from './WrappedData'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
-import { verifyPayload } from './ajv/Helpers'
+import { AJV_IDENT, verifyPayload } from './ajv/Helpers'
 
 export type GetAccountDataRespSerializable = {
   data?: {
@@ -82,12 +82,12 @@ export function deserializeGetAccountDataResp(stream: VectorBufferStream): GetAc
     }
   }
 
-  const ajvErrors = verifyPayload('GetAccountDataResp', {
+  const ajvErrors = verifyPayload(AJV_IDENT.GET_ACCOUNTDATA_RESPONSE, {
     ...(data ? { data } : {}),
     ...(errors ? { errors } : {}),
   })
   if (ajvErrors && ajvErrors.length > 0) {
-    console.log("The AjvErrors are:", ajvErrors)
+    console.log('The AjvErrors are:', ajvErrors)
     throw new Error('Data validation error')
   }
 

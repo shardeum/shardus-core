@@ -4,7 +4,7 @@ import {
   deserializeGetAccountDataResp,
   serializeGetAccountDataResp,
 } from '../../../../src/types/GetAccountDataResp'
-import { serializeWrappedData, deserializeWrappedData } from '../../../../src/types/WrappedData'
+import { serializeWrappedData } from '../../../../src/types/WrappedData'
 import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 
@@ -473,7 +473,6 @@ describe('GetAccountDataRespSerializable Serialization and Deserialization', () 
       const expectedObj = deserializeGetAccountDataResp(stream)
       expect(expectedObj).toEqual(obj)
     })
-
   })
 
   describe('Serialization and Deserialization Together', () => {
