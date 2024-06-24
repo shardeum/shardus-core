@@ -24,6 +24,8 @@ import {
   getStandbyNodesInfoMap,
   saveJoinRequest,
   standbyNodesInfoHashes,
+  isOnStandbyList,
+  isInNewJoinRequests,
 } from './v2'
 import { err, ok, Result } from 'neverthrow'
 import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
@@ -50,10 +52,9 @@ let p2pLogger: Logger
 let mainLogger: Logger
 const clone = rfdc()
 
-let requests: P2P.JoinTypes.JoinRequest[]
+let requests: JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
-let queuedReceivedJoinRequests: JoinRequest[] = []
-let queuedJoinRequestsForGossip: JoinRequest[] = []
+let queuedJoinRequests: JoinRequest[] = []
 let queuedStartedSyncingId: string
 let queuedFinishedSyncingId: string
 let queuedStandbyRefreshPubKeys: string[] = []
@@ -515,11 +516,6 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       }
     }
 
-    if (CycleCreator.currentQuarter === 3) {
-      // transfer join requests received this cycle to queue for gossipping next cycle
-      queuedJoinRequestsForGossip = queuedReceivedJoinRequests
-      queuedReceivedJoinRequests = []
-    }
   } else {
     // old protocol handling
     record.joinedConsensors = txs.standbyAdd
@@ -738,16 +734,19 @@ export function sendRequests(): void {
     queuedStandbyRefreshPubKeys = []
   }
 
-  if (queuedJoinRequestsForGossip.length > 0) {
-    for (const joinRequest of queuedJoinRequestsForGossip) {
+  if (queuedJoinRequests.length > 0) {
+    for (const joinRequest of queuedJoinRequests) {
       // TODO: may need to check if node is on standby and maybe validate the request again
       // need to think about this more
 
-      // The point of having two arrays for joinReq gossip was that it was the simplest way I could think at the time to avoid a race conditon. 
-      // however, I think its over-engineered. I think its even simpler to let a node that validated before sendRequests to just send it,
-      // and next cycle, the other nodes should check if the node is on the standby list before sending it. This will speed up creating a network
+      // check if the node is already in the standby list
+      if (isOnStandbyList(joinRequest.nodeInfo.publicKey)) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join:sendRequests: not sending joinRequest since node is already in standby list` )
+        continue
+      }
 
       // re-compute selection number for the join request for the current cycle
+      // since its possible that the join request was created in the previous cycle
       const selectionNumResult = computeSelectionNum(joinRequest)
       if (selectionNumResult.isErr()) {
         /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join:sendRequests: failed to compute selection number` )
@@ -760,6 +759,8 @@ export function sendRequests(): void {
       if (seen.has(joinRequest.nodeInfo.publicKey) === false) {
         // since join request was already validated last cycle, we can just set seen to true directly
         seen.add(joinRequest.nodeInfo.publicKey)
+        saveJoinRequest(joinRequest)
+      } else if (isInNewJoinRequests(joinRequest.nodeInfo.publicKey) === false) {
         saveJoinRequest(joinRequest)
       }
 
@@ -780,7 +781,7 @@ export function sendRequests(): void {
       nestedCountersInstance.countEvent('p2p', `join:sendRequests: saved join request and gossiped to network`)
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: saved join request and gossiped to network`)
     }
-    queuedJoinRequestsForGossip = []
+    queuedJoinRequests = []
   }
 
   if (queuedUnjoinRequestsForThisCycle.length > 0) {
@@ -838,7 +839,7 @@ export function queueStandbyRefreshRequest(publicKey: string): void {
 }
 
 export function queueJoinRequest(joinRequest: JoinRequest): void {
-  queuedReceivedJoinRequests.push(joinRequest)
+  queuedJoinRequests.push(joinRequest)
 }
 
 export function queueUnjoinRequest(unjoinRequest: P2P.JoinTypes.SignedUnjoinRequest): void {
