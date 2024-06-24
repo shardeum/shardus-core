@@ -130,6 +130,7 @@ function handleMultiDebugAuth(_req, res, next) {
         if (allSignaturesValid) {
           multiSigLstCounter = parseInt(_req.query.sig_counter)
           next()
+          return
         } else {
           return res.status(401).json({
             status: 401,
