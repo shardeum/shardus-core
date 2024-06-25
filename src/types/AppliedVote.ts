@@ -1,7 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { SignSerializable, deserializeSign, serializeSign } from './Sign'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
-import { AJV_IDENT, verifyPayload } from './ajv/Helpers'
 
 const cAppliedVoteVersion = 1
 
@@ -115,7 +114,6 @@ export function deserializeAppliedVote(stream: VectorBufferStream): AppliedVoteS
   if (app_data_hash) {
     result.app_data_hash = app_data_hash
   }
-
 
   return result
 }

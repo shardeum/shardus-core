@@ -1,17 +1,17 @@
-import { addSchema } from "../../utils/serialization/SchemaHelpers";
-import { AJV_IDENT } from "./Helpers";
+import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { AJV_IDENT } from './Helpers'
 
 export const schemaGetAppliedVoteReq = {
-  type: "object",
+  type: 'object',
   properties: {
-    txId: { type: "string" }
+    txId: { type: 'string' },
   },
-  required: ["txId"]
-};
+  required: ['txId'],
+}
 
 export function initGetAppliedVoteReq(): void {
-  addSchemaDependencies();
-  addSchemas();
+  addSchemaDependencies()
+  addSchemas()
 }
 
 function addSchemaDependencies(): void {
@@ -19,6 +19,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.GET_APPLIED_VOTE_REQ, schemaGetAppliedVoteReq);
+  addSchema(AJV_IDENT.GET_APPLIED_VOTE_REQ, schemaGetAppliedVoteReq)
 }
-

@@ -1,26 +1,26 @@
-import { addSchema } from "../../utils/serialization/SchemaHelpers";
-import { AJV_IDENT } from "./Helpers";
-import { schemaWrappedData } from "./WrappedData";
+import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { AJV_IDENT } from './Helpers'
+import { schemaWrappedData } from './WrappedData'
 
 export const schemaRequestStateForTxResp = {
-  type: "object",
+  type: 'object',
   properties: {
-    stateList: { type: "array", items: schemaWrappedData},
+    stateList: { type: 'array', items: schemaWrappedData },
     beforeHashes: {
-      type: "object",
+      type: 'object',
       additionalProperties: {
-        type: "string",
+        type: 'string',
       },
     },
-    note: { type: "string" },
-    success: { type: "boolean" }
+    note: { type: 'string' },
+    success: { type: 'boolean' },
   },
-  required: ["stateList", "beforeHashes", "note", "success"]
-};
+  required: ['stateList', 'beforeHashes', 'note', 'success'],
+}
 
 export function initRequestStateForTxResp(): void {
-  addSchemaDependencies();
-  addSchemas();
+  addSchemaDependencies()
+  addSchemas()
 }
 
 function addSchemaDependencies(): void {
@@ -28,5 +28,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.REQUEST_STATE_FOR_TX_RESP, schemaRequestStateForTxResp);
+  addSchema(AJV_IDENT.REQUEST_STATE_FOR_TX_RESP, schemaRequestStateForTxResp)
 }

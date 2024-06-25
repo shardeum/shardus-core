@@ -45,7 +45,7 @@ export const deserializeRequestStateForTxResp = (
   }
   const stateListLen = stream.readUInt16()
 
-  let ret: RequestStateForTxRespSerialized = {
+  const ret: RequestStateForTxRespSerialized = {
     stateList: new Array<WrappedData>(stateListLen),
     beforeHashes: {},
     note: '',
@@ -54,7 +54,8 @@ export const deserializeRequestStateForTxResp = (
 
   console.log('stateListLen', stateListLen)
   for (let i = 0; i < stateListLen; i++) {
-    ret.stateList[i] = (deserializeWrappedData(stream))
+    // eslint-disable-next-line security/detect-object-injection
+    ret.stateList[i] = deserializeWrappedData(stream)
   }
 
   const beforeHashesLen = stream.readUInt16()

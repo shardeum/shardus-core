@@ -1,20 +1,20 @@
-import { AJV_IDENT } from "./Helpers";
-import { schemaAppliedVote } from "./RepairOOSAccountsReq";
-import { addSchema } from "../../utils/serialization/SchemaHelpers";
+import { AJV_IDENT } from './Helpers'
+import { schemaAppliedVote } from './RepairOOSAccountsReq'
+import { addSchema } from '../../utils/serialization/SchemaHelpers'
 
 export const schemaGetAppliedVoteResp = {
-  type: "object",
+  type: 'object',
   properties: {
-    txId: { type: "string" },
+    txId: { type: 'string' },
     appliedVote: schemaAppliedVote,
-    appliedVoteHash: { type: "string" },
+    appliedVoteHash: { type: 'string' },
   },
-  required: ["txId", "appliedVote", "appliedVoteHash"],
-};
+  required: ['txId', 'appliedVote', 'appliedVoteHash'],
+}
 
 export function initGetAppliedVoteResp(): void {
-  addSchemaDependencies();
-  addSchemas();
+  addSchemaDependencies()
+  addSchemas()
 }
 
 function addSchemaDependencies(): void {
@@ -22,5 +22,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.GET_APPLIED_VOTE_RESP, schemaGetAppliedVoteResp);
+  addSchema(AJV_IDENT.GET_APPLIED_VOTE_RESP, schemaGetAppliedVoteResp)
 }

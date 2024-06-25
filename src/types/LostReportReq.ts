@@ -65,6 +65,5 @@ export function deserializeLostReportReq(stream: VectorBufferStream): LostReport
     throw new Error(`AJV: validation error -> ${errors.join(', ')}`)
   }
 
-
   return obj
 }

@@ -1,18 +1,18 @@
-import { addSchema } from "../../utils/serialization/SchemaHelpers";
-import { AJV_IDENT } from "./Helpers";
+import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { AJV_IDENT } from './Helpers'
 
 export const schemaRequestReceiptForTxReq = {
-  type: "object",
+  type: 'object',
   properties: {
-    txid: { type: "string" },
-    timestamp: { type: "number" }
+    txid: { type: 'string' },
+    timestamp: { type: 'number' },
   },
-  required: ["txid", "timestamp"]
-};
+  required: ['txid', 'timestamp'],
+}
 
 export function initRequestReceiptForTxReq(): void {
-  addSchemaDependencies();
-  addSchemas();
+  addSchemaDependencies()
+  addSchemas()
 }
 
 function addSchemaDependencies(): void {
@@ -20,7 +20,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.REQUEST_RECEIPT_FOR_TX_REQ, schemaRequestReceiptForTxReq);
+  addSchema(AJV_IDENT.REQUEST_RECEIPT_FOR_TX_REQ, schemaRequestReceiptForTxReq)
 }
-
-

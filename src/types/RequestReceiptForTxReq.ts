@@ -33,7 +33,7 @@ export function deserializeRequestReceiptForTxReq(
   const txid = stream.readString()
   const timestamp = Number(stream.readString())
 
-  const result =  { txid, timestamp }
+  const result = { txid, timestamp }
 
   const errors = verifyPayload(AJV_IDENT.REQUEST_RECEIPT_FOR_TX_REQ, result)
   if (errors && errors.length > 0) {

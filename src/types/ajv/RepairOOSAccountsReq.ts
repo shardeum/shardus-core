@@ -1,113 +1,99 @@
-import { addSchema } from "../../utils/serialization/SchemaHelpers";
-import { InternalRouteEnum } from "../enum/InternalRouteEnum";
-import { AJV_IDENT } from "./Helpers";
-import { schemaWrappedData } from "./WrappedData";
+import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { AJV_IDENT } from './Helpers'
+import { schemaWrappedData } from './WrappedData'
 
 export const schemaSign = {
-  type: "object",
+  type: 'object',
   properties: {
-    owner: { type: "string" },
-    sig: { type: "string" }
+    owner: { type: 'string' },
+    sig: { type: 'string' },
   },
-  required: ["owner", "sig"]
-};
+  required: ['owner', 'sig'],
+}
 
 export const schemaAppliedVote = {
-  type: "object",
+  type: 'object',
   properties: {
-    txid: { type: "string" },
-    transaction_result: { type: "boolean" },
+    txid: { type: 'string' },
+    transaction_result: { type: 'boolean' },
     account_id: {
-      type: "array",
-      items: { type: "string" }
+      type: 'array',
+      items: { type: 'string' },
     },
     account_state_hash_after: {
-      type: "array",
-      items: { type: "string" }
+      type: 'array',
+      items: { type: 'string' },
     },
     account_state_hash_before: {
-      type: "array",
-      items: { type: "string" }
+      type: 'array',
+      items: { type: 'string' },
     },
-    cant_apply: { type: "boolean" },
-    node_id: { type: "string" },
+    cant_apply: { type: 'boolean' },
+    node_id: { type: 'string' },
     sign: schemaSign,
-    app_data_hash: { type: "string" }
+    app_data_hash: { type: 'string' },
   },
   required: [
-    "txid",
-    "transaction_result",
-    "account_id",
-    "account_state_hash_after",
-    "account_state_hash_before",
-    "cant_apply",
-    "node_id"
-  ]
-};
+    'txid',
+    'transaction_result',
+    'account_id',
+    'account_state_hash_after',
+    'account_state_hash_before',
+    'cant_apply',
+    'node_id',
+  ],
+}
 
 export const schemaConfirmOrChallengeMessage = {
-  type: "object",
+  type: 'object',
   properties: {
-    message: { type: "string" },
-    nodeId: { type: "string" },
+    message: { type: 'string' },
+    nodeId: { type: 'string' },
     appliedVote: schemaAppliedVote,
-    sign: schemaSign
+    sign: schemaSign,
   },
-  required: ["message", "nodeId", "appliedVote"]
-};
+  required: ['message', 'nodeId', 'appliedVote'],
+}
 
 export const schemaAppliedReceipt2 = {
-  type: "object",
+  type: 'object',
   properties: {
-    txid: { type: "string" },
-    result: { type: "boolean" },
+    txid: { type: 'string' },
+    result: { type: 'boolean' },
     appliedVote: schemaAppliedVote,
     confirmOrChallenge: schemaConfirmOrChallengeMessage,
     signatures: {
-      type: "array",
-      items: schemaSign
+      type: 'array',
+      items: schemaSign,
     },
-    app_data_hash: { type: "string" }
+    app_data_hash: { type: 'string' },
   },
-  required: [
-    "txid",
-    "result",
-    "appliedVote",
-    "signatures",
-    "app_data_hash"
-  ]
-};
+  required: ['txid', 'result', 'appliedVote', 'signatures', 'app_data_hash'],
+}
 
 export const schemaAccountRepairInstruction = {
-  type: "object",
+  type: 'object',
   properties: {
-    accountID: { type: "string" },
-    hash: { type: "string" },
-    txId: { type: "string" },
+    accountID: { type: 'string' },
+    hash: { type: 'string' },
+    txId: { type: 'string' },
     accountData: schemaWrappedData,
-    targetNodeId: { type: "string" },
-    receipt2: schemaAppliedReceipt2
+    targetNodeId: { type: 'string' },
+    receipt2: schemaAppliedReceipt2,
   },
-  required: [
-    "accountID",
-    "hash",
-    "txId",
-    "accountData",
-    "targetNodeId",
-    "receipt2"
-  ]
-};
+  required: ['accountID', 'hash', 'txId', 'accountData', 'targetNodeId', 'receipt2'],
+}
 
 export const schemaRepairOOSAccountsReq = {
-  type: "object",
+  type: 'object',
   properties: {
     repairInstructions: {
-      type: "array",
-      items: schemaAccountRepairInstruction 
-    }
+      type: 'array',
+      items: schemaAccountRepairInstruction,
+    },
   },
-  required: ["repairInstructions"]
-};
+  required: ['repairInstructions'],
+}
 
 export function initRepairOOSAccountReq(): void {
   addSchemaDependencies()
@@ -115,6 +101,7 @@ export function initRepairOOSAccountReq(): void {
 }
 
 function addSchemaDependencies(): void {
+  // No dependencies
 }
 
 function addSchemas(): void {

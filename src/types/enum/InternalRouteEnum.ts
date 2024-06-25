@@ -28,7 +28,7 @@ export enum InternalRouteEnum {
   binary_get_applied_vote = 'binary/get_applied_vote', // ask
   binary_lost_report = 'binary/lost_report', // tell
   binary_gossip = 'binary/gossip', // tell,
-  binary_repair_oos_accounts = 'binary/repair_oos_accounts' // tell
+  binary_repair_oos_accounts = 'binary/repair_oos_accounts', // tell
 }
 
 const askRoutes = new Set([

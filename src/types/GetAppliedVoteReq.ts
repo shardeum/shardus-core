@@ -25,7 +25,7 @@ export function deserializeGetAppliedVoteReq(stream: VectorBufferStream): GetApp
   if (version > cGetAppliedVoteReqVersion) {
     throw new Error('GetAppliedVoteReq version mismatch')
   }
-  const result =  {
+  const result = {
     txId: stream.readString(),
   }
   const errors = verifyPayload(AJV_IDENT.GET_APPLIED_VOTE_REQ, result)
