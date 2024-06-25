@@ -1470,7 +1470,7 @@ class Shardus extends EventEmitter {
         }
       }
       if (shouldAddToNonceQueue) {
-        const nonceQueueEntry: NonceQueueItem = {
+        const nonceQueueEntry = {
           tx,
           txId,
           accountId: senderAddress,

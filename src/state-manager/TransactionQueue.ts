@@ -981,9 +981,12 @@ class TransactionQueue {
     return { totalQueued, totalAccounts, avgQueueLength }
   }
 
-  addTransactionToNonceQueue(nonceQueueEntry: NonceQueueItem): {success: boolean; reason?: string} {
+  addTransactionToNonceQueue(nonceQueueEntryWithoutTimestamp: Omit<NonceQueueItem, 'timestamp'>): {success: boolean; reason?: string} {
+    const nonceQueueEntry: NonceQueueItem = {
+      ...nonceQueueEntryWithoutTimestamp,
+      timestamp: Date.now()
+    }
     try {
-      nonceQueueEntry.timestamp = Date.now()
       let queue = this.nonceQueue.get(nonceQueueEntry.accountId)
       if (queue == null || (Array.isArray(queue) && queue.length === 0)) {
         queue = [nonceQueueEntry]
@@ -1038,8 +1041,11 @@ class TransactionQueue {
     }
   }
   private cleanupNonceQueue(): void {
+    if (!configContext.stateManager.clearStaleNonceQueueEntries) {
+      return
+    }
     const now = Date.now()
-    const nonceQueueClearTime = configContext.network.nonceQueueClearTimeMs
+    const nonceQueueClearTime = configContext.stateManager.nonceQueueClearTimeMs
 
     this.nonceQueue.forEach((queue, accountId) => {
       this.nonceQueue.set(accountId, queue.filter(item => now - item.timestamp <= nonceQueueClearTime))

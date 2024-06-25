@@ -325,7 +325,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     singleAccountStuckFix: true,
     stuckTxMoveTime: 60000,
     forceVoteForFailedPreApply: true,
-    nonceQueueClearTimeMs: 5 * 60 * 1000
+    nonceQueueClearTimeMs: 5 * 60 * 1000,
+    clearStaleNonceQueueEntries: true
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,
