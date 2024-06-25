@@ -21,13 +21,11 @@ import { initGetAppliedVoteResp } from './GetAppliedVoteResp'
 import { initLostReportReq } from './LostReportReq'
 import { initRequestReceiptForTxReq } from './RequestReceiptForTxReq'
 import { initRequestReceiptForTxResp } from './RequestReceiptForTxResp'
-import { initRepairMissingAccountsReq } from './RepairMissingAccountsReq'
 import { initRequestStateForTxPostReq } from './RequestStateForTxPostReq'
 import { initRequestStateForTxPostResp } from './RequestStateForTxPostResp'
 import { initWrappedDataResponse } from './WrappedDataResponse'
 import { initBroadcastStateReq } from './BroadcastStateReq'
 import { initGetAccountDataRespSerializable } from './GetAccountDataResp'
-
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -50,7 +48,6 @@ export function initAjvSchemas(): void {
   initGetAppliedVoteReq()
   initGetAppliedVoteResp()
   initLostReportReq()
-  initRepairMissingAccountsReq()
   initRequestStateForTxPostReq()
   initRequestStateForTxPostResp()
   initWrappedDataResponse()
@@ -94,7 +91,7 @@ export enum AJV_IDENT {
   REQUEST_STATE_FOR_TX_POST_RESP = 'requestStateForTxPostResp',
   WRAPPED_DATA_RESPONSE = 'wrappedDataResponse',
   BROADCAST_STATE_REQ = 'BroadcastStateReq',
-  GET_ACCOUNTDATA_RESPONSE = 'getAccountDataResp'
+  GET_ACCOUNTDATA_RESPONSE = 'getAccountDataResp',
   APOPTOSIS_REQ = 'ApoptosisProposalReq',
   APOPTOSIS_RESP = 'ApoptosisProposalResp',
 }
