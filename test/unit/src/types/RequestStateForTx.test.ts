@@ -1,5 +1,5 @@
 import { Utils } from '@shardus/types'
-import { AJV_IDENT, initAjvSchemas, verifyPayload } from '../../../../src/types/ajv/Helpers'
+import { initAjvSchemas, verifyPayload } from '../../../../src/types/ajv/Helpers'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import {
   deserializeRequestStateForTxReq,
@@ -10,6 +10,7 @@ import {
   serializeRequestStateForTxResp,
 } from '../../../../src/types/RequestStateForTxResp'
 import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
+import { AJVSchemaEnum } from '../../../../src/types/enum/AJVSchemaEnum'
 
 // Mock the Context module and its nested structure
 jest.mock('../../../../src/p2p/Context', () => ({
@@ -111,7 +112,7 @@ describe('RequestStateForTx Serialization', () => {
       timestamp: '123',
       keys: ['key1', 'key2'],
     }
-    let errors = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_REQ, data)
+    let errors = verifyPayload(AJVSchemaEnum.RequestStateForTxReq, data)
     expect(errors).toBeInstanceOf(Array)
     expect(errors).toHaveLength(1)
 
@@ -132,7 +133,7 @@ describe('RequestStateForTx Serialization', () => {
       success: true,
     }
 
-    let errors2 = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_RESP, resp_payload)
+    let errors2 = verifyPayload(AJVSchemaEnum.RequestStateForTxResp, resp_payload)
     expect(errors2).toBeInstanceOf(Array)
     expect(errors2).toHaveLength(1)
   })
@@ -143,7 +144,7 @@ describe('RequestStateForTx Serialization', () => {
       timestamp: 123,
       keys: ['key1', 'key2'],
     }
-    let errors = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_REQ, data)
+    let errors = verifyPayload(AJVSchemaEnum.RequestStateForTxReq, data)
     expect(errors).toBeNull()
 
     const resp_payload = {
@@ -163,7 +164,7 @@ describe('RequestStateForTx Serialization', () => {
       success: true,
     }
 
-    let errors2 = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_RESP, resp_payload)
+    let errors2 = verifyPayload(AJVSchemaEnum.RequestStateForTxResp, resp_payload)
     expect(errors2).toBeNull()
   })
 })

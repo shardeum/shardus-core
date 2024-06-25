@@ -1,6 +1,6 @@
 // write jest unit test for RequestStateForTx
 import { Utils } from '@shardus/types'
-import { AJV_IDENT, initAjvSchemas, verifyPayload } from '../../../../src/types/ajv/Helpers'
+import { initAjvSchemas, verifyPayload } from '../../../../src/types/ajv/Helpers'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import {
   deserializeRequestReceiptForTxReq,
@@ -11,15 +11,8 @@ import {
   RequestReceiptForTxRespSerialized,
   serializeRequestReceiptForTxResp,
 } from '../../../../src/types/RequestReceiptForTxResp'
-import {
-  deserializeRequestStateForTxReq,
-  serializeRequestStateForTxReq,
-} from '../../../../src/types/RequestStateForTxReq'
-import {
-  deserializeRequestStateForTxResp,
-  serializeRequestStateForTxResp,
-} from '../../../../src/types/RequestStateForTxResp'
 import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
+import { AJVSchemaEnum } from '../../../../src/types/enum/AJVSchemaEnum'
 
 // Mock the Context module and its nested structure
 jest.mock('../../../../src/p2p/Context', () => ({
@@ -143,7 +136,7 @@ describe('RequestReceiptForTx Serialization', () => {
       timestamp: '123',
     }
 
-    const req_errors = verifyPayload(AJV_IDENT.REQUEST_RECEIPT_FOR_TX_REQ, req_payload)
+    const req_errors = verifyPayload(AJVSchemaEnum.RequestReceiptForTxReq, req_payload)
     expect(req_errors).toBeInstanceOf(Array)
     expect(req_errors).toHaveLength(1)
 
@@ -175,7 +168,7 @@ describe('RequestReceiptForTx Serialization', () => {
       note: 'note',
       success: 'true', // <- another failure point, but this will not be in errors array since ajv setting set allErrors to false at default
     }
-    const errors = verifyPayload(AJV_IDENT.REQUEST_RECEIPT_FOR_TX_RESP, resp_payload)
+    const errors = verifyPayload(AJVSchemaEnum.RequestReceiptForTxResp, resp_payload)
     expect(errors).toBeInstanceOf(Array)
     expect(errors).toHaveLength(1)
   })
@@ -186,7 +179,7 @@ describe('RequestReceiptForTx Serialization', () => {
       timestamp: 123,
     }
 
-    const req_errors = verifyPayload(AJV_IDENT.REQUEST_RECEIPT_FOR_TX_REQ, req_payload)
+    const req_errors = verifyPayload(AJVSchemaEnum.RequestReceiptForTxReq, req_payload)
     expect(req_errors).toBeNull()
 
     const appliedVote_dummy = {
@@ -217,7 +210,7 @@ describe('RequestReceiptForTx Serialization', () => {
       note: 'note',
       success: true,
     }
-    const errors = verifyPayload(AJV_IDENT.REQUEST_RECEIPT_FOR_TX_RESP, resp_payload)
+    const errors = verifyPayload(AJVSchemaEnum.RequestReceiptForTxResp, resp_payload)
     expect(errors).toBeNull()
   })
 })

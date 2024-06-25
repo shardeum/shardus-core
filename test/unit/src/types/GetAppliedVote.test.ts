@@ -1,6 +1,6 @@
 import { Utils } from '@shardus/types'
 import { VectorBufferStream } from '../../../../src'
-import { AJV_IDENT, initAjvSchemas, verifyPayload } from '../../../../src/types/ajv/Helpers'
+import { initAjvSchemas, verifyPayload } from '../../../../src/types/ajv/Helpers'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import {
   deserializeGetAppliedVoteReq,
@@ -11,6 +11,7 @@ import {
   GetAppliedVoteResp,
   serializeGetAppliedVoteResp,
 } from '../../../../src/types/GetAppliedVoteResp'
+import { AJVSchemaEnum } from '../../../../src/types/enum/AJVSchemaEnum'
 jest.mock('../../../../src/p2p/Context', () => ({
   setDefaultConfigs: jest.fn(),
   stateManager: {
@@ -99,7 +100,7 @@ describe('RequestStateForTx Serialization', () => {
       txId: ['txid'],
     }
 
-    const errors = verifyPayload(AJV_IDENT.GET_APPLIED_VOTE_REQ, req_payload)
+    const errors = verifyPayload(AJVSchemaEnum.GetAppliedVoteReq, req_payload)
     expect(errors).toBeInstanceOf(Array)
 
     const resp_payload = {
@@ -116,7 +117,7 @@ describe('RequestStateForTx Serialization', () => {
       appliedVoteHash: 'appliedVoteHash',
     }
 
-    const errors2 = verifyPayload(AJV_IDENT.GET_APPLIED_VOTE_RESP, resp_payload)
+    const errors2 = verifyPayload(AJVSchemaEnum.GetAppliedVoteResp, resp_payload)
     expect(errors2).toBeInstanceOf(Array)
   })
 
@@ -125,7 +126,7 @@ describe('RequestStateForTx Serialization', () => {
       txId: 'txid',
     }
 
-    const errors = verifyPayload(AJV_IDENT.GET_APPLIED_VOTE_REQ, req_payload)
+    const errors = verifyPayload(AJVSchemaEnum.GetAppliedVoteReq, req_payload)
     expect(errors).toBeFalsy()
 
     const resp_payload = {
@@ -142,7 +143,7 @@ describe('RequestStateForTx Serialization', () => {
       appliedVoteHash: 'appliedVoteHash',
     }
 
-    const errors2 = verifyPayload(AJV_IDENT.GET_APPLIED_VOTE_RESP, resp_payload)
+    const errors2 = verifyPayload(AJVSchemaEnum.GetAppliedVoteResp, resp_payload)
     expect(errors2).toBeFalsy()
   })
 })
