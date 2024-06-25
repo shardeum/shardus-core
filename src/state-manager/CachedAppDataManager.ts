@@ -341,7 +341,7 @@ class CachedAppDataManager {
       return false
     }
 
-    const targetGroup = this.stateManager.transactionQueue.getStorageGroupForAccount(dataID)
+    const targetGroup = this.stateManager.transactionQueue.getConsenusGroupForAccount(dataID)
     const allNodes = Array.from(new Set([...senderGroup, ...targetGroup])).sort((a, b) => a.id.localeCompare(b.id));
     const senderIndexInTxGroup = allNodes.findIndex((node) => node.id === senderNodeId)
     const ourIndexInTxGroup = allNodes.findIndex((node) => node.id === this.stateManager.currentCycleShardData.nodeShardData.node.id)
@@ -391,7 +391,7 @@ class CachedAppDataManager {
     const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
 
     const senderGroup = queueEntry.executionGroup
-    const targetGroup = this.stateManager.transactionQueue.getStorageGroupForAccount(dataID)
+    const targetGroup = this.stateManager.transactionQueue.getConsenusGroupForAccount(dataID)
     const allNodes = Array.from(new Set([...senderGroup, ...targetGroup])).sort((a, b) => a.id.localeCompare(b.id));
     const senderIndexInTxGroup = allNodes.findIndex((node) => node.id === ourNodeData.node.id)
     const senderGroupSize = senderGroup.length
