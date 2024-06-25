@@ -52,14 +52,12 @@ export const deserializeRequestStateForTxResp = (
     success: false,
   }
 
-  console.log('stateListLen', stateListLen)
   for (let i = 0; i < stateListLen; i++) {
     // eslint-disable-next-line security/detect-object-injection
     ret.stateList[i] = deserializeWrappedData(stream)
   }
 
   const beforeHashesLen = stream.readUInt16()
-  console.log('beforeHashesLen', beforeHashesLen)
   for (let i = 0; i < beforeHashesLen; i++) {
     const key = stream.readString()
     const value = stream.readString()
