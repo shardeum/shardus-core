@@ -407,7 +407,7 @@ class CachedAppDataManager {
       queueEntry.correspondingGlobalOffset,
       targetGroupSize,
       senderGroupSize,
-      queueEntry.transactionGroup.length
+      allNodes.length
     )
 
     const correspondingNodes: P2PTypes.NodeListTypes.Node[] = []
