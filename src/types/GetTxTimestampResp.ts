@@ -59,7 +59,7 @@ export function deserializeGetTxTimestampResp(stream: VectorBufferStream): getTx
   const cycleCounter = stream.readUInt32()
   const timestamp = Number(stream.readBigUInt64())
 
-  let sign: Sign
+  let sign: Sign = undefined
   if (stream.readUInt8() === 1) {
     const owner = stream.readString()
     const sig = stream.readString()
@@ -71,14 +71,26 @@ export function deserializeGetTxTimestampResp(stream: VectorBufferStream): getTx
     isResponse = stream.readUInt8() === 1 ? true : false
   }
 
-  const result: getTxTimestampResp = {
-    txId,
-    cycleMarker,
-    cycleCounter,
-    timestamp,
-    ...(sign && { sign }),
-    ...(typeof isResponse !== 'undefined' && { isResponse }),
+  let result: getTxTimestampResp
+  if (sign != undefined) {
+    result = {
+      txId,
+      cycleMarker,
+      cycleCounter,
+      timestamp,
+      sign,
+      ...(typeof isResponse !== 'undefined' && { isResponse }),
+    }
+  } else {
+    result = {
+      txId,
+      cycleMarker,
+      cycleCounter,
+      timestamp,
+      ...(typeof isResponse !== 'undefined' && { isResponse }),
+    }
   }
+
   const errors = verifyPayload('GetTxTimestampResp', result)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
