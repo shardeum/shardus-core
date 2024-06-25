@@ -1,6 +1,7 @@
 import { isValidShardusAddress } from '../utils'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export type GetAccountDataReqSerializable = {
@@ -44,7 +45,7 @@ export function deserializeGetAccountDataReq(stream: VectorBufferStream): GetAcc
     offset: Number(stream.readBigUInt64()),
     accountOffset: stream.readString(),
   }
-  const errors = verifyPayload('GetAccountDataReq3', obj)
+  const errors = verifyPayload(AJVSchemaEnum.GetAccountDataReq, obj)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }

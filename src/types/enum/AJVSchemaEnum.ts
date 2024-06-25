@@ -12,6 +12,7 @@ export enum AJVSchemaEnum {
   RequestStateForTxPostResp = 'RequestStateForTxPostResp',
   WrappedDataResponse = 'WrappedDataResponse',
   BroadcastStateReq = 'BroadcastStateReq',
+  GetAccountDataReq = 'GetAccountDataReq',
   GetAccountDataResp = 'GetAccountDataResp',
   ApoptosisProposalReq = 'ApoptosisProposalReq',
   ApoptosisProposalResp = 'ApoptosisProposalResp',
