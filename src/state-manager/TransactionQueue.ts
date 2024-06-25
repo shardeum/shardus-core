@@ -1039,10 +1039,10 @@ class TransactionQueue {
   }
   private cleanupNonceQueue(): void {
     const now = Date.now()
-    const tenMinutes = 10 * 60 * 1000
+    const nonceQueueClearTime = configContext.network.nonceQueueClearTimeMs
 
     this.nonceQueue.forEach((queue, accountId) => {
-      this.nonceQueue.set(accountId, queue.filter(item => now - item.timestamp <= tenMinutes))
+      this.nonceQueue.set(accountId, queue.filter(item => now - item.timestamp <= nonceQueueClearTime))
     })
     if (logFlags.debug) this.mainLogger.debug(`Nonce queue cleanup completed at ${new Date(now).toISOString()}`)
   }
