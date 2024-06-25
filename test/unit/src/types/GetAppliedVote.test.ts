@@ -1,10 +1,16 @@
-
-import { Utils } from "@shardus/types"
-import { VectorBufferStream } from "../../../../src"
-import { AJV_IDENT, initAjvSchemas, verifyPayload } from "../../../../src/types/ajv/Helpers"
-import { TypeIdentifierEnum } from "../../../../src/types/enum/TypeIdentifierEnum"
-import { deserializeGetAppliedVoteReq, serializeGetAppliedVoteReq } from "../../../../src/types/GetAppliedVoteReq"
-import { deserializeGetAppliedVoteResp, GetAppliedVoteResp, serializeGetAppliedVoteResp } from "../../../../src/types/GetAppliedVoteResp"
+import { Utils } from '@shardus/types'
+import { VectorBufferStream } from '../../../../src'
+import { AJV_IDENT, initAjvSchemas, verifyPayload } from '../../../../src/types/ajv/Helpers'
+import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
+import {
+  deserializeGetAppliedVoteReq,
+  serializeGetAppliedVoteReq,
+} from '../../../../src/types/GetAppliedVoteReq'
+import {
+  deserializeGetAppliedVoteResp,
+  GetAppliedVoteResp,
+  serializeGetAppliedVoteResp,
+} from '../../../../src/types/GetAppliedVoteResp'
 jest.mock('../../../../src/p2p/Context', () => ({
   setDefaultConfigs: jest.fn(),
   stateManager: {
@@ -35,7 +41,6 @@ describe('RequestStateForTx Serialization', () => {
     expect(req_stream.readUInt16()).toEqual(TypeIdentifierEnum.cGetAppliedVoteReq)
     expect(deserializeGetAppliedVoteReq(req_stream)).toEqual(req_payload)
 
-
     const resp_payload: GetAppliedVoteResp = {
       txId: 'txid',
       appliedVote: {
@@ -56,7 +61,6 @@ describe('RequestStateForTx Serialization', () => {
     resp_stream.position = 0
     expect(resp_stream.readUInt16()).toEqual(TypeIdentifierEnum.cGetAppliedVoteResp)
     expect(deserializeGetAppliedVoteResp(resp_stream)).toEqual(resp_payload)
-    
   })
 
   test('Should serialize/desrialize with root false', () => {
@@ -68,7 +72,6 @@ describe('RequestStateForTx Serialization', () => {
     // we'll read , so reset the position
     req_stream.position = 0
     expect(deserializeGetAppliedVoteReq(req_stream)).toEqual(req_payload)
-
 
     const resp_payload: GetAppliedVoteResp = {
       txId: 'txid',
@@ -89,7 +92,6 @@ describe('RequestStateForTx Serialization', () => {
     // we'll read , so reset the position
     resp_stream.position = 0
     expect(deserializeGetAppliedVoteResp(resp_stream)).toEqual(resp_payload)
-    
   })
 
   test('Should return errors on AJV fails', () => {
@@ -97,10 +99,8 @@ describe('RequestStateForTx Serialization', () => {
       txId: ['txid'],
     }
 
-
     const errors = verifyPayload(AJV_IDENT.GET_APPLIED_VOTE_REQ, req_payload)
     expect(errors).toBeInstanceOf(Array)
-
 
     const resp_payload = {
       txId: 'txid',
@@ -118,7 +118,6 @@ describe('RequestStateForTx Serialization', () => {
 
     const errors2 = verifyPayload(AJV_IDENT.GET_APPLIED_VOTE_RESP, resp_payload)
     expect(errors2).toBeInstanceOf(Array)
-    
   })
 
   test('Should not return errors on AJV passes', () => {
@@ -126,10 +125,8 @@ describe('RequestStateForTx Serialization', () => {
       txId: 'txid',
     }
 
-
     const errors = verifyPayload(AJV_IDENT.GET_APPLIED_VOTE_REQ, req_payload)
     expect(errors).toBeFalsy()
-
 
     const resp_payload = {
       txId: 'txid',
@@ -147,7 +144,5 @@ describe('RequestStateForTx Serialization', () => {
 
     const errors2 = verifyPayload(AJV_IDENT.GET_APPLIED_VOTE_RESP, resp_payload)
     expect(errors2).toBeFalsy()
-    
   })
 })
-

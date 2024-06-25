@@ -18,8 +18,7 @@ export function initBroadcastStateReq(): void {
   addSchemas()
 }
 
-function addSchemaDependencies(): void {
- }
+function addSchemaDependencies(): void {}
 
 function addSchemas(): void {
   addSchema(AJV_IDENT.BROADCAST_STATE_REQ, schemaBroadcastStateReq)

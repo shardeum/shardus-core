@@ -1,9 +1,15 @@
-import { Utils } from "@shardus/types"
-import { AJV_IDENT, initAjvSchemas, verifyPayload } from "../../../../src/types/ajv/Helpers"
-import { TypeIdentifierEnum } from "../../../../src/types/enum/TypeIdentifierEnum"
-import { deserializeRequestStateForTxReq, serializeRequestStateForTxReq } from '../../../../src/types/RequestStateForTxReq'
-import { deserializeRequestStateForTxResp, serializeRequestStateForTxResp } from "../../../../src/types/RequestStateForTxResp"
-import { VectorBufferStream } from "../../../../src/utils/serialization/VectorBufferStream"
+import { Utils } from '@shardus/types'
+import { AJV_IDENT, initAjvSchemas, verifyPayload } from '../../../../src/types/ajv/Helpers'
+import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
+import {
+  deserializeRequestStateForTxReq,
+  serializeRequestStateForTxReq,
+} from '../../../../src/types/RequestStateForTxReq'
+import {
+  deserializeRequestStateForTxResp,
+  serializeRequestStateForTxResp,
+} from '../../../../src/types/RequestStateForTxResp'
+import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
 
 // Mock the Context module and its nested structure
 jest.mock('../../../../src/p2p/Context', () => ({
@@ -30,7 +36,7 @@ describe('RequestStateForTx Serialization', () => {
     const req_payload = {
       txid: 'txid',
       timestamp: 123,
-      keys: ['key1', 'key2']
+      keys: ['key1', 'key2'],
     }
     serializeRequestStateForTxReq(req_stream, req_payload, true)
     // we'll read , so reset the position
@@ -46,14 +52,14 @@ describe('RequestStateForTx Serialization', () => {
           stateId: 'stateId',
           data: { key: 'value' },
           timestamp: 123,
-          syncData: { key: 'value' }
-        }
+          syncData: { key: 'value' },
+        },
       ],
       beforeHashes: {
-        accountId: 'hash'
+        accountId: 'hash',
       },
       note: 'note',
-      success: true
+      success: true,
     }
 
     const resp_stream = new VectorBufferStream(0)
@@ -69,7 +75,7 @@ describe('RequestStateForTx Serialization', () => {
     const data = {
       txid: 'txid',
       timestamp: 123,
-      keys: ['key1', 'key2']
+      keys: ['key1', 'key2'],
     }
     serializeRequestStateForTxReq(stream, data, false)
     // we'll read , so reset the position
@@ -83,14 +89,14 @@ describe('RequestStateForTx Serialization', () => {
           stateId: 'stateId',
           data: { key: 'value' },
           timestamp: 123,
-          syncData: { key: 'value' }
-        }
+          syncData: { key: 'value' },
+        },
       ],
       beforeHashes: {
-        'accountId': 'hash'
+        accountId: 'hash',
       },
       note: 'note',
-      success: true
+      success: true,
     }
 
     const resp_stream = new VectorBufferStream(0)
@@ -102,8 +108,8 @@ describe('RequestStateForTx Serialization', () => {
   test('Should return errors if AJV validation fails', () => {
     let data = {
       txid: 'txid',
-      timestamp: "123",
-      keys: ['key1', 'key2']
+      timestamp: '123',
+      keys: ['key1', 'key2'],
     }
     let errors = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_REQ, data)
     expect(errors).toBeInstanceOf(Array)
@@ -116,27 +122,26 @@ describe('RequestStateForTx Serialization', () => {
           stateId: 'stateId',
           data: null, // <- this should not return an error
           timestamp: 123,
-          syncData: { key: 'value' }
-        }
+          syncData: { key: 'value' },
+        },
       ],
       beforeHashes: {
-        'accountId': ['hash'] // <- this should return an error
+        accountId: ['hash'], // <- this should return an error
       },
       note: 'note',
-      success: true
+      success: true,
     }
 
     let errors2 = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_RESP, resp_payload)
     expect(errors2).toBeInstanceOf(Array)
     expect(errors2).toHaveLength(1)
-
   })
 
   test('Should not return errors if AJV validation passes', () => {
     let data = {
       txid: 'txid',
       timestamp: 123,
-      keys: ['key1', 'key2']
+      keys: ['key1', 'key2'],
     }
     let errors = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_REQ, data)
     expect(errors).toBeNull()
@@ -148,19 +153,17 @@ describe('RequestStateForTx Serialization', () => {
           stateId: 'stateId',
           data: { key: 'value' },
           timestamp: 123,
-          syncData: { key: 'value' }
-        }
+          syncData: { key: 'value' },
+        },
       ],
       beforeHashes: {
-        'accountId': 'hash'
+        accountId: 'hash',
       },
       note: 'note',
-      success: true
+      success: true,
     }
 
     let errors2 = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_RESP, resp_payload)
     expect(errors2).toBeNull()
-
   })
 })
-
