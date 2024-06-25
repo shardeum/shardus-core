@@ -1254,6 +1254,8 @@ export interface ServerConfiguration {
     singleAccountStuckFix: boolean
     // wait time before moving stuck "consensing" tx to "await final data"
     stuckTxMoveTime: number
+    // wait time before removing stuck tx (e.g. too high nonce) from the nonce queue to free up memory
+    nonceQueueClearTimeMs: number
   }
   /** Options for sharding calculations */
   sharding?: {
