@@ -1,7 +1,8 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
-import { AJV_IDENT, verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { AppliedVoteSerializable, deserializeAppliedVote, serializeAppliedVote } from './AppliedVote'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { verifyPayload } from './ajv/Helpers'
 
 const cGetAppliedVoteRespVersion = 1
 
@@ -39,7 +40,7 @@ export function deserializeGetAppliedVoteResp(stream: VectorBufferStream): GetAp
     appliedVote,
     appliedVoteHash,
   }
-  const errors = verifyPayload(AJV_IDENT.GET_APPLIED_VOTE_RESP, result)
+  const errors = verifyPayload(AJVSchemaEnum.GetAppliedVoteResp, result)
   if (errors && errors.length > 0) {
     throw new Error(`AJV: validation error -> ${errors.join(', ')}`)
   }

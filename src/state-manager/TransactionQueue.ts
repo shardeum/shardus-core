@@ -72,7 +72,7 @@ import {
   deserializeBroadcastFinalStateReq,
   serializeBroadcastFinalStateReq,
 } from '../types/BroadcastFinalStateReq'
-import { AJV_IDENT, verifyPayload } from '../types/ajv/Helpers'
+import { verifyPayload } from '../types/ajv/Helpers'
 import {
   SpreadTxToGroupSyncingReq,
   deserializeSpreadTxToGroupSyncingReq,

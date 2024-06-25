@@ -2,7 +2,8 @@ import { AccountRepairInstruction } from '../state-manager/AccountPatcher'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { deserializeAppliedReceipt2, serializeAppliedReceipt2 } from './AppliedReceipt2'
 import { deserializeWrappedData, serializeWrappedData } from './WrappedData'
-import { AJV_IDENT, verifyPayload } from './ajv/Helpers'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export type RepairOOSAccountsReq = {
@@ -66,7 +67,7 @@ export const deserializeRepairOOSAccountsReq = (stream: VectorBufferStream): Rep
       receipt2: deserializeAppliedReceipt2(stream),
     })
   }
-  const errors = verifyPayload(AJV_IDENT.REPAIR_OOS_ACCOUNTS_REQ, result)
+  const errors = verifyPayload(AJVSchemaEnum.RepairOOSAccountsReq, result)
   if (errors && errors.length > 0) {
     throw new Error('AJV: Data validation error ->' + errors.join(', '))
   }

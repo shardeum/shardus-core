@@ -1,4 +1,4 @@
-import { AJV_IDENT } from './Helpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 import { schemaAppliedVote } from './RepairOOSAccountsReq'
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
 
@@ -22,5 +22,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.GET_APPLIED_VOTE_RESP, schemaGetAppliedVoteResp)
+  addSchema(AJVSchemaEnum.GetAppliedVoteResp, schemaGetAppliedVoteResp)
 }

@@ -1,5 +1,5 @@
-import { addSchema, addSchemaDependency } from '../../utils/serialization/SchemaHelpers'
-import { AJV_IDENT } from './Helpers'
+import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 import { schemaWrappedDataResponse } from './WrappedDataResponse'
 
 const schemaBroadcastStateReq = {
@@ -21,5 +21,5 @@ export function initBroadcastStateReq(): void {
 function addSchemaDependencies(): void {}
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.BROADCAST_STATE_REQ, schemaBroadcastStateReq)
+  addSchema(AJVSchemaEnum.BroadcastStateReq, schemaBroadcastStateReq)
 }

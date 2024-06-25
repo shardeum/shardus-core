@@ -1,7 +1,8 @@
 import { WrappedData, serializeWrappedData, deserializeWrappedData } from './WrappedData'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
-import { AJV_IDENT, verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
+import { verifyPayload } from './ajv/Helpers'
 
 export type GetAccountDataRespSerializable = {
   data?: {
@@ -82,7 +83,7 @@ export function deserializeGetAccountDataResp(stream: VectorBufferStream): GetAc
     }
   }
 
-  const ajvErrors = verifyPayload(AJV_IDENT.GET_ACCOUNTDATA_RESPONSE, {
+  const ajvErrors = verifyPayload(AJVSchemaEnum.GetAccountDataResp, {
     ...(data ? { data } : {}),
     ...(errors ? { errors } : {}),
   })

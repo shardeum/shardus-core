@@ -1,5 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
-import { AJV_IDENT } from './Helpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 import { schemaWrappedData } from './WrappedData'
 
 export const schemaSign = {
@@ -105,5 +105,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.REPAIR_OOS_ACCOUNTS_REQ, schemaRepairOOSAccountsReq)
+  addSchema(AJVSchemaEnum.RepairOOSAccountsReq, schemaRepairOOSAccountsReq)
 }

@@ -2,7 +2,7 @@ import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { WrappedData, deserializeWrappedData, serializeWrappedData } from './WrappedData'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { verifyPayload } from './ajv/Helpers'
-import { AJV_IDENT } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
 export const cWrappedDataResponseVersion = 1
 
@@ -33,7 +33,7 @@ export function deserializeWrappedDataResponse(stream: VectorBufferStream): Wrap
   const wrappedData = deserializeWrappedData(stream)
   const accountCreated = stream.readUInt8() !== 0
   const isPartial = stream.readUInt8() !== 0
-  const errors = verifyPayload(AJV_IDENT.WRAPPED_DATA_RESPONSE, {
+  const errors = verifyPayload(AJVSchemaEnum.WrappedDataResponse, {
     ...wrappedData,
     accountCreated,
     isPartial,

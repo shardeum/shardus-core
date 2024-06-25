@@ -1,5 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
-import { AJV_IDENT } from './Helpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
 export const schemaGetAppliedVoteReq = {
   type: 'object',
@@ -19,5 +19,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.GET_APPLIED_VOTE_REQ, schemaGetAppliedVoteReq)
+  addSchema(AJVSchemaEnum.GetAppliedVoteReq, schemaGetAppliedVoteReq)
 }

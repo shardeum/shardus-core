@@ -1,5 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
-import { AJV_IDENT } from './Helpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
 const schemaRequestStateForTxPostReq = {
   type: 'object',
@@ -24,5 +24,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema(AJV_IDENT.REQUEST_STATE_FOR_TX_POST_REQ, schemaRequestStateForTxPostReq)
+  addSchema(AJVSchemaEnum.RequestStateForTxPostReq, schemaRequestStateForTxPostReq)
 }

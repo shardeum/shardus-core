@@ -1,6 +1,6 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
 import { schemaWrappedData } from './WrappedData'
-import { AJV_IDENT } from './Helpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
 export const schemaWrappedDataResponse = {
   type: 'object',
@@ -24,5 +24,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema(AJV_IDENT.WRAPPED_DATA_RESPONSE, schemaWrappedDataResponse)
+  addSchema(AJVSchemaEnum.WrappedDataResponse, schemaWrappedDataResponse)
 }

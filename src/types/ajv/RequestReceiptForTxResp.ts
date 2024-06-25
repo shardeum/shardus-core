@@ -1,4 +1,4 @@
-import { AJV_IDENT } from './Helpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 import { schemaAppliedReceipt2 } from './RepairOOSAccountsReq'
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
 
@@ -22,5 +22,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.REQUEST_RECEIPT_FOR_TX_RESP, schemaRequestReceiptForTxResp)
+  addSchema(AJVSchemaEnum.RequestReceiptForTxResp, schemaRequestReceiptForTxResp)
 }

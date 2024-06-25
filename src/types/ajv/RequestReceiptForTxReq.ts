@@ -1,5 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
-import { AJV_IDENT } from './Helpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
 export const schemaRequestReceiptForTxReq = {
   type: 'object',
@@ -20,5 +20,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.REQUEST_RECEIPT_FOR_TX_REQ, schemaRequestReceiptForTxReq)
+  addSchema(AJVSchemaEnum.RequestReceiptForTxReq, schemaRequestReceiptForTxReq)
 }

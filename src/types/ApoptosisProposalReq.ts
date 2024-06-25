@@ -1,5 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
-import { AJV_IDENT, verifyPayload } from './ajv/Helpers'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export const cApoptosisProposalReqVersion = 1
@@ -34,7 +35,7 @@ export function deserializeApoptosisProposalReq(stream: VectorBufferStream): Apo
     id,
     when,
   }
-  const errors = verifyPayload(AJV_IDENT.APOPTOSIS_REQ, obj)
+  const errors = verifyPayload(AJVSchemaEnum.ApoptosisProposalReq, obj)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }

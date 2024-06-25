@@ -6,7 +6,7 @@ import {
   serializeWrappedDataResponse,
 } from './WrappedDataResponse'
 import { verifyPayload } from './ajv/Helpers'
-import { AJV_IDENT } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
 export const cRequestStateForTxPostRespVersion = 1
 
@@ -54,7 +54,7 @@ export function deserializeRequestStateForTxPostResp(stream: VectorBufferStream)
   }
   const stateListLength = stream.readUInt16()
   const stateList = Array.from({ length: stateListLength }, () => deserializeWrappedDataResponse(stream))
-  const errors = verifyPayload(AJV_IDENT.REQUEST_STATE_FOR_TX_POST_RESP, {
+  const errors = verifyPayload(AJVSchemaEnum.RequestStateForTxPostResp, {
     success,
     note,
     beforeHashes,

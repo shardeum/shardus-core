@@ -1,5 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
-import { AJV_IDENT } from './Helpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
 const schemaCompareCert = {
   type: 'object',
@@ -75,5 +75,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema(AJV_IDENT.COMPARE_CERT_REQ, schemaCompareCert)
+  addSchema(AJVSchemaEnum.CompareCertReq, schemaCompareCert)
 }

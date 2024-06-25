@@ -1,5 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
-import { AJV_IDENT } from './Helpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
 export const schemaLostReportReq = {
   type: 'object',
@@ -33,5 +33,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.LOST_REPORT_REQ, schemaLostReportReq)
+  addSchema(AJVSchemaEnum.LostReportReq, schemaLostReportReq)
 }

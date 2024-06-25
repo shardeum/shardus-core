@@ -1,5 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
-import { AJV_IDENT } from './Helpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
 const schemaApoptosisResp = {
   type: 'object',
@@ -22,5 +22,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema(AJV_IDENT.APOPTOSIS_RESP, schemaApoptosisResp)
+  addSchema(AJVSchemaEnum.ApoptosisProposalResp, schemaApoptosisResp)
 }

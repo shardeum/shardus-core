@@ -76,22 +76,3 @@ function parseAjvErrors(errors: Array<ErrorObject> | null): string[] | null {
     return errorMsg
   })
 }
-
-export enum AJV_IDENT {
-  COMPARE_CERT_REQ = 'compareCertReq',
-  REPAIR_OOS_ACCOUNTS_REQ = 'repairOOSAccountsReq',
-  REQUEST_STATE_FOR_TX_REQ = 'requestStateForTxReq',
-  REQUEST_STATE_FOR_TX_RESP = 'requestStateForTxResp',
-  REQUEST_RECEIPT_FOR_TX_REQ = 'requestReceiptForTxReq',
-  REQUEST_RECEIPT_FOR_TX_RESP = 'requestReceiptForTxResp',
-  GET_APPLIED_VOTE_REQ = 'getAppliedVoteReq',
-  GET_APPLIED_VOTE_RESP = 'getAppliedVoteResp',
-  LOST_REPORT_REQ = 'lostReportReq',
-  REQUEST_STATE_FOR_TX_POST_REQ = 'requestStateForTxPostReq',
-  REQUEST_STATE_FOR_TX_POST_RESP = 'requestStateForTxPostResp',
-  WRAPPED_DATA_RESPONSE = 'wrappedDataResponse',
-  BROADCAST_STATE_REQ = 'BroadcastStateReq',
-  GET_ACCOUNTDATA_RESPONSE = 'getAccountDataResp',
-  APOPTOSIS_REQ = 'ApoptosisProposalReq',
-  APOPTOSIS_RESP = 'ApoptosisProposalResp',
-}

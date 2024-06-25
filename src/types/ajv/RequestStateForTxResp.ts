@@ -1,5 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
-import { AJV_IDENT } from './Helpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 import { schemaWrappedData } from './WrappedData'
 
 export const schemaRequestStateForTxResp = {
@@ -28,5 +28,5 @@ function addSchemaDependencies(): void {
 }
 
 function addSchemas(): void {
-  addSchema(AJV_IDENT.REQUEST_STATE_FOR_TX_RESP, schemaRequestStateForTxResp)
+  addSchema(AJVSchemaEnum.RequestStateForTxResp, schemaRequestStateForTxResp)
 }
