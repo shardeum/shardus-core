@@ -1,5 +1,6 @@
 import { isValidShardusAddress } from '../utils'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export type GetAccountDataReqSerializable = {
@@ -43,10 +44,14 @@ export function deserializeGetAccountDataReq(stream: VectorBufferStream): GetAcc
     offset: Number(stream.readBigUInt64()),
     accountOffset: stream.readString(),
   }
+  const errors = verifyPayload('GetAccountDataReq3', obj)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
   return obj
 }
 
-export function verifyAddressRange(obj: GetAccountDataReqSerializable): boolean {
+export function verifyGetAccountDataReq(obj: GetAccountDataReqSerializable): boolean {
   if (isValidShardusAddress([obj.accountStart, obj.accountEnd]) === false) {
     /* prettier-ignore */ console.log(`GetAccountDataReq: Invalid accountStart or accountEnd: ${obj.accountStart}, ${obj.accountEnd}`)
     return false
