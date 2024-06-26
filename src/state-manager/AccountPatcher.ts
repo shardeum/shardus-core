@@ -807,7 +807,7 @@ class AccountPatcher {
             this.initStoredRadixValues(cycle)
           }
 
-          const node = NodeList.nodes.get(header.sender_id)
+          const node = NodeList.byPubKey.get(sign.owner)
 
           for (const nodeHashes of request.nodeHashes) {
             if (this.isRadixStored(cycle, nodeHashes.radix) === false) {
