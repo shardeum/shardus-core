@@ -92,12 +92,15 @@ function handleMultiDebugAuth(_req, res, next) {
           message: 'Unauthorized!',
         })
       }
-      // Require a larger counter than before. This prevents replay attacks
+      //reguire a larger counter than before. This prevents replay attacks
+      const currentCounter = parseInt(_req.query.sig_counter)
+      const currentTime = new Date().getTime()
       if (
-        parseInt(_req.query.sig_counter) > multiSigLstCounter &&
+        currentCounter > multiSigLstCounter &&
+        currentCounter <= currentTime + MAX_COUNTER_BUFFER_MILLISECONDS &&
         parsedSignatures.length >= parsedProposal.noOfApprovals
       ) {
-        let validSignaturesCount = 0;
+        let validSignaturesCount = 0
         for (let i = 0; i < parsedSignatures.length; i++) {
           // Check each signature against all public keys
           for (const publicKey of Object.keys(devPublicKeys)) {
@@ -107,13 +110,13 @@ function handleMultiDebugAuth(_req, res, next) {
               const proposalClearanceLevel = clearanceLevels[parsedProposal.securityClearance.toLowerCase()]
               const authorized = ensureKeySecurity(publicKey, proposalClearanceLevel) // Check if the approver is authorized to access the endpoint
               if (authorized) {
-                validSignaturesCount++; // Increment only if signature is valid and authorized
-                break; // Break if a valid and authorized signature is found
+                validSignaturesCount++ // Increment only if signature is valid and authorized
+                break // Break if a valid and authorized signature is found
               } else {
                 return res.status(401).json({
                   status: 401,
                   message: 'Unauthorized!',
-                });
+                })
               }
             }
           }
@@ -124,7 +127,7 @@ function handleMultiDebugAuth(_req, res, next) {
           }
         }
         // Set allSignaturesValid to true only if all signatures are valid and authorized
-        allSignaturesValid = validSignaturesCount >= parsedProposal.noOfApprovals;
+        allSignaturesValid = validSignaturesCount >= parsedProposal.noOfApprovals
 
         // If all signatures are valid, proceed with the next middleware
         if (allSignaturesValid) {
