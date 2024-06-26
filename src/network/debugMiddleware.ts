@@ -98,15 +98,26 @@ function handleMultiDebugAuth(_req, res, next) {
         parsedSignatures.length >= parsedProposal.noOfApprovals
       ) {
         let validSignaturesCount = 0;
+        const usedDevKeys = [];
         for (let i = 0; i < parsedSignatures.length; i++) {
           // Check each signature against all public keys
           for (const publicKey of Object.keys(devPublicKeys)) {
+            // CAN DO THIS: if (usedDevKeys.includes(publicKey)) continue
             signatureValid = crypto.verify(crypto.hashObj(parsedProposal), parsedSignatures[i], publicKey)
             if (signatureValid) {
+              /* OR CAN DO THIS IF WE WANT TO HANDLE THE ERROR INSTEAD
+              if (usedDevKeys.includes(publicKey)) {
+                return res.status(422).json({
+                  status: 422, // Ill leave it to you to chose the right status code here
+                  message: 'Cannot include multiple signatures from a single signer',
+                });
+              }
+              */
               const clearanceLevels = { low: 1, medium: 2, high: 3 } // Enum for security levels
               const proposalClearanceLevel = clearanceLevels[parsedProposal.securityClearance.toLowerCase()]
               const authorized = ensureKeySecurity(publicKey, proposalClearanceLevel) // Check if the approver is authorized to access the endpoint
               if (authorized) {
+                usedDevKeys.push(publicKey);
                 validSignaturesCount++; // Increment only if signature is valid and authorized
                 break; // Break if a valid and authorized signature is found
               } else {
