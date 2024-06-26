@@ -99,7 +99,7 @@ const failExternalRoute: P2P.P2PTypes.Route<Handler> = {
 const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
   name: InternalRouteEnum.apoptosize,
   handler: (payload, response, header, sign) => {
-    const route = InternalRouteEnum.binary_compare_cert
+    const route = InternalRouteEnum.apoptosize
     nestedCountersInstance.countEvent('internal', route)
     profilerInstance.scopedProfileSectionStart(route)
     const errorHandler = (
