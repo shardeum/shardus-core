@@ -3,7 +3,11 @@ import { NetworkClass } from '../network'
 import * as Context from '../p2p/Context'
 import zlib from 'zlib'
 import Trie from 'trie-prefix-tree'
-import { isDebugModeMiddleware, isDebugModeMiddlewareMedium } from '../network/debugMiddleware'
+import {
+  isDebugModeMiddleware,
+  isDebugModeMiddlewareMedium,
+  isDebugModeMiddlewareMultiSig,
+} from '../network/debugMiddleware'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 const tar = require('tar-fs')
 const fs = require('fs')
@@ -116,6 +120,10 @@ class Debug {
       } catch (e) {
         return res.send({ success: false, error: e.message })
       }
+      return res.send({ success: true })
+    })
+
+    this.network.registerExternalGet('debug-multiSig', isDebugModeMiddlewareMultiSig, (req, res) => {
       return res.send({ success: true })
     })
   }
