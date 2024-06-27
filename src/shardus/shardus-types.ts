@@ -1121,6 +1121,8 @@ export interface ServerConfiguration {
     ignoreDataTellChance: number
     // flag to add bogus increments to NTP offset
     debugNTPBogusDecrements: boolean
+    /** chance to fail before state in sending tx receipt to archiver */
+    beforeStateFailChance: number
   }
   /** Options for the statistics module */
   statistics?: {
