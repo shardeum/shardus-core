@@ -1,5 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
-import { AJV_IDENT } from './Helpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
 const schemaSign = {
   type: 'object',
@@ -35,5 +35,5 @@ function addSchemaDependencies(): void {
 // Function to register the schema
 function addSchemas(): void {
   addSchema('schemaSign', schemaSign)
-  addSchema(AJV_IDENT.MAKE_RECEIPT_REQ, schemaMakeReceiptReq)
+  addSchema(AJVSchemaEnum.MakeReceiptReq, schemaMakeReceiptReq)
 }

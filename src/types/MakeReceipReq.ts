@@ -2,7 +2,7 @@ import { Utils } from '@shardus/types'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { verifyPayload } from './ajv/Helpers'
-import { AJV_IDENT } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
 export const cMakeReceiptReqVersion = 1
 
@@ -45,7 +45,7 @@ export function deserializeMakeReceiptReq(stream: VectorBufferStream): MakeRecei
     when: Number(stream.readBigUInt64()),
     source: stream.readString(),
   }
-  const errors = verifyPayload(AJV_IDENT.MAKE_RECEIPT_REQ, obj)
+  const errors = verifyPayload(AJVSchemaEnum.MakeReceiptReq, obj)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }
