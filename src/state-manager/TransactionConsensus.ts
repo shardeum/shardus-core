@@ -1403,7 +1403,7 @@ class TransactionConsenus {
       }
 
       if (this.stateManager.transactionQueue.useNewPOQ === false) {
-        const requiredVotes = Math.round(votingGroup.length * (2 / 3.0)) //hacky for now.  debug code:
+        const requiredVotes = Math.round(votingGroup.length * this.config.p2p.requiredVotesPercentage) //hacky for now.  debug code:
 
         if (queueEntry.debug.loggedStats1 == null) {
           queueEntry.debug.loggedStats1 = true

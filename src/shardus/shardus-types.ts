@@ -947,6 +947,8 @@ export interface ServerConfiguration {
     downNodeFilteringEnabled: boolean
     // /** The number of ms to wait to resubmit a standby add request to an active node if we get an error */
     resubmitStandbyAddWaitDuration: number
+    // /** The percentage of votes required to confirm transaction*/
+    requiredVotesPercentage: number
   }
   /** Server IP configuration */
   ip?: {

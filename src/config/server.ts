@@ -179,6 +179,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     formingNodesPerCycle: 7,
     downNodeFilteringEnabled: false,
     resubmitStandbyAddWaitDuration: 1000, // 1 second in ms
+    requiredVotesPercentage: 0.67,
   },
   ip: {
     externalIp: '0.0.0.0',
