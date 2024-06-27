@@ -7579,6 +7579,7 @@ class TransactionQueue {
         lastFinalDataRequestTimestamp: queueEntry.lastFinalDataRequestTimestamp,
         dataSharedTimestamp: queueEntry.dataSharedTimestamp,
         firstVoteTimestamp: queueEntry.firstVoteReceivedTimestamp,
+        lastVoteTimestamp: queueEntry.lastVoteReceivedTimestamp,
         firstConfirmationsTimestamp: queueEntry.firstConfirmOrChallengeTimestamp,
         robustBestConfirmation: queueEntry.receivedBestConfirmation,
         robustBestVote: queueEntry.receivedBestVote,
@@ -7590,7 +7591,7 @@ class TransactionQueue {
         waitForReceiptOnly: queueEntry.waitForReceiptOnly,
         ourVote: queueEntry.ourVote || null,
         receipt2: this.stateManager.getReceipt2(queueEntry) || null,
-        uniqueChallenges: queueEntry.uniqueChallengesCount
+        uniqueChallenges: queueEntry.uniqueChallengesCount,
       }
     })
   }
