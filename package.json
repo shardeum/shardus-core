@@ -22,6 +22,7 @@
     "clean": "shx rm -rf dist build",
     "create:folders": "shx mkdir -p dist",
     "compile:ts": "tsc",
+    "compile:integrationTest": "tsc --project tsconfig.test.json",
     "compile:pack": "webpack",
     "compile:js": "bytenode -c build/src/index.js",
     "release:move:typedocs": "shx mv build/src/index.d.ts dist/",
@@ -38,6 +39,7 @@
     "check": "gts check",
     "fix": "gts fix",
     "test": "jest",
+    "test:integration": "npm run compile:integrationTest && node build/test/integration/RunIntegrationTests.js",
     "test-watch": "jest --watch",
     "depcheck": "depcheck --skip-missing --ignores webpack,webpack-cli,prettier,typescript-eslint,typescript-estree,@mapbox/node-pre-gyp,@types/estree",
     "format-check": "prettier --check './src/**/*.ts'"
