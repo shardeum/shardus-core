@@ -1,8 +1,10 @@
 import { Utils } from '@shardus/types'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { verifyPayload } from './ajv/Helpers'
+import { AJV_IDENT } from './ajv/Helpers'
 
-const cMakeReceiptReqVersion = 1
+export const cMakeReceiptReqVersion = 1
 
 export type MakeReceiptReq = {
   sign: {
@@ -33,7 +35,7 @@ export function deserializeMakeReceiptReq(stream: VectorBufferStream): MakeRecei
   if (version > cMakeReceiptReqVersion) {
     throw new Error(`Invalid version ${version} for MakeReceiptReq`)
   }
-  return {
+  const obj: MakeReceiptReq = {
     sign: {
       owner: stream.readString(),
       sig: stream.readString(),
@@ -43,4 +45,9 @@ export function deserializeMakeReceiptReq(stream: VectorBufferStream): MakeRecei
     when: Number(stream.readBigUInt64()),
     source: stream.readString(),
   }
+  const errors = verifyPayload(AJV_IDENT.MAKE_RECEIPT_REQ, obj)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
+  return obj
 }
