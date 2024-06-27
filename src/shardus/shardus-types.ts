@@ -1095,6 +1095,8 @@ export interface ServerConfiguration {
     finishedSyncingDelay: number
     /** config for the minimum number of seconds a node must be in the ready state */
     readyNodeDelay: number
+    /** chance to fail before state in sending tx receipt to archiver */
+    beforeStateFailChance: number
   }
   /** Options for the statistics module */
   statistics?: {
