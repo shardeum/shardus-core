@@ -3057,6 +3057,7 @@ class TransactionConsenus {
       if (numVotes === 0) {
         queueEntry.collectedVotes.push(vote)
         queueEntry.newVotes = true
+        if (queueEntry.firstVoteReceivedTimestamp === 0) queueEntry.firstVoteReceivedTimestamp = shardusGetTime()
         if (this.stateManager.consensusLog)
           this.mainLogger.debug(`First vote appended for tx ${queueEntry.logID}}`)
         return true
@@ -3072,7 +3073,7 @@ class TransactionConsenus {
           return false
         }
       }
-
+      queueEntry.lastVoteReceivedTimestamp = shardusGetTime()
       queueEntry.collectedVotes.push(vote)
       queueEntry.newVotes = true
 

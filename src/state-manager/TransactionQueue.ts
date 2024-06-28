@@ -5158,6 +5158,9 @@ class TransactionQueue {
                   if (configContext.stateManager.singleAccountStuckFix) {
                     const timeSinceVoteSeen = shardusGetTime() - queueEntry.firstVoteReceivedTimestamp
                     // if we has seenVote but still stuck in consensing state, we should go to await final data and ask receipt+data
+
+                    //note: this block below may not be what we want in POQo, but is behind a long time setting for now (in dapp)
+                    //need to consider some clean up here
                     if (queueEntry.state === 'consensing' && timeSinceVoteSeen > configContext.stateManager.stuckTxMoveTime) {
                       if (logFlags.debug) this.mainLogger.debug(`txId ${queueEntry.logID} move stuck consensing tx to await final data. timeSinceVoteSeen: ${timeSinceVoteSeen} ms`)
                       nestedCountersInstance.countEvent('consensus', `move stuck consensing tx to await final data.`)
