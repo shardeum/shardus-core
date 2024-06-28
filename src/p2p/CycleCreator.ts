@@ -8,7 +8,7 @@ import * as Active from './Active'
 import * as Apoptosis from './Apoptosis'
 import * as Archivers from './Archivers'
 import * as Comms from './Comms'
-import { config, crypto, logger, storage } from './Context'
+import { config, crypto, logger, stateManager, storage } from './Context'
 import * as CycleAutoScale from './CycleAutoScale'
 import * as CycleChain from './CycleChain'
 import * as Join from './Join'
@@ -767,8 +767,7 @@ function makeNetworkConfigHash() {
     sharding: config.sharding,
     transactionExpireTime: config.transactionExpireTime,
     p2p: { ...config.p2p },
-    useNewPOQ: config.stateManager.useNewPOQ,
-    devPublicKeys: config.debug.devPublicKeys,
+    stateManager: config.stateManager
     // debug: config.debug,
   }
   delete netConfig.p2p.existingArchivers
