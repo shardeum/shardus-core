@@ -314,8 +314,10 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     nodesToGossipAppliedReceipt: 10,
     useCopiedWrappedStateForApply: true,
     disableTxExpiration: true,
-    removeStuckTxsFromQueue: false,
+    removeStuckTxsFromQueue: false, //this should remain disabled due to possible stuck/oos issues
     stuckTxRemoveTime: 1000 * 60 * 2, // 2 minutes
+    removeStuckTxsFromQueue2: false, //start disabled turn on via migration only
+    stuckTxRemoveTime2: 1000 * 60 * 2, // 2 minutes (since we saw a valid vote, not the total age)
     removeStuckChallengedTXs: true,
     receiptRemoveFix: true,
     stuckTxQueueFix: true,

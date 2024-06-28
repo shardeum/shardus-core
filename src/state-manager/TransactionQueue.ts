@@ -5132,6 +5132,21 @@ class TransactionQueue {
             continue
           }
 
+          if (configContext.stateManager.removeStuckTxsFromQueue2 === true) {
+            const timeSinceLastVoteMessage = queueEntry.lastVoteReceivedTimestamp > 0 ? currentTime - queueEntry.lastVoteReceivedTimestamp : 0
+            // see if we have been consensing for more than a long time.
+            // follow up code needs to handle this in a better way
+            // if there is a broken TX at the end of a chain. this will peel it off. 
+            // any freshly exposed TXs will have a fair amount of time to be in consensus so 
+            // this should minimize the risk of OOS. 
+            if(timeSinceLastVoteMessage > configContext.stateManager.stuckTxRemoveTime2){
+              nestedCountersInstance.countEvent('txSafelyRemoved', `tx in consensus more than ${configContext.stateManager.stuckTxRemoveTime2 / 1000} seconds. state: ${queueEntry.state}`)
+              this.statemanager_fatal(`txSafelyRemoved`, `stuck in consensus. txid: ${shortID} state: ${queueEntry.state} age:${txAge} tx first vote seen ${timeSinceLastVoteMessage / 1000} seconds ago`)
+              this.removeFromQueue(queueEntry, currentIndex)
+              continue
+            }
+          }
+
           if (txAge > timeM3 + configContext.stateManager.confirmationSeenExpirationTime + 10000) {
             nestedCountersInstance.countEvent('txExpired', `txAge > timeM3 + confirmSeenExpirationTime + 10s`)
             // maybe we missed the spread_appliedReceipt2 gossip, go to await final data if we have a confirmation

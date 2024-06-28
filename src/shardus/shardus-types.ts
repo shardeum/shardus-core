@@ -1236,6 +1236,10 @@ export interface ServerConfiguration {
     removeStuckTxsFromQueue: boolean
     // how long to wait before removing the tx from the queue
     stuckTxRemoveTime: number
+    // whether to remove the tx from the queue if it stuck for X min. Based on time since first vote seen
+    removeStuckTxsFromQueue2: boolean
+    // how long to wait before removing the tx from the queue. Based on time since first vote seen
+    stuckTxRemoveTime2: number
     // remove a stuck challenged tx
     removeStuckChallengedTXs: boolean
     // receipt remove fix
