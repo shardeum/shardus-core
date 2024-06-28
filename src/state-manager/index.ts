@@ -1769,6 +1769,7 @@ class StateManager {
           account_state_hash_after: {},
           note: '',
           success: false,
+          appReceiptData: null
         }
         try {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cRequestTxAndStateReq)
@@ -1843,6 +1844,7 @@ class StateManager {
                 response.stateList.push(accountData)
               }
             }
+            response.appReceiptData = queueEntry.preApplyTXResult?.applyResponse?.appReceiptData
           }
           response.success = true
           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state success: ${queueEntry.logID}  ${response.stateList.length}  ${Utils.safeStringify(response)}`)
