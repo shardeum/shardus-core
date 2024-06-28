@@ -356,7 +356,7 @@ export interface App {
   getNodeInfoAppData?: () => any
   signAppData?: (type: string, hash: string, nodesToSign: number, appData: any) => Promise<SignAppDataResult>
   updateNetworkChangeQueue?: (account: WrappedData, appData: any) => Promise<WrappedData[]>
-  pruneNetworkChangeQueue?: (account: WrappedData, appData: any) => Promise<WrappedData[]>
+  pruneNetworkChangeQueue?: (account: WrappedData, cycle: number) => Promise<WrappedData[]>
   beforeStateAccountFilter?: (account: WrappedData) => boolean
   canStayOnStandby: (joinInfo: JoinRequest) => { canStay: boolean; reason: string }
   binarySerializeObject: (identifier: AppObjEnum, obj: any) => Buffer

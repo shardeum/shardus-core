@@ -2647,14 +2647,8 @@ class Shardus extends EventEmitter {
       if (typeof application.pruneNetworkChangeQueue === 'function') {
         applicationInterfaceImpl.pruneNetworkChangeQueue = async (
           account: ShardusTypes.WrappedData,
-          appData: any
-        ) => application.pruneNetworkChangeQueue(account, appData)
-      }
-      if (typeof application.pruneNetworkChangeQueue === 'function') {
-        applicationInterfaceImpl.pruneNetworkChangeQueue = async (
-          account: ShardusTypes.WrappedData,
-          appData: any
-        ) => application.pruneNetworkChangeQueue(account, appData)
+          cycle: number
+        ) => application.pruneNetworkChangeQueue(account, cycle)
       }
       if (typeof application.canStayOnStandby === 'function') {
         applicationInterfaceImpl.canStayOnStandby = (joinInfo: JoinRequest) =>
