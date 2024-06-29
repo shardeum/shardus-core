@@ -1410,9 +1410,11 @@ class TransactionConsenus {
       }
 
       // Design TODO:  should this be the full transaction group or just the consensus group?
-      let votingGroup
+      let votingGroup: Shardus.NodeWithRank[] | P2PTypes.NodeListTypes.Node[]
 
-      if (
+      if (this.stateManager.transactionQueue.usePOQo === true) {
+        votingGroup = queueEntry.executionGroup
+      } else if (
         this.stateManager.transactionQueue.executeInOneShard &&
         this.stateManager.transactionQueue.useNewPOQ === false
       ) {
@@ -1423,9 +1425,100 @@ class TransactionConsenus {
       }
 
       if (this.stateManager.transactionQueue.usePOQo === true) {
-        throw new Error('POQo not implemented')
-      }
-      else if (this.stateManager.transactionQueue.useNewPOQ === false) {
+        if (queueEntry.ourVote === undefined) {
+          // Cannot produce receipt just yet. Wait further.
+          // In V2 of POQo, we may not have to check this.
+          // further versions could ask other nodes for proposal blob
+          return null
+        }
+
+        const majorityCount = Math.ceil(votingGroup.length * 2 / 3)
+
+        const numVotes = queueEntry.collectedVoteHashes.length
+
+        if (numVotes < majorityCount) {
+          // we need more votes
+          return null
+        }
+        // be smart an only recalculate votes when we see a new vote show up.
+        if (queueEntry.newVotes === false) {
+          return null
+        }
+        queueEntry.newVotes = false
+        let winningVoteHash: string
+        const hashCounts: Map<string, number> = new Map()
+
+        for (let i = 0; i < numVotes; i++) {
+          // eslint-disable-next-line security/detect-object-injection
+          const currentVote = queueEntry.collectedVoteHashes[i]
+          const voteCount = hashCounts.get(currentVote.voteHash) || 0
+          hashCounts.set(currentVote.voteHash, voteCount + 1)
+          if (voteCount + 1 > majorityCount) {
+            winningVoteHash = currentVote.voteHash
+            break
+          }
+        }
+
+        if (winningVoteHash != undefined) {
+          // For V1 of POQo check if our voteHash matches the winning hash
+          // If not, do not generate a receipt and log it
+          // In later versions of POQo, we should get the proposal blob from a winning node
+          if (queueEntry.ourVoteHash !== winningVoteHash) {
+            nestedCountersInstance.countEvent('poqo', 'My votehash did not match consensed vote hash. Not producing receipt.')
+            return
+          }
+
+          //make the new receipt.
+          const appliedReceipt2: AppliedReceipt2 = {
+            txid: queueEntry.acceptedTx.txId,
+            result: undefined,
+            appliedVote: undefined,
+            signatures: [],
+            app_data_hash: '',
+            // transaction_result: false //this was missing before..
+          }
+          for (let i = 0; i < numVotes; i++) {
+            // eslint-disable-next-line security/detect-object-injection
+            const currentVote = queueEntry.collectedVoteHashes[i]
+            if (currentVote.voteHash === winningVoteHash) {
+              appliedReceipt2.signatures.push(currentVote.sign)
+            }
+          }
+
+          appliedReceipt2.result = queueEntry.ourVote.transaction_result
+          appliedReceipt2.appliedVote = queueEntry.ourVote
+          // now send it !!!
+
+          for (let i = 0; i < queueEntry.ourVote.account_id.length; i++) {
+            /* eslint-disable security/detect-object-injection */
+            if (queueEntry.ourVote.account_id[i] === 'app_data_hash') {
+              appliedReceipt2.app_data_hash = queueEntry.ourVote.account_state_hash_after[i]
+              break
+            }
+            /* eslint-enable security/detect-object-injection */
+          }
+          
+          queueEntry.appliedReceipt2 = appliedReceipt2
+          queueEntry.poqoReceipt = appliedReceipt2
+
+          //this is a temporary hack to reduce the ammount of refactor needed.
+          const appliedReceipt: AppliedReceipt = {
+            txid: queueEntry.acceptedTx.txId,
+            result: queueEntry.ourVote.transaction_result,
+            appliedVotes: [queueEntry.ourVote],
+            confirmOrChallenge: [], // TODO: Do we remove this for POQo??
+            app_data_hash: appliedReceipt2.app_data_hash,
+          }
+          queueEntry.appliedReceipt = appliedReceipt
+
+          // tellx128 the receipt to the entire execution group
+          Comms.tell(votingGroup, 'poqo-send-receipt', appliedReceipt2)
+          // Corresponding tell of receipt+data to entire transaction group
+          // this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
+
+          return appliedReceipt
+        }
+      } else if (this.stateManager.transactionQueue.useNewPOQ === false) {
         const requiredVotes = Math.round(votingGroup.length * this.config.p2p.requiredVotesPercentage) //hacky for now.  debug code:
 
         if (queueEntry.debug.loggedStats1 == null) {
