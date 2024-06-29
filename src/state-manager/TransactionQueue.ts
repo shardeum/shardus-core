@@ -6208,7 +6208,30 @@ class TransactionQueue {
               let finishedConsensing = false
               let result: AppliedReceipt
 
-              if (this.useNewPOQ) {
+              if (this.usePOQo) {
+                // Try to produce receipt
+                // If receipt made, tellx128 it to execution group
+                // that endpoint should then factTellCorrespondingNodesFinalData
+                const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+                if (receipt2 != null) {
+                  if (logFlags.debug)
+                    this.mainLogger.debug(
+                      `processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`
+                    )
+                  nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
+                  //we have a receipt2, so we can make a receipt
+                  result = {
+                    result: receipt2.result,
+                    appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
+                    confirmOrChallenge: [receipt2.confirmOrChallenge],
+                    txid: receipt2.txid,
+                    app_data_hash: receipt2.app_data_hash,
+                  }
+                } else {
+                  result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
+                }
+              }
+              else if (this.useNewPOQ) {
                 this.stateManager.transactionConsensus.confirmOrChallenge(queueEntry)
 
                 if (queueEntry.pendingConfirmOrChallenge.size > 0 && queueEntry.robustQueryVoteCompleted === true && queueEntry.acceptVoteMessage === false) {
@@ -6298,7 +6321,11 @@ class TransactionQueue {
                 const isChallengedReceipt = receipt2.confirmOrChallenge?.message === 'challenge'
                 let shouldSendReceipt = false
                 if (queueEntry.isInExecutionHome) {
-                  if (this.useNewPOQ) {
+                  if (this.usePOQo) {
+                    // Already handled above
+                    shouldSendReceipt = false
+                  }
+                  else if (this.useNewPOQ) {
                     let numberOfSharingNodes = configContext.stateManager.nodesToGossipAppliedReceipt
                     if (numberOfSharingNodes > queueEntry.executionGroup.length) numberOfSharingNodes = queueEntry.executionGroup.length
                     const highestRankedNodeIds = queueEntry.executionGroup.slice(0, numberOfSharingNodes).map(n => n.id)
