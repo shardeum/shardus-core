@@ -3106,7 +3106,26 @@ class TransactionConsenus {
   }
 
   calculateVoteHash(vote: AppliedVote, removeSign = true): string {
-    if (this.stateManager.transactionQueue.useNewPOQ) {
+    if (this.stateManager.transactionQueue.usePOQo) {
+      const appliedHash = {
+        applied: vote.transaction_result,
+        cantApply: vote.cant_apply
+      }  
+      const stateHash = {
+        account_id: vote.account_id,
+        account_state_hash_after: vote.account_state_hash_after,
+        account_state_hash_before: vote.account_state_hash_before,
+      }
+      const appDataHash = {
+        app_data_hash: vote.app_data_hash,
+      }
+      const voteToHash = {
+        appliedHash: this.crypto.hash(appliedHash),
+        stateHash: this.crypto.hash(stateHash),
+        appDataHash: this.crypto.hash(appDataHash),
+      }
+      return this.crypto.hash(voteToHash)
+    } else if (this.stateManager.transactionQueue.useNewPOQ) {
       const voteToHash = {
         txId: vote.txid,
         transaction_result: vote.transaction_result,
