@@ -1402,7 +1402,10 @@ class TransactionConsenus {
         votingGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
       }
 
-      if (this.stateManager.transactionQueue.useNewPOQ === false) {
+      if (this.stateManager.transactionQueue.usePOQo === true) {
+        throw new Error('POQo not implemented')
+      }
+      else if (this.stateManager.transactionQueue.useNewPOQ === false) {
         const requiredVotes = Math.round(votingGroup.length * this.config.p2p.requiredVotesPercentage) //hacky for now.  debug code:
 
         if (queueEntry.debug.loggedStats1 == null) {
