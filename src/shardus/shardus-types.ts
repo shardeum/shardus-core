@@ -1194,6 +1194,12 @@ export interface ServerConfiguration {
     minRequiredChallenges: number
     // turn on the improved Proof of Quorum for large shards sizes
     useNewPOQ: boolean
+    // turn on POQo consensus
+    usePOQo: boolean
+    // Interval between switching to the next vote aggregator batch
+    poqoloopTime: number,
+    // batch size for vote aggregation
+    poqobatchCount: number,
     // should the network forward TXs to lucky nodes?  (does not impact nonce queue, that is the flag below)
     forwardToLuckyNodes: boolean
     // should the network forward TXs to lucky nodes?  (only for the nonce queue)

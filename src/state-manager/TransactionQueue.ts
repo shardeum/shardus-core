@@ -158,6 +158,7 @@ class TransactionQueue {
 
   executeInOneShard: boolean
   useNewPOQ: boolean
+  usePOQo: boolean
 
   txCoverageMap: { [key: symbol]: unknown }
 
@@ -214,6 +215,7 @@ class TransactionQueue {
     this.storage = storage
     this.stateManager = stateManager
     this.useNewPOQ = this.config.stateManager.useNewPOQ
+    this.usePOQo = this.config.stateManager.usePOQo
 
     this.mainLogger = logger.getLogger('main')
     this.seqLogger = logger.getLogger('seq')
@@ -2078,7 +2080,9 @@ class TransactionQueue {
           //set the nodes that are in the executionGroup.
           //This is needed so that consensus will expect less nodes to be voting
           const unRankedExecutionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
-          if (this.useNewPOQ) {
+          if (this.usePOQo) {
+            txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
+          } else if (this.useNewPOQ) {
             txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
           } else {
             txQueueEntry.executionGroup = unRankedExecutionGroup

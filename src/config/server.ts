@@ -295,6 +295,9 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     waitLimitAfterFirstMessage: 2000,
     minRequiredChallenges: 1,
     useNewPOQ: false,
+    usePOQo: true,
+    poqoloopTime: 2000,
+    poqobatchCount: 1,
     forwardToLuckyNodes: true,
     forwardToLuckyNodesNonceQueue: false,
     forwardToLuckyNodesCheckRotation: true,
@@ -322,7 +325,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     stuckTxQueueFix: true,
     singleAccountStuckFix: true,
     stuckTxMoveTime: 60000,
-    forceVoteForFailedPreApply: true
+    forceVoteForFailedPreApply: true,
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,
