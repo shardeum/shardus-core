@@ -4863,20 +4863,45 @@ class TransactionQueue {
               }
             }
 
-            this.p2p.tellBinary<BroadcastFinalStateReq>(
-              filterdCorrespondingAccNodes,
-              InternalRouteEnum.binary_broadcast_finalstate,
-              request,
-              serializeBroadcastFinalStateReq,
-              {
-                verification_data: verificationDataCombiner(
-                  message.txid,
-                  message.stateList.length.toString()
-                ),
-              }
-            )
+
+            if (this.usePOQo) {
+              // Use the POQo endpoint which also shares the receipt
+              // TODO: MIGRATE THIS TO BINARY
+              this.p2p.tell(
+                filterdCorrespondingAccNodes,
+                'poqo-data-and-receipt',
+                {
+                  finalState: message,
+                  receipt: queueEntry.appliedReceipt2
+                }
+              )
+            } else {
+              this.p2p.tellBinary<BroadcastFinalStateReq>(
+                filterdCorrespondingAccNodes,
+                InternalRouteEnum.binary_broadcast_finalstate,
+                request,
+                serializeBroadcastFinalStateReq,
+                {
+                  verification_data: verificationDataCombiner(
+                    message.txid,
+                    message.stateList.length.toString()
+                  ),
+                }
+              )
+            }
           } else {
-            this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
+            if (this.usePOQo) {
+              this.p2p.tell(
+                filterdCorrespondingAccNodes,
+                'poqo-data-and-receipt',
+                {
+                  finalState: message,
+                  receipt: queueEntry.appliedReceipt2
+                }
+              )
+            } else {
+              this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
+            }
           }
           totalShares++
         }

@@ -1024,6 +1024,191 @@ class TransactionConsenus {
         }
       }
     )
+
+    Comms.registerGossipHandler(
+      'poqo-receipt-gossip',
+      (payload: AppliedReceipt2) => {
+        profilerInstance.scopedProfileSectionStart('poqo-receipt-gossip')
+        try {
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid)
+          if (queueEntry == null) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip no queue entry for ${payload.txid}`)
+            return
+          }
+          if (queueEntry.poqoReceipt == null) {
+            queueEntry.poqoReceipt = payload
+            queueEntry.appliedReceipt2 = payload
+          }
+          Comms.sendGossip(
+            'poqo-receipt-gossip',
+            payload,
+            null,
+            null,
+            queueEntry.transactionGroup,
+            false,
+            4,
+            payload.txid
+          )
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('poqo-receipt-gossip')
+        }
+      }
+    )
+
+    Comms.registerInternal(
+      'poqo-data-and-receipt',
+      async (
+        payload: {
+          finalState: { txid: string; stateList: Shardus.WrappedResponse[] }, 
+          receipt: AppliedReceipt2
+        }, 
+        _respond: unknown,
+        _sender: P2PTypes.NodeListTypes.Node,
+      ) => {
+        profilerInstance.scopedProfileSectionStart('poqo-data-and-receipt')
+        try {
+          // make sure we have it
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.finalState.txid) // , payload.timestamp)
+          //It is okay to ignore this transaction if the txId is not found in the queue.
+          if (queueEntry == null) {
+            //In the past we would enqueue the TX, expecially if syncing but that has been removed.
+            //The normal mechanism of sharing TXs is good enough.
+            nestedCountersInstance.countEvent('processing', 'broadcast_finalstate_noQueueEntry')
+            return
+          }
+          if (logFlags.debug)
+            this.mainLogger.debug(`poqo-data-and-receipt ${queueEntry.logID}, ${Utils.safeStringify(payload.finalState.stateList)}`)
+          // add the data in
+          const savedAccountIds: Set<string> = new Set()
+          for (const data of payload.finalState.stateList) {
+            //let wrappedResponse = data as Shardus.WrappedResponse
+            //this.queueEntryAddData(queueEntry, data)
+            if (data == null) {
+              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`poqo-data-and-receipt data == null`)
+              continue
+            }
+            // validate corresponding tell sender
+            if (_sender == null ||  _sender.id == null) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for data: ${data.accountId}, sender: ${JSON.stringify(_sender)}`)
+              continue
+            }
+            const isValidFinalDataSender = this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, _sender.id)
+            if (isValidFinalDataSender === false) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender.id} for data: ${data.accountId}`)
+              continue
+            }
+            if (queueEntry.collectedFinalData[data.accountId] == null) {
+              queueEntry.collectedFinalData[data.accountId] = data
+              savedAccountIds.add(data.accountId)
+              /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('poqo-data-and-receipt', `${queueEntry.logID}`, `poqo-data-and-receipt addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
+            }
+
+            // if (queueEntry.state === 'syncing') {
+            //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+            // }
+          }
+          const nodesToSendTo: Set<Shardus.Node> = new Set()
+          for (const data of payload.finalState.stateList) {
+            if (data == null) {
+              continue
+            }
+            if (savedAccountIds.has(data.accountId) === false) {
+              continue
+            }
+            const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
+            for (const node of storageNodes) {
+              nodesToSendTo.add(node)
+            }
+          }
+          if (nodesToSendTo.size > 0) {
+            Comms.sendGossip(
+              'gossip-final-state',
+              payload.finalState,
+              null,
+              null,
+              Array.from(nodesToSendTo),
+              false,
+              4,
+              queueEntry.acceptedTx.txId
+            )
+            nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
+          }
+          if (!queueEntry.poqoReceipt) {
+            queueEntry.poqoReceipt = payload.receipt
+            queueEntry.appliedReceipt2 = payload.receipt
+            Comms.sendGossip(
+              'poqo-receipt-gossip',
+              payload.receipt,
+              null,
+              null,
+              queueEntry.transactionGroup,
+              false,
+              4,
+              payload.finalState.txid
+            )
+          }
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('poqo-data-and-receipt')
+        }
+      }
+    )
+
+    Comms.registerInternal(
+      'poqo-send-receipt',
+      (
+        payload: AppliedReceipt2,
+        _respond: unknown,
+        _sender: unknown,
+        _tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('poqo-send-receipt', false, msgSize)
+        try{
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid)
+          if (queueEntry == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-receipt: no queue entry found')
+            return
+          }
+
+          if (queueEntry.poqoReceipt) {
+            // We've already handled this
+            return
+          }
+
+          const receivedReceipt = payload as AppliedReceipt2
+          queueEntry.poqoReceipt = receivedReceipt
+          queueEntry.appliedReceipt2 = receivedReceipt
+          this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('poqo-send-receipt')
+        }
+      }
+    )
+
+    Comms.registerInternal(
+      'poqo-send-vote',
+      async (
+        payload: AppliedVoteHash,
+        _respond: unknown,
+        _sender: unknown,
+        _tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('poqo-send-vote', false, msgSize)
+        try{
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid)
+          if (queueEntry == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-vote: no queue entry found')
+            return
+          }
+          const collectedVoteHash = payload as AppliedVoteHash
+          // We can reuse the same function for POQo
+          this.tryAppendVoteHash(queueEntry, collectedVoteHash)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('poqo-send-vote')
+        }
+      }
+    )
   }
 
   async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {
