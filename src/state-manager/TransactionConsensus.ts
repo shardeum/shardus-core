@@ -1026,6 +1026,26 @@ class TransactionConsenus {
     )
   }
 
+  async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {
+    queueEntry.poqoNextSendIndex = 0
+    const aggregatorList = queueEntry.executionGroup
+    while (!queueEntry.poqoReceipt) {
+      if (queueEntry.poqoNextSendIndex >= aggregatorList.length) {
+        // Maybe use modulous to wrap around
+        break
+      }
+      nestedCountersInstance.countEvent('poqo', `At index ${queueEntry.poqoNextSendIndex} in poqoVoteSendLoop`)
+      const voteReceivers = aggregatorList.slice(
+        queueEntry.poqoNextSendIndex, queueEntry.poqoNextSendIndex + this.config.stateManager.poqobatchCount
+      )
+      queueEntry.poqoNextSendIndex += this.config.stateManager.poqobatchCount
+      // Send vote to the selected aggregator in the priority list
+      // TODO: Add SIGN here to the payload
+      Comms.tell(voteReceivers, 'poqo-send-vote', appliedVoteHash)
+      await utils.sleep(this.config.stateManager.poqoloopTime)
+    }
+  }
+
   generateTimestampReceipt(
     txId: string,
     cycleMarker: string,
@@ -2685,6 +2705,14 @@ class TransactionConsenus {
       queueEntry.ourVote = ourVote
       if (queueEntry.firstVoteReceivedTimestamp === 0) {
         queueEntry.firstVoteReceivedTimestamp = shardusGetTime()
+      }
+
+      if (this.stateManager.transactionQueue.usePOQo) {
+        // Kick off POQo vote sending loop asynchronously in the background and return
+        // Can skip over the remaining part of the function because this loop will
+        // handle sending the vote to the intended receivers
+        this.poqoVoteSendLoop(queueEntry, appliedVoteHash)
+        return
       }
 
       if (this.stateManager.transactionQueue.useNewPOQ) {

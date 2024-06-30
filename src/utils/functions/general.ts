@@ -1,7 +1,7 @@
 import { P2P } from '@shardus/types'
 import { Ordering } from '..'
 import { Response } from 'express-serve-static-core'
-import { DevSecurityLevel } from '../../shardus/shardus-types'
+import { DevSecurityLevel, NodeWithRank } from '../../shardus/shardus-types'
 import { nestedCountersInstance } from '../nestedCounters'
 import { Utils } from '@shardus/types'
 
@@ -528,8 +528,8 @@ export function isValidShardusAddress(hexStrings: string[]): boolean {
   return true
 }
 
-export function logNode(node: P2P.NodeListTypes.Node): string {
-  return `Node ID : ${node.id} Node Address : ${node.address} externalPort : ${node.externalPort} externalIP : ${node.externalIp}`
+export function logNode(node: P2P.NodeListTypes.Node | NodeWithRank): string {
+  return `Node ID : ${node.id} externalPort : ${node.externalPort} externalIP : ${node.externalIp}`
 }
 
 /**
