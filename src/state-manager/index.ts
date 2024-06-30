@@ -1900,6 +1900,7 @@ class StateManager {
         _tracker: string,
         msgSize: number
       ) => {
+        // TODO: can be replaced with poqo-send-vote so can be removed
         profilerInstance.scopedProfileSectionStart('spread_appliedVoteHash', false, msgSize)
         try {
           const queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)

@@ -287,7 +287,7 @@ export class NetworkClass extends EventEmitter {
   }
 
   async tellBinary(
-    nodes: Shardus.Node[],
+    nodes: Shardus.Node[] | Shardus.NodeWithRank[],
     route: string,
     message: Buffer,
     appHeader: AppHeader,

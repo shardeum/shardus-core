@@ -266,7 +266,7 @@ function createGossipTracker() {
 
 // Our own P2P version of the network tell, with a sign added
 export async function tell(
-  nodes: ShardusTypes.Node[],
+  nodes: ShardusTypes.Node[] | ShardusTypes.NodeWithRank[],
   route,
   message,
   logged = false,
