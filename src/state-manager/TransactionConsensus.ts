@@ -1069,7 +1069,7 @@ class TransactionConsenus {
           receipt: AppliedReceipt2
         }, 
         _respond: unknown,
-        _sender: P2PTypes.NodeListTypes.Node,
+        _sender: string,
       ) => {
         profilerInstance.scopedProfileSectionStart('poqo-data-and-receipt')
         try {
@@ -1094,13 +1094,13 @@ class TransactionConsenus {
               continue
             }
             // validate corresponding tell sender
-            if (_sender == null ||  _sender.id == null) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for data: ${data.accountId}, sender: ${JSON.stringify(_sender)}`)
+            if (_sender == null) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for data: ${data.accountId}, sender: ${_sender}`)
               continue
             }
-            const isValidFinalDataSender = this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, _sender.id)
+            const isValidFinalDataSender = this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, _sender)
             if (isValidFinalDataSender === false) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender.id} for data: ${data.accountId}`)
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender} for data: ${data.accountId}`)
               continue
             }
             if (queueEntry.collectedFinalData[data.accountId] == null) {
