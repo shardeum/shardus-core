@@ -1024,6 +1024,216 @@ class TransactionConsenus {
         }
       }
     )
+
+    Comms.registerGossipHandler(
+      'poqo-receipt-gossip',
+      (payload: AppliedReceipt2) => {
+        profilerInstance.scopedProfileSectionStart('poqo-receipt-gossip')
+        try {
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid)
+          if (queueEntry == null) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip no queue entry for ${payload.txid}`)
+            return
+          }
+          if (queueEntry.hasSentFinalReceipt === true) {
+            // We've already send this receipt, no need to send it again
+            return
+          }
+          
+          queueEntry.poqoReceipt = payload
+          queueEntry.appliedReceipt2 = payload
+          Comms.sendGossip(
+            'poqo-receipt-gossip',
+            payload,
+            null,
+            null,
+            queueEntry.transactionGroup,
+            false,
+            4,
+            payload.txid
+          )
+          queueEntry.hasSentFinalReceipt = true
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('poqo-receipt-gossip')
+        }
+      }
+    )
+
+    Comms.registerInternal(
+      'poqo-data-and-receipt',
+      async (
+        payload: {
+          finalState: { txid: string; stateList: Shardus.WrappedResponse[] }, 
+          receipt: AppliedReceipt2
+        }, 
+        _respond: unknown,
+        _sender: P2PTypes.NodeListTypes.Node,
+      ) => {
+        profilerInstance.scopedProfileSectionStart('poqo-data-and-receipt')
+        try {
+          // make sure we have it
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.finalState.txid) // , payload.timestamp)
+          //It is okay to ignore this transaction if the txId is not found in the queue.
+          if (queueEntry == null) {
+            //In the past we would enqueue the TX, expecially if syncing but that has been removed.
+            //The normal mechanism of sharing TXs is good enough.
+            nestedCountersInstance.countEvent('processing', 'broadcast_finalstate_noQueueEntry')
+            return
+          }
+          if (logFlags.debug)
+            this.mainLogger.debug(`poqo-data-and-receipt ${queueEntry.logID}, ${Utils.safeStringify(payload.finalState.stateList)}`)
+          // add the data in
+          const savedAccountIds: Set<string> = new Set()
+          for (const data of payload.finalState.stateList) {
+            //let wrappedResponse = data as Shardus.WrappedResponse
+            //this.queueEntryAddData(queueEntry, data)
+            if (data == null) {
+              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`poqo-data-and-receipt data == null`)
+              continue
+            }
+            // validate corresponding tell sender
+            if (_sender == null ||  _sender.id == null) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for data: ${data.accountId}, sender: ${JSON.stringify(_sender)}`)
+              continue
+            }
+            const isValidFinalDataSender = this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, _sender.id)
+            if (isValidFinalDataSender === false) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender.id} for data: ${data.accountId}`)
+              continue
+            }
+            if (queueEntry.collectedFinalData[data.accountId] == null) {
+              queueEntry.collectedFinalData[data.accountId] = data
+              savedAccountIds.add(data.accountId)
+              /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('poqo-data-and-receipt', `${queueEntry.logID}`, `poqo-data-and-receipt addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
+            }
+
+            // if (queueEntry.state === 'syncing') {
+            //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+            // }
+          }
+          const nodesToSendTo: Set<Shardus.Node> = new Set()
+          for (const data of payload.finalState.stateList) {
+            if (data == null) {
+              continue
+            }
+            if (savedAccountIds.has(data.accountId) === false) {
+              continue
+            }
+            const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
+            for (const node of storageNodes) {
+              nodesToSendTo.add(node)
+            }
+          }
+          if (nodesToSendTo.size > 0) {
+            Comms.sendGossip(
+              'gossip-final-state',
+              payload.finalState,
+              null,
+              null,
+              Array.from(nodesToSendTo),
+              false,
+              4,
+              queueEntry.acceptedTx.txId
+            )
+            nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
+          }
+          if (!queueEntry.hasSentFinalReceipt) {
+            queueEntry.poqoReceipt = payload.receipt
+            queueEntry.appliedReceipt2 = payload.receipt
+            Comms.sendGossip(
+              'poqo-receipt-gossip',
+              payload.receipt,
+              null,
+              null,
+              queueEntry.transactionGroup,
+              false,
+              4,
+              payload.finalState.txid
+            )
+            queueEntry.hasSentFinalReceipt = true
+          }
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('poqo-data-and-receipt')
+        }
+      }
+    )
+
+    Comms.registerInternal(
+      'poqo-send-receipt',
+      (
+        payload: AppliedReceipt2,
+        _respond: unknown,
+        _sender: unknown,
+        _tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('poqo-send-receipt', false, msgSize)
+        try{
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid)
+          if (queueEntry == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-receipt: no queue entry found')
+            return
+          }
+
+          if (queueEntry.poqoReceipt) {
+            // We've already handled this
+            return
+          }
+
+          const receivedReceipt = payload as AppliedReceipt2
+          queueEntry.poqoReceipt = receivedReceipt
+          queueEntry.appliedReceipt2 = receivedReceipt
+          this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('poqo-send-receipt')
+        }
+      }
+    )
+
+    Comms.registerInternal(
+      'poqo-send-vote',
+      async (
+        payload: AppliedVoteHash,
+        _respond: unknown,
+        _sender: unknown,
+        _tracker: string,
+        msgSize: number
+      ) => {
+        profilerInstance.scopedProfileSectionStart('poqo-send-vote', false, msgSize)
+        try{
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid)
+          if (queueEntry == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-vote: no queue entry found')
+            return
+          }
+          const collectedVoteHash = payload as AppliedVoteHash
+          // We can reuse the same function for POQo
+          this.tryAppendVoteHash(queueEntry, collectedVoteHash)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd('poqo-send-vote')
+        }
+      }
+    )
+  }
+
+  async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {
+    queueEntry.poqoNextSendIndex = 0
+    const aggregatorList = queueEntry.executionGroup
+    while (!queueEntry.poqoReceipt) {
+      if (queueEntry.poqoNextSendIndex >= aggregatorList.length) {
+        // Maybe use modulous to wrap around
+        break
+      }
+      nestedCountersInstance.countEvent('poqo', `At index ${queueEntry.poqoNextSendIndex} in poqoVoteSendLoop`)
+      const voteReceivers = aggregatorList.slice(
+        queueEntry.poqoNextSendIndex, queueEntry.poqoNextSendIndex + this.config.stateManager.poqobatchCount
+      )
+      queueEntry.poqoNextSendIndex += this.config.stateManager.poqobatchCount
+      // Send vote to the selected aggregator in the priority list
+      // TODO: Add SIGN here to the payload
+      Comms.tell(voteReceivers, 'poqo-send-vote', appliedVoteHash)
+      await utils.sleep(this.config.stateManager.poqoloopTime)
+    }
   }
 
   generateTimestampReceipt(
@@ -1390,9 +1600,11 @@ class TransactionConsenus {
       }
 
       // Design TODO:  should this be the full transaction group or just the consensus group?
-      let votingGroup
+      let votingGroup: Shardus.NodeWithRank[] | P2PTypes.NodeListTypes.Node[]
 
-      if (
+      if (this.stateManager.transactionQueue.usePOQo === true) {
+        votingGroup = queueEntry.executionGroup
+      } else if (
         this.stateManager.transactionQueue.executeInOneShard &&
         this.stateManager.transactionQueue.useNewPOQ === false
       ) {
@@ -1402,7 +1614,101 @@ class TransactionConsenus {
         votingGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
       }
 
-      if (this.stateManager.transactionQueue.useNewPOQ === false) {
+      if (this.stateManager.transactionQueue.usePOQo === true) {
+        if (queueEntry.ourVote === undefined) {
+          // Cannot produce receipt just yet. Wait further.
+          // In V2 of POQo, we may not have to check this.
+          // further versions could ask other nodes for proposal blob
+          return null
+        }
+
+        const majorityCount = Math.ceil(votingGroup.length * 2 / 3)
+
+        const numVotes = queueEntry.collectedVoteHashes.length
+
+        if (numVotes < majorityCount) {
+          // we need more votes
+          return null
+        }
+        // be smart an only recalculate votes when we see a new vote show up.
+        if (queueEntry.newVotes === false) {
+          return null
+        }
+        queueEntry.newVotes = false
+        let winningVoteHash: string
+        const hashCounts: Map<string, number> = new Map()
+
+        for (let i = 0; i < numVotes; i++) {
+          // eslint-disable-next-line security/detect-object-injection
+          const currentVote = queueEntry.collectedVoteHashes[i]
+          const voteCount = hashCounts.get(currentVote.voteHash) || 0
+          hashCounts.set(currentVote.voteHash, voteCount + 1)
+          if (voteCount + 1 > majorityCount) {
+            winningVoteHash = currentVote.voteHash
+            break
+          }
+        }
+
+        if (winningVoteHash != undefined) {
+          // For V1 of POQo check if our voteHash matches the winning hash
+          // If not, do not generate a receipt and log it
+          // In later versions of POQo, we should get the proposal blob from a winning node
+          if (queueEntry.ourVoteHash !== winningVoteHash) {
+            nestedCountersInstance.countEvent('poqo', 'My votehash did not match consensed vote hash. Not producing receipt.')
+            return
+          }
+
+          //make the new receipt.
+          const appliedReceipt2: AppliedReceipt2 = {
+            txid: queueEntry.acceptedTx.txId,
+            result: undefined,
+            appliedVote: undefined,
+            signatures: [],
+            app_data_hash: '',
+            // transaction_result: false //this was missing before..
+          }
+          for (let i = 0; i < numVotes; i++) {
+            // eslint-disable-next-line security/detect-object-injection
+            const currentVote = queueEntry.collectedVoteHashes[i]
+            if (currentVote.voteHash === winningVoteHash) {
+              appliedReceipt2.signatures.push(currentVote.sign)
+            }
+          }
+
+          appliedReceipt2.result = queueEntry.ourVote.transaction_result
+          appliedReceipt2.appliedVote = queueEntry.ourVote
+          // now send it !!!
+
+          for (let i = 0; i < queueEntry.ourVote.account_id.length; i++) {
+            /* eslint-disable security/detect-object-injection */
+            if (queueEntry.ourVote.account_id[i] === 'app_data_hash') {
+              appliedReceipt2.app_data_hash = queueEntry.ourVote.account_state_hash_after[i]
+              break
+            }
+            /* eslint-enable security/detect-object-injection */
+          }
+          
+          queueEntry.appliedReceipt2 = appliedReceipt2
+          queueEntry.poqoReceipt = appliedReceipt2
+
+          //this is a temporary hack to reduce the ammount of refactor needed.
+          const appliedReceipt: AppliedReceipt = {
+            txid: queueEntry.acceptedTx.txId,
+            result: queueEntry.ourVote.transaction_result,
+            appliedVotes: [queueEntry.ourVote],
+            confirmOrChallenge: [], // TODO: Do we remove this for POQo??
+            app_data_hash: appliedReceipt2.app_data_hash,
+          }
+          queueEntry.appliedReceipt = appliedReceipt
+
+          // tellx128 the receipt to the entire execution group
+          Comms.tell(votingGroup, 'poqo-send-receipt', appliedReceipt2)
+          // Corresponding tell of receipt+data to entire transaction group
+          // this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
+
+          return appliedReceipt
+        }
+      } else if (this.stateManager.transactionQueue.useNewPOQ === false) {
         const requiredVotes = Math.round(votingGroup.length * (2 / 3.0)) //hacky for now.  debug code:
 
         if (queueEntry.debug.loggedStats1 == null) {
@@ -2684,6 +2990,14 @@ class TransactionConsenus {
         queueEntry.firstVoteReceivedTimestamp = shardusGetTime()
       }
 
+      if (this.stateManager.transactionQueue.usePOQo) {
+        // Kick off POQo vote sending loop asynchronously in the background and return
+        // Can skip over the remaining part of the function because this loop will
+        // handle sending the vote to the intended receivers
+        this.poqoVoteSendLoop(queueEntry, appliedVoteHash)
+        return
+      }
+
       if (this.stateManager.transactionQueue.useNewPOQ) {
         if (isEligibleToShareVote === false) {
           nestedCountersInstance.countEvent(
@@ -2797,7 +3111,26 @@ class TransactionConsenus {
   }
 
   calculateVoteHash(vote: AppliedVote, removeSign = true): string {
-    if (this.stateManager.transactionQueue.useNewPOQ) {
+    if (this.stateManager.transactionQueue.usePOQo) {
+      const appliedHash = {
+        applied: vote.transaction_result,
+        cantApply: vote.cant_apply
+      }  
+      const stateHash = {
+        account_id: vote.account_id,
+        account_state_hash_after: vote.account_state_hash_after,
+        account_state_hash_before: vote.account_state_hash_before,
+      }
+      const appDataHash = {
+        app_data_hash: vote.app_data_hash,
+      }
+      const voteToHash = {
+        appliedHash: this.crypto.hash(appliedHash),
+        stateHash: this.crypto.hash(stateHash),
+        appDataHash: this.crypto.hash(appDataHash),
+      }
+      return this.crypto.hash(voteToHash)
+    } else if (this.stateManager.transactionQueue.useNewPOQ) {
       const voteToHash = {
         txId: vote.txid,
         transaction_result: vote.transaction_result,

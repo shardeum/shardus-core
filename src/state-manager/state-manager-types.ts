@@ -87,6 +87,11 @@ export type QueueEntry = {
   // Local preapply response
   preApplyTXResult?: PreApplyAcceptedTransactionResult // Shardus.ApplyResponse;
 
+  // POQo
+  poqoNextSendIndex?: number
+  poqoReceipt?: AppliedReceipt2
+  hasSentFinalReceipt?: boolean
+
   // Consensus tracking:
   ourVote?: AppliedVote
   ourVoteHash?: string
