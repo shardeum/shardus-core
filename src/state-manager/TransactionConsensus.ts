@@ -1681,16 +1681,17 @@ class TransactionConsenus {
 
           appliedReceipt2.result = queueEntry.ourVote.transaction_result
           appliedReceipt2.appliedVote = queueEntry.ourVote
+          appliedReceipt2.app_data_hash = queueEntry.ourVote.app_data_hash
           // now send it !!!
 
-          for (let i = 0; i < queueEntry.ourVote.account_id.length; i++) {
-            /* eslint-disable security/detect-object-injection */
-            if (queueEntry.ourVote.account_id[i] === 'app_data_hash') {
-              appliedReceipt2.app_data_hash = queueEntry.ourVote.account_state_hash_after[i]
-              break
-            }
-            /* eslint-enable security/detect-object-injection */
-          }
+          // for (let i = 0; i < queueEntry.ourVote.account_id.length; i++) {
+          //   /* eslint-disable security/detect-object-injection */
+          //   if (queueEntry.ourVote.account_id[i] === 'app_data_hash') {
+          //     appliedReceipt2.app_data_hash = queueEntry.ourVote.account_state_hash_after[i]
+          //     break
+          //   }
+          //   /* eslint-enable security/detect-object-injection */
+          // }
           
           queueEntry.appliedReceipt2 = appliedReceipt2
           queueEntry.poqoReceipt = appliedReceipt2
@@ -1708,7 +1709,7 @@ class TransactionConsenus {
           // tellx128 the receipt to the entire execution group
           Comms.tell(votingGroup, 'poqo-send-receipt', appliedReceipt2)
           // Corresponding tell of receipt+data to entire transaction group
-          // this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
+          this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
 
           return appliedReceipt
         }
