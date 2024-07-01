@@ -90,6 +90,7 @@ export type QueueEntry = {
   // POQo
   poqoNextSendIndex?: number
   poqoReceipt?: AppliedReceipt2
+  hasSentFinalReceipt?: boolean
 
   // Consensus tracking:
   ourVote?: AppliedVote

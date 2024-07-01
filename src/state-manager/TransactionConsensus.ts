@@ -1035,10 +1035,13 @@ class TransactionConsenus {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip no queue entry for ${payload.txid}`)
             return
           }
-          if (queueEntry.poqoReceipt == null) {
-            queueEntry.poqoReceipt = payload
-            queueEntry.appliedReceipt2 = payload
+          if (queueEntry.hasSentFinalReceipt === true) {
+            // We've already send this receipt, no need to send it again
+            return
           }
+          
+          queueEntry.poqoReceipt = payload
+          queueEntry.appliedReceipt2 = payload
           Comms.sendGossip(
             'poqo-receipt-gossip',
             payload,
@@ -1049,6 +1052,7 @@ class TransactionConsenus {
             4,
             payload.txid
           )
+          queueEntry.hasSentFinalReceipt = true
         } finally {
           profilerInstance.scopedProfileSectionEnd('poqo-receipt-gossip')
         }
@@ -1133,7 +1137,7 @@ class TransactionConsenus {
             )
             nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
           }
-          if (!queueEntry.poqoReceipt) {
+          if (!queueEntry.hasSentFinalReceipt) {
             queueEntry.poqoReceipt = payload.receipt
             queueEntry.appliedReceipt2 = payload.receipt
             Comms.sendGossip(
@@ -1146,6 +1150,7 @@ class TransactionConsenus {
               4,
               payload.finalState.txid
             )
+            queueEntry.hasSentFinalReceipt = true
           }
         } finally {
           profilerInstance.scopedProfileSectionEnd('poqo-data-and-receipt')
