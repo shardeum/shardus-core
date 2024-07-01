@@ -1050,7 +1050,9 @@ class TransactionConsenus {
             queueEntry.transactionGroup,
             false,
             4,
-            payload.txid
+            payload.txid,
+            '',
+            true
           )
           queueEntry.hasSentFinalReceipt = true
         } finally {
@@ -1148,7 +1150,9 @@ class TransactionConsenus {
               queueEntry.transactionGroup,
               false,
               4,
-              payload.finalState.txid
+              payload.finalState.txid,
+              '',
+              true
             )
             queueEntry.hasSentFinalReceipt = true
           }
