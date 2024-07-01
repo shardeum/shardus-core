@@ -34,7 +34,8 @@ import {
   RequestReceiptForTxReq,
   RequestReceiptForTxResp,
   WrappedResponses,
-  TimestampRemoveRequest
+  TimestampRemoveRequest,
+  RequestTxResp
 } from './state-manager-types'
 import { ipInfo, shardusGetTime } from '../network'
 import { robustQuery } from '../p2p/Utils'
@@ -1035,6 +1036,21 @@ class TransactionConsenus {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip no queue entry for ${payload.txid}`)
             return
           }
+          // If the queue entry does not have the valid data, request that
+          if(!queueEntry.hasValidFinalData) {
+            setTimeout(() => {
+              // this.p2p.ask(
+              //   node,
+              //   'poqo-request-data',
+              //   { 
+              //     queueEntry,
+              //     payload.appliedVote.account_id.
+              //   },
+              // )
+              payload.appliedVote.account_id
+            }, this.config.stateManager.nonExWaitForData
+          )}
+
           if (queueEntry.hasSentFinalReceipt === true) {
             // We've already send this receipt, no need to send it again
             return
@@ -1065,7 +1081,7 @@ class TransactionConsenus {
         payload: {
           finalState: { txid: string; stateList: Shardus.WrappedResponse[] }, 
           receipt: AppliedReceipt2
-        }, 
+        },
         _respond: unknown,
         _sender: P2PTypes.NodeListTypes.Node,
       ) => {
@@ -1214,7 +1230,103 @@ class TransactionConsenus {
         }
       }
     )
-  }
+
+  //   Comms.registerInternal(
+  //     'poqo-request-data',
+  //     async (
+  //       payload: { txid: string; accountIds: string[] },
+  //       respond: (arg0: RequestTxResp) => Promise<number>,
+  //       _sender: unknown,
+  //       _tracker: string,
+  //       msgSize: number
+  //     ) => {
+  //       profilerInstance.scopedProfileSectionStart('poqo-request-data', false, msgSize)
+  //       let responseSize = cUninitializedSize
+  //       try {
+  //         const response: RequestTxResp = {
+  //           stateList: [],
+  //           account_state_hash_before: {},
+  //           account_state_hash_after: {},
+  //           note: '',
+  //           success: false,
+  //           // originalData: {},
+  //         }
+
+  //         const txid = payload.txid
+  //         const requestedAccountIds = payload.accountIds
+
+  //         let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txid)
+  //         if (queueEntry == null) {
+  //           queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txid, 'poqo-request-data')
+  //         }
+
+  //         if (queueEntry == null) {
+  //           response.note = `failed to find queue entry: ${utils.stringifyReduce(txid)} dbg:${
+  //             this.debugTXHistory[utils.stringifyReduce(txid)]
+  //           }`
+
+  //           if (logFlags.error) this.mainLogger.error(`poqo-request-data ${response.note}`)
+  //           await respond(response)
+  //           return
+  //         }
+
+  //         if (queueEntry.isInExecutionHome === false) {
+  //           response.note = `poqo-request-data not in execution group: ${utils.stringifyReduce(txid)}`
+  //           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(response.note)
+  //           await respond(response)
+  //           return
+  //         }
+
+  //         let receipt2 = this.getReceipt2(queueEntry)
+  //         if (receipt2 == null) {
+  //           response.note = `poqo-request-data does not have valid receipt2: ${utils.stringifyReduce(
+  //             txid
+  //           )}`
+  //           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(response.note)
+  //           await respond(response)
+  //           return
+  //         }
+
+  //         let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
+
+  //         // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
+  //         const writtenAccountsMap: WrappedResponses = {}
+  //         const applyResponse = queueEntry?.preApplyTXResult.applyResponse
+  //         if (
+  //           applyResponse != null &&
+  //           applyResponse.accountWrites != null &&
+  //           applyResponse.accountWrites.length > 0
+  //         ) {
+  //           for (const writtenAccount of applyResponse.accountWrites) {
+  //             writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+  //           }
+  //           wrappedStates = writtenAccountsMap
+  //           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`poqo-request-data applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+  //         }
+
+  //         //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
+
+  //         if (wrappedStates != null) {
+  //           for (let i = 0; i < receipt2.appliedVote.account_id.length; i++) {
+  //             let key = receipt2.appliedVote.account_id[i]
+  //             let accountData = wrappedStates[key]
+  //             if (accountData && requestedAccountIds.includes(key)) {
+  //               // eslint-disable-next-line security/detect-object-injection
+  //               response.account_state_hash_before[key] = receipt2.appliedVote.account_state_hash_before[i]
+  //               response.account_state_hash_after[key] = receipt2.appliedVote.account_state_hash_after[i]
+  //               response.stateList.push(accountData)
+  //             }
+  //           }
+  //         }
+  //         response.success = true
+  //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`poqo-request-data success: ${queueEntry.logID}  ${response.stateList.length}  ${Utils.safeStringify(response)}`)
+  //         responseSize = await respond(response)
+  //       } finally {
+  //         profilerInstance.scopedProfileSectionEnd('poqo-request-data', responseSize)
+  //       }
+  //     }
+  //   )
+  // }
 
   async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {
     queueEntry.poqoNextSendIndex = 0

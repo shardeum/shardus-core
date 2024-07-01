@@ -7222,6 +7222,7 @@ class TransactionQueue {
     return [...this.forwardedReceiptsByTimestamp.values()]
   }
 
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   async requestFinalData(queueEntry: QueueEntry, accountIds: string[]) {
     profilerInstance.profileSectionStart('requestFinalData')
     this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} accountIds: ${utils.stringifyReduce(accountIds)}`);
@@ -7306,6 +7307,80 @@ class TransactionQueue {
       }
     }
     profilerInstance.profileSectionEnd('requestFinalData')
+  }
+
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+  async poqoRequestFinalData(queueEntry: QueueEntry, accountIds: string[]) {
+    profilerInstance.profileSectionStart('poqoRequestFinalData')
+    this.mainLogger.debug(`poqoRequestFinalData: txid: ${queueEntry.logID} accountIds: ${utils.stringifyReduce(accountIds)}`);
+    const message = { txid: queueEntry.acceptedTx.txId, accountIds }
+    let success = false
+    let successCount = 0
+
+    // first check if we have received final data
+    for (const accountId of accountIds) {
+      if (queueEntry.collectedFinalData[accountId] != null) {
+        successCount++
+      }
+    }
+    if (successCount === accountIds.length) {
+      nestedCountersInstance.countEvent('stateManager', 'requestFinalDataAlreadyReceived')
+      this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} already received all data`)
+      return
+    }
+
+    try {
+      const randomIndex = Math.floor(Math.random() * queueEntry.executionGroup.length)
+      const randomExeNode = queueEntry.executionGroup[randomIndex]
+      const nodeToAsk: Shardus.Node = nodes.get(randomExeNode.id)
+      if (!nodeToAsk) {
+        if (logFlags.error)
+          this.mainLogger.error('poqoRequestFinalData: could not find node from execution group')
+          throw new Error('poqoRequestFinalData: could not find node from execution group')
+      }
+
+      if (logFlags.debug)
+        this.mainLogger.debug(
+          `poqoRequestFinalData: txid: ${queueEntry.acceptedTx.txId} accountIds: ${utils.stringifyReduce(
+            accountIds
+          )}, asking node: ${nodeToAsk.id} ${nodeToAsk.externalPort} at timestamp ${shardusGetTime()}`
+        )
+
+      const response = await Comms.ask(nodeToAsk, 'poqo-request-data', message)
+
+      if (response && response.stateList) {
+        this.mainLogger.debug(`poqoRequestFinalData: txid: ${queueEntry.logID} received data for ${response.stateList.length} accounts`)
+      } else {
+        this.mainLogger.error(`poqoRequestFinalData: txid: ${queueEntry.logID} response is null`)
+      }
+
+      for (const data of response.stateList) {
+        if (data == null) {
+          /* prettier-ignore */
+          if (logFlags.error && logFlags.debug) this.mainLogger.error(`requestFinalData data == null for tx ${queueEntry.logID}`);
+          success = false
+          break
+        }
+        if (queueEntry.collectedFinalData[data.accountId] == null) {
+          // todo: check the state hashes and verify
+          queueEntry.collectedFinalData[data.accountId] = data
+          successCount++
+          /* prettier-ignore */
+          if (logFlags.debug) this.mainLogger.debug(`poqoRequestFinalData: txid: ${queueEntry.logID} success accountId: ${data.accountId} stateId: ${data.stateId}`);
+        }
+      }
+      if (successCount === accountIds.length) {
+        success = true
+      }
+    } catch (e) {
+      nestedCountersInstance.countEvent('stateManager', 'poqoRequestFinalDataError')
+      this.mainLogger.error(`requestFinalData: txid: ${queueEntry.logID} error: ${e.message}`)
+    } finally {
+      if (success === false) {
+        /* prettier-ignore */ this.mainLogger.error(`poqoRequestFinalData: txid: ${queueEntry.logID} failed. successCount: ${successCount} accountIds: ${accountIds.length}`);
+      }
+    }
+    profilerInstance.profileSectionEnd('poqoRequestFinalData')
   }
 
   resetReceiptsToForward(): void {
