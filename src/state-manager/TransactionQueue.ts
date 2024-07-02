@@ -10,6 +10,7 @@ import { nodes, byPubKey, potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import * as utils from '../utils'
+import { getCorrespondingNodes, verifyCorrespondingSender } from '../utils/fastAggregatedCorrespondingTell'
 import {Signature, SignedObject} from '@shardus/crypto-utils'
 import {
   errorToStringFull,
@@ -388,17 +389,6 @@ class TransactionQueue {
             })
           }
 
-          const isSenderValid = this.validateCorrespondingTellSender(
-            queueEntry,
-            vStateAddress,
-            header.sender_id
-          )
-          /* prettier-ignore */ if (logFlags.verbose && logFlags.console) console.log(`${route} TxId: ${vTxId} isSenderValid: ${isSenderValid}`)
-          if (!isSenderValid) {
-            /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`${route} validateCorrespondingTellSender failed`)
-            return errorHandler(RequestErrorEnum.InvalidSender)
-          }
-
           const req = deserializeBroadcastStateReq(requestStream)
           if (req.txid !== vTxId) {
             return errorHandler(RequestErrorEnum.InvalidVerificationData)
@@ -411,13 +401,36 @@ class TransactionQueue {
 
           for (let i = 0; i < req.stateList.length; i++) {
             // eslint-disable-next-line security/detect-object-injection
-            const state = req.stateList[i]
-            if (
-              i !== 0 &&
-              !this.validateCorrespondingTellSender(queueEntry, state.accountId, header.sender_id)
-            ) {
-              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`${route} validateCorrespondingTellSender failed for ${state.accountId}`)
-              return errorHandler(RequestErrorEnum.InvalidSender)
+            const state = req.stateList[i];
+            let isSenderValid = false
+            const senderNodeId = header.sender_id
+            if (configContext.p2p.useFactCorrespondingTell) {
+              let isSenderOurExeNeighbour = false
+              // check if it is a neighbour exe node sharing data
+              if (configContext.stateManager.shareCompleteData) {
+                const senderIsInExecutionGroup = queueEntry.executionGroupMap.has(senderNodeId)
+                const neighbourNodes = utils.selectNeighbors(queueEntry.executionGroup, queueEntry.ourExGroupIndex, 2) as Shardus.Node[]
+                const neighbourNodeIds = neighbourNodes.map((node) => node.id)
+                isSenderOurExeNeighbour = senderIsInExecutionGroup && neighbourNodeIds.includes(senderNodeId)
+                if (isSenderOurExeNeighbour) {
+                  nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellSender: sender is an execution node and a neighbour node')
+                  isSenderValid = true
+                } else {
+                  // check if it is a corresponding tell sender
+                  isSenderValid = this.factValidateCorrespondingTellSender(
+                    queueEntry,
+                    state.accountId,
+                    senderNodeId
+                  )
+                }
+              }
+            } else {
+              isSenderValid = this.validateCorrespondingTellSender(queueEntry, state.accountId, senderNodeId)
+            }
+
+            if (i !== 0 && isSenderValid === false) {
+              this.mainLogger.error(`${route} validateCorrespondingTellSender failed for ${state.accountId}`);
+              return errorHandler(RequestErrorEnum.InvalidSender);
             }
             this.queueEntryAddData(queueEntry, state)
             if (queueEntry.state === 'syncing') {
@@ -435,9 +448,12 @@ class TransactionQueue {
 
     this.p2p.registerInternalBinary(broadcastStateRoute.name, broadcastStateRoute.handler)
 
-    this.p2p.registerInternal(
+    Comms.registerInternal(
       'broadcast_finalstate',
-      async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
+      async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }, respond: () => void,
+      _sender: P2PTypes.NodeListTypes.Node,
+      _tracker: string,
+      msgSize: number) => {
         profilerInstance.scopedProfileSectionStart('broadcast_finalstate')
         try {
           // make sure we have it
@@ -458,6 +474,16 @@ class TransactionQueue {
             //this.queueEntryAddData(queueEntry, data)
             if (data == null) {
               /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_finalstate data == null`)
+              continue
+            }
+            // validate corresponding tell sender
+            if (_sender == null ||  _sender.id == null) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`broadcast_finalstate invalid sender for data: ${data.accountId}, sender: ${JSON.stringify(_sender)}`)
+              continue
+            }
+            const isValidFinalDataSender = this.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, _sender.id)
+            if (isValidFinalDataSender === false) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`broadcast_finalstate invalid sender ${_sender.id} for data: ${data.accountId}`)
               continue
             }
             if (queueEntry.collectedFinalData[data.accountId] == null) {
@@ -557,39 +583,15 @@ class TransactionQueue {
               /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_finalstate data == null`)
               continue
             }
+            const isValidFinalDataSender = this.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, header.sender_id)
+            if (isValidFinalDataSender === false) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`broadcast_finalstate invalid sender ${header.sender_id} for data: ${data.accountId}`)
+              continue
+            }
             if (queueEntry.collectedFinalData[data.accountId] == null) {
               queueEntry.collectedFinalData[data.accountId] = data
               saveSomething = true
               /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('broadcast_finalstate', `${queueEntry.logID}`, `broadcast_finalstate addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
-            }
-
-            // if (queueEntry.state === 'syncing') {
-            //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
-            // }
-          }
-          if (saveSomething) {
-            const nodesToSendTo: Set<Node> = new Set()
-            for (const data of req.stateList) {
-              if (data == null) {
-                continue
-              }
-              const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
-              for (const node of storageNodes) {
-                nodesToSendTo.add(node)
-              }
-            }
-            if (nodesToSendTo.size > 0) {
-              Comms.sendGossip(
-                'gossip-final-state',
-                req,
-                null,
-                null,
-                Array.from(nodesToSendTo),
-                false,
-                4,
-                queueEntry.acceptedTx.txId
-              )
-              nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
             }
           }
         } catch (e) {
@@ -1962,6 +1964,7 @@ class TransactionQueue {
           endTimestamp: {},
         },
         executionGroupMap: new Map(),
+        executionNodeIdSorted: [],
         txSieveTime: 0,
         debug: {},
         voteCastAge: 0,
@@ -1978,7 +1981,8 @@ class TransactionQueue {
         topConfirmations: new Set(),
         topVoters: new Set(),
         hasRobustConfirmation: false,
-        sharedCompleteData: false
+        sharedCompleteData: false,
+        correspondingGlobalOffset: 0
       } // age comes from timestamp
       this.txDebugMarkStartTime(txQueueEntry, 'total_queue_time')
       this.txDebugMarkStartTime(txQueueEntry, 'aging')
@@ -2079,6 +2083,8 @@ class TransactionQueue {
           } else {
             txQueueEntry.executionGroup = unRankedExecutionGroup
           }
+          // for the new FACT algorithm
+          txQueueEntry.executionNodeIdSorted = txQueueEntry.executionGroup.map((node) => node.id).sort()
 
           if (txQueueEntry.isInExecutionHome) {
             txQueueEntry.ourNodeRank = this.computeNodeRank(
@@ -2105,6 +2111,10 @@ class TransactionQueue {
               .slice(txQueueEntry.executionGroup.length - numberOfVoters)
               .map((node) => node.id)
           )
+
+          // calculate globalOffset for FACT
+          // take last 2 bytes of the txId and convert it to an integer
+          txQueueEntry.correspondingGlobalOffset = parseInt(txId.slice(-4), 16)
 
           const ourID = this.stateManager.currentCycleShardData.ourNode.id
           for (let idx = 0; idx < txQueueEntry.executionGroup.length; idx++) {
@@ -4202,6 +4212,189 @@ class TransactionQueue {
     }
   }
 
+  async factTellCorrespondingNodes(queueEntry: QueueEntry): Promise<unknown> {
+    if (this.stateManager.currentCycleShardData == null) {
+      throw new Error('factTellCorrespondingNodes: currentCycleShardData == null')
+    }
+    if (queueEntry.uniqueKeys == null) {
+      throw new Error('factTellCorrespondingNodes: queueEntry.uniqueKeys == null')
+    }
+    const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
+    const dataKeysWeHave = []
+    const dataValuesWeHave = []
+    const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
+    const remoteShardsByKey: { [accountID: string]: StateManagerTypes.shardFunctionTypes.NodeShardData } = {} // shard homenodes that we do not have the data for.
+    let loggedPartition = false
+    for (const key of queueEntry.uniqueKeys) {
+      let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
+
+      // HOMENODEMATHS factTellCorrespondingNodes patch the value of hasKey
+      // did we get patched in
+      if (queueEntry.patchedOnNodes.has(ourNodeData.node.id)) {
+        hasKey = true
+      }
+
+      let isGlobalKey = false
+      //intercept that we have this data rather than requesting it.
+      if (this.stateManager.accountGlobals.isGlobalAccount(key)) {
+        hasKey = true
+        isGlobalKey = true
+        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', queueEntry.logID, `factTellCorrespondingNodes - has`)
+      }
+
+      if (hasKey === false) {
+        if (loggedPartition === false) {
+          loggedPartition = true
+          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodes hasKey=false`)
+        }
+        /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodes hasKey=false  key: ${utils.stringifyReduce(key)}`)
+      }
+
+      if (hasKey) {
+        // TODO PERF is it possible that this query could be used to update our in memory cache? (this would save us from some slow look ups) later on
+        //    when checking timestamps.. alternatively maybe there is a away we can note the timestamp with what is returned here in the queueEntry data
+        //    and not have to deal with the cache.
+        // todo old: Detect if our node covers this paritition..  need our partition data
+
+        this.profiler.profileSectionStart('process_dapp.getRelevantData')
+        this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
+        /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.app.getRelevantData')
+        let data = await this.app.getRelevantData(
+          key,
+          queueEntry.acceptedTx.data,
+          queueEntry.acceptedTx.appData
+        )
+        /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.app.getRelevantData', DebugComplete.Completed)
+        this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
+        this.profiler.profileSectionEnd('process_dapp.getRelevantData')
+
+        //if this is not freshly created data then we need to make a backup copy of it!!
+        //This prevents us from changing data before the commiting phase
+        if (data.accountCreated == false) {
+          data = utils.deepCopy(data)
+        }
+
+        //only queue this up to share if it is not a global account. global accounts dont need to be shared.
+        if (isGlobalKey === false) {
+          // eslint-disable-next-line security/detect-object-injection
+          datas[key] = data
+          dataKeysWeHave.push(key)
+          dataValuesWeHave.push(data)
+        }
+
+        // eslint-disable-next-line security/detect-object-injection
+        queueEntry.localKeys[key] = true
+        // add this data to our own queue entry!!
+        this.queueEntryAddData(queueEntry, data, false)
+      } else {
+        // eslint-disable-next-line security/detect-object-injection
+        remoteShardsByKey[key] = queueEntry.homeNodes[key]
+      }
+    }
+    if (queueEntry.globalModification === true) {
+      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('factTellCorrespondingNodes', queueEntry.logID, `factTellCorrespondingNodes - globalModification = true, not telling other nodes`)
+      return
+    }
+
+    const payload: { stateList: Shardus.WrappedResponse[]; txid: string } = {
+      stateList: [],
+      txid: queueEntry.acceptedTx.txId,
+    }
+    for (const key of queueEntry.uniqueKeys) {
+      // eslint-disable-next-line security/detect-object-injection
+      if (datas[key] != null) {
+        // eslint-disable-next-line security/detect-object-injection
+        payload.stateList.push(datas[key]) // only sending just this one key at a time
+      }
+    }
+    // sign each account data
+    const signedPayload = this.crypto.sign(payload)
+
+    // prepare inputs to get corresponding indices
+    const ourIndexInTxGroup = queueEntry.ourTXGroupIndex
+    const targetGroup = queueEntry.executionNodeIdSorted
+    const targetGroupSize = targetGroup.length
+    const senderGroupSize = targetGroupSize
+
+    // calculate target start and end indices in txGroup
+    const targetIndices = this.getStartAndEndIndexOfTargetGroup(targetGroup, queueEntry.transactionGroup)
+
+    // temp logs
+    if (logFlags.verbose) {
+      this.mainLogger.debug(`factTellCorrespondingNodes: target group size`, targetGroup.length, targetGroup);
+      this.mainLogger.debug(`factTellCorrespondingNodes: tx group size`, queueEntry.transactionGroup.length, queueEntry.transactionGroup.map(n => n.id));
+      this.mainLogger.debug(`factTellCorrespondingNodes: getting corresponding indices for tx: ${queueEntry.logID}`, ourIndexInTxGroup, targetIndices.startIndex, targetIndices.endIndex, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, queueEntry.transactionGroup.length);
+      this.mainLogger.debug(`factTellCorrespondingNodes: target group indices`, targetIndices)
+    }
+
+    const correspondingIndices = getCorrespondingNodes(
+      ourIndexInTxGroup,
+      targetIndices.startIndex,
+      targetIndices.endIndex,
+      queueEntry.correspondingGlobalOffset,
+      targetGroupSize,
+      senderGroupSize,
+      queueEntry.transactionGroup.length
+    )
+    if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodes: correspondingIndices ${queueEntry.logID}`, ourIndexInTxGroup, correspondingIndices);
+
+    const validCorrespondingIndices = []
+    for (const targetIndex of correspondingIndices) {
+      validCorrespondingIndices.push(targetIndex)
+
+      if (logFlags.debug) {
+        //  debug verification code
+        const isValid = verifyCorrespondingSender(targetIndex, ourIndexInTxGroup, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, targetIndices.startIndex, targetIndices.endIndex, queueEntry.transactionGroup.length)
+        if (logFlags.debug) this.mainLogger.debug(`factTellCorrespondingNodes: debug verifyCorrespondingSender`, ourIndexInTxGroup, '->', targetIndex, isValid);
+      }
+    }
+
+
+    const correspondingNodes = []
+    for (const index of validCorrespondingIndices) {
+      if (index === ourIndexInTxGroup) {
+        continue
+      }
+      const targetNode = queueEntry.transactionGroup[index]
+      let targetHasOurData = true
+      for (const wrappedResponse of signedPayload.stateList) {
+        const accountId = wrappedResponse.accountId
+        const targetNodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(targetNode.id)
+        if (targetNodeShardData === null) {
+          targetHasOurData = false
+          break
+        }
+        const targetHasKey = ShardFunctions.testAddressInRange(accountId, targetNodeShardData.storedPartitions)
+        if (targetHasKey === false) {
+          targetHasOurData = false
+          break
+        }
+      }
+      // send only if target needs our data
+      if (targetHasOurData === false) {
+        correspondingNodes.push(targetNode)
+      }
+    }
+    if (correspondingNodes.length === 0) {
+      nestedCountersInstance.countEvent('stateManager', 'factTellCorrespondingNodes: no corresponding nodes needed to send')
+      return
+    }
+
+    // Filter nodes before we send tell()
+    const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
+      correspondingNodes,
+      'factTellCorrespondingNodes',
+      true,
+      true
+    )
+    if (filteredNodes.length === 0) {
+      /* prettier-ignore */ if (logFlags.error) this.mainLogger.error("factTellCorrespondingNodes: filterValidNodesForInternalMessage no valid nodes left to try");
+      return null
+    }
+    // send payload to each node in correspondingNodes
+    this.broadcastState(filteredNodes, payload, 'factTellCorrespondingNodes')
+  }
+
   validateCorrespondingTellSender(queueEntry: QueueEntry, dataKey: string, senderNodeId: string): boolean {
     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`validateCorrespondingTellSender: data key: ${dataKey} sender node id: ${senderNodeId}`)
     const receiverNode = this.stateManager.currentCycleShardData.nodeShardData
@@ -4239,6 +4432,84 @@ class TransactionQueue {
     }
 
     return false
+  }
+
+  factValidateCorrespondingTellSender(queueEntry: QueueEntry, dataKey: string, senderNodeId: string): boolean {
+    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factValidateCorrespondingTellSender: txId: ${queueEntry.acceptedTx.txId} sender node id: ${senderNodeId}, receiver id: ${Self.id}`)
+    const receiverNode = this.stateManager.currentCycleShardData.nodeShardData
+    if (receiverNode == null) return false
+
+    const senderNode = this.stateManager.currentCycleShardData.nodeShardDataMap.get(senderNodeId)
+    if (senderNode === null) return false
+    const senderHasAddress = ShardFunctions.testAddressInRange(dataKey, senderNode.storedPartitions)
+
+    // check if it is a FACT sender
+    const receivingNodeIndex = queueEntry.ourTXGroupIndex // we are the receiver
+    const senderNodeIndex = queueEntry.transactionGroup.findIndex((node) => node.id === senderNodeId)
+    const receiverGroupSize = queueEntry.executionNodeIdSorted.length
+    const senderGroupSize = receiverGroupSize
+
+    const targetGroup = queueEntry.executionNodeIdSorted
+    const targetIndices = this.getStartAndEndIndexOfTargetGroup(targetGroup, queueEntry.transactionGroup)
+
+    const isValidFactSender = verifyCorrespondingSender(
+      receivingNodeIndex,
+      senderNodeIndex,
+      queueEntry.correspondingGlobalOffset,
+      receiverGroupSize,
+      senderGroupSize,
+      targetIndices.startIndex,
+      targetIndices.endIndex,
+      queueEntry.transactionGroup.length
+    ) // it maybe a FACT sender but sender does not cover the account
+    if (senderHasAddress === false) {
+      this.mainLogger.error(
+        `factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender does not have the address and is not a exe neighbour`
+      )
+      nestedCountersInstance.countEvent(
+        'stateManager',
+        'factValidateCorrespondingTellSender: sender does not have the address and is not a exe; neighbour'
+      )
+      return false
+    }
+
+    // it is neither a FACT corresponding node nor an exe neighbour node
+    if (isValidFactSender === false) {
+      this.mainLogger.error(
+        `factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender is neither a valid sender nor a neighbour node isValidSender:  ${isValidFactSender}`
+      )
+      nestedCountersInstance.countEvent(
+        'stateManager',
+        'factValidateCorrespondingTellSender: sender is not a valid sender or a neighbour node'
+      )
+      return false
+    }
+    return true
+  }
+
+  getStartAndEndIndexOfTargetGroup(targetGroup: string[], transactionGroup: (Shardus.NodeWithRank | P2PTypes.NodeListTypes.Node)[]): { startIndex: number; endIndex: number } {
+    const targetIndexes: number[] = []
+    for (let i = 0; i < transactionGroup.length; i++) {
+      const nodeId = transactionGroup[i].id
+      if (targetGroup.indexOf(nodeId) >= 0) {
+        targetIndexes.push(i)
+      }
+    }
+    if (logFlags.verbose) this.mainLogger.debug(`getStartAndEndIndexOfTargetGroup: all target indexes`, targetIndexes);
+    const n = targetIndexes.length
+    let startIndex = targetIndexes[0]
+    // Find the pivot where the circular array starts
+    for (let i = 1; i < n; i++) {
+      if (targetIndexes[i] > targetIndexes[i - 1] + 1) {
+        startIndex = targetIndexes[i]
+        break
+      }
+    }
+    let endIndex = startIndex + n
+    if (endIndex > transactionGroup.length) {
+      endIndex = endIndex - transactionGroup.length
+    }
+    return { startIndex, endIndex }
   }
 
   /**
@@ -4466,6 +4737,187 @@ class TransactionQueue {
     nestedCountersInstance.countEvent('tellCorrespondingNodesFinalData', 'totalShares', totalShares)
     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodesFinalData - end: ${queueEntry.logID} totalShares:${totalShares}`)
     profilerInstance.profileSectionEnd('tellCorrespondingNodesFinalData', true)
+  }
+
+  factTellCorrespondingNodesFinalData(queueEntry: QueueEntry): void {
+    profilerInstance.profileSectionStart('factTellCorrespondingNodesFinalData', true)
+    /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('factTellCorrespondingNodesFinalData', queueEntry.logID, `factTellCorrespondingNodesFinalData - start: ${queueEntry.logID}`)
+
+    if (this.stateManager.currentCycleShardData == null) {
+      throw new Error('factTellCorrespondingNodesFinalData: currentCycleShardData == null')
+    }
+    if (queueEntry.uniqueKeys == null) {
+      throw new Error('factTellCorrespondingNodesFinalData: queueEntry.uniqueKeys == null')
+    }
+    if (queueEntry.globalModification === true) {
+      throw new Error('factTellCorrespondingNodesFinalData globalModification === true')
+    }
+
+    if (this.executeInOneShard && queueEntry.isInExecutionHome === false) {
+      throw new Error('factTellCorrespondingNodesFinalData isInExecutionHome === false')
+    }
+    if (queueEntry.executionShardKey == null || queueEntry.executionShardKey == '') {
+      throw new Error('factTellCorrespondingNodesFinalData executionShardKey == null or empty')
+    }
+    if (queueEntry.preApplyTXResult == null) {
+      throw new Error('factTellCorrespondingNodesFinalData preApplyTXResult == null')
+    }
+
+    const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
+
+    const applyResponse = queueEntry.preApplyTXResult.applyResponse
+    let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
+    const writtenAccountsMap: WrappedResponses = {}
+    if (applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+      for (const writtenAccount of applyResponse.accountWrites) {
+        writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+        writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId]
+          ? wrappedStates[writtenAccount.accountId].stateId
+          : ''
+        writtenAccountsMap[writtenAccount.accountId].prevDataCopy = wrappedStates[writtenAccount.accountId]
+          ? utils.deepCopy(writtenAccount.data)
+          : {}
+
+        datas[writtenAccount.accountId] = writtenAccount.data
+      }
+      //override wrapped states with writtenAccountsMap which should be more complete if it included
+      wrappedStates = writtenAccountsMap
+    }
+    const keysToShare = Object.keys(wrappedStates)
+
+    let message: { stateList: Shardus.WrappedResponse[]; txid: string }
+
+    let totalShares = 0
+    const targetStartIndex = 0
+    const targetEndIndex = queueEntry.transactionGroup.length
+    const targetGroupSize = queueEntry.transactionGroup.length
+
+    const senderIndexInTxGroup = queueEntry.ourTXGroupIndex
+    const senderGroupSize = queueEntry.executionGroup.length
+
+    const correspondingIndices = getCorrespondingNodes(
+      senderIndexInTxGroup,
+      targetStartIndex,
+      targetEndIndex,
+      queueEntry.correspondingGlobalOffset,
+      targetGroupSize,
+      senderGroupSize,
+      queueEntry.transactionGroup.length
+    )
+    for (const key of keysToShare) {
+      // eslint-disable-next-line security/detect-object-injection
+      if (wrappedStates[key] != null) {
+        if (queueEntry.ourExGroupIndex === -1) {
+          throw new Error(
+            'factTellCorrespondingNodesFinalData: should never get here.  our sending node must be in the execution group'
+          )
+        }
+        const storageNodesForAccount = this.getStorageGroupForAccount(key)
+        const storageNodesAccountIds = new Set(storageNodesForAccount.map((node) => node.id))
+
+        const correspondingNodes: P2PTypes.NodeListTypes.Node[] = []
+        for (const index of correspondingIndices) {
+          const node = queueEntry.transactionGroup[index]
+          if (storageNodesAccountIds.has(node.id)) {
+            correspondingNodes.push(node)
+          }
+        }
+
+        //how can we be making so many calls??
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) {
+          this.logger.playbackLogNote('factTellCorrespondingNodesFinalData', queueEntry.logID, `factTellCorrespondingNodesFinalData ourIndex: ${senderIndexInTxGroup} correspondingIndices:${JSON.stringify(correspondingIndices)} correspondingNodes:${JSON.stringify(correspondingNodes.map(node => node.id))} for accounts: ${key}`)
+        }
+
+        const dataToSend: Shardus.WrappedResponse[] = []
+        // eslint-disable-next-line security/detect-object-injection
+        dataToSend.push(datas[key]) // only sending just this one key at a time
+        message = { stateList: dataToSend, txid: queueEntry.acceptedTx.txId }
+        if (correspondingNodes.length > 0) {
+          // Filter nodes before we send tell()
+          const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
+            correspondingNodes,
+            'factTellCorrespondingNodesFinalData',
+            true,
+            true
+          )
+          if (filteredNodes.length === 0) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('factTellCorrespondingNodesFinalData: filterValidNodesForInternalMessage no valid nodes left to try')
+            //return null
+            continue
+          }
+          const filterdCorrespondingAccNodes = filteredNodes
+          const filterNodesIpPort = filterdCorrespondingAccNodes.map(
+            (node) => node.externalIp + ':' + node.externalPort
+          )
+          /* prettier-ignore */ if (logFlags.error) this.mainLogger.debug('tellcorrernodingnodesfinaldata', queueEntry.logID, ` : filterValidNodesForInternalMessage ${filterNodesIpPort} for accounts: ${utils.stringifyReduce(message.stateList)}`)
+          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastFinalStateBinary) {
+            // convert legacy message to binary supported type
+            const request = message as BroadcastFinalStateReq
+            if (logFlags.seqdiagram) {
+              for (const node of filterdCorrespondingAccNodes) {
+                /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_finalstate'}`)
+              }
+            }
+
+            this.p2p.tellBinary<BroadcastFinalStateReq>(
+              filterdCorrespondingAccNodes,
+              InternalRouteEnum.binary_broadcast_finalstate,
+              request,
+              serializeBroadcastFinalStateReq,
+              {
+                verification_data: verificationDataCombiner(
+                  message.txid,
+                  message.stateList.length.toString()
+                ),
+              }
+            )
+          } else {
+            this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
+          }
+          totalShares++
+        }
+      }
+    }
+
+    nestedCountersInstance.countEvent('factTellCorrespondingNodesFinalData', 'totalShares', totalShares)
+    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodesFinalData - end: ${queueEntry.logID} totalShares:${totalShares}`)
+    profilerInstance.profileSectionEnd('factTellCorrespondingNodesFinalData', true)
+  }
+
+  factValidateCorrespondingTellFinalDataSender(queueEntry: QueueEntry, dataKey: string, senderNodeId: string): boolean {
+    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factValidateCorrespondingTellFinalDataSender: txId: ${queueEntry.acceptedTx.txId} sender node id: ${senderNodeId}, receiver id: ${Self.id}`)
+    const senderNode = NodeList.nodes.get(senderNodeId)
+    if (senderNode === null) {
+      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender node is null`)
+      return false
+    }
+    const senderIsInExecutionGroup = queueEntry.executionGroupMap.has(senderNodeId)
+
+    if (senderIsInExecutionGroup === false) {
+      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender is not in the execution group`)
+      return false
+    }
+
+    const senderNodeIndex = queueEntry.transactionGroup.findIndex((node) => node.id === senderNodeId)
+    const senderGroupSize = queueEntry.executionGroup.length
+
+    const targetNodeIndex = queueEntry.ourTXGroupIndex // we are the receiver
+    const targetGroupSize = queueEntry.transactionGroup.length
+    const targetStartIndex = 0 // start of tx group
+    const targetEndIndex = queueEntry.transactionGroup.length // end of tx group
+
+
+    // check if it is a FACT sender
+    const isValidFactSender = verifyCorrespondingSender(targetNodeIndex, senderNodeIndex, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, targetStartIndex
+      , targetEndIndex, queueEntry.transactionGroup.length)
+
+    // it is not a FACT corresponding node
+    if (isValidFactSender === false) {
+      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender is not a valid sender isValidSender:  ${isValidFactSender}`);
+      nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellFinalDataSender: sender is not a valid sender or a neighbour node')
+      return false
+    }
+    return true
   }
 
   dumpTxDebugToStatList(queueEntry: QueueEntry): void {
@@ -5391,13 +5843,21 @@ class TransactionQueue {
                 if (this.executeInOneShard === true) {
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodes(queueEntry)')
                   profilerInstance.scopedProfileSectionStart(`scoped-tellCorrespondingNodes`)
-                  await this.tellCorrespondingNodes(queueEntry)
+                  if (configContext.p2p.useFactCorrespondingTell) {
+                    await this.factTellCorrespondingNodes(queueEntry)
+                  } else  {
+                    await this.tellCorrespondingNodes(queueEntry)
+                  }
                   profilerInstance.scopedProfileSectionEnd(`scoped-tellCorrespondingNodes`)
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodes(queueEntry)', DebugComplete.Completed)
                 } else {
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodesOld(queueEntry)')
                   //specific fixes were needed for tellCorrespondingNodes.  tellCorrespondingNodesOld is the old version before fixes
-                  await this.tellCorrespondingNodes(queueEntry)
+                  if (configContext.p2p.useFactCorrespondingTell) {
+                    await this.factTellCorrespondingNodes(queueEntry)
+                  } else  {
+                    await this.tellCorrespondingNodes(queueEntry)
+                  }
                   /* prettier-ignore */ this.setDebugLastAwaitedCall('this.stateManager.transactionQueue.tellCorrespondingNodesOld(queueEntry)', DebugComplete.Completed)
                 }
                 queueEntry.dataSharedTimestamp = shardusGetTime()
@@ -5904,7 +6364,11 @@ class TransactionQueue {
                     const awaitStart = shardusGetTime()
                     // This is an async function but we do not await it
                     if (configContext.stateManager.attachDataToReceipt === false) {
-                      this.tellCorrespondingNodesFinalData(queueEntry)
+                      if (configContext.p2p.useFactCorrespondingTell) {
+                        this.factTellCorrespondingNodesFinalData(queueEntry)
+                      } else {
+                        this.tellCorrespondingNodesFinalData(queueEntry)
+                      }
                     }
                     this.updateSimpleStatsObject(
                       processStats.awaitStats,
@@ -6750,7 +7214,7 @@ class TransactionQueue {
           throw new Error('requestFinalData: could not find node from execution group')
       }
 
-      if (true)
+      if (logFlags.debug)
         this.mainLogger.debug(
           `requestFinalData: txid: ${queueEntry.acceptedTx.txId} accountIds: ${utils.stringifyReduce(
             accountIds

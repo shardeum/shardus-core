@@ -178,6 +178,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     resumbitStandbyRefreshWaitDuration: 1000, // 1 second in ms
     formingNodesPerCycle: 7,
     downNodeFilteringEnabled: false,
+    useFactCorrespondingTell: true,
     resubmitStandbyAddWaitDuration: 1000, // 1 second in ms
     requiredVotesPercentage: 2 / 3.0,
   },
