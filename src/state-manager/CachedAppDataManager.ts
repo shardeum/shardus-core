@@ -447,6 +447,7 @@ class CachedAppDataManager {
       const filteredCorrespondingAccNodes = filteredNodes
 
       if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.sendCachedAppDataBinary) {
+        if(logFlags.shardedCache) console.log(`cachedAddData: factSendCorrespondingCachedAppData sending ${dataID}`)
         const sendCacheAppDataReq: SendCachedAppDataReq = {
           topic,
           txId,
