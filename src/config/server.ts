@@ -180,6 +180,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     downNodeFilteringEnabled: false,
     resubmitStandbyAddWaitDuration: 1000, // 1 second in ms
     requiredVotesPercentage: 2 / 3.0,
+    timestampCacheFix: true
   },
   ip: {
     externalIp: '0.0.0.0',
