@@ -388,9 +388,14 @@ class CachedAppDataManager {
     }
     const queueEntry: QueueEntry = this.stateManager.transactionQueue.getQueueEntry(txId)
 
+    if (!queueEntry.executionGroup) {
+      console.log(`Atharva: EMPTY EXECUTION GROUP ${txId} ${dataID}`)
+      return
+    }
+
     const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
 
-    const senderGroup = queueEntry.executionGroup
+    const senderGroup = this.stateManager.transactionQueue.getConsenusGroupForAccount(queueEntry.executionShardKey)
     const targetGroup = this.stateManager.transactionQueue.getConsenusGroupForAccount(dataID)
     const allNodes = Array.from(new Set([...senderGroup, ...targetGroup])).sort((a, b) => a.id.localeCompare(b.id));
     const senderIndexInTxGroup = allNodes.findIndex((node) => node.id === ourNodeData.node.id)

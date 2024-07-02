@@ -266,7 +266,7 @@ function createGossipTracker() {
 
 // Our own P2P version of the network tell, with a sign added
 export async function tell(
-  nodes: ShardusTypes.Node[],
+  nodes: ShardusTypes.Node[] | ShardusTypes.NodeWithRank[],
   route,
   message,
   logged = false,
@@ -850,7 +850,8 @@ export async function sendGossip(
   isOrigin = false,
   factor = -1,
   txId = '',
-  context = ''
+  context = '',
+  commonOrigin = false
 ) {
   //console.log('entered sendGossip gossiping ', type)
   let msgSize = cUninitializedSize
@@ -915,7 +916,7 @@ export async function sendGossip(
 
   if (context != '')
     /* prettier-ignore */ if (logFlags.seqdiagram) seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipContext:${context}`)
-  if (originIdx !== undefined && originIdx >= 0) {
+  if (originIdx !== undefined && originIdx >= 0 && !commonOrigin) {
     // If it is protocol tx signed by a node in the network
     recipientIdxs = utils.getLinearGossipBurstList(nodeIdxs.length, gossipFactor, myIdx, originIdx)
     if (logFlags.seqdiagram && txId != '') {
