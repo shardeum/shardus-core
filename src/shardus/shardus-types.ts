@@ -951,6 +951,8 @@ export interface ServerConfiguration {
     resubmitStandbyAddWaitDuration: number
     // /** The percentage of votes required to confirm transaction*/
     requiredVotesPercentage: number
+    // /** a fix to prevent node from producing different ts for same txId */
+    timestampCacheFix: boolean
   }
   /** Server IP configuration */
   ip?: {

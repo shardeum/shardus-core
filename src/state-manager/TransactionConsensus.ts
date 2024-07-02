@@ -105,6 +105,8 @@ class TransactionConsenus {
   statemanager_fatal: (key: string, log: string) => void
 
   txTimestampCache: { [key: string | number]: { [key: string]: TimestampReceipt } }
+  txTimestampCacheByTxId: { [key: string]: TimestampReceipt }
+  seenTimestampRequests: { [key: string]: boolean }
 
   produceBadVote: boolean
   produceBadChallenge: boolean
@@ -135,6 +137,8 @@ class TransactionConsenus {
     this.statsLogger = logger.getLogger('statsDump')
     this.statemanager_fatal = stateManager.statemanager_fatal
     this.txTimestampCache = {}
+    this.txTimestampCacheByTxId = {}
+    this.seenTimestampRequests = {}
 
     this.produceBadVote = this.config.debug.produceBadVote
     this.produceBadChallenge = this.config.debug.produceBadChallenge
@@ -302,6 +306,13 @@ class TransactionConsenus {
           }
 
           const readableReq = deserializeGetTxTimestampReq(requestStream)
+          // handle rare race condition where we have seen the txId but not the timestamp
+          if (Context.config.p2p.timestampCacheFix && this.seenTimestampRequests[readableReq.txId] && this.txTimestampCacheByTxId[readableReq.txId] == null) {
+            nestedCountersInstance.countEvent('consensus', 'get_tx_timestamp seen txId but found no timestamp')
+            return respond(tsReceipt, serializeGetTxTimestampResp)
+          }
+          this.seenTimestampRequests[readableReq.txId] = true
+
           // eslint-disable-next-line security/detect-object-injection
           if (
             this.txTimestampCache[readableReq.cycleCounter] &&
@@ -309,7 +320,13 @@ class TransactionConsenus {
           ) {
             // eslint-disable-next-line security/detect-object-injection
             tsReceipt = this.txTimestampCache[readableReq.cycleCounter][readableReq.txId]
-            /* prettier-ignore */ this.mainLogger.debug(`Found timestamp cache for txId: ${readableReq.txId}, timestamp: ${Utils.safeStringify(tsReceipt)}`)
+            /* prettier-ignore */ this.mainLogger.debug(`get_tx_timestamp handler: Found timestamp cache for txId: ${readableReq.txId}, timestamp: ${Utils.safeStringify(tsReceipt)}`)
+            return respond(tsReceipt, serializeGetTxTimestampResp)
+          } else if(Context.config.p2p.timestampCacheFix && this.txTimestampCacheByTxId[readableReq.txId]) {
+            // eslint-disable-next-line security/detect-object-injection
+            tsReceipt = this.txTimestampCacheByTxId[readableReq.txId]
+            /* prettier-ignore */ this.mainLogger.debug(`get_tx_timestamp handler: Found timestamp cache for txId in cacheById: ${readableReq.txId}, timestamp: ${Utils.safeStringify(tsReceipt)}`)
+            nestedCountersInstance.countEvent('consensus', 'get_tx_timestamp found tx timestamp in cacheById')
             return respond(tsReceipt, serializeGetTxTimestampResp)
           } else {
             const tsReceipt: Shardus.TimestampReceipt = this.generateTimestampReceipt(
@@ -1278,16 +1295,35 @@ class TransactionConsenus {
     if (!this.txTimestampCache[signedTsReceipt.cycleCounter]) {
       this.txTimestampCache[signedTsReceipt.cycleCounter] = {}
     }
-    // eslint-disable-next-line security/detect-object-injection
+
+    // cache to txId map
     this.txTimestampCache[signedTsReceipt.cycleCounter][txId] = signedTsReceipt
+    if (Context.config.p2p.timestampCacheFix) {
+      // eslint-disable-next-line security/detect-object-injection
+      this.txTimestampCacheByTxId[txId] = signedTsReceipt
+      this.seenTimestampRequests[txId] = true
+    }
+    /* prettier-ignore */ this.mainLogger.debug(`Timestamp receipt cached for txId ${txId} in cycle ${signedTsReceipt.cycleCounter}: ${utils.stringifyReduce(signedTsReceipt)}`)
     return signedTsReceipt
   }
 
   pruneTxTimestampCache(): void {
-    for (const key in this.txTimestampCache) {
-      if (parseInt(key) + 1 < CycleChain.newest.counter) {
+    let cycleToKeepCache = 1
+    if (Context.config.p2p.timestampCacheFix) {
+      cycleToKeepCache = 2
+    }
+    for (const cycleCounter in this.txTimestampCache) {
+      if (parseInt(cycleCounter) + cycleToKeepCache < CycleChain.newest.counter) {
+        for (const txId in this.txTimestampCache[cycleCounter]) {
+          if (Context.config.p2p.timestampCacheFix && this.txTimestampCacheByTxId[txId]) {
+            // eslint-disable-next-line security/detect-object-injection
+            delete this.txTimestampCacheByTxId[txId]
+            // eslint-disable-next-line security/detect-object-injection
+            delete this.seenTimestampRequests[txId]
+          }
+        }
         // eslint-disable-next-line security/detect-object-injection
-        delete this.txTimestampCache[key]
+        delete this.txTimestampCache[cycleCounter]
       }
     }
     if (logFlags.debug) this.mainLogger.debug(`Pruned tx timestamp cache.`)
