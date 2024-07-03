@@ -1043,6 +1043,7 @@ class TransactionConsenus {
           if (logFlags.verbose) this.mainLogger.debug(`POQo: received receipt from gossip for ${queueEntry.logID} forwarding gossip`)
           queueEntry.poqoReceipt = payload
           queueEntry.appliedReceipt2 = payload
+          queueEntry.recievedAppliedReceipt2 = payload
           Comms.sendGossip(
             'poqo-receipt-gossip',
             payload,
@@ -1144,6 +1145,7 @@ class TransactionConsenus {
             if (logFlags.verbose) this.mainLogger.debug(`POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`)
             queueEntry.poqoReceipt = payload.receipt
             queueEntry.appliedReceipt2 = payload.receipt
+            queueEntry.recievedAppliedReceipt2 = payload.receipt
             Comms.sendGossip(
               'poqo-receipt-gossip',
               payload.receipt,
@@ -1190,6 +1192,7 @@ class TransactionConsenus {
           const receivedReceipt = payload as AppliedReceipt2
           queueEntry.poqoReceipt = receivedReceipt
           queueEntry.appliedReceipt2 = receivedReceipt
+          queueEntry.recievedAppliedReceipt2 = receivedReceipt
           this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
         } finally {
           profilerInstance.scopedProfileSectionEnd('poqo-send-receipt')
