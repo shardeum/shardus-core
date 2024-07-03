@@ -1039,7 +1039,8 @@ class TransactionConsenus {
             // We've already send this receipt, no need to send it again
             return
           }
-          
+
+          if (logFlags.verbose) this.mainLogger.debug(`POQo: received receipt from gossip for ${queueEntry.logID} forwarding gossip`)
           queueEntry.poqoReceipt = payload
           queueEntry.appliedReceipt2 = payload
           Comms.sendGossip(
@@ -1140,6 +1141,7 @@ class TransactionConsenus {
             nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
           }
           if (!queueEntry.hasSentFinalReceipt) {
+            if (logFlags.verbose) this.mainLogger.debug(`POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`)
             queueEntry.poqoReceipt = payload.receipt
             queueEntry.appliedReceipt2 = payload.receipt
             Comms.sendGossip(
@@ -1184,6 +1186,7 @@ class TransactionConsenus {
             return
           }
 
+          if (logFlags.verbose) this.mainLogger.debug(`POQo: Received receipt from aggregator for ${queueEntry.logID} starting CT2 for data & receipt`)
           const receivedReceipt = payload as AppliedReceipt2
           queueEntry.poqoReceipt = receivedReceipt
           queueEntry.appliedReceipt2 = receivedReceipt
@@ -2999,6 +3002,7 @@ class TransactionConsenus {
         // Kick off POQo vote sending loop asynchronously in the background and return
         // Can skip over the remaining part of the function because this loop will
         // handle sending the vote to the intended receivers
+        if (logFlags.verbose) this.mainLogger.debug(`POQO: Sending vote for ${queueEntry.logID}`)
         this.poqoVoteSendLoop(queueEntry, appliedVoteHash)
         return
       }
