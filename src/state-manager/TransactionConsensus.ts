@@ -3185,6 +3185,7 @@ class TransactionConsenus {
     if (numVotes === 0) {
       queueEntry.collectedVoteHashes.push(voteHash)
       queueEntry.newVotes = true
+      queueEntry.lastVoteReceivedTimestamp = shardusGetTime()
       return true
     }
 
