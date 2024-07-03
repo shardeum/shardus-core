@@ -573,6 +573,7 @@ async function runQ3() {
     if (currentQuarter === 3 && Self.isActive) {
       const cycleData =
         Utils.safeStringify({
+          id: Self.id,
           port: Self.port,
           cycleNumber: record.counter,
           cycleRecord: record,
