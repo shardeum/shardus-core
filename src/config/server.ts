@@ -172,6 +172,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     requestReceiptForTxBinary: true,
     lostReportBinary: true,
     repairMissingAccountsBinary: true,
+    poqoSendReceiptBinary : true,
     rotationEdgeToAvoid: 3,
     forcedMode: '',
     delayZombieRestartSec: 180,
