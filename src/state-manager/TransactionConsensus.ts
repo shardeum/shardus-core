@@ -3915,7 +3915,7 @@ class TransactionConsenus {
 
     queueEntry.collectedVoteHashes.push(voteHash)
     queueEntry.newVotes = true
-
+    queueEntry.lastVoteReceivedTimestamp = shardusGetTime()
     return true
   }
 
