@@ -85,6 +85,7 @@ import {
 import { BadRequest, InternalError, NotFound, serializeResponseError } from '../types/ResponseError'
 import { randomUUID } from 'crypto'
 import { Utils } from '@shardus/types'
+import { deserializePoqoSendReceiptReq } from '../types/PoqoSendReceiptReq'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -1212,6 +1213,58 @@ class TransactionConsenus {
         }
       }
     )
+
+    const poqoSendReceiptBinary: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_poqo_send_receipt,
+      handler: async (payload, respond, header) => {
+        const route = InternalRouteEnum.binary_poqo_send_receipt
+        this.profiler.scopedProfileSectionStart(route)
+        nestedCountersInstance.countEvent('internal', route)
+        profilerInstance.scopedProfileSectionStart(route, false, payload.length)
+
+        const errorHandler = (
+          errorType: RequestErrorEnum,
+          opts?: { customErrorLog?: string; customCounterSuffix?: string }
+        ): void => requestErrorHandler(route, errorType, header, opts)
+
+        
+        try {
+          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cPoqoSendReceiptReq)
+          if (!requestStream) {
+            return errorHandler(RequestErrorEnum.InvalidRequest)
+          }
+
+          const readableReq = deserializePoqoSendReceiptReq(requestStream)
+
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(readableReq.txid)
+          if (queueEntry == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'binary/poqo_send_receipt: no queue entry found')
+            return
+          }
+
+          if (queueEntry.poqoReceipt) {
+            // We've already handled this
+            return
+          }
+
+          if (logFlags.verbose) this.mainLogger.debug(`POQo: Received receipt from aggregator for ${queueEntry.logID} starting CT2 for data & receipt`)
+          const receivedReceipt = readableReq as AppliedReceipt2
+          queueEntry.poqoReceipt = receivedReceipt
+          queueEntry.appliedReceipt2 = receivedReceipt
+          queueEntry.recievedAppliedReceipt2 = receivedReceipt
+          this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
+         
+        } catch (e) {
+          console.error(`Error processing poqoSendReceiptBinary handler: ${e}`)
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd(route)
+        }
+      },
+    }
+
+    Comms.registerInternalBinary(poqoSendReceiptBinary.name, poqoSendReceiptBinary.handler)
 
     Comms.registerInternal(
       'poqo-send-vote',
