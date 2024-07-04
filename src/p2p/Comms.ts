@@ -296,7 +296,7 @@ export async function tell(
 }
 
 export async function tellBinary<TReq>(
-  nodes: ShardusTypes.Node[],
+  nodes: ShardusTypes.Node[] | ShardusTypes.NodeWithRank[],
   route: string,
   message: TReq,
   serializerFunc: (stream: VectorBufferStream, obj: TReq, root?: boolean) => void,
@@ -324,7 +324,8 @@ export async function tellBinary<TReq>(
     /* prettier-ignore */ nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `tellBinary ${route} recipients:${nodes.length}`)
   }
 
-  const nonSelfNodes = nodes.filter((node) => node.id !== Self.id)
+  const typecasted_nodes = nodes as ShardusTypes.Node[]
+  const nonSelfNodes = typecasted_nodes.filter((node) => node.id !== Self.id)
   try {
     const wrappedReq = requestSerializer(message, serializerFunc)
     await network.tellBinary(nonSelfNodes, route, wrappedReq.getBuffer(), appHeader, tracker, logged)

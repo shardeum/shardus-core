@@ -85,6 +85,8 @@ import {
 import { BadRequest, InternalError, NotFound, serializeResponseError } from '../types/ResponseError'
 import { randomUUID } from 'crypto'
 import { Utils } from '@shardus/types'
+import { deserializePoqoDataAndReceiptResp } from '../types/PoqoDataAndReceiptReq'
+import { deserializePoqoSendVoteReq, serializePoqoSendVoteReq } from '../types/PoqoSendVoteReq'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -1063,6 +1065,111 @@ class TransactionConsenus {
       }
     )
 
+    const poqoDataAndReceiptBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_poqo_data_and_receipt,
+      handler: async (payload, respond, header, sign) => {
+        const route = InternalRouteEnum.binary_poqo_data_and_receipt
+        this.profiler.scopedProfileSectionStart(route, false)
+        try {
+          const _sender = header.sender_id
+          const reqStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cPoqoDataAndReceiptReq)
+          if(!reqStream){
+            nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
+            return;
+          }
+          const readableReq = deserializePoqoDataAndReceiptResp(reqStream);
+          // make sure we have it
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(readableReq.finalState.txid) // , payload.timestamp)
+          //It is okay to ignore this transaction if the txId is not found in the queue.
+          if (queueEntry == null) {
+            //In the past we would enqueue the TX, expecially if syncing but that has been removed.
+            //The normal mechanism of sharing TXs is good enough.
+            nestedCountersInstance.countEvent('processing', 'broadcast_finalstate_noQueueEntry')
+            return
+          }
+          if (logFlags.debug)
+            this.mainLogger.debug(`poqo-data-and-receipt ${queueEntry.logID}, ${Utils.safeStringify(readableReq.finalState.stateList)}`)
+          // add the data in
+          const savedAccountIds: Set<string> = new Set()
+          for (const data of readableReq.finalState.stateList) {
+            //let wrappedResponse = data as Shardus.WrappedResponse
+            //this.queueEntryAddData(queueEntry, data)
+            if (data == null) {
+              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`poqo-data-and-receipt data == null`)
+              continue
+            }
+            // validate corresponding tell sender
+            if (_sender == null) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for data: ${data.accountId}, sender: ${_sender}`)
+              continue
+            }
+            const isValidFinalDataSender = this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, _sender)
+            if (isValidFinalDataSender === false) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender} for data: ${data.accountId}`)
+              continue
+            }
+            if (queueEntry.collectedFinalData[data.accountId] == null) {
+              queueEntry.collectedFinalData[data.accountId] = data
+              savedAccountIds.add(data.accountId)
+              /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('poqo-data-and-receipt', `${queueEntry.logID}`, `poqo-data-and-receipt addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
+            }
+
+            // if (queueEntry.state === 'syncing') {
+            //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+            // }
+          }
+          const nodesToSendTo: Set<Shardus.Node> = new Set()
+
+          for (const data of readableReq.finalState.stateList) {
+            if (data == null) {
+              continue
+            }
+            if (savedAccountIds.has(data.accountId) === false) {
+              continue
+            }
+            const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
+            for (const node of storageNodes) {
+              nodesToSendTo.add(node)
+            }
+          }
+          if (nodesToSendTo.size > 0) {
+            Comms.sendGossip(
+              'gossip-final-state',
+              readableReq.finalState,
+              null,
+              null,
+              Array.from(nodesToSendTo),
+              false,
+              4,
+              queueEntry.acceptedTx.txId
+            )
+            nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
+          }
+          if (!queueEntry.hasSentFinalReceipt) {
+            if (logFlags.verbose) this.mainLogger.debug(`POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`)
+            queueEntry.poqoReceipt = readableReq.receipt
+            queueEntry.appliedReceipt2 = readableReq.receipt
+            Comms.sendGossip(
+              'poqo-receipt-gossip',
+              readableReq.receipt,
+              null,
+              null,
+              queueEntry.transactionGroup,
+              false,
+              4,
+              readableReq.finalState.txid,
+              '',
+              true
+            )
+            queueEntry.hasSentFinalReceipt = true
+          }
+        } finally {
+          profilerInstance.scopedProfileSectionEnd(route)
+        }
+      }
+    }
+    Comms.registerInternalBinary(poqoDataAndReceiptBinaryHandler.name, poqoDataAndReceiptBinaryHandler.handler);
+
     Comms.registerInternal(
       'poqo-data-and-receipt',
       async (
@@ -1213,6 +1320,34 @@ class TransactionConsenus {
       }
     )
 
+    const poqoSendVoteBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_poqo_send_vote,
+      handler: (payload, respond, header, sign) => {
+        const route = InternalRouteEnum.binary_poqo_send_vote
+        profilerInstance.scopedProfileSectionStart(route, false)
+        try{
+          const stream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cPoqoSendVoteReq)
+          if(!payload){
+            nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
+            return
+          }
+          const readableReq = deserializePoqoSendVoteReq(stream)
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(readableReq.txid)
+          if (queueEntry == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-vote: no queue entry found')
+            return
+          }
+          const collectedVoteHash = readableReq as AppliedVoteHash
+          // We can reuse the same function for POQo
+          this.tryAppendVoteHash(queueEntry, collectedVoteHash)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd(route)
+        }
+      }
+
+    }
+    Comms.registerInternalBinary(poqoSendVoteBinaryHandler.name, poqoSendVoteBinaryHandler.handler)
+
     Comms.registerInternal(
       'poqo-send-vote',
       async (
@@ -1254,7 +1389,17 @@ class TransactionConsenus {
       queueEntry.poqoNextSendIndex += this.config.stateManager.poqobatchCount
       // Send vote to the selected aggregator in the priority list
       // TODO: Add SIGN here to the payload
-      Comms.tell(voteReceivers, 'poqo-send-vote', appliedVoteHash)
+      if(this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.poqoSendVoteBinary){
+        Comms.tellBinary<AppliedVoteHash>(
+          voteReceivers, 
+          InternalRouteEnum.binary_poqo_send_vote, 
+          appliedVoteHash, 
+          serializePoqoSendVoteReq,
+          {}
+        )
+      }else{
+        Comms.tell(voteReceivers, 'poqo-send-vote', appliedVoteHash)
+      }
       await utils.sleep(this.config.stateManager.poqoloopTime)
     }
   }
