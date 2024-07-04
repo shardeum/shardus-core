@@ -1193,6 +1193,19 @@ class TransactionConsenus {
           queueEntry.poqoReceipt = receivedReceipt
           queueEntry.appliedReceipt2 = receivedReceipt
           queueEntry.recievedAppliedReceipt2 = receivedReceipt
+          queueEntry.hasSentFinalReceipt = true
+          Comms.sendGossip(
+            'poqo-receipt-gossip',
+            payload,
+            null,
+            null,
+            queueEntry.transactionGroup,
+            false,
+            4,
+            payload.txid,
+            '',
+            true
+          )
           this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
         } finally {
           profilerInstance.scopedProfileSectionEnd('poqo-send-receipt')
@@ -1716,7 +1729,20 @@ class TransactionConsenus {
           Comms.tell(votingGroup, 'poqo-send-receipt', appliedReceipt2)
           // Corresponding tell of receipt+data to entire transaction group
           this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
-
+          // Kick off receipt-gossip
+          queueEntry.hasSentFinalReceipt = true
+          Comms.sendGossip(
+            'poqo-receipt-gossip',
+            appliedReceipt2,
+            null,
+            null,
+            queueEntry.transactionGroup,
+            false,
+            4,
+            queueEntry.acceptedTx.txId,
+            '',
+            true
+          )
           return appliedReceipt
         }
       } else if (this.stateManager.transactionQueue.useNewPOQ === false) {
