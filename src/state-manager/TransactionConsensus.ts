@@ -1632,7 +1632,7 @@ class TransactionConsenus {
           return null
         }
 
-        const majorityCount = Math.ceil(votingGroup.length * 2 / 3)
+        const majorityCount = Math.ceil(votingGroup.length * this.config.p2p.requiredVotesPercentage)
 
         const numVotes = queueEntry.collectedVoteHashes.length
 
