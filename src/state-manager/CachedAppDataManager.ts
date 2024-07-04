@@ -431,6 +431,17 @@ class CachedAppDataManager {
     const message: CacheAppDataResponse = { topic, cachedAppData: cacheAppDataToSend }
 
     if (correspondingNodes.length > 0) {
+      // Handle edge case where we send to own node
+      if (correspondingNodes.length === 1 && correspondingNodes[0].id === ourNodeData.node.id) {
+        const existingCachedAppData = this.getCachedItem(topic, dataID)
+        if (existingCachedAppData) {
+          console.log(`We have already processed this cached data`, existingCachedAppData)
+          return
+        }
+        this.insertCachedItem(topic, dataID, appData, cycle)
+        return
+      }
+
       // Filter nodes before we send tell()
       const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
         correspondingNodes,
