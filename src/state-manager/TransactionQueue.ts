@@ -6060,8 +6060,13 @@ class TransactionQueue {
                   if (queueEntry.appliedReceiptForRepair.result === true) {
                     // need to start repair process and wait
                     //await note: it is best to not await this.  it should be an async operation.
-                    this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
-                    this.updateTxState(queueEntry, 'await repair')
+                    if (configContext.stateManager.noRepairIfDataAttached && configContext.stateManager.attachDataToReceipt) {
+                      // we have received the final data, so we can just go to "await final data" and commit the accounts
+                      this.updateTxState(queueEntry, 'await final data')
+                    } else {
+                      this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
+                      this.updateTxState(queueEntry, 'await repair')
+                    }
                     continue
                   } else {
                     // We got a reciept, but the consensus is that this TX was not applied.
