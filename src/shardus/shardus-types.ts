@@ -931,6 +931,7 @@ export interface ServerConfiguration {
     broadcastFinalStateBinary: boolean
     lostReportBinary: boolean
     repairMissingAccountsBinary: boolean
+    poqoSendReceiptBinary: boolean
     poqoDataAndReceiptBinary: boolean
     poqoSendVoteBinary: boolean
     /** number of nodes on both ends of the rotationIndex

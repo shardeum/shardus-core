@@ -85,9 +85,9 @@ import {
 import { BadRequest, InternalError, NotFound, serializeResponseError } from '../types/ResponseError'
 import { randomUUID } from 'crypto'
 import { Utils } from '@shardus/types'
+import { PoqoSendReceiptReq, deserializePoqoSendReceiptReq, serializePoqoSendReceiptReq } from '../types/PoqoSendReceiptReq'
 import { deserializePoqoDataAndReceiptResp } from '../types/PoqoDataAndReceiptReq'
 import { deserializePoqoSendVoteReq, serializePoqoSendVoteReq } from '../types/PoqoSendVoteReq'
-import { deserializePoqoSendReceiptReq } from '../types/PoqoSendReceiptReq'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -1924,7 +1924,19 @@ class TransactionConsenus {
           queueEntry.appliedReceipt = appliedReceipt
 
           // tellx128 the receipt to the entire execution group
-          Comms.tell(votingGroup, 'poqo-send-receipt', appliedReceipt2)
+          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.poqoSendReceiptBinary) {
+           
+            Comms.tellBinary<PoqoSendReceiptReq>(
+              votingGroup,
+              InternalRouteEnum.binary_lost_report,
+              appliedReceipt2,
+              serializePoqoSendReceiptReq,
+              {}
+            )
+          } else {
+            Comms.tell(votingGroup, 'poqo-send-receipt', appliedReceipt2)
+          }
+          
           // Corresponding tell of receipt+data to entire transaction group
           this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
           // Kick off receipt-gossip
