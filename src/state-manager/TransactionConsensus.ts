@@ -1928,7 +1928,7 @@ class TransactionConsenus {
            
             Comms.tellBinary<PoqoSendReceiptReq>(
               votingGroup,
-              InternalRouteEnum.binary_lost_report,
+              InternalRouteEnum.binary_poqo_send_receipt,
               appliedReceipt2,
               serializePoqoSendReceiptReq,
               {}
