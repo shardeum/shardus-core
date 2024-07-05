@@ -308,7 +308,20 @@ class TransactionQueue {
           }
           // add the data in
           for (const data of payload.stateList) {
-            this.queueEntryAddData(queueEntry, data)
+            if (configContext.stateManager.collectedDataFix) {
+              const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(data.accountId)
+              const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
+              if (coveredByUs) {
+                nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
+                /* prettier-ignore */ if (logFlags.verbose) console.log(`broadcast_state: coveredByUs: ${data.accountId} no need to accept this data`)
+                continue
+              } else {
+                this.queueEntryAddData(queueEntry, data)
+              }
+            } else {
+              this.queueEntryAddData(queueEntry, data)
+            }
+
             if (queueEntry.state === 'syncing') {
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
             }
@@ -333,7 +346,19 @@ class TransactionQueue {
             return
           }
           for (const data of payload.stateList) {
-            this.queueEntryAddData(queueEntry, data)
+            if (configContext.stateManager.collectedDataFix) {
+              const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(data.accountId)
+              const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
+              if (coveredByUs) {
+                nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
+                /* prettier-ignore */ if (logFlags.verbose) console.log(`broadcast_state: coveredByUs: ${data.accountId} no need to accept this data`)
+                continue
+              } else {
+                this.queueEntryAddData(queueEntry, data)
+              }
+            } else {
+              this.queueEntryAddData(queueEntry, data)
+            }
           }
           Comms.sendGossip(
             'broadcast_state_complete_data',
@@ -419,7 +444,19 @@ class TransactionQueue {
               /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`${route} validateCorrespondingTellSender failed for ${state.accountId}`)
               return errorHandler(RequestErrorEnum.InvalidSender)
             }
-            this.queueEntryAddData(queueEntry, state)
+            if (configContext.stateManager.collectedDataFix) {
+              const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(state.accountId)
+              const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
+              if (coveredByUs) {
+                nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
+                /* prettier-ignore */ if (logFlags.verbose) console.log(`broadcast_state: coveredByUs: ${state.accountId} no need to accept this data`)
+                continue
+              } else {
+                this.queueEntryAddData(queueEntry, state)
+              }
+            } else {
+              this.queueEntryAddData(queueEntry, state)
+            }
             if (queueEntry.state === 'syncing') {
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${state.accountId}`)
             }
@@ -2559,8 +2596,19 @@ class TransactionQueue {
       )
     }
     if (queueEntry.collectedData[data.accountId] != null) {
-      // we have already collected this data
-      return
+      if (configContext.stateManager.collectedDataFix) {
+        // compare the timestamps and keep the newest
+        const existingData = queueEntry.collectedData[data.accountId]
+        if (data.timestamp > existingData.timestamp) {
+          queueEntry.collectedData[data.accountId] = data
+          nestedCountersInstance.countEvent('queueEntryAddData', 'collectedDataFix replace with newer data')
+        } else {
+          return
+        }
+      } else {
+        // we have already collected this data
+        return
+      }
     }
     profilerInstance.profileSectionStart('queueEntryAddData', true)
     // check the signature of each account data
