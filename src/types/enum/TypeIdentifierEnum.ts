@@ -60,6 +60,7 @@ export enum TypeIdentifierEnum {
   cConfirmOrChallengeMessage,
   cAppliedReceipt2,
   cRepairOOSAccountsReq,
+  cPoqoSendReceiptReq,
   cPoqoDataAndReceiptReq,
   cPoqoSendVoteReq
 }
