@@ -1266,6 +1266,8 @@ export interface ServerConfiguration {
     stuckTxMoveTime: number
     // use newer collected data
     collectedDataFix: boolean
+    // no repairToMatch if data is attached to receipt
+    noRepairIfDataAttached: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
