@@ -1264,6 +1264,8 @@ export interface ServerConfiguration {
     singleAccountStuckFix: boolean
     // wait time before moving stuck "consensing" tx to "await final data"
     stuckTxMoveTime: number
+    // use newer collected data
+    collectedDataFix: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

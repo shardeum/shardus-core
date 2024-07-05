@@ -330,6 +330,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     singleAccountStuckFix: true,
     stuckTxMoveTime: 60000,
     forceVoteForFailedPreApply: true,
+    collectedDataFix: true
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,
