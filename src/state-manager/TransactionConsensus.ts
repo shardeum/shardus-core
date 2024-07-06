@@ -1321,34 +1321,6 @@ class TransactionConsenus {
       }
     )
 
-    const poqoSendVoteBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
-      name: InternalRouteEnum.binary_poqo_send_vote,
-      handler: (payload, respond, header, sign) => {
-        const route = InternalRouteEnum.binary_poqo_send_vote
-        profilerInstance.scopedProfileSectionStart(route, false)
-        try{
-          const stream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cPoqoSendVoteReq)
-          if(!payload){
-            nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
-            return
-          }
-          const readableReq = deserializePoqoSendVoteReq(stream)
-          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(readableReq.txid)
-          if (queueEntry == null) {
-            /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-vote: no queue entry found')
-            return
-          }
-          const collectedVoteHash = readableReq as AppliedVoteHash
-          // We can reuse the same function for POQo
-          this.tryAppendVoteHash(queueEntry, collectedVoteHash)
-        } finally {
-          profilerInstance.scopedProfileSectionEnd(route)
-        }
-      }
-
-    }
-    Comms.registerInternalBinary(poqoSendVoteBinaryHandler.name, poqoSendVoteBinaryHandler.handler)
-
     const poqoSendReceiptBinary: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_poqo_send_receipt,
       handler: async (payload, respond, header) => {
@@ -1425,6 +1397,34 @@ class TransactionConsenus {
         }
       }
     )
+
+    const poqoSendVoteBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_poqo_send_vote,
+      handler: (payload, respond, header, sign) => {
+        const route = InternalRouteEnum.binary_poqo_send_vote
+        profilerInstance.scopedProfileSectionStart(route, false)
+        try{
+          const stream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cPoqoSendVoteReq)
+          if(!payload){
+            nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
+            return
+          }
+          const readableReq = deserializePoqoSendVoteReq(stream)
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(readableReq.txid)
+          if (queueEntry == null) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-vote: no queue entry found')
+            return
+          }
+          const collectedVoteHash = readableReq as AppliedVoteHash
+          // We can reuse the same function for POQo
+          this.tryAppendVoteHash(queueEntry, collectedVoteHash)
+        } finally {
+          profilerInstance.scopedProfileSectionEnd(route)
+        }
+      }
+
+    }
+    Comms.registerInternalBinary(poqoSendVoteBinaryHandler.name, poqoSendVoteBinaryHandler.handler)
   }
 
   async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {
