@@ -844,6 +844,9 @@ export async function checkAndUpdateTimeSyncedOffset(timeServers) {
   // Ignore time check if debug flag is set
   if (config.debug.ignoreTimeCheck === true) return true
 
+  // Define sync limit in milliseconds
+  const syncLimitMs = config.p2p.syncLimit * 1000
+
   // Check if local time is within 5 minutes of time servers
   for (const host of timeServers) {
     try {
@@ -854,7 +857,11 @@ export async function checkAndUpdateTimeSyncedOffset(timeServers) {
       //update our offset convert from seconds to MS
       //docs are wrong... time.t seems to be in ms
       ntpOffsetMs = Math.floor(time.t)
-      const isInRange = time.t <= config.p2p.syncLimit * 1000 //convert config to ms
+
+      if (config.debug.debugNTPBogusDecrements) ntpOffsetMs -= 3 * syncLimitMs
+
+      // Check if the offset is within the acceptable range of positive and negative values
+      const isInRange = Math.abs(ntpOffsetMs) <= syncLimitMs
 
       lastNTPTimeObj = time
       //check if ntpOffsetMs is a number
