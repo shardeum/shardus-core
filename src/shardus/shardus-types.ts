@@ -1104,6 +1104,8 @@ export interface ServerConfiguration {
     debugStatListMaxSize: number
     /** chance to ignore being told data for a certain account */
     ignoreDataTellChance: number
+    // flag to add bogus increments to NTP offset
+    debugNTPBogusDecrements: boolean
   }
   /** Options for the statistics module */
   statistics?: {

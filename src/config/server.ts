@@ -252,6 +252,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     randomCycleData: false,
     debugStatListMaxSize: 1000,
     ignoreDataTellChance: 0,
+    debugNTPBogusDecrements: false,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {

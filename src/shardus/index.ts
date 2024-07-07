@@ -440,9 +440,8 @@ class Shardus extends EventEmitter {
     const isInTimeLimit = await Network.checkAndUpdateTimeSyncedOffset(this.config.p2p.timeServers)
 
     if (isInTimeLimit === false) {
-      this.mainLogger.error(`Time is not synced with the network`)
-      //this is TBD
-      // throw new Error(`Time is not synced with the network`)
+      this.mainLogger.error(`Time is not in sync with the network from checkAndUpdateTimeSyncedOffset process`)
+      throw new Error(`Time is not in sync with the network during ntpOffsetMs generation`)
     }
 
     if (!isServiceMode()) {
