@@ -68,6 +68,8 @@ export function getAllowBogon(): boolean {
 
 let mode = null
 
+export let finishedSyncingCycle = -1
+
 // let hasSubmittedJoinRequest = false
 // export function getHasSubmittedJoinRequest(): boolean {
 //   return hasSubmittedJoinRequest
@@ -744,6 +746,7 @@ export function queueStartedSyncingRequest(): void {
 
 export function queueFinishedSyncingRequest(): void {
   queuedFinishedSyncingId = Self.id
+  finishedSyncingCycle = CycleCreator.currentCycle
 }
 
 export function queueStandbyRefreshRequest(publicKey: string): void {

@@ -256,6 +256,10 @@ class StateManager {
 
   useAccountWritesOnly: boolean
   reinjectTxsMap: Map<string, number>
+
+  // idk if this copy is needed. there's a function called getSyncTrackerRanges in AccountPatcher.ts that looks like
+  // it does the same thing. just doing this as a temp measure to move fast
+  coverageChangesCopy: { start: number; end: number }[]
   /***
    *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########
    *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ##
@@ -798,6 +802,8 @@ class StateManager {
       oldShardData.nodeShardData,
       newSharddata.nodeShardData
     )
+
+    this.coverageChangesCopy = coverageChanges
 
     for (const change of coverageChanges) {
       // log info about the change.

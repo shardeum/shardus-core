@@ -2539,7 +2539,7 @@ class AccountPatcher {
       if (ourTrieNode == null) {
         /* prettier-ignore */ nestedCountersInstance.countRareEvent(`accountPatcher`, `isInSync ${radix} our trieNode === null`, 1)
         if (logFlags.debug) this.mainLogger.debug(`isInSync ${radix} our trieNode === null, cycle: ${cycle}`)
-        isInsyncResult.radixes.push({radix, insync: false, inConsensusRange, inEdgeRange})
+        isInsyncResult.radixes.push({radix, insync: false, inConsensusRange, inEdgeRange, recentRuntimeSync: false})
         isInsyncResult.insync = false
         isInsyncResult.stats.bad++
         isInsyncResult.stats.total++
@@ -2582,11 +2582,11 @@ class AccountPatcher {
           )
         }
         isInsyncResult.insync = false
-        isInsyncResult.radixes.push({radix, insync: false, inConsensusRange, inEdgeRange})
+        isInsyncResult.radixes.push({radix, insync: false, inConsensusRange, inEdgeRange, recentRuntimeSync: false})
         isInsyncResult.stats.bad++
         isInsyncResult.stats.total++
       } else if (ourTrieNode.hash === votesMap.bestHash) {
-        isInsyncResult.radixes.push({radix, insync: true, inConsensusRange, inEdgeRange})
+        isInsyncResult.radixes.push({radix, insync: true, inConsensusRange, inEdgeRange, recentRuntimeSync: false})
         isInsyncResult.stats.good++
         isInsyncResult.stats.total++
       }
@@ -2597,6 +2597,31 @@ class AccountPatcher {
     })
     //todo what about situation where we do not have enough votes??
     //todo?? more utility / get list of oos radix
+
+    // set recentRuntimeSync to true in the radices that have had recent coverage changes
+    for (const coverageChange of this.stateManager.coverageChangesCopy) {
+      const startRadix = coverageChange.start.toString().substring(0, this.treeSyncDepth)
+      const endRadix = coverageChange.end.toString().substring(0, this.treeSyncDepth)
+
+      // for non-wrapped ranges
+      if (startRadix <= endRadix) {
+        for (let i = 0; i <= isInsyncResult.radixes.length; i++) {
+          const radixEntry = isInsyncResult.radixes[i]
+          if (radixEntry.radix >= startRadix && radixEntry.radix <= endRadix) {
+            radixEntry.recentRuntimeSync = true
+          }
+        }
+      // for wrapped ranges because we start at the end and wrap around to the beginning of 32 byte address space
+      } else {
+        for (let i = 0; i <= isInsyncResult.radixes.length; i++) {
+          const radixEntry = isInsyncResult.radixes[i]
+          if (radixEntry.radix >= startRadix || radixEntry.radix <= endRadix) {
+            radixEntry.recentRuntimeSync = true
+          }
+        }
+      }
+    }
+
     return isInsyncResult // {inSync, }
   }
 
