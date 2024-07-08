@@ -2583,9 +2583,6 @@ class TransactionQueue {
    * @param data
    */
   queueEntryAddData(queueEntry: QueueEntry, data: Shardus.WrappedResponse, signatureCheck = false): void {
-    if (queueEntry.collectedData[data.accountId] != null) {
-      return // already have the data
-    }
     if (queueEntry.uniqueKeys == null) {
       // cant have all data yet if we dont even have unique keys.
       throw new Error(
