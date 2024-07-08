@@ -1484,14 +1484,14 @@ class TransactionConsenus {
   }
 
   verifyAppliedReceipt(receipt: AppliedReceipt2, executionGroupNodes: Set<string>): boolean {
-    const ownerToSignMap = new Map();
+    const ownerToSignMap = new Map<string, Shardus.Sign>();
     for (const sign of receipt.signatures) {
       if (executionGroupNodes.has(sign.owner)) {
         ownerToSignMap.set(sign.owner, sign);
       }
     }
     const totalNodes = executionGroupNodes.size;
-    const requiredMajority = Math.round(totalNodes * (2 / 3.0)); //hacky for now.
+    const requiredMajority = Math.ceil(totalNodes * this.config.p2p.requiredVotesPercentage)
     if (ownerToSignMap.size < requiredMajority) {
       return false;
     }
