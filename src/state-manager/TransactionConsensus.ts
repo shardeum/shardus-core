@@ -3547,7 +3547,7 @@ class TransactionConsenus {
   }
 
   tryAppendVoteHash(queueEntry: QueueEntry, voteHash: AppliedVoteHash): boolean {
-    const numVotes = queueEntry.collectedVotes.length
+    const numVotes = queueEntry.collectedVoteHashes.length
 
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVoteHash', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVoteHashes.length}`)
     /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryAppendVoteHash collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVoteHashes.length} `)
