@@ -334,7 +334,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     stuckTxMoveTime: 60000,
     forceVoteForFailedPreApply: true,
     collectedDataFix: true,
-    noRepairIfDataAttached: true
+    noRepairIfDataAttached: true,
+    rejectSharedDataIfCovered: false,
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,
