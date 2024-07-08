@@ -32,16 +32,18 @@ export function serializeAppliedReceipt2(
     stream.writeUInt16(TypeIdentifierEnum.cAppliedReceipt2)
   }
   stream.writeUInt8(cAppliedReceipt2Version)
-  // stream.writeString(obj.txid)
-  // stream.writeUInt8(obj.result ? 1 : 0)
-  // serializeAppliedVote(stream, obj.appliedVote)
-  // serializeConfirmOrChallengeMessage(stream, obj.confirmOrChallenge)
-  // stream.writeUInt16(obj.signatures.length)
-  // // TODO: Convert to for loop
-  // obj.signatures.forEach((sig) => serializeSign(stream, sig))
-  // stream.writeString(obj.app_data_hash)
-  const stringified = Utils.safeStringify(obj)
-  stream.writeString(stringified)
+  stream.writeString(obj.txid)
+  stream.writeUInt8(obj.result ? 1 : 0)
+  serializeAppliedVote(stream, obj.appliedVote)
+  serializeConfirmOrChallengeMessage(stream, obj.confirmOrChallenge)
+
+  stream.writeUInt16(obj.signatures.length)
+
+  for(let i = 0; i < obj.signatures.length; i++) {
+    serializeSign(stream, obj.signatures[i])
+  }
+
+  stream.writeString(obj.app_data_hash)
 }
 
 export function deserializeAppliedReceipt2(stream: VectorBufferStream): AppliedReceipt2Serializable {
@@ -49,24 +51,22 @@ export function deserializeAppliedReceipt2(stream: VectorBufferStream): AppliedR
   if (version > cAppliedReceipt2Version) {
     throw new Error(`AppliedReceipt2Deserializer expected version ${cAppliedReceipt2Version}, got ${version}`)
   }
-  // const txid = stream.readString()
-  // const result = stream.readUInt8() === 1
-  // const appliedVote = deserializeAppliedVote(stream)
-  // const confirmOrChallenge = deserializeConfirmOrChallengeMessage(stream)
-  // const signaturesLength = stream.readUInt16()
-  // const signatures: SignSerializable[] = []
-  // for (let i = 0; i < signaturesLength; i++) {
-  //   signatures.push(deserializeSign(stream))
-  // }
-  // const app_data_hash = stream.readString()
-  // return {
-  //   txid,
-  //   result,
-  //   appliedVote,
-  //   confirmOrChallenge,
-  //   signatures,
-  //   app_data_hash,
-  // }
-  const stringified = stream.readString()
-  return Utils.safeJsonParse(stringified)
+  const txid = stream.readString()
+  const result = stream.readUInt8() === 1
+  const appliedVote = deserializeAppliedVote(stream)
+  const confirmOrChallenge = deserializeConfirmOrChallengeMessage(stream)
+  const signaturesLength = stream.readUInt16()
+  const signatures: SignSerializable[] = new Array(signaturesLength)
+  for (let i = 0; i < signaturesLength; i++) {
+    signatures.push(deserializeSign(stream))
+  }
+  const app_data_hash = stream.readString()
+  return {
+    txid,
+    result,
+    appliedVote,
+    confirmOrChallenge,
+    signatures,
+    app_data_hash,
+  }
 }
