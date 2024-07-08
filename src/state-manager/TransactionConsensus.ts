@@ -1419,9 +1419,9 @@ class TransactionConsenus {
       handler: (payload, respond, header, sign) => {
         const route = InternalRouteEnum.binary_poqo_send_vote
         profilerInstance.scopedProfileSectionStart(route, false)
-        try{
+        try {
           const stream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cPoqoSendVoteReq)
-          if(!payload){
+          if (!payload) {
             nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
             return
           }
@@ -1434,11 +1434,14 @@ class TransactionConsenus {
           const collectedVoteHash = readableReq as AppliedVoteHash
           // We can reuse the same function for POQo
           this.tryAppendVoteHash(queueEntry, collectedVoteHash)
+        } catch (e) {
+          console.error(`Error processing poqoSendVoteBinary handler: ${e}`)
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
         } finally {
           profilerInstance.scopedProfileSectionEnd(route)
         }
-      }
-
+      },
     }
     Comms.registerInternalBinary(poqoSendVoteBinaryHandler.name, poqoSendVoteBinaryHandler.handler)
   }
