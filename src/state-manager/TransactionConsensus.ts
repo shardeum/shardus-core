@@ -1354,11 +1354,27 @@ class TransactionConsenus {
             return
           }
 
-          if (logFlags.verbose) this.mainLogger.debug(`POQo: Received receipt from aggregator for ${queueEntry.logID} starting CT2 for data & receipt`)
+          if (logFlags.verbose)
+            this.mainLogger.debug(
+              `POQo: Received receipt from aggregator for ${queueEntry.logID} starting CT2 for data & receipt`
+            )
           const receivedReceipt = readableReq as AppliedReceipt2
           queueEntry.poqoReceipt = receivedReceipt
           queueEntry.appliedReceipt2 = receivedReceipt
           queueEntry.recievedAppliedReceipt2 = receivedReceipt
+          queueEntry.hasSentFinalReceipt = true
+          Comms.sendGossip(
+            'poqo-receipt-gossip',
+            payload,
+            null,
+            null,
+            queueEntry.transactionGroup,
+            false,
+            4,
+            readableReq.txid,
+            '',
+            true
+          )
           this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
          
         } catch (e) {
