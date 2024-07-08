@@ -1268,6 +1268,8 @@ export interface ServerConfiguration {
     collectedDataFix: boolean
     // no repairToMatch if data is attached to receipt
     noRepairIfDataAttached: boolean
+    // reject shared data if we cover it
+    rejectSharedDataIfCovered: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

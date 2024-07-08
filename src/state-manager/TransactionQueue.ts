@@ -311,8 +311,13 @@ class TransactionQueue {
           }
           // add the data in
           for (const data of payload.stateList) {
-            if (configContext.stateManager.collectedDataFix) {
-              const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(data.accountId)
+            if (
+              configContext.stateManager.collectedDataFix &&
+              configContext.stateManager.rejectSharedDataIfCovered
+            ) {
+              const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(
+                data.accountId
+              )
               const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
               if (coveredByUs) {
                 nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
