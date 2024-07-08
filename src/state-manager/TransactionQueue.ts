@@ -356,7 +356,7 @@ class TransactionQueue {
             return
           }
           for (const data of payload.stateList) {
-            if (configContext.stateManager.collectedDataFix) {
+            if (configContext.stateManager.collectedDataFix && configContext.stateManager.rejectSharedDataIfCovered) {
               const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(data.accountId)
               const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
               if (coveredByUs) {
@@ -466,7 +466,7 @@ class TransactionQueue {
               this.mainLogger.error(`${route} validateCorrespondingTellSender failed for ${state.accountId}`);
               return errorHandler(RequestErrorEnum.InvalidSender);
             }
-            if (configContext.stateManager.collectedDataFix) {
+            if (configContext.stateManager.collectedDataFix && configContext.stateManager.rejectSharedDataIfCovered) {
               const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(state.accountId)
               const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
               if (coveredByUs) {
