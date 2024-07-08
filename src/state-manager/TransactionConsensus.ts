@@ -1044,6 +1044,14 @@ class TransactionConsenus {
           }
 
           if (logFlags.verbose) this.mainLogger.debug(`POQo: received receipt from gossip for ${queueEntry.logID} forwarding gossip`)
+
+          const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
+          const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload, executionGroupNodes)
+          if (!hasTwoThirdsMajority) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.txid}`)
+            return
+          }
+          
           queueEntry.poqoReceipt = payload
           queueEntry.appliedReceipt2 = payload
           queueEntry.recievedAppliedReceipt2 = payload
@@ -1271,6 +1279,12 @@ class TransactionConsenus {
           }
           if (!queueEntry.hasSentFinalReceipt) {
             if (logFlags.verbose) this.mainLogger.debug(`POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`)
+            const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
+            const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload.receipt, executionGroupNodes)
+            if(!hasTwoThirdsMajority) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.receipt.txid}`)
+              return
+            }
             queueEntry.poqoReceipt = payload.receipt
             queueEntry.appliedReceipt2 = payload.receipt
             queueEntry.recievedAppliedReceipt2 = payload.receipt
@@ -1315,8 +1329,13 @@ class TransactionConsenus {
             // We've already handled this
             return
           }
-
           if (logFlags.verbose) this.mainLogger.debug(`POQo: Received receipt from aggregator for ${queueEntry.logID} starting CT2 for data & receipt`)
+          const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
+          const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload, executionGroupNodes)
+          if (!hasTwoThirdsMajority) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.txid}`)
+            return
+          }
           const receivedReceipt = payload as AppliedReceipt2
           queueEntry.poqoReceipt = receivedReceipt
           queueEntry.appliedReceipt2 = receivedReceipt
@@ -1462,6 +1481,36 @@ class TransactionConsenus {
       },
     }
     Comms.registerInternalBinary(poqoSendVoteBinaryHandler.name, poqoSendVoteBinaryHandler.handler)
+  }
+
+  verifyAppliedReceipt(receipt: AppliedReceipt2, executionGroupNodes: Set<string>): boolean {
+    const ownerToSignMap = new Map();
+    for (const sign of receipt.signatures) {
+      if (executionGroupNodes.has(sign.owner)) {
+        ownerToSignMap.set(sign.owner, sign);
+      }
+    }
+    const totalNodes = executionGroupNodes.size;
+    const requiredMajority = Math.round(totalNodes * (2 / 3.0)); //hacky for now.
+    if (ownerToSignMap.size < requiredMajority) {
+      return false;
+    }
+
+    const vote = receipt.appliedVote; 
+    const voteHash = this.calculateVoteHash(vote);
+    const appliedVoteHash = {
+      txid: vote.txid,
+      voteHash,
+    }
+
+    let validSignatures = 0;    
+    for (const owner of ownerToSignMap.keys()) {
+      const signedObject = { ...appliedVoteHash, sign: ownerToSignMap.get(owner) };
+      if (this.crypto.verify(signedObject, owner)) {
+        validSignatures++;
+      }
+    }
+    return validSignatures >= requiredMajority;
   }
 
   async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {
