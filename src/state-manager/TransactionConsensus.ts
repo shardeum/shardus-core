@@ -1074,11 +1074,11 @@ class TransactionConsenus {
         try {
           const _sender = header.sender_id
           const reqStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cPoqoDataAndReceiptReq)
-          if(!reqStream){
+          if (!reqStream) {
             nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
-            return;
+            return
           }
-          const readableReq = deserializePoqoDataAndReceiptResp(reqStream);
+          const readableReq = deserializePoqoDataAndReceiptResp(reqStream)
           // make sure we have it
           const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(readableReq.finalState.txid) // , payload.timestamp)
           //It is okay to ignore this transaction if the txId is not found in the queue.
@@ -1089,7 +1089,11 @@ class TransactionConsenus {
             return
           }
           if (logFlags.debug)
-            this.mainLogger.debug(`poqo-data-and-receipt ${queueEntry.logID}, ${Utils.safeStringify(readableReq.finalState.stateList)}`)
+            this.mainLogger.debug(
+              `poqo-data-and-receipt ${queueEntry.logID}, ${Utils.safeStringify(
+                readableReq.finalState.stateList
+              )}`
+            )
           // add the data in
           const savedAccountIds: Set<string> = new Set()
           for (const data of readableReq.finalState.stateList) {
@@ -1104,7 +1108,12 @@ class TransactionConsenus {
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for data: ${data.accountId}, sender: ${_sender}`)
               continue
             }
-            const isValidFinalDataSender = this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, _sender)
+            const isValidFinalDataSender =
+              this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(
+                queueEntry,
+                data.accountId,
+                _sender
+              )
             if (isValidFinalDataSender === false) {
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender} for data: ${data.accountId}`)
               continue
@@ -1147,9 +1156,13 @@ class TransactionConsenus {
             nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
           }
           if (!queueEntry.hasSentFinalReceipt) {
-            if (logFlags.verbose) this.mainLogger.debug(`POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`)
+            if (logFlags.verbose)
+              this.mainLogger.debug(
+                `POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`
+              )
             queueEntry.poqoReceipt = readableReq.receipt
             queueEntry.appliedReceipt2 = readableReq.receipt
+            queueEntry.recievedAppliedReceipt2 = readableReq.receipt
             Comms.sendGossip(
               'poqo-receipt-gossip',
               readableReq.receipt,
@@ -1164,12 +1177,19 @@ class TransactionConsenus {
             )
             queueEntry.hasSentFinalReceipt = true
           }
+        } catch (e) {
+          console.error(`Error processing poqoDataAndReceipt Binary handler: ${e}`)
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
         } finally {
           profilerInstance.scopedProfileSectionEnd(route)
         }
-      }
+      },
     }
-    Comms.registerInternalBinary(poqoDataAndReceiptBinaryHandler.name, poqoDataAndReceiptBinaryHandler.handler);
+    Comms.registerInternalBinary(
+      poqoDataAndReceiptBinaryHandler.name,
+      poqoDataAndReceiptBinaryHandler.handler
+    )
 
     Comms.registerInternal(
       'poqo-data-and-receipt',
@@ -1334,7 +1354,6 @@ class TransactionConsenus {
           opts?: { customErrorLog?: string; customCounterSuffix?: string }
         ): void => requestErrorHandler(route, errorType, header, opts)
 
-        
         try {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cPoqoSendReceiptReq)
           if (!requestStream) {
@@ -1376,7 +1395,6 @@ class TransactionConsenus {
             true
           )
           this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
-         
         } catch (e) {
           console.error(`Error processing poqoSendReceiptBinary handler: ${e}`)
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
@@ -1399,7 +1417,7 @@ class TransactionConsenus {
         msgSize: number
       ) => {
         profilerInstance.scopedProfileSectionStart('poqo-send-vote', false, msgSize)
-        try{
+        try {
           const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid)
           if (queueEntry == null) {
             /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-vote: no queue entry found')
