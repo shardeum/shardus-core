@@ -27,7 +27,7 @@ export function serializePoqoSendReceiptReq(
 
   serializeAppliedVote(stream, obj.appliedVote)
 
-  if (obj.confirmOrChallenge !== undefined) {
+  if (obj.confirmOrChallenge) {
     stream.writeUInt8(1)
     serializeConfirmOrChallengeMessage(stream, obj.confirmOrChallenge)
   } else {
@@ -55,8 +55,6 @@ export function deserializePoqoSendReceiptReq(stream: VectorBufferStream): PoqoS
   let confirmOrChallenge
   if (stream.readUInt8() === 1) {
     confirmOrChallenge = deserializeConfirmOrChallengeMessage(stream)
-  } else {
-    confirmOrChallenge = undefined
   }
 
   const signaturesLength = stream.readUInt16()
@@ -67,12 +65,22 @@ export function deserializePoqoSendReceiptReq(stream: VectorBufferStream): PoqoS
 
   const app_data_hash = stream.readString()
 
-  return {
-    txid,
-    result,
-    appliedVote,
-    confirmOrChallenge,
-    signatures,
-    app_data_hash,
+  if (confirmOrChallenge) {
+    return {
+      txid,
+      result,
+      appliedVote,
+      confirmOrChallenge,
+      signatures,
+      app_data_hash,
+    }
+  } else {
+    return {
+      txid,
+      result,
+      appliedVote,
+      signatures,
+      app_data_hash,
+    }
   }
 }
