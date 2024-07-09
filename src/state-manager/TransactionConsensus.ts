@@ -1106,7 +1106,7 @@ class TransactionConsenus {
           const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
           const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq.receipt, executionGroupNodes)
           if(!hasTwoThirdsMajority) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.receipt.txid}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.receipt.txid}`)
             nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt because no majority')
             return
           }
@@ -1419,7 +1419,7 @@ class TransactionConsenus {
           const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
           const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq, executionGroupNodes)
           if (!hasTwoThirdsMajority) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.txid}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.txid}`)
             nestedCountersInstance.countEvent('poqo', 'poqo-send-receipt: Rejecting receipt because no majority')
             return
           }
@@ -1475,6 +1475,12 @@ class TransactionConsenus {
             return
           }
           const collectedVoteHash = payload as AppliedVoteHash
+
+          // Check if vote hash has a sign
+          if (!collectedVoteHash.sign) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-vote: no sign found')
+            return
+          }
           // We can reuse the same function for POQo
           this.tryAppendVoteHash(queueEntry, collectedVoteHash)
         } finally {
@@ -1501,6 +1507,12 @@ class TransactionConsenus {
             return
           }
           const collectedVoteHash = readableReq as AppliedVoteHash
+
+          // Check if vote hash has a sign
+          if (!collectedVoteHash.sign) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-vote: no sign found')
+            return
+          }
           // We can reuse the same function for POQo
           this.tryAppendVoteHash(queueEntry, collectedVoteHash)
         } catch (e) {
@@ -3840,10 +3852,11 @@ class TransactionConsenus {
             `tryAppendVote: ${queueEntry.logID} received vote is NOT better than current vote. lastReceivedVoteTimestamp: ${queueEntry.lastVoteReceivedTimestamp}`
           )
         }
-        if (receivedVoter)
+        if (receivedVoter) {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter ${NodeList.activeIdToPartition.get(receivedVoter.id)}`)
-        else
+        } else {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter`)
+        }
         return false
       }
 
@@ -3875,6 +3888,12 @@ class TransactionConsenus {
   }
 
   tryAppendVoteHash(queueEntry: QueueEntry, voteHash: AppliedVoteHash): boolean {
+    // Check if sender is in execution group
+    if (!queueEntry.executionGroup.some((node) => node.publicKey === voteHash.sign.owner)) {
+      nestedCountersInstance.countEvent('poqo', 'Vote sender not in execution group')
+      return false
+    }
+
     const numVotes = queueEntry.collectedVoteHashes.length
 
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVoteHash', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVoteHashes.length}`)
