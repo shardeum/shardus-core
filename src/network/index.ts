@@ -127,6 +127,19 @@ export class NetworkClass extends EventEmitter {
     next()
   }
 
+  handleError(error: any, req: any, res: any, route: string) {
+    /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Error in route ${route}: ${error.message}`)
+
+    nestedCountersInstance.countEvent('endpoint-exception', `error-${route}`)
+
+    // Send an error response
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: isDebugMode() ? error.message : 'An unexpected error occurred',
+      route: route,
+    })
+  }
+
   // TODO: Allow for binding to a specified network interface
   _setupExternal() {
     return new Promise((resolve, reject) => {
@@ -545,28 +558,28 @@ export class NetworkClass extends EventEmitter {
       handlers.push(authHandler)
     }
 
-    if (isDebugMode() && ['GET', 'POST'].includes(method)) {
-      const wrappedHandler = async (req, res, next) => {
-        profilerInstance.profileSectionStart('net-externl', false)
-        profilerInstance.profileSectionStart(`net-externl-${route}`, false)
-        profilerInstance.scopedProfileSectionStart(`net-externl-${route}`, false)
-
-        let result
-        try {
-          result = await responseHandler(req, res, next)
-        } finally {
+    const wrappedHandler = async (req, res, next) => {
+      let result
+      try {
+        if (isDebugMode() && ['GET', 'POST'].includes(method)) {
+          profilerInstance.profileSectionStart('net-externl', false)
+          profilerInstance.profileSectionStart(`net-externl-${route}`, false)
+          profilerInstance.scopedProfileSectionStart(`net-externl-${route}`, false)
+        }
+        result = await responseHandler(req, res, next)
+      } catch (error) {
+        this.handleError(error, req, res, route)
+      } finally {
+        if (isDebugMode() && ['GET', 'POST'].includes(method)) {
           profilerInstance.scopedProfileSectionEnd(`net-externl-${route}`)
           profilerInstance.profileSectionEnd(`net-externl-${route}`, false)
           profilerInstance.profileSectionEnd('net-externl', false)
         }
-
-        return result
       }
-
-      handlers.push(wrappedHandler)
-    } else {
-      handlers.push(responseHandler)
+      return result
     }
+
+    handlers.push(wrappedHandler)
 
     let expressMethod = {
       GET: 'get',
