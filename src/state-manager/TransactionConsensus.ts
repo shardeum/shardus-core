@@ -1049,6 +1049,7 @@ class TransactionConsenus {
           const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload, executionGroupNodes)
           if (!hasTwoThirdsMajority) {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.txid}`)
+            nestedCountersInstance.countEvent('poqo', 'poqo-receipt-gossip: Rejecting receipt because no majority')
             return
           }
           
@@ -1096,6 +1097,20 @@ class TransactionConsenus {
             nestedCountersInstance.countEvent('processing', 'broadcast_finalstate_noQueueEntry')
             return
           }
+
+          // Continue if we've already processed this before
+          if (queueEntry.hasSentFinalReceipt) {
+            return
+          }
+
+          const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
+          const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq.receipt, executionGroupNodes)
+          if(!hasTwoThirdsMajority) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.receipt.txid}`)
+            nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt because no majority')
+            return
+          }
+
           if (logFlags.debug)
             this.mainLogger.debug(
               `poqo-data-and-receipt ${queueEntry.logID}, ${Utils.safeStringify(
@@ -1220,6 +1235,20 @@ class TransactionConsenus {
             nestedCountersInstance.countEvent('processing', 'broadcast_finalstate_noQueueEntry')
             return
           }
+
+          // Continue if we've already processed this before
+          if (queueEntry.hasSentFinalReceipt) {
+            return
+          }
+
+          const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
+          const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload.receipt, executionGroupNodes)
+          if(!hasTwoThirdsMajority) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.receipt.txid}`)
+            nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt because no majority')
+            return
+          }
+
           if (logFlags.debug)
             this.mainLogger.debug(`poqo-data-and-receipt ${queueEntry.logID}, ${Utils.safeStringify(payload.finalState.stateList)}`)
           // add the data in
@@ -1279,12 +1308,6 @@ class TransactionConsenus {
           }
           if (!queueEntry.hasSentFinalReceipt) {
             if (logFlags.verbose) this.mainLogger.debug(`POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`)
-            const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
-            const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload.receipt, executionGroupNodes)
-            if(!hasTwoThirdsMajority) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.receipt.txid}`)
-              return
-            }
             queueEntry.poqoReceipt = payload.receipt
             queueEntry.appliedReceipt2 = payload.receipt
             queueEntry.recievedAppliedReceipt2 = payload.receipt
@@ -1334,6 +1357,7 @@ class TransactionConsenus {
           const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload, executionGroupNodes)
           if (!hasTwoThirdsMajority) {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.txid}`)
+            nestedCountersInstance.countEvent('poqo', 'poqo-send-receipt: Rejecting receipt because no majority')
             return
           }
           const receivedReceipt = payload as AppliedReceipt2
@@ -1389,6 +1413,14 @@ class TransactionConsenus {
 
           if (queueEntry.poqoReceipt) {
             // We've already handled this
+            return
+          }
+
+          const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
+          const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq, executionGroupNodes)
+          if (!hasTwoThirdsMajority) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.txid}`)
+            nestedCountersInstance.countEvent('poqo', 'poqo-send-receipt: Rejecting receipt because no majority')
             return
           }
 
