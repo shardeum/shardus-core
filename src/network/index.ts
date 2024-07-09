@@ -132,7 +132,7 @@ export class NetworkClass extends EventEmitter {
   handleError(error: any, req: any, res: any, route: string) {
     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Error in route ${route}: ${error.message}`)
 
-    nestedCountersInstance.countEvent('endpoint-exception', `${route}`)
+    nestedCountersInstance.countEvent('endpoint-exception', `error-${route}`)
 
     // Send an error response
     res.status(500).json({
