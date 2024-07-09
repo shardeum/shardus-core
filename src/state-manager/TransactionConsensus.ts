@@ -1104,6 +1104,16 @@ class TransactionConsenus {
             return
           }
 
+          const isValidFinalDataSender =
+            this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(
+              queueEntry,
+              _sender
+            )
+          if (isValidFinalDataSender === false) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender} for data: ${queueEntry.acceptedTx.txId}`)
+            return
+          }
+
           if (!queueEntry.hasSentFinalReceipt) {
             const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
             const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq.receipt, executionGroupNodes)
@@ -1150,16 +1160,6 @@ class TransactionConsenus {
               continue
             }
             
-            const isValidFinalDataSender =
-              this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(
-                queueEntry,
-                data.accountId,
-                _sender
-              )
-            if (isValidFinalDataSender === false) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender} for data: ${data.accountId}`)
-              continue
-            }
             if (queueEntry.collectedFinalData[data.accountId] == null) {
               queueEntry.collectedFinalData[data.accountId] = data
               savedAccountIds.add(data.accountId)
@@ -1238,6 +1238,13 @@ class TransactionConsenus {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for txid: ${payload.finalState.txid}, sender: ${_sender}`)
             return
           }
+
+          const isValidFinalDataSender = this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(queueEntry, _sender)
+          if (isValidFinalDataSender === false) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender} for data: ${queueEntry.acceptedTx.txId}`)
+            return
+          }
+
           if (!queueEntry.hasSentFinalReceipt) {
             const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
             const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload.receipt, executionGroupNodes)
@@ -1277,11 +1284,6 @@ class TransactionConsenus {
               continue
             }
 
-            const isValidFinalDataSender = this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, _sender)
-            if (isValidFinalDataSender === false) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender} for data: ${data.accountId}`)
-              continue
-            }
             if (queueEntry.collectedFinalData[data.accountId] == null) {
               queueEntry.collectedFinalData[data.accountId] = data
               savedAccountIds.add(data.accountId)

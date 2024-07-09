@@ -485,7 +485,7 @@ class TransactionQueue {
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`broadcast_finalstate invalid sender for data: ${data.accountId}, sender: ${JSON.stringify(_sender)}`)
               continue
             }
-            const isValidFinalDataSender = this.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, _sender.id)
+            const isValidFinalDataSender = this.factValidateCorrespondingTellFinalDataSender(queueEntry, _sender.id)
             if (isValidFinalDataSender === false) {
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`broadcast_finalstate invalid sender ${_sender.id} for data: ${data.accountId}`)
               continue
@@ -587,7 +587,7 @@ class TransactionQueue {
               /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_finalstate data == null`)
               continue
             }
-            const isValidFinalDataSender = this.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, header.sender_id)
+            const isValidFinalDataSender = this.factValidateCorrespondingTellFinalDataSender(queueEntry, header.sender_id)
             if (isValidFinalDataSender === false) {
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`broadcast_finalstate invalid sender ${header.sender_id} for data: ${data.accountId}`)
               continue
@@ -4911,7 +4911,7 @@ class TransactionQueue {
     profilerInstance.profileSectionEnd('factTellCorrespondingNodesFinalData', true)
   }
 
-  factValidateCorrespondingTellFinalDataSender(queueEntry: QueueEntry, dataKey: string, senderNodeId: string): boolean {
+  factValidateCorrespondingTellFinalDataSender(queueEntry: QueueEntry, senderNodeId: string): boolean {
     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factValidateCorrespondingTellFinalDataSender: txId: ${queueEntry.acceptedTx.txId} sender node id: ${senderNodeId}, receiver id: ${Self.id}`)
     const senderNode = NodeList.nodes.get(senderNodeId)
     if (senderNode === null) {
