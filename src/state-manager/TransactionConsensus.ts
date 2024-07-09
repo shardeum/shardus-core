@@ -1044,6 +1044,15 @@ class TransactionConsenus {
           }
 
           if (logFlags.verbose) this.mainLogger.debug(`POQo: received receipt from gossip for ${queueEntry.logID} forwarding gossip`)
+
+          const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
+          const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload, executionGroupNodes)
+          if (!hasTwoThirdsMajority) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.txid}`)
+            nestedCountersInstance.countEvent('poqo', 'poqo-receipt-gossip: Rejecting receipt because no majority')
+            return
+          }
+          
           queueEntry.poqoReceipt = payload
           queueEntry.appliedReceipt2 = payload
           queueEntry.recievedAppliedReceipt2 = payload
@@ -1088,6 +1097,13 @@ class TransactionConsenus {
             nestedCountersInstance.countEvent('processing', 'broadcast_finalstate_noQueueEntry')
             return
           }
+
+          // validate corresponding tell sender
+          if (_sender == null) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for txid: ${readableReq.finalState.txid}, sender: ${_sender}`)
+            return
+          }
+
           if (logFlags.debug)
             this.mainLogger.debug(
               `poqo-data-and-receipt ${queueEntry.logID}, ${Utils.safeStringify(
@@ -1103,11 +1119,7 @@ class TransactionConsenus {
               /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`poqo-data-and-receipt data == null`)
               continue
             }
-            // validate corresponding tell sender
-            if (_sender == null) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for data: ${data.accountId}, sender: ${_sender}`)
-              continue
-            }
+            
             const isValidFinalDataSender =
               this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(
                 queueEntry,
@@ -1156,6 +1168,13 @@ class TransactionConsenus {
             nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
           }
           if (!queueEntry.hasSentFinalReceipt) {
+            const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
+            const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq.receipt, executionGroupNodes)
+            if(!hasTwoThirdsMajority) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.receipt.txid}`)
+              nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt because no majority')
+              return
+            }
             if (logFlags.verbose)
               this.mainLogger.debug(
                 `POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`
@@ -1212,6 +1231,13 @@ class TransactionConsenus {
             nestedCountersInstance.countEvent('processing', 'broadcast_finalstate_noQueueEntry')
             return
           }
+
+          // validate corresponding tell sender
+          if (_sender == null) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for txid: ${payload.finalState.txid}, sender: ${_sender}`)
+            return
+          }
+
           if (logFlags.debug)
             this.mainLogger.debug(`poqo-data-and-receipt ${queueEntry.logID}, ${Utils.safeStringify(payload.finalState.stateList)}`)
           // add the data in
@@ -1223,11 +1249,7 @@ class TransactionConsenus {
               /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`poqo-data-and-receipt data == null`)
               continue
             }
-            // validate corresponding tell sender
-            if (_sender == null) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for data: ${data.accountId}, sender: ${_sender}`)
-              continue
-            }
+
             const isValidFinalDataSender = this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, _sender)
             if (isValidFinalDataSender === false) {
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender} for data: ${data.accountId}`)
@@ -1270,6 +1292,13 @@ class TransactionConsenus {
             nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
           }
           if (!queueEntry.hasSentFinalReceipt) {
+            const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
+            const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload.receipt, executionGroupNodes)
+            if(!hasTwoThirdsMajority) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.receipt.txid}`)
+              nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt because no majority')
+              return
+            }
             if (logFlags.verbose) this.mainLogger.debug(`POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`)
             queueEntry.poqoReceipt = payload.receipt
             queueEntry.appliedReceipt2 = payload.receipt
@@ -1315,8 +1344,14 @@ class TransactionConsenus {
             // We've already handled this
             return
           }
-
           if (logFlags.verbose) this.mainLogger.debug(`POQo: Received receipt from aggregator for ${queueEntry.logID} starting CT2 for data & receipt`)
+          const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
+          const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload, executionGroupNodes)
+          if (!hasTwoThirdsMajority) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.txid}`)
+            nestedCountersInstance.countEvent('poqo', 'poqo-send-receipt: Rejecting receipt because no majority')
+            return
+          }
           const receivedReceipt = payload as AppliedReceipt2
           queueEntry.poqoReceipt = receivedReceipt
           queueEntry.appliedReceipt2 = receivedReceipt
@@ -1373,6 +1408,14 @@ class TransactionConsenus {
             return
           }
 
+          const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
+          const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq, executionGroupNodes)
+          if (!hasTwoThirdsMajority) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.txid}`)
+            nestedCountersInstance.countEvent('poqo', 'poqo-send-receipt: Rejecting receipt because no majority')
+            return
+          }
+
           if (logFlags.verbose)
             this.mainLogger.debug(
               `POQo: Received receipt from aggregator for ${queueEntry.logID} starting CT2 for data & receipt`
@@ -1424,6 +1467,12 @@ class TransactionConsenus {
             return
           }
           const collectedVoteHash = payload as AppliedVoteHash
+
+          // Check if vote hash has a sign
+          if (!collectedVoteHash.sign) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-vote: no sign found')
+            return
+          }
           // We can reuse the same function for POQo
           this.tryAppendVoteHash(queueEntry, collectedVoteHash)
         } finally {
@@ -1450,6 +1499,12 @@ class TransactionConsenus {
             return
           }
           const collectedVoteHash = readableReq as AppliedVoteHash
+
+          // Check if vote hash has a sign
+          if (!collectedVoteHash.sign) {
+            /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-vote: no sign found')
+            return
+          }
           // We can reuse the same function for POQo
           this.tryAppendVoteHash(queueEntry, collectedVoteHash)
         } catch (e) {
@@ -1462,6 +1517,36 @@ class TransactionConsenus {
       },
     }
     Comms.registerInternalBinary(poqoSendVoteBinaryHandler.name, poqoSendVoteBinaryHandler.handler)
+  }
+
+  verifyAppliedReceipt(receipt: AppliedReceipt2, executionGroupNodes: Set<string>): boolean {
+    const ownerToSignMap = new Map<string, Shardus.Sign>();
+    for (const sign of receipt.signatures) {
+      if (executionGroupNodes.has(sign.owner)) {
+        ownerToSignMap.set(sign.owner, sign);
+      }
+    }
+    const totalNodes = executionGroupNodes.size;
+    const requiredMajority = Math.ceil(totalNodes * this.config.p2p.requiredVotesPercentage)
+    if (ownerToSignMap.size < requiredMajority) {
+      return false;
+    }
+
+    const vote = receipt.appliedVote; 
+    const voteHash = this.calculateVoteHash(vote);
+    const appliedVoteHash = {
+      txid: vote.txid,
+      voteHash,
+    }
+
+    let validSignatures = 0;    
+    for (const owner of ownerToSignMap.keys()) {
+      const signedObject = { ...appliedVoteHash, sign: ownerToSignMap.get(owner) };
+      if (this.crypto.verify(signedObject, owner)) {
+        validSignatures++;
+      }
+    }
+    return validSignatures >= requiredMajority;
   }
 
   async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {
@@ -3759,10 +3844,11 @@ class TransactionConsenus {
             `tryAppendVote: ${queueEntry.logID} received vote is NOT better than current vote. lastReceivedVoteTimestamp: ${queueEntry.lastVoteReceivedTimestamp}`
           )
         }
-        if (receivedVoter)
+        if (receivedVoter) {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter ${NodeList.activeIdToPartition.get(receivedVoter.id)}`)
-        else
+        } else {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter`)
+        }
         return false
       }
 
@@ -3794,6 +3880,12 @@ class TransactionConsenus {
   }
 
   tryAppendVoteHash(queueEntry: QueueEntry, voteHash: AppliedVoteHash): boolean {
+    // Check if sender is in execution group
+    if (!queueEntry.executionGroup.some((node) => node.publicKey === voteHash.sign.owner)) {
+      nestedCountersInstance.countEvent('poqo', 'Vote sender not in execution group')
+      return false
+    }
+
     const numVotes = queueEntry.collectedVoteHashes.length
 
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVoteHash', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVoteHashes.length}`)
