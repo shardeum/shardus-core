@@ -1098,16 +1098,9 @@ class TransactionConsenus {
             return
           }
 
-          // Continue if we've already processed this before
-          if (queueEntry.hasSentFinalReceipt) {
-            return
-          }
-
-          const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
-          const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq.receipt, executionGroupNodes)
-          if(!hasTwoThirdsMajority) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.receipt.txid}`)
-            nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt because no majority')
+          // validate corresponding tell sender
+          if (_sender == null) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for txid: ${readableReq.finalState.txid}, sender: ${_sender}`)
             return
           }
 
@@ -1126,11 +1119,7 @@ class TransactionConsenus {
               /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`poqo-data-and-receipt data == null`)
               continue
             }
-            // validate corresponding tell sender
-            if (_sender == null) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for data: ${data.accountId}, sender: ${_sender}`)
-              continue
-            }
+            
             const isValidFinalDataSender =
               this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(
                 queueEntry,
@@ -1179,6 +1168,13 @@ class TransactionConsenus {
             nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
           }
           if (!queueEntry.hasSentFinalReceipt) {
+            const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
+            const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq.receipt, executionGroupNodes)
+            if(!hasTwoThirdsMajority) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.receipt.txid}`)
+              nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt because no majority')
+              return
+            }
             if (logFlags.verbose)
               this.mainLogger.debug(
                 `POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`
@@ -1236,16 +1232,9 @@ class TransactionConsenus {
             return
           }
 
-          // Continue if we've already processed this before
-          if (queueEntry.hasSentFinalReceipt) {
-            return
-          }
-
-          const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
-          const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload.receipt, executionGroupNodes)
-          if(!hasTwoThirdsMajority) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.receipt.txid}`)
-            nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt because no majority')
+          // validate corresponding tell sender
+          if (_sender == null) {
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for txid: ${payload.finalState.txid}, sender: ${_sender}`)
             return
           }
 
@@ -1260,11 +1249,7 @@ class TransactionConsenus {
               /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`poqo-data-and-receipt data == null`)
               continue
             }
-            // validate corresponding tell sender
-            if (_sender == null) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender for data: ${data.accountId}, sender: ${_sender}`)
-              continue
-            }
+
             const isValidFinalDataSender = this.stateManager.transactionQueue.factValidateCorrespondingTellFinalDataSender(queueEntry, data.accountId, _sender)
             if (isValidFinalDataSender === false) {
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender} for data: ${data.accountId}`)
@@ -1307,6 +1292,13 @@ class TransactionConsenus {
             nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
           }
           if (!queueEntry.hasSentFinalReceipt) {
+            const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
+            const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload.receipt, executionGroupNodes)
+            if(!hasTwoThirdsMajority) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.receipt.txid}`)
+              nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt because no majority')
+              return
+            }
             if (logFlags.verbose) this.mainLogger.debug(`POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`)
             queueEntry.poqoReceipt = payload.receipt
             queueEntry.appliedReceipt2 = payload.receipt
