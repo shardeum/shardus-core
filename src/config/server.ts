@@ -314,7 +314,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     voterPercentage: 0.1,
     waitUpstreamTx: false,
     gossipCompleteData: false,
-    shareCompleteData: true,
+    shareCompleteData: false,  //turn off the neighbor sharing of complete data.
     txStateMachineChanges: true,
     canRequestFinalData: true,
     numberOfReInjectNodes: 5,
@@ -334,7 +334,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     stuckTxMoveTime: 60000,
     forceVoteForFailedPreApply: true,
     collectedDataFix: true,
-    noRepairIfDataAttached: true,
+    noRepairIfDataAttached: false,  // this seems to be an optimization that we will leave off for now
     rejectSharedDataIfCovered: false,
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
