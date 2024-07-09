@@ -1,3 +1,4 @@
+import * as Context from '../p2p/Context'
 import { P2P as P2PTypes, StateManager as StateManagerTypes } from '@shardus/types'
 import StateManager from '.'
 import Crypto from '../crypto'
@@ -98,6 +99,7 @@ import {
 import { isNodeInRotationBounds } from '../p2p/Utils'
 import { ResponseError } from '../types/ResponseError'
 import { error } from 'console'
+import { PoqoDataAndReceiptReq, serializePoqoDataAndReceiptReq } from '../types/PoqoDataAndReceiptReq'
 
 interface Receipt {
   tx: AcceptedTx
@@ -4854,7 +4856,6 @@ class TransactionQueue {
             (node) => node.externalIp + ':' + node.externalPort
           )
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.debug('tellcorrernodingnodesfinaldata', queueEntry.logID, ` : filterValidNodesForInternalMessage ${filterNodesIpPort} for accounts: ${utils.stringifyReduce(message.stateList)}`)
-          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastFinalStateBinary) {
             // convert legacy message to binary supported type
             const request = message as BroadcastFinalStateReq
             if (logFlags.seqdiagram) {
@@ -4864,44 +4865,41 @@ class TransactionQueue {
             }
 
 
-            if (this.usePOQo) {
-              // Use the POQo endpoint which also shares the receipt
-              // TODO: MIGRATE THIS TO BINARY
-              this.p2p.tell(
-                filterdCorrespondingAccNodes,
-                'poqo-data-and-receipt',
-                {
-                  finalState: message,
-                  receipt: queueEntry.appliedReceipt2
-                }
-              )
-            } else {
-              this.p2p.tellBinary<BroadcastFinalStateReq>(
-                filterdCorrespondingAccNodes,
-                InternalRouteEnum.binary_broadcast_finalstate,
-                request,
-                serializeBroadcastFinalStateReq,
-                {
-                  verification_data: verificationDataCombiner(
-                    message.txid,
-                    message.stateList.length.toString()
-                  ),
-                }
-              )
-            }
+          if (this.usePOQo && this.config.p2p.useBinarySerializedEndpoints && Context.config.p2p.poqoDataAndReceiptBinary) {
+            this.p2p.tellBinary<PoqoDataAndReceiptReq>(
+              filterdCorrespondingAccNodes,
+              InternalRouteEnum.binary_poqo_data_and_receipt,
+              {
+                finalState: message,
+                receipt: queueEntry.appliedReceipt2
+              },
+              serializePoqoDataAndReceiptReq,
+              {}
+            )
+          } else if (this.usePOQo) {
+            this.p2p.tell(
+              filterdCorrespondingAccNodes,
+              'poqo-data-and-receipt',
+              {
+                finalState: message,
+                receipt: queueEntry.appliedReceipt2
+              }
+            )
+          } else if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastFinalStateBinary) {
+            this.p2p.tellBinary<BroadcastFinalStateReq>(
+              filterdCorrespondingAccNodes,
+              InternalRouteEnum.binary_broadcast_finalstate,
+              request,
+              serializeBroadcastFinalStateReq,
+              {
+                verification_data: verificationDataCombiner(
+                  message.txid,
+                  message.stateList.length.toString()
+                ),
+              }
+            )
           } else {
-            if (this.usePOQo) {
-              this.p2p.tell(
-                filterdCorrespondingAccNodes,
-                'poqo-data-and-receipt',
-                {
-                  finalState: message,
-                  receipt: queueEntry.appliedReceipt2
-                }
-              )
-            } else {
-              this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
-            }
+            this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
           }
           totalShares++
         }
