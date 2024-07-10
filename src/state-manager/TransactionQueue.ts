@@ -4285,189 +4285,199 @@ class TransactionQueue {
   }
 
   async factTellCorrespondingNodes(queueEntry: QueueEntry): Promise<unknown> {
-    if (this.stateManager.currentCycleShardData == null) {
-      throw new Error('factTellCorrespondingNodes: currentCycleShardData == null')
-    }
-    if (queueEntry.uniqueKeys == null) {
-      throw new Error('factTellCorrespondingNodes: queueEntry.uniqueKeys == null')
-    }
-    const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
-    const dataKeysWeHave = []
-    const dataValuesWeHave = []
-    const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
-    const remoteShardsByKey: { [accountID: string]: StateManagerTypes.shardFunctionTypes.NodeShardData } = {} // shard homenodes that we do not have the data for.
-    let loggedPartition = false
-    for (const key of queueEntry.uniqueKeys) {
-      let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
-
-      // HOMENODEMATHS factTellCorrespondingNodes patch the value of hasKey
-      // did we get patched in
-      if (queueEntry.patchedOnNodes.has(ourNodeData.node.id)) {
-        hasKey = true
+    try {
+      if (this.stateManager.currentCycleShardData == null) {
+        throw new Error('factTellCorrespondingNodes: currentCycleShardData == null')
       }
-
-      let isGlobalKey = false
-      //intercept that we have this data rather than requesting it.
-      if (this.stateManager.accountGlobals.isGlobalAccount(key)) {
-        hasKey = true
-        isGlobalKey = true
-        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', queueEntry.logID, `factTellCorrespondingNodes - has`)
+      if (queueEntry.uniqueKeys == null) {
+        throw new Error('factTellCorrespondingNodes: queueEntry.uniqueKeys == null')
       }
+      const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
+      const dataKeysWeHave = []
+      const dataValuesWeHave = []
+      const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
+      const remoteShardsByKey: { [accountID: string]: StateManagerTypes.shardFunctionTypes.NodeShardData } = {} // shard homenodes that we do not have the data for.
+      let loggedPartition = false
+      for (const key of queueEntry.uniqueKeys) {
+        let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
 
-      if (hasKey === false) {
-        if (loggedPartition === false) {
-          loggedPartition = true
-          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodes hasKey=false`)
-        }
-        /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodes hasKey=false  key: ${utils.stringifyReduce(key)}`)
-      }
-
-      if (hasKey) {
-        // TODO PERF is it possible that this query could be used to update our in memory cache? (this would save us from some slow look ups) later on
-        //    when checking timestamps.. alternatively maybe there is a away we can note the timestamp with what is returned here in the queueEntry data
-        //    and not have to deal with the cache.
-        // todo old: Detect if our node covers this paritition..  need our partition data
-
-        this.profiler.profileSectionStart('process_dapp.getRelevantData')
-        this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
-        /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.app.getRelevantData')
-        let data = await this.app.getRelevantData(
-          key,
-          queueEntry.acceptedTx.data,
-          queueEntry.acceptedTx.appData
-        )
-        /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.app.getRelevantData', DebugComplete.Completed)
-        this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
-        this.profiler.profileSectionEnd('process_dapp.getRelevantData')
-
-        //if this is not freshly created data then we need to make a backup copy of it!!
-        //This prevents us from changing data before the commiting phase
-        if (data.accountCreated == false) {
-          data = utils.deepCopy(data)
+        // HOMENODEMATHS factTellCorrespondingNodes patch the value of hasKey
+        // did we get patched in
+        if (queueEntry.patchedOnNodes.has(ourNodeData.node.id)) {
+          hasKey = true
         }
 
-        //only queue this up to share if it is not a global account. global accounts dont need to be shared.
-        if (isGlobalKey === false) {
+        let isGlobalKey = false
+        //intercept that we have this data rather than requesting it.
+        if (this.stateManager.accountGlobals.isGlobalAccount(key)) {
+          hasKey = true
+          isGlobalKey = true
+          /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', queueEntry.logID, `factTellCorrespondingNodes - has`)
+        }
+
+        if (hasKey === false) {
+          if (loggedPartition === false) {
+            loggedPartition = true
+            /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodes hasKey=false`)
+          }
+          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodes hasKey=false  key: ${utils.stringifyReduce(key)}`)
+        }
+
+        if (hasKey) {
+          // TODO PERF is it possible that this query could be used to update our in memory cache? (this would save us from some slow look ups) later on
+          //    when checking timestamps.. alternatively maybe there is a away we can note the timestamp with what is returned here in the queueEntry data
+          //    and not have to deal with the cache.
+          // todo old: Detect if our node covers this paritition..  need our partition data
+
+          this.profiler.profileSectionStart('process_dapp.getRelevantData')
+          this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
+          /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.app.getRelevantData')
+          let data = await this.app.getRelevantData(
+            key,
+            queueEntry.acceptedTx.data,
+            queueEntry.acceptedTx.appData
+          )
+          /* prettier-ignore */ this.setDebugLastAwaitedCallInner('this.stateManager.transactionQueue.app.getRelevantData', DebugComplete.Completed)
+          this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
+          this.profiler.profileSectionEnd('process_dapp.getRelevantData')
+
+          //if this is not freshly created data then we need to make a backup copy of it!!
+          //This prevents us from changing data before the commiting phase
+          if (data.accountCreated == false) {
+            data = utils.deepCopy(data)
+          }
+
+          //only queue this up to share if it is not a global account. global accounts dont need to be shared.
+          if (isGlobalKey === false) {
+            // eslint-disable-next-line security/detect-object-injection
+            datas[key] = data
+            dataKeysWeHave.push(key)
+            dataValuesWeHave.push(data)
+          }
+
           // eslint-disable-next-line security/detect-object-injection
-          datas[key] = data
-          dataKeysWeHave.push(key)
-          dataValuesWeHave.push(data)
+          queueEntry.localKeys[key] = true
+          // add this data to our own queue entry!!
+          this.queueEntryAddData(queueEntry, data, false)
+        } else {
+          // eslint-disable-next-line security/detect-object-injection
+          remoteShardsByKey[key] = queueEntry.homeNodes[key]
         }
+      }
+      if (queueEntry.globalModification === true) {
+        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('factTellCorrespondingNodes', queueEntry.logID, `factTellCorrespondingNodes - globalModification = true, not telling other nodes`)
+        return
+      }
 
+      const payload: { stateList: Shardus.WrappedResponse[]; txid: string } = {
+        stateList: [],
+        txid: queueEntry.acceptedTx.txId,
+      }
+      for (const key of queueEntry.uniqueKeys) {
         // eslint-disable-next-line security/detect-object-injection
-        queueEntry.localKeys[key] = true
-        // add this data to our own queue entry!!
-        this.queueEntryAddData(queueEntry, data, false)
-      } else {
-        // eslint-disable-next-line security/detect-object-injection
-        remoteShardsByKey[key] = queueEntry.homeNodes[key]
+        if (datas[key] != null) {
+          // eslint-disable-next-line security/detect-object-injection
+          payload.stateList.push(datas[key]) // only sending just this one key at a time
+        }
       }
-    }
-    if (queueEntry.globalModification === true) {
-      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('factTellCorrespondingNodes', queueEntry.logID, `factTellCorrespondingNodes - globalModification = true, not telling other nodes`)
-      return
-    }
+      // sign each account data
+      const signedPayload = this.crypto.sign(payload)
 
-    const payload: { stateList: Shardus.WrappedResponse[]; txid: string } = {
-      stateList: [],
-      txid: queueEntry.acceptedTx.txId,
-    }
-    for (const key of queueEntry.uniqueKeys) {
-      // eslint-disable-next-line security/detect-object-injection
-      if (datas[key] != null) {
-        // eslint-disable-next-line security/detect-object-injection
-        payload.stateList.push(datas[key]) // only sending just this one key at a time
+      // prepare inputs to get corresponding indices
+      const ourIndexInTxGroup = queueEntry.ourTXGroupIndex
+      const targetGroup = queueEntry.executionNodeIdSorted
+      const targetGroupSize = targetGroup.length
+      const senderGroupSize = targetGroupSize
+
+      // calculate target start and end indices in txGroup
+      const targetIndices = this.getStartAndEndIndexOfTargetGroup(targetGroup, queueEntry.transactionGroup)
+
+      // temp logs
+      if (logFlags.verbose) {
+        this.mainLogger.debug(`factTellCorrespondingNodes: target group size`, targetGroup.length, targetGroup);
+        this.mainLogger.debug(`factTellCorrespondingNodes: tx group size`, queueEntry.transactionGroup.length, queueEntry.transactionGroup.map(n => n.id));
+        this.mainLogger.debug(`factTellCorrespondingNodes: getting corresponding indices for tx: ${queueEntry.logID}`, ourIndexInTxGroup, targetIndices.startIndex, targetIndices.endIndex, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, queueEntry.transactionGroup.length);
+        this.mainLogger.debug(`factTellCorrespondingNodes: target group indices`, targetIndices)
       }
-    }
-    // sign each account data
-    const signedPayload = this.crypto.sign(payload)
 
-    // prepare inputs to get corresponding indices
-    const ourIndexInTxGroup = queueEntry.ourTXGroupIndex
-    const targetGroup = queueEntry.executionNodeIdSorted
-    const targetGroupSize = targetGroup.length
-    const senderGroupSize = targetGroupSize
+      const correspondingIndices = getCorrespondingNodes(
+        ourIndexInTxGroup,
+        targetIndices.startIndex,
+        targetIndices.endIndex,
+        queueEntry.correspondingGlobalOffset,
+        targetGroupSize,
+        senderGroupSize,
+        queueEntry.transactionGroup.length
+      )
+      if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodes: correspondingIndices ${queueEntry.logID}`, ourIndexInTxGroup, correspondingIndices);
 
-    // calculate target start and end indices in txGroup
-    const targetIndices = this.getStartAndEndIndexOfTargetGroup(targetGroup, queueEntry.transactionGroup)
+      const validCorrespondingIndices = []
+      for (const targetIndex of correspondingIndices) {
+        validCorrespondingIndices.push(targetIndex)
 
-    // temp logs
-    if (logFlags.verbose) {
-      this.mainLogger.debug(`factTellCorrespondingNodes: target group size`, targetGroup.length, targetGroup);
-      this.mainLogger.debug(`factTellCorrespondingNodes: tx group size`, queueEntry.transactionGroup.length, queueEntry.transactionGroup.map(n => n.id));
-      this.mainLogger.debug(`factTellCorrespondingNodes: getting corresponding indices for tx: ${queueEntry.logID}`, ourIndexInTxGroup, targetIndices.startIndex, targetIndices.endIndex, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, queueEntry.transactionGroup.length);
-      this.mainLogger.debug(`factTellCorrespondingNodes: target group indices`, targetIndices)
-    }
-
-    const correspondingIndices = getCorrespondingNodes(
-      ourIndexInTxGroup,
-      targetIndices.startIndex,
-      targetIndices.endIndex,
-      queueEntry.correspondingGlobalOffset,
-      targetGroupSize,
-      senderGroupSize,
-      queueEntry.transactionGroup.length
-    )
-    if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodes: correspondingIndices ${queueEntry.logID}`, ourIndexInTxGroup, correspondingIndices);
-
-    const validCorrespondingIndices = []
-    for (const targetIndex of correspondingIndices) {
-      validCorrespondingIndices.push(targetIndex)
-
-      if (logFlags.debug) {
-        //  debug verification code
-        const isValid = verifyCorrespondingSender(targetIndex, ourIndexInTxGroup, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, targetIndices.startIndex, targetIndices.endIndex, queueEntry.transactionGroup.length)
-        if (logFlags.debug) this.mainLogger.debug(`factTellCorrespondingNodes: debug verifyCorrespondingSender`, ourIndexInTxGroup, '->', targetIndex, isValid);
-      }
-    }
-
-    const correspondingNodes = []
-    for (const index of validCorrespondingIndices) {
-      if (index === ourIndexInTxGroup) {
-        continue
-      }
-      const targetNode = queueEntry.transactionGroup[index]
-      let targetHasOurData = false
-
-      if (this.config.stateManager.filterReceivingNodesForTXData) {
-        targetHasOurData = true
-        for (const wrappedResponse of signedPayload.stateList) {
-          const accountId = wrappedResponse.accountId
-          const targetNodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(targetNode.id)
-          if (targetNodeShardData == null) {
-            targetHasOurData = false
-            break
-          }
-          const targetHasKey = ShardFunctions.testAddressInRange(accountId, targetNodeShardData.storedPartitions)
-          if (targetHasKey === false) {
-            targetHasOurData = false
-            break
-          }
+        if (logFlags.debug) {
+          //  debug verification code
+          const isValid = verifyCorrespondingSender(targetIndex, ourIndexInTxGroup, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, targetIndices.startIndex, targetIndices.endIndex, queueEntry.transactionGroup.length)
+          if (logFlags.debug) this.mainLogger.debug(`factTellCorrespondingNodes: debug verifyCorrespondingSender`, ourIndexInTxGroup, '->', targetIndex, isValid);
         }
       }
 
-      // send only if target needs our data
-      if (targetHasOurData === false) {
-        correspondingNodes.push(targetNode)
+      const correspondingNodes = []
+      for (const index of validCorrespondingIndices) {
+        if (index === ourIndexInTxGroup) {
+          continue
+        }
+        const targetNode = queueEntry.transactionGroup[index]
+        let targetHasOurData = false
+
+        if (this.config.stateManager.filterReceivingNodesForTXData) {
+          targetHasOurData = true
+          for (const wrappedResponse of signedPayload.stateList) {
+            const accountId = wrappedResponse.accountId
+            const targetNodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(targetNode.id)
+            if (targetNodeShardData == null) {
+              targetHasOurData = false
+              break
+            }
+            const targetHasKey = ShardFunctions.testAddressInRange(accountId, targetNodeShardData.storedPartitions)
+            if (targetHasKey === false) {
+              targetHasOurData = false
+              break
+            }
+          }
+        }
+
+        // send only if target needs our data
+        if (targetHasOurData === false) {
+          correspondingNodes.push(targetNode)
+        }
       }
+      if (correspondingNodes.length === 0) {
+        nestedCountersInstance.countEvent('stateManager', 'factTellCorrespondingNodes: no corresponding nodes needed to send')
+        return
+      }
+      // Filter nodes before we send tell()
+      const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
+        correspondingNodes,
+        'factTellCorrespondingNodes',
+        true,
+        true
+      )
+      if (filteredNodes.length === 0) {
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error("factTellCorrespondingNodes: filterValidNodesForInternalMessage no valid nodes left to try");
+        nestedCountersInstance.countEvent('stateManager', 'factTellCorrespondingNodes: no corresponding nodes needed to send')
+        return null
+      }
+      if(payload.stateList.length === 0){
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error("factTellCorrespondingNodes: filterValidNodesForInternalMessage payload.stateList.length === 0");
+        nestedCountersInstance.countEvent('stateManager', 'factTellCorrespondingNodes: payload.stateList.length === 0')
+        return null
+      }
+      // send payload to each node in correspondingNodes
+      this.broadcastState(filteredNodes, payload, 'factTellCorrespondingNodes')
+    } catch (error) {
+      /* prettier-ignore */ this.statemanager_fatal( `factTellCorrespondingNodes_ex`, 'factTellCorrespondingNodes' + utils.formatErrorMessage(error) )
     }
-    if (correspondingNodes.length === 0) {
-      nestedCountersInstance.countEvent('stateManager', 'factTellCorrespondingNodes: no corresponding nodes needed to send')
-      return
-    }
-    // Filter nodes before we send tell()
-    const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
-      correspondingNodes,
-      'factTellCorrespondingNodes',
-      true,
-      true
-    )
-    if (filteredNodes.length === 0) {
-      /* prettier-ignore */ if (logFlags.error) this.mainLogger.error("factTellCorrespondingNodes: filterValidNodesForInternalMessage no valid nodes left to try");
-      return null
-    }
-    // send payload to each node in correspondingNodes
-    this.broadcastState(filteredNodes, payload, 'factTellCorrespondingNodes')
   }
 
   validateCorrespondingTellSender(queueEntry: QueueEntry, dataKey: string, senderNodeId: string): boolean {
