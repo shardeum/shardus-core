@@ -164,23 +164,49 @@ class TransactionConsenus {
       try {
         const newChance = req.query.newChance
         if (typeof newChance !== 'string' || !newChance) {
-          res.write(`this.useNewPOQ: ${this.debugFailPOQo}\n`)
+          res.write(`debug-poqo-fail: missing param newChance ${this.debugFailPOQo}\n`)
           res.end()
           return
         }
         const newChanceInt = parseFloat(newChance)
         if (newChanceInt >= 1) {
-          res.write(`this.useNewPOQ: ${this.debugFailPOQo}\n`)
+          res.write(`debug-poqo-fail: newChance not a float: ${this.debugFailPOQo}\n`)
           res.end()
           return
         }
         this.debugFailPOQo = newChanceInt
-        res.write(`this.useNewPOQ: ${this.debugFailPOQo}\n`)
+        res.write(`debug-poqo-fail: set: ${this.debugFailPOQo}\n`)
       } catch (e) {
-        res.write(`this.useNewPOQ: ${this.debugFailPOQo}\n`)
+        res.write(`debug-poqo-fail: error: ${this.debugFailPOQo}\n`)
       }
       res.end()
     })
+
+    // todo need to sort out a cleaner way to allow local override of debug config values. should solve this once
+    // Context.network.registerExternalGet('debug-ignore-data-tell', isDebugModeMiddleware, (req, res) => {
+    //   try {
+    //     const newChance = req.query.newChance
+    //     const currentValue = this.config.debug.ignoreDataTellChance
+    //     const configName = "ignore-data-tell"
+    //     if (typeof newChance !== 'string' || !newChance) {
+    //       res.write(`${configName}: missing param newChance ${this.debugFailPOQo}\n`)
+    //       res.end()
+    //       return
+    //     }
+    //     const newChanceInt = parseFloat(newChance)
+    //     if (newChanceInt >= 1) {
+    //       res.write(`${configName}: newChance not a float: ${this.debugFailPOQo}\n`)
+    //       res.end()
+    //       return
+    //     }
+    //     //todo need and intermediate value because it is not safe to one off change this
+    //     this.config.debug.ignoreDataTellChance = newChanceInt
+    //     res.write(`${configName}: set: ${this.debugFailPOQo}\n`)
+    //   } catch (e) {
+    //     res.write(`${configName}: error: ${this.debugFailPOQo}\n`)
+    //   }
+    //   res.end()
+    // })
 
     Context.network.registerExternalGet('debug-poq-switch', isDebugModeMiddleware, (_req, res) => {
       try {

@@ -1092,6 +1092,8 @@ export interface ServerConfiguration {
     randomCycleData: boolean
     // Maximum number of elements allowed in txDebugStatList map
     debugStatListMaxSize: number
+    /** chance to ignore being told data for a certain account */
+    ignoreDataTellChance: number
   }
   /** Options for the statistics module */
   statistics?: {

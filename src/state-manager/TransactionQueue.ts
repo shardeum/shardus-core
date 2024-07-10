@@ -457,13 +457,26 @@ class TransactionQueue {
                     senderNodeId
                   )
                 }
+              } else {
+                // check if it is a corresponding tell sender
+                isSenderValid = this.factValidateCorrespondingTellSender(
+                  queueEntry,
+                  state.accountId,
+                  senderNodeId
+                )
               }
             } else {
               isSenderValid = this.validateCorrespondingTellSender(queueEntry, state.accountId, senderNodeId)
             }
 
+            if (this.stateManager.testFailChance(configContext.debug.ignoreDataTellChance, 
+            'ignoreDataTellChance', queueEntry.logID, '', logFlags.verbose ) === true ) {
+              isSenderValid = false
+            }
+
             if (i !== 0 && isSenderValid === false) {
               this.mainLogger.error(`${route} validateCorrespondingTellSender failed for ${state.accountId}`);
+              nestedCountersInstance.countEvent('processing', 'validateCorrespondingTellSender failed')
               return errorHandler(RequestErrorEnum.InvalidSender);
             }
             if (configContext.stateManager.collectedDataFix && configContext.stateManager.rejectSharedDataIfCovered) {
@@ -2605,6 +2618,7 @@ class TransactionQueue {
    */
   queueEntryAddData(queueEntry: QueueEntry, data: Shardus.WrappedResponse, signatureCheck = false): void {
     if (queueEntry.uniqueKeys == null) {
+      nestedCountersInstance.countEvent('queueEntryAddData', 'uniqueKeys == null')
       // cant have all data yet if we dont even have unique keys.
       throw new Error(
         `Attempting to add data and uniqueKeys are not available yet: ${utils.stringifyReduceLimit(
@@ -2621,10 +2635,12 @@ class TransactionQueue {
           queueEntry.collectedData[data.accountId] = data
           nestedCountersInstance.countEvent('queueEntryAddData', 'collectedDataFix replace with newer data')
         } else {
+          nestedCountersInstance.countEvent('queueEntryAddData', 'already collected 1')
           return
         }
       } else {
         // we have already collected this data
+        nestedCountersInstance.countEvent('queueEntryAddData', 'already collected 2')
         return
       }
     }
@@ -5677,11 +5693,11 @@ class TransactionQueue {
           }
 
           if (txAge > timeM3 + configContext.stateManager.confirmationSeenExpirationTime + 10000) {
-            nestedCountersInstance.countEvent('txExpired', `txAge > timeM3 + confirmSeenExpirationTime + 10s`)
+            // nestedCountersInstance.countEvent('txExpired', `txAge > timeM3 + confirmSeenExpirationTime + 10s`)
             // maybe we missed the spread_appliedReceipt2 gossip, go to await final data if we have a confirmation
             // we will request the final data (and probably receipt2)
             if (configContext.stateManager.disableTxExpiration && hasSeenVote && queueEntry.firstVoteReceivedTimestamp > 0) {
-              nestedCountersInstance.countEvent('txExpired', `> timeM3 + confirmSeenExpirationTime state: ${queueEntry.state} hasSeenVote: ${hasSeenVote} hasSeenConfirmation: ${hasSeenConfirmation} waitForReceiptOnly: ${queueEntry.waitForReceiptOnly}`)
+              // nestedCountersInstance.countEvent('txExpired', `> timeM3 + confirmSeenExpirationTime state: ${queueEntry.state} hasSeenVote: ${hasSeenVote} hasSeenConfirmation: ${hasSeenConfirmation} waitForReceiptOnly: ${queueEntry.waitForReceiptOnly}`)
               if(this.config.stateManager.txStateMachineChanges){
                 if (configContext.stateManager.stuckTxQueueFix) {
                   if (configContext.stateManager.singleAccountStuckFix) {
@@ -5737,8 +5753,8 @@ class TransactionQueue {
             }
           } else if (txAge > timeM3 + configContext.stateManager.noVoteSeenExpirationTime && !hasSeenVote) {
             // seen no vote but past timeM3 + noVoteSeenExpirationTime
-            nestedCountersInstance.countEvent('txExpired', `> timeM3 + noVoteSeenExpirationTime`)
-            this.mainLogger.error(`${queueEntry.logID} txAge > timeM3 + noVoteSeenExpirationTime general case. no vote seen`)
+            // nestedCountersInstance.countEvent('txExpired', `> timeM3 + noVoteSeenExpirationTime`)
+            // this.mainLogger.error(`${queueEntry.logID} txAge > timeM3 + noVoteSeenExpirationTime general case. no vote seen`)
             if (configContext.stateManager.disableTxExpiration === false) {
               this.setTXExpired(queueEntry, currentIndex, 'txAge > timeM3 + noVoteSeenExpirationTime general case. no vote seen')
               continue
@@ -6666,42 +6682,50 @@ class TransactionQueue {
               const timeSinceAwaitFinalStart = queueEntry.txDebug.startTimestamp['await final data'] > 0 ? shardusGetTime() - queueEntry.txDebug.startTimestamp['await final data'] : 0
               let vote: AppliedVote
 
-              if(configContext.stateManager.removeStuckChallengedTXs && this.useNewPOQ) {
-                // first check if this is a challenge receipt
-                if (receipt2 && receipt2.confirmOrChallenge.message === 'challenge') {
-                  if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} challenge from receipt2`)
-                  this.updateTxState(queueEntry, 'fail')
-                  this.removeFromQueue(queueEntry, currentIndex)
-                  continue
-                } if (receipt2 == null && queueEntry.receivedBestChallenge) {
-                  const enoughUniqueChallenges = queueEntry.uniqueChallengesCount >= configContext.stateManager.minRequiredChallenges
-                  if (enoughUniqueChallenges) {
-                    if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} has unique challenges`)
-                    this.updateTxState(queueEntry, 'fail')
-                    this.removeFromQueue(queueEntry, currentIndex)
-                  } else if (timeSinceAwaitFinalStart > 1000 * 30) {
-                    // if we have a challenge and we have waited for a minute, we can fail the tx
-                    if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} not enough but waited long enough`)
-                    this.updateTxState(queueEntry, 'fail')
-                    this.removeFromQueue(queueEntry, currentIndex)
-                  } else {
-                    if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} not enough challenges but waited ${timeSinceAwaitFinalStart}ms`)
-                  }
-                  continue
-                }
-              }
+              // if(configContext.stateManager.removeStuckChallengedTXs && this.useNewPOQ) {
+              //   // first check if this is a challenge receipt
+              //   if (receipt2 && receipt2.confirmOrChallenge.message === 'challenge') {
+              //     if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} challenge from receipt2`)
+              //     this.updateTxState(queueEntry, 'fail')
+              //     this.removeFromQueue(queueEntry, currentIndex)
+              //     continue
+              //   } if (receipt2 == null && queueEntry.receivedBestChallenge) {
+              //     const enoughUniqueChallenges = queueEntry.uniqueChallengesCount >= configContext.stateManager.minRequiredChallenges
+              //     if (enoughUniqueChallenges) {
+              //       if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} has unique challenges`)
+              //       this.updateTxState(queueEntry, 'fail')
+              //       this.removeFromQueue(queueEntry, currentIndex)
+              //     } else if (timeSinceAwaitFinalStart > 1000 * 30) {
+              //       // if we have a challenge and we have waited for a minute, we can fail the tx
+              //       if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} not enough but waited long enough`)
+              //       this.updateTxState(queueEntry, 'fail')
+              //       this.removeFromQueue(queueEntry, currentIndex)
+              //     } else {
+              //       if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_challenge : ${queueEntry.logID} not enough challenges but waited ${timeSinceAwaitFinalStart}ms`)
+              //     }
+              //     continue
+              //   }
+              // }
 
+              // see if we can find a good vote to use
               if (receipt2) {
                 vote = receipt2.appliedVote
               } else if (queueEntry.receivedBestConfirmation?.appliedVote) {
+                // I think this is POQ-LS and will go away
                 vote = queueEntry.receivedBestConfirmation.appliedVote
               } else if (queueEntry.receivedBestVote) {
+                // I think this is POQ-LS and will go away
                 vote = queueEntry.receivedBestVote
               } else if (queueEntry.ourVote && configContext.stateManager.stuckTxQueueFix) {
                 // allow node to request missing data if it has an own vote
+                // 20240709 this does not seem right.  We should not use our own vote to request missing data
+                // going to add counters to confirm 
+                nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData used ourVote')
                 vote = queueEntry.ourVote
               }
               const accountsNotStored = new Set()
+              //if we got a vote above then build a list of accounts that we store but are missing in our 
+              //collectedFinalData
               if (vote) {
                 let failed = false
                 let incomplete = false
@@ -6741,7 +6765,9 @@ class TransactionQueue {
                   }
                 }
 
+                // if we have missing accounts, we need to request the data
                 if (incomplete && missingAccounts.length > 0) {
+                  nestedCountersInstance.countEvent('stateManager', `shrd_awaitFinalData missing accounts ${missingAccounts.length}`)
 
                   // start request process for missing data if we waited long enough
                   let shouldStartFinalDataRequest = false
@@ -6762,6 +6788,8 @@ class TransactionQueue {
                     queueEntry.lastFinalDataRequestTimestamp = shardusGetTime()
                     continue
                   }
+                } else {
+                  nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData not missing accounts')
                 }
 
                 /* eslint-enable security/detect-object-injection */
@@ -6777,6 +6805,7 @@ class TransactionQueue {
 
                 // This is the case where awaiting final data has succeeded. Store the final data and remove TX from the queue
                 if (failed === false && incomplete === false) {
+                  
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_passed', `${shortID}`, `qId: ${queueEntry.entryID} skipped:${skipped}`)
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_passed : ${queueEntry.logID} skipped:${skipped}`)
 
@@ -6795,6 +6824,8 @@ class TransactionQueue {
                     rawAccounts.push(wrappedAccount.data)
                     accountRecords.push(wrappedAccount)
                   }
+
+                  nestedCountersInstance.countEvent('stateManager', `shrd_awaitFinalData got data, time to save it ${accountRecords.length}`)
                   /* eslint-enable security/detect-object-injection */
                   //await this.app.setAccountData(rawAccounts)
                   const awaitStart = shardusGetTime()
@@ -6804,6 +6835,7 @@ class TransactionQueue {
                     `txId: ${queueEntry.logID} awaitFinalData_passed`,
                     false
                   )
+
                   /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.checkAndSetAccountData()', DebugComplete.Completed )
                   queueEntry.accountDataSet = true
                   // endpoint to allow dapp to execute something that depends on a transaction being approved.
@@ -7366,7 +7398,10 @@ class TransactionQueue {
         }
       }
       if (successCount === accountIds.length) {
+        nestedCountersInstance.countEvent('stateManager', 'requestFinalData: got all needed data')
         success = true
+      } else {
+        nestedCountersInstance.countEvent('stateManager', `requestFinalData: did not get enough data: ${successCount} <  ${accountIds.length}`)
       }
     } catch (e) {
       nestedCountersInstance.countEvent('stateManager', 'requestFinalDataError')
