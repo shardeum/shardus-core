@@ -4984,13 +4984,15 @@ class TransactionQueue {
     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factValidateCorrespondingTellFinalDataSender: txId: ${queueEntry.acceptedTx.txId} sender node id: ${senderNodeId}, receiver id: ${Self.id}`)
     const senderNode = NodeList.nodes.get(senderNodeId)
     if (senderNode === null) {
-      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender node is null`)
+      /* prettier-ignore */ if(logFlags.error) this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender node is null`)
+      nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellFinalDataSender: sender node is null')
       return false
     }
     const senderIsInExecutionGroup = queueEntry.executionGroupMap.has(senderNodeId)
 
     if (senderIsInExecutionGroup === false) {
-      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender is not in the execution group`)
+      /* prettier-ignore */ if(logFlags.error) this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender is not in the execution group`)
+      nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellFinalDataSender: sender is not in the execution group')
       return false
     }
 
@@ -5009,7 +5011,7 @@ class TransactionQueue {
 
     // it is not a FACT corresponding node
     if (isValidFactSender === false) {
-      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender is not a valid sender isValidSender:  ${isValidFactSender}`);
+      /* prettier-ignore */ if(logFlags.error) this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender is not a valid sender isValidSender:  ${isValidFactSender}`);
       nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellFinalDataSender: sender is not a valid sender or a neighbour node')
       return false
     }

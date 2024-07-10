@@ -332,12 +332,14 @@ class CachedAppDataManager {
     const senderNode = NodeList.nodes.get(senderNodeId)
     const logID = utils.stringifyReduce(txId)
     if (senderNode === null) {
-      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${logID} sender node is null`)
+      /* prettier-ignore */ if(logFlags.error) this.mainLogger.error(`factValidateCorrespondingCachedAppDataSender: logId: ${logID} sender node is null`)
+      nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingCachedAppDataSender: sender node is null')
       return false
     }
     const senderIsInExecutionGroup = senderGroup.some((node) => node.id === senderNodeId)
     if (senderIsInExecutionGroup === false) {
-      this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${logID} sender is not in the execution group`)
+      /* prettier-ignore */ if(logFlags.error) this.mainLogger.error(`factValidateCorrespondingCachedAppDataSender: logId: ${logID} sender is not in the execution group sender:${senderNodeId}`)
+      nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingCachedAppDataSender: sender is not in the execution group')
       return false
     }
 
@@ -365,7 +367,7 @@ class CachedAppDataManager {
 
     // it is not a FACT corresponding node
     if (isValidFactSender === false) {
-      this.mainLogger.error(`factValidateCorrespondingCachedAppDataSender: logId: logId: ${logID} sender is not a valid sender isValidSender:  ${isValidFactSender}`);
+      /* prettier-ignore */ if(logFlags.error) this.mainLogger.error(`factValidateCorrespondingCachedAppDataSender: logId: logId: ${logID} sender is not a valid sender isValidSender:  ${isValidFactSender}`);
       nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingCachedAppDataSender: sender is not a valid sender or a neighbour node')
       return false
     }
@@ -435,7 +437,7 @@ class CachedAppDataManager {
       if (correspondingNodes.length === 1 && correspondingNodes[0].id === ourNodeData.node.id) {
         const existingCachedAppData = this.getCachedItem(topic, dataID)
         if (existingCachedAppData) {
-          console.log(`We have already processed this cached data`, existingCachedAppData)
+          /* prettier-ignore */ if(logFlags.shardedCache) console.log(`We have already processed this cached data`, existingCachedAppData)
           return
         }
         this.insertCachedItem(topic, dataID, appData, cycle)
