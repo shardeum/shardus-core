@@ -8086,6 +8086,37 @@ class TransactionQueue {
     }
   }
 
+getDebugStuckTxs(opts): unknown {
+  const txStates = [
+    'syncing',
+    'aging',
+    'processing',
+    'awaiting data',
+    'consensing',
+    'await repair',
+    'await final data',
+    'committing',
+    'canceled',
+  ]
+  
+  const stateIndex = txStates.indexOf(opts.state);
+  if (stateIndex === -1) {
+    return `${opts.state} is not a valid tx state.`;
+  }
+
+  const queueItems = this.getQueueItems();
+  const stuckTxs = queueItems.filter((queueEntry) => {
+    const queueStateIndex = txStates.indexOf(queueEntry.state);
+    return (
+      queueEntry.txAge > opts.minAge &&
+      queueEntry.state &&
+      (opts.nextStates ? queueStateIndex >= stateIndex : queueStateIndex === stateIndex)
+    );
+  });
+
+  return stuckTxs;
+}
+
   getDebugProccessingStatus(): unknown {
     let txDebug = ''
     if (this.debugRecentQueueEntry != null) {

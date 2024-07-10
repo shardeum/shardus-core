@@ -2259,6 +2259,15 @@ class StateManager {
       res.end()
     })
 
+    Context.network.registerExternalGet('debug-stuck-tx', isDebugModeMiddleware, (_req, res) => {
+      const opts = {
+        minAge: _req.query?.minAge || 0,
+        state: _req.query?.state,
+        nextStates: _req.query?.nextStates === 'false' ? false : true,
+      }
+      res.send(this.transactionQueue.getDebugStuckTxs(opts))
+    })
+
     Context.network.registerExternalGet('debug-stuck-processing', isDebugModeMiddleware, (_req, res) => {
       res.send(this.transactionQueue.getDebugProccessingStatus())
     })
