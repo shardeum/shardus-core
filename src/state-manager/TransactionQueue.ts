@@ -4991,7 +4991,7 @@ class TransactionQueue {
     const senderIsInExecutionGroup = queueEntry.executionGroupMap.has(senderNodeId)
 
     if (senderIsInExecutionGroup === false) {
-      /* prettier-ignore */ if(logFlags.error) this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender is not in the execution group`)
+      /* prettier-ignore */ if(logFlags.error) this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender: logId: ${queueEntry.logID} sender is not in the execution group sender:${senderNodeId}`)
       nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellFinalDataSender: sender is not in the execution group')
       return false
     }
