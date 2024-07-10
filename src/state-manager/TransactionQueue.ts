@@ -4428,20 +4428,25 @@ class TransactionQueue {
         continue
       }
       const targetNode = queueEntry.transactionGroup[index]
-      let targetHasOurData = true
-      for (const wrappedResponse of signedPayload.stateList) {
-        const accountId = wrappedResponse.accountId
-        const targetNodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(targetNode.id)
-        if (targetNodeShardData === null) {
-          targetHasOurData = false
-          break
-        }
-        const targetHasKey = ShardFunctions.testAddressInRange(accountId, targetNodeShardData.storedPartitions)
-        if (targetHasKey === false) {
-          targetHasOurData = false
-          break
+      let targetHasOurData = false
+
+      if (this.config.stateManager.filterReceivingNodesForTXData) {
+        targetHasOurData = true
+        for (const wrappedResponse of signedPayload.stateList) {
+          const accountId = wrappedResponse.accountId
+          const targetNodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(targetNode.id)
+          if (targetNodeShardData === null) {
+            targetHasOurData = false
+            break
+          }
+          const targetHasKey = ShardFunctions.testAddressInRange(accountId, targetNodeShardData.storedPartitions)
+          if (targetHasKey === false) {
+            targetHasOurData = false
+            break
+          }
         }
       }
+
       // send only if target needs our data
       if (targetHasOurData === false) {
         correspondingNodes.push(targetNode)

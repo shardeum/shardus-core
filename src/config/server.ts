@@ -339,6 +339,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     rejectSharedDataIfCovered: false,
     requestAwaitedDataAllowed: false, // this has been disabled by accident for a long time so leaving it off
     awaitingDataCanBailOnReceipt: false, 
+    filterReceivingNodesForTXData: false, // this seems to be breaking factTellCorrespondingNodes if true
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

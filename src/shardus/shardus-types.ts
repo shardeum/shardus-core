@@ -1280,6 +1280,8 @@ export interface ServerConfiguration {
     /** if this is true and our node still cant run the TX but the rest of the network already has a valid receipt
         then we can move to awaiting final data */
     awaitingDataCanBailOnReceipt: boolean
+    // Filter receiving nodes if they cover the account already
+    filterReceivingNodesForTXData: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
