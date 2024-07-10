@@ -250,6 +250,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     highResolutionProfiling: true,
     randomCycleData: false,
     debugStatListMaxSize: 1000,
+    ignoreDataTellChance: 0,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {
@@ -336,6 +337,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     collectedDataFix: true,
     noRepairIfDataAttached: false,  // this seems to be an optimization that we will leave off for now
     rejectSharedDataIfCovered: false,
+    requestAwaitedDataAllowed: false, // this has been disabled by accident for a long time so leaving it off
+    awaitingDataCanBailOnReceipt: false, 
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

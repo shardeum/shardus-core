@@ -1275,6 +1275,11 @@ export interface ServerConfiguration {
     noRepairIfDataAttached: boolean
     // reject shared data if we cover it
     rejectSharedDataIfCovered: boolean
+    // set if our node is allowed to request awaited data after a certain time.  See comments. not ready to enable
+    requestAwaitedDataAllowed: boolean
+    /** if this is true and our node still cant run the TX but the rest of the network already has a valid receipt
+        then we can move to awaiting final data */
+    awaitingDataCanBailOnReceipt: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

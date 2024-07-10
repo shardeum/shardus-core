@@ -6009,7 +6009,14 @@ class TransactionQueue {
                     queueEntry.upStreamBlocker = upstreamTx.logID
                     this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: upstream:same`)                    
                   }
-                  nestedCountersInstance.countEvent('processing', 'busy waiting the upstream tx but it is same txId')
+                  //not 100% confident that upstreamTX check works.
+                  if(upstreamTx === queueEntry){
+                    //this queue entry could be marked as seen due to aging above
+                    nestedCountersInstance.countEvent('processing', 'busy waiting but the upstream tx reference matches our queue entry') 
+                  } else {
+                    nestedCountersInstance.countEvent('processing', 'busy waiting the upstream tx but it is same txId')                    
+                  }
+
                 } else {
                   /* prettier-ignore */ if (logFlags.seqdiagram && queueEntry?.upStreamBlocker !== upstreamTx.logID) {
                     queueEntry.upStreamBlocker = upstreamTx.logID
@@ -6030,45 +6037,46 @@ class TransactionQueue {
             // Once we have all the data we need we can move to consensing phase.
             // IF this is a global account it will go strait to commiting phase since the data was shared by other means.
 
-            if (this.queueTimingFixes === true) {
-              if (txAge > timeM2_5) {
-                // const isBlocked = this.processQueue_accountSeen(seenAccounts, queueEntry)
-                // //need to review this in context of sharding
-                // /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} isBlocked:${isBlocked}`)
-                // const missingAccounts = this.queueEntryListMissingData(queueEntry)
-                // nestedCountersInstance.countEvent('txExpired', `missing accounts: ${missingAccounts.length}`)
-                // if (logFlags.playback) {
-                //   this.logger.playbackLogNote(
-                //     'txExpired>M2.5',
-                //     `${shortID}`,
-                //     `> M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${
-                //       queueEntry.hasAll
-                //     } globalMod:${
-                //       queueEntry.globalModification
-                //     } isBlocked:${isBlocked} missing:${utils.stringifyReduce(missingAccounts)}`
-                //   )
-                // }
-                // //Log as error also.. can comment this out later
-                // /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`txExpired > M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} isBlocked:${isBlocked} missing:${utils.stringifyReduce(missingAccounts)}`)
-                // this.setTXExpired(queueEntry, currentIndex, 'm2.5 awaiting data')
-                // continue
-              }
-            } else {
-              // catch all in case we get waiting for data
-              if (txAge > timeM2_5) {
-                this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-                /* prettier-ignore */ nestedCountersInstance.countEvent('processing', `awaiting data txAge > m2.5 set to consensing hasAll:${queueEntry.hasAll} hasReceivedApplyReceipt:${hasReceivedApplyReceipt}`)
+            // 20240709  this if/else looks like it can go away
+            // if (this.queueTimingFixes === true) {
+            //   if (txAge > timeM2_5) {
+            //     // const isBlocked = this.processQueue_accountSeen(seenAccounts, queueEntry)
+            //     // //need to review this in context of sharding
+            //     // /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} isBlocked:${isBlocked}`)
+            //     // const missingAccounts = this.queueEntryListMissingData(queueEntry)
+            //     // nestedCountersInstance.countEvent('txExpired', `missing accounts: ${missingAccounts.length}`)
+            //     // if (logFlags.playback) {
+            //     //   this.logger.playbackLogNote(
+            //     //     'txExpired>M2.5',
+            //     //     `${shortID}`,
+            //     //     `> M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${
+            //     //       queueEntry.hasAll
+            //     //     } globalMod:${
+            //     //       queueEntry.globalModification
+            //     //     } isBlocked:${isBlocked} missing:${utils.stringifyReduce(missingAccounts)}`
+            //     //   )
+            //     // }
+            //     // //Log as error also.. can comment this out later
+            //     // /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`txExpired > M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} isBlocked:${isBlocked} missing:${utils.stringifyReduce(missingAccounts)}`)
+            //     // this.setTXExpired(queueEntry, currentIndex, 'm2.5 awaiting data')
+            //     // continue
+            //   }
+            // } else {
+            //   // catch all in case we get waiting for data
+            //   if (txAge > timeM2_5) {
+            //     this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
+            //     /* prettier-ignore */ nestedCountersInstance.countEvent('processing', `awaiting data txAge > m2.5 set to consensing hasAll:${queueEntry.hasAll} hasReceivedApplyReceipt:${hasReceivedApplyReceipt}`)
 
-                queueEntry.waitForReceiptOnly = true
+            //     queueEntry.waitForReceiptOnly = true
 
-                if(this.config.stateManager.txStateMachineChanges){
-                  this.updateTxState(queueEntry, 'await final data', 'processTx6')
-                } else {
-                  this.updateTxState(queueEntry, 'consensing')
-                }
-                continue
-              }
-            }
+            //     if(this.config.stateManager.txStateMachineChanges){
+            //       this.updateTxState(queueEntry, 'await final data', 'processTx6')
+            //     } else {
+            //       this.updateTxState(queueEntry, 'consensing')
+            //     }
+            //     continue
+            //   }
+            // }
 
             // TODO review this block below in more detail.
             // check if we have all accounts
@@ -6089,35 +6097,61 @@ class TransactionQueue {
                 continue
               }
 
-              if (
-                this.queueTimingFixes === true &&
-                this.processQueue_accountSeen(seenAccounts, queueEntry) === true
-              ) {
-                //we are stuck in line so no cause to ask for data yet.
+              // This code is wrong, so disabling it for now
+              // if (
+              //   this.queueTimingFixes === true &&
+              //   this.processQueue_accountSeen(seenAccounts, queueEntry) === true
+              // ) {
+              //   //we are stuck in line so no cause to ask for data yet.
 
-                //TODO may need a flag that know if a TX was stuck until time m.. then let it not
-                //ask for other accoun data right away...
-                nestedCountersInstance.countEvent(`processing`, `awaiting data. stuck in line`)
-                continue
+              //   //TODO may need a flag that know if a TX was stuck until time m.. then let it not
+              //   //ask for other accoun data right away...
+
+              //   //This counter seems wrong.  the processQueue_accountSeen is just detecting where we 
+              //   // called processQueue_markAccountsSeen before 
+              //   nestedCountersInstance.countEvent(`processing`, `awaiting data. stuck in line - but not really`)
+              //   continue
+              // }
+
+              //TODO check for receipt and move to repair state / await final data
+
+              if(this.config.stateManager.awaitingDataCanBailOnReceipt){
+                const receipt = this.stateManager.getReceipt2(queueEntry)
+                if(receipt != null){
+                  //we saw a receipt so we can move to await final data
+
+                  this.updateTxState(queueEntry, 'await final data', 'receipt while waiting for initial data')
+                  continue
+                }
               }
 
-              // 7.  Manually request missing state
-              try {
-                nestedCountersInstance.countEvent('processing', 'data missing at t>M2. request data')
-                // Await note: current thinking is that is is best to not await this call.
-                this.queueEntryRequestMissingData(queueEntry)
-              } catch (ex) {
-                /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug('processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-                this.statemanager_fatal(
-                  `processAcceptedTxQueue2_missingData`,
-                  'processAcceptedTxQueue2 queueEntryRequestMissingData:' +
-                    ex.name +
-                    ': ' +
-                    ex.message +
-                    ' at ' +
-                    ex.stack
-                )
+
+              if(this.config.stateManager.requestAwaitedDataAllowed){
+                // Before we turn this back on we must set the correct conditions.
+                // our node may be unaware of how other nodes have upstream blocking TXs that 
+                // prevent them from sharing data.  The only safe way to know if we can ask for data
+                // is to know another node has voted but this has some issues as well
+              
+                // 7.  Manually request missing state
+                try {
+                  nestedCountersInstance.countEvent('processing', 'data missing at t>M2. request data')
+                  // Await note: current thinking is that is is best to not await this call.
+                  this.queueEntryRequestMissingData(queueEntry)
+                } catch (ex) {
+                  /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug('processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+                  this.statemanager_fatal(
+                    `processAcceptedTxQueue2_missingData`,
+                    'processAcceptedTxQueue2 queueEntryRequestMissingData:' +
+                      ex.name +
+                      ': ' +
+                      ex.message +
+                      ' at ' +
+                      ex.stack
+                  )
+                }
               }
+
+
             } else if (queueEntry.hasAll) {
               queueEntry.executionDebug.log1 = 'has all'
 
