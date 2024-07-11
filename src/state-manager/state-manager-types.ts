@@ -79,6 +79,7 @@ export type QueueEntry = {
   executionGroup?: Shardus.NodeWithRank[] | Shardus.Node[] //List of nodes that are in the execution group
   executionGroupMap?: Map<string, Shardus.NodeWithRank | Shardus.Node>
   executionNodeIdSorted: string[]
+  executionStorageGroup?: Shardus.NodeWithRank[] | Shardus.Node[] // storage counter part of ex group
   txGroupCycle: number
   updatedTransactionGroup?: Shardus.Node[]
   updatedTxGroupCycle: number

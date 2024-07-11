@@ -2137,8 +2137,10 @@ class TransactionQueue {
           //set the nodes that are in the executionGroup.
           //This is needed so that consensus will expect less nodes to be voting
           const unRankedExecutionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
+          const unRankedExecutionStorageGroup = homeShardData.homeNodes[0].nodeThatStoreOurParitionFull.slice()
           if (this.usePOQo) {
             txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
+            txQueueEntry.executionStorageGroup = unRankedExecutionStorageGroup.sort((a, b) => a.id.localeCompare(b.id))
           } else if (this.useNewPOQ) {
             txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
           } else {
@@ -4301,6 +4303,9 @@ class TransactionQueue {
       for (const key of queueEntry.uniqueKeys) {
         let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
 
+        // TODO: Ensure that we're a consensus node for this key
+        // Above checks for storage instead of consensus. We need consensus. Only share then.
+
         // HOMENODEMATHS factTellCorrespondingNodes patch the value of hasKey
         // did we get patched in
         if (queueEntry.patchedOnNodes.has(ourNodeData.node.id)) {
@@ -4384,13 +4389,13 @@ class TransactionQueue {
       const signedPayload = this.crypto.sign(payload)
 
       // prepare inputs to get corresponding indices
-      const ourIndexInTxGroup = queueEntry.ourTXGroupIndex
-      const targetGroup = queueEntry.executionNodeIdSorted
-      const targetGroupSize = targetGroup.length
-      const senderGroupSize = targetGroupSize
+      const ourIndexInTxGroup = queueEntry.ourTXGroupIndex // Works
+      const targetGroup = queueEntry.executionStorageGroup // ES group
+      const targetGroupSize = targetGroup.length // length of above
+      const senderGroupSize = queueEntry.transactionGroup.length // change to transactionGroup size
 
       // calculate target start and end indices in txGroup
-      const targetIndices = this.getStartAndEndIndexOfTargetGroup(targetGroup, queueEntry.transactionGroup)
+      const targetIndices = this.getStartAndEndIndexOfTargetGroup2(targetGroup.map(node => node.id), queueEntry.transactionGroup)
 
       // temp logs
       if (logFlags.verbose) {
@@ -4531,11 +4536,11 @@ class TransactionQueue {
     // check if it is a FACT sender
     const receivingNodeIndex = queueEntry.ourTXGroupIndex // we are the receiver
     const senderNodeIndex = queueEntry.transactionGroup.findIndex((node) => node.id === senderNodeId)
-    const receiverGroupSize = queueEntry.executionNodeIdSorted.length
-    const senderGroupSize = receiverGroupSize
+    const receiverGroupSize = queueEntry.executionStorageGroup.length
+    const senderGroupSize = queueEntry.transactionGroup.length
 
-    const targetGroup = queueEntry.executionNodeIdSorted
-    const targetIndices = this.getStartAndEndIndexOfTargetGroup(targetGroup, queueEntry.transactionGroup)
+    const targetGroup = queueEntry.executionStorageGroup
+    const targetIndices = this.getStartAndEndIndexOfTargetGroup(targetGroup.map(node => node.id), queueEntry.transactionGroup)
 
     const isValidFactSender = verifyCorrespondingSender(
       receivingNodeIndex,
@@ -4595,6 +4600,31 @@ class TransactionQueue {
       endIndex = endIndex - transactionGroup.length
     }
     return { startIndex, endIndex }
+  }
+
+  getStartAndEndIndexOfTargetGroup2(targetGroup: string[], transactionGroup: (Shardus.NodeWithRank | P2PTypes.NodeListTypes.Node)[]): { startIndex: number; endIndex: number } {
+    const targetIndexes: number[] = [] // index of targetGroup nodes in transactionGroup
+    for (let i = 0; i < transactionGroup.length; i++) {
+      const nodeId = transactionGroup[i].id
+      if (targetGroup.indexOf(nodeId) >= 0) {
+        targetIndexes.push(i)
+      }
+    }
+
+    // Sort in ascending order
+    targetIndexes.sort((a, b) => a - b)
+    
+    if (targetIndexes[targetIndexes.length-1] - targetIndexes[0] === targetIndexes.length - 1) {
+      // targetGroup is contiguous. Does not wrap around
+      return { startIndex: targetIndexes[0], endIndex: targetIndexes[targetIndexes.length - 1] }
+    } else {
+      // targetGroup wraps around. Return pivot point
+      for (let i = 1; i < targetIndexes.length; i++) {
+        if (targetIndexes[i] > targetIndexes[i - 1] + 1) {
+          return { startIndex: targetIndexes[i], endIndex: targetIndexes[i - 1] }
+        }
+      }
+    }
   }
 
   /**
