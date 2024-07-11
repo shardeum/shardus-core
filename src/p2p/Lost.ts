@@ -1274,8 +1274,8 @@ async function isDownCheck(node) {
     const resp: { newestCycle: CycleData } = await http.get(`${ip}:${port}/sync-newest-cycle`)
     return resp
   }
-  const resp = await queryExt(node) // if the node is down, reportLost() will set status to 'down'
   try {
+    const resp = await queryExt(node) // if the node is down, reportLost() will set status to 'down'
     if (typeof resp.newestCycle.counter !== 'number') return 'down'
   } catch {
     /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-3', 1)

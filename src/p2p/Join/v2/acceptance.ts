@@ -44,26 +44,33 @@ export function getHasConfirmedAcceptance(): boolean {
 }
 
 export async function confirmAcceptance(offer: SignedObject<AcceptanceOffer>): Promise<Result<boolean, Error>> {
+  let activeNodes: P2P.P2PTypes.Node[]
   alreadyCheckingAcceptance = true
 
-  // ensure we even have nodes to check from
-  const archiver = getRandomAvailableArchiver()
-  const activeNodesResult = await getActiveNodesFromArchiver(archiver)
-  if (activeNodesResult.isErr()) {
-    return err(new Error(`couldn't get active nodes: ${activeNodesResult.error}`))
-  }
-  const activeNodes = activeNodesResult.value.nodeList
-  if (activeNodes.length === 0) {
-    // disable this flag since we're returning
-    alreadyCheckingAcceptance = false
-    return err(new Error('no active nodes provided'))
-  }
+  try {
+    // ensure we even have nodes to check from
+    const archiver = getRandomAvailableArchiver()
+    const activeNodesResult = await getActiveNodesFromArchiver(archiver)
+    if (activeNodesResult.isErr()) {
+      return err(new Error(`couldn't get active nodes: ${activeNodesResult.error}`))
+    }
+    activeNodes = activeNodesResult.value.nodeList
+    if (activeNodes.length === 0) {
+      // disable this flag since we're returning
+      alreadyCheckingAcceptance = false
+      return err(new Error('no active nodes provided'))
+    }
 
-  // verify the signature of the offer
-  if (!crypto.verify(offer, offer.activeNodePublicKey)) {
+    // verify the signature of the offer
+    if (!crypto.verify(offer, offer.activeNodePublicKey)) {
+      // disable this flag since we're returning
+      alreadyCheckingAcceptance = false
+      return err(new Error('acceptance offer signature invalid'))
+    }
+  } catch (e) {
     // disable this flag since we're returning
     alreadyCheckingAcceptance = false
-    return err(new Error('acceptance offer signature invalid'))
+    return err(new Error(`error while checking acceptance: ${e}`))
   }
 
   // now, we need to query for the cycle record from a node to confirm that we were,

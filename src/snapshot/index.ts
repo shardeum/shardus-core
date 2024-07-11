@@ -454,7 +454,9 @@ async function sendOldDataToNodes(
     const res = await http.post(
       `${nodesToSendData[i].externalIp}:${nodesToSendData[i].externalPort}/snapshot-data-offer`,
       offer
-    )
+    ).catch((e) => {
+      console.error('Error sending data offer to node', e)
+    })
   }
 }
 
@@ -616,6 +618,10 @@ async function sendOfferToNode(node, offer, isSuggestedByNetwork = false) {
       }
     }
     await http.post(`${node.ip}:${node.port}/snapshot-data`, dataToSend)
+      .catch(e => {
+        log('ERROR: unable to send snapshot data to node')
+        log('ERROR: ', e)
+      })
     // If a node reply us 'try_later', wait X amount of time provided by node (OR) cycleDuration/2
   } else if (answer === P2P.SnapshotTypes.offerResponse.tryLater) {
     const waitTime = res.waitTime || 5 * Context.config.p2p.cycleDuration * 1000

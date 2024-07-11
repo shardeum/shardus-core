@@ -1014,7 +1014,7 @@ class AccountSync {
           return r
         } catch (error) {
           console.error('getGlobalAccountReportFromArchiver error', error)
-          null
+          return null
         }
       }
 
@@ -1037,21 +1037,21 @@ class AccountSync {
         return result
       }
       result = result as Partial<GlobalAccountReportResp> & { msg: string }
-      if (result === null) {
+      if (result == null) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} result === null`)
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null ${resultFromArchiver ? 'archiver:': 'node:'}${utils.stringifyReduce(nodeId)} `)
         result = { ready: false, msg: `result === null: ${Math.random()}` }
         return result
       }
 
-      if (result != null && result.ready === false) {
+      if (result.ready === false) {
         /* prettier-ignore */ nestedCountersInstance.countEvent( 'sync', `DATASYNC: getRobustGlobalReport_${tag} result.ready = false` )
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error( `ASK FAIL getRobustGlobalReport result.ready === false, result: ${utils.stringifyReduce(result)}` )
         result = { ready: false, msg: `not ready: ${Math.random()}` }
         return result
       }
 
-      if (result != null && result.accounts == null) {
+      if (result.accounts == null) {
         /* prettier-ignore */ nestedCountersInstance.countEvent( 'sync', `DATASYNC: getRobustGlobalReport_${tag} result != null, result.stateHash == null. result: ${utils.stringifyReduce( result )}` )
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error( `ASK FAIL getRobustGlobalReport result.stateHash == null, result: ${utils.stringifyReduce( result )}` )
         result = { ready: false, msg: `invalid data format: ${Math.random()}` }
