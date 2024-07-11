@@ -180,6 +180,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     downNodeFilteringEnabled: false,
     resubmitStandbyAddWaitDuration: 1000, // 1 second in ms
     requiredVotesPercentage: 2 / 3.0,
+    timestampCacheFix: true
   },
   ip: {
     externalIp: '0.0.0.0',
@@ -324,7 +325,10 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     stuckTxQueueFix: true,
     singleAccountStuckFix: true,
     stuckTxMoveTime: 60000,
-    forceVoteForFailedPreApply: true
+    forceVoteForFailedPreApply: true,
+    collectedDataFix: true,
+    noRepairIfDataAttached: true,
+    rejectSharedDataIfCovered: false,
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Debug,

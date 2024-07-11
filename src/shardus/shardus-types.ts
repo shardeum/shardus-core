@@ -949,6 +949,8 @@ export interface ServerConfiguration {
     resubmitStandbyAddWaitDuration: number
     // /** The percentage of votes required to confirm transaction*/
     requiredVotesPercentage: number
+    // /** a fix to prevent node from producing different ts for same txId */
+    timestampCacheFix: boolean
   }
   /** Server IP configuration */
   ip?: {
@@ -1254,6 +1256,12 @@ export interface ServerConfiguration {
     singleAccountStuckFix: boolean
     // wait time before moving stuck "consensing" tx to "await final data"
     stuckTxMoveTime: number
+    // use newer collected data
+    collectedDataFix: boolean
+    // no repairToMatch if data is attached to receipt
+    noRepairIfDataAttached: boolean
+    // reject shared data if we cover it
+    rejectSharedDataIfCovered: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

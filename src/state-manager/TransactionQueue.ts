@@ -308,7 +308,25 @@ class TransactionQueue {
           }
           // add the data in
           for (const data of payload.stateList) {
-            this.queueEntryAddData(queueEntry, data)
+            if (
+              configContext.stateManager.collectedDataFix &&
+              configContext.stateManager.rejectSharedDataIfCovered
+            ) {
+              const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(
+                data.accountId
+              )
+              const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
+              if (coveredByUs) {
+                nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
+                /* prettier-ignore */ if (logFlags.verbose) console.log(`broadcast_state: coveredByUs: ${data.accountId} no need to accept this data`)
+                continue
+              } else {
+                this.queueEntryAddData(queueEntry, data)
+              }
+            } else {
+              this.queueEntryAddData(queueEntry, data)
+            }
+
             if (queueEntry.state === 'syncing') {
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
             }
@@ -333,7 +351,19 @@ class TransactionQueue {
             return
           }
           for (const data of payload.stateList) {
-            this.queueEntryAddData(queueEntry, data)
+            if (configContext.stateManager.collectedDataFix && configContext.stateManager.rejectSharedDataIfCovered) {
+              const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(data.accountId)
+              const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
+              if (coveredByUs) {
+                nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
+                /* prettier-ignore */ if (logFlags.verbose) console.log(`broadcast_state: coveredByUs: ${data.accountId} no need to accept this data`)
+                continue
+              } else {
+                this.queueEntryAddData(queueEntry, data)
+              }
+            } else {
+              this.queueEntryAddData(queueEntry, data)
+            }
           }
           Comms.sendGossip(
             'broadcast_state_complete_data',
@@ -419,7 +449,19 @@ class TransactionQueue {
               /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`${route} validateCorrespondingTellSender failed for ${state.accountId}`)
               return errorHandler(RequestErrorEnum.InvalidSender)
             }
-            this.queueEntryAddData(queueEntry, state)
+            if (configContext.stateManager.collectedDataFix && configContext.stateManager.rejectSharedDataIfCovered) {
+              const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(state.accountId)
+              const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
+              if (coveredByUs) {
+                nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
+                /* prettier-ignore */ if (logFlags.verbose) console.log(`broadcast_state: coveredByUs: ${state.accountId} no need to accept this data`)
+                continue
+              } else {
+                this.queueEntryAddData(queueEntry, state)
+              }
+            } else {
+              this.queueEntryAddData(queueEntry, state)
+            }
             if (queueEntry.state === 'syncing') {
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${state.accountId}`)
             }
@@ -2546,9 +2588,6 @@ class TransactionQueue {
    * @param data
    */
   queueEntryAddData(queueEntry: QueueEntry, data: Shardus.WrappedResponse, signatureCheck = false): void {
-    if (queueEntry.collectedData[data.accountId] != null) {
-      return // already have the data
-    }
     if (queueEntry.uniqueKeys == null) {
       // cant have all data yet if we dont even have unique keys.
       throw new Error(
@@ -2559,8 +2598,19 @@ class TransactionQueue {
       )
     }
     if (queueEntry.collectedData[data.accountId] != null) {
-      // we have already collected this data
-      return
+      if (configContext.stateManager.collectedDataFix) {
+        // compare the timestamps and keep the newest
+        const existingData = queueEntry.collectedData[data.accountId]
+        if (data.timestamp > existingData.timestamp) {
+          queueEntry.collectedData[data.accountId] = data
+          nestedCountersInstance.countEvent('queueEntryAddData', 'collectedDataFix replace with newer data')
+        } else {
+          return
+        }
+      } else {
+        // we have already collected this data
+        return
+      }
     }
     profilerInstance.profileSectionStart('queueEntryAddData', true)
     // check the signature of each account data
@@ -6012,8 +6062,13 @@ class TransactionQueue {
                   if (queueEntry.appliedReceiptForRepair.result === true) {
                     // need to start repair process and wait
                     //await note: it is best to not await this.  it should be an async operation.
-                    this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
-                    this.updateTxState(queueEntry, 'await repair')
+                    if (configContext.stateManager.noRepairIfDataAttached && configContext.stateManager.attachDataToReceipt) {
+                      // we have received the final data, so we can just go to "await final data" and commit the accounts
+                      this.updateTxState(queueEntry, 'await final data')
+                    } else {
+                      this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
+                      this.updateTxState(queueEntry, 'await repair')
+                    }
                     continue
                   } else {
                     // We got a reciept, but the consensus is that this TX was not applied.
