@@ -305,7 +305,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     poqoloopTime: 2000,
     poqobatchCount: 1,
     forwardToLuckyNodes: true,
-    forwardToLuckyNodesNonceQueue: false,
+    forwardToLuckyNodesNonceQueue: true,
     forwardToLuckyNodesCheckRotation: true,
     integrityCheckBeforeChallenge: true,
     checkPrecrackStatus: true,
