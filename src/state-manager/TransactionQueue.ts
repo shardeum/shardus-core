@@ -4421,7 +4421,6 @@ class TransactionQueue {
       }
     }
 
-
     const correspondingNodes = []
     for (const index of validCorrespondingIndices) {
       if (index === ourIndexInTxGroup) {
@@ -4435,7 +4434,7 @@ class TransactionQueue {
         for (const wrappedResponse of signedPayload.stateList) {
           const accountId = wrappedResponse.accountId
           const targetNodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(targetNode.id)
-          if (targetNodeShardData === null) {
+          if (targetNodeShardData == null) {
             targetHasOurData = false
             break
           }
@@ -4456,7 +4455,6 @@ class TransactionQueue {
       nestedCountersInstance.countEvent('stateManager', 'factTellCorrespondingNodes: no corresponding nodes needed to send')
       return
     }
-
     // Filter nodes before we send tell()
     const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
       correspondingNodes,
