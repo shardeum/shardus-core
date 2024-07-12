@@ -9,10 +9,11 @@ export function getCorrespondingNodes(
   globalOffset: number,
   receiverGroupSize: number,
   sendGroupSize: number,
-  transactionGroupSize: number
+  transactionGroupSize: number,
+  note =  ''
 ): number[] {
   if (verbose) {
-    console.log(`getCorrespondingNodes ${ourIndex} ${startTargetIndex} ${endTargetIndex} ${globalOffset} ${receiverGroupSize} ${sendGroupSize} ${transactionGroupSize}`)
+    console.log(`getCorrespondingNodes ${note} ${ourIndex} ${startTargetIndex} ${endTargetIndex} ${globalOffset} ${receiverGroupSize} ${sendGroupSize} ${transactionGroupSize}`)
   }
   let wrappedIndex: number
   let targetNumber: number
@@ -100,8 +101,12 @@ export function verifyCorrespondingSender(
   receiverStartIndex = 0,
   receiverEndIndex = 0,
   transactionGroupSize = 0,
-  shouldUnwrapSender = false
+  shouldUnwrapSender = false,
+  note = ''
 ): boolean {
+  if (verbose) {
+    console.log(`verifyCorrespondingSender ${note} ${receivingNodeIndex} ${sendingNodeIndex} ${globalOffset} ${receiverGroupSize} ${sendGroupSize} ${receiverStartIndex} ${receiverEndIndex} ${transactionGroupSize}`)
+  }
   //note, in the gather case, we need to check the address range of the sender node also, to prove
   //that it does cover the given account range
   let unwrappedReceivingNodeIndex = receivingNodeIndex

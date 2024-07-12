@@ -2041,7 +2041,8 @@ class TransactionQueue {
         topVoters: new Set(),
         hasRobustConfirmation: false,
         sharedCompleteData: false,
-        correspondingGlobalOffset: 0
+        correspondingGlobalOffset: 0,
+        isSenderWrappedTxGroup: {}
       } // age comes from timestamp
       this.txDebugMarkStartTime(txQueueEntry, 'total_queue_time')
       this.txDebugMarkStartTime(txQueueEntry, 'aging')
@@ -2314,6 +2315,23 @@ class TransactionQueue {
           if (txQueueEntry.ourNodeInTransactionGroup || txQueueEntry.didSync === true) {
             // go ahead and calculate this now if we are in the tx group or we are syncing this range!
             this.queueEntryGetConsensusGroup(txQueueEntry)
+
+            // populate isSenderWrappedTxGroup
+              for (const accountId of txQueueEntry.uniqueKeys) {
+                const homeNodeShardData = txQueueEntry.homeNodes[accountId]
+                const consensusGroupForAccount = homeNodeShardData.consensusNodeForOurNodeFull.map(n => n.id)
+                const startAndEndIndices = this.getStartAndEndIndexOfTargetGroup(consensusGroupForAccount, txQueueEntry.transactionGroup)
+                const isWrapped = startAndEndIndices.endIndex < startAndEndIndices.startIndex
+                if (isWrapped === false) continue
+                const unwrappedEndIndex = startAndEndIndices.endIndex + txQueueEntry.transactionGroup.length
+                for (let i = startAndEndIndices.startIndex; i < unwrappedEndIndex; i++) {
+                  if (i >= txQueueEntry.transactionGroup.length) {
+                    const wrappedIndex = i - txQueueEntry.transactionGroup.length
+                    txQueueEntry.isSenderWrappedTxGroup[txQueueEntry.transactionGroup[wrappedIndex].id] = i
+                  }
+                }
+              }
+              this.mainLogger.debug(`routeAndQueueAcceptedTransaction isSenderWrappedTxGroup ${txQueueEntry.logID} ${utils.stringifyReduce(txQueueEntry.isSenderWrappedTxGroup)}`)
           }
           if (sendGossip && txQueueEntry.globalModification === false) {
             try {
@@ -4391,6 +4409,7 @@ class TransactionQueue {
 
       // calculate target start and end indices in txGroup
       const targetIndices = this.getStartAndEndIndexOfTargetGroup(targetGroup, queueEntry.transactionGroup)
+      const unwrappedIndex = queueEntry.isSenderWrappedTxGroup[Self.id]
 
       // temp logs
       if (logFlags.verbose) {
@@ -4414,8 +4433,9 @@ class TransactionQueue {
         // can just find if any home nodes for the accounts we cover would say that our node is wrapped
         // precalc shouldUnwrapSender   check if any account we own shows that we are on the left side of a wrapped range
         // can use partitions to check this
-        if (queueEntry.shouldUnwrapSender) {
+        if (unwrappedIndex != null) {
           const ourUnWrappedIndex = queueEntry.transactionGroup.length + ourIndexInTxGroup
+          this.mainLogger.debug(`factTellCorrespondingNodes: unwrappedIndex ${queueEntry.logID}`, unwrappedIndex, ourUnWrappedIndex)
           const extraCorrespondingIndices = getCorrespondingNodes(
             ourUnWrappedIndex,
             targetIndices.startIndex,
@@ -4423,7 +4443,8 @@ class TransactionQueue {
             queueEntry.correspondingGlobalOffset,
             targetGroupSize,
             senderGroupSize,
-            queueEntry.transactionGroup.length
+            queueEntry.transactionGroup.length,
+            queueEntry.logID
           )
           //add them
           correspondingIndices = correspondingIndices.concat(extraCorrespondingIndices)
@@ -4439,11 +4460,11 @@ class TransactionQueue {
       for (const targetIndex of correspondingIndices) {
         validCorrespondingIndices.push(targetIndex)
 
-        if (logFlags.debug) {
-          //  debug verification code
-          const isValid = verifyCorrespondingSender(targetIndex, ourIndexInTxGroup, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, targetIndices.startIndex, targetIndices.endIndex, queueEntry.transactionGroup.length)
-          if (logFlags.debug) this.mainLogger.debug(`factTellCorrespondingNodes: debug verifyCorrespondingSender`, ourIndexInTxGroup, '->', targetIndex, isValid);
-        }
+        // if (logFlags.debug) {
+        //   //  debug verification code
+        //   const isValid = verifyCorrespondingSender(targetIndex, ourIndexInTxGroup, queueEntry.correspondingGlobalOffset, targetGroupSize, senderGroupSize, targetIndices.startIndex, targetIndices.endIndex, queueEntry.transactionGroup.length)
+        //   if (logFlags.debug) this.mainLogger.debug(`factTellCorrespondingNodes: debug verifyCorrespondingSender`, ourIndexInTxGroup, '->', targetIndex, isValid);
+        // }
       }
 
       const correspondingNodes = []
@@ -4554,12 +4575,17 @@ class TransactionQueue {
 
     // check if it is a FACT sender
     const receivingNodeIndex = queueEntry.ourTXGroupIndex // we are the receiver
-    const senderNodeIndex = queueEntry.transactionGroup.findIndex((node) => node.id === senderNodeId)
+    let senderNodeIndex = queueEntry.transactionGroup.findIndex((node) => node.id === senderNodeId)
+    if (queueEntry.isSenderWrappedTxGroup[senderNodeId] != null) {
+      senderNodeIndex = queueEntry.isSenderWrappedTxGroup[senderNodeId]
+    }
     const receiverGroupSize = queueEntry.executionNodeIdSorted.length
     const senderGroupSize = receiverGroupSize
 
     const targetGroup = queueEntry.executionNodeIdSorted
     const targetIndices = this.getStartAndEndIndexOfTargetGroup(targetGroup, queueEntry.transactionGroup)
+
+    this.mainLogger.debug(`factValidateCorrespondingTellSender: txId: ${queueEntry.acceptedTx.txId} sender node id: ${senderNodeId}, receiver id: ${Self.id} senderHasAddress: ${senderHasAddress} receivingNodeIndex: ${receivingNodeIndex} senderNodeIndex: ${senderNodeIndex} receiverGroupSize: ${receiverGroupSize} senderGroupSize: ${senderGroupSize} targetIndices: ${utils.stringifyReduce(targetIndices)}`)
 
     const isValidFactSender = verifyCorrespondingSender(
       receivingNodeIndex,
@@ -4569,7 +4595,9 @@ class TransactionQueue {
       senderGroupSize,
       targetIndices.startIndex,
       targetIndices.endIndex,
-      queueEntry.transactionGroup.length
+      queueEntry.transactionGroup.length,
+      false,
+      queueEntry.logID
     ) // it maybe a FACT sender but sender does not cover the account
     if (senderHasAddress === false) {
       this.mainLogger.error(

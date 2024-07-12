@@ -207,6 +207,8 @@ export type QueueEntry = {
     waitingOn?: string
     loggedStats1?: boolean
   }
+
+  isSenderWrappedTxGroup: { [nodeId: string]: number }
 }
 
 // export type SyncTracker = {
