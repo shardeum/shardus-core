@@ -307,6 +307,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     forwardToLuckyNodes: true,
     forwardToLuckyNodesNonceQueue: true,
     forwardToLuckyNodesCheckRotation: true,
+    forwardToLuckyMulti: false,
     integrityCheckBeforeChallenge: true,
     checkPrecrackStatus: true,
     noVoteSeenExpirationTime: 10000,
@@ -328,6 +329,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     stuckTxRemoveTime: 1000 * 60 * 2, // 2 minutes
     removeStuckTxsFromQueue2: false, //start disabled turn on via migration only
     stuckTxRemoveTime2: 1000 * 60 * 2, // 2 minutes (since we saw a valid vote, not the total age)
+    removeStuckTxsFromQueue3: false,
+    stuckTxRemoveTime3: 1000 * 60 * 3, // 2 minutes (since being in consensing state, not the total age)
     removeStuckChallengedTXs: true,
     receiptRemoveFix: true,
     stuckTxQueueFix: true,

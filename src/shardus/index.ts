@@ -1578,7 +1578,10 @@ class Shardus extends EventEmitter {
       }
       selectedValidators.push(validatorDetails)
     }
-    for (const validator of selectedValidators) {
+
+    let successCount = 0
+    let failedCount = 0
+    for(const validator of selectedValidators) {
       try {
         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_req_${context} ${activeIdToPartition.get(validator.id)}`)
 
@@ -1595,16 +1598,23 @@ class Shardus extends EventEmitter {
         if (result == null) {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_null_${context} ${activeIdToPartition.get(validator.id)}`)
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got null/undefined response upon forwarding injected tx: ${txId} to node ${validator.id}` )
+          failedCount++
           continue
         }
         if (result && result.success === false) {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_false_${context} ${activeIdToPartition.get(validator.id)}`)
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got unsuccessful response upon forwarding injected tx: ${validator.id}. ${message} ${Utils.safeStringify(tx)}` )
+          failedCount++
           continue
         }
         if (result && result.success === true) {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_success_${context} ${activeIdToPartition.get(validator.id)}`)
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got successful response upon forwarding injected tx: ${validator.id}. ${message} ${Utils.safeStringify(tx)}` )
+          nestedCountersInstance.countEvent('statistics', `forward to luck success ${message}`)
+          if(Context.config.stateManager.forwardToLuckyMulti){
+            successCount++
+            continue
+          }
           return { success: true, reason: 'Transaction forwarded to validators', status: 200 }
         }
       } catch (e) {
@@ -1612,7 +1622,15 @@ class Shardus extends EventEmitter {
         /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx to ${validator.id} failed. ${message} ${Utils.safeStringify(tx)} error: ${ e.stack }` )
       }
     }
-    nestedCountersInstance.countEvent('statistics', `forward failed: ${Utils.safeStringify(stats)}`)
+
+    if (successCount > 0) {
+      /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_success_${context}`)
+      /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got successful response upon forwarding injected tx: ${message} ${Utils.safeStringify(tx)}` )
+      nestedCountersInstance.countEvent('statistics', `forward to luck success ${message} failed/success/total: ${failedCount}/${successCount}/${selectedValidators.length}`)
+      return { success: true, reason: 'Transaction forwarded to validators', status: 200 }
+    }
+
+    nestedCountersInstance.countEvent('statistics', `forward failed: ${Utils.safeStringify(stats)} ${message}`)
     /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx out of tries. ${Utils.safeStringify(stats)} ${Utils.safeStringify(tx)} ` )
     return { success: false, reason: 'No validators found to forward the transaction', status: 500 }
   }

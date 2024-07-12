@@ -1213,6 +1213,8 @@ export interface ServerConfiguration {
     forwardToLuckyNodes: boolean
     // should the network forward TXs to lucky nodes?  (only for the nonce queue)
     forwardToLuckyNodesNonceQueue: boolean
+    // forward to multiple lucy nodes (requires other configs to forward at all)
+    forwardToLuckyMulti: boolean
     /// check rotation bounds when forwarding to lucky nodes
     forwardToLuckyNodesCheckRotation: boolean
     // whether the node should verify its data against the network before challenging
@@ -1257,6 +1259,10 @@ export interface ServerConfiguration {
     removeStuckTxsFromQueue2: boolean
     // how long to wait before removing the tx from the queue. Based on time since first vote seen
     stuckTxRemoveTime2: number
+    // whether to remove the tx from the queue if it stuck for X min. must be in consensing state
+    removeStuckTxsFromQueue3: boolean
+    // how long to wait before removing the tx from the queue. must be in consensing state
+    stuckTxRemoveTime3: number
     // remove a stuck challenged tx
     removeStuckChallengedTXs: boolean
     // receipt remove fix
