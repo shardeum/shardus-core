@@ -2503,7 +2503,8 @@ class AccountPatcher {
     for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
       const votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
       const ourTrieNode = this.shardTrie.layerMaps[this.treeSyncDepth].get(radix)
-      if (logFlags.debug) this.mainLogger.debug(`Checking isInSync ${radix}, cycle: ${cycle}, ${Utils.safeStringify(votesMap)}`);
+      if (logFlags.debug)
+        this.mainLogger.debug(`Checking isInSync ${radix}, cycle: ${cycle}, ${Utils.safeStringify(votesMap)}`)
 
       const nonConsensusRanges = this.getNonConsensusRanges(cycle)
       const nonStorageRanges = this.getNonStoredRanges(cycle)
@@ -2539,7 +2540,14 @@ class AccountPatcher {
       if (ourTrieNode == null) {
         /* prettier-ignore */ nestedCountersInstance.countRareEvent(`accountPatcher`, `isInSync ${radix} our trieNode === null`, 1)
         if (logFlags.debug) this.mainLogger.debug(`isInSync ${radix} our trieNode === null, cycle: ${cycle}`)
-        isInsyncResult.radixes.push({radix, insync: false, inConsensusRange, inEdgeRange, recentRuntimeSync: false})
+        isInsyncResult.radixes.push({
+          radix,
+          insync: false,
+          inConsensusRange,
+          inEdgeRange,
+          recentRuntimeSync: false,
+          recentRuntimeSyncCycle: -1,
+        })
         isInsyncResult.insync = false
         isInsyncResult.stats.bad++
         isInsyncResult.stats.total++
@@ -2582,11 +2590,25 @@ class AccountPatcher {
           )
         }
         isInsyncResult.insync = false
-        isInsyncResult.radixes.push({radix, insync: false, inConsensusRange, inEdgeRange, recentRuntimeSync: false})
+        isInsyncResult.radixes.push({
+          radix,
+          insync: false,
+          inConsensusRange,
+          inEdgeRange,
+          recentRuntimeSync: false,
+          recentRuntimeSyncCycle: -1,
+        })
         isInsyncResult.stats.bad++
         isInsyncResult.stats.total++
       } else if (ourTrieNode.hash === votesMap.bestHash) {
-        isInsyncResult.radixes.push({radix, insync: true, inConsensusRange, inEdgeRange, recentRuntimeSync: false})
+        isInsyncResult.radixes.push({
+          radix,
+          insync: true,
+          inConsensusRange,
+          inEdgeRange,
+          recentRuntimeSync: false,
+          recentRuntimeSyncCycle: -1,
+        })
         isInsyncResult.stats.good++
         isInsyncResult.stats.total++
       }
@@ -2609,14 +2631,16 @@ class AccountPatcher {
           const radixEntry = isInsyncResult.radixes[i]
           if (radixEntry.radix >= startRadix && radixEntry.radix <= endRadix) {
             radixEntry.recentRuntimeSync = true
+            radixEntry.recentRuntimeSyncCycle = cycle
           }
         }
-      // for wrapped ranges because we start at the end and wrap around to the beginning of 32 byte address space
+        // for wrapped ranges because we start at the end and wrap around to the beginning of 32 byte address space
       } else {
         for (let i = 0; i <= isInsyncResult.radixes.length; i++) {
           const radixEntry = isInsyncResult.radixes[i]
           if (radixEntry.radix >= startRadix || radixEntry.radix <= endRadix) {
             radixEntry.recentRuntimeSync = true
+            radixEntry.recentRuntimeSyncCycle = cycle
           }
         }
       }
