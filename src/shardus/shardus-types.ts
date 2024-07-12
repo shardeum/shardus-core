@@ -1282,6 +1282,8 @@ export interface ServerConfiguration {
     awaitingDataCanBailOnReceipt: boolean
     // Filter receiving nodes if they cover the account already
     filterReceivingNodesForTXData: boolean
+    // unwrap sender indicies when calculating corresponding tell
+    correspondingTellUseUnwrapped: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

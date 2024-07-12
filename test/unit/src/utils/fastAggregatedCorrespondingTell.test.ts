@@ -3,7 +3,7 @@ import {
   verifyCorrespondingSender,
 } from '../../../../src/utils/fastAggregatedCorrespondingTell'
 
-const verbose = false
+const verbose = true
 
 describe('FACT Tests', () => {
   //push several test cases into an array
@@ -71,7 +71,17 @@ describe('FACT Tests', () => {
       senderEndRange: 20,
       sendGroupSize: 10,
     },
+    {
+      //globalOffset           = 43776
+      startTargetIndex: 2,
+      endTargetIndex: 7,
+      transactionGroupSize: 8,
+      senderStartRange: 5,
+      senderEndRange: 2,
+      sendGroupSize: 5,
+    }
   ]
+
 
   receiverTestCases.forEach(
     (
@@ -87,10 +97,37 @@ describe('FACT Tests', () => {
     ) => {
       test(`Test case ${index}: startTargetIndex: ${startTargetIndex}, endTargetIndex: ${endTargetIndex} transactionGroupSize:${transactionGroupSize} sendGroupSize:${sendGroupSize}`, () => {
         const receiverGroupSize = endTargetIndex - startTargetIndex
-        const globalOffset = Math.round(Math.random() * 1000)
+        const globalOffset = 0 //43776 // Math.round(Math.random() * 1000)
         const coverage = new Array(transactionGroupSize).fill(0)
 
-        for (let senderNodeIndex = senderStartRange; senderNodeIndex < senderEndRange; senderNodeIndex++) {
+        const senderIndicies:number[] = []
+        if(senderStartRange < senderEndRange){
+          for (let i = senderStartRange; i < senderEndRange; i++) {
+            senderIndicies.push(i)
+          }
+        } else {
+          const useUnWrapped = true
+          if(useUnWrapped){
+            //indicies can go past the end
+            for (let i = senderStartRange; i < senderEndRange + transactionGroupSize; i++) {
+              senderIndicies.push(i)
+            }
+          } else {
+            // wrapped 
+            for (let i = 0; i < senderEndRange; i++) {
+              senderIndicies.push(i)
+            }
+            for (let i = senderStartRange; i < transactionGroupSize; i++) {
+              senderIndicies.push(i)
+            }
+          }
+
+
+          if (verbose) console.log(`wrapped sender ranges ${senderIndicies}`)
+        }
+
+
+        for(let senderNodeIndex of senderIndicies) {
           //get a list of destination nodes for this sender
           const destinationNodes = getCorrespondingNodes(
             senderNodeIndex,
@@ -102,6 +139,7 @@ describe('FACT Tests', () => {
             transactionGroupSize
           )
 
+          console.log(`sender ${senderNodeIndex} send all payload to nodes ${destinationNodes}`)
           //cheap hack to test that verification can refute things
           //globalOffset++
 
@@ -115,13 +153,24 @@ describe('FACT Tests', () => {
 
             //verification check
             //extra step here, remove in production
+
+            let shouldUnwrapSender = false
+            if(senderNodeIndex > transactionGroupSize){
+              senderNodeIndex = senderNodeIndex - transactionGroupSize
+              shouldUnwrapSender = true
+            }
+
             expect(
               verifyCorrespondingSender(
                 receiverNodeIndex,
                 senderNodeIndex,
                 globalOffset,
                 receiverGroupSize,
-                sendGroupSize
+                sendGroupSize,
+                0,
+                0,
+                transactionGroupSize,
+                shouldUnwrapSender
               )
             ).toBe(true)
           })

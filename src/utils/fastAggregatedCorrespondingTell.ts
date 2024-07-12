@@ -99,7 +99,8 @@ export function verifyCorrespondingSender(
   sendGroupSize: number,
   receiverStartIndex = 0,
   receiverEndIndex = 0,
-  transactionGroupSize = 0
+  transactionGroupSize = 0,
+  shouldUnwrapSender = false
 ): boolean {
   //note, in the gather case, we need to check the address range of the sender node also, to prove
   //that it does cover the given account range
@@ -109,18 +110,22 @@ export function verifyCorrespondingSender(
   if (receiverStartIndex > unwrappedReceivingNodeIndex) {
     unwrappedReceivingNodeIndex = unwrappedReceivingNodeIndex + transactionGroupSize
   }
+  let unwrappedSendingNodeIndex = sendingNodeIndex
+  if(shouldUnwrapSender) {
+    unwrappedSendingNodeIndex = sendingNodeIndex + transactionGroupSize
+  }
 
   // use unwrappedReceivingNodeIndex to calculate the target index
   const targetIndex = ((unwrappedReceivingNodeIndex + globalOffset) % receiverGroupSize) % sendGroupSize
-  const targetIndex2 = sendingNodeIndex % sendGroupSize
+  const targetIndex2 = unwrappedSendingNodeIndex % sendGroupSize
   if (targetIndex === targetIndex2) {
     if (verbose)
       console.log(
-        `verification passed ${targetIndex} === ${targetIndex2}  ${sendingNodeIndex}->${receivingNodeIndex}`
+        `verification passed ${targetIndex} === ${targetIndex2}  ${unwrappedSendingNodeIndex}->${receivingNodeIndex}`
       )
     return true
   } else {
-    console.log(`X verification failed ${targetIndex} !== ${targetIndex2} sender: ${sendingNodeIndex} receiver: ${receivingNodeIndex}`)
+    console.log(`X verification failed ${targetIndex} !== ${targetIndex2} sender: ${unwrappedSendingNodeIndex} receiver: ${receivingNodeIndex}`)
     return false
   }
 }

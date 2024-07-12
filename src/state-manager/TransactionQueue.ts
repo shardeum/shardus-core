@@ -4400,7 +4400,7 @@ class TransactionQueue {
         this.mainLogger.debug(`factTellCorrespondingNodes: target group indices`, targetIndices)
       }
 
-      const correspondingIndices = getCorrespondingNodes(
+      let correspondingIndices = getCorrespondingNodes(
         ourIndexInTxGroup,
         targetIndices.startIndex,
         targetIndices.endIndex,
@@ -4409,6 +4409,30 @@ class TransactionQueue {
         senderGroupSize,
         queueEntry.transactionGroup.length
       )
+
+      if(this.config.stateManager.correspondingTellUseUnwrapped){
+        // can just find if any home nodes for the accounts we cover would say that our node is wrapped
+        // precalc shouldUnwrapSender   check if any account we own shows that we are on the left side of a wrapped range
+        // can use partitions to check this
+        if (queueEntry.shouldUnwrapSender) {
+          const ourUnWrappedIndex = queueEntry.transactionGroup.length + ourIndexInTxGroup
+          const extraCorrespondingIndices = getCorrespondingNodes(
+            ourUnWrappedIndex,
+            targetIndices.startIndex,
+            targetIndices.endIndex,
+            queueEntry.correspondingGlobalOffset,
+            targetGroupSize,
+            senderGroupSize,
+            queueEntry.transactionGroup.length
+          )
+          //add them
+          correspondingIndices = correspondingIndices.concat(extraCorrespondingIndices)
+          //replace them 
+          // possible optimization where we pick one or the other path based on our account index
+          //correspondingIndices = extraCorrespondingIndices
+        }
+      }
+
       if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodes: correspondingIndices ${queueEntry.logID}`, ourIndexInTxGroup, correspondingIndices);
 
       const validCorrespondingIndices = []
