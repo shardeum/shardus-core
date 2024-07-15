@@ -73,7 +73,7 @@ The existing join code is in the repository "shardus-global-server", aka "Shardu
   - Where to make the request
     - There are multiple `shutdown()` methods in Shardus Core where this might be done, or:
     - The constructor of the `Shardus` class in `src/shardus/index.ts` contains multiple `this.exitHandler.registerAsync()` calls that could be used to register the `unjoin` request.
-- The unjoin request will require a new list in the cycle record because it cannot remove immediately.
+- The unjoin request will require a new list in the cycle record because it cannot be removed immediately.
 - Ignore the unjoin request if the node is not found in `standbyNodeByPublicKey` or `byJoinOrder`.
 
 ## Additional Context

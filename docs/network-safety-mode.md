@@ -8,7 +8,7 @@ The functional specification ["Network Safety"](https://docs.google.com/document
 
 There is a [Linear project](https://linear.app/shm/project/network-safety-mode-743d4f2d34fd) for the implementation.
 
-There is already an implentation of safety mode in place, but it is more primitive, and the intention is to add a mode system.
+There is already an implementation of safety mode in place, but it is more primitive, and the intention is to add a mode system.
 
 ## Benefits
 
