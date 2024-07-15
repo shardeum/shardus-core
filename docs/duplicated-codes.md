@@ -81,7 +81,7 @@ joinNetwork(nodes, firstTime)
 -----
 ## Syncing Cycle Records and Building Node List
 ### Description
-When a new consensor node or archiver joins the network, it trys to sync the cycle records and build active node list from the record
+When a new consensor node or archiver joins the network, it tries to sync the cycle records and build active node list from the record
 ### Functions
 ```
 ChangeSquasher()
