@@ -52,18 +52,22 @@ const gossipInternalBinaryRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer
       errorType: RequestErrorEnum,
       opts?: { customErrorLog?: string; customCounterSuffix?: string }
     ): void => requestErrorHandler(route, errorType, header, opts)
+    let gossipType = 'unknown'
     try {
       const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGossipReq)
       if (!requestStream) {
         return errorHandler(RequestErrorEnum.InvalidRequest)
       }
       const req: GossipReqBinary = deserializeGossipReq(requestStream)
+      gossipType = req.type
       await handleGossip(req, header.sender_id, header.tracker_id, payload.length)
     } catch (e) {
-      nestedCountersInstance.countEvent('internal', `${route}-exception`)
+      nestedCountersInstance.countEvent('internal', `${route}-${gossipType}-exception`)
       logger
         .getLogger('comms-route')
-        .error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+        .error(
+          `${route}: Exception executing gossip type: ${gossipType}, request: ${utils.errorToStringFull(e)}`
+        )
     } finally {
       profilerInstance.scopedProfileSectionEnd(route)
     }
@@ -332,6 +336,7 @@ export async function tellBinary<TReq>(
     await network.tellBinary(nonSelfNodes, route, wrappedReq.getBuffer(), appHeader, tracker, logged)
   } catch (err) {
     warn(`tellBinary: network.tellBinary: P2P TELL_BINARY: failed. route: ${route}, error: ${err}`)
+    // Add more details to the error in gossip case
   }
   profilerInstance.profileSectionEnd('p2p-tellBinary')
   profilerInstance.profileSectionEnd(`p2p-tellBinary-${route}`)
