@@ -82,7 +82,7 @@ import { Utils } from '@shardus/types'
 import { isNodeInRotationBounds } from '../p2p/Utils'
 import ShardFunctions from '../state-manager/shardFunctions'
 import SocketIO from 'socket.io'
-import { nodeListFromStates, queueFinishedSyncingRequest } from '../p2p/Join'
+import { nodeListFromStates, setFinishedSyncing } from '../p2p/Join'
 import * as NodeList from '../p2p/NodeList'
 import { P2P } from '@shardus/types'
 
@@ -717,9 +717,9 @@ class Shardus extends EventEmitter {
       console.log('restore - startCatchUpQueue')
       nestedCountersInstance.countEvent('restore', `restore event: finished startCatchUpQueue. ${shardusGetTime()}`)
 
-      queueFinishedSyncingRequest()
-      console.log('syncAppData - queueFinishedSyncingRequest')
-      nestedCountersInstance.countEvent('restore', `restore event: queue finished-syncing-request ${shardusGetTime()}`)
+      setFinishedSyncing()
+      console.log('syncAppData - setFinishedSyncing()')
+      nestedCountersInstance.countEvent('restore', `restore event: set-finished-syncing ${shardusGetTime()}`)
 
       this.stateManager.appFinishedSyncing = true
       this.stateManager.startProcessingCycleSummaries()
@@ -1183,9 +1183,9 @@ class Shardus extends EventEmitter {
       // the following comment of delay is probably not relavent now as we are using cycle txs
       // we don't have a delay here as there's practically no time between sync-started and sync-finished for the first node
       // since we already wait fro sync-finished, its very unlikely we'll be in the wrong quarter
-      queueFinishedSyncingRequest()
-      console.log('syncAppData - queueFinishedSyncingRequest')
-      nestedCountersInstance.countEvent('p2p', `queue finished-syncing-request ${shardusGetTime()}`)
+      setFinishedSyncing()
+      console.log('syncAppData - setFinishedSyncing()')
+      nestedCountersInstance.countEvent('p2p', `set-finished-syncing ${shardusGetTime()}`)
       await this.stateManager.waitForShardCalcs()
       await this.app.sync()
       console.log('syncAppData - sync')
@@ -1200,9 +1200,9 @@ class Shardus extends EventEmitter {
       Self.setp2pIgnoreJoinRequests(false)
       console.log('p2pIgnoreJoinRequests = false')
 
-      queueFinishedSyncingRequest()
-      console.log('syncAppData - queueFinishedSyncingRequest')
-      nestedCountersInstance.countEvent('p2p', `queue finished-syncing-request ${shardusGetTime()}`)
+      setFinishedSyncing()
+      console.log('syncAppData - setFinishedSyncing()')
+      nestedCountersInstance.countEvent('p2p', `set-finished-syncing ${shardusGetTime()}`)
       this.stateManager.appFinishedSyncing = true
     }
     // Set network joinable to true
