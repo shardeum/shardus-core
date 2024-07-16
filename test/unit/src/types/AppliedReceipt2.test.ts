@@ -1,9 +1,10 @@
+import exp from 'node:constants'
 import { VectorBufferStream } from '../../../../src'
 import { AppliedReceipt2 } from '../../../../src/state-manager/state-manager-types'
 import { cAppliedReceipt2Version, serializeAppliedReceipt2 } from '../../../../src/types/AppliedReceipt2'
 import { serializeAppliedVote } from '../../../../src/types/AppliedVote'
 import { serializeConfirmOrChallengeMessage } from '../../../../src/types/ConfirmOrChallengeMessage'
-import { cSignVersion } from '../../../../src/types/Sign'
+import { cSignVersion, serializeSign } from '../../../../src/types/Sign'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import { Utils } from '@shardus/types'
 
@@ -35,8 +36,13 @@ describe('AppliedReceipt2 Serialization', () => {
     const expectedStream = new VectorBufferStream(0)
     expectedStream.writeUInt16(TypeIdentifierEnum.cAppliedReceipt2)
     expectedStream.writeUInt8(cAppliedReceipt2Version)
-    const stringified = Utils.safeStringify(obj)
-    expectedStream.writeString(stringified)
+    expectedStream.writeString(obj.txid)
+    expectedStream.writeUInt8(1)
+    serializeAppliedVote(expectedStream, obj.appliedVote)
+    expectedStream.writeUInt8(0)
+    expectedStream.writeUInt16(1)
+    serializeSign(expectedStream, obj.signatures[0])
+    expectedStream.writeString(obj.app_data_hash)
 
     expect(stream.getBuffer()).toEqual(expectedStream.getBuffer())
   })
@@ -77,8 +83,14 @@ describe('AppliedReceipt2 Serialization', () => {
 
     const expectedStream = new VectorBufferStream(0)
     expectedStream.writeUInt8(cAppliedReceipt2Version)
-    const stringified = Utils.safeStringify(obj)
-    expectedStream.writeString(stringified)
+    expectedStream.writeString(obj.txid)
+    expectedStream.writeUInt8(0)
+    serializeAppliedVote(expectedStream, obj.appliedVote)
+    expectedStream.writeUInt8(0)
+    expectedStream.writeUInt16(2)
+    serializeSign(expectedStream, obj.signatures[0])
+    serializeSign(expectedStream, obj.signatures[1])
+    expectedStream.writeString(obj.app_data_hash)
 
     expect(stream.getBuffer()).toEqual(expectedStream.getBuffer())
   })

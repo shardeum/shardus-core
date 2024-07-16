@@ -35,7 +35,13 @@ export function serializeAppliedReceipt2(
   stream.writeString(obj.txid)
   stream.writeUInt8(obj.result ? 1 : 0)
   serializeAppliedVote(stream, obj.appliedVote)
-  serializeConfirmOrChallengeMessage(stream, obj.confirmOrChallenge)
+  // Check if confirmOrChallenge is defined
+  if (obj.confirmOrChallenge) {
+    stream.writeUInt8(1)
+    serializeConfirmOrChallengeMessage(stream, obj.confirmOrChallenge)
+  } else {
+    stream.writeUInt8(0)
+  }
 
   stream.writeUInt16(obj.signatures.length)
 
@@ -54,7 +60,13 @@ export function deserializeAppliedReceipt2(stream: VectorBufferStream): AppliedR
   const txid = stream.readString()
   const result = stream.readUInt8() === 1
   const appliedVote = deserializeAppliedVote(stream)
-  const confirmOrChallenge = deserializeConfirmOrChallengeMessage(stream)
+  const confirmOrChallengeFlag = stream.readUInt8()
+  let confirmOrChallenge
+  if (confirmOrChallengeFlag === 1) {
+    confirmOrChallenge = deserializeConfirmOrChallengeMessage(stream)
+  } else {
+    confirmOrChallenge = undefined
+  }
   const signaturesLength = stream.readUInt16()
   const signatures: SignSerializable[] = new Array(signaturesLength)
   for (let i = 0; i < signaturesLength; i++) {
