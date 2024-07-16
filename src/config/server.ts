@@ -301,6 +301,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     waitLimitAfterFirstMessage: 2000,
     minRequiredChallenges: 1,
     useNewPOQ: false,
+    nonExWaitForData: 5000,
     usePOQo: true,
     poqoloopTime: 2000,
     poqobatchCount: 1,
