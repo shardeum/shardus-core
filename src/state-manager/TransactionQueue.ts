@@ -4434,10 +4434,8 @@ class TransactionQueue {
         // precalc shouldUnwrapSender   check if any account we own shows that we are on the left side of a wrapped range
         // can use partitions to check this
         if (unwrappedIndex != null) {
-          const ourUnWrappedIndex = queueEntry.transactionGroup.length + ourIndexInTxGroup
-          this.mainLogger.debug(`factTellCorrespondingNodes: unwrappedIndex ${queueEntry.logID}`, unwrappedIndex, ourUnWrappedIndex)
           const extraCorrespondingIndices = getCorrespondingNodes(
-            ourUnWrappedIndex,
+            unwrappedIndex,
             targetIndices.startIndex,
             targetIndices.endIndex,
             queueEntry.correspondingGlobalOffset,
@@ -4931,6 +4929,7 @@ class TransactionQueue {
 
     const senderIndexInTxGroup = queueEntry.ourTXGroupIndex
     const senderGroupSize = queueEntry.executionGroup.length
+    const unwrappedIndex = queueEntry.isSenderWrappedTxGroup[Self.id]
 
     const correspondingIndices = getCorrespondingNodes(
       senderIndexInTxGroup,
@@ -4939,8 +4938,27 @@ class TransactionQueue {
       queueEntry.correspondingGlobalOffset,
       targetGroupSize,
       senderGroupSize,
-      queueEntry.transactionGroup.length
+      queueEntry.transactionGroup.length,
+      queueEntry.logID
     )
+
+    if (this.config.stateManager.correspondingTellUseUnwrapped) {
+      if (unwrappedIndex != null) {
+        const extraCorrespondingIndices = getCorrespondingNodes(
+          unwrappedIndex,
+          targetStartIndex,
+          targetEndIndex,
+          queueEntry.correspondingGlobalOffset,
+          targetGroupSize,
+          senderGroupSize,
+          queueEntry.transactionGroup.length,
+          queueEntry.logID
+        )
+
+        correspondingIndices.concat(extraCorrespondingIndices)
+      }
+    }
+
     for (const key of keysToShare) {
       // eslint-disable-next-line security/detect-object-injection
       if (wrappedStates[key] != null) {
@@ -5058,7 +5076,10 @@ class TransactionQueue {
       return false
     }
 
-    const senderNodeIndex = queueEntry.transactionGroup.findIndex((node) => node.id === senderNodeId)
+    let senderNodeIndex = queueEntry.transactionGroup.findIndex((node) => node.id === senderNodeId)
+    if (queueEntry.isSenderWrappedTxGroup[senderNodeId] != null) {
+      senderNodeIndex = queueEntry.isSenderWrappedTxGroup[senderNodeId]
+    }
     const senderGroupSize = queueEntry.executionGroup.length
 
     const targetNodeIndex = queueEntry.ourTXGroupIndex // we are the receiver
