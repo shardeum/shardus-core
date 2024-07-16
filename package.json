@@ -16,8 +16,7 @@
     "dist": "./dist"
   },
   "scripts": {
-    "lint": "eslint './src/**/*.ts'",
-    "lint-windows": "eslint ./src/**/*.ts",
+    "lint": "eslint \"./src/**/*.ts\"",
     "ensure:node-version": "node -e \"'v' + require('./package.json').engines.node == process.version || process.exit(1)\"",
     "clean": "shx rm -rf dist build",
     "create:folders": "shx mkdir -p dist",
@@ -34,7 +33,6 @@
     "release:move": "npm-run-all release:move:*",
     "build:dev": "npm-run-all clean compile:ts dev:move",
     "build:release": "npm-run-all clean prep compile release:move",
-    "build": "npm run compile",
     "release": "npm-run-all ensure:* build:release np",
     "check": "gts check",
     "fix": "gts fix",
