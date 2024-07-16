@@ -1530,7 +1530,7 @@ class TransactionConsenus {
           queueEntry.hasSentFinalReceipt = true
           Comms.sendGossip(
             'poqo-receipt-gossip',
-            payload,
+            readableReq,
             null,
             null,
             queueEntry.transactionGroup,
