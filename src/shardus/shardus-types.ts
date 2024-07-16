@@ -1203,6 +1203,8 @@ export interface ServerConfiguration {
     minRequiredChallenges: number
     // turn on the improved Proof of Quorum for large shards sizes
     useNewPOQ: boolean
+    // milliseconds to wait after receiving the receipt and before asking data
+    nonExWaitForData: number
     // turn on POQo consensus
     usePOQo: boolean
     // Interval between switching to the next vote aggregator batch

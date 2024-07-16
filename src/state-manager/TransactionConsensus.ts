@@ -34,7 +34,7 @@ import {
   RequestReceiptForTxReq,
   RequestReceiptForTxResp,
   WrappedResponses,
-  TimestampRemoveRequest
+  TimestampRemoveRequest,
 } from './state-manager-types'
 import { ipInfo, shardusGetTime } from '../network'
 import { robustQuery } from '../p2p/Utils'
@@ -1105,6 +1105,7 @@ class TransactionConsenus {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip no queue entry for ${payload.txid}`)
             return
           }
+
           if (queueEntry.hasSentFinalReceipt === true) {
             // We've already send this receipt, no need to send it again
             return
@@ -1135,12 +1136,38 @@ class TransactionConsenus {
             '',
             true
           )
+
           queueEntry.hasSentFinalReceipt = true
+
+          // If the queue entry does not have the valid final data then request that
+          if (!queueEntry.hasValidFinalData) {
+            setTimeout(async () => {
+              // Check if we have final data
+              if (queueEntry.hasValidFinalData) {
+                return
+              }
+              if (logFlags.verbose)
+                this.mainLogger.debug(`poqo-receipt-gossip: requesting final data for ${queueEntry.logID}`)
+              nestedCountersInstance.countEvent(
+                'request-final-data',
+                'final data timeout, making explicit request'
+              )
+
+              const nodesToAskKeys = payload.signatures?.map((signature) => signature.owner)
+
+              await this.stateManager.transactionQueue.requestFinalData(
+                queueEntry,
+                payload.appliedVote.account_id,
+                nodesToAskKeys
+              )
+
+              nestedCountersInstance.countEvent('request-final-data', 'final data received')
+            }, this.config.stateManager.nonExWaitForData)
+          }
         } finally {
           profilerInstance.scopedProfileSectionEnd('poqo-receipt-gossip')
         }
-      }
-    )
+    })
 
     const poqoDataAndReceiptBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_poqo_data_and_receipt,
