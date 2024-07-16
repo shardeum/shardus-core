@@ -840,6 +840,7 @@ export interface NonceQueueItem {
   appData: any
   global: boolean
   noConsensus: boolean
+  timestamp: number
 }
 
 export type GlobalAccountReportResp = {
