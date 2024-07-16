@@ -336,7 +336,6 @@ export async function tellBinary<TReq>(
     await network.tellBinary(nonSelfNodes, route, wrappedReq.getBuffer(), appHeader, tracker, logged)
   } catch (err) {
     warn(`tellBinary: network.tellBinary: P2P TELL_BINARY: failed. route: ${route}, error: ${err}`)
-    // Add more details to the error in gossip case
   }
   profilerInstance.profileSectionEnd('p2p-tellBinary')
   profilerInstance.profileSectionEnd(`p2p-tellBinary-${route}`)
