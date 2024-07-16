@@ -34,6 +34,7 @@
     "release:move": "npm-run-all release:move:*",
     "build:dev": "npm-run-all clean compile:ts dev:move",
     "build:release": "npm-run-all clean prep compile release:move",
+    "build": "npm run compile",
     "release": "npm-run-all ensure:* build:release np",
     "check": "gts check",
     "fix": "gts fix",
