@@ -776,7 +776,7 @@ class TransactionQueue {
     this.p2p.registerGossipHandler(
       'gossip-final-state',
       async (
-        payload: { txid: string; stateList: Shardus.WrappedResponse[] },
+        payload: { txid: string; stateList: Shardus.WrappedResponse[], txGroupCycle?: number },
         sender: Node,
         tracker: string,
         msgSize: number
@@ -792,6 +792,16 @@ class TransactionQueue {
             //The normal mechanism of sharing TXs is good enough.
             nestedCountersInstance.countEvent('processing', 'gossip-final-state_noQueueEntry')
             return
+          }
+          if (payload.txGroupCycle) {
+            if (queueEntry.txGroupCycle !== payload.txGroupCycle) {
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`gossip-final-state mismatch txGroupCycle for txid: ${payload.txid}, sender's txGroupCycle: ${payload.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
+              nestedCountersInstance.countEvent(
+                'processing',
+                'gossip-final-state: mismatch txGroupCycle for txid ' + payload.txid
+              )
+            }
+            delete payload.txGroupCycle
           }
           if (logFlags.debug)
             this.mainLogger.debug(`gossip-final-state ${queueEntry.logID}, ${Utils.safeStringify(payload.stateList)}`)
@@ -826,6 +836,7 @@ class TransactionQueue {
               }
             }
             if (nodesToSendTo.size > 0) {
+              payload.txGroupCycle = queueEntry.txGroupCycle
               Comms.sendGossip(
                 'gossip-final-state',
                 payload,
@@ -5020,7 +5031,8 @@ class TransactionQueue {
               InternalRouteEnum.binary_poqo_data_and_receipt,
               {
                 finalState: message,
-                receipt: queueEntry.appliedReceipt2
+                receipt: queueEntry.appliedReceipt2,
+                txGroupCycle: queueEntry.txGroupCycle
               },
               serializePoqoDataAndReceiptReq,
               {}

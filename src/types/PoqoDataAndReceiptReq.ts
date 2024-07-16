@@ -10,6 +10,7 @@ export type PoqoDataAndReceiptReq = {
     stateList: WrappedResponse[]
   }
   receipt: AppliedReceipt2Serializable
+  txGroupCycle: number
 }
 
 
@@ -22,6 +23,7 @@ export function serializePoqoDataAndReceiptReq(stream: VectorBufferStream, inp: 
   stream.writeUInt8(cPoqoDataAndReceiptReqVersion)
   stream.writeString(inp.finalState.txid)
   stream.writeString(StringUtils.safeStringify(inp.finalState.stateList))
+  stream.writeUInt32(inp.txGroupCycle)
   serializeAppliedReceipt2(stream, inp.receipt)
 }
 
@@ -32,6 +34,7 @@ export function deserializePoqoDataAndReceiptResp(stream: VectorBufferStream): P
   }
   const txid = stream.readString();
   const stateList = StringUtils.safeJsonParse(stream.readString());
+  const txGroupCycle = stream.readUInt32();
   const appliedReceipt2 = deserializeAppliedReceipt2(stream);
 
   return {
@@ -39,6 +42,7 @@ export function deserializePoqoDataAndReceiptResp(stream: VectorBufferStream): P
       txid: txid,
       stateList: stateList
     },
-    receipt: appliedReceipt2
+    receipt: appliedReceipt2,
+    txGroupCycle: txGroupCycle
   }
 }
