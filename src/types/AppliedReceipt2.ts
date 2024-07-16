@@ -68,7 +68,7 @@ export function deserializeAppliedReceipt2(stream: VectorBufferStream): AppliedR
     confirmOrChallenge = undefined
   }
   const signaturesLength = stream.readUInt16()
-  const signatures: SignSerializable[] = new Array(signaturesLength)
+  const signatures: SignSerializable[] = []
   for (let i = 0; i < signaturesLength; i++) {
     signatures.push(deserializeSign(stream))
   }
