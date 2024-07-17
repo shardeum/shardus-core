@@ -78,7 +78,7 @@ export function addSyncStarted(syncStarted: StartedSyncingRequest): SyncStartedR
     }
   }
 
-  newSyncStarted
+  newSyncStarted.set(syncStarted.nodeId, syncStarted)
 
   return {
     success: true,
