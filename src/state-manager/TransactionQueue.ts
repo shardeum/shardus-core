@@ -294,54 +294,54 @@ class TransactionQueue {
    */
 
   setupHandlers(): void {
-    this.p2p.registerInternal(
-      'broadcast_state',
-      async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
-        profilerInstance.scopedProfileSectionStart('broadcast_state')
-        try {
-          // Save the wrappedAccountState with the rest our queue data
-          // let message = { stateList: datas, txid: queueEntry.acceptedTX.id }
-          // this.p2p.tell([correspondingEdgeNode], 'broadcast_state', message)
+    // this.p2p.registerInternal(
+    //   'broadcast_state',
+    //   async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
+    //     profilerInstance.scopedProfileSectionStart('broadcast_state')
+    //     try {
+    //       // Save the wrappedAccountState with the rest our queue data
+    //       // let message = { stateList: datas, txid: queueEntry.acceptedTX.id }
+    //       // this.p2p.tell([correspondingEdgeNode], 'broadcast_state', message)
 
-          // make sure we have it
-          const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          //It is okay to ignore this transaction if the txId is not found in the queue.
-          if (queueEntry == null) {
-            //In the past we would enqueue the TX, expecially if syncing but that has been removed.
-            //The normal mechanism of sharing TXs is good enough.
-            nestedCountersInstance.countEvent('processing', 'broadcast_state_noQueueEntry')
-            return
-          }
-          // add the data in
-          for (const data of payload.stateList) {
-            if (
-              configContext.stateManager.collectedDataFix &&
-              configContext.stateManager.rejectSharedDataIfCovered
-            ) {
-              const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(
-                data.accountId
-              )
-              const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
-              if (coveredByUs) {
-                nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
-                /* prettier-ignore */ if (logFlags.verbose) console.log(`broadcast_state: coveredByUs: ${data.accountId} no need to accept this data`)
-                continue
-              } else {
-                this.queueEntryAddData(queueEntry, data)
-              }
-            } else {
-              this.queueEntryAddData(queueEntry, data)
-            }
+    //       // make sure we have it
+    //       const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       //It is okay to ignore this transaction if the txId is not found in the queue.
+    //       if (queueEntry == null) {
+    //         //In the past we would enqueue the TX, expecially if syncing but that has been removed.
+    //         //The normal mechanism of sharing TXs is good enough.
+    //         nestedCountersInstance.countEvent('processing', 'broadcast_state_noQueueEntry')
+    //         return
+    //       }
+    //       // add the data in
+    //       for (const data of payload.stateList) {
+    //         if (
+    //           configContext.stateManager.collectedDataFix &&
+    //           configContext.stateManager.rejectSharedDataIfCovered
+    //         ) {
+    //           const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(
+    //             data.accountId
+    //           )
+    //           const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
+    //           if (coveredByUs) {
+    //             nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
+    //             /* prettier-ignore */ if (logFlags.verbose) console.log(`broadcast_state: coveredByUs: ${data.accountId} no need to accept this data`)
+    //             continue
+    //           } else {
+    //             this.queueEntryAddData(queueEntry, data)
+    //           }
+    //         } else {
+    //           this.queueEntryAddData(queueEntry, data)
+    //         }
 
-            if (queueEntry.state === 'syncing') {
-              /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
-            }
-          }
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('broadcast_state')
-        }
-      }
-    )
+    //         if (queueEntry.state === 'syncing') {
+    //           /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+    //         }
+    //       }
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('broadcast_state')
+    //     }
+    //   }
+    // )
 
     this.p2p.registerInternal(
       'broadcast_state_complete_data',
@@ -508,85 +508,85 @@ class TransactionQueue {
 
     this.p2p.registerInternalBinary(broadcastStateRoute.name, broadcastStateRoute.handler)
 
-    Comms.registerInternal(
-      'broadcast_finalstate',
-      async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }, respond: () => void,
-      _sender: P2PTypes.NodeListTypes.Node,
-      _tracker: string,
-      msgSize: number) => {
-        profilerInstance.scopedProfileSectionStart('broadcast_finalstate')
-        try {
-          // make sure we have it
-          const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          //It is okay to ignore this transaction if the txId is not found in the queue.
-          if (queueEntry == null) {
-            //In the past we would enqueue the TX, expecially if syncing but that has been removed.
-            //The normal mechanism of sharing TXs is good enough.
-            nestedCountersInstance.countEvent('processing', 'broadcast_finalstate_noQueueEntry')
-            return
-          }
-          if (logFlags.debug)
-            this.mainLogger.debug(`broadcast_finalstate ${queueEntry.logID}, ${Utils.safeStringify(payload.stateList)}`)
-          // add the data in
-          const savedAccountIds: Set<string> = new Set()
-          for (const data of payload.stateList) {
-            //let wrappedResponse = data as Shardus.WrappedResponse
-            //this.queueEntryAddData(queueEntry, data)
-            if (data == null) {
-              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_finalstate data == null`)
-              continue
-            }
-            // validate corresponding tell sender
-            if (_sender == null ||  _sender.id == null) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`broadcast_finalstate invalid sender for data: ${data.accountId}, sender: ${JSON.stringify(_sender)}`)
-              continue
-            }
-            const isValidFinalDataSender = this.factValidateCorrespondingTellFinalDataSender(queueEntry, _sender.id)
-            if (isValidFinalDataSender === false) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`broadcast_finalstate invalid sender ${_sender.id} for data: ${data.accountId}`)
-              continue
-            }
-            if (queueEntry.collectedFinalData[data.accountId] == null) {
-              queueEntry.collectedFinalData[data.accountId] = data
-              savedAccountIds.add(data.accountId)
-              /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('broadcast_finalstate', `${queueEntry.logID}`, `broadcast_finalstate addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
-            }
+    // Comms.registerInternal(
+    //   'broadcast_finalstate',
+    //   async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }, respond: () => void,
+    //   _sender: P2PTypes.NodeListTypes.Node,
+    //   _tracker: string,
+    //   msgSize: number) => {
+    //     profilerInstance.scopedProfileSectionStart('broadcast_finalstate')
+    //     try {
+    //       // make sure we have it
+    //       const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       //It is okay to ignore this transaction if the txId is not found in the queue.
+    //       if (queueEntry == null) {
+    //         //In the past we would enqueue the TX, expecially if syncing but that has been removed.
+    //         //The normal mechanism of sharing TXs is good enough.
+    //         nestedCountersInstance.countEvent('processing', 'broadcast_finalstate_noQueueEntry')
+    //         return
+    //       }
+    //       if (logFlags.debug)
+    //         this.mainLogger.debug(`broadcast_finalstate ${queueEntry.logID}, ${Utils.safeStringify(payload.stateList)}`)
+    //       // add the data in
+    //       const savedAccountIds: Set<string> = new Set()
+    //       for (const data of payload.stateList) {
+    //         //let wrappedResponse = data as Shardus.WrappedResponse
+    //         //this.queueEntryAddData(queueEntry, data)
+    //         if (data == null) {
+    //           /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_finalstate data == null`)
+    //           continue
+    //         }
+    //         // validate corresponding tell sender
+    //         if (_sender == null ||  _sender.id == null) {
+    //           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`broadcast_finalstate invalid sender for data: ${data.accountId}, sender: ${JSON.stringify(_sender)}`)
+    //           continue
+    //         }
+    //         const isValidFinalDataSender = this.factValidateCorrespondingTellFinalDataSender(queueEntry, _sender.id)
+    //         if (isValidFinalDataSender === false) {
+    //           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`broadcast_finalstate invalid sender ${_sender.id} for data: ${data.accountId}`)
+    //           continue
+    //         }
+    //         if (queueEntry.collectedFinalData[data.accountId] == null) {
+    //           queueEntry.collectedFinalData[data.accountId] = data
+    //           savedAccountIds.add(data.accountId)
+    //           /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('broadcast_finalstate', `${queueEntry.logID}`, `broadcast_finalstate addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
+    //         }
 
-            // if (queueEntry.state === 'syncing') {
-            //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
-            // }
-          }
-          const nodesToSendTo: Set<Node> = new Set()
-          for (const data of payload.stateList) {
-            if (data == null) {
-              continue
-            }
-            if (savedAccountIds.has(data.accountId) === false) {
-              continue
-            }
-            const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
-            for (const node of storageNodes) {
-              nodesToSendTo.add(node)
-            }
-          }
-          if (nodesToSendTo.size > 0) {
-            Comms.sendGossip(
-              'gossip-final-state',
-              payload,
-              null,
-              null,
-              Array.from(nodesToSendTo),
-              false,
-              4,
-              queueEntry.acceptedTx.txId
-            )
-            nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
-          }
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('broadcast_finalstate')
-        }
-      }
-    )
+    //         // if (queueEntry.state === 'syncing') {
+    //         //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+    //         // }
+    //       }
+    //       const nodesToSendTo: Set<Node> = new Set()
+    //       for (const data of payload.stateList) {
+    //         if (data == null) {
+    //           continue
+    //         }
+    //         if (savedAccountIds.has(data.accountId) === false) {
+    //           continue
+    //         }
+    //         const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
+    //         for (const node of storageNodes) {
+    //           nodesToSendTo.add(node)
+    //         }
+    //       }
+    //       if (nodesToSendTo.size > 0) {
+    //         Comms.sendGossip(
+    //           'gossip-final-state',
+    //           payload,
+    //           null,
+    //           null,
+    //           Array.from(nodesToSendTo),
+    //           false,
+    //           4,
+    //           queueEntry.acceptedTx.txId
+    //         )
+    //         nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
+    //       }
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('broadcast_finalstate')
+    //     }
+    //   }
+    // )
 
     const broadcastFinalStateRoute: P2PTypes.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_broadcast_finalstate,
@@ -665,18 +665,18 @@ class TransactionQueue {
 
     this.p2p.registerInternalBinary(broadcastFinalStateRoute.name, broadcastFinalStateRoute.handler)
 
-    this.p2p.registerInternal(
-      'spread_tx_to_group_syncing',
-      async (payload: Shardus.AcceptedTx, _respondWrapped: unknown, sender: Node) => {
-        profilerInstance.scopedProfileSectionStart('spread_tx_to_group_syncing')
-        try {
-          //handleSharedTX will also validate fields
-          this.handleSharedTX(payload.data, payload.appData, sender)
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('spread_tx_to_group_syncing')
-        }
-      }
-    )
+    // this.p2p.registerInternal(
+    //   'spread_tx_to_group_syncing',
+    //   async (payload: Shardus.AcceptedTx, _respondWrapped: unknown, sender: Node) => {
+    //     profilerInstance.scopedProfileSectionStart('spread_tx_to_group_syncing')
+    //     try {
+    //       //handleSharedTX will also validate fields
+    //       this.handleSharedTX(payload.data, payload.appData, sender)
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('spread_tx_to_group_syncing')
+    //     }
+    //   }
+    // )
 
     const spreadTxToGroupSyncingBinaryHandler: P2PTypes.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_spread_tx_to_group_syncing,
@@ -861,48 +861,48 @@ class TransactionQueue {
      * request_state_for_tx
      * used by the transaction queue when a queue entry needs to ask for missing state
      */
-    this.p2p.registerInternal(
-      'request_state_for_tx',
-      async (payload: RequestStateForTxReq, respond: (arg0: RequestStateForTxResp) => unknown) => {
-        profilerInstance.scopedProfileSectionStart('request_state_for_tx')
-        try {
-          const response: RequestStateForTxResp = {
-            stateList: [],
-            beforeHashes: {},
-            note: '',
-            success: false,
-          }
-          // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
-          let queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            queueEntry = this.getQueueEntryArchived(payload.txid, 'request_state_for_tx') // , payload.timestamp)
-          }
+    // this.p2p.registerInternal(
+    //   'request_state_for_tx',
+    //   async (payload: RequestStateForTxReq, respond: (arg0: RequestStateForTxResp) => unknown) => {
+    //     profilerInstance.scopedProfileSectionStart('request_state_for_tx')
+    //     try {
+    //       const response: RequestStateForTxResp = {
+    //         stateList: [],
+    //         beforeHashes: {},
+    //         note: '',
+    //         success: false,
+    //       }
+    //       // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
+    //       let queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         queueEntry = this.getQueueEntryArchived(payload.txid, 'request_state_for_tx') // , payload.timestamp)
+    //       }
 
-          if (queueEntry == null) {
-            response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${
-              payload.timestamp
-            } dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-            await respond(response)
-            // if a node cant get data it will have to get repaired by the patcher since we can only keep stuff en the archive queue for so long
-            // due to memory concerns
-            return
-          }
+    //       if (queueEntry == null) {
+    //         response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${
+    //           payload.timestamp
+    //         } dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+    //         await respond(response)
+    //         // if a node cant get data it will have to get repaired by the patcher since we can only keep stuff en the archive queue for so long
+    //         // due to memory concerns
+    //         return
+    //       }
 
-          for (const key of payload.keys) {
-            // eslint-disable-next-line security/detect-object-injection
-            const data = queueEntry.originalData[key] // collectedData
-            if (data) {
-              //response.stateList.push(JSON.parse(data))
-              response.stateList.push(data)
-            }
-          }
-          response.success = true
-          await respond(response)
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('request_state_for_tx')
-        }
-      }
-    )
+    //       for (const key of payload.keys) {
+    //         // eslint-disable-next-line security/detect-object-injection
+    //         const data = queueEntry.originalData[key] // collectedData
+    //         if (data) {
+    //           //response.stateList.push(JSON.parse(data))
+    //           response.stateList.push(data)
+    //         }
+    //       }
+    //       response.success = true
+    //       await respond(response)
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('request_state_for_tx')
+    //     }
+    //   }
+    // )
 
     const requestStateForTxRoute: P2PTypes.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_request_state_for_tx,
@@ -2436,10 +2436,10 @@ class TransactionQueue {
                       cycleShardData.syncingNeighborsTxGroup
                     )
                     //this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, cycleShardData.syncingNeighborsTxGroup)
-                    if (
-                      this.stateManager.config.p2p.useBinarySerializedEndpoints &&
-                      this.stateManager.config.p2p.spreadTxToGroupSyncingBinary
-                    ) {
+                    // if (
+                    //   this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+                    //   this.stateManager.config.p2p.spreadTxToGroupSyncingBinary
+                    // ) {
                       if (logFlags.seqdiagram) {
                         for (const node of cycleShardData.syncingNeighborsTxGroup) {
                           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'spread_tx_to_group_syncing'}`)
@@ -2453,13 +2453,13 @@ class TransactionQueue {
                         serializeSpreadTxToGroupSyncingReq,
                         {}
                       )
-                    } else {
-                      this.p2p.tell(
-                        cycleShardData.syncingNeighborsTxGroup,
-                        'spread_tx_to_group_syncing',
-                        acceptedTx
-                      )
-                    }
+                    // } else {
+                    //   this.p2p.tell(
+                    //     cycleShardData.syncingNeighborsTxGroup,
+                    //     'spread_tx_to_group_syncing',
+                    //     acceptedTx
+                    //   )
+                    // }
                   } else {
                     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true ${txQueueEntry.logID}`)
                   }
@@ -3029,7 +3029,7 @@ class TransactionQueue {
           }
           let result = null
           try {
-            if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestStateForTxBinary) {
+            // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestStateForTxBinary) {
               // GOLD-66 Error handling try/catch happens one layer outside of this function in process transactions
               /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'request_state_for_tx'}`)
               result = (await this.p2p.askBinary<RequestStateForTxReq, RequestStateForTxRespSerialized>(
@@ -3040,9 +3040,9 @@ class TransactionQueue {
                 deserializeRequestStateForTxResp,
                 {}
               )) as RequestStateForTxRespSerialized
-            } else {
-              result = (await this.p2p.ask(node, 'request_state_for_tx', message)) as RequestStateForTxResp
-            }
+            // } else {
+            //   result = (await this.p2p.ask(node, 'request_state_for_tx', message)) as RequestStateForTxResp
+            // }
           } catch (error) {
             /* prettier-ignore */ if (logFlags.error) {
               if (error instanceof ResponseError) {
@@ -3215,10 +3215,10 @@ class TransactionQueue {
         const message = { txid: queueEntry.acceptedTx.txId, timestamp: queueEntry.acceptedTx.timestamp }
         let result = null
         // GOLD-67 to be safe this function needs a try/catch block to prevent a timeout from causing an unhandled exception
-        if (
-          this.stateManager.config.p2p.useBinarySerializedEndpoints &&
-          this.stateManager.config.p2p.requestReceiptForTxBinary
-        ) {
+        // if (
+        //   this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+        //   this.stateManager.config.p2p.requestReceiptForTxBinary
+        // ) {
           try {
             /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'request_receipt_for_tx'}`)
             result = await this.p2p.askBinary<
@@ -3236,9 +3236,9 @@ class TransactionQueue {
             this.statemanager_fatal(`queueEntryRequestMissingReceipt`, `error: ${e.message}`)
             /* prettier-ignore */ this.mainLogger.error(`askBinary error: ${InternalRouteEnum.binary_request_receipt_for_tx} asked to ${node.externalIp}:${node.externalPort}:${node.id}`)
           }
-        } else {
-          result = await this.p2p.ask(node, 'request_receipt_for_tx', message) // not sure if we should await this.
-        }
+        // } else {
+        //   result = await this.p2p.ask(node, 'request_receipt_for_tx', message) // not sure if we should await this.
+        // }
 
         if (result == null) {
           if (logFlags.verbose) {
@@ -3280,136 +3280,136 @@ class TransactionQueue {
     }
   }
 
-  async queueEntryRequestMissingReceipt_old(queueEntry: QueueEntry): Promise<void> {
-    if (this.stateManager.currentCycleShardData == null) {
-      return
-    }
+  // async queueEntryRequestMissingReceipt_old(queueEntry: QueueEntry): Promise<void> {
+  //   if (this.stateManager.currentCycleShardData == null) {
+  //     return
+  //   }
 
-    if (queueEntry.uniqueKeys == null) {
-      throw new Error('queueEntryRequestMissingReceipt queueEntry.uniqueKeys == null')
-    }
+  //   if (queueEntry.uniqueKeys == null) {
+  //     throw new Error('queueEntryRequestMissingReceipt queueEntry.uniqueKeys == null')
+  //   }
 
-    if (queueEntry.requestingReceipt === true) {
-      return
-    }
+  //   if (queueEntry.requestingReceipt === true) {
+  //     return
+  //   }
 
-    queueEntry.requestingReceipt = true
-    queueEntry.receiptEverRequested = true
+  //   queueEntry.requestingReceipt = true
+  //   queueEntry.receiptEverRequested = true
 
-    /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_start', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID}`)
+  //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_start', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID}`)
 
-    const consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
+  //   const consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
 
-    this.stateManager.debugNodeGroup(
-      queueEntry.acceptedTx.txId,
-      queueEntry.acceptedTx.timestamp,
-      `queueEntryRequestMissingReceipt`,
-      consensusGroup
-    )
-    //let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
-    //the outer loop here could just use the transaction group of nodes instead. but already had this working in a similar function
-    //TODO change it to loop the transaction group untill we get a good receipt
+  //   this.stateManager.debugNodeGroup(
+  //     queueEntry.acceptedTx.txId,
+  //     queueEntry.acceptedTx.timestamp,
+  //     `queueEntryRequestMissingReceipt`,
+  //     consensusGroup
+  //   )
+  //   //let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
+  //   //the outer loop here could just use the transaction group of nodes instead. but already had this working in a similar function
+  //   //TODO change it to loop the transaction group untill we get a good receipt
 
-    //Note: we only need to get one good receipt, the loop on keys is in case we have to try different groups of nodes
-    let gotReceipt = false
-    for (const key of queueEntry.uniqueKeys) {
-      if (gotReceipt === true) {
-        break
-      }
+  //   //Note: we only need to get one good receipt, the loop on keys is in case we have to try different groups of nodes
+  //   let gotReceipt = false
+  //   for (const key of queueEntry.uniqueKeys) {
+  //     if (gotReceipt === true) {
+  //       break
+  //     }
 
-      let keepTrying = true
-      let triesLeft = Math.min(5, consensusGroup.length)
-      let nodeIndex = 0
-      while (keepTrying) {
-        if (triesLeft <= 0) {
-          keepTrying = false
-          break
-        }
-        triesLeft--
-        // eslint-disable-next-line security/detect-object-injection
-        const homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
+  //     let keepTrying = true
+  //     let triesLeft = Math.min(5, consensusGroup.length)
+  //     let nodeIndex = 0
+  //     while (keepTrying) {
+  //       if (triesLeft <= 0) {
+  //         keepTrying = false
+  //         break
+  //       }
+  //       triesLeft--
+  //       // eslint-disable-next-line security/detect-object-injection
+  //       const homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
 
-        // eslint-disable-next-line security/detect-object-injection
-        const node = consensusGroup[nodeIndex]
-        nodeIndex++
+  //       // eslint-disable-next-line security/detect-object-injection
+  //       const node = consensusGroup[nodeIndex]
+  //       nodeIndex++
 
-        if (node == null) {
-          continue
-        }
-        if (node.status != 'active' || potentiallyRemoved.has(node.id)) {
-          continue
-        }
-        if (node === this.stateManager.currentCycleShardData.ourNode) {
-          continue
-        }
+  //       if (node == null) {
+  //         continue
+  //       }
+  //       if (node.status != 'active' || potentiallyRemoved.has(node.id)) {
+  //         continue
+  //       }
+  //       if (node === this.stateManager.currentCycleShardData.ourNode) {
+  //         continue
+  //       }
 
-        const relationString = ShardFunctions.getNodeRelation(
-          homeNodeShardData,
-          this.stateManager.currentCycleShardData.ourNode.id
-        )
-        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+  //       const relationString = ShardFunctions.getNodeRelation(
+  //         homeNodeShardData,
+  //         this.stateManager.currentCycleShardData.ourNode.id
+  //       )
+  //       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
 
-        // Node Precheck!
-        if (
-          this.stateManager.isNodeValidForInternalMessage(
-            node.id,
-            'queueEntryRequestMissingReceipt',
-            true,
-            true
-          ) === false
-        ) {
-          // if(this.tryNextDataSourceNode('queueEntryRequestMissingReceipt') == false){
-          //   break
-          // }
-          continue
-        }
+  //       // Node Precheck!
+  //       if (
+  //         this.stateManager.isNodeValidForInternalMessage(
+  //           node.id,
+  //           'queueEntryRequestMissingReceipt',
+  //           true,
+  //           true
+  //         ) === false
+  //       ) {
+  //         // if(this.tryNextDataSourceNode('queueEntryRequestMissingReceipt') == false){
+  //         //   break
+  //         // }
+  //         continue
+  //       }
 
-        const message = { txid: queueEntry.acceptedTx.txId, timestamp: queueEntry.acceptedTx.timestamp }
-        const result: RequestReceiptForTxResp_old = await this.p2p.ask(
-          node,
-          'request_receipt_for_tx_old',
-          message
-        ) // not sure if we should await this.
+  //       const message = { txid: queueEntry.acceptedTx.txId, timestamp: queueEntry.acceptedTx.timestamp }
+  //       const result: RequestReceiptForTxResp_old = await this.p2p.ask(
+  //         node,
+  //         'request_receipt_for_tx_old',
+  //         message
+  //       ) // not sure if we should await this.
 
-        if (result == null) {
-          if (logFlags.verbose) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL request_receipt_for_tx_old ${triesLeft} ${utils.makeShortHash(node.id)}`)
-          }
-          /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
-          continue
-        }
-        if (result.success !== true) {
-          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL queueEntryRequestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} note:${result.note} txid:${queueEntry.logID}`)
-          continue
-        }
+  //       if (result == null) {
+  //         if (logFlags.verbose) {
+  //           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL request_receipt_for_tx_old ${triesLeft} ${utils.makeShortHash(node.id)}`)
+  //         }
+  //         /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+  //         continue
+  //       }
+  //       if (result.success !== true) {
+  //         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL queueEntryRequestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} note:${result.note} txid:${queueEntry.logID}`)
+  //         continue
+  //       }
 
-        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${queueEntry.logID}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
+  //       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${queueEntry.logID}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
 
-        if (result.success === true && result.receipt != null) {
-          //TODO implement this!!!
-          queueEntry.recievedAppliedReceipt = result.receipt
-          keepTrying = false
-          gotReceipt = true
+  //       if (result.success === true && result.receipt != null) {
+  //         //TODO implement this!!!
+  //         queueEntry.recievedAppliedReceipt = result.receipt
+  //         keepTrying = false
+  //         gotReceipt = true
 
-          this.mainLogger.debug(
-            `queueEntryRequestMissingReceipt got good receipt for: ${
-              queueEntry.logID
-            } from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`
-          )
-        }
-      }
+  //         this.mainLogger.debug(
+  //           `queueEntryRequestMissingReceipt got good receipt for: ${
+  //             queueEntry.logID
+  //           } from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`
+  //         )
+  //       }
+  //     }
 
-      // break the outer loop after we are done trying.  todo refactor this.
-      if (keepTrying == false) {
-        break
-      }
-    }
-    queueEntry.requestingReceipt = false
+  //     // break the outer loop after we are done trying.  todo refactor this.
+  //     if (keepTrying == false) {
+  //       break
+  //     }
+  //   }
+  //   queueEntry.requestingReceipt = false
 
-    if (gotReceipt === false) {
-      queueEntry.requestingReceiptFailed = true
-    }
-  }
+  //   if (gotReceipt === false) {
+  //     queueEntry.requestingReceiptFailed = true
+  //   }
+  // }
 
   // compute the rand of the node where rank = node_id XOR hash(tx_id + tx_ts)
   computeNodeRank(nodeId: string, txId: string, txTimestamp: number): bigint {
@@ -4060,7 +4060,7 @@ class TransactionQueue {
     message: { stateList: Shardus.WrappedResponse[]; txid: string },
     context: string
   ): Promise<void> {
-    if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastStateBinary) {
+    // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastStateBinary) {
       // convert legacy message to binary supported type
       const request = message as BroadcastStateReq
       if (logFlags.seqdiagram) {
@@ -4085,9 +4085,9 @@ class TransactionQueue {
           ),
         }
       )
-      return
-    }
-    this.p2p.tell(nodes, 'broadcast_state', message)
+      // return
+    // }
+    // this.p2p.tell(nodes, 'broadcast_state', message)
   }
 
   /**
@@ -4951,7 +4951,7 @@ class TransactionQueue {
             (node) => node.externalIp + ':' + node.externalPort
           )
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.debug('tellcorrernodingnodesfinaldata', queueEntry.logID, ` : filterValidNodesForInternalMessage ${filterNodesIpPort} for accounts: ${utils.stringifyReduce(message.stateList)}`)
-          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastFinalStateBinary) {
+          // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastFinalStateBinary) {
             // convert legacy message to binary supported type
             const request = message as BroadcastFinalStateReq
             if (logFlags.seqdiagram) {
@@ -4972,9 +4972,9 @@ class TransactionQueue {
                 ),
               }
             )
-          } else {
-            this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
-          }
+          // } else {
+            // this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
+          // }
           totalShares++
         }
       }
@@ -5128,7 +5128,8 @@ class TransactionQueue {
             }
 
 
-          if (this.usePOQo && this.config.p2p.useBinarySerializedEndpoints && Context.config.p2p.poqoDataAndReceiptBinary) {
+          if (this.usePOQo) {
+            // && this.config.p2p.useBinarySerializedEndpoints && Context.config.p2p.poqoDataAndReceiptBinary) {
             this.p2p.tellBinary<PoqoDataAndReceiptReq>(
               filterdCorrespondingAccNodes,
               InternalRouteEnum.binary_poqo_data_and_receipt,
@@ -5140,16 +5141,16 @@ class TransactionQueue {
               serializePoqoDataAndReceiptReq,
               {}
             )
-          } else if (this.usePOQo) {
-            this.p2p.tell(
-              filterdCorrespondingAccNodes,
-              'poqo-data-and-receipt',
-              {
-                finalState: message,
-                receipt: queueEntry.appliedReceipt2
-              }
-            )
-          } else if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastFinalStateBinary) {
+          // } else if (this.usePOQo) {
+          //   this.p2p.tell(
+          //     filterdCorrespondingAccNodes,
+          //     'poqo-data-and-receipt',
+          //     {
+          //       finalState: message,
+          //       receipt: queueEntry.appliedReceipt2
+          //     }
+          //   )
+          } else //if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastFinalStateBinary) {
             this.p2p.tellBinary<BroadcastFinalStateReq>(
               filterdCorrespondingAccNodes,
               InternalRouteEnum.binary_broadcast_finalstate,
@@ -5162,9 +5163,9 @@ class TransactionQueue {
                 ),
               }
             )
-          } else {
-            this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
-          }
+          // } else {
+            // this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
+          // }
           totalShares++
         }
       }
@@ -7615,7 +7616,7 @@ class TransactionQueue {
       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug( `requestFinalData: txid: ${queueEntry.acceptedTx.txId} accountIds: ${utils.stringifyReduce( accountIds )}, asking node: ${nodeToAsk.id} ${nodeToAsk.externalPort} at timestamp ${shardusGetTime()}` )
 
       let response
-      if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestTxAndStateBinary) {
+      // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestTxAndStateBinary) {
         const requestMessage = message as RequestTxAndStateReq
         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(nodeToAsk.id)}: ${'request_tx_and_state'}`)
         response = await Comms.askBinary<RequestTxAndStateReq, RequestTxAndStateResp>(
@@ -7626,7 +7627,7 @@ class TransactionQueue {
           deserializeRequestTxAndStateResp,
           {}
         )
-      } else response = await Comms.ask(nodeToAsk, 'request_tx_and_state', message)
+      // } else response = await Comms.ask(nodeToAsk, 'request_tx_and_state', message)
 
       if (response && response.stateList && response.stateList.length > 0) {
         this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} received data for ${response.stateList.length} accounts`)

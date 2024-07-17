@@ -177,17 +177,17 @@ export function informInvestigator(target: publicKey): void {
 
     // Send message to investigator
     info(`informInvestigator: sending InvestigateArchiverMsg: ${inspect(investigateMsg)}`)
-    if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.lostArchiverInvestigateBinary) {
+    // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.lostArchiverInvestigateBinary) {
       Comms.tellBinary<LostArchiverInvestigateReq>(
         [investigator],
-        InternalRouteEnum.binary_broadcast_state,
+        InternalRouteEnum.binary_lost_archiver_investigate,
         investigateMsg,
         serializeLostArchiverInvestigateReq,
         {}
       )
-    } else {
-      Comms.tell([investigator], 'lost-archiver-investigate', investigateMsg)
-    }
+    // } else {
+    //   Comms.tell([investigator], 'lost-archiver-investigate', investigateMsg)
+    // }
     
   } catch (ex) {
     nestedCountersInstance.countEvent('p2p', `informInvestigator error ${shardusGetTime()}`)

@@ -133,10 +133,10 @@ const isDownCheckRoute: P2P.P2PTypes.Route<Handler> = {
   },
 }
 
-const lostReportRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<P2P.LostTypes.SignedLostReport>> = {
-  name: 'lost-report',
-  handler: lostReportHandler,
-}
+// const lostReportRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<P2P.LostTypes.SignedLostReport>> = {
+//   name: 'lost-report',
+//   handler: lostReportHandler,
+// }
 
 /**
 note: we are not using the SignedObject part yet
@@ -200,7 +200,7 @@ const removeByAppRoute: P2P.P2PTypes.GossipHandler = (
 
 const routes = {
   external: [killExternalRoute, killOtherExternalRoute],
-  internal: [lostReportRoute, pingNodeRoute],
+  internal: [pingNodeRoute], //lostReportRoute
   gossip: {
     'lost-down': lostDownRoute,
     'lost-up': lostUpRoute,
@@ -257,9 +257,9 @@ export function init() {
         }
         let res = null
         if (
-          payload.route === 'get_trie_hashes' &&
-          this.p2p.useBinarySerializedEndpoints &&
-          this.p2p.getTrieHashesBinary
+          payload.route === 'get_trie_hashes' // &&
+          // this.p2p.useBinarySerializedEndpoints &&
+          // this.p2p.getTrieHashesBinary
         ) {
           nestedCountersInstance.countEvent('p2p', 'getTrieHashesBinary', 1)
           res = await Comms.askBinary<GetTrieHashesRequest, GetTrieHashesResponse>(
@@ -767,7 +767,7 @@ function reportLost(target, reason: string, requestId: string) {
       msgCopy.timestamp = shardusGetTime()
       msgCopy.requestId = requestId
       report = crypto.sign(msgCopy)
-      if (config.p2p.useBinarySerializedEndpoints && config.p2p.lostReportBinary) {
+      // if (config.p2p.useBinarySerializedEndpoints && config.p2p.lostReportBinary) {
         const request = report as LostReportReq
         Comms.tellBinary<LostReportReq>(
           [checker],
@@ -776,9 +776,9 @@ function reportLost(target, reason: string, requestId: string) {
           serializeLostReportReq,
           {}
         )
-      } else {
-        Comms.tell([checker], 'lost-report', report)
-      }
+      // } else {
+      //   Comms.tell([checker], 'lost-report', report)
+      // }
       lostReported.set(key, report)
     }
     /* prettier-ignore */ if (logFlags.lost) console.log('reportLost: lostReported:', lostReported)
@@ -868,70 +868,70 @@ function getCheckerNode(id, cycle) {
   return activeByIdOrder[idx]
 }
 
-async function lostReportHandler(payload, response, sender) {
-  /* prettier-ignore */ if (logFlags.lost) console.log('lostReportHandler: this is for the checker node')
-  /* prettier-ignore */ if (logFlags.lost) console.log('lostReportHandler: target:', payload.target)
-  profilerInstance.scopedProfileSectionStart('lost-report')
-  try {
-    let requestId = generateUUID()
-    /* prettier-ignore */ if (logFlags.lost) info(`Got investigate request requestId: ${requestId}, req: ${Utils.safeStringify(payload)} from ${logNode(sender)}`)
-    let err = ''
-    // for request tracing
-    err = validateTypes(payload, { timestamp: 'n', requestId: 's' })
-    if (!err) {
-      /* prettier-ignore */ if (logFlags.lost) info(`Lost report tracing, requestId: ${payload.requestId}, timestamp: ${payload.timestamp}, sender: ${logNode(sender)}`)
-      requestId = payload.requestId
-    }
-    err = validateTypes(payload, { target: 's', reporter: 's', checker: 's', cycle: 'n', sign: 'o' })
-    if (err) {
-      warn(`requestId: ${requestId} bad input ${err}`)
-      return
-    }
-    err = validateTypes(payload.sign, { owner: 's', sig: 's' })
-    if (err) {
-      warn(`requestId: ${requestId} bad input ${err}`)
-      return
-    }
-    if (stopReporting[payload.target]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
-    const key = `${payload.target}-${payload.cycle}`
-    if (checkedLostRecordMap.get(key)) return // we have already seen this node for this cycle
-    const [valid, reason] = checkReport(payload, currentCycle + 1)
-    if (!valid) {
-      warn(`Got bad investigate request. requestId: ${requestId}, reason: ${reason}`)
-      return
-    }
-    if (sender !== payload.reporter) return // sender must be same as reporter
-    if (payload.checker !== Self.id) return // the checker should be our node id
-    let record: P2P.LostTypes.LostRecord = {
-      target: payload.target,
-      cycle: payload.cycle,
-      status: 'checking',
-      message: payload,
-      reporter: payload.reporter,
-      checker: payload.checker,
-    }
-    // check if we already know that this node is down
-    if (isDown[payload.target]) {
-      record.status = 'down'
-      return
-    }
-    let result = await isDownCache(nodes.get(payload.target), requestId)
-    /* prettier-ignore */ if (logFlags.lost) console.log('lostReportHandler: result:', result)
-    /* prettier-ignore */ if (logFlags.lost) info(`isDownCache for requestId: ${requestId}, result ${result}`)
-    if (payload.killother) result = 'down'
-    if (record.status === 'checking') record.status = result
-    /* prettier-ignore */ if (logFlags.lost) info(
-      `Status after checking for node ${payload.target} payload cycle: ${payload.cycle}, currentCycle: ${currentCycle} is ` +
-        record.status
-    )
-    if (!checkedLostRecordMap.has(key)) {
-      checkedLostRecordMap.set(key, record)
-    }
-    // At start of Q1 of the next cycle sendRequests() will start a gossip if the node was found to be down
-  } finally {
-    profilerInstance.scopedProfileSectionEnd('lost-report')
-  }
-}
+// async function lostReportHandler(payload, response, sender) {
+//   /* prettier-ignore */ if (logFlags.lost) console.log('lostReportHandler: this is for the checker node')
+//   /* prettier-ignore */ if (logFlags.lost) console.log('lostReportHandler: target:', payload.target)
+//   profilerInstance.scopedProfileSectionStart('lost-report')
+//   try {
+//     let requestId = generateUUID()
+//     /* prettier-ignore */ if (logFlags.lost) info(`Got investigate request requestId: ${requestId}, req: ${Utils.safeStringify(payload)} from ${logNode(sender)}`)
+//     let err = ''
+//     // for request tracing
+//     err = validateTypes(payload, { timestamp: 'n', requestId: 's' })
+//     if (!err) {
+//       /* prettier-ignore */ if (logFlags.lost) info(`Lost report tracing, requestId: ${payload.requestId}, timestamp: ${payload.timestamp}, sender: ${logNode(sender)}`)
+//       requestId = payload.requestId
+//     }
+//     err = validateTypes(payload, { target: 's', reporter: 's', checker: 's', cycle: 'n', sign: 'o' })
+//     if (err) {
+//       warn(`requestId: ${requestId} bad input ${err}`)
+//       return
+//     }
+//     err = validateTypes(payload.sign, { owner: 's', sig: 's' })
+//     if (err) {
+//       warn(`requestId: ${requestId} bad input ${err}`)
+//       return
+//     }
+//     if (stopReporting[payload.target]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
+//     const key = `${payload.target}-${payload.cycle}`
+//     if (checkedLostRecordMap.get(key)) return // we have already seen this node for this cycle
+//     const [valid, reason] = checkReport(payload, currentCycle + 1)
+//     if (!valid) {
+//       warn(`Got bad investigate request. requestId: ${requestId}, reason: ${reason}`)
+//       return
+//     }
+//     if (sender !== payload.reporter) return // sender must be same as reporter
+//     if (payload.checker !== Self.id) return // the checker should be our node id
+//     let record: P2P.LostTypes.LostRecord = {
+//       target: payload.target,
+//       cycle: payload.cycle,
+//       status: 'checking',
+//       message: payload,
+//       reporter: payload.reporter,
+//       checker: payload.checker,
+//     }
+//     // check if we already know that this node is down
+//     if (isDown[payload.target]) {
+//       record.status = 'down'
+//       return
+//     }
+//     let result = await isDownCache(nodes.get(payload.target), requestId)
+//     /* prettier-ignore */ if (logFlags.lost) console.log('lostReportHandler: result:', result)
+//     /* prettier-ignore */ if (logFlags.lost) info(`isDownCache for requestId: ${requestId}, result ${result}`)
+//     if (payload.killother) result = 'down'
+//     if (record.status === 'checking') record.status = result
+//     /* prettier-ignore */ if (logFlags.lost) info(
+//       `Status after checking for node ${payload.target} payload cycle: ${payload.cycle}, currentCycle: ${currentCycle} is ` +
+//         record.status
+//     )
+//     if (!checkedLostRecordMap.has(key)) {
+//       checkedLostRecordMap.set(key, record)
+//     }
+//     // At start of Q1 of the next cycle sendRequests() will start a gossip if the node was found to be down
+//   } finally {
+//     profilerInstance.scopedProfileSectionEnd('lost-report')
+//   }
+// }
 
 const LostReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
   name: InternalRouteEnum.binary_lost_report,

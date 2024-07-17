@@ -569,10 +569,10 @@ class TransactionRepair {
                   timestamp: queueEntry.acceptedTx.timestamp,
                 }
 
-                if (
-                  this.config.p2p.useBinarySerializedEndpoints &&
-                  this.config.p2p.requestStateForTxPostBinary
-                ) {
+                // if (
+                //   this.config.p2p.useBinarySerializedEndpoints &&
+                //   this.config.p2p.requestStateForTxPostBinary
+                // ) {
                   const request = message as RequestStateForTxPostReq
                   /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'request_state_for_tx_post'}`)
                   // GOLD-65 This only has a try /finally.  repairToMatchReceipt is called in several places so it is better hanlde the error here
@@ -586,9 +586,9 @@ class TransactionRepair {
                       verification_data: request.txid,
                     }
                   )
-                } else {
-                  result = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
-                }
+                // } else {
+                  // result = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
+                // }
                 if (result == null) {
                   if (logFlags.verbose) {
                     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post result == null tx:${txLogID}  acc:${shortKey}`)

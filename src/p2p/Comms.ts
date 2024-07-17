@@ -32,15 +32,15 @@ import { nodeListFromStates } from './Join'
 
 type GossipReq = P2P.P2PTypes.LooseObject
 
-const gossipInternalRoute: P2P.P2PTypes.InternalHandler<GossipReq> = async (
-  payload,
-  _respond,
-  sender,
-  tracker,
-  msgSize
-) => {
-  await handleGossip(payload, sender, tracker, msgSize)
-}
+// const gossipInternalRoute: P2P.P2PTypes.InternalHandler<GossipReq> = async (
+//   payload,
+//   _respond,
+//   sender,
+//   tracker,
+//   msgSize
+// ) => {
+//   await handleGossip(payload, sender, tracker, msgSize)
+// }
 
 const gossipInternalBinaryRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
   name: InternalRouteEnum.binary_gossip,
@@ -72,7 +72,7 @@ const gossipInternalBinaryRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer
 
 const routes = {
   internal: {
-    gossip: gossipInternalRoute,
+    // gossip: gossipInternalRoute,
   },
   internalBinary: {
     gossip: gossipInternalBinaryRoute,
@@ -595,6 +595,7 @@ export function registerInternal(route, handler) {
   }
   // Include that in the handler function that is passed
   network.registerInternal(route, wrappedHandler)
+  /* prettier-ignore */ if(logFlags.p2pNonFatal) info(`registerInternal wrappedPayload, ${route} endpoint registeration complete`)
 }
 
 export function registerInternalBinary(route: string, handler: InternalBinaryHandler) {
@@ -1020,7 +1021,7 @@ export async function sendGossip(
       }
     }
 
-    if (config.p2p.useBinarySerializedEndpoints === true) {
+    // if (config.p2p.useBinarySerializedEndpoints === true) {
       msgSize = await tellBinary<GossipReqBinary>(
         recipients,
         InternalRouteEnum.binary_gossip,
@@ -1032,9 +1033,9 @@ export async function sendGossip(
         true,
         tracker
       )
-    } else {
-      msgSize = await tell(recipients, 'gossip', gossipPayload, true, tracker, type)
-    }
+    // } else {
+    //   msgSize = await tell(recipients, 'gossip', gossipPayload, true, tracker, type)
+    // }
   } catch (ex) {
     //console.log('entered catch ', ex)
     if (logFlags.verbose) {
@@ -1136,7 +1137,18 @@ export async function sendGossipAll(
       })
     }
 
-    msgSize = await tell(recipients, 'gossip', gossipPayload, true, tracker, type)
+    msgSize = await tellBinary<GossipReqBinary>(
+      recipients,
+      InternalRouteEnum.binary_gossip,
+      gossipPayload,
+      serializeGossipReq,
+      {
+        tracker_id: tracker,
+      },
+      true,
+      tracker
+    )
+    // msgSize = await tell(recipients, 'gossip', gossipPayload, true, tracker, type)
   } catch (ex) {
     if (logFlags.verbose) {
       p2pLogger.error(`Failed to sendGossip(${type} ${utils.stringifyReduce(payload)}) Exception => ${ex}`)
