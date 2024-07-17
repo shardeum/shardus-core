@@ -79,97 +79,97 @@ class AccountGlobals {
   }
 
   setupHandlers(): void {
-    this.p2p.registerInternal(
-      'get_globalaccountreport',
-      async (
-        _payload: unknown,
-        respond: (arg0: GlobalAccountReportResp | { error: string }) => Promise<number>,
-        _sender: unknown,
-        _tracker: string,
-        msgSize: number
-      ) => {
-        this.profiler.scopedProfileSectionStart('get_globalaccountreport', false, msgSize)
-        let responseSize = cUninitializedSize
-        try {
-          const result = {
-            combinedHash: '',
-            accounts: [],
-            ready: this.stateManager.appFinishedSyncing,
-          } as GlobalAccountReportResp
+    // this.p2p.registerInternal(
+    //   'get_globalaccountreport',
+    //   async (
+    //     _payload: unknown,
+    //     respond: (arg0: GlobalAccountReportResp | { error: string }) => Promise<number>,
+    //     _sender: unknown,
+    //     _tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     this.profiler.scopedProfileSectionStart('get_globalaccountreport', false, msgSize)
+    //     let responseSize = cUninitializedSize
+    //     try {
+    //       const result = {
+    //         combinedHash: '',
+    //         accounts: [],
+    //         ready: this.stateManager.appFinishedSyncing,
+    //       } as GlobalAccountReportResp
 
-          const globalAccountKeys = this.globalAccountSet.keys()
+    //       const globalAccountKeys = this.globalAccountSet.keys()
 
-          const toQuery: string[] = []
+    //       const toQuery: string[] = []
 
-          console.log(
-            'Running get_globalaccountreport',
-            this.stateManager.accountSync.globalAccountsSynced,
-            this.stateManager.appFinishedSyncing
-          )
-          console.log('Running get_globalaccountreport result', result)
-          // not ready
-          if (
-            this.stateManager.accountSync.globalAccountsSynced === false ||
-            this.stateManager.appFinishedSyncing === false
-          ) {
-            result.ready = false
-            await respond(result)
-          }
+    //       console.log(
+    //         'Running get_globalaccountreport',
+    //         this.stateManager.accountSync.globalAccountsSynced,
+    //         this.stateManager.appFinishedSyncing
+    //       )
+    //       console.log('Running get_globalaccountreport result', result)
+    //       // not ready
+    //       if (
+    //         this.stateManager.accountSync.globalAccountsSynced === false ||
+    //         this.stateManager.appFinishedSyncing === false
+    //       ) {
+    //         result.ready = false
+    //         await respond(result)
+    //       }
 
-          //TODO: Perf  could do things faster by pulling from cache, but would need extra testing:
-          // let notInCache:string[]
-          // for(let key of globalAccountKeys){
-          //   let report
-          //   if(this.globalAccountRepairBank.has(key)){
-          //     let accountCopyList = this.globalAccountRepairBank.get(key)
-          //     let newestCopy = accountCopyList[accountCopyList.length-1]
-          //     report = {id:key, hash:newestCopy.hash, timestamp:newestCopy.timestamp }
-          //   } else{
-          //     notInCache.push(key)
-          //   }
-          //   result.accounts.push(report)
-          // }
-          for (const key of globalAccountKeys) {
-            toQuery.push(key)
-          }
+    //       //TODO: Perf  could do things faster by pulling from cache, but would need extra testing:
+    //       // let notInCache:string[]
+    //       // for(let key of globalAccountKeys){
+    //       //   let report
+    //       //   if(this.globalAccountRepairBank.has(key)){
+    //       //     let accountCopyList = this.globalAccountRepairBank.get(key)
+    //       //     let newestCopy = accountCopyList[accountCopyList.length-1]
+    //       //     report = {id:key, hash:newestCopy.hash, timestamp:newestCopy.timestamp }
+    //       //   } else{
+    //       //     notInCache.push(key)
+    //       //   }
+    //       //   result.accounts.push(report)
+    //       // }
+    //       for (const key of globalAccountKeys) {
+    //         toQuery.push(key)
+    //       }
 
-          if (result.ready === false) {
-            nestedCountersInstance.countEvent(`sync`, `HACKFIX - forgot to return!`)
-            await respond({ error: 'Result not ready' })
-            return
-          }
+    //       if (result.ready === false) {
+    //         nestedCountersInstance.countEvent(`sync`, `HACKFIX - forgot to return!`)
+    //         await respond({ error: 'Result not ready' })
+    //         return
+    //       }
 
-          let accountData: Shardus.WrappedData[]
-          let ourLockID = -1
-          try {
-            ourLockID = await this.stateManager.fifoLock('accountModification')
-            // TODO: if we have more than 900 keys to query in this list must split this into multiple queries!.. ok technically this will not impact liberdus but it could impact
-            //       a dapp that uses sqlite
-            accountData = await this.app.getAccountDataByList(toQuery)
-          } finally {
-            this.stateManager.fifoUnlock('accountModification', ourLockID)
-          }
-          if (accountData != null) {
-            for (const wrappedAccount of accountData) {
-              const report = {
-                id: wrappedAccount.accountId,
-                hash: wrappedAccount.stateId,
-                timestamp: wrappedAccount.timestamp,
-              }
-              result.accounts.push(report)
-            }
-          }
-          //TODO: SOON. PERF Disiable this in production or performance testing. (we need a global flag to specify if it is a release or debug build, could then implement this, along with turning off debug endpoints)
-          this.stateManager.testAccountDataWrapped(accountData)
+    //       let accountData: Shardus.WrappedData[]
+    //       let ourLockID = -1
+    //       try {
+    //         ourLockID = await this.stateManager.fifoLock('accountModification')
+    //         // TODO: if we have more than 900 keys to query in this list must split this into multiple queries!.. ok technically this will not impact liberdus but it could impact
+    //         //       a dapp that uses sqlite
+    //         accountData = await this.app.getAccountDataByList(toQuery)
+    //       } finally {
+    //         this.stateManager.fifoUnlock('accountModification', ourLockID)
+    //       }
+    //       if (accountData != null) {
+    //         for (const wrappedAccount of accountData) {
+    //           const report = {
+    //             id: wrappedAccount.accountId,
+    //             hash: wrappedAccount.stateId,
+    //             timestamp: wrappedAccount.timestamp,
+    //           }
+    //           result.accounts.push(report)
+    //         }
+    //       }
+    //       //TODO: SOON. PERF Disiable this in production or performance testing. (we need a global flag to specify if it is a release or debug build, could then implement this, along with turning off debug endpoints)
+    //       this.stateManager.testAccountDataWrapped(accountData)
 
-          result.accounts.sort(utils.sort_id_Asc)
-          result.combinedHash = this.crypto.hash(result)
-          responseSize = await respond(result)
-        } finally {
-          this.profiler.scopedProfileSectionEnd('get_globalaccountreport', responseSize)
-        }
-      }
-    )
+    //       result.accounts.sort(utils.sort_id_Asc)
+    //       result.combinedHash = this.crypto.hash(result)
+    //       responseSize = await respond(result)
+    //     } finally {
+    //       this.profiler.scopedProfileSectionEnd('get_globalaccountreport', responseSize)
+    //     }
+    //   }
+    // )
 
     const globalAccountReportBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_get_globalaccountreport,

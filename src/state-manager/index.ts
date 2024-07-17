@@ -1314,97 +1314,97 @@ class StateManager {
     this.partitionStats.setupHandlers()
 
     // p2p ASK
-    this.p2p.registerInternal(
-      'request_receipt_for_tx_old',
-      async (
-        payload: RequestReceiptForTxReq,
-        respond: (arg0: RequestReceiptForTxResp_old) => Promise<number>,
-        _sender: unknown,
-        _tracker: string,
-        msgSize: number
-      ) => {
-        profilerInstance.scopedProfileSectionStart('request_receipt_for_tx_old', false, msgSize)
+    // this.p2p.registerInternal(
+    //   'request_receipt_for_tx_old',
+    //   async (
+    //     payload: RequestReceiptForTxReq,
+    //     respond: (arg0: RequestReceiptForTxResp_old) => Promise<number>,
+    //     _sender: unknown,
+    //     _tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     profilerInstance.scopedProfileSectionStart('request_receipt_for_tx_old', false, msgSize)
 
-        const response: RequestReceiptForTxResp_old = { receipt: null, note: '', success: false }
+    //     const response: RequestReceiptForTxResp_old = { receipt: null, note: '', success: false }
 
-        let responseSize = cUninitializedSize
-        try {
-          let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
-          }
+    //     let responseSize = cUninitializedSize
+    //     try {
+    //       let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
+    //       }
 
-          if (queueEntry == null) {
-            response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${
-              payload.timestamp
-            } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-            await respond(response)
-            return
-          }
+    //       if (queueEntry == null) {
+    //         response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${
+    //           payload.timestamp
+    //         } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+    //         await respond(response)
+    //         return
+    //       }
 
-          if (queueEntry.appliedReceipt != null) {
-            response.receipt = queueEntry.appliedReceipt
-          } else if (queueEntry.recievedAppliedReceipt != null) {
-            response.receipt = queueEntry.recievedAppliedReceipt
-          }
-          if (response.receipt != null) {
-            response.success = true
-          } else {
-            response.note = `found queueEntry but no receipt: ${utils.stringifyReduce(payload.txid)} ${
-              payload.txid
-            }  ${payload.timestamp}`
-          }
-          responseSize = await respond(response)
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('request_receipt_for_tx_old', responseSize)
-        }
-      }
-    )
+    //       if (queueEntry.appliedReceipt != null) {
+    //         response.receipt = queueEntry.appliedReceipt
+    //       } else if (queueEntry.recievedAppliedReceipt != null) {
+    //         response.receipt = queueEntry.recievedAppliedReceipt
+    //       }
+    //       if (response.receipt != null) {
+    //         response.success = true
+    //       } else {
+    //         response.note = `found queueEntry but no receipt: ${utils.stringifyReduce(payload.txid)} ${
+    //           payload.txid
+    //         }  ${payload.timestamp}`
+    //       }
+    //       responseSize = await respond(response)
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('request_receipt_for_tx_old', responseSize)
+    //     }
+    //   }
+    // )
 
     // p2p ASK
-    this.p2p.registerInternal(
-      'request_receipt_for_tx',
-      async (
-        payload: RequestReceiptForTxReq,
-        respond: (arg0: RequestReceiptForTxResp) => Promise<number>,
-        _sender: unknown,
-        _tracker: string,
-        msgSize: number
-      ) => {
-        profilerInstance.scopedProfileSectionStart('request_receipt_for_tx', false, msgSize)
+    // this.p2p.registerInternal(
+    //   'request_receipt_for_tx',
+    //   async (
+    //     payload: RequestReceiptForTxReq,
+    //     respond: (arg0: RequestReceiptForTxResp) => Promise<number>,
+    //     _sender: unknown,
+    //     _tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     profilerInstance.scopedProfileSectionStart('request_receipt_for_tx', false, msgSize)
 
-        const response: RequestReceiptForTxResp = { receipt: null, note: '', success: false }
+    //     const response: RequestReceiptForTxResp = { receipt: null, note: '', success: false }
 
-        let responseSize = cUninitializedSize
-        try {
-          let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
-          }
+    //     let responseSize = cUninitializedSize
+    //     try {
+    //       let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
+    //       }
 
-          if (queueEntry == null) {
-            response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${
-              payload.timestamp
-            } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-            await respond(response)
-            return
-          }
+    //       if (queueEntry == null) {
+    //         response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${
+    //           payload.timestamp
+    //         } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+    //         await respond(response)
+    //         return
+    //       }
 
-          response.receipt = this.getReceipt2(queueEntry)
+    //       response.receipt = this.getReceipt2(queueEntry)
 
-          if (response.receipt != null) {
-            response.success = true
-          } else {
-            response.note = `found queueEntry but no receipt: ${utils.stringifyReduce(payload.txid)} ${
-              payload.txid
-            }  ${payload.timestamp}`
-          }
-          responseSize = await respond(response)
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('request_receipt_for_tx', responseSize)
-        }
-      }
-    )
+    //       if (response.receipt != null) {
+    //         response.success = true
+    //       } else {
+    //         response.note = `found queueEntry but no receipt: ${utils.stringifyReduce(payload.txid)} ${
+    //           payload.txid
+    //         }  ${payload.timestamp}`
+    //       }
+    //       responseSize = await respond(response)
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('request_receipt_for_tx', responseSize)
+    //     }
+    //   }
+    // )
 
     const requestReceiptForTxBinaryHandler: P2PTypes.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_request_receipt_for_tx,
@@ -1454,103 +1454,103 @@ class StateManager {
       requestReceiptForTxBinaryHandler.handler
     )
 
-    this.p2p.registerInternal(
-      'request_state_for_tx_post',
-      async (
-        payload: RequestStateForTxReqPost,
-        respond: (arg0: RequestStateForTxResp) => Promise<number>,
-        _sender: unknown,
-        _tracker: string,
-        msgSize: number
-      ) => {
-        profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
-        let responseSize = cUninitializedSize
-        try {
-          const response: RequestStateForTxResp = {
-            stateList: [],
-            beforeHashes: {},
-            note: '',
-            success: false,
-          }
-          // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
-          let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            queueEntry = this.transactionQueue.getQueueEntryArchived(
-              payload.txid,
-              'request_state_for_tx_post'
-            ) // , payload.timestamp)
-          }
+    // this.p2p.registerInternal(
+    //   'request_state_for_tx_post',
+    //   async (
+    //     payload: RequestStateForTxReqPost,
+    //     respond: (arg0: RequestStateForTxResp) => Promise<number>,
+    //     _sender: unknown,
+    //     _tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
+    //     let responseSize = cUninitializedSize
+    //     try {
+    //       const response: RequestStateForTxResp = {
+    //         stateList: [],
+    //         beforeHashes: {},
+    //         note: '',
+    //         success: false,
+    //       }
+    //       // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
+    //       let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         queueEntry = this.transactionQueue.getQueueEntryArchived(
+    //           payload.txid,
+    //           'request_state_for_tx_post'
+    //         ) // , payload.timestamp)
+    //       }
 
-          if (queueEntry == null) {
-            response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${
-              payload.timestamp
-            } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post cant find queue entry')
-            await respond(response)
-            return
-          }
+    //       if (queueEntry == null) {
+    //         response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${
+    //           payload.timestamp
+    //         } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+    //         /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post cant find queue entry')
+    //         await respond(response)
+    //         return
+    //       }
 
-          if (queueEntry.hasValidFinalData === false) {
-            response.note = `has queue entry but not final data: ${utils.stringifyReduce(payload.txid)}  ${
-              payload.timestamp
-            } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', `request_state_for_tx_post hasValidFinalData==false, tx state: ${queueEntry.state}`)
-            await respond(response)
-            return
-          }
+    //       if (queueEntry.hasValidFinalData === false) {
+    //         response.note = `has queue entry but not final data: ${utils.stringifyReduce(payload.txid)}  ${
+    //           payload.timestamp
+    //         } dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+    //         /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', `request_state_for_tx_post hasValidFinalData==false, tx state: ${queueEntry.state}`)
+    //         await respond(response)
+    //         return
+    //       }
 
-          let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
+    //       let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
 
-          // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
-          const writtenAccountsMap: WrappedResponses = {}
-          const applyResponse = queueEntry?.preApplyTXResult.applyResponse
-          if (
-            applyResponse != null &&
-            applyResponse.accountWrites != null &&
-            applyResponse.accountWrites.length > 0
-          ) {
-            for (const writtenAccount of applyResponse.accountWrites) {
-              writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
-            }
-            wrappedStates = writtenAccountsMap
-            /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_state_for_tx_post applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
-          }
+    //       // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
+    //       const writtenAccountsMap: WrappedResponses = {}
+    //       const applyResponse = queueEntry?.preApplyTXResult.applyResponse
+    //       if (
+    //         applyResponse != null &&
+    //         applyResponse.accountWrites != null &&
+    //         applyResponse.accountWrites.length > 0
+    //       ) {
+    //         for (const writtenAccount of applyResponse.accountWrites) {
+    //           writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+    //         }
+    //         wrappedStates = writtenAccountsMap
+    //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_state_for_tx_post applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+    //       }
 
-          //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
+    //       //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
 
-          if (wrappedStates != null) {
-            for (const [key, accountData] of Object.entries(wrappedStates)) {
-              if (payload.key !== accountData.accountId) {
-                continue //not this account.
-              }
+    //       if (wrappedStates != null) {
+    //         for (const [key, accountData] of Object.entries(wrappedStates)) {
+    //           if (payload.key !== accountData.accountId) {
+    //             continue //not this account.
+    //           }
 
-              if (accountData.stateId != payload.hash) {
-                response.note = `failed accountData.stateId != payload.hash txid: ${utils.makeShortHash(
-                  payload.txid
-                )}  ts:${payload.timestamp} hash:${utils.makeShortHash(accountData.stateId)}`
-                response.success = false
-                /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post failed accountData.stateId != payload.hash txid')
-                await respond(response)
-                return
-              }
-              if (accountData) {
-                //include the before hash
-                // eslint-disable-next-line security/detect-object-injection
-                response.beforeHashes[key] = queueEntry.beforeHashes[key]
-                //include the data
-                response.stateList.push(accountData)
-              }
-            }
-          }
+    //           if (accountData.stateId != payload.hash) {
+    //             response.note = `failed accountData.stateId != payload.hash txid: ${utils.makeShortHash(
+    //               payload.txid
+    //             )}  ts:${payload.timestamp} hash:${utils.makeShortHash(accountData.stateId)}`
+    //             response.success = false
+    //             /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post failed accountData.stateId != payload.hash txid')
+    //             await respond(response)
+    //             return
+    //           }
+    //           if (accountData) {
+    //             //include the before hash
+    //             // eslint-disable-next-line security/detect-object-injection
+    //             response.beforeHashes[key] = queueEntry.beforeHashes[key]
+    //             //include the data
+    //             response.stateList.push(accountData)
+    //           }
+    //         }
+    //       }
 
-          nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post success')
-          response.success = true
-          responseSize = await respond(response)
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
-        }
-      }
-    )
+    //       nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post success')
+    //       response.success = true
+    //       responseSize = await respond(response)
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
+    //     }
+    //   }
+    // )
 
     const requestStateForTxPostBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_request_state_for_tx_post,
@@ -1657,101 +1657,101 @@ class StateManager {
       requestStateForTxPostBinaryHandler.handler
     )
 
-    Comms.registerInternal(
-      'request_tx_and_state',
-      async (
-        payload: { txid: string; accountIds: string[] },
-        respond: (arg0: RequestTxResp) => Promise<number>,
-        _sender: unknown,
-        _tracker: string,
-        msgSize: number
-      ) => {
-        profilerInstance.scopedProfileSectionStart('request_tx_and_state', false, msgSize)
-        let responseSize = cUninitializedSize
-        try {
-          let response: RequestTxResp = {
-            stateList: [],
-            account_state_hash_before: {},
-            account_state_hash_after: {},
-            note: '',
-            success: false,
-            // originalData: {},
-          }
+    // Comms.registerInternal(
+    //   'request_tx_and_state',
+    //   async (
+    //     payload: { txid: string; accountIds: string[] },
+    //     respond: (arg0: RequestTxResp) => Promise<number>,
+    //     _sender: unknown,
+    //     _tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     profilerInstance.scopedProfileSectionStart('request_tx_and_state', false, msgSize)
+    //     let responseSize = cUninitializedSize
+    //     try {
+    //       let response: RequestTxResp = {
+    //         stateList: [],
+    //         account_state_hash_before: {},
+    //         account_state_hash_after: {},
+    //         note: '',
+    //         success: false,
+    //         // originalData: {},
+    //       }
 
-          const txid = payload.txid
-          const requestedAccountIds = payload.accountIds
+    //       const txid = payload.txid
+    //       const requestedAccountIds = payload.accountIds
 
-          let queueEntry = this.transactionQueue.getQueueEntrySafe(txid)
-          if (queueEntry == null) {
-            queueEntry = this.transactionQueue.getQueueEntryArchived(txid, 'request_tx_and_state')
-          }
+    //       let queueEntry = this.transactionQueue.getQueueEntrySafe(txid)
+    //       if (queueEntry == null) {
+    //         queueEntry = this.transactionQueue.getQueueEntryArchived(txid, 'request_tx_and_state')
+    //       }
 
-          if (queueEntry == null) {
-            response.note = `failed to find queue entry: ${utils.stringifyReduce(txid)} dbg:${
-              this.debugTXHistory[utils.stringifyReduce(txid)]
-            }`
+    //       if (queueEntry == null) {
+    //         response.note = `failed to find queue entry: ${utils.stringifyReduce(txid)} dbg:${
+    //           this.debugTXHistory[utils.stringifyReduce(txid)]
+    //         }`
 
-            if (logFlags.error) this.mainLogger.error(`request_tx_and_state ${response.note}`)
-            await respond(response)
-            return
-          }
+    //         if (logFlags.error) this.mainLogger.error(`request_tx_and_state ${response.note}`)
+    //         await respond(response)
+    //         return
+    //       }
 
-          if (queueEntry.isInExecutionHome === false) {
-            response.note = `request_tx_and_state not in execution group: ${utils.stringifyReduce(txid)}`
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(response.note)
-            await respond(response)
-            return
-          }
+    //       if (queueEntry.isInExecutionHome === false) {
+    //         response.note = `request_tx_and_state not in execution group: ${utils.stringifyReduce(txid)}`
+    //         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(response.note)
+    //         await respond(response)
+    //         return
+    //       }
 
-          let receipt2 = this.getReceipt2(queueEntry)
-          if (receipt2 == null) {
-            response.note = `request_tx_and_state does not have valid receipt2: ${utils.stringifyReduce(
-              txid
-            )}`
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(response.note)
-            await respond(response)
-            return
-          }
+    //       let receipt2 = this.getReceipt2(queueEntry)
+    //       if (receipt2 == null) {
+    //         response.note = `request_tx_and_state does not have valid receipt2: ${utils.stringifyReduce(
+    //           txid
+    //         )}`
+    //         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(response.note)
+    //         await respond(response)
+    //         return
+    //       }
 
-          let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
+    //       let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
 
-          // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
-          const writtenAccountsMap: WrappedResponses = {}
-          const applyResponse = queueEntry?.preApplyTXResult.applyResponse
-          if (
-            applyResponse != null &&
-            applyResponse.accountWrites != null &&
-            applyResponse.accountWrites.length > 0
-          ) {
-            for (const writtenAccount of applyResponse.accountWrites) {
-              writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
-            }
-            wrappedStates = writtenAccountsMap
-            /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
-          }
+    //       // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
+    //       const writtenAccountsMap: WrappedResponses = {}
+    //       const applyResponse = queueEntry?.preApplyTXResult.applyResponse
+    //       if (
+    //         applyResponse != null &&
+    //         applyResponse.accountWrites != null &&
+    //         applyResponse.accountWrites.length > 0
+    //       ) {
+    //         for (const writtenAccount of applyResponse.accountWrites) {
+    //           writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+    //         }
+    //         wrappedStates = writtenAccountsMap
+    //         /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+    //       }
 
-          //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
+    //       //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
 
-          if (wrappedStates != null) {
-            for (let i = 0; i < receipt2.appliedVote.account_id.length; i++) {
-              let key = receipt2.appliedVote.account_id[i]
-              let accountData = wrappedStates[key]
-              if (accountData && requestedAccountIds.includes(key)) {
-                // eslint-disable-next-line security/detect-object-injection
-                response.account_state_hash_before[key] = receipt2.appliedVote.account_state_hash_before[i]
-                response.account_state_hash_after[key] = receipt2.appliedVote.account_state_hash_after[i]
-                response.stateList.push(accountData)
-              }
-            }
-          }
-          response.success = true
-          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state success: ${queueEntry.logID}  ${response.stateList.length}  ${Utils.safeStringify(response)}`)
-          responseSize = await respond(response)
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('request_tx_and_state', responseSize)
-        }
-      }
-    )
+    //       if (wrappedStates != null) {
+    //         for (let i = 0; i < receipt2.appliedVote.account_id.length; i++) {
+    //           let key = receipt2.appliedVote.account_id[i]
+    //           let accountData = wrappedStates[key]
+    //           if (accountData && requestedAccountIds.includes(key)) {
+    //             // eslint-disable-next-line security/detect-object-injection
+    //             response.account_state_hash_before[key] = receipt2.appliedVote.account_state_hash_before[i]
+    //             response.account_state_hash_after[key] = receipt2.appliedVote.account_state_hash_after[i]
+    //             response.stateList.push(accountData)
+    //           }
+    //         }
+    //       }
+    //       response.success = true
+    //       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state success: ${queueEntry.logID}  ${response.stateList.length}  ${Utils.safeStringify(response)}`)
+    //       responseSize = await respond(response)
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('request_tx_and_state', responseSize)
+    //     }
+    //   }
+    // )
 
     const requestTxAndStateBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_request_tx_and_state,
@@ -1897,35 +1897,35 @@ class StateManager {
       }
     )
 
-    this.p2p.registerInternal(
-      'spread_appliedVoteHash',
-      async (
-        payload: AppliedVoteHash,
-        _respond: unknown,
-        _sender: unknown,
-        _tracker: string,
-        msgSize: number
-      ) => {
-        // TODO: can be replaced with poqo-send-vote so can be removed
-        profilerInstance.scopedProfileSectionStart('spread_appliedVoteHash', false, msgSize)
-        try {
-          const queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'spread_appliedVoteHash_no_queue_entry')
-            return
-          }
-          const collectedVoteHash = payload as AppliedVoteHash
-          // TODO STATESHARDING4 ENDPOINTS check payload format
-          // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (correct consenus group and valid signature)
+    // this.p2p.registerInternal(
+    //   'spread_appliedVoteHash',
+    //   async (
+    //     payload: AppliedVoteHash,
+    //     _respond: unknown,
+    //     _sender: unknown,
+    //     _tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     // TODO: can be replaced with poqo-send-vote so can be removed
+    //     profilerInstance.scopedProfileSectionStart('spread_appliedVoteHash', false, msgSize)
+    //     try {
+    //       const queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'spread_appliedVoteHash_no_queue_entry')
+    //         return
+    //       }
+    //       const collectedVoteHash = payload as AppliedVoteHash
+    //       // TODO STATESHARDING4 ENDPOINTS check payload format
+    //       // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (correct consenus group and valid signature)
 
-          if (this.transactionConsensus.tryAppendVoteHash(queueEntry, collectedVoteHash)) {
-            // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
-          }
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('spread_appliedVoteHash')
-        }
-      }
-    )
+    //       if (this.transactionConsensus.tryAppendVoteHash(queueEntry, collectedVoteHash)) {
+    //         // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
+    //       }
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('spread_appliedVoteHash')
+    //     }
+    //   }
+    // )
 
     const spreadAppliedVoteHashBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_spread_appliedVoteHash,
@@ -1970,54 +1970,54 @@ class StateManager {
       spreadAppliedVoteHashBinaryHandler.handler
     )
 
-    this.p2p.registerInternal(
-      'get_account_data_with_queue_hints',
-      async (
-        payload: { accountIds: string[] },
-        respond: (arg0: GetAccountDataWithQueueHintsResp | false) => Promise<number>,
-        _sender: unknown,
-        _tracker: string,
-        msgSize: number
-      ) => {
-        profilerInstance.scopedProfileSectionStart('get_account_data_with_queue_hints', false, msgSize)
-        let responseSize = cUninitializedSize
-        try {
-          const result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
-          let accountData = null
-          let ourLockID = -1
-          try {
-            ourLockID = await this.fifoLock('accountModification')
-            accountData = await this.app.getAccountDataByList(payload.accountIds)
-          } finally {
-            this.fifoUnlock('accountModification', ourLockID)
-          }
-          if (accountData != null) {
-            for (const wrappedAccount of accountData) {
-              const wrappedAccountInQueueRef = wrappedAccount as ShardusTypes.WrappedDataFromQueue
-              wrappedAccountInQueueRef.seenInQueue = false
+    // this.p2p.registerInternal(
+    //   'get_account_data_with_queue_hints',
+    //   async (
+    //     payload: { accountIds: string[] },
+    //     respond: (arg0: GetAccountDataWithQueueHintsResp | false) => Promise<number>,
+    //     _sender: unknown,
+    //     _tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     profilerInstance.scopedProfileSectionStart('get_account_data_with_queue_hints', false, msgSize)
+    //     let responseSize = cUninitializedSize
+    //     try {
+    //       const result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
+    //       let accountData = null
+    //       let ourLockID = -1
+    //       try {
+    //         ourLockID = await this.fifoLock('accountModification')
+    //         accountData = await this.app.getAccountDataByList(payload.accountIds)
+    //       } finally {
+    //         this.fifoUnlock('accountModification', ourLockID)
+    //       }
+    //       if (accountData != null) {
+    //         for (const wrappedAccount of accountData) {
+    //           const wrappedAccountInQueueRef = wrappedAccount as ShardusTypes.WrappedDataFromQueue
+    //           wrappedAccountInQueueRef.seenInQueue = false
 
-              if (this.lastSeenAccountsMap != null) {
-                const queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
-                if (queueEntry != null) {
-                  wrappedAccountInQueueRef.seenInQueue = true
-                }
-              }
-            }
-          }
-          //PERF Disiable this in production or performance testing. / this works due to inheritance
-          //this can throw an error an result in a non response
-          this.testAccountDataWrapped(accountData)
-          // we cast up the array return type because we have attached the seenInQueue memeber to the data.
-          result.accountData = accountData as ShardusTypes.WrappedDataFromQueue[]
-          responseSize = await respond(result)
-        } catch (ex) {
-          //we dont want to delay. let the asking node know qukcly so it can try again
-          responseSize = await respond(false)
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('get_account_data_with_queue_hints', responseSize)
-        }
-      }
-    )
+    //           if (this.lastSeenAccountsMap != null) {
+    //             const queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
+    //             if (queueEntry != null) {
+    //               wrappedAccountInQueueRef.seenInQueue = true
+    //             }
+    //           }
+    //         }
+    //       }
+    //       //PERF Disiable this in production or performance testing. / this works due to inheritance
+    //       //this can throw an error an result in a non response
+    //       this.testAccountDataWrapped(accountData)
+    //       // we cast up the array return type because we have attached the seenInQueue memeber to the data.
+    //       result.accountData = accountData as ShardusTypes.WrappedDataFromQueue[]
+    //       responseSize = await respond(result)
+    //     } catch (ex) {
+    //       //we dont want to delay. let the asking node know qukcly so it can try again
+    //       responseSize = await respond(false)
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('get_account_data_with_queue_hints', responseSize)
+    //     }
+    //   }
+    // )
 
     const binaryGetAccDataWithQueueHintsHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_get_account_data_with_queue_hints,
@@ -2084,38 +2084,38 @@ class StateManager {
       binaryGetAccDataWithQueueHintsHandler.handler
     )
 
-    this.p2p.registerInternal(
-      'get_account_queue_count',
-      async (
-        payload: RequestAccountQueueCounts,
-        respond: (arg0: QueueCountsResponse) => Promise<number>,
-        _sender: unknown,
-        _tracker: string,
-        msgSize: number
-      ) => {
-        profilerInstance.scopedProfileSectionStart('get_account_queue_count', false, msgSize)
+    // this.p2p.registerInternal(
+    //   'get_account_queue_count',
+    //   async (
+    //     payload: RequestAccountQueueCounts,
+    //     respond: (arg0: QueueCountsResponse) => Promise<number>,
+    //     _sender: unknown,
+    //     _tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     profilerInstance.scopedProfileSectionStart('get_account_queue_count', false, msgSize)
 
-        let responseSize = cUninitializedSize
-        try {
-          const result: QueueCountsResponse = { counts: [], committingAppData: [], accounts: [] }
-          for (const address of payload.accountIds) {
-            const { count, committingAppData } = this.transactionQueue.getAccountQueueCount(address, true)
-            result.counts.push(count)
-            result.committingAppData.push(committingAppData)
-            if (this.config.stateManager.enableAccountFetchForQueueCounts) {
-              const currentAccountData = await this.getLocalOrRemoteAccount(address)
-              if (currentAccountData && currentAccountData.data) {
-                result.accounts.push(currentAccountData.data)
-              }
-            }
-          }
+    //     let responseSize = cUninitializedSize
+    //     try {
+    //       const result: QueueCountsResponse = { counts: [], committingAppData: [], accounts: [] }
+    //       for (const address of payload.accountIds) {
+    //         const { count, committingAppData } = this.transactionQueue.getAccountQueueCount(address, true)
+    //         result.counts.push(count)
+    //         result.committingAppData.push(committingAppData)
+    //         if (this.config.stateManager.enableAccountFetchForQueueCounts) {
+    //           const currentAccountData = await this.getLocalOrRemoteAccount(address)
+    //           if (currentAccountData && currentAccountData.data) {
+    //             result.accounts.push(currentAccountData.data)
+    //           }
+    //         }
+    //       }
 
-          responseSize = await respond(result)
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('get_account_queue_count', responseSize)
-        }
-      }
-    )
+    //       responseSize = await respond(result)
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('get_account_queue_count', responseSize)
+    //     }
+    //   }
+    // )
 
     const binaryGetAccountQueueCountHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_get_account_queue_count,
@@ -2327,26 +2327,26 @@ class StateManager {
   }
 
   _unregisterEndpoints() {
-    this.p2p.unregisterInternal('get_account_data3')
-    this.p2p.unregisterInternal('get_account_data_by_list')
+    // this.p2p.unregisterInternal('get_account_data3')
+    // this.p2p.unregisterInternal('get_account_data_by_list')
 
     // new shard endpoints:
-    this.p2p.unregisterInternal('request_state_for_tx')
-    this.p2p.unregisterInternal('request_state_for_tx_post')
-    this.p2p.unregisterInternal('request_tx_and_state')
+    // this.p2p.unregisterInternal('request_state_for_tx')
+    // this.p2p.unregisterInternal('request_state_for_tx_post')
+    // this.p2p.unregisterInternal('request_tx_and_state')
 
-    this.p2p.unregisterInternal('request_receipt_for_tx')
-    this.p2p.unregisterInternal('broadcast_state')
+    // this.p2p.unregisterInternal('request_receipt_for_tx')
+    // this.p2p.unregisterInternal('broadcast_state')
     this.p2p.unregisterGossipHandler('spread_tx_to_group')
-    this.p2p.unregisterInternal('get_account_data_with_queue_hints')
-    this.p2p.unregisterInternal('get_globalaccountreport')
+    // this.p2p.unregisterInternal('get_account_data_with_queue_hints')
+    // this.p2p.unregisterInternal('get_globalaccountreport')
     this.p2p.unregisterInternal('spread_appliedVote')
     this.p2p.unregisterGossipHandler('spread_appliedReceipt')
 
-    this.p2p.unregisterInternal('get_trie_hashes')
-    this.p2p.unregisterInternal('sync_trie_hashes')
-    this.p2p.unregisterInternal('get_trie_accountHashes')
-    this.p2p.unregisterInternal('get_account_data_by_hashes')
+    // this.p2p.unregisterInternal('get_trie_hashes')
+    // this.p2p.unregisterInternal('sync_trie_hashes')
+    // this.p2p.unregisterInternal('get_trie_accountHashes')
+    // this.p2p.unregisterInternal('get_account_data_by_hashes')
 
     for (const binary_endpoint of Object.values(InternalRouteEnum)) {
       this.p2p.unregisterInternal(binary_endpoint)
@@ -2650,7 +2650,7 @@ class StateManager {
         let r: QueueCountsResponse | false
 
         try {
-          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountQueueCountBinary) {
+          // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountQueueCountBinary) {
             const serialized_res = await this.p2p.askBinary<
               GetAccountQueueCountReq,
               GetAccountQueueCountResp
@@ -2663,9 +2663,9 @@ class StateManager {
               {}
             )
             r = serialized_res as QueueCountsResponse
-          } else {
-            r = await this.p2p.ask(randomConsensusNode, 'get_account_queue_count', message)
-          }
+          // } else {
+          //   r = await this.p2p.ask(randomConsensusNode, 'get_account_queue_count', message)
+          // }
         } catch (error) {
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getLocalOrRemoteAccountQueueCount: askBinary ex: ${error.message}`)
           r = null
@@ -2798,10 +2798,10 @@ class StateManager {
 
       let r: GetAccountDataWithQueueHintsResp
 
-      if (
-        this.config.p2p.useBinarySerializedEndpoints &&
-        this.config.p2p.getAccountDataWithQueueHintsBinary
-      ) {
+      // if (
+      //   this.config.p2p.useBinarySerializedEndpoints &&
+      //   this.config.p2p.getAccountDataWithQueueHintsBinary
+      // ) {
         try {
           const serialized_res = await this.p2p.askBinary<
             GetAccountDataWithQueueHintsReqSerializable,
@@ -2828,9 +2828,9 @@ class StateManager {
             nestedCountersInstance.countEvent('getLocalOrRemoteAccount', `askBinary ex: ${er?.message}`)
           }
         }
-      } else {
-        r = await this.p2p.ask(randomConsensusNode, 'get_account_data_with_queue_hints', message)
-      }
+      // } else {
+        // r = await this.p2p.ask(randomConsensusNode, 'get_account_data_with_queue_hints', message)
+      // }
 
       if (!r) {
         if (logFlags.error || logFlags.getLocalOrRemote) this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount r === false')
@@ -2930,7 +2930,7 @@ class StateManager {
 
     const message = { accountIds: [address] }
     let result: GetAccountDataWithQueueHintsResp
-    if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountDataWithQueueHintsBinary) {
+    // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getAccountDataWithQueueHintsBinary) {
       try {
         const serialized_res = await this.p2p.askBinary<
           GetAccountDataWithQueueHintsReqSerializable,
@@ -2953,9 +2953,9 @@ class StateManager {
         else if (logFlags.verbose) this.mainLogger.error('ASK FAIL getRemoteAccount exception:', er)
         return null
       }
-    } else {
-      result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
-    }
+    // } else {
+      // result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
+    // }
 
     if (!result) {
       if (logFlags.error) this.mainLogger.error('ASK FAIL getRemoteAccount result === false')

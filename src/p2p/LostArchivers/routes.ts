@@ -157,44 +157,44 @@ const lostArchiverDownGossip: GossipHandler<SignedObject<ArchiverDownMsg>, Node[
 
 /** Internal */
 
-const investigateLostArchiverRoute: Route<InternalHandler<SignedObject<InvestigateArchiverMsg>>> = {
-  method: 'GET',
-  name: 'lost-archiver-investigate',
-  handler: (payload, response, sender) => {
-    // we're being told to investigate a seemingly lost archiver
+// const investigateLostArchiverRoute: Route<InternalHandler<SignedObject<InvestigateArchiverMsg>>> = {
+//   method: 'GET',
+//   name: 'lost-archiver-investigate',
+//   handler: (payload, response, sender) => {
+//     // we're being told to investigate a seemingly lost archiver
 
-    // If Lost Archiver Detection is disabled, return
-    if (config.p2p.enableLostArchiversCycles === false) {
-      return
-    }
+//     // If Lost Archiver Detection is disabled, return
+//     if (config.p2p.enableLostArchiversCycles === false) {
+//       return
+//     }
 
-    logging.info(`investigateLostArchiverRoute: payload: ${inspect(payload)}, sender: ${sender}`)
+//     logging.info(`investigateLostArchiverRoute: payload: ${inspect(payload)}, sender: ${sender}`)
 
-    // check args
-    if (!payload) { logging.warn(`investigateLostArchiverRoute: missing payload`); return }
-    if (!response) { logging.warn(`investigateLostArchiverRoute: missing response`); return }
-    if (!sender) { logging.warn(`investigateLostArchiverRoute: missing sender`); return }
-    const error = funcs.errorForInvestigateArchiverMsg(payload)
-    if (error) {
-      nestedCountersInstance.countEvent('lostArchivers', `investigateLostArchiverRoute invalid payload ${error}`)       
-      logging.warn(
-        `investigateLostArchiverRoute: invalid payload error: ${error}, payload: ${inspect(payload)}`
-      )
-      return
-    }
+//     // check args
+//     if (!payload) { logging.warn(`investigateLostArchiverRoute: missing payload`); return }
+//     if (!response) { logging.warn(`investigateLostArchiverRoute: missing response`); return }
+//     if (!sender) { logging.warn(`investigateLostArchiverRoute: missing sender`); return }
+//     const error = funcs.errorForInvestigateArchiverMsg(payload)
+//     if (error) {
+//       nestedCountersInstance.countEvent('lostArchivers', `investigateLostArchiverRoute invalid payload ${error}`)       
+//       logging.warn(
+//         `investigateLostArchiverRoute: invalid payload error: ${error}, payload: ${inspect(payload)}`
+//       )
+//       return
+//     }
 
-    if (id !== payload.investigator) {
-      logging.info(`investigateLostArchiverRoute: not the investigator. returning`)
-      return
-      // to-do: check cycle too?
-      // original comment:
-      // Ignore hits here if we're not the designated Investigator for the given Archiver and cycle
-    }
+//     if (id !== payload.investigator) {
+//       logging.info(`investigateLostArchiverRoute: not the investigator. returning`)
+//       return
+//       // to-do: check cycle too?
+//       // original comment:
+//       // Ignore hits here if we're not the designated Investigator for the given Archiver and cycle
+//     }
 
-    logging.info(`investigateLostArchiverRoute: calling investigateArchiver()`)
-    funcs.investigateArchiver(payload)
-  },
-}
+//     logging.info(`investigateLostArchiverRoute: calling investigateArchiver()`)
+//     funcs.investigateArchiver(payload)
+//   },
+// }
 
 const investigateLostArchiverRouteBinary: Route<InternalBinaryHandler<Buffer>> = {
   name: InternalRouteEnum.binary_lost_archiver_investigate,
@@ -337,7 +337,7 @@ const reportFakeLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
 const routes = {
   debugExternal: [reportFakeLostArchiverRoute],
   external: [refuteLostArchiverRoute],
-  internal: [investigateLostArchiverRoute],
+  internal: [], //[investigateLostArchiverRoute],
   internalBinary: [investigateLostArchiverRouteBinary],
   gossip: {
     'lost-archiver-up': lostArchiverUpGossip,

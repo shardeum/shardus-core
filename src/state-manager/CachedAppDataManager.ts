@@ -102,24 +102,24 @@ class CachedAppDataManager {
   }
 
   setupHandlers(): void {
-    this.p2p.registerInternal('send_cachedAppData', async (payload: CacheAppDataResponse) => {
-      profilerInstance.scopedProfileSectionStart('send_cachedAppData')
-      try {
-        /* prettier-ignore */ if (logFlags.net_trace && logFlags.console) console.log(`send_cachedAppData full payload`, Utils.safeStringify(payload));
-        const cachedAppData = payload.cachedAppData
-        const existingCachedAppData = this.getCachedItem(payload.topic, cachedAppData.dataID)
-        if (existingCachedAppData) {
-          /* prettier-ignore */ if(logFlags.shardedCache) console.log(`cachedAppData: We have already processed this cached data`, cachedAppData, Date.now())
-          return
-        }
-        // insert cachedAppData
-        this.insertCachedItem(payload.topic, cachedAppData.dataID, cachedAppData.appData, cachedAppData.cycle)
-      } catch (e) {
-        this.mainLogger.error(`cachedAppData: Error while processing send_cacheAppData`, e)
-      } finally {
-        profilerInstance.scopedProfileSectionEnd('send_cachedAppData')
-      }
-    })
+    // this.p2p.registerInternal('send_cachedAppData', async (payload: CacheAppDataResponse) => {
+    //   profilerInstance.scopedProfileSectionStart('send_cachedAppData')
+    //   try {
+    //     /* prettier-ignore */ if (logFlags.net_trace && logFlags.console) console.log(`send_cachedAppData full payload`, Utils.safeStringify(payload));
+    //     const cachedAppData = payload.cachedAppData
+    //     const existingCachedAppData = this.getCachedItem(payload.topic, cachedAppData.dataID)
+    //     if (existingCachedAppData) {
+    //       /* prettier-ignore */ if(logFlags.shardedCache) console.log(`cachedAppData: We have already processed this cached data`, cachedAppData, Date.now())
+    //       return
+    //     }
+    //     // insert cachedAppData
+    //     this.insertCachedItem(payload.topic, cachedAppData.dataID, cachedAppData.appData, cachedAppData.cycle)
+    //   } catch (e) {
+    //     this.mainLogger.error(`cachedAppData: Error while processing send_cacheAppData`, e)
+    //   } finally {
+    //     profilerInstance.scopedProfileSectionEnd('send_cachedAppData')
+    //   }
+    // })
 
     const send_cacheAppDataBinarySerializedHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_send_cachedAppData,
@@ -173,30 +173,30 @@ class CachedAppDataManager {
       send_cacheAppDataBinarySerializedHandler.handler
     )
 
-    this.p2p.registerInternal(
-      'get_cached_app_data',
-      async (payload: CacheAppDataRequest, respond: (arg0: CachedAppData) => Promise<void>) => {
-        profilerInstance.scopedProfileSectionStart('get_cached_app_data')
-        try {
-          const { topic, dataId } = payload
-          const foundCachedAppData = this.getCachedItem(topic, dataId)
-          if (foundCachedAppData == null) {
-            this.mainLogger.error(
-              `cachedAppData: Cannot find cached data for topic: ${topic}, dataId: ${dataId}`
-            )
-            /* prettier-ignore */ if(logFlags.shardedCache) console.log(`cachedAppData: Cannot find cached data for topic: ${topic}, dataId: ${dataId}`)
-          }
-          await respond(foundCachedAppData)
-          profilerInstance.scopedProfileSectionEnd('get_cached_app_data')
-          return
-        } catch (e) {
-          this.mainLogger.error(`cachedAppData: Error while processing get_cachedAppData`, e)
-          /* prettier-ignore */ if(logFlags.shardedCache) console.log(`cachedAppData: Error while processing get_cachedAppData`, e)
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('get_cached_app_data')
-        }
-      }
-    )
+    // this.p2p.registerInternal(
+    //   'get_cached_app_data',
+    //   async (payload: CacheAppDataRequest, respond: (arg0: CachedAppData) => Promise<void>) => {
+    //     profilerInstance.scopedProfileSectionStart('get_cached_app_data')
+    //     try {
+    //       const { topic, dataId } = payload
+    //       const foundCachedAppData = this.getCachedItem(topic, dataId)
+    //       if (foundCachedAppData == null) {
+    //         this.mainLogger.error(
+    //           `cachedAppData: Cannot find cached data for topic: ${topic}, dataId: ${dataId}`
+    //         )
+    //         /* prettier-ignore */ if(logFlags.shardedCache) console.log(`cachedAppData: Cannot find cached data for topic: ${topic}, dataId: ${dataId}`)
+    //       }
+    //       await respond(foundCachedAppData)
+    //       profilerInstance.scopedProfileSectionEnd('get_cached_app_data')
+    //       return
+    //     } catch (e) {
+    //       this.mainLogger.error(`cachedAppData: Error while processing get_cachedAppData`, e)
+    //       /* prettier-ignore */ if(logFlags.shardedCache) console.log(`cachedAppData: Error while processing get_cachedAppData`, e)
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('get_cached_app_data')
+    //     }
+    //   }
+    // )
 
     const getCachedAppDataBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_get_cached_app_data,
@@ -459,7 +459,7 @@ class CachedAppDataManager {
       }
       const filteredCorrespondingAccNodes = filteredNodes
 
-      if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.sendCachedAppDataBinary) {
+      // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.sendCachedAppDataBinary) {
         if(logFlags.shardedCache) console.log(`cachedAddData: factSendCorrespondingCachedAppData sending ${dataID}`)
         const sendCacheAppDataReq: SendCachedAppDataReq = {
           topic,
@@ -478,10 +478,10 @@ class CachedAppDataManager {
           serializeSendCachedAppDataReq,
           {}
         )
-        return
-      }
+        // return
+      // }
 
-      this.p2p.tell(filteredCorrespondingAccNodes, 'send_cachedAppData', message)
+      // this.p2p.tell(filteredCorrespondingAccNodes, 'send_cachedAppData', message)
     }
   }
 
@@ -672,7 +672,7 @@ class CachedAppDataManager {
             }
             const filteredCorrespondingAccNodes = filteredNodes
 
-            if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.sendCachedAppDataBinary) {
+            // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.sendCachedAppDataBinary) {
               const sendCacheAppDataReq: SendCachedAppDataReq = {
                 topic,
                 txId,
@@ -690,10 +690,10 @@ class CachedAppDataManager {
                 serializeSendCachedAppDataReq,
                 {}
               )
-              return
-            }
+              // return
+            // }
 
-            this.p2p.tell(filteredCorrespondingAccNodes, 'send_cachedAppData', message)
+            // this.p2p.tell(filteredCorrespondingAccNodes, 'send_cachedAppData', message)
           }
         }
       }
@@ -757,7 +757,7 @@ class CachedAppDataManager {
       const message = { topic, dataId }
       let r: CachedAppData | boolean
       try {
-        if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getCachedAppDataBinary) {
+        // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.getCachedAppDataBinary) {
           const resp = await this.p2p.askBinary<GetCachedAppDataReq, GetCachedAppDataResp>(
             randomConsensusNode,
             InternalRouteEnum.binary_get_cached_app_data,
@@ -766,10 +766,10 @@ class CachedAppDataManager {
             deserializeGetCachedAppDataResp,
             {}
           )
-          r = resp?.cachedAppData
-        } else {
-          r = await this.p2p.ask(randomConsensusNode, 'get_cached_app_data', message)
-        }
+          r = resp?.cachedAppData ?? false
+        // } else {
+        //   r = await this.p2p.ask(randomConsensusNode, 'get_cached_app_data', message)
+        // }
       } catch (e) {
         if (logFlags.error) this.mainLogger.error(`cachedAppData: ASK exception getLocalOrRemoteCachedAppData`, e)
         nestedCountersInstance.countEvent('cached-app-data', 'ask exception')

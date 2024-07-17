@@ -271,54 +271,54 @@ class AccountSync {
    */
 
   setupHandlers(): void {
-    this.p2p.registerInternal(
-      'get_account_data3',
-      async (
-        payload: GetAccountData3Req,
-        respond: (arg0: { data: GetAccountDataByRangeSmart; errors?: string[] }) => Promise<number>,
-        _sender: unknown,
-        _tracker: string,
-        msgSize: number
-      ) => {
-        this.profiler.scopedProfileSectionStart('get_account_data3', false, msgSize)
-        const result = {} as { data: GetAccountDataByRangeSmart; errors?: string[] } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
+    // this.p2p.registerInternal(
+    //   'get_account_data3',
+    //   async (
+    //     payload: GetAccountData3Req,
+    //     respond: (arg0: { data: GetAccountDataByRangeSmart; errors?: string[] }) => Promise<number>,
+    //     _sender: unknown,
+    //     _tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     this.profiler.scopedProfileSectionStart('get_account_data3', false, msgSize)
+    //     const result = {} as { data: GetAccountDataByRangeSmart; errors?: string[] } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
 
-        const errors = verifyPayload(AJVSchemaEnum.GetAccountDataReq, payload)
-        if (errors && errors.length > 0) {
-          this.mainLogger.error(`get_account_data3: request validation errors: ${errors}`)
-          result.errors = errors
-          await respond(result)
-          return
-        }
+    //     const errors = verifyPayload('GetAccountData3Req', payload)
+    //     if (errors && errors.length > 0) {
+    //       this.mainLogger.error(`get_account_data3: request validation errors: ${errors}`)
+    //       result.errors = errors
+    //       await respond(result)
+    //       return
+    //     }
 
-        let accountData: GetAccountDataByRangeSmart | null = null
-        let ourLockID = -1
-        try {
-          ourLockID = await this.stateManager.fifoLock('accountModification')
-          // returns { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
-          //GetAccountDataByRangeSmart
-          accountData = await this.stateManager.getAccountDataByRangeSmart(
-            payload.accountStart,
-            payload.accountEnd,
-            payload.tsStart,
-            payload.maxRecords,
-            payload.offset,
-            payload.accountOffset
-          )
-        } finally {
-          this.stateManager.fifoUnlock('accountModification', ourLockID)
-        }
+    //     let accountData: GetAccountDataByRangeSmart | null = null
+    //     let ourLockID = -1
+    //     try {
+    //       ourLockID = await this.stateManager.fifoLock('accountModification')
+    //       // returns { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
+    //       //GetAccountDataByRangeSmart
+    //       accountData = await this.stateManager.getAccountDataByRangeSmart(
+    //         payload.accountStart,
+    //         payload.accountEnd,
+    //         payload.tsStart,
+    //         payload.maxRecords,
+    //         payload.offset,
+    //         payload.accountOffset
+    //       )
+    //     } finally {
+    //       this.stateManager.fifoUnlock('accountModification', ourLockID)
+    //     }
 
-        //PERF Disiable this in production or performance testing.
-        this.stateManager.testAccountDataWrapped(accountData.wrappedAccounts)
-        //PERF Disiable this in production or performance testing.
-        this.stateManager.testAccountDataWrapped(accountData.wrappedAccounts2)
+    //     //PERF Disiable this in production or performance testing.
+    //     this.stateManager.testAccountDataWrapped(accountData.wrappedAccounts)
+    //     //PERF Disiable this in production or performance testing.
+    //     this.stateManager.testAccountDataWrapped(accountData.wrappedAccounts2)
 
-        result.data = accountData
-        const responseSize = await respond(result)
-        this.profiler.scopedProfileSectionEnd('get_account_data3', responseSize)
-      }
-    )
+    //     result.data = accountData
+    //     const responseSize = await respond(result)
+    //     this.profiler.scopedProfileSectionEnd('get_account_data3', responseSize)
+    //   }
+    // )
 
     const getAccDataBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_get_account_data,
@@ -387,32 +387,32 @@ class AccountSync {
     // For applications with multiple “Account” tables the returned data is grouped by table name.
     // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
     // Updated names:  accountIds, max records
-    this.p2p.registerInternal(
-      'get_account_data_by_list',
-      async (
-        payload: { accountIds: string[] },
-        respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => Promise<number>,
-        _sender: unknown,
-        _tracker: string,
-        msgSize: number
-      ) => {
-        this.profiler.scopedProfileSectionStart('get_account_data_by_list', false, msgSize)
-        const result = {} as { accountData: Shardus.WrappedData[] | null }
-        let accountData = null
-        let ourLockID = -1
-        try {
-          ourLockID = await this.stateManager.fifoLock('accountModification')
-          accountData = await this.app.getAccountDataByList(payload.accountIds)
-        } finally {
-          this.stateManager.fifoUnlock('accountModification', ourLockID)
-        }
-        //PERF Disiable this in production or performance testing.
-        this.stateManager.testAccountDataWrapped(accountData)
-        result.accountData = accountData
-        const responseSize = await respond(result)
-        this.profiler.scopedProfileSectionEnd('get_account_data_by_list', responseSize)
-      }
-    )
+    // this.p2p.registerInternal(
+    //   'get_account_data_by_list',
+    //   async (
+    //     payload: { accountIds: string[] },
+    //     respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => Promise<number>,
+    //     _sender: unknown,
+    //     _tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     this.profiler.scopedProfileSectionStart('get_account_data_by_list', false, msgSize)
+    //     const result = {} as { accountData: Shardus.WrappedData[] | null }
+    //     let accountData = null
+    //     let ourLockID = -1
+    //     try {
+    //       ourLockID = await this.stateManager.fifoLock('accountModification')
+    //       accountData = await this.app.getAccountDataByList(payload.accountIds)
+    //     } finally {
+    //       this.stateManager.fifoUnlock('accountModification', ourLockID)
+    //     }
+    //     //PERF Disiable this in production or performance testing.
+    //     this.stateManager.testAccountDataWrapped(accountData)
+    //     result.accountData = accountData
+    //     const responseSize = await respond(result)
+    //     this.profiler.scopedProfileSectionEnd('get_account_data_by_list', responseSize)
+    //   }
+    // )
 
     const getAccDataByListBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_get_account_data_by_list,
@@ -968,10 +968,10 @@ class AccountSync {
         // Various failure cases will alter the returned result so that it is tallied in a more orderly way.
         // The random numbers were kept to prevent the hash of results from being equal, but now custom equalFn takes care of this concern
         let result
-        if (
-          this.stateManager.config.p2p.useBinarySerializedEndpoints &&
-          this.stateManager.config.p2p.getGloablAccountReportBinary
-        ) {
+        // if (
+        //   this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+        //   this.stateManager.config.p2p.getGloablAccountReportBinary
+        // ) {
           const request = {} as GlobalAccountReportReqSerializable
           result = await this.p2p.askBinary<
             GlobalAccountReportReqSerializable,
@@ -984,9 +984,9 @@ class AccountSync {
             deserializeGlobalAccountReportResp,
             {}
           )
-        } else {
-          result = await this.p2p.ask(node, 'get_globalaccountreport', {})
-        }
+        // } else {
+          // result = await this.p2p.ask(node, 'get_globalaccountreport', {})
+        // }
         return checkResultFn(result, node.id)
       } catch (error) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} exception`)

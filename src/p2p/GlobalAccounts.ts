@@ -27,19 +27,19 @@ import { Utils } from '@shardus/types'
 /** ROUTES */
 // [TODO] - need to add validattion of types to the routes
 
-const makeReceiptRoute: P2P.P2PTypes.Route<
-  P2P.P2PTypes.InternalHandler<P2P.GlobalAccountsTypes.SignedSetGlobalTx, unknown, string>
-> = {
-  name: 'make-receipt',
-  handler: (payload, respond, sender) => {
-    profilerInstance.scopedProfileSectionStart('make-receipt')
-    try {
-      makeReceipt(payload, sender)
-    } finally {
-      profilerInstance.scopedProfileSectionEnd('make-receipt')
-    }
-  },
-}
+// const makeReceiptRoute: P2P.P2PTypes.Route<
+//   P2P.P2PTypes.InternalHandler<P2P.GlobalAccountsTypes.SignedSetGlobalTx, unknown, string>
+// > = {
+//   name: 'make-receipt',
+//   handler: (payload, respond, sender) => {
+//     profilerInstance.scopedProfileSectionStart('make-receipt')
+//     try {
+//       makeReceipt(payload, sender)
+//     } finally {
+//       profilerInstance.scopedProfileSectionEnd('make-receipt')
+//     }
+//   },
+// }
 
 const makeReceiptBinaryHandler: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
   name: InternalRouteEnum.binary_make_receipt,
@@ -98,7 +98,7 @@ const trackers = new Map<P2P.GlobalAccountsTypes.TxHash, P2P.GlobalAccountsTypes
 
 export function init() {
   // Register routes
-  Comms.registerInternal(makeReceiptRoute.name, makeReceiptRoute.handler)
+  // Comms.registerInternal(makeReceiptRoute.name, makeReceiptRoute.handler)
   Comms.registerInternalBinary(makeReceiptBinaryHandler.name, makeReceiptBinaryHandler.handler)
   Comms.registerGossipHandler(setGlobalGossipRoute.name, setGlobalGossipRoute.handler)
 }
@@ -179,7 +179,7 @@ export function setGlobal(address, value, when, source) {
   makeReceipt(signedTx, Self.id) // Need this because internalRoute handler ignores messages from ourselves
   /** [TODO] [AS] Replace with Comms.tell */
   // p2p.tell(consensusGroup, 'make-receipt', signedTx)
-  if (Context.config.p2p.useBinarySerializedEndpoints && Context.config.p2p.makeReceiptBinary) {
+  // if (Context.config.p2p.useBinarySerializedEndpoints && Context.config.p2p.makeReceiptBinary) {
     const request = signedTx as MakeReceiptReq
     Comms.tellBinary<MakeReceiptReq>(
       consensusGroup,
@@ -188,9 +188,9 @@ export function setGlobal(address, value, when, source) {
       serializeMakeReceiptReq,
       {}
     )
-  } else {
-    Comms.tell(consensusGroup, 'make-receipt', signedTx)
-  }
+  // } else {
+    // Comms.tell(consensusGroup, 'make-receipt', signedTx)
+  // }
 }
 
 export function createMakeReceiptHandle(txHash: string) {

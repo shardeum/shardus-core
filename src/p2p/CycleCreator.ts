@@ -155,15 +155,15 @@ interface CompareCertRes {
   record: P2P.CycleCreatorTypes.CycleRecord
 }
 
-const compareCertRoute: P2P.P2PTypes.InternalHandler<
-  CompareCertReq,
-  CompareCertRes,
-  P2P.NodeListTypes.Node['id']
-> = async (payload, respond, sender) => {
-  profilerInstance.scopedProfileSectionStart('compareCert')
-  await respond(compareCycleCertEndpoint(payload, sender, 'compareCycleCertEndpoint'))
-  profilerInstance.scopedProfileSectionEnd('compareCert')
-}
+// const compareCertRoute: P2P.P2PTypes.InternalHandler<
+//   CompareCertReq,
+//   CompareCertRes,
+//   P2P.NodeListTypes.Node['id']
+// > = async (payload, respond, sender) => {
+//   profilerInstance.scopedProfileSectionStart('compareCert')
+//   await respond(compareCycleCertEndpoint(payload, sender, 'compareCycleCertEndpoint'))
+//   profilerInstance.scopedProfileSectionEnd('compareCert')
+// }
 
 const gossipCertRoute: P2P.P2PTypes.GossipHandler<CompareCertReq, P2P.NodeListTypes.Node['id']> = (
   payload,
@@ -221,7 +221,7 @@ const compareCertBinaryHandler: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>
 
 const routes = {
   internal: {
-    'compare-cert': compareCertRoute,
+    // 'compare-cert': compareCertRoute,
   },
   gossip: {
     'gossip-cert': gossipCertRoute,
@@ -1172,7 +1172,7 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
     }
 
     let resp: CompareCertRes
-    if (config.p2p.useBinarySerializedEndpoints && config.p2p.compareCertBinary) {
+    // if (config.p2p.useBinarySerializedEndpoints && config.p2p.compareCertBinary) {
       let reqSerialized = req as CompareCertReqSerializable
       resp = await Comms.askBinary<CompareCertReqSerializable, CompareCertRespSerializable>(
         node,
@@ -1182,9 +1182,9 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
         deserializeCompareCertResp,
         {}
       )
-    } else {
-      resp = await Comms.ask(node, 'compare-cert', req)
-    }
+    // } else {
+      // resp = await Comms.ask(node, 'compare-cert', req)
+    // }
     if (!validateCertsRecordTypes(resp, 'compareCycleCert')) return [null, node]
     if (!(resp && resp.certs && resp.certs[0].marker && resp.record)) {
       throw new Error('compareCycleCert: Invalid query response')

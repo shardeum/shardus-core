@@ -2828,23 +2828,23 @@ class Shardus extends EventEmitter {
     })
 
 
-    this.p2p.registerInternal(
-      'sign-app-data',
-      async (
-        payload: {
-          type: string
-          nodesToSign: string
-          hash: string
-          appData: any
-        },
-        respond: (arg0: any) => any
-      ) => {
-        const { type, nodesToSign, hash, appData } = payload
-        const { success, signature } = await this.app.signAppData?.(type, hash, Number(nodesToSign), appData)
+    // this.p2p.registerInternal(
+    //   'sign-app-data',
+    //   async (
+    //     payload: {
+    //       type: string
+    //       nodesToSign: string
+    //       hash: string
+    //       appData: any
+    //     },
+    //     respond: (arg0: any) => any
+    //   ) => {
+    //     const { type, nodesToSign, hash, appData } = payload
+    //     const { success, signature } = await this.app.signAppData?.(type, hash, Number(nodesToSign), appData)
 
-        await respond({ success, signature })
-      }
-    )
+    //     await respond({ success, signature })
+    //   }
+    // )
 
     const signAppDataBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_sign_app_data,
@@ -3161,7 +3161,7 @@ class Shardus extends EventEmitter {
     if (filterNodeIds.length > 0) {
       const groupPromiseResp = await groupResolvePromises(
         closestNodes.map((node) => {
-          if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.signAppDataBinary) {
+          // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.signAppDataBinary) {
             const request: SignAppDataReq = {
               type,
               hash,
@@ -3176,13 +3176,13 @@ class Shardus extends EventEmitter {
               deserializeSignAppDataResp,
               {}
             )
-          } else
-            return this.p2p.ask(node, 'sign-app-data', {
-              type,
-              hash,
-              nodesToSign,
-              appData,
-            })
+          // } else
+          // return this.p2p.ask(node, 'sign-app-data', {
+          //   type,
+          //   hash,
+          //   nodesToSign,
+          //   appData,
+          // })
         }),
         (res) => {
           if (res.success) return true
