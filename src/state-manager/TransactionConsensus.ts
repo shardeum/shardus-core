@@ -307,8 +307,18 @@ class TransactionConsenus {
             this.txTimestampCache[readableReq.cycleCounter] &&
             this.txTimestampCache[readableReq.cycleCounter][readableReq.txId]
           ) {
+            nestedCountersInstance.countEvent('consensus', 'get_tx_timestamp_cache_hit')
             // eslint-disable-next-line security/detect-object-injection
             tsReceipt = this.txTimestampCache[readableReq.cycleCounter][readableReq.txId]
+            /* prettier-ignore */ this.mainLogger.debug(`Found timestamp cache for txId: ${readableReq.txId}, timestamp: ${Utils.safeStringify(tsReceipt)}`)
+            return respond(tsReceipt, serializeGetTxTimestampResp)
+          } else if (
+            this.txTimestampCache[readableReq.cycleCounter - 1] &&
+            this.txTimestampCache[readableReq.cycleCounter - 1][readableReq.txId]
+          ) {
+            nestedCountersInstance.countEvent('consensus', 'get_tx_timestamp_cache_hit_1')
+            // eslint-disable-next-line security/detect-object-injection
+            tsReceipt = this.txTimestampCache[readableReq.cycleCounter - 1][readableReq.txId]
             /* prettier-ignore */ this.mainLogger.debug(`Found timestamp cache for txId: ${readableReq.txId}, timestamp: ${Utils.safeStringify(tsReceipt)}`)
             return respond(tsReceipt, serializeGetTxTimestampResp)
           } else {
@@ -1047,12 +1057,13 @@ class TransactionConsenus {
     }
     // eslint-disable-next-line security/detect-object-injection
     this.txTimestampCache[signedTsReceipt.cycleCounter][txId] = signedTsReceipt
+    this.txTimestampCache[signedTsReceipt.cycleCounter-1][txId] = signedTsReceipt
     return signedTsReceipt
   }
 
   pruneTxTimestampCache(): void {
     for (const key in this.txTimestampCache) {
-      if (parseInt(key) + 1 < CycleChain.newest.counter) {
+      if (parseInt(key) + 2 < CycleChain.newest.counter) {
         // eslint-disable-next-line security/detect-object-injection
         delete this.txTimestampCache[key]
       }
