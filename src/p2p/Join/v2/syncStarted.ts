@@ -1,6 +1,6 @@
 import { logFlags } from '../../../logger'
 import * as NodeList from '../../NodeList'
-import { StartedSyncingRequest, lostAfterSelectionRequest } from '@shardus/types/build/src/p2p/JoinTypes'
+import { StartedSyncingRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import * as CycleChain from '../../CycleChain'
 import { crypto } from '../../Context'
@@ -11,7 +11,7 @@ import { currentQuarter } from '../../CycleCreator'
 // import { ok, Result } from 'neverthrow'
 
 export const nodesYetToStartSyncing: Map<string, number> = new Map()
-export let lostAfterSelection: lostAfterSelectionRequest[] = []
+export let lostAfterSelection: string[] = []
 let newSyncStarted: Map<string, StartedSyncingRequest> = new Map()
 
 export interface SyncStartedRequestResponse {
@@ -42,8 +42,7 @@ export async function submitSyncStarted(payload: SyncStarted): Promise<Result<vo
 
 export function addSyncStarted(syncStarted: StartedSyncingRequest): SyncStartedRequestResponse {
   // lookup node by id in payload and use pubkey and compare to sig.owner
-  const publicKeysMatch =
-    NodeList.byIdOrder.find((node) => node.id === syncStarted.nodeId)?.publicKey === syncStarted.sign.owner
+  const publicKeysMatch = ((NodeList.byIdOrder.find((node) => node.id === syncStarted.nodeId))?.publicKey) === syncStarted.sign.owner
   if (!publicKeysMatch) {
     return {
       success: false,
@@ -88,6 +87,7 @@ export function addSyncStarted(syncStarted: StartedSyncingRequest): SyncStartedR
   }
 }
 
+
 /**
  * Returns the list of nodeIds of nodes that started syncing empties the map.
  */
@@ -102,7 +102,7 @@ export function drainSyncStarted(): StartedSyncingRequest[] {
   }
 }
 
-export function drainLostAfterSelectionNodes(): lostAfterSelectionRequest[] {
+export function drainLostAfterSelectionNodes(): string[] {
   if (currentQuarter === 3) {
     if (logFlags.verbose) console.log('draining lost after selection nodes:', lostAfterSelection)
     const tmp = lostAfterSelection

@@ -215,7 +215,6 @@ export function getTxs(): P2P.JoinTypes.Txs {
     finishedSyncing: drainFinishedSyncingRequest(),
     standbyRefresh: drainNewStandbyRefreshRequests(),
     standbyRemove: drainNewUnjoinRequests(),
-    lostAfterSelection: drainLostAfterSelectionNodes(),
   }
 }
 
@@ -250,7 +249,6 @@ export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
     finishedSyncing: [],
     standbyRefresh: [],
     standbyRemove: [],
-    lostAfterSelection: [],
   }
 }
 
@@ -300,8 +298,8 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     record.syncing += record.startedSyncing.length
 
     // these nodes are being repeated in lost and apop
-    for (const nodeIds in txs.lostAfterSelection) {
-      record.lostAfterSelection.push(nodeIds)
+    for (const nodeId of drainLostAfterSelectionNodes()) {
+      record.lostAfterSelection.push(nodeId)
       nestedCountersInstance.countEvent('p2p', `added node to lostAfterSelection`)
       /* prettier-ignore */ if (logFlags.verbose) console.log(`added node to lostAfterSelection`)
     }
@@ -628,7 +626,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
         if (record.finishedSyncing.includes(nodeId)) continue
 
         // add node to lostAfterSelection to be added to the cycle record next cycle
-        lostAfterSelection.push({ nodeId })
+        lostAfterSelection.push(nodeId)
       }
     }
 
@@ -648,7 +646,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
         // do nothing. the node was just added and isn't in the nodelist yet
         continue
       } else if (record.counter > cycleNumber + config.p2p.cyclesToWaitForSyncStarted) {
-        lostAfterSelection.push({ nodeId })
+        lostAfterSelection.push(nodeId)
         nestedCountersInstance.countEvent('p2p', `added node to lostAfterSelection`)
         /* prettier-ignore */ if (logFlags.verbose) console.log(`added node to lostAfterSelection`)
       }
@@ -656,7 +654,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
     return {
       added,
-      removed: lostAfterSelection.map((node) => node.nodeId),
+      removed: [...lostAfterSelection],
       updated,
     }
   }
