@@ -2237,8 +2237,7 @@ class TransactionQueue {
         }
 
         // calculate information needed for receiptmap
-        //txQueueEntry.cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
-        txQueueEntry.cycleToRecordOn = cycleNumber
+        txQueueEntry.cycleToRecordOn = CycleChain.getCycleNumberFromTimestamp(timestamp)
         /* prettier-ignore */ if (logFlags.verbose) console.log('Cycle number from timestamp', timestamp, txQueueEntry.cycleToRecordOn)
         if (txQueueEntry.cycleToRecordOn < 0) {
           nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'caused Enqueue fail')
