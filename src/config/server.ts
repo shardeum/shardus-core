@@ -345,6 +345,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     awaitingDataCanBailOnReceipt: false, 
     filterReceivingNodesForTXData: true, // factTellCorrespondingNodes
     correspondingTellUseUnwrapped: true,
+    deterministicTXCycleEnabled: false,
+    reduceTimeFromTxTimestamp: 10000
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Release,

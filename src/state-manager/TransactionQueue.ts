@@ -1798,7 +1798,12 @@ class TransactionQueue {
   }
 
   updateHomeInformation(txQueueEntry: QueueEntry): void {
-    if (this.stateManager.currentCycleShardData != null && txQueueEntry.hasShardInfo === false) {
+    let cycleShardData = this.stateManager.currentCycleShardData
+    if (Context.config.stateManager.deterministicTXCycleEnabled) {
+      cycleShardData = this.stateManager.shardValuesByCycle.get(txQueueEntry.txGroupCycle)
+    }
+
+    if (cycleShardData != null && txQueueEntry.hasShardInfo === false) {
       const txId = txQueueEntry.acceptedTx.txId
       // Init home nodes!
       for (const key of txQueueEntry.txKeys.allKeys) {
@@ -1806,9 +1811,9 @@ class TransactionQueue {
           throw new Error(`updateHomeInformation key == null ${key}`)
         }
         const homeNode = ShardFunctions.findHomeNode(
-          this.stateManager.currentCycleShardData.shardGlobals,
+          cycleShardData.shardGlobals,
           key,
-          this.stateManager.currentCycleShardData.parititionShardDataMap
+          cycleShardData.parititionShardDataMap
         )
         if (homeNode == null) {
           nestedCountersInstance.countRareEvent('fatal', 'updateHomeInformation homeNode == null')
@@ -1833,10 +1838,7 @@ class TransactionQueue {
         if (logFlags.playback) {
           // HOMENODEMATHS Based on home node.. should this be chaned to homepartition?
           const summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
-          const relationString = ShardFunctions.getNodeRelation(
-            homeNode,
-            this.stateManager.currentCycleShardData.ourNode.id
-          )
+          const relationString = ShardFunctions.getNodeRelation(homeNode, cycleShardData.ourNode.id)
           // route_to_home_node
           this.logger.playbackLogNote(
             'shrd_homeNodeSummary',
@@ -1948,7 +1950,18 @@ class TransactionQueue {
         }
       }
 
-      const cycleNumber = this.stateManager.currentCycleShardData.cycleNumber
+      let cycleNumber = this.stateManager.currentCycleShardData.cycleNumber
+      if (Context.config.stateManager.deterministicTXCycleEnabled) {
+        cycleNumber = CycleChain.getCycleNumberFromTimestamp(
+          acceptedTx.timestamp - Context.config.stateManager.reduceTimeFromTxTimestamp,
+          true,
+          false
+        )
+        if (cycleNumber > this.stateManager.currentCycleShardData.cycleNumber) {
+          cycleNumber = this.stateManager.currentCycleShardData.cycleNumber
+        }
+      }
+
 
       this.queueEntryCounter++
       const txQueueEntry: QueueEntry = {
@@ -2127,6 +2140,11 @@ class TransactionQueue {
           /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction allKeys == null || allKeys.length === 0 ${timestamp} not putting tx in queue.`)
           return false
         }
+        let cycleShardData = this.stateManager.currentCycleShardData
+        if (Context.config.stateManager.deterministicTXCycleEnabled) {
+          txQueueEntry.txGroupCycle = cycleNumber
+          cycleShardData = this.stateManager.shardValuesByCycle.get(cycleNumber)
+        }
 
         this.updateHomeInformation(txQueueEntry)
 
@@ -2139,12 +2157,11 @@ class TransactionQueue {
 
           // we were doing this in queueEntryGetTransactionGroup.  moved it earlier.
           const { homePartition } = ShardFunctions.addressToPartition(
-            this.stateManager.currentCycleShardData.shardGlobals,
+            cycleShardData.shardGlobals,
             txQueueEntry.executionShardKey
           )
 
-          const homeShardData =
-            this.stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
+          const homeShardData = cycleShardData.parititionShardDataMap.get(homePartition)
 
           //set the nodes that are in the executionGroup.
           //This is needed so that consensus will expect less nodes to be voting
@@ -2161,7 +2178,7 @@ class TransactionQueue {
 
           if (txQueueEntry.isInExecutionHome) {
             txQueueEntry.ourNodeRank = this.computeNodeRank(
-              this.stateManager.currentCycleShardData.ourNode.id,
+              cycleShardData.ourNode.id,
               txQueueEntry.acceptedTx.txId,
               txQueueEntry.acceptedTx.timestamp
             )
@@ -2189,7 +2206,7 @@ class TransactionQueue {
           // take last 2 bytes of the txId and convert it to an integer
           txQueueEntry.correspondingGlobalOffset = parseInt(txId.slice(-4), 16)
 
-          const ourID = this.stateManager.currentCycleShardData.ourNode.id
+          const ourID = cycleShardData.ourNode.id
           for (let idx = 0; idx < txQueueEntry.executionGroup.length; idx++) {
             // eslint-disable-next-line security/detect-object-injection
             const node = txQueueEntry.executionGroup[idx]
@@ -2209,11 +2226,8 @@ class TransactionQueue {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: groupsize confirmators ${txQueueEntry.eligibleNodeIdsToConfirm.size}`)
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: groupsize execution ${txQueueEntry.executionGroup.length}`)
 
-
           //if we are not in the execution group then set isInExecutionHome to false
-          if (
-            txQueueEntry.executionGroupMap.has(this.stateManager.currentCycleShardData.ourNode.id) === false
-          ) {
+          if (txQueueEntry.executionGroupMap.has(cycleShardData.ourNode.id) === false) {
             txQueueEntry.isInExecutionHome = false
           }
 
@@ -2224,7 +2238,7 @@ class TransactionQueue {
 
         // calculate information needed for receiptmap
         //txQueueEntry.cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
-        txQueueEntry.cycleToRecordOn = CycleChain.getCycleNumberFromTimestamp(timestamp)
+        txQueueEntry.cycleToRecordOn = cycleNumber
         /* prettier-ignore */ if (logFlags.verbose) console.log('Cycle number from timestamp', timestamp, txQueueEntry.cycleToRecordOn)
         if (txQueueEntry.cycleToRecordOn < 0) {
           nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'caused Enqueue fail')
@@ -2374,7 +2388,7 @@ class TransactionQueue {
               // If we have syncing neighbors forward this TX to them
               if (
                 this.config.debug.forwardTXToSyncingNeighbors &&
-                this.stateManager.currentCycleShardData.hasSyncingNeighbors === true
+                cycleShardData.hasSyncingNeighbors === true
               ) {
                 let send_spread_tx_to_group_syncing = true
                 //todo turn this back on if other testing goes ok
@@ -2397,27 +2411,28 @@ class TransactionQueue {
                   // only send non global modification TXs
                   if (txQueueEntry.globalModification === false) {
                     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: spread_tx_to_group ${txQueueEntry.logID}`)
-                    /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_tx', `${txQueueEntry.logID}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup.map((x) => x.id))}`)
+                    /* prettier-ignore */
+                    if (logFlags.playback) this.logger.playbackLogNote("shrd_sync_tx", `${txQueueEntry.logID}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(cycleShardData.syncingNeighborsTxGroup.map((x) => x.id))}`)
 
                     this.stateManager.debugNodeGroup(
                       txId,
                       timestamp,
                       `share to syncing neighbors`,
-                      this.stateManager.currentCycleShardData.syncingNeighborsTxGroup
+                      cycleShardData.syncingNeighborsTxGroup
                     )
-                    //this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
+                    //this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, cycleShardData.syncingNeighborsTxGroup)
                     if (
                       this.stateManager.config.p2p.useBinarySerializedEndpoints &&
                       this.stateManager.config.p2p.spreadTxToGroupSyncingBinary
                     ) {
                       if (logFlags.seqdiagram) {
-                        for (const node of this.stateManager.currentCycleShardData.syncingNeighborsTxGroup) {                
+                        for (const node of cycleShardData.syncingNeighborsTxGroup) {
                           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'spread_tx_to_group_syncing'}`)
                         }
                       }
                       const request = acceptedTx as SpreadTxToGroupSyncingReq
                       this.p2p.tellBinary<SpreadTxToGroupSyncingReq>(
-                        this.stateManager.currentCycleShardData.syncingNeighborsTxGroup,
+                        cycleShardData.syncingNeighborsTxGroup,
                         InternalRouteEnum.binary_spread_tx_to_group_syncing,
                         request,
                         serializeSpreadTxToGroupSyncingReq,
@@ -2425,7 +2440,7 @@ class TransactionQueue {
                       )
                     } else {
                       this.p2p.tell(
-                        this.stateManager.currentCycleShardData.syncingNeighborsTxGroup,
+                        cycleShardData.syncingNeighborsTxGroup,
                         'spread_tx_to_group_syncing',
                         acceptedTx
                       )
@@ -3419,7 +3434,11 @@ class TransactionQueue {
    * @returns {Node[]}
    */
   queueEntryGetTransactionGroup(queueEntry: QueueEntry, tryUpdate = false): Shardus.Node[] {
-    if (this.stateManager.currentCycleShardData == null) {
+    let cycleShardData = this.stateManager.currentCycleShardData
+    if (Context.config.stateManager.deterministicTXCycleEnabled) {
+      cycleShardData = this.stateManager.shardValuesByCycle.get(queueEntry.txGroupCycle)
+    }
+    if (cycleShardData == null) {
       throw new Error('queueEntryGetTransactionGroup: currentCycleShardData == null')
     }
     if (queueEntry.uniqueKeys == null) {
@@ -3442,11 +3461,11 @@ class TransactionQueue {
       }
       if (homeNode.extendedData === false) {
         ShardFunctions.computeExtendedNodePartitionData(
-          this.stateManager.currentCycleShardData.shardGlobals,
-          this.stateManager.currentCycleShardData.nodeShardDataMap,
-          this.stateManager.currentCycleShardData.parititionShardDataMap,
+          cycleShardData.shardGlobals,
+          cycleShardData.nodeShardDataMap,
+          cycleShardData.parititionShardDataMap,
           homeNode,
-          this.stateManager.currentCycleShardData.nodes
+          cycleShardData.nodes
         )
       }
 
@@ -3485,14 +3504,14 @@ class TransactionQueue {
       //                    build a list of nodes.
       // maybe this could go on the partitions.
       const { homePartition } = ShardFunctions.addressToPartition(
-        this.stateManager.currentCycleShardData.shardGlobals,
+        cycleShardData.shardGlobals,
         key
       )
       if (homePartition != homeNode.homePartition) {
         //loop all nodes for now
-        for (const nodeID of this.stateManager.currentCycleShardData.nodeShardDataMap.keys()) {
+        for (const nodeID of cycleShardData.nodeShardDataMap.keys()) {
           const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
-            this.stateManager.currentCycleShardData.nodeShardDataMap.get(nodeID)
+            cycleShardData.nodeShardDataMap.get(nodeID)
           const nodeStoresThisPartition = ShardFunctions.testInRange(
             homePartition,
             nodeShardData.storedPartitions
@@ -3543,7 +3562,7 @@ class TransactionQueue {
       // }
     }
     queueEntry.ourNodeInTransactionGroup = true
-    if (uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] == null) {
+    if (uniqueNodes[cycleShardData.ourNode.id] == null) {
       queueEntry.ourNodeInTransactionGroup = false
       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${queueEntry.logID}`)
     }
@@ -3553,8 +3572,8 @@ class TransactionQueue {
     // make sure our node is included: needed for gossip! - although we may not care about the data!
     // This may seem confusing, but to gossip to other nodes, we have to have our node in the list we will gossip to
     // Other logic will use queueEntry.ourNodeInTransactionGroup to know what else to do with the queue entry
-    uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] =
-      this.stateManager.currentCycleShardData.ourNode
+    uniqueNodes[cycleShardData.ourNode.id] =
+      cycleShardData.ourNode
 
     const values = Object.values(uniqueNodes)
     for (const v of values) {
@@ -3563,7 +3582,7 @@ class TransactionQueue {
 
     txGroup.sort(this.stateManager._sortByIdAsc)
     if (queueEntry.ourNodeInTransactionGroup) {
-      const ourID = this.stateManager.currentCycleShardData.ourNode.id
+      const ourID = cycleShardData.ourNode.id
       for (let idx = 0; idx < txGroup.length; idx++) {
         // eslint-disable-next-line security/detect-object-injection
         const node = txGroup[idx]
@@ -3574,7 +3593,9 @@ class TransactionQueue {
       }
     }
     if (tryUpdate != true) {
-      queueEntry.txGroupCycle = this.stateManager.currentCycleShardData.cycleNumber
+      if (Context.config.stateManager.deterministicTXCycleEnabled === false) {
+        queueEntry.txGroupCycle = this.stateManager.currentCycleShardData.cycleNumber
+      }
       queueEntry.transactionGroup = txGroup
     } else {
       queueEntry.updatedTxGroupCycle = this.stateManager.currentCycleShardData.cycleNumber

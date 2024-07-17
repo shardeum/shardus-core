@@ -1292,6 +1292,10 @@ export interface ServerConfiguration {
     filterReceivingNodesForTXData: boolean
     // unwrap sender indicies when calculating corresponding tell
     correspondingTellUseUnwrapped: boolean
+    // decide txGroupCycle based on the txTimestamp
+    deterministicTXCycleEnabled: boolean
+    // deterministic reduce time from tx timestamp (in ms)
+    reduceTimeFromTxTimestamp: number
   }
   /** Options for sharding calculations */
   sharding?: {
