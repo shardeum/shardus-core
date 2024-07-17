@@ -346,7 +346,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     filterReceivingNodesForTXData: true, // factTellCorrespondingNodes
     correspondingTellUseUnwrapped: true,
     deterministicTXCycleEnabled: false,
-    reduceTimeFromTxTimestamp: 10000
+    reduceTimeFromTxTimestamp: 5000
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Release,
