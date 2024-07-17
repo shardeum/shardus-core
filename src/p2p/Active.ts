@@ -97,7 +97,7 @@ let p2pLogger: Logger
 
 let activeRequests: Map<P2P.NodeListTypes.Node['publicKey'], P2P.ActiveTypes.SignedActiveRequest>
 let queuedRequest: P2P.ActiveTypes.ActiveRequest
-let neverGoActive = false
+export let neverGoActive = false
 
 /** FUNCTIONS */
 

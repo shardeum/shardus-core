@@ -31,12 +31,19 @@ import { deleteStandbyNode, drainNewUnjoinRequests } from './v2/unjoin'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { updateNodeState } from '../Self'
 import { HTTPError } from 'got'
-import { drainLostAfterSelectionNodes, drainSyncStarted, lostAfterSelection, insertSyncStarted, addSyncStarted } from './v2/syncStarted'
+import {
+  drainLostAfterSelectionNodes,
+  drainSyncStarted,
+  lostAfterSelection,
+  insertSyncStarted,
+  addSyncStarted,
+} from './v2/syncStarted'
 import { addFinishedSyncing, drainFinishedSyncingRequest, newSyncFinishedNodes } from './v2/syncFinished'
 //import { getLastCycleStandbyRefreshRequest, resetLastCycleStandbyRefreshRequests, drainNewStandbyRefreshRequests } from './v2/standbyRefresh'
 import { drainNewStandbyRefreshRequests, addStandbyRefresh } from './v2/standbyRefresh'
 import rfdc from 'rfdc'
 import { Utils } from '@shardus/types'
+import { neverGoActive } from '../Active'
 
 /** STATE */
 
@@ -433,7 +440,6 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
         }
       }
 
-
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log( `join:updateRecord cycle number: ${record.counter} skipped: ${skipped} removedTTLCount: ${standbyRemoved_Age}  removed list: ${record.standbyRemove} ` )
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList(standbyList, `join.updateRecord: last-hashed ${record.counter}`)
       /* prettier-ignore */ if (logFlags.p2pNonFatal) debugDumpJoinRequestList( Array.from(getStandbyNodesInfoMap().values()), `join.updateRecord: standby-map ${record.counter}` )
@@ -476,7 +482,6 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
       queuedJoinRequestsForGossip = queuedReceivedJoinRequests
       queuedReceivedJoinRequests = []
     }
-
   } else {
     // old protocol handling
     record.joinedConsensors = txs.join
@@ -745,6 +750,7 @@ export function queueStartedSyncingRequest(): void {
 }
 
 export function queueFinishedSyncingRequest(): void {
+  if (neverGoActive) return
   queuedFinishedSyncingId = Self.id
   finishedSyncingCycle = CycleCreator.currentCycle
 }
@@ -789,7 +795,8 @@ export async function createJoinRequest(
     }
   }
   const signedJoinReq = crypto.sign(joinReq)
-  if (logFlags.p2pNonFatal) info(`Join request created... Join request: ${Utils.safeStringify(signedJoinReq)}`)
+  if (logFlags.p2pNonFatal)
+    info(`Join request created... Join request: ${Utils.safeStringify(signedJoinReq)}`)
   return signedJoinReq
 }
 
@@ -1565,17 +1572,17 @@ export function nodeListFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeL
   return result
 }
 
-  function info(...msg: string[]): void {
-    const entry = `Join: ${msg.join(' ')}`
-    p2pLogger.info(entry)
-  }
+function info(...msg: string[]): void {
+  const entry = `Join: ${msg.join(' ')}`
+  p2pLogger.info(entry)
+}
 
-  export function warn(...msg: string[]): void {
-    const entry = `Join: ${msg.join(' ')}`
-    p2pLogger.warn(entry)
-  }
+export function warn(...msg: string[]): void {
+  const entry = `Join: ${msg.join(' ')}`
+  p2pLogger.warn(entry)
+}
 
-  export function error(...msg: string[]): void {
-    const entry = `Join: ${msg.join(' ')}`
-    p2pLogger.error(entry)
-  }
+export function error(...msg: string[]): void {
+  const entry = `Join: ${msg.join(' ')}`
+  p2pLogger.error(entry)
+}
