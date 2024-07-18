@@ -1295,6 +1295,8 @@ class Shardus extends EventEmitter {
         status: 500,
       }
     }
+    // set === true (which is handled in the else case here) is a special kind of TX that is allowed only be the first node in the network
+    // this is used to create global network settings and other dawn of time accounts
     if (set === false) {
       if (!this.p2p.allowTransactions()) {
         if (global === true && this.p2p.allowSet()) {
@@ -1313,6 +1315,7 @@ class Shardus extends EventEmitter {
         }
       }
     } else {
+      // this is where set is true.  check if we allow it (i.e. only one node active). if not, reject early
       if (!this.p2p.allowSet()) {
         this.statistics.incrementCounter('txRejected')
         nestedCountersInstance.countEvent('rejected', '!allowTransactions2')
@@ -1323,6 +1326,8 @@ class Shardus extends EventEmitter {
         }
       }
     }
+
+    // Now it is time to check rate limiting to see if our node can accept more transactions
     if (this.rateLimiting.isOverloaded(txId)) {
       /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: reject_overload`)
       this.statistics.incrementCounter('txRejected')
@@ -1483,6 +1488,16 @@ class Shardus extends EventEmitter {
           this.stateManager.transactionQueue.addTransactionToNonceQueue(nonceQueueEntry)
 
         if(Context.config.stateManager.forwardToLuckyNodesNonceQueue){
+          // if we ever support cancellation by using replacment for a TX that will change how we 
+          // need to handle this run-away protection.  may need to re-evaluate later
+          if(nonceQueueAddResult?.alreadyAdded === true && Context.config.stateManager.forwardToLuckyNodesNonceQueueLimitFix){
+            nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: nonce queue skipped. we already have it`)
+            return {
+              success: true,
+              reason: `Transaction already added to pending nonce queue.`,
+              status: 200
+            }
+          }
           let result = this.forwardTransactionToLuckyNodes(senderAddress, tx, txId, 'consensus to consensus', '3') // don't wait here
           return result as Promise<{ success: boolean; reason: string; status: number; txId?: string }>
         } else {
@@ -1542,7 +1557,10 @@ class Shardus extends EventEmitter {
     let  stats ={
       skippedSelf:0,
       skippedRotation:0,
-      skippedHome:0
+      skippedHome:0,
+      ok_inQ:0,
+      ok_inQ2:0,
+      ok_addQ:0
     }
 
     for (const id of closetNodeIds) {
@@ -1610,7 +1628,18 @@ class Shardus extends EventEmitter {
         if (result && result.success === true) {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_success_${context} ${activeIdToPartition.get(validator.id)}`)
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got successful response upon forwarding injected tx: ${validator.id}. ${message} ${Utils.safeStringify(tx)}` )
-          nestedCountersInstance.countEvent('statistics', `forward to luck success ${message}`)
+          
+          if(result.reason === 'Transaction is already in pending nonce queue.'){
+            stats.ok_inQ++
+          }
+          if(result.reason === `Transaction already added to pending nonce queue.`){
+            stats.ok_inQ2++
+          }
+          if(result.reason === `Transaction added to pending nonce queue.`){
+            stats.ok_addQ++
+          }
+            
+          nestedCountersInstance.countEvent('statistics', `forward to lucky node success ${message} ${Utils.safeStringify(stats)}`)
           if(Context.config.stateManager.forwardToLuckyMulti){
             successCount++
             continue
@@ -1630,7 +1659,7 @@ class Shardus extends EventEmitter {
       return { success: true, reason: 'Transaction forwarded to validators', status: 200 }
     }
 
-    nestedCountersInstance.countEvent('statistics', `forward failed: ${Utils.safeStringify(stats)} ${message}`)
+    nestedCountersInstance.countEvent('statistics', `forward failed: ${message} ${Utils.safeStringify(stats)}`)
     /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx out of tries. ${Utils.safeStringify(stats)} ${Utils.safeStringify(tx)} ` )
     return { success: false, reason: 'No validators found to forward the transaction', status: 500 }
   }

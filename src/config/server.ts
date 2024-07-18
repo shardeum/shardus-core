@@ -309,6 +309,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     forwardToLuckyNodesNonceQueue: true,
     forwardToLuckyNodesCheckRotation: true,
     forwardToLuckyMulti: false,
+    forwardToLuckyNodesNonceQueueLimitFix: true,
     integrityCheckBeforeChallenge: true,
     checkPrecrackStatus: true,
     noVoteSeenExpirationTime: 10000,

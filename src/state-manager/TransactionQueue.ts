@@ -1050,7 +1050,7 @@ class TransactionQueue {
     return { totalQueued, totalAccounts, avgQueueLength }
   }
 
-  addTransactionToNonceQueue(nonceQueueEntry: NonceQueueItem): {success: boolean; reason?: string} {
+  addTransactionToNonceQueue(nonceQueueEntry: NonceQueueItem): {success: boolean; reason?: string, alreadyAdded?: boolean} {
     try {
       let queue = this.nonceQueue.get(nonceQueueEntry.accountId)
       if (queue == null || (Array.isArray(queue) && queue.length === 0)) {
@@ -1065,7 +1065,7 @@ class TransactionQueue {
           this.nonceQueue.set(nonceQueueEntry.accountId, queue)
           nestedCountersInstance.countEvent('processing', 'replaceExistingNonceTx')
           if (logFlags.debug) this.mainLogger.debug(`replace existing nonce tx ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce}, txId: ${nonceQueueEntry.txId}`)
-          return { success: true, reason: 'Replace existing pending nonce tx' }
+          return { success: true, reason: 'Replace existing pending nonce tx', alreadyAdded: true }
         }
         // add new item to the queue
         utils.insertSorted(queue, nonceQueueEntry, (a, b) => Number(a.nonce) - Number(b.nonce));
@@ -1074,11 +1074,11 @@ class TransactionQueue {
       /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${nonceQueueEntry.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: pause_nonceQ`)
       nestedCountersInstance.countEvent('processing', 'addTransactionToNonceQueue')
       if (logFlags.debug) this.mainLogger.debug(`Added tx to nonce queue for ${nonceQueueEntry.accountId} with nonce ${nonceQueueEntry.nonce} nonceQueue: ${queue.length}`)
-      return { success: true, reason: `Nonce queue size for account: ${queue.length}` }
+      return { success: true, reason: `Nonce queue size for account: ${queue.length}`, alreadyAdded: false }
     } catch (e) {
       nestedCountersInstance.countEvent('processing', 'addTransactionToNonceQueueError')
       this.mainLogger.error(`Error adding tx to nonce queue: ${e.message}, tx: ${utils.stringifyReduce(nonceQueueEntry)}`)
-      return { success: false, reason: e.message }
+      return { success: false, reason: e.message, alreadyAdded: false }
     }
   }
   async processNonceQueue(accounts: Shardus.WrappedData[]): Promise<void> {

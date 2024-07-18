@@ -1217,6 +1217,8 @@ export interface ServerConfiguration {
     forwardToLuckyNodesNonceQueue: boolean
     // forward to multiple lucy nodes (requires other configs to forward at all)
     forwardToLuckyMulti: boolean
+    // only send to lucky nodes in the case that we did not already have this item in our nonce queue
+    forwardToLuckyNodesNonceQueueLimitFix: boolean
     /// check rotation bounds when forwarding to lucky nodes
     forwardToLuckyNodesCheckRotation: boolean
     // whether the node should verify its data against the network before challenging
