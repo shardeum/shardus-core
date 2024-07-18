@@ -265,19 +265,13 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
   if (config.p2p.useJoinProtocolV2) {
     // for join v2, add new standby nodes to the standbyAdd field ...
     for (const request of txs.standbyAdd) {
-      const publicKey = request.sign.owner
-      const node = NodeList.byPubKey.get(publicKey)
-      if (node) {
-        record.standbyAdd.push(request)
-      } else {
-        /* prettier-ignore */ if(logFlags.important_as_error) warn(`join:updateRecord:standbyAdd: node not found: ${publicKey}`)
-      }
+      record.standbyAdd.push(request)
     }
 
     // ... and unjoining nodes to the standbyRemove field ...
     for (const request of txs.standbyRemove) {
       const publicKey = request.sign.owner
-      const node = NodeList.byPubKey.get(publicKey)
+      const node = getStandbyNodesInfoMap().get(publicKey)
       if (node) {
         record.standbyRemove.push(publicKey)
       } else {
@@ -325,7 +319,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     // only the node that the refresh request was posted to would have the tx?
     for (const request of txs.standbyRefresh) {
       const publicKey = request.sign.owner
-      const node = NodeList.byPubKey.get(publicKey)
+      const node = getStandbyNodesInfoMap().get(publicKey)
       if (node) {
         record.standbyRefresh.push(request.publicKey)
       } else {
