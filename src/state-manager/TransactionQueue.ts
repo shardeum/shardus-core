@@ -3625,7 +3625,11 @@ class TransactionQueue {
    * @returns {Node[]}
    */
   queueEntryGetConsensusGroup(queueEntry: QueueEntry): Shardus.Node[] {
-    if (this.stateManager.currentCycleShardData == null) {
+    let cycleShardData = this.stateManager.currentCycleShardData
+    if (Context.config.stateManager.deterministicTXCycleEnabled) {
+      cycleShardData = this.stateManager.shardValuesByCycle.get(queueEntry.txGroupCycle)
+    }
+    if (cycleShardData == null) {
       throw new Error('queueEntryGetConsensusGroup: currentCycleShardData == null')
     }
     if (queueEntry.uniqueKeys == null) {
@@ -3646,11 +3650,11 @@ class TransactionQueue {
       }
       if (homeNode.extendedData === false) {
         ShardFunctions.computeExtendedNodePartitionData(
-          this.stateManager.currentCycleShardData.shardGlobals,
-          this.stateManager.currentCycleShardData.nodeShardDataMap,
-          this.stateManager.currentCycleShardData.parititionShardDataMap,
+          cycleShardData.shardGlobals,
+          cycleShardData.nodeShardDataMap,
+          cycleShardData.parititionShardDataMap,
           homeNode,
-          this.stateManager.currentCycleShardData.nodes
+          cycleShardData.nodes
         )
       }
 
@@ -3673,14 +3677,14 @@ class TransactionQueue {
       uniqueNodes[homeNode.node.id] = homeNode.node
     }
     queueEntry.ourNodeInConsensusGroup = true
-    if (uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] == null) {
+    if (uniqueNodes[cycleShardData.ourNode.id] == null) {
       queueEntry.ourNodeInConsensusGroup = false
       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetConsensusGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${queueEntry.logID}`)
     }
 
     // make sure our node is included: needed for gossip! - although we may not care about the data!
-    uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] =
-      this.stateManager.currentCycleShardData.ourNode
+    uniqueNodes[cycleShardData.ourNode.id] =
+      cycleShardData.ourNode
 
     const values = Object.values(uniqueNodes)
     for (const v of values) {
@@ -3698,7 +3702,11 @@ class TransactionQueue {
    * @returns {Node[]}
    */
   queueEntryGetConsensusGroupForAccount(queueEntry: QueueEntry, accountId: string): Shardus.Node[] {
-    if (this.stateManager.currentCycleShardData == null) {
+    let cycleShardData = this.stateManager.currentCycleShardData
+    if (Context.config.stateManager.deterministicTXCycleEnabled) {
+      cycleShardData = this.stateManager.shardValuesByCycle.get(queueEntry.txGroupCycle)
+    }
+    if (cycleShardData == null) {
       throw new Error('queueEntryGetConsensusGroup: currentCycleShardData == null')
     }
     if (queueEntry.uniqueKeys == null) {
@@ -3722,11 +3730,11 @@ class TransactionQueue {
     }
     if (homeNode.extendedData === false) {
       ShardFunctions.computeExtendedNodePartitionData(
-        this.stateManager.currentCycleShardData.shardGlobals,
-        this.stateManager.currentCycleShardData.nodeShardDataMap,
-        this.stateManager.currentCycleShardData.parititionShardDataMap,
+        cycleShardData.shardGlobals,
+        cycleShardData.nodeShardDataMap,
+        cycleShardData.parititionShardDataMap,
         homeNode,
-        this.stateManager.currentCycleShardData.nodes
+        cycleShardData.nodes
       )
     }
 
@@ -3747,14 +3755,13 @@ class TransactionQueue {
     // make sure the home node is in there in case we hit and edge case
     uniqueNodes[homeNode.node.id] = homeNode.node
     queueEntry.ourNodeInConsensusGroup = true
-    if (uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] == null) {
+    if (uniqueNodes[cycleShardData.ourNode.id] == null) {
       queueEntry.ourNodeInConsensusGroup = false
       /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetConsensusGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${queueEntry.logID}`)
     }
 
     // make sure our node is included: needed for gossip! - although we may not care about the data!
-    uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] =
-      this.stateManager.currentCycleShardData.ourNode
+    uniqueNodes[cycleShardData.ourNode.id] = cycleShardData.ourNode
 
     const values = Object.values(uniqueNodes)
     for (const v of values) {
