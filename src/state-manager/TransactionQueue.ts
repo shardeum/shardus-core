@@ -1958,7 +1958,14 @@ class TransactionQueue {
           false
         )
         if (cycleNumber > this.stateManager.currentCycleShardData.cycleNumber) {
-          cycleNumber = this.stateManager.currentCycleShardData.cycleNumber
+          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction derived txGroupCycle > currentCycleShardData.cycleNumber. txId:${txId} txGroupCycle:${cycleNumber} currentCycleShardData.cycleNumber:${this.stateManager.currentCycleShardData.cycleNumber}`)
+          nestedCountersInstance.countEvent('stateManager', 'derived txGroupCycle is larger than current cycle')
+          // cycleNumber = this.stateManager.currentCycleShardData.cycleNumber
+        } else if (cycleNumber < this.stateManager.currentCycleShardData.cycleNumber) {
+          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction derived txGroupCycle < currentCycleShardData.cycleNumber. txId:${txId} txGroupCycle:${cycleNumber} currentCycleShardData.cycleNumber:${this.stateManager.currentCycleShardData.cycleNumber}`)
+          nestedCountersInstance.countEvent('stateManager', 'derived txGroupCycle is less than current cycle')
+        } else if (cycleNumber === this.stateManager.currentCycleShardData.cycleNumber) {
+          nestedCountersInstance.countEvent('stateManager', 'derived txGroupCycle is same as current cycle')
         }
       }
 
