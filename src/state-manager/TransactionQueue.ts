@@ -1960,7 +1960,9 @@ class TransactionQueue {
         if (cycleNumber > this.stateManager.currentCycleShardData.cycleNumber) {
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction derived txGroupCycle > currentCycleShardData.cycleNumber. txId:${txId} txGroupCycle:${cycleNumber} currentCycleShardData.cycleNumber:${this.stateManager.currentCycleShardData.cycleNumber}`)
           nestedCountersInstance.countEvent('stateManager', 'derived txGroupCycle is larger than current cycle')
-          // cycleNumber = this.stateManager.currentCycleShardData.cycleNumber
+          if (Context.config.stateManager.fallbackToCurrentCycleFortxGroup) {
+            cycleNumber = this.stateManager.currentCycleShardData.cycleNumber
+          }
         } else if (cycleNumber < this.stateManager.currentCycleShardData.cycleNumber) {
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction derived txGroupCycle < currentCycleShardData.cycleNumber. txId:${txId} txGroupCycle:${cycleNumber} currentCycleShardData.cycleNumber:${this.stateManager.currentCycleShardData.cycleNumber}`)
           nestedCountersInstance.countEvent('stateManager', 'derived txGroupCycle is less than current cycle')

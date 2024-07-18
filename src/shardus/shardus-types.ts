@@ -1296,6 +1296,8 @@ export interface ServerConfiguration {
     deterministicTXCycleEnabled: boolean
     // deterministic reduce time from tx timestamp (in ms)
     reduceTimeFromTxTimestamp: number
+    // whether node should use current cycle if derived cycle is lager than current cycle
+    fallbackToCurrentCycleFortxGroup: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
