@@ -305,7 +305,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     usePOQo: true,
     poqoloopTime: 2000,
     poqobatchCount: 1,
-    forwardToLuckyNodes: true,
+    forwardToLuckyNodes: false,
     forwardToLuckyNodesNonceQueue: true,
     forwardToLuckyNodesCheckRotation: true,
     forwardToLuckyMulti: false,
@@ -343,10 +343,10 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     noRepairIfDataAttached: false,  // this seems to be an optimization that we will leave off for now
     rejectSharedDataIfCovered: false,
     requestAwaitedDataAllowed: false, // this has been disabled by accident for a long time so leaving it off
-    awaitingDataCanBailOnReceipt: false, 
+    awaitingDataCanBailOnReceipt: true,
     filterReceivingNodesForTXData: true, // factTellCorrespondingNodes
     correspondingTellUseUnwrapped: true,
-    deterministicTXCycleEnabled: false,
+    deterministicTXCycleEnabled: true,
     reduceTimeFromTxTimestamp: 60000,
     fallbackToCurrentCycleFortxGroup: false
   },
