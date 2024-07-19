@@ -2253,7 +2253,7 @@ class StateManager {
       res.end()
     })
 
-    Context.network.registerExternalGet('debug-queue-item', isDebugModeMiddlewareLow, (_req, res) => {
+    Context.network.registerExternalGet('debug-queue-item-by-txid', isDebugModeMiddlewareLow, (_req, res) => {
       const txId = _req.query.txId
       if (txId == null || typeof txId !== 'string' || txId.length !== 64) {
         res.write('invalid txId provided')

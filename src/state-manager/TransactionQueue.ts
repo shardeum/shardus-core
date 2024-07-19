@@ -8409,6 +8409,7 @@ getDebugStuckTxs(opts): unknown {
   }
   getDebugQueueInfo(queueEntry: QueueEntry): any {
     return {
+      txId: queueEntry.acceptedTx.txId,
       logID: queueEntry.logID,
       state: queueEntry.state,
       hasAll: queueEntry.hasAll,
