@@ -8399,37 +8399,45 @@ getDebugStuckTxs(opts): unknown {
   }
   getQueueItems(): any[] {
     return this._transactionQueue.map((queueEntry) => {
-      return {
-        logID: queueEntry.logID,
-        state: queueEntry.state,
-        hasAll: queueEntry.hasAll,
-        isExecutionNode: queueEntry.isInExecutionHome,
-        globalModification: queueEntry.globalModification,
-        entryID: queueEntry.entryID,
-        txGroupCyle: queueEntry.txGroupCycle,
-        uniqueKeys: queueEntry.uniqueKeys,
-        collectedData: queueEntry.collectedData,
-        finalData: queueEntry.collectedFinalData,
-        preApplyResult: queueEntry.preApplyTXResult,
-        txAge: shardusGetTime() - queueEntry.acceptedTx.timestamp,
-        lastFinalDataRequestTimestamp: queueEntry.lastFinalDataRequestTimestamp,
-        dataSharedTimestamp: queueEntry.dataSharedTimestamp,
-        firstVoteTimestamp: queueEntry.firstVoteReceivedTimestamp,
-        lastVoteTimestamp: queueEntry.lastVoteReceivedTimestamp,
-        firstConfirmationsTimestamp: queueEntry.firstConfirmOrChallengeTimestamp,
-        robustBestConfirmation: queueEntry.receivedBestConfirmation,
-        robustBestVote: queueEntry.receivedBestVote,
-        robustBestChallenge: queueEntry.receivedBestChallenge,
-        completedRobustVote: queueEntry.robustQueryVoteCompleted,
-        completedRobustChallenge: queueEntry.robustQueryConfirmOrChallengeCompleted,
-        txDebug: queueEntry.txDebug,
-        executionDebug: queueEntry.executionDebug,
-        waitForReceiptOnly: queueEntry.waitForReceiptOnly,
-        ourVote: queueEntry.ourVote || null,
-        receipt2: this.stateManager.getReceipt2(queueEntry) || null,
-        uniqueChallenges: queueEntry.uniqueChallengesCount,
-      }
+      return this.getDebugQueueInfo(queueEntry)
     })
+  }
+  getQueueItemById(txId: string): any {
+    if (this._transactionQueueByID.has(txId)) return this.getDebugQueueInfo(this._transactionQueueByID.get(txId))
+    if (this.archivedQueueEntriesByID.has(txId)) return this.getDebugQueueInfo(this.archivedQueueEntriesByID.get(txId))
+    return null
+  }
+  getDebugQueueInfo(queueEntry: QueueEntry): any {
+    return {
+      logID: queueEntry.logID,
+      state: queueEntry.state,
+      hasAll: queueEntry.hasAll,
+      isExecutionNode: queueEntry.isInExecutionHome,
+      globalModification: queueEntry.globalModification,
+      entryID: queueEntry.entryID,
+      txGroupCyle: queueEntry.txGroupCycle,
+      uniqueKeys: queueEntry.uniqueKeys,
+      collectedData: queueEntry.collectedData,
+      finalData: queueEntry.collectedFinalData,
+      preApplyResult: queueEntry.preApplyTXResult,
+      txAge: shardusGetTime() - queueEntry.acceptedTx.timestamp,
+      lastFinalDataRequestTimestamp: queueEntry.lastFinalDataRequestTimestamp,
+      dataSharedTimestamp: queueEntry.dataSharedTimestamp,
+      firstVoteTimestamp: queueEntry.firstVoteReceivedTimestamp,
+      lastVoteTimestamp: queueEntry.lastVoteReceivedTimestamp,
+      firstConfirmationsTimestamp: queueEntry.firstConfirmOrChallengeTimestamp,
+      robustBestConfirmation: queueEntry.receivedBestConfirmation,
+      robustBestVote: queueEntry.receivedBestVote,
+      robustBestChallenge: queueEntry.receivedBestChallenge,
+      completedRobustVote: queueEntry.robustQueryVoteCompleted,
+      completedRobustChallenge: queueEntry.robustQueryConfirmOrChallengeCompleted,
+      txDebug: queueEntry.txDebug,
+      executionDebug: queueEntry.executionDebug,
+      waitForReceiptOnly: queueEntry.waitForReceiptOnly,
+      ourVote: queueEntry.ourVote || null,
+      receipt2: this.stateManager.getReceipt2(queueEntry) || null,
+      uniqueChallenges: queueEntry.uniqueChallengesCount,
+    }
   }
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   removeTxFromArchivedQueue(txId: string) {
