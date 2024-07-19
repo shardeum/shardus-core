@@ -8406,6 +8406,8 @@ getDebugStuckTxs(opts): unknown {
         isExecutionNode: queueEntry.isInExecutionHome,
         globalModification: queueEntry.globalModification,
         entryID: queueEntry.entryID,
+        txGroupCyle: queueEntry.txGroupCycle,
+        uniqueKeys: queueEntry.uniqueKeys,
         collectedData: queueEntry.collectedData,
         finalData: queueEntry.collectedFinalData,
         preApplyResult: queueEntry.preApplyTXResult,
