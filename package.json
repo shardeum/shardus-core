@@ -39,7 +39,8 @@
     "test": "jest",
     "test-watch": "jest --watch",
     "depcheck": "depcheck --skip-missing --ignores webpack,webpack-cli,prettier,typescript-eslint,typescript-estree,@mapbox/node-pre-gyp,@types/estree",
-    "format-check": "prettier --check './src/**/*.ts'"
+    "format-check": "prettier --check './src/**/*.ts'",
+    "format-fix": "prettier --write './src/**/*.ts'"
   },
   "repository": {
     "type": "git",
