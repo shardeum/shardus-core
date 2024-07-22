@@ -16,4 +16,5 @@ export enum AJVSchemaEnum {
   GetAccountDataResp = 'GetAccountDataResp',
   ApoptosisProposalReq = 'ApoptosisProposalReq',
   ApoptosisProposalResp = 'ApoptosisProposalResp',
+  BroadcastFinalStateReq = 'BroadcastFinalStateReq',
 }

@@ -5,6 +5,8 @@ import {
   serializeWrappedDataResponse,
 } from './WrappedDataResponse'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
 export const cBroadcastFinalStateReqVersion = 1
 
@@ -35,5 +37,9 @@ export function deserializeBroadcastFinalStateReq(stream: VectorBufferStream): B
   const txid = stream.readString()
   const stateListLength = stream.readUInt16()
   const stateList = Array.from({ length: stateListLength }, () => deserializeWrappedDataResponse(stream))
+  const errors = verifyPayload(AJVSchemaEnum.BroadcastFinalStateReq, { txid, stateList })
+  if (errors && errors.length > 0) {
+    throw new Error('BroadcastFinalStateReq: Data validation error')
+  }
   return { txid, stateList }
 }
