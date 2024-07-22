@@ -2155,6 +2155,12 @@ class TransactionQueue {
           cycleShardData = this.stateManager.shardValuesByCycle.get(cycleNumber)
         }
 
+        if (cycleShardData == null) {
+          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction logID:${txQueueEntry.logID} cycleShardData == null cycle:${cycleNumber} not putting tx in queue.`)
+          nestedCountersInstance.countEvent('stateManager', 'routeAndQueueAcceptedTransaction cycleShardData == null')
+          return false
+        }
+
         this.updateHomeInformation(txQueueEntry)
 
         //set the executionShardKey for the transaction
@@ -4351,13 +4357,17 @@ class TransactionQueue {
 
   async factTellCorrespondingNodes(queueEntry: QueueEntry): Promise<unknown> {
     try {
-      if (this.stateManager.currentCycleShardData == null) {
-        throw new Error('factTellCorrespondingNodes: currentCycleShardData == null')
+      let cycleShardData = this.stateManager.currentCycleShardData
+      if (Context.config.stateManager.deterministicTXCycleEnabled) {
+        cycleShardData = this.stateManager.shardValuesByCycle.get(queueEntry.txGroupCycle)
+      }
+      if (cycleShardData == null) {
+        throw new Error('factTellCorrespondingNodes: cycleShardData == null')
       }
       if (queueEntry.uniqueKeys == null) {
         throw new Error('factTellCorrespondingNodes: queueEntry.uniqueKeys == null')
       }
-      const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
+      const ourNodeData = cycleShardData.nodeShardData
       const dataKeysWeHave = []
       const dataValuesWeHave = []
       const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
@@ -4504,8 +4514,6 @@ class TransactionQueue {
         }
       }
 
-      if (logFlags.verbose) this.mainLogger.debug(`factTellCorrespondingNodes: correspondingIndices ${queueEntry.logID}`, ourIndexInTxGroup, correspondingIndices);
-
       const validCorrespondingIndices = []
       for (const targetIndex of correspondingIndices) {
         validCorrespondingIndices.push(targetIndex)
@@ -4529,7 +4537,7 @@ class TransactionQueue {
           targetHasOurData = true
           for (const wrappedResponse of signedPayload.stateList) {
             const accountId = wrappedResponse.accountId
-            const targetNodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(targetNode.id)
+            const targetNodeShardData = cycleShardData.nodeShardDataMap.get(targetNode.id)
             if (targetNodeShardData == null) {
               targetHasOurData = false
               break
@@ -4616,12 +4624,24 @@ class TransactionQueue {
 
   factValidateCorrespondingTellSender(queueEntry: QueueEntry, dataKey: string, senderNodeId: string): boolean {
     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`factValidateCorrespondingTellSender: txId: ${queueEntry.acceptedTx.txId} sender node id: ${senderNodeId}, receiver id: ${Self.id}`)
-    const receiverNode = this.stateManager.currentCycleShardData.nodeShardData
-    if (receiverNode == null) return false
+    let cycleShardData = this.stateManager.currentCycleShardData
+    if (Context.config.stateManager.deterministicTXCycleEnabled) {
+      cycleShardData = this.stateManager.shardValuesByCycle.get(queueEntry.txGroupCycle)
+    }
+    const receiverNodeShardData = cycleShardData.nodeShardData
+    if (receiverNodeShardData == null) {
+      this.mainLogger.error(`factValidateCorrespondingTellSender: logID: ${queueEntry.logID} receiverNodeShardData == null, txGroupCycle: ${queueEntry.txGroupCycle}}`)
+      nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellSender: receiverNodeShardData == null')
+      return false
+    }
 
-    const senderNode = this.stateManager.currentCycleShardData.nodeShardDataMap.get(senderNodeId)
-    if (senderNode === null) return false
-    const senderHasAddress = ShardFunctions.testAddressInRange(dataKey, senderNode.storedPartitions)
+    const senderNodeShardData = cycleShardData.nodeShardDataMap.get(senderNodeId)
+    if (senderNodeShardData === null) {
+      this.mainLogger.error(`factValidateCorrespondingTellSender: logID: ${queueEntry.logID} senderNodeShardData == null, txGroupCycle: ${queueEntry.txGroupCycle}}`)
+      nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellSender: senderNodeShardData == null')
+      return false
+    }
+    const senderHasAddress = ShardFunctions.testAddressInRange(dataKey, senderNodeShardData.storedPartitions)
 
     // check if it is a FACT sender
     const receivingNodeIndex = queueEntry.ourTXGroupIndex // we are the receiver
