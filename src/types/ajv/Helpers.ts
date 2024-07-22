@@ -36,6 +36,7 @@ import { initGetAccountDataWithQueueHintsResp } from './GetAccountDataWithQueueH
 import { initSpreadAppliedVoteHashReq } from './SpreadAppliedVoteHashReq'
 import { initGlobalAccountReportReq } from './GlobalAccountReportReq'
 import { initGlobalAccountReportResp } from './GlobalAccountReportResp'
+import { initSyncTrieHashesReq } from './SyncTrieHashesReq'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -73,6 +74,7 @@ export function initAjvSchemas(): void {
   initSpreadAppliedVoteHashReq()
   initGlobalAccountReportReq()
   initGlobalAccountReportResp()
+  initSyncTrieHashesReq()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {
