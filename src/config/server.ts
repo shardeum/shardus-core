@@ -344,7 +344,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     rejectSharedDataIfCovered: false,
     requestAwaitedDataAllowed: false, // this has been disabled by accident for a long time so leaving it off
     awaitingDataCanBailOnReceipt: true,
-    filterReceivingNodesForTXData: true, // factTellCorrespondingNodes
+    filterReceivingNodesForTXData: false, // factTellCorrespondingNodes
     correspondingTellUseUnwrapped: true,
     concatCorrespondingTellUseUnwrapped: false,
     deterministicTXCycleEnabled: true,
