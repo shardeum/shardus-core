@@ -2229,7 +2229,7 @@ class TransactionQueue {
             if (node.id === ourID) {
               txQueueEntry.ourExGroupIndex = idx
               /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: executor index ${txQueueEntry.ourExGroupIndex}:${(node as Shardus.NodeWithRank).rank}`)
-            }            
+            }
           }
           if (txQueueEntry.eligibleNodeIdsToConfirm.has(Self.id)) {
             /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455105 ${shardusGetTime()} tx:${txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: confirmator`)
@@ -4069,7 +4069,7 @@ class TransactionQueue {
             /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_state_nodes'}`)
           } else {
             /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_state_neighbour'}`)
-          }        
+          }
         }
       }
       this.p2p.tellBinary<BroadcastStateReq>(
@@ -4555,6 +4555,12 @@ class TransactionQueue {
           correspondingNodes.push(targetNode)
         }
       }
+      this.mainLogger.debug(`factTellCorrespondingNodes: correspondingIndices and nodes ${queueEntry.logID}`, ourIndexInTxGroup, correspondingIndices, correspondingNodes.map(n => n.id))
+      queueEntry.txDebug.correspondingDebugInfo = {
+        ourIndex: ourIndexInTxGroup,
+        correspondingIndices:  correspondingIndices,
+        correspondingNodeIds: correspondingNodes.map(n => n.id)
+      }
       if (correspondingNodes.length === 0) {
         nestedCountersInstance.countEvent('stateManager', 'factTellCorrespondingNodes: no corresponding nodes needed to send')
         return
@@ -4916,7 +4922,7 @@ class TransactionQueue {
             // convert legacy message to binary supported type
             const request = message as BroadcastFinalStateReq
             if (logFlags.seqdiagram) {
-              for (const node of filterdCorrespondingAccNodes) {                
+              for (const node of filterdCorrespondingAccNodes) {
                 /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_finalstate'}`)
               }
             }
@@ -5845,9 +5851,9 @@ class TransactionQueue {
             const timeSinceLastVoteMessage = queueEntry.lastVoteReceivedTimestamp > 0 ? currentTime - queueEntry.lastVoteReceivedTimestamp : 0
             // see if we have been consensing for more than a long time.
             // follow up code needs to handle this in a better way
-            // if there is a broken TX at the end of a chain. this will peel it off. 
-            // any freshly exposed TXs will have a fair amount of time to be in consensus so 
-            // this should minimize the risk of OOS. 
+            // if there is a broken TX at the end of a chain. this will peel it off.
+            // any freshly exposed TXs will have a fair amount of time to be in consensus so
+            // this should minimize the risk of OOS.
             if(timeSinceLastVoteMessage > configContext.stateManager.stuckTxRemoveTime2){
               nestedCountersInstance.countEvent('txSafelyRemoved', `tx waiting for votes more than ${configContext.stateManager.stuckTxRemoveTime2 / 1000} seconds. state: ${queueEntry.state}`)
               this.statemanager_fatal(`txSafelyRemoved`, `stuck in consensus. 2. waiting for votes. txid: ${shortID} state: ${queueEntry.state} age:${txAge} tx first vote seen ${timeSinceLastVoteMessage / 1000} seconds ago`)
@@ -5862,7 +5868,7 @@ class TransactionQueue {
               nestedCountersInstance.countEvent('txSafelyRemoved', `tx in consensus more than ${configContext.stateManager.stuckTxRemoveTime3 / 1000} seconds. state: ${queueEntry.state} has seen vote: ${anyVotes}`)
               this.statemanager_fatal(`txSafelyRemoved`, `stuck in consensus. 3. txid: ${shortID} state: ${queueEntry.state} age:${txAge}`)
               this.removeFromQueue(queueEntry, currentIndex)
-              continue           
+              continue
             }
           }
 
@@ -6177,24 +6183,24 @@ class TransactionQueue {
                 }
                 nestedCountersInstance.countEvent('processing', 'busy waiting the upstream tx.' +
                   ' but it is null')
-              } else {                
+              } else {
                 if (upstreamTx.logID === queueEntry.logID) {
                   /* prettier-ignore */ if (logFlags.seqdiagram && queueEntry?.upStreamBlocker !== upstreamTx.logID) {
                     queueEntry.upStreamBlocker = upstreamTx.logID
-                    this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: upstream:same`)                    
+                    this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: upstream:same`)
                   }
                   //not 100% confident that upstreamTX check works.
                   if(upstreamTx === queueEntry){
                     //this queue entry could be marked as seen due to aging above
-                    nestedCountersInstance.countEvent('processing', 'busy waiting but the upstream tx reference matches our queue entry') 
+                    nestedCountersInstance.countEvent('processing', 'busy waiting but the upstream tx reference matches our queue entry')
                   } else {
-                    nestedCountersInstance.countEvent('processing', 'busy waiting the upstream tx but it is same txId')                    
+                    nestedCountersInstance.countEvent('processing', 'busy waiting the upstream tx but it is same txId')
                   }
 
                 } else {
                   /* prettier-ignore */ if (logFlags.seqdiagram && queueEntry?.upStreamBlocker !== upstreamTx.logID) {
                     queueEntry.upStreamBlocker = upstreamTx.logID
-                    this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: upstream:${upstreamTx.logID}`)                    
+                    this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: upstream:${upstreamTx.logID}`)
                   }
                   nestedCountersInstance.countEvent('processing', `busy waiting the upstream tx to complete. state ${queueEntry.state}`)
                 }
@@ -6281,8 +6287,8 @@ class TransactionQueue {
               //   //TODO may need a flag that know if a TX was stuck until time m.. then let it not
               //   //ask for other accoun data right away...
 
-              //   //This counter seems wrong.  the processQueue_accountSeen is just detecting where we 
-              //   // called processQueue_markAccountsSeen before 
+              //   //This counter seems wrong.  the processQueue_accountSeen is just detecting where we
+              //   // called processQueue_markAccountsSeen before
               //   nestedCountersInstance.countEvent(`processing`, `awaiting data. stuck in line - but not really`)
               //   continue
               // }
@@ -6302,10 +6308,10 @@ class TransactionQueue {
 
               if(this.config.stateManager.requestAwaitedDataAllowed){
                 // Before we turn this back on we must set the correct conditions.
-                // our node may be unaware of how other nodes have upstream blocking TXs that 
+                // our node may be unaware of how other nodes have upstream blocking TXs that
                 // prevent them from sharing data.  The only safe way to know if we can ask for data
                 // is to know another node has voted but this has some issues as well
-              
+
                 // 7.  Manually request missing state
                 try {
                   nestedCountersInstance.countEvent('processing', 'data missing at t>M2. request data')
@@ -6927,12 +6933,12 @@ class TransactionQueue {
               } else if (queueEntry.ourVote && configContext.stateManager.stuckTxQueueFix) {
                 // allow node to request missing data if it has an own vote
                 // 20240709 this does not seem right.  We should not use our own vote to request missing data
-                // going to add counters to confirm 
+                // going to add counters to confirm
                 nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData used ourVote')
                 vote = queueEntry.ourVote
               }
               const accountsNotStored = new Set()
-              //if we got a vote above then build a list of accounts that we store but are missing in our 
+              //if we got a vote above then build a list of accounts that we store but are missing in our
               //collectedFinalData
               if (vote) {
                 let failed = false
@@ -7013,7 +7019,7 @@ class TransactionQueue {
 
                 // This is the case where awaiting final data has succeeded. Store the final data and remove TX from the queue
                 if (failed === false && incomplete === false) {
-                  
+
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_passed', `${shortID}`, `qId: ${queueEntry.entryID} skipped:${skipped}`)
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_passed : ${queueEntry.logID} skipped:${skipped}`)
 
@@ -7568,7 +7574,7 @@ class TransactionQueue {
         const randomExeNode = queueEntry.executionGroup[randomIndex]
         nodeToAsk = nodes.get(randomExeNode.id)
       }
-      
+
       if (!nodeToAsk) {
         if (logFlags.error)
           this.mainLogger.error('requestFinalData: could not find node from execution group')
@@ -7680,7 +7686,7 @@ class TransactionQueue {
       return false
     }
     for (const key of queueEntry.uniqueKeys) {
-      // eslint-disable-next-line security/detect-object-injection      
+      // eslint-disable-next-line security/detect-object-injection
       if (seenAccounts[key] != null) {
         return true
       }
@@ -8269,7 +8275,7 @@ getDebugStuckTxs(opts): unknown {
     'committing',
     'canceled',
   ]
-  
+
   const stateIndex = txStates.indexOf(opts.state);
   if (stateIndex === -1) {
     return `${opts.state} is not a valid tx state.`;
@@ -8439,8 +8445,10 @@ getDebugStuckTxs(opts): unknown {
     return {
       txId: queueEntry.acceptedTx.txId,
       logID: queueEntry.logID,
+      nodeId: Self.id,
       state: queueEntry.state,
       hasAll: queueEntry.hasAll,
+      hasShardInfo: queueEntry.hasShardInfo,
       isExecutionNode: queueEntry.isInExecutionHome,
       globalModification: queueEntry.globalModification,
       entryID: queueEntry.entryID,

@@ -1,5 +1,5 @@
 //get the target nodes for a given corresponding sender
-const verbose = false
+import { logFlags } from '../logger'
 
 //this only has to be computed once time no matter how many facts are being shared
 export function getCorrespondingNodes(
@@ -12,7 +12,7 @@ export function getCorrespondingNodes(
   transactionGroupSize: number,
   note =  ''
 ): number[] {
-  if (verbose) {
+  if (logFlags.verbose) {
     console.log(`getCorrespondingNodes ${note} ${ourIndex} ${startTargetIndex} ${endTargetIndex} ${globalOffset} ${receiverGroupSize} ${sendGroupSize} ${transactionGroupSize}`)
   }
   let wrappedIndex: number
@@ -86,8 +86,8 @@ export function getCorrespondingNodes(
       wrappedIndex = startTargetIndex + howFarPastUnWrapped
     }
   }
-  if (verbose) {
-    console.log(`destinationNodes ${destinationNodes}`)
+  if (logFlags.verbose) {
+    console.log(`note: ${note} destinationNodes ${destinationNodes}`)
   }
   return destinationNodes
 }
@@ -104,7 +104,7 @@ export function verifyCorrespondingSender(
   shouldUnwrapSender = false,
   note = ''
 ): boolean {
-  if (verbose) {
+  if (logFlags.verbose) {
     console.log(`verifyCorrespondingSender ${note} ${receivingNodeIndex} ${sendingNodeIndex} ${globalOffset} ${receiverGroupSize} ${sendGroupSize} ${receiverStartIndex} ${receiverEndIndex} ${transactionGroupSize}`)
   }
   //note, in the gather case, we need to check the address range of the sender node also, to prove
@@ -124,13 +124,13 @@ export function verifyCorrespondingSender(
   const targetIndex = ((unwrappedReceivingNodeIndex + globalOffset) % receiverGroupSize) % sendGroupSize
   const targetIndex2 = unwrappedSendingNodeIndex % sendGroupSize
   if (targetIndex === targetIndex2) {
-    if (verbose)
+    if (logFlags.verbose)
       console.log(
-        `verification passed ${targetIndex} === ${targetIndex2}  ${unwrappedSendingNodeIndex}->${receivingNodeIndex}`
+        `note: ${note} verification passed ${targetIndex} === ${targetIndex2}  ${unwrappedSendingNodeIndex}->${receivingNodeIndex}`
       )
     return true
   } else {
-    console.log(`X verification failed ${targetIndex} !== ${targetIndex2} sender: ${unwrappedSendingNodeIndex} receiver: ${receivingNodeIndex}`)
+    console.log(`note: ${note} X verification failed ${targetIndex} !== ${targetIndex2} sender: ${unwrappedSendingNodeIndex} receiver: ${receivingNodeIndex}`)
     return false
   }
 }

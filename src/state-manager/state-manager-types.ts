@@ -14,6 +14,11 @@ export type TxDebug = {
   endTime: { [key: string]: HRTime }
   startTimestamp: { [key: string]: number }
   endTimestamp: { [key: string]: number }
+  correspondingDebugInfo?: {
+    ourIndex: number
+    correspondingIndices:  number[]
+    correspondingNodeIds: string[]
+  }
 }
 
 export type QueueEntry = {
