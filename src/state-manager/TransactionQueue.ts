@@ -4491,9 +4491,14 @@ class TransactionQueue {
             queueEntry.transactionGroup.length,
             queueEntry.logID
           )
+          if (Context.config.stateManager.concatCorrespondingTellUseUnwrapped) {
           //add them
           correspondingIndices = correspondingIndices.concat(extraCorrespondingIndices)
-          //replace them 
+          } else {
+            // replace them
+            correspondingIndices = extraCorrespondingIndices
+          }
+          //replace them
           // possible optimization where we pick one or the other path based on our account index
           //correspondingIndices = extraCorrespondingIndices
         }
@@ -4978,7 +4983,7 @@ class TransactionQueue {
     const senderGroupSize = queueEntry.executionGroup.length
     const unwrappedIndex = queueEntry.isSenderWrappedTxGroup[Self.id]
 
-    const correspondingIndices = getCorrespondingNodes(
+    let correspondingIndices = getCorrespondingNodes(
       senderIndexInTxGroup,
       targetStartIndex,
       targetEndIndex,
@@ -5001,8 +5006,11 @@ class TransactionQueue {
           queueEntry.transactionGroup.length,
           queueEntry.logID
         )
-
-        correspondingIndices.concat(extraCorrespondingIndices)
+        if (Context.config.stateManager.concatCorrespondingTellUseUnwrapped) {
+          correspondingIndices.concat(extraCorrespondingIndices)
+        } else {
+          correspondingIndices = extraCorrespondingIndices
+        }
       }
     }
 
