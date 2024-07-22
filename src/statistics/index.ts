@@ -271,6 +271,17 @@ class Statistics extends EventEmitter {
     return ringHolder.ring.multiStats()
   }
 
+  getMax(name) {
+    const fifoHolder = this.fifoStats[name]
+    if (fifoHolder) {
+      return fifoHolder.max()
+    }
+    const ringHolder =
+      this.counters[name] || this.watchers[name] || this.timers[name] || this.manualStats[name]
+    if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
+    return ringHolder.ring.max()
+  }
+
   clearRing(name) {
     const ringHolder =
       this.counters[name] || this.watchers[name] || this.timers[name] || this.manualStats[name]
@@ -421,6 +432,19 @@ class Ring {
     return { min, max, avg, allVals, sum }
   }
 
+  max() {
+    let maxVal = Number.MIN_VALUE
+    for (const element of this.elements) {
+      if (_exists(element)) {
+        const val = Number(element)
+        if (val > maxVal) {
+          maxVal = val
+        }
+      }
+    }
+    return maxVal !== Number.MIN_VALUE ? maxVal : null
+  }
+
   previous() {
     const prevIndex = (this.index < 1 ? this.elements.length : this.index) - 1
     return this.elements[prevIndex] || 0
@@ -541,6 +565,19 @@ class FifoStats {
       }
     }
     return total > 0 ? sum / total : 0
+  }
+
+  max() {
+    let maxVal = Number.MIN_VALUE
+    for (const element of this.items) {
+      if (_exists(element)) {
+        const val = Number(element)
+        if (val > maxVal) {
+          maxVal = val
+        }
+      }
+    }
+    return maxVal !== Number.MIN_VALUE ? maxVal : null
   }
 
   multiStats() {

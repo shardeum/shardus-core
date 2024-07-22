@@ -310,6 +310,7 @@ class Reporter {
     const executeQueueLength = this.statistics.getPreviousElement('executeQueueLength')
     queueLength = executeQueueLength //debug hack until the monitor client can show this
     const txTimeInQueue = this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
+    const maxTxTimeInQueue = this.statistics.getMax('txTimeInQueue') / 1000
     const isNodeLost = this.checkIsNodeLost(Self.id)
     const isNodeRefuted = this.checkIsNodeRefuted(Self.id)
     const isDataSynced = !this.stateManager.accountPatcher.failedLastTrieSync
@@ -367,6 +368,7 @@ class Reporter {
         queueLength,
         executeQueueLength,
         txTimeInQueue,
+        maxTxTimeInQueue,
         rareCounters,
         txCoverage,
         isLost: isNodeLost,
@@ -376,7 +378,7 @@ class Reporter {
         archiverListHash,
         lastInSyncResult,
         cycleFinishedSyncing,
-        stillNeedsInitialPatchPostActive
+        stillNeedsInitialPatchPostActive,
       })
       if (this.stateManager != null && config.mode === 'debug' && !config.debug.disableTxCoverageReport) {
         this.stateManager.transactionQueue.resetTxCoverageMap()
