@@ -478,8 +478,6 @@ export function updateRecord(
         //todo remove this later after we feel good about the system.. it wont really be that rare, so we dont want to swamp rare counters
         /* prettier-ignore */ nestedCountersInstance.countRareEvent('lost', 'sync timeout ' + `${utils.stringifyReduce(syncingNode.id)} ${syncTime} > ${record.maxSyncTime}`)
         lostSyncingNodeIds.push(syncingNode.id)
-        NodeList.emitSyncTimeoutEvent(syncingNode, record)
-        if (config.p2p.removeLostSyncingNodeFromList) NodeList.removeSyncingNode(syncingNode.id)
       }
     }
   }
@@ -549,6 +547,17 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
       warn(`self-schedule refute currentC:${currentCycle} inCycle:${record.counter} refuteat:${sendRefute}`)
       /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-schedule refute currentC:${currentCycle} inCycle:${record.counter}`, 1)
     }
+  }
+
+  // If we see our node in the lostSyncing field of the cycle record, emit a sync timeout event
+  for (const id of record.lostSyncing) {
+    const node = NodeList.nodes.get(id)
+    if (node == null) {
+      error(`Lost syncing node ${id} is not in the network`)
+      continue
+    }
+    NodeList.emitSyncTimeoutEvent(node, record)
+    if (config.p2p.removeLostSyncingNodeFromList) NodeList.removeSyncingNode(id)
   }
 
   if (record.lostSyncing.includes(Self.id)) {
