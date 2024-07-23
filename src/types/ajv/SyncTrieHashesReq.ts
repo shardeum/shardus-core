@@ -1,7 +1,7 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
 import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
-const schemaBroadcastStateReq = {
+const schemaSyncTrieHashesReq = {
   type: 'object',
   properties: {
     cycle: { type: 'number' },
@@ -32,5 +32,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema(AJVSchemaEnum.SyncTrieHashesReq, schemaBroadcastStateReq)
+  addSchema(AJVSchemaEnum.SyncTrieHashesReq, schemaSyncTrieHashesReq)
 }

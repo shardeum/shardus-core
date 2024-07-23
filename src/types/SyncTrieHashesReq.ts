@@ -43,7 +43,7 @@ export function deserializeSyncTrieHashesReq(stream: VectorBufferStream): SyncTr
 
   const errors = verifyPayload(AJVSchemaEnum.SyncTrieHashesReq, { cycle, nodeHashes })
   if (errors && errors.length > 0) {
-    throw new Error(`AJV: SyncTrieHashesRequest validation failed : ${errors.join(', ')}`)
+    throw new Error('AJV: SyncTrieHashesRequest validation failed')
   }
 
   return {
