@@ -3,7 +3,7 @@ import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { verifyPayload } from './ajv/Helpers'
 import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
-export const cSyncTrieHashesReqVersion = 1
+const cSyncTrieHashesReqVersion = 1
 
 export type SyncTrieHashesRequest = {
   cycle: number
@@ -41,7 +41,7 @@ export function deserializeSyncTrieHashesReq(stream: VectorBufferStream): SyncTr
     nodeHashes.push({ radix, hash })
   }
 
-  const errors = verifyPayload(AJVSchemaEnum.SyncTrieHashesRequest, { cycle, nodeHashes })
+  const errors = verifyPayload(AJVSchemaEnum.SyncTrieHashesReq, { cycle, nodeHashes })
   if (errors && errors.length > 0) {
     throw new Error(`AJV: SyncTrieHashesRequest validation failed : ${errors.join(', ')}`)
   }

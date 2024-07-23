@@ -29,4 +29,5 @@ export enum AJVSchemaEnum {
   GlobalAccountReportReq = 'GlobalAccountReportReq',
   GlobalAccountReportResp = 'GlobalAccountReportResp',
   SyncTrieHashesRequest = 'SyncTrieHashesRequest',
+  SyncTrieHashesReq = 'SyncTrieHashesReq',
 }
