@@ -346,7 +346,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     awaitingDataCanBailOnReceipt: true,
     filterReceivingNodesForTXData: false, // factTellCorrespondingNodes
     correspondingTellUseUnwrapped: true,
-    concatCorrespondingTellUseUnwrapped: false,
+    concatCorrespondingTellUseUnwrapped: true,
     deterministicTXCycleEnabled: true,
     reduceTimeFromTxTimestamp: 60000,
     fallbackToCurrentCycleFortxGroup: false

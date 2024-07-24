@@ -4651,9 +4651,10 @@ class TransactionQueue {
 
     // check if it is a FACT sender
     const receivingNodeIndex = queueEntry.ourTXGroupIndex // we are the receiver
-    let senderNodeIndex = queueEntry.transactionGroup.findIndex((node) => node.id === senderNodeId)
+    const senderNodeIndex = queueEntry.transactionGroup.findIndex((node) => node.id === senderNodeId)
+    let wrappedSenderNodeIndex = null
     if (queueEntry.isSenderWrappedTxGroup[senderNodeId] != null) {
-      senderNodeIndex = queueEntry.isSenderWrappedTxGroup[senderNodeId]
+      wrappedSenderNodeIndex = queueEntry.isSenderWrappedTxGroup[senderNodeId]
     }
     const receiverGroupSize = queueEntry.executionNodeIdSorted.length
     const senderGroupSize = receiverGroupSize
@@ -4663,7 +4664,7 @@ class TransactionQueue {
 
     this.mainLogger.debug(`factValidateCorrespondingTellSender: txId: ${queueEntry.acceptedTx.txId} sender node id: ${senderNodeId}, receiver id: ${Self.id} senderHasAddress: ${senderHasAddress} receivingNodeIndex: ${receivingNodeIndex} senderNodeIndex: ${senderNodeIndex} receiverGroupSize: ${receiverGroupSize} senderGroupSize: ${senderGroupSize} targetIndices: ${utils.stringifyReduce(targetIndices)}`)
 
-    const isValidFactSender = verifyCorrespondingSender(
+    let isValidFactSender = verifyCorrespondingSender(
       receivingNodeIndex,
       senderNodeIndex,
       queueEntry.correspondingGlobalOffset,
@@ -4674,7 +4675,23 @@ class TransactionQueue {
       queueEntry.transactionGroup.length,
       false,
       queueEntry.logID
-    ) // it maybe a FACT sender but sender does not cover the account
+    )
+    if (isValidFactSender === false && wrappedSenderNodeIndex != null && wrappedSenderNodeIndex >= 0) {
+      // try again with wrapped sender index
+      isValidFactSender = verifyCorrespondingSender(
+        receivingNodeIndex,
+        wrappedSenderNodeIndex,
+        queueEntry.correspondingGlobalOffset,
+        receiverGroupSize,
+        senderGroupSize,
+        targetIndices.startIndex,
+        targetIndices.endIndex,
+        queueEntry.transactionGroup.length,
+        false,
+        queueEntry.logID
+      )
+    }
+    // it maybe a FACT sender but sender does not cover the account
     if (senderHasAddress === false) {
       this.mainLogger.error(
         `factValidateCorrespondingTellSender: logId: ${queueEntry.logID} sender does not have the address and is not a exe neighbour`
