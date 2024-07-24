@@ -1,26 +1,23 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
 import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
-const schemaApoptosisResp = {
+export const schemaGetAppliedVoteReq = {
   type: 'object',
   properties: {
-    s: { type: 'string' },
-    r: { type: 'number' },
+    txId: { type: 'string' },
   },
-  required: ['s', 'r'],
+  required: ['txId'],
 }
 
-export function initApoptosisProposalResp(): void {
+export function initGetAppliedVoteReq(): void {
   addSchemaDependencies()
   addSchemas()
 }
 
-// Function to add schema dependencies
 function addSchemaDependencies(): void {
   // No dependencies
 }
 
-// Function to register the schema
 function addSchemas(): void {
-  addSchema(AJVSchemaEnum.ApoptosisProposalResp, schemaApoptosisResp)
+  addSchema(AJVSchemaEnum.GetAppliedVoteReq, schemaGetAppliedVoteReq)
 }

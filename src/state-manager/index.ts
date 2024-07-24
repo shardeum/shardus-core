@@ -1571,6 +1571,29 @@ class StateManager {
             success: false,
           }
 
+          const txId = header.verification_data
+          let queueEntry = this.transactionQueue.getQueueEntrySafe(txId)
+          if (queueEntry == null) {
+            queueEntry = this.transactionQueue.getQueueEntryArchived(txId, route)
+          }
+          if (queueEntry == null) {
+            response.note = `failed to find queue entry: ${utils.stringifyReduce(txId)} dbg:${
+              this.debugTXHistory[utils.stringifyReduce(txId)]
+            }`
+            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', `${route} cant find queue entry`)
+            return respond(response, serializeRequestStateForTxPostResp)
+          }
+
+          if (queueEntry.hasValidFinalData === false) {
+            response.note = `has queue entry but not final data: ${utils.stringifyReduce(txId)} dbg:${
+              this.debugTXHistory[utils.stringifyReduce(txId)]
+            }`
+
+            if (logFlags.error && logFlags.verbose) this.mainLogger.error(response.note)
+            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', `${route} hasValidFinalData==false, tx state: ${queueEntry.state}`)
+            return respond(response, serializeRequestStateForTxPostResp)
+          }
+
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cRequestStateForTxPostReq)
           if (!requestStream) {
             errorHandler(RequestErrorEnum.InvalidRequest)
@@ -1579,29 +1602,6 @@ class StateManager {
 
           const req = deserializeRequestStateForTxPostReq(requestStream)
           // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
-          let queueEntry = this.transactionQueue.getQueueEntrySafe(req.txid)
-          if (queueEntry == null) {
-            queueEntry = this.transactionQueue.getQueueEntryArchived(req.txid, route)
-          }
-
-          if (queueEntry == null) {
-            response.note = `failed to find queue entry: ${utils.stringifyReduce(req.txid)} ${
-              req.timestamp
-            } dbg:${this.debugTXHistory[utils.stringifyReduce(req.txid)]}`
-            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', `${route} cant find queue entry`)
-            return respond(response, serializeRequestStateForTxPostResp)
-          }
-
-          if (queueEntry.hasValidFinalData === false) {
-            response.note = `has queue entry but not final data: ${utils.stringifyReduce(req.txid)} ${
-              req.timestamp
-            } dbg:${this.debugTXHistory[utils.stringifyReduce(req.txid)]}`
-
-            if (logFlags.error && logFlags.verbose) this.mainLogger.error(response.note)
-            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', `${route} hasValidFinalData==false, tx state: ${queueEntry.state}`)
-            return respond(response, serializeRequestStateForTxPostResp)
-          }
-
           let wrappedStates = this.useAccountWritesOnly ? {} : queueEntry.collectedData
           const applyResponse = queueEntry?.preApplyTXResult.applyResponse
           if (

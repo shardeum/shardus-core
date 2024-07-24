@@ -15,29 +15,6 @@ describe('ApoptosisProposalResp Serialization and Deserialization', () => {
   })
 
   describe('ApoptosisProposalResp Serialization', () => {
-    describe('Data validation Cases', () => {
-      const incompleteObjects = [
-        { description: "missing 's'", data: { r: 1234 } as ApoptosisProposalResp },
-        { description: "missing 'r'", data: { s: 'test' } as ApoptosisProposalResp },
-        {
-          description: "null value in a field' ",
-          data: { r: 12, s: 'null' } as ApoptosisProposalResp,
-        },
-      ]
-
-      test.each(incompleteObjects)(
-        'should throw error if field is improper during serialization',
-        ({ data }) => {
-          const dataClone = Utils.safeJsonParse(Utils.safeStringify(data))
-          if (dataClone.s === 'null') {
-            dataClone.s = null // we have added this for custom validation purposes
-          }
-          const stream = new VectorBufferStream(0)
-          expect(() => serializeApoptosisProposalResp(stream, dataClone)).toThrow('Data validation error')
-        }
-      )
-    })
-
     test('should serialize with root true', () => {
       const obj: ApoptosisProposalResp = { s: 'test', r: 1234 }
       const stream = new VectorBufferStream(0)

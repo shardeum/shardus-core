@@ -1,4 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { deserializeWrappedData, serializeWrappedData, WrappedData } from './WrappedData'
 
@@ -52,7 +54,8 @@ export const deserializeRequestStateForTxResp = (
   }
 
   for (let i = 0; i < stateListLen; i++) {
-    ret.stateList.push(deserializeWrappedData(stream))
+    // eslint-disable-next-line security/detect-object-injection
+    ret.stateList[i] = deserializeWrappedData(stream)
   }
 
   const beforeHashesLen = stream.readUInt16()
@@ -64,5 +67,12 @@ export const deserializeRequestStateForTxResp = (
   }
   ret.note = stream.readString()
   ret.success = stream.readUInt8() !== 0
+
+  console.log('ret', ret)
+  const errors = verifyPayload(AJVSchemaEnum.RequestStateForTxResp, ret)
+  if (errors && errors.length > 0) {
+    throw new Error(`AJV: validation error -> ${errors.join(', ')}`)
+  }
+
   return ret
 }

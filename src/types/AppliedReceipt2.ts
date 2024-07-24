@@ -5,22 +5,18 @@ import {
   deserializeConfirmOrChallengeMessage,
   serializeConfirmOrChallengeMessage,
 } from './ConfirmOrChallengeMessage'
-import { SignSerializable, deserializeSign, serializeSign } from './Sign'
+import { deserializeSign, serializeSign, SignSerializable } from './Sign'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
-import {Utils} from '@shardus/types'
 
 export const cAppliedReceipt2Version = 1
 
 export type AppliedReceipt2Serializable = {
   txid: string
   result: boolean
-  //single copy of vote
-  appliedVote: AppliedVoteSerializable
+  appliedVote: AppliedVoteSerializable //single copy of vote
   confirmOrChallenge?: ConfirmOrChallengeMessageSerializable
-  //all signatures for this vote
-  signatures: SignSerializable[] //Could have all signatures or best N.  (lowest signature value?)
-  // hash of app data
-  app_data_hash: string
+  signatures: SignSerializable[] //all signatures for this vote, Could have all signatures or best N.  (lowest signature value?)
+  app_data_hash: string // hash of app data
 }
 
 export function serializeAppliedReceipt2(
@@ -45,7 +41,7 @@ export function serializeAppliedReceipt2(
 
   stream.writeUInt16(obj.signatures.length)
 
-  for(let i = 0; i < obj.signatures.length; i++) {
+  for (let i = 0; i < obj.signatures.length; i++) {
     serializeSign(stream, obj.signatures[i])
   }
 
