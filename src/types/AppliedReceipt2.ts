@@ -1,8 +1,11 @@
-import { Utils } from '@shardus/types'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
-import { AppliedVoteSerializable } from './AppliedVote'
-import { ConfirmOrChallengeMessageSerializable } from './ConfirmOrChallengeMessage'
-import { SignSerializable } from './Sign'
+import { AppliedVoteSerializable, deserializeAppliedVote, serializeAppliedVote } from './AppliedVote'
+import {
+  ConfirmOrChallengeMessageSerializable,
+  deserializeConfirmOrChallengeMessage,
+  serializeConfirmOrChallengeMessage,
+} from './ConfirmOrChallengeMessage'
+import { deserializeSign, serializeSign, SignSerializable } from './Sign'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export const cAppliedReceipt2Version = 1
@@ -38,7 +41,7 @@ export function serializeAppliedReceipt2(
 
   stream.writeUInt16(obj.signatures.length)
 
-  for(let i = 0; i < obj.signatures.length; i++) {
+  for (let i = 0; i < obj.signatures.length; i++) {
     serializeSign(stream, obj.signatures[i])
   }
 
