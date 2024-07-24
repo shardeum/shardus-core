@@ -16,9 +16,22 @@ export type TxDebug = {
   endTimestamp: { [key: string]: number }
   correspondingDebugInfo?: {
     ourIndex: number
+    ourUnwrappedIndex: number
+    callParams: {
+        oi: number
+        st: number
+        et: number
+        gl: number
+        tg: number
+        sg: number
+        tn: number
+    }
+    localKeys: {[x:string]: boolean }
+    oldCorrespondingIndices: number[]
     correspondingIndices:  number[]
     correspondingNodeIds: string[]
   }
+
 }
 
 export type QueueEntry = {
