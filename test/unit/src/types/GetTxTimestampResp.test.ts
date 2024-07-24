@@ -247,6 +247,8 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
       stream.writeString('456')
       stream.writeUInt32(789)
       stream.writeBigUInt64(BigInt(101112))
+      stream.writeUInt8(0) // sign not present
+      stream.writeUInt8(0) // isResponse not present
       stream.position = 0 // Reset position for reading
 
       expect(() => deserializeGetTxTimestampResp(stream)).toThrow(
@@ -261,6 +263,8 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
       stream.writeString('')
       stream.writeUInt32(1234)
       stream.writeBigUInt64(BigInt(5678))
+      stream.writeUInt8(0) // sign not present
+      stream.writeUInt8(0) // isResponse not present
       stream.position = 0 // Reset position for reading
 
       const obj = deserializeGetTxTimestampResp(stream)
@@ -295,6 +299,8 @@ describe('getTxTimestampResp Serialization and Deserialization', () => {
       stream.writeString('marker')
       stream.writeUInt32(2147483647)
       stream.writeBigUInt64(BigInt(123456789012345))
+      stream.writeUInt8(0) // sign not present
+      stream.writeUInt8(0) // isResponse not present
       stream.position = 0 // Reset position for reading
 
       const obj = deserializeGetTxTimestampResp(stream)

@@ -4,33 +4,12 @@ import {
   deserializeApoptosisProposalReq,
   serializeApoptosisProposalReq,
 } from '../../../../src/types/ApoptosisProposalReq'
+import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
 import { Utils } from '@shardus/types'
 
 describe('ApoptosisProposalReq Serialization', () => {
-  describe('Data validation Cases', () => {
-    const incompleteObjects = [
-      { description: "missing 'id'", data: { when: 1234 } as ApoptosisProposalReq },
-      { description: "missing 'when'", data: { id: 'test' } as ApoptosisProposalReq },
-      {
-        description: "null value in a field' ",
-        data: { when: 12, id: 'null' } as ApoptosisProposalReq, // cannot assign directly to a variable
-      },
-    ]
-
-    test.each(incompleteObjects)(
-      'should throw error if field is improper during serialization',
-      ({ data }) => {
-        const dataClone = Utils.safeJsonParse(Utils.safeStringify(data))
-        if (dataClone.id === 'null') {
-          dataClone.id = null // we have added this for custom validation purposes
-        }
-        const stream = new VectorBufferStream(0)
-        expect(() => serializeApoptosisProposalReq(stream, dataClone)).toThrow('invalid obj')
-      }
-    )
-  })
   test('should serialize with root true', () => {
     const obj: ApoptosisProposalReq = { id: 'test', when: 1234 }
     const stream = new VectorBufferStream(0)
@@ -86,6 +65,10 @@ describe('ApoptosisProposalReq Serialization', () => {
 })
 
 describe('ApoptosisProposalReq Deserialization', () => {
+  beforeAll(() => {
+    initAjvSchemas()
+  })
+
   test('should deserialize successfully', () => {
     const stream = new VectorBufferStream(0)
     stream.writeUInt8(cApoptosisProposalReqVersion)

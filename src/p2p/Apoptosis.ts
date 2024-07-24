@@ -48,6 +48,9 @@ import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
 import { SQLDataTypes } from '../storage/utils/schemaDefintions'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { Utils } from '@shardus/types'
+import { BadRequest, serializeResponseError } from '../types/ResponseError'
+import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
+import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
 
 
 /** STATE */
@@ -96,17 +99,23 @@ const failExternalRoute: P2P.P2PTypes.Route<Handler> = {
 const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
   name: InternalRouteEnum.apoptosize,
   handler: (payload, response, header, sign) => {
-    profilerInstance.scopedProfileSectionStart('apoptosize')
+    const route = InternalRouteEnum.apoptosize
+    nestedCountersInstance.countEvent('internal', route)
+    profilerInstance.scopedProfileSectionStart(route)
+    const errorHandler = (
+      errorType: RequestErrorEnum,
+      opts?: { customErrorLog?: string; customCounterSuffix?: string }
+    ): void => requestErrorHandler(route, errorType, header, opts)
+
     try {
-      const requestStream = VectorBufferStream.fromBuffer(payload)
-      const requestType = requestStream.readUInt16()
-      if (requestType !== TypeIdentifierEnum.cApoptosisProposalReq) {
-        /* prettier-ignore */ if (logFlags.error) warn(`apoptosisInternalRoute: bad requestType: ${requestType}`)
-        let resp: ApoptosisProposalResp = { s: 'bad request', r: 1 }
-        response(resp, serializeApoptosisProposalResp)
-        return
+      const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cApoptosisProposalReq)
+      if (!requestStream) {
+        errorHandler(RequestErrorEnum.InvalidRequest)
+        return response(BadRequest('Invalid apoptosisInternalRoute request stream'), serializeResponseError)
       }
+
       const req = deserializeApoptosisProposalReq(requestStream)
+
       const apopProposal: P2P.ApoptosisTypes.SignedApoptosisProposal = {
         id: req.id,
         when: req.when,
@@ -125,15 +134,13 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> 
 
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `self-isDownCheck c:${currentCycle} ${down_msg}`, 1)
         let resp: ApoptosisProposalResp = { s: down_msg, r: 1 }
-        response(resp, serializeApoptosisProposalResp)
-        return
+        return response(resp, serializeApoptosisProposalResp)
       }
 
       const when = apopProposal.when
       if (when > currentCycle + 1 || when < currentCycle - 1) {
         let resp: ApoptosisProposalResp = { s: 'fail', r: 2 }
-        response(resp, serializeApoptosisProposalResp)
-        return
+        return response(resp, serializeApoptosisProposalResp)
       }
       //  check that the node which sent this is the same as the node that signed it, otherwise this is not original message so ignore it
       if (header.sender_id === apopProposal.id) {
@@ -147,19 +154,16 @@ const apoptosisInternalRoute: P2P.P2PTypes.Route<InternalBinaryHandler<Buffer>> 
             Comms.sendGossip(gossipRouteName, apopProposal)
           }
           let resp: ApoptosisProposalResp = { s: 'pass', r: 1 }
-          response(resp, serializeApoptosisProposalResp)
-          return
+          return response(resp, serializeApoptosisProposalResp)
         } else {
           /* prettier-ignore */ if (logFlags.error) warn(`addProposal failed for payload: ${Utils.safeStringify(apopProposal)}`)
           let resp: ApoptosisProposalResp = { s: 'fail', r: 4 }
-          response(resp, serializeApoptosisProposalResp)
-          return
+          return response(resp, serializeApoptosisProposalResp)
         }
       } else {
         /* prettier-ignore */ if (logFlags.error) warn(`sender is not apop node: sender:${header.sender_id} apop:${apopProposal.id}`)
         let resp: ApoptosisProposalResp = { s: 'fail', r: 3 }
-        response(resp, serializeApoptosisProposalResp)
-        return
+        return response(resp, serializeApoptosisProposalResp)
       }
     } finally {
       profilerInstance.scopedProfileSectionEnd('apoptosize')

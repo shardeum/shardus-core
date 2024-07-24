@@ -1,7 +1,9 @@
 import { Utils } from '@shardus/types'
 import { AppliedReceipt2 } from '../state-manager/state-manager-types'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { verifyPayload } from './ajv/Helpers'
 
 export type RequestReceiptForTxRespSerialized = {
   receipt: AppliedReceipt2 | null
@@ -43,8 +45,13 @@ export function deserializeRequestReceiptForTxResp(
     const success = stream.readUInt8() === 1
     return { receipt: null, note, success }
   }
-  const receipt = Utils.safeJsonParse(stream.readString()) as AppliedReceipt2
+  const receipt_str = stream.readString()
+  const receipt = Utils.safeJsonParse(receipt_str) as AppliedReceipt2
   const note = stream.readString()
   const success = stream.readUInt8() === 1
+  const errors = verifyPayload(AJVSchemaEnum.RequestReceiptForTxResp, { receipt, note, success })
+  if (errors && errors.length > 0) {
+    throw new Error(`AJV: validation error -> ${errors.join(', ')}`)
+  }
   return { receipt, note, success }
 }

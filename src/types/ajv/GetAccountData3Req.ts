@@ -1,4 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
 const schemaGetAccountData3Req = {
   type: 'object',
@@ -25,5 +26,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('GetAccountData3Req', schemaGetAccountData3Req)
+  addSchema(AJVSchemaEnum.GetAccountDataReq, schemaGetAccountData3Req)
 }

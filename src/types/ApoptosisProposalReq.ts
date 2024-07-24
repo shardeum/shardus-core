@@ -1,4 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export const cApoptosisProposalReqVersion = 1
@@ -13,10 +15,6 @@ export function serializeApoptosisProposalReq(
   obj: ApoptosisProposalReq,
   root = false
 ): void {
-  if (stream == null) throw new Error('invalid stream')
-  if (obj == null) throw new Error('invalid obj')
-  if (obj.id === null || obj.id === undefined) throw new Error('invalid obj.id')
-  if (obj.when === null || obj.when === undefined) throw new Error('invalid obj.when')
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cApoptosisProposalReq)
   }
@@ -36,6 +34,10 @@ export function deserializeApoptosisProposalReq(stream: VectorBufferStream): Apo
   const obj: ApoptosisProposalReq = {
     id,
     when,
+  }
+  const errors = verifyPayload(AJVSchemaEnum.ApoptosisProposalReq, obj)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
   }
 
   return obj
