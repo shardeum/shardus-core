@@ -1,5 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export const cApoptosisProposalRespVersion = 1
@@ -14,10 +15,6 @@ export function serializeApoptosisProposalResp(
   obj: ApoptosisProposalResp,
   root = false
 ): void {
-  const errors = verifyPayload('ApoptosisProposalResp', obj)
-  if (errors && errors.length > 0) {
-    throw new Error('Data validation error')
-  }
   if (root) {
     stream.writeUInt16(TypeIdentifierEnum.cApoptosisProposalResp)
   }
@@ -38,7 +35,7 @@ export function deserializeApoptosisProposalResp(stream: VectorBufferStream): Ap
     s,
     r,
   }
-  const errors = verifyPayload('ApoptosisProposalResp', obj)
+  const errors = verifyPayload(AJVSchemaEnum.ApoptosisProposalResp, obj)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }

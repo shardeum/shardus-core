@@ -97,7 +97,7 @@ import {
   serializeRequestReceiptForTxReq,
 } from '../types/RequestReceiptForTxReq'
 import { isNodeInRotationBounds } from '../p2p/Utils'
-import { ResponseError } from '../types/ResponseError'
+import { BadRequest, ResponseError, serializeResponseError } from '../types/ResponseError'
 import { error } from 'console'
 import { PoqoDataAndReceiptReq, serializePoqoDataAndReceiptReq } from '../types/PoqoDataAndReceiptReq'
 
@@ -404,7 +404,6 @@ class TransactionQueue {
           if (!requestStream) {
             return errorHandler(RequestErrorEnum.InvalidRequest)
           }
-
           // verification data checks
           if (header.verification_data == null) {
             return errorHandler(RequestErrorEnum.MissingVerificationData)

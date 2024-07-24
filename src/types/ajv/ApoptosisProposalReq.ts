@@ -1,16 +1,16 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
 import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
-const schemaApoptosisResp = {
+const schemaApoptosisReq = {
   type: 'object',
   properties: {
-    s: { type: 'string' },
-    r: { type: 'number' },
+    id: { type: 'string' },
+    when: { type: 'number' },
   },
-  required: ['s', 'r'],
+  required: ['id', 'when'],
 }
 
-export function initApoptosisProposalResp(): void {
+export function initApoptosisProposalReq(): void {
   addSchemaDependencies()
   addSchemas()
 }
@@ -22,5 +22,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema(AJVSchemaEnum.ApoptosisProposalResp, schemaApoptosisResp)
+  addSchema(AJVSchemaEnum.ApoptosisProposalReq, schemaApoptosisReq)
 }

@@ -3,7 +3,8 @@ import { getVerifyFunction } from '../../utils/serialization/SchemaHelpers'
 import { initGetAccountData3Req } from './GetAccountData3Req'
 import { initCompareCertReq } from './CompareCert'
 import { initSpreadTxToGroupSyncingReq } from './SpreadTxToGroupSyncingReq'
-import { initApoptosisProposal } from './ApoptosisProposalResp'
+import { initApoptosisProposalReq } from './ApoptosisProposalReq'
+import { initApoptosisProposalResp } from './ApoptosisProposalResp'
 import { initGetTxTimestampReq } from './GetTxTimestampReq'
 import { initGetTxTimestampResp } from './GetTxTimestampResp'
 import { initGetAccountDataByListResp } from './GetAccountDataByListResp'
@@ -12,13 +13,26 @@ import { initGetAccountDataByHashesReq } from './GetAccountDataByHashesReq'
 import { initGetAccountDataByHashesResp } from './GetAccountDataByHashesResp'
 import { initWrappedData } from './WrappedData'
 import { Utils } from '@shardus/types'
-import { initRepairMissingAccountsReq } from './RepairMissingAccountsReq'
+import { initRepairOOSAccountReq } from './RepairOOSAccountsReq'
+import { initRequestStateForTxReq } from './RequestStateForTxReq'
+import { initRequestStateForTxResp } from './RequestStateForTxResp'
+import { initGetAppliedVoteReq } from './GetAppliedVoteReq'
+import { initGetAppliedVoteResp } from './GetAppliedVoteResp'
+import { initLostReportReq } from './LostReportReq'
+import { initRequestReceiptForTxReq } from './RequestReceiptForTxReq'
+import { initRequestReceiptForTxResp } from './RequestReceiptForTxResp'
+import { initRequestStateForTxPostReq } from './RequestStateForTxPostReq'
+import { initRequestStateForTxPostResp } from './RequestStateForTxPostResp'
+import { initWrappedDataResponse } from './WrappedDataResponse'
+import { initBroadcastStateReq } from './BroadcastStateReq'
+import { initGetAccountDataRespSerializable } from './GetAccountDataResp'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
   initCompareCertReq()
   initSpreadTxToGroupSyncingReq()
-  initApoptosisProposal()
+  initApoptosisProposalReq()
+  initApoptosisProposalResp()
   initGetTxTimestampReq()
   initGetTxTimestampResp()
   initWrappedData()
@@ -26,7 +40,19 @@ export function initAjvSchemas(): void {
   initGetAccountDataByListResp()
   initGetAccountDataByHashesReq()
   initGetAccountDataByHashesResp()
-  initRepairMissingAccountsReq()
+  initRepairOOSAccountReq()
+  initRequestStateForTxReq()
+  initRequestStateForTxResp()
+  initRequestReceiptForTxReq()
+  initRequestReceiptForTxResp()
+  initGetAppliedVoteReq()
+  initGetAppliedVoteResp()
+  initLostReportReq()
+  initRequestStateForTxPostReq()
+  initRequestStateForTxPostResp()
+  initWrappedDataResponse()
+  initBroadcastStateReq()
+  initGetAccountDataRespSerializable()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {

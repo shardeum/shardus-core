@@ -582,7 +582,9 @@ class TransactionRepair {
                     request,
                     serializeRequestStateForTxPostReq,
                     deserializeRequestStateForTxPostResp,
-                    {}
+                    {
+                      verification_data: request.txid,
+                    }
                   )
                 } else {
                   result = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.

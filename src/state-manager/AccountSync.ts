@@ -55,6 +55,7 @@ import {
 } from '../types/GlobalAccountReportResp'
 import { BadRequest, InternalError, serializeResponseError } from '../types/ResponseError'
 import { Utils } from '@shardus/types'
+import { AJVSchemaEnum } from '../types/enum/AJVSchemaEnum'
 
 const REDUNDANCY = 3
 
@@ -282,7 +283,7 @@ class AccountSync {
         this.profiler.scopedProfileSectionStart('get_account_data3', false, msgSize)
         const result = {} as { data: GetAccountDataByRangeSmart; errors?: string[] } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
 
-        const errors = verifyPayload('GetAccountData3Req', payload)
+        const errors = verifyPayload(AJVSchemaEnum.GetAccountDataReq, payload)
         if (errors && errors.length > 0) {
           this.mainLogger.error(`get_account_data3: request validation errors: ${errors}`)
           result.errors = errors
@@ -341,7 +342,7 @@ class AccountSync {
           }
           const readableReq = deserializeGetAccountDataReq(reqStream)
 
-          // validate the request
+          // validate the addres range for shardus addresses
           const valid = verifyGetAccountDataReq(readableReq)
           if (valid === false) {
             nestedCountersInstance.countEvent('internal', `${route}-invalid_account_ids`)

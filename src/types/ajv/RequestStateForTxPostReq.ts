@@ -1,16 +1,18 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
 import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
-const schemaApoptosisResp = {
+const schemaRequestStateForTxPostReq = {
   type: 'object',
   properties: {
-    s: { type: 'string' },
-    r: { type: 'number' },
+    txid: { type: 'string' },
+    timestamp: { type: 'number' },
+    key: { type: 'string' },
+    hash: { type: 'string' },
   },
-  required: ['s', 'r'],
+  required: ['txid', 'timestamp', 'key', 'hash'],
 }
 
-export function initApoptosisProposalResp(): void {
+export function initRequestStateForTxPostReq(): void {
   addSchemaDependencies()
   addSchemas()
 }
@@ -22,5 +24,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema(AJVSchemaEnum.ApoptosisProposalResp, schemaApoptosisResp)
+  addSchema(AJVSchemaEnum.RequestStateForTxPostReq, schemaRequestStateForTxPostReq)
 }
