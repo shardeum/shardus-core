@@ -25,4 +25,5 @@ export enum AJVSchemaEnum {
   WrappedDataFromQueueSerializable = 'WrappedDataFromQueueSerializable',
   GetAccountDataWithQueueHintsReq = 'GetAccountDataWithQueueHintsReq',
   GetAccountDataWithQueueHintsResp = 'GetAccountDataWithQueueHintsResp',
+  SpreadAppliedVoteHashReq = 'SpreadAppliedVoteHashReq',
 }
