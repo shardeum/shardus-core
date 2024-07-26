@@ -8507,6 +8507,7 @@ getDebugStuckTxs(opts): unknown {
       ourVote: queueEntry.ourVote || null,
       receipt2: this.stateManager.getReceipt2(queueEntry) || null,
       uniqueChallenges: queueEntry.uniqueChallengesCount,
+      collectedVoteCount: queueEntry.collectedVoteHashes.length
     }
   }
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
