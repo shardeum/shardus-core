@@ -60,6 +60,7 @@ const cycles = [
     standbyRefresh: { type: SQLDataTypes.TEXT, allowNull: false },
     ...P2PApoptosis.sequelizeCycleFieldModel,
     random: { type: SQLDataTypes.INTEGER, allowNull: false },
+    serviceQueue: { type: SQLDataTypes.JSON, allowNull: false },
   },
 ]
 
