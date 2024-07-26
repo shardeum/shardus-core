@@ -26,4 +26,6 @@ export enum AJVSchemaEnum {
   GetAccountDataWithQueueHintsReq = 'GetAccountDataWithQueueHintsReq',
   GetAccountDataWithQueueHintsResp = 'GetAccountDataWithQueueHintsResp',
   SpreadAppliedVoteHashReq = 'SpreadAppliedVoteHashReq',
+  GlobalAccountReportReq = 'GlobalAccountReportReq',
+  GlobalAccountReportResp = 'GlobalAccountReportResp',
 }
