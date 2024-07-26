@@ -7575,7 +7575,7 @@ class TransactionQueue {
     }
 
     let isAccountsMatchWithReceipt2 = true
-    let accountWrites = queueEntry.preApplyTXResult?.applyResponse?.accountWrites
+    const accountWrites = queueEntry.preApplyTXResult?.applyResponse?.accountWrites
 
     if (accountWrites != null && accountWrites.length === receipt2.appliedVote.account_id.length) {
       for (const account of accountWrites) {
@@ -7598,12 +7598,13 @@ class TransactionQueue {
       // request the final accounts and appReceiptData
       let success = false
       let count = 0
-      let maxRetry = 3
+      const maxRetry = 3
+      const nodesToAskKeys = receipt2.signatures?.map((signature) => signature.owner)
 
       // retry 3 times if the request fails
       while (success === false && count < maxRetry) {
         count++
-        const requestedData = await this.requestFinalData(queueEntry, receipt2.appliedVote.account_id, true)
+        const requestedData = await this.requestFinalData(queueEntry, receipt2.appliedVote.account_id, nodesToAskKeys, true)
         if (requestedData && requestedData.wrappedResponses && requestedData.appReceiptData) {
           success = true
           for (const accountId in requestedData.wrappedResponses) {
@@ -7692,7 +7693,7 @@ class TransactionQueue {
   }
 
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-  async requestFinalData(queueEntry: QueueEntry, accountIds: string[], nodesToAskKeys: string[] | null = null) {
+  async requestFinalData(queueEntry: QueueEntry, accountIds: string[], nodesToAskKeys: string[] | null = null, includeAppReceiptData = false) {
     profilerInstance.profileSectionStart('requestFinalData')
     this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} accountIds: ${utils.stringifyReduce(accountIds)}`);
     const message = { txid: queueEntry.acceptedTx.txId, accountIds, includeAppReceiptData }
