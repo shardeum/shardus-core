@@ -2266,8 +2266,22 @@ class TransactionConsenus {
             Comms.tell(votingGroup, 'poqo-send-receipt', payload)
           }
 
-          // Corresponding tell of receipt+data to entire transaction group
-          this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
+          // we are checking this here, because factTellCorrespondingNodesFinalData will throw and eror if we have no
+          // preApplyTXResult.   The issue is that we may have a TX that has consensed on the idea that we should not apply a change
+          // it is still important to gossip this receipt so and move forward so we can remove it from the queue.
+          // This means we dont want to panic on a missing preApplyTXResult
+          if (queueEntry.preApplyTXResult != null) {
+            // Corresponding tell of receipt+data to entire transaction group
+            this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
+          } else {
+            // however if we have a missing preApplyTXResult but the result is false we should log a count 
+            // as this may be an error condition to look out for
+            if(appliedReceipt2.result === true){
+              // if we have a receipt with a positive result we should not have a null preApplyTXResult
+              nestedCountersInstance.countEvent('poqo', 'error: unexpected preApplyTXResult == null while result === true ')
+              if (logFlags.error) this.mainLogger.error(`error: unexpected preApplyTXResult == null while result === true ${queueEntry.logID}`)
+            }
+          }
           // Kick off receipt-gossip
           queueEntry.hasSentFinalReceipt = true
           Comms.sendGossip(
