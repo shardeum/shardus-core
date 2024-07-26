@@ -7590,10 +7590,6 @@ class TransactionQueue {
       isAccountsMatchWithReceipt2 = false
     }
 
-    if (Math.random() < 0.2) {
-      isAccountsMatchWithReceipt2 = false
-    }
-
     let finalAccounts = []
     let appReceiptData = queueEntry.preApplyTXResult?.applyResponse?.appReceiptData || null
     if (isAccountsMatchWithReceipt2) {
