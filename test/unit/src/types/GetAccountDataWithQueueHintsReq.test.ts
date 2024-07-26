@@ -5,10 +5,15 @@ import {
   deserializeGetAccountDataWithQueueHintsReq,
 } from '../../../../src/types/GetAccountDataWithQueueHintsReq'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
+import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
 
 const cGetAccountDataWithQueueHintsReqVersion = 1 // taken from GetAccountDataWithQueueHintsReq
 
 describe('GetAccountDataWithQueueHintsReq Serialization and Deserialization', () => {
+  beforeAll(() => {
+    initAjvSchemas()
+  })
+
   describe('Serialization', () => {
     test('should serialize data with root true', () => {
       const obj: GetAccountDataWithQueueHintsReqSerializable = {
