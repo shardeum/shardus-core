@@ -1090,6 +1090,7 @@ export function getThisNodeInfo(): P2P.P2PTypes.P2PNode {
   const address = publicKey
   const joinRequestTimestamp = utils.getTime('s')
   const activeTimestamp = 0
+  const activeCycle = 0
   const syncingTimestamp = 0
   const readyTimestamp = 0
   const nodeInfo = {
@@ -1101,6 +1102,7 @@ export function getThisNodeInfo(): P2P.P2PTypes.P2PNode {
     address,
     joinRequestTimestamp,
     activeTimestamp,
+    activeCycle,
     syncingTimestamp,
     readyTimestamp,
   }

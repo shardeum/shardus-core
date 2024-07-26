@@ -4,7 +4,7 @@ import { nodes } from "./NodeList";
 import { P2P } from '@shardus/types'
 
 let p2pLogger: Logger
-const queue: P2P.ServiceQueueTypes.ServiceEntry[] = []
+let queue: P2P.ServiceQueueTypes.ServiceEntry[] = []
 
 export function init(): void {
   p2pLogger = logger.getLogger('p2p')
@@ -15,7 +15,7 @@ export function reset(): void {}
 export function sendRequests(): void {}
 
 export function getTxs(): any {
-  return queue
+  return
 }
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
@@ -27,22 +27,28 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 }
 
 export function updateRecord(
-  txs: P2P.LostTypes.Txs,
+  txs: P2P.ServiceQueueTypes.Txs,
   record: P2P.CycleCreatorTypes.CycleRecord,
   prev: P2P.CycleCreatorTypes.CycleRecord
 ): void {
-
-  const removedId = record.removed
-  for (const id in removedId) {
+  console.log('updateRecord')
+  console.log('queue', queue)
+  console.log('record queue', record.serviceQueue)
+  queue = prev?.serviceQueue || []
+  const removedId = [...record.removed, ...record.appRemoved, ...record.apoptosized]
+  for (const id of removedId) {
     const node = nodes.get(id)
+    console.log('removing', node.publicKey)
     queue.push({
       publicKey: node.publicKey,
-      startCycle: node.activeTimestamp,
-      endCycle: Number(record.counter),
-      rewardRate: 0
+      startCycle: node.activeCycle,
+      endCycle: record.counter,
+      rewardRate: 0,
     })
   }
   record.serviceQueue = queue
+  console.log('record queue', record.serviceQueue)
+  console.log('queue', queue)
 }
 
 export function validateRecordTypes(): string {

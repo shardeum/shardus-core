@@ -261,6 +261,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   const updated = record.activated.map((id) => ({
     id,
     activeTimestamp: record.start,
+    activeCycle: record.counter,
     status: P2P.P2PTypes.NodeStatus.ACTIVE,
   }))
 
