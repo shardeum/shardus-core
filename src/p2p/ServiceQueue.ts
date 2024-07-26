@@ -1,16 +1,10 @@
 import { Logger } from 'log4js'
 import { logger } from './Context'
-import { byPubKey } from './NodeList'
+import { nodes } from "./NodeList";
 import { P2P } from '@shardus/types'
 
-interface ServiceEntry {
-  id: string
-  start: number
-  end: number
-}
-
 let p2pLogger: Logger
-const queue: ServiceEntry[] = []
+const queue: P2P.ServiceQueueTypes.ServiceEntry[] = []
 
 export function init(): void {
   p2pLogger = logger.getLogger('p2p')
@@ -34,16 +28,18 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
 export function updateRecord(
   txs: P2P.LostTypes.Txs,
-  record: P2P.CycleCreatorTypes.CycleRecord & { serviceQueue: any[] },
+  record: P2P.CycleCreatorTypes.CycleRecord,
   prev: P2P.CycleCreatorTypes.CycleRecord
 ): void {
+
   const removedId = record.removed
   for (const id in removedId) {
-    const node = byPubKey.get(id)
+    const node = nodes.get(id)
     queue.push({
-      id,
-      start: node.activeTimestamp,
-      end: Number(record.counter),
+      publicKey: node.publicKey,
+      startCycle: node.activeTimestamp,
+      endCycle: Number(record.counter),
+      rewardRate: 0
     })
   }
   record.serviceQueue = queue
