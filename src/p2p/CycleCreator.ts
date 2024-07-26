@@ -20,6 +20,7 @@ import * as Rotation from './Rotation'
 import * as SafetyMode from './SafetyMode'
 import * as Modes from './Modes'
 import * as Self from './Self'
+import * as ServiceQueue from './ServiceQueue'
 import * as LostArchivers from './LostArchivers'
 import { compareQuery, Comparison } from './Utils'
 import { errorToStringFull, formatErrorMessage } from '../utils'
@@ -69,6 +70,7 @@ type submoduleTypes =
   | typeof Modes
   | typeof CycleAutoScale
   | typeof LostArchivers
+  | typeof ServiceQueue
 
 /** STATE */
 
@@ -95,6 +97,7 @@ export let submodules: submoduleTypes[] = [
   Modes,
   CycleAutoScale,
   LostArchivers,
+  ServiceQueue,
 ]
 
 export let currentQuarter = -1 // means we have not started creating cycles
@@ -736,7 +739,8 @@ function makeCycleRecord(
     archiverListHash: '',
     standbyNodeListHash: '',
     random: config.debug.randomCycleData ? Math.floor(Math.random() * 1000) + 1 : 0,
-  }) as P2P.CycleCreatorTypes.CycleRecord
+    serviceQueue: [],
+  }) as P2P.CycleCreatorTypes.CycleRecord & { serviceQueue: any[] }
 
   submodules.map((submodule) => submodule.updateRecord(cycleTxs, cycleRecord, prevRecord))
   //Updating Cycle Record if network has entered 'Shutdown' Mode
