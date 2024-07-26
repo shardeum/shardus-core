@@ -164,6 +164,7 @@ class Storage {
           '`finishedSyncing` TEXT NOT NULL',
           '`standbyRefresh` TEXT NOT NULL',
           '`random` BIGINT NOT NULL',
+          '`serviceQueue` JSON NOT NULL',
         ].join(', ') +
         ')'
     )
