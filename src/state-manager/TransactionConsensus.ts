@@ -2270,16 +2270,21 @@ class TransactionConsenus {
           // preApplyTXResult.   The issue is that we may have a TX that has consensed on the idea that we should not apply a change
           // it is still important to gossip this receipt so and move forward so we can remove it from the queue.
           // This means we dont want to panic on a missing preApplyTXResult
-          if (queueEntry.preApplyTXResult != null) {
+          if (queueEntry.preApplyTXResult != null && queueEntry.preApplyTXResult.applyResponse != null) {
             // Corresponding tell of receipt+data to entire transaction group
             this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
           } else {
             // however if we have a missing preApplyTXResult but the result is false we should log a count 
             // as this may be an error condition to look out for
+            // note: appliedReceipt2.result comes from queueEntry.ourVote.transaction_result which comes from PreApplyAcceptedTransactionResult.passed
+            // it will be false if the apply funciton throws an error to signal that it was not possible apply
+
             if(appliedReceipt2.result === true){
               // if we have a receipt with a positive result we should not have a null preApplyTXResult
-              nestedCountersInstance.countEvent('poqo', 'error: unexpected preApplyTXResult == null while result === true ')
-              if (logFlags.error) this.mainLogger.error(`error: unexpected preApplyTXResult == null while result === true ${queueEntry.logID}`)
+              /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', `error: unexpected preApplyTXResult == null while result === true.  preApplyTXResult:${queueEntry.preApplyTXResult != null} applyResponse:${queueEntry.preApplyTXResult?.applyResponse != null}`)
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`error: unexpected preApplyTXResult == null while result === true ${queueEntry.logID}   preApplyTXResult:${queueEntry.preApplyTXResult != null}  applyResponse:${queueEntry.preApplyTXResult?.applyResponse != null}`)
+            } else {
+              /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', `expected skip fact tell preApplyTXResult == null while result === false.  preApplyTXResult:${queueEntry.preApplyTXResult != null}  applyResponse:${queueEntry.preApplyTXResult?.applyResponse != null}`)
             }
           }
           // Kick off receipt-gossip
@@ -2721,7 +2726,8 @@ class TransactionConsenus {
       }
       return null
     } catch (e) {
-      this.mainLogger.error(`tryProduceReceipt: error ${queueEntry.logID} error: ${e.message}`)
+      //if (logFlags.error) this.mainLogger.error(`tryProduceReceipt: error ${queueEntry.logID} error: ${e.message}`)
+      /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`tryProduceReceipt: error ${queueEntry.logID} error: ${utils.formatErrorMessage(e)}`)  
     } finally {
       if (logFlags.profiling_verbose) this.profiler.scopedProfileSectionEnd('tryProduceReceipt')
       this.profiler.profileSectionEnd('tryProduceReceipt')
