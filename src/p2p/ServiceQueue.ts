@@ -210,6 +210,6 @@ const routes = {
   internalBinary: [],
   gossip: {
     ['gossip-addtx']: addTxGossipRoute,
-    ['gossip-removetx']: addTxGossipRoute,
+    ['gossip-removetx']: removeTxGossipRoute,
   },
 }
