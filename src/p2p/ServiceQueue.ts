@@ -1,10 +1,34 @@
 import { Logger } from 'log4js'
-import { logger } from './Context'
-import { nodes } from "./NodeList";
-import { P2P } from '@shardus/types'
+import { logger, config } from './Context'
+import { nodes } from './NodeList'
+import { P2P, Utils } from '@shardus/types'
+import * as events from 'events'
+import * as Self from './Self'
 
 let p2pLogger: Logger
-let queue: P2P.ServiceQueueTypes.ServiceEntry[] = []
+let queue = [
+  {
+    type: 'rewardTx',
+    data: {
+      start: 1,
+      end: 2,
+    },
+  },
+  {
+    type: 'penltyTx',
+    data: {
+      start: 2,
+      end: 3,
+    },
+  },
+  {
+    type: 'customTx',
+    data: {
+      start: 4,
+      end: 5,
+    },
+  },
+]
 
 export function init(): void {
   p2pLogger = logger.getLogger('p2p')
@@ -53,6 +77,16 @@ export function updateRecord(
 
 export function validateRecordTypes(): string {
   return ''
+}
+
+export function processNetworkTransactions(): void {
+  info('processNetworkTransactions')
+  const length = Math.min(queue.length, config.p2p.networkTransactionsToProcessPerCycle)
+  for (let i = 0; i < length; i++) {
+    const record = queue[i]
+    info('emit network transaction event', Utils.safeStringify(record))
+    Self.emitter.emit('try-network-transaction', record)
+  }
 }
 
 function info(...msg: unknown[]) {

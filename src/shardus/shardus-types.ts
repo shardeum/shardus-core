@@ -963,6 +963,8 @@ export interface ServerConfiguration {
     requiredVotesPercentage: number
     // /** a fix to prevent node from producing different ts for same txId */
     timestampCacheFix: boolean
+    // /** The number of network transactions to try to process per cycle from txAdd in cycle record */
+    networkTransactionsToProcessPerCycle: number
   }
   /** Server IP configuration */
   ip?: {
@@ -1568,6 +1570,7 @@ type ShardusEventType =
   | 'node-left-early'
   | 'node-refuted'
   | 'node-sync-timeout'
+  | 'try-network-transaction'
 
 export type ShardusEvent = {
   type: ShardusEventType
