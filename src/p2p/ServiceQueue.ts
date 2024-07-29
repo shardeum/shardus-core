@@ -59,14 +59,14 @@ function _addNetworkTx(type: string, tx: OpaqueTransaction): string {
   try {
     if (!beforeAddVerify.has(type)) {
       // todo: should this throw or not?
-      console.warn('Adding network tx without a verify function!')
+      warn('Adding network tx without a verify function!')
     } else if (!beforeAddVerify.get(type)()) {
-      console.error(`Failed add network tx verification of type ${type} \n
+      error(`Failed add network tx verification of type ${type} \n
                      tx: ${stringifyReduce(tx)}`)
       return
     }
   } catch (e) {
-    console.error(`Failed add network tx verification of type ${type} \n
+    error(`Failed add network tx verification of type ${type} \n
                    tx: ${stringifyReduce(tx)}\n 
                    error: ${e instanceof Error ? e.stack : e}`)
     return
@@ -83,21 +83,21 @@ export function removeNetworkTx(txHash: string): boolean {
 
 export function _removeNetworkTx(txHash: string): boolean {
   if (!txList.has(txHash)) {
-    console.error(`TxHash ${txHash} does not exist in txList`)
+    error(`TxHash ${txHash} does not exist in txList`)
     return false
   }
   const listEntry = txList.get(txHash)
   try {
     if (!beforeRemoveVerify.has(listEntry.type)) {
       // todo: should this throw or not?
-      console.warn('Remove network tx without a verify function!')
+      warn('Remove network tx without a verify function!')
     } else if (!beforeRemoveVerify.get(listEntry.type)()) {
-      console.error(`Failed remove network tx verification of type ${listEntry.type} \n
+      error(`Failed remove network tx verification of type ${listEntry.type} \n
                      tx: ${stringifyReduce(listEntry.txData)}`)
       return false
     }
   } catch (e) {
-    console.error(`Failed add network tx verification of type ${listEntry.type} \n
+    error(`Failed add network tx verification of type ${listEntry.type} \n
                    tx: ${stringifyReduce(listEntry.txData)}\n 
                    error: ${e instanceof Error ? e.stack : e}`)
     return false
@@ -111,14 +111,9 @@ export function updateRecord(
   record: P2P.CycleCreatorTypes.CycleRecord,
   prev: P2P.CycleCreatorTypes.CycleRecord
 ): void {
-  console.log('updateRecord')
-  console.log('queue', txList)
-  console.log('record queue', record.serviceQueue)
   record.txadd = txAdd
   record.txremove = txRemove
   record.txlisthash = crypto.hash(txList.values())
-  console.log('record queue', record.serviceQueue)
-  console.log('queue', txList)
 }
 
 export function validateRecordTypes(): string {
