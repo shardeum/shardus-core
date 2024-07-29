@@ -1,29 +1,21 @@
 import { Logger } from 'log4js'
-import { logger, config } from './Context'
+import { logger, config, crypto } from './Context'
 import { P2P, Utils } from "@shardus/types";
 import { OpaqueTransaction } from '../shardus/shardus-types'
 import { stringifyReduce, validateTypes } from "../utils";
-import Crypto from '../crypto'
 import * as Comms from './Comms'
 import { profilerInstance } from '../utils/profiler'
-import * as events from 'events'
 import * as Self from './Self'
 import { currentQuarter } from "./CycleCreator";
 import { logFlags } from "../logger";
 import { byIdOrder } from "./NodeList";
 
 let p2pLogger: Logger
-export let crypto: Crypto
 const txList: Map<string, P2P.ServiceQueueTypes.NetworkTx> = new Map()
 const txAdd: P2P.ServiceQueueTypes.NetworkTx[] = []
 const txRemove: string[] = []
 const beforeAddVerify = new Map()
 const beforeRemoveVerify = new Map()
-
-
-export function setCryptoContext(context) {
-  crypto = context
-}
 
 export function registerBeforeAddVerify(type: string, verifier: () => boolean) {
   beforeAddVerify.set(type, verifier)
