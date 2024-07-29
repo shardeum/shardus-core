@@ -27,8 +27,8 @@ export function registerBeforeRemoveVerify(type: string, verifier: () => boolean
 
 export function init(): void {
   p2pLogger = logger.getLogger('p2p')
-  for (const route of routes.internal) {
-    Comms.registerInternal(route.name, route.handler)
+  for (const [name, handler] of Object.entries(routes.gossip)) {
+    Comms.registerGossipHandler(name, handler)
   }
 }
 
