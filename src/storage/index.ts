@@ -164,7 +164,9 @@ class Storage {
           '`finishedSyncing` TEXT NOT NULL',
           '`standbyRefresh` TEXT NOT NULL',
           '`random` BIGINT NOT NULL',
-          '`serviceQueue` JSON NOT NULL',
+          '`txadd` JSON NOT NULL',
+          '`txremove` JSON NOT NULL',
+          '`txlisthash` TEXT NOT NULL',
         ].join(', ') +
         ')'
     )

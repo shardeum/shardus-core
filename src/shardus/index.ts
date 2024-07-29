@@ -33,6 +33,7 @@ import * as CycleChain from '../p2p/CycleChain'
 import * as CycleCreator from '../p2p/CycleCreator'
 import { netConfig } from '../p2p/CycleCreator'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
+import * as ServiceQueue from '../p2p/ServiceQueue'
 import { scheduleLostReport, removeNodeWithCertificiate } from '../p2p/Lost'
 import { activeIdToPartition, activeByIdOrder, getAgeIndexForNodeId, nodes } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
@@ -40,10 +41,10 @@ import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
 import * as ShardusTypes from '../shardus/shardus-types'
-import { AppObjEnum, DevSecurityLevel, WrappedData } from "../shardus/shardus-types";
+import { AppObjEnum, DevSecurityLevel, WrappedData } from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
-import { CachedAppData, NonceQueueItem, QueueCountsResult } from "../state-manager/state-manager-types";
+import { CachedAppData, NonceQueueItem, QueueCountsResult } from '../state-manager/state-manager-types'
 import { DebugComplete } from '../state-manager/TransactionQueue'
 import Statistics from '../statistics'
 import Storage from '../storage'
@@ -132,6 +133,8 @@ interface Shardus {
   registerExternalPut: RouteHandlerRegister
   registerExternalDelete: RouteHandlerRegister
   registerExternalPatch: RouteHandlerRegister
+  registerBeforeAddVerify: (type: string, verifier: () => boolean) => void
+  registerBeforeRemoveVerify: (type: string, verifier: () => boolean) => void
   _listeners: any
   appliedConfigChanges: Set<string>
 
@@ -248,6 +251,10 @@ class Shardus extends EventEmitter {
       this.network.registerExternalDelete(route, authHandler, handler)
     this.registerExternalPatch = (route, authHandler, handler) =>
       this.network.registerExternalPatch(route, authHandler, handler)
+
+    this.registerBeforeAddVerify = (type, verifier) => ServiceQueue.registerBeforeAddVerify(type, verifier)
+    this.registerBeforeRemoveVerify = (type, verifier) =>
+      ServiceQueue.registerBeforeRemoveVerify(type, verifier)
 
     this.exitHandler.addSigListeners()
     this.exitHandler.registerSync('reporter', () => {
@@ -1796,6 +1803,10 @@ class Shardus extends EventEmitter {
 
   setDebugSetLastAppAwait(label: string, complete = DebugComplete.Incomplete) {
     this.stateManager?.transactionQueue.setDebugSetLastAppAwait(label, complete)
+  }
+
+  addNetworkTx(type: string, tx: any) {
+    ServiceQueue.addNetworkTx(type, tx)
   }
 
   validateActiveNodeSignatures(

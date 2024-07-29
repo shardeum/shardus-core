@@ -741,7 +741,9 @@ function makeCycleRecord(
     archiverListHash: '',
     standbyNodeListHash: '',
     random: config.debug.randomCycleData ? Math.floor(Math.random() * 1000) + 1 : 0,
-    serviceQueue: [],
+    txadd: [],
+    txremove: [],
+    txlisthash: '',
   }) as P2P.CycleCreatorTypes.CycleRecord
 
   submodules.map((submodule) => submodule.updateRecord(cycleTxs, cycleRecord, prevRecord))
