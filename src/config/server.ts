@@ -172,7 +172,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     requestReceiptForTxBinary: true,
     lostReportBinary: true,
     repairMissingAccountsBinary: true,
-    poqoSendReceiptBinary : true,
+    poqoSendReceiptBinary: true,
     poqoDataAndReceiptBinary: true,
     poqoSendVoteBinary: true,
     rotationEdgeToAvoid: 3,
@@ -184,7 +184,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     useFactCorrespondingTell: true,
     resubmitStandbyAddWaitDuration: 1000, // 1 second in ms
     requiredVotesPercentage: 2 / 3.0,
-    timestampCacheFix: true
+    timestampCacheFix: true,
+    networkTransactionsToProcessPerCycle: 20,
   },
   ip: {
     externalIp: '0.0.0.0',

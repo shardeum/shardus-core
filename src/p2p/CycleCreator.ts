@@ -505,6 +505,8 @@ async function runQ1() {
 
   if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 
+  ServiceQueue.processNetworkTransactions()
+
   const SECOND = 1000
   const cycleDuration = record.duration * SECOND
   const quarterDuration = cycleDuration / 4

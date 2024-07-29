@@ -956,6 +956,8 @@ export interface ServerConfiguration {
     requiredVotesPercentage: number
     // /** a fix to prevent node from producing different ts for same txId */
     timestampCacheFix: boolean
+    // /** The number of network transactions to try to process per cycle from txAdd in cycle record */
+    networkTransactionsToProcessPerCycle: number
   }
   /** Server IP configuration */
   ip?: {
@@ -1208,9 +1210,9 @@ export interface ServerConfiguration {
     // turn on POQo consensus
     usePOQo: boolean
     // Interval between switching to the next vote aggregator batch
-    poqoloopTime: number,
+    poqoloopTime: number
     // batch size for vote aggregation
-    poqobatchCount: number,
+    poqobatchCount: number
     // should the network forward TXs to lucky nodes?  (does not impact nonce queue, that is the flag below)
     forwardToLuckyNodes: boolean
     // should the network forward TXs to lucky nodes?  (only for the nonce queue)
@@ -1242,7 +1244,7 @@ export interface ServerConfiguration {
     // state machine chages updateTxState in several places from 'consensing' to 'await final data'
     txStateMachineChanges: boolean
     // will a node attempt to request final data
-    canRequestFinalData:boolean
+    canRequestFinalData: boolean
     // how many node to re-inject the tx received from client
     numberOfReInjectNodes: number
     // max number of pending nonce tx for an account
@@ -1559,6 +1561,7 @@ type ShardusEventType =
   | 'node-left-early'
   | 'node-refuted'
   | 'node-sync-timeout'
+  | 'try-network-transaction'
 
 export type ShardusEvent = {
   type: ShardusEventType

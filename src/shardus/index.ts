@@ -888,6 +888,14 @@ class Shardus extends EventEmitter {
         this.mainLogger.error(`Error: while processing node-sync-timeout event stack: ${e.stack}`)
       }
     })
+    Self.emitter.on('try-network-transaction', ({ ...params }) => {
+      console.log('try-network-transaction event', params)
+      try {
+        this.app.eventNotify?.({ type: 'try-network-transaction', ...params })
+      } catch (e) {
+        this.mainLogger.error(`Error: while processing try-network-transaction event stack: ${e.stack}`)
+      }
+    })
 
     Context.setShardusContext(this)
 
