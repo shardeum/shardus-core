@@ -41,7 +41,7 @@ import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
 import * as ShardusTypes from '../shardus/shardus-types'
-import { AppObjEnum, DevSecurityLevel, WrappedData } from '../shardus/shardus-types'
+import { AppObjEnum, DevSecurityLevel, OpaqueTransaction, WrappedData } from "../shardus/shardus-types";
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
 import { CachedAppData, NonceQueueItem, QueueCountsResult } from '../state-manager/state-manager-types'
@@ -133,10 +133,10 @@ interface Shardus {
   registerExternalPut: RouteHandlerRegister
   registerExternalDelete: RouteHandlerRegister
   registerExternalPatch: RouteHandlerRegister
-  registerBeforeAddVerify: (type: string, verifier: (tx: P2P.ServiceQueueTypes.NetworkTx) => boolean) => void
+  registerBeforeAddVerify: (type: string, verifier: (tx: OpaqueTransaction) => boolean) => void
   registerBeforeRemoveVerify: (
     type: string,
-    verifier: (tx: P2P.ServiceQueueTypes.NetworkTx) => boolean
+    verifier: (tx: OpaqueTransaction) => boolean
   ) => void
   _listeners: any
   appliedConfigChanges: Set<string>
@@ -1506,7 +1506,7 @@ class Shardus extends EventEmitter {
           this.stateManager.transactionQueue.addTransactionToNonceQueue(nonceQueueEntry)
 
         if(Context.config.stateManager.forwardToLuckyNodesNonceQueue){
-          // if we ever support cancellation by using replacment for a TX that will change how we 
+          // if we ever support cancellation by using replacment for a TX that will change how we
           // need to handle this run-away protection.  may need to re-evaluate later
           if(nonceQueueAddResult?.alreadyAdded === true && Context.config.stateManager.forwardToLuckyNodesNonceQueueLimitFix){
             nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: nonce queue skipped. we already have it`)
@@ -1646,7 +1646,7 @@ class Shardus extends EventEmitter {
         if (result && result.success === true) {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_success_${context} ${activeIdToPartition.get(validator.id)}`)
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got successful response upon forwarding injected tx: ${validator.id}. ${message} ${Utils.safeStringify(tx)}` )
-          
+
           if(result.reason === 'Transaction is already in pending nonce queue.'){
             stats.ok_inQ++
           }
@@ -1656,7 +1656,7 @@ class Shardus extends EventEmitter {
           if(result.reason === `Transaction added to pending nonce queue.`){
             stats.ok_addQ++
           }
-            
+
           nestedCountersInstance.countEvent('statistics', `forward to lucky node success ${message} ${Utils.safeStringify(stats)}`)
           if(Context.config.stateManager.forwardToLuckyMulti){
             successCount++
