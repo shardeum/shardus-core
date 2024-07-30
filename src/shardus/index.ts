@@ -133,8 +133,11 @@ interface Shardus {
   registerExternalPut: RouteHandlerRegister
   registerExternalDelete: RouteHandlerRegister
   registerExternalPatch: RouteHandlerRegister
-  registerBeforeAddVerify: (type: string, verifier: () => boolean) => void
-  registerBeforeRemoveVerify: (type: string, verifier: () => boolean) => void
+  registerBeforeAddVerify: (type: string, verifier: (tx: P2P.ServiceQueueTypes.NetworkTx) => boolean) => void
+  registerBeforeRemoveVerify: (
+    type: string,
+    verifier: (tx: P2P.ServiceQueueTypes.NetworkTx) => boolean
+  ) => void
   _listeners: any
   appliedConfigChanges: Set<string>
 
