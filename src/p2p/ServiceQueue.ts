@@ -45,12 +45,10 @@ export function reset(): void {
 
 export function sendRequests(): void {
   for (const add of addProposal) {
-    const signedAdd = crypto.sign(add)
     Comms.sendGossip('gossip-addtx', add, '', Self.id, byIdOrder, true)
   }
 
   for (const remove of removeProposal) {
-    const signedRemove = crypto.sign(remove)
     Comms.sendGossip('gossip-removetx', remove, '', Self.id, byIdOrder, true)
   }
   addProposal.length = 0
@@ -225,6 +223,7 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
     const signer = byPubKey.get(payload.sign.owner)
     if (!signer) {
       /* prettier-ignore */ if (logFlags.error) warn('gossip-addtx: Got request from unknown node')
+      return
     }
     if (!crypto.verify(payload, payload.sign.owner)) {
       if (logFlags.console) console.log(`addTxGossipRoute(): signature invalid`, payload.sign.owner)
@@ -264,6 +263,7 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
     const signer = byPubKey.get(payload.sign.owner)
     if (!signer) {
       /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: Got request from unknown node')
+      return
     }
     if (!crypto.verify(payload, payload.sign.owner)) {
       if (logFlags.console) console.log(`removeTxGossipRoute(): signature invalid`, payload.sign.owner)
