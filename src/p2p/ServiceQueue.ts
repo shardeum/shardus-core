@@ -17,11 +17,17 @@ let txRemove: string[] = []
 const beforeAddVerify = new Map()
 const beforeRemoveVerify = new Map()
 
-export function registerBeforeAddVerify(type: string, verifier: () => boolean) {
+export function registerBeforeAddVerify(
+  type: string,
+  verifier: (tx: P2P.ServiceQueueTypes.NetworkTx) => boolean
+) {
   beforeAddVerify.set(type, verifier)
 }
 
-export function registerBeforeRemoveVerify(type: string, verifier: () => boolean) {
+export function registerBeforeRemoveVerify(
+  type: string,
+  verifier: (tx: P2P.ServiceQueueTypes.NetworkTx) => boolean
+) {
   beforeRemoveVerify.set(type, verifier)
 }
 
@@ -88,7 +94,7 @@ function _addNetworkTx(type: string, tx: OpaqueTransaction): string {
 
 export function removeNetworkTx(txHash: string): boolean {
   const removed = _removeNetworkTx(txHash)
-  Comms.sendGossip('gossip-removetx', txHash, '', Self.id, byIdOrder, true) // use Self.id so we don't gossip to ourself
+  Comms.sendGossip('gossip-removetx', { hash: txHash }, '', Self.id, byIdOrder, true) // use Self.id so we don't gossip to ourself
   return removed
 }
 
@@ -102,18 +108,19 @@ export function _removeNetworkTx(txHash: string): boolean {
     if (!beforeRemoveVerify.has(listEntry.type)) {
       // todo: should this throw or not?
       warn('Remove network tx without a verify function!')
-    } else if (!beforeRemoveVerify.get(listEntry.type)()) {
+    } else if (!beforeRemoveVerify.get(listEntry.type)(listEntry.txData)) {
       error(`Failed remove network tx verification of type ${listEntry.type} \n
                      tx: ${stringifyReduce(listEntry.txData)}`)
       return false
     }
   } catch (e) {
-    error(`Failed add network tx verification of type ${listEntry.type} \n
+    error(`Failed remove network tx verification of type ${listEntry.type} \n
                    tx: ${stringifyReduce(listEntry.txData)}\n 
                    error: ${e instanceof Error ? e.stack : e}`)
     return false
   }
   txRemove.push(txHash)
+  txList.delete(txHash)
   return true
 }
 
@@ -140,8 +147,13 @@ export function processNetworkTransactions(): void {
       return
     }
     const record = entry
-    info('emit network transaction event', Utils.safeStringify(record))
-    Self.emitter.emit('try-network-transaction', record)
+    if (beforeRemoveVerify.has(record.type) && !beforeRemoveVerify.get(record.type)(record.txData)) {
+      info('emit network transaction event', Utils.safeStringify(record))
+      Self.emitter.emit('try-network-transaction', record)
+    } else {
+      removeNetworkTx(key)
+      continue
+    }
     i++
   }
 }
@@ -171,22 +183,17 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Network
   }
 }
 
-const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<string> = (
-  payload,
-  sender,
-  tracker
-) => {
+const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<{ hash: string }> = (payload, sender, tracker) => {
   profilerInstance.scopedProfileSectionStart('serviceQueue - removeTx')
   try {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got removeTx gossip: ${Utils.safeStringify(payload)}`)
-    const err = validateTypes(payload, { type: 's', txData: 'o' })
-    if (typeof payload !== 'string') {
-      warn('removeTxGossipRoute bad payload: ' + err)
+    if (typeof payload.hash !== 'string') {
+      warn('removeTxGossipRoute bad payload is not a string')
       return
     }
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
-      if (_removeNetworkTx(payload)) {
+      if (_removeNetworkTx(payload.hash)) {
         Comms.sendGossip('gossip-removetx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
       }
     }
