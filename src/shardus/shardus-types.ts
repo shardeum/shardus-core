@@ -1550,10 +1550,6 @@ export interface OpaqueTransaction extends ObjectAlias {}
 export interface ReinjectedOpaqueTransaction extends OpaqueTransaction {
   isReinjected: boolean
 }
-export interface NetworkTransaction extends OpaqueTransaction {
-  id: string
-  [key: string]: any
-}
 
 export type DeepRequired<T> = Required<{
   [P in keyof T]: T[P] extends object | undefined ? DeepRequired<Required<T[P]>> : T[P]
