@@ -1,7 +1,7 @@
 import { Logger } from 'log4js'
 import { logger, config, crypto } from './Context'
 import { P2P, Utils } from "@shardus/types";
-import { NetworkTransaction } from '../shardus/shardus-types'
+import { OpaqueTransaction } from '../shardus/shardus-types'
 import { stringifyReduce, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { profilerInstance } from '../utils/profiler'
@@ -12,8 +12,8 @@ import { byIdOrder } from './NodeList'
 
 let p2pLogger: Logger
 const txList: Map<string, P2P.ServiceQueueTypes.NetworkTx> = new Map()
-const txAdd: P2P.ServiceQueueTypes.NetworkTx[] = []
-const txRemove: string[] = []
+let txAdd: P2P.ServiceQueueTypes.NetworkTx[] = []
+let txRemove: string[] = []
 const beforeAddVerify = new Map()
 const beforeRemoveVerify = new Map()
 
@@ -27,12 +27,18 @@ export function registerBeforeRemoveVerify(type: string, verifier: () => boolean
 
 export function init(): void {
   p2pLogger = logger.getLogger('p2p')
+
+  reset()
+
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
   }
 }
 
-export function reset(): void {}
+export function reset(): void {
+  txAdd = []
+  txRemove = []
+}
 
 export function sendRequests(): void {}
 
@@ -48,14 +54,14 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   }
 }
 
-export function addNetworkTx(type: string, tx: NetworkTransaction): string {
+export function addNetworkTx(type: string, tx: OpaqueTransaction): string {
   const hash = _addNetworkTx(type, tx)
   // todo: are we one of the 5 closest otherwise don't gossip
   Comms.sendGossip('gossip-addtx', { type, txData: tx }, '', Self.id, byIdOrder, true) // use Self.id so we don't gossip to ourself
   return hash
 }
 
-function _addNetworkTx(type: string, tx: NetworkTransaction): string {
+function _addNetworkTx(type: string, tx: OpaqueTransaction): string {
   try {
     if (!beforeAddVerify.has(type)) {
       // todo: should this throw or not?
@@ -71,9 +77,10 @@ function _addNetworkTx(type: string, tx: NetworkTransaction): string {
                    error: ${e instanceof Error ? e.stack : e}`)
     return
   }
-  if (!txAdd.some((existingTx) => existingTx.txData.id === tx.id)) {
+  if (!txList.has(crypto.hash(tx))) {
     info(`Adding network tx of type ${type} and payload ${stringifyReduce(tx)}`)
     txAdd.push({ type, txData: tx })
+    txList.set(crypto.hash(tx), { type, txData: tx })
     return crypto.hash(tx)
   }
   return
@@ -151,12 +158,6 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Network
     err = validateTypes(payload, { type: 's', txData: 'o' })
     if (err) {
       warn('addTxGossipRoute bad payload: ' + err)
-      return
-    }
-    //should we throw if missing id?
-    err = validateTypes(payload.txData, { id: 's' })
-    if (err) {
-      error('addTxGossipRoute bad payload: ' + err)
       return
     }
     // todo: which quartes?
