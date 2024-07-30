@@ -152,7 +152,6 @@ export function processNetworkTransactions(): void {
       Self.emitter.emit('try-network-transaction', record)
     } else {
       removeNetworkTx(key)
-      continue
     }
     i++
   }
@@ -188,7 +187,7 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<{ hash: string }> = (paylo
   try {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got removeTx gossip: ${Utils.safeStringify(payload)}`)
     if (typeof payload.hash !== 'string') {
-      warn('removeTxGossipRoute bad payload is not a string')
+      warn('removeTxGossipRoute bad payload. hash is not a string')
       return
     }
     // todo: which quartes?
