@@ -19,14 +19,14 @@ const beforeRemoveVerify = new Map()
 
 export function registerBeforeAddVerify(
   type: string,
-  verifier: (tx: P2P.ServiceQueueTypes.NetworkTx) => boolean
+  verifier: (txData: OpaqueTransaction) => boolean
 ) {
   beforeAddVerify.set(type, verifier)
 }
 
 export function registerBeforeRemoveVerify(
   type: string,
-  verifier: (tx: P2P.ServiceQueueTypes.NetworkTx) => boolean
+  verifier: (txData: OpaqueTransaction) => boolean
 ) {
   beforeRemoveVerify.set(type, verifier)
 }
@@ -73,7 +73,7 @@ function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): string {
     if (!beforeAddVerify.has(addTx.type)) {
       // todo: should this throw or not?
       warn('Adding network tx without a verify function!')
-    } else if (!beforeAddVerify.get(addTx.type)()) {
+    } else if (!beforeAddVerify.get(addTx.type)(addTx.txData)) {
       error(`Failed add network tx verification of type ${addTx.type} \n
                      tx: ${stringifyReduce(addTx.txData)}`)
       return
@@ -196,7 +196,7 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Remo
     }
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
-      if (_removeNetworkTx(payload.hash)) {
+      if (_removeNetworkTx(payload)) {
         Comms.sendGossip('gossip-removetx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
       }
     }
