@@ -6,14 +6,14 @@ import { stringifyReduce, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { profilerInstance } from '../utils/profiler'
 import * as Self from './Self'
-import { currentQuarter } from './CycleCreator'
+import { currentCycle, currentQuarter } from "./CycleCreator";
 import { logFlags } from '../logger'
 import { byIdOrder } from './NodeList'
 
 let p2pLogger: Logger
-const txList: Map<string, P2P.ServiceQueueTypes.NetworkTx> = new Map()
-let txAdd: P2P.ServiceQueueTypes.NetworkTx[] = []
-let txRemove: string[] = []
+const txList: Array<{ hash: string, tx: P2P.ServiceQueueTypes.AddNetworkTx }> = []
+let txAdd: P2P.ServiceQueueTypes.AddNetworkTx[] = []
+let txRemove: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
 const beforeAddVerify = new Map()
 const beforeRemoveVerify = new Map()
 
@@ -61,66 +61,70 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 }
 
 export function addNetworkTx(type: string, tx: OpaqueTransaction): string {
-  const hash = _addNetworkTx(type, tx)
+  let networkTx = {type, txData: tx, cycle: currentCycle}
+  const hash = _addNetworkTx(networkTx)
   // todo: are we one of the 5 closest otherwise don't gossip
-  Comms.sendGossip('gossip-addtx', { type, txData: tx }, '', Self.id, byIdOrder, true) // use Self.id so we don't gossip to ourself
+  Comms.sendGossip('gossip-addtx', networkTx, '', Self.id, byIdOrder, true) // use Self.id so we don't gossip to ourself
   return hash
 }
 
-function _addNetworkTx(type: string, tx: OpaqueTransaction): string {
+function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): string {
   try {
-    if (!beforeAddVerify.has(type)) {
+    if (!beforeAddVerify.has(addTx.type)) {
       // todo: should this throw or not?
       warn('Adding network tx without a verify function!')
-    } else if (!beforeAddVerify.get(type)()) {
-      error(`Failed add network tx verification of type ${type} \n
-                     tx: ${stringifyReduce(tx)}`)
+    } else if (!beforeAddVerify.get(addTx.type)()) {
+      error(`Failed add network tx verification of type ${addTx.type} \n
+                     tx: ${stringifyReduce(addTx.txData)}`)
       return
     }
   } catch (e) {
-    error(`Failed add network tx verification of type ${type} \n
-                   tx: ${stringifyReduce(tx)}\n 
+    error(`Failed add network tx verification of type ${addTx.type} \n
+                   tx: ${stringifyReduce(addTx.txData)}\n 
                    error: ${e instanceof Error ? e.stack : e}`)
     return
   }
-  if (!txList.has(crypto.hash(tx))) {
-    info(`Adding network tx of type ${type} and payload ${stringifyReduce(tx)}`)
-    txAdd.push({ type, txData: tx })
-    txList.set(crypto.hash(tx), { type, txData: tx })
-    return crypto.hash(tx)
+  const txHash = crypto.hash(addTx.txData)
+  if (!txList.find(entry => entry.hash === txHash)) {
+    info(`Adding network tx of type ${addTx.type} and payload ${stringifyReduce(addTx.txData)}`)
+    txAdd.push(addTx)
+    sortedInsert({ hash: txHash, tx: addTx })
+    return crypto.hash(addTx.txData)
   }
   return
 }
 
 export function removeNetworkTx(txHash: string): boolean {
-  const removed = _removeNetworkTx(txHash)
-  Comms.sendGossip('gossip-removetx', { hash: txHash }, '', Self.id, byIdOrder, true) // use Self.id so we don't gossip to ourself
+  const removeTx = {txHash, cycle: currentCycle}
+  const removed = _removeNetworkTx(removeTx)
+  Comms.sendGossip('gossip-removetx', removeTx, '', Self.id, byIdOrder, true) // use Self.id so we don't gossip to ourself
   return removed
 }
 
-export function _removeNetworkTx(txHash: string): boolean {
-  if (!txList.has(txHash)) {
-    error(`TxHash ${txHash} does not exist in txList`)
+export function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx): boolean {
+  const index = txList.findIndex(entry => entry.hash === removeTx.txHash)
+  if (index === -1) {
+    error(`TxHash ${removeTx.txHash} does not exist in txList`)
     return false
   }
-  const listEntry = txList.get(txHash)
+  const listEntry = txList[index]
   try {
-    if (!beforeRemoveVerify.has(listEntry.type)) {
+    if (!beforeRemoveVerify.has(listEntry.tx.type)) {
       // todo: should this throw or not?
       warn('Remove network tx without a verify function!')
-    } else if (!beforeRemoveVerify.get(listEntry.type)(listEntry.txData)) {
-      error(`Failed remove network tx verification of type ${listEntry.type} \n
-                     tx: ${stringifyReduce(listEntry.txData)}`)
+    } else if (!beforeRemoveVerify.get(listEntry.tx.type)(listEntry.tx.txData)) {
+      error(`Failed remove network tx verification of type ${listEntry.tx.type} \n
+                     tx: ${stringifyReduce(listEntry.tx.txData)}`)
       return false
     }
   } catch (e) {
-    error(`Failed remove network tx verification of type ${listEntry.type} \n
-                   tx: ${stringifyReduce(listEntry.txData)}\n 
+    error(`Failed remove network tx verification of type ${listEntry.tx.type} \n
+                   tx: ${stringifyReduce(listEntry.tx.txData)}\n 
                    error: ${e instanceof Error ? e.stack : e}`)
     return false
   }
-  txRemove.push(txHash)
-  txList.delete(txHash)
+  txRemove.push(removeTx)
+  txList.splice(index, 1)
   return true
 }
 
@@ -131,7 +135,7 @@ export function updateRecord(
 ): void {
   record.txadd = txAdd
   record.txremove = txRemove
-  record.txlisthash = crypto.hash(txList.values())
+  record.txlisthash = crypto.hash(txList.map(entry => entry.tx.txData))
 }
 
 export function validateRecordTypes(): string {
@@ -140,24 +144,19 @@ export function validateRecordTypes(): string {
 
 export function processNetworkTransactions(): void {
   info('processNetworkTransactions')
-  const length = Math.min(txList.size, config.p2p.networkTransactionsToProcessPerCycle)
-  let i = 0
-  for (const [key, entry] of txList) {
-    if (i >= length) {
-      return
-    }
-    const record = entry
+  const length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
+  for (let i = 0; i < length; i++) {
+    const record = txList[i].tx
     if (beforeRemoveVerify.has(record.type) && !beforeRemoveVerify.get(record.type)(record.txData)) {
       info('emit network transaction event', Utils.safeStringify(record))
       Self.emitter.emit('try-network-transaction', record)
     } else {
-      removeNetworkTx(key)
+      removeNetworkTx(txList[i].hash)
     }
-    i++
   }
 }
 
-const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.NetworkTx> = (
+const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.AddNetworkTx> = (
   payload,
   sender,
   tracker
@@ -166,14 +165,14 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Network
   try {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got Apoptosis gossip: ${Utils.safeStringify(payload)}`)
     let err = ''
-    err = validateTypes(payload, { type: 's', txData: 'o' })
+    err = validateTypes(payload, { type: 's', txData: 'o', cycle: 'n' })
     if (err) {
       warn('addTxGossipRoute bad payload: ' + err)
       return
     }
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
-      if (_addNetworkTx(payload.type, payload.txData)) {
+      if (_addNetworkTx(payload)) {
         Comms.sendGossip('gossip-addtx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
       }
     }
@@ -182,12 +181,17 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Network
   }
 }
 
-const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<{ hash: string }> = (payload, sender, tracker) => {
+const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.RemoveNetworkTx> = (
+  payload,
+  sender,
+  tracker
+) => {
   profilerInstance.scopedProfileSectionStart('serviceQueue - removeTx')
   try {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got removeTx gossip: ${Utils.safeStringify(payload)}`)
-    if (typeof payload.hash !== 'string') {
-      warn('removeTxGossipRoute bad payload. hash is not a string')
+    const err = validateTypes(payload, { txHash: 's', cycle: 'n' })
+    if (err) {
+      warn('removeTxGossipRoute bad payload: ' + err)
       return
     }
     // todo: which quartes?
@@ -198,6 +202,18 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<{ hash: string }> = (paylo
     }
   } finally {
     profilerInstance.scopedProfileSectionEnd('serviceQueue - removeTx')
+  }
+}
+
+function sortedInsert(entry: { hash: string, tx: P2P.ServiceQueueTypes.AddNetworkTx }) {
+  const index = txList.findIndex(item =>
+    item.tx.cycle > entry.tx.cycle ||
+    (item.tx.cycle === entry.tx.cycle && item.hash > entry.hash)
+  )
+  if (index === -1) {
+    txList.push(entry)
+  } else {
+    txList.splice(index, 0, entry)
   }
 }
 
