@@ -2,13 +2,14 @@ import { P2P } from '@shardus/types'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { Utils } from '@shardus/types'
+import { verifyPayload } from './ajv/Helpers'
 
 export interface CompareCertReqSerializable {
   certs: P2P.CycleCreatorTypes.CycleCert[]
   record: P2P.CycleCreatorTypes.CycleRecord
 }
 
-const cCompareCertReqVersion = 1
+export const cCompareCertReqVersion = 1
 
 export const serializeCompareCertReq = (
   stream: VectorBufferStream,
@@ -28,5 +29,11 @@ export const deserializeCompareCertReq = (stream: VectorBufferStream): CompareCe
     throw new Error(`Unsupported CompareCertReqSerializable version ${version}`)
   }
   const obj: CompareCertReqSerializable = Utils.safeJsonParse(stream.readString())
+
+  const errors = verifyPayload('CompareCertReq', obj)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
+
   return obj
 }
