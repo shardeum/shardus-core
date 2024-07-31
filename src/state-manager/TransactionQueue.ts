@@ -8508,7 +8508,7 @@ getDebugStuckTxs(opts): unknown {
       receipt2: this.stateManager.getReceipt2(queueEntry) || null,
       uniqueChallenges: queueEntry.uniqueChallengesCount,
       collectedVoteCount: queueEntry.collectedVoteHashes.length,
-      simpleDebugStr: this.app.getSimpleTxDebugValue ? this.app.getSimpleTxDebugValue(queueEntry.acceptedTx.data) : "",
+      simpleDebugStr: this.app.getSimpleTxDebugValue ? this.app.getSimpleTxDebugValue(queueEntry.acceptedTx?.data) : "",
     }
   }
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
