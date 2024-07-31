@@ -1,5 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { verifyPayload } from './ajv/Helpers'
 
 export const cGetTrieAccountHashesRespVersion = 1
 export const cRadixAndChildHashesVersion = 1
@@ -54,14 +55,26 @@ export function deserializeGetTrieAccountHashesResp(stream: VectorBufferStream):
   for (let i = 0; i < nodeChildHashesLength; i++) {
     nodeChildHashes.push(deserializeRadixAndChildHashes(stream))
   }
+
+  const stats = {
+    matched: stream.readUInt32(),
+    visisted: stream.readUInt32(),
+    empty: stream.readUInt32(),
+    childCount: stream.readUInt32(),
+  }
+
+  const errors = verifyPayload('GetTrieAccountHashesResp', {
+    nodeChildHashes,
+    stats,
+  })
+
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
+
   return {
     nodeChildHashes,
-    stats: {
-      matched: stream.readUInt32(),
-      visisted: stream.readUInt32(),
-      empty: stream.readUInt32(),
-      childCount: stream.readUInt32(),
-    },
+    stats,
   }
 }
 
