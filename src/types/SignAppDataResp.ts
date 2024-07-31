@@ -1,4 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export const cSignAppDataRespVersion = 1
@@ -30,11 +32,16 @@ export function deserializeSignAppDataResp(stream: VectorBufferStream): SignAppD
   if (version > cSignAppDataRespVersion) {
     throw new Error(`SignAppDataResp version mismatch, version: ${version}`)
   }
-  return {
+  const result = {
     success: stream.readUInt8() === 1,
     signature: {
       owner: stream.readString(),
       sig: stream.readString(),
     },
   }
+  const errors = verifyPayload(AJVSchemaEnum.SignAppDataResp, result)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
+  return result
 }
