@@ -3794,8 +3794,8 @@ class StateManager {
 
         if (this.doDataCleanup === true) {
           if (logFlags.verbose) this.mainLogger.debug(`cycle_q3_start-clean cycle: ${lastCycle.counter}`)
-          // clean up cycle data that is more than 20 cycles old.
-          this.periodicCycleDataCleanup(lastCycle.counter - 20)
+          // clean up cycle data that is more than <maxCyclesShardDataToKeep> cycles old.
+          this.periodicCycleDataCleanup(lastCycle.counter - this.config.stateManager.maxCyclesShardDataToKeep)
         }
       } finally {
         this.profiler.profileSectionEnd('stateManager_cycle_q3_start')

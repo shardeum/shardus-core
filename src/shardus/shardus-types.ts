@@ -170,7 +170,10 @@ export interface InjectTxResponse {
 }
 
 export interface App {
-  injectTxToConsensor(consensor: ValidatorNodeDetails[], tx: OpaqueTransaction): Promise<InjectTxResponse | null>
+  injectTxToConsensor(
+    consensor: ValidatorNodeDetails[],
+    tx: OpaqueTransaction
+  ): Promise<InjectTxResponse | null>
   getNonceFromTx(tx: OpaqueTransaction): bigint
   getAccountNonce(accountId: string, wrappedData?: WrappedData): Promise<bigint>
   getTxSenderAddress(tx: OpaqueTransaction): string
@@ -237,7 +240,12 @@ export interface App {
    * This is a place to generate other transactions, or do off chain work like send and email.
    * isExecutionGroup: boolean  this is set to true if we are in the execution group
    */
-  transactionReceiptPass?: (inTx: OpaqueTransaction, wrappedStates: any, applyResponse: ApplyResponse, isExecutionGroup: boolean) => void
+  transactionReceiptPass?: (
+    inTx: OpaqueTransaction,
+    wrappedStates: any,
+    applyResponse: ApplyResponse,
+    isExecutionGroup: boolean
+  ) => void
 
   /**
    * This is called after consensus has received or produced a receipt and the trasaction fails.
@@ -487,7 +495,6 @@ export interface WrappedResponse extends WrappedData {
   prevDataCopy?: any
   sign?: Sign
 }
-
 
 // old version:
 // export interface WrappedResponse {
@@ -1208,9 +1215,9 @@ export interface ServerConfiguration {
     // turn on POQo consensus
     usePOQo: boolean
     // Interval between switching to the next vote aggregator batch
-    poqoloopTime: number,
+    poqoloopTime: number
     // batch size for vote aggregation
-    poqobatchCount: number,
+    poqobatchCount: number
     // should the network forward TXs to lucky nodes?  (does not impact nonce queue, that is the flag below)
     forwardToLuckyNodes: boolean
     // should the network forward TXs to lucky nodes?  (only for the nonce queue)
@@ -1242,7 +1249,7 @@ export interface ServerConfiguration {
     // state machine chages updateTxState in several places from 'consensing' to 'await final data'
     txStateMachineChanges: boolean
     // will a node attempt to request final data
-    canRequestFinalData:boolean
+    canRequestFinalData: boolean
     // how many node to re-inject the tx received from client
     numberOfReInjectNodes: number
     // max number of pending nonce tx for an account
@@ -1302,6 +1309,8 @@ export interface ServerConfiguration {
     reduceTimeFromTxTimestamp: number
     // whether node should use current cycle if derived cycle is lager than current cycle
     fallbackToCurrentCycleFortxGroup: boolean
+    // max number of recent cycle shard data to keep
+    maxCyclesShardDataToKeep: number
   }
   /** Options for sharding calculations */
   sharding?: {

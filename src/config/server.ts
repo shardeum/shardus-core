@@ -349,7 +349,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     concatCorrespondingTellUseUnwrapped: true,
     deterministicTXCycleEnabled: true,
     reduceTimeFromTxTimestamp: 60000,
-    fallbackToCurrentCycleFortxGroup: false
+    fallbackToCurrentCycleFortxGroup: false,
+    maxCyclesShardDataToKeep: 20,
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Release,

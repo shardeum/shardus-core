@@ -767,8 +767,8 @@ function makeNetworkConfigHash() {
     sharding: config.sharding,
     transactionExpireTime: config.transactionExpireTime,
     p2p: { ...config.p2p },
-    stateManager: config.stateManager
-    // debug: config.debug,
+    stateManager: config.stateManager,
+    debug: config.debug,
   }
   delete netConfig.p2p.existingArchivers
   return crypto.hash(netConfig)
