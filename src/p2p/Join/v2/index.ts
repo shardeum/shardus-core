@@ -176,6 +176,15 @@ export function getStandbyListHash(): hexstring | undefined {
   return CycleChain.newest?.standbyNodeListHash
 }
 
+/**
+ * Returns the txList hash from the last complete cycle, if available
+ */
+export function getTxListHash(): hexstring | undefined {
+  if (logFlags.verbose) console.log('getting tx list hash')
+  return CycleChain.newest?.txlisthash
+}
+
+
 /** Returns the last list of standby information that had its hash computed. */
 export function getLastHashedStandbyList(): JoinRequest[] {
   if (logFlags.verbose) console.log('getting last hashed standby list')

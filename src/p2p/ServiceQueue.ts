@@ -12,7 +12,7 @@ import { byIdOrder, byPubKey } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 
 let p2pLogger: Logger
-const txList: Array<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }> = []
+let txList: Array<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }> = []
 let txAdd: P2P.ServiceQueueTypes.AddNetworkTx[] = []
 let txRemove: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
 const addProposal: P2P.ServiceQueueTypes.SignedAddNetworkTx[] = []
@@ -174,7 +174,7 @@ export function updateRecord(
 ): void {
   record.txadd = txAdd
   record.txremove = txRemove
-  record.txlisthash = crypto.hash(txList.map((entry) => entry.tx.txData))
+  record.txlisthash = crypto.hash(txList)
 }
 
 export function validateRecordTypes(): string {
@@ -279,6 +279,18 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
   } finally {
     profilerInstance.scopedProfileSectionEnd('serviceQueue - removeTx')
   }
+}
+
+export function getTxListHash() {
+  return crypto.hash(txList)
+}
+
+export function getTxList() {
+  return txList
+}
+
+export function setTxList(_txList: { hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }[]) {
+  txList = _txList
 }
 
 function sortedInsert(entry: { hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }) {
