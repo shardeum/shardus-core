@@ -50,7 +50,7 @@ const txListHashRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'tx-list-hash',
   handler: (_req, res) => {
-    res.send({ standbyNodeListHash: JoinV2.getTxListHash() })
+    res.send({ txListHash: ServiceQueue.getTxListHash() })
   },
 }
 
