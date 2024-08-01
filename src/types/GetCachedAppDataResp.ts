@@ -1,5 +1,7 @@
 import { stateManager } from '../p2p/Context'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { AppObjEnum } from './enum/AppObjEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
@@ -41,11 +43,13 @@ export function deserializeGetCachedAppDataResp(stream: VectorBufferStream): Get
     throw new Error('Unsupported version in deserializeGetCachedAppDataResp')
   }
 
+  let resp = {}
+
   if (stream.readUInt8() === 1) {
     const dataID = stream.readString()
     const appData = stateManager.app.binaryDeserializeObject(AppObjEnum.CachedAppData, stream.readBuffer())
     const cycle = stream.readUInt32()
-    return {
+    resp = {
       cachedAppData: {
         dataID,
         appData,
@@ -54,5 +58,10 @@ export function deserializeGetCachedAppDataResp(stream: VectorBufferStream): Get
     }
   }
 
-  return {}
+  const errors = verifyPayload(AJVSchemaEnum.GetCachedAppDataResp, resp)
+  if (errors && errors.length > 0) {
+    throw new Error(`AJV: validation error -> ${errors.join(', ')}`)
+  }
+
+  return resp
 }
