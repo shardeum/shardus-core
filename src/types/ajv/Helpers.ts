@@ -40,6 +40,10 @@ import { initSyncTrieHashesReq } from './SyncTrieHashesReq'
 import { initGetAccountQueueCountReq } from './GetAccountQueueCountReq'
 import { initGetAccountQueueCountResp } from './GetAccountQueueCountResp'
 import { initMakeReceiptReq } from './MakeReceiptReq'
+import { initGetTrieHashesReq } from './GetTrieHashesReq'
+import { initGetTrieHashesResp } from './GetTrieHashesResp'
+import { initCachedAppData } from './CachedAppData'
+import { initSendCachedAppDataReq } from './sendCachedAppDataReq'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -81,6 +85,10 @@ export function initAjvSchemas(): void {
   initGetAccountQueueCountReq()
   initGetAccountQueueCountResp()
   initMakeReceiptReq()
+  initGetTrieHashesReq()
+  initGetTrieHashesResp()
+  initCachedAppData()
+  initSendCachedAppDataReq()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {

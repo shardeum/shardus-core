@@ -1,5 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
 export type GetTrieHashesResponse = {
   nodeHashes: { radix: string; hash: string }[]
@@ -38,5 +40,11 @@ export function deserializeGetTrieHashesResp(stream: VectorBufferStream): GetTri
     const hash = stream.readString()
     hashes.push({ radix, hash })
   }
+
+  const errors = verifyPayload(AJVSchemaEnum.GetTrieHashesResp, { nodeHashes: hashes, nodeId: nodeId || '' })
+  if (errors && errors.length > 0) {
+    throw new Error('AJV: GetTrieHashesResp validation error')
+  }
+
   return { nodeHashes: hashes, nodeId: nodeId || '' }
 }
