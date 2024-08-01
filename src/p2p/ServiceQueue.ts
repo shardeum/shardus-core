@@ -1,12 +1,13 @@
 import { Logger } from 'log4js'
 import { logger, config, crypto } from './Context'
-import { P2P, Utils } from "@shardus/types";
-import { OpaqueTransaction } from '../shardus/shardus-types'
+import * as CycleChain from './CycleChain'
+import { P2P, Utils } from '@shardus/types'
+import { OpaqueTransaction, ShardusEvent } from '../shardus/shardus-types'
 import { stringifyReduce, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { profilerInstance } from '../utils/profiler'
 import * as Self from './Self'
-import { currentCycle, currentQuarter } from "./CycleCreator";
+import { currentCycle, currentQuarter } from './CycleCreator'
 import { logFlags } from '../logger'
 import { byIdOrder, byPubKey } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -191,8 +192,16 @@ export function processNetworkTransactions(): void {
     }
     const record = txList[i].tx
     if (beforeRemoveVerify.has(record.type) && !beforeRemoveVerify.get(record.type)(record.txData)) {
-      info('emit network transaction event', Utils.safeStringify(record))
-      Self.emitter.emit('try-network-transaction', record)
+      const emitParams: Omit<ShardusEvent, 'type'> = {
+        nodeId: record.txData.nodeId,
+        reason: 'Try Network Transaction',
+        time: CycleChain.newest.start,
+        publicKey: record.txData.publicKey,
+        cycleNumber: record.cycle,
+        additionalData: record,
+      }
+      info('emit network transaction event', Utils.safeStringify(emitParams))
+      Self.emitter.emit('try-network-transaction', emitParams)
     } else {
       info('removeNetworkTx', txList[i].hash)
       removeNetworkTx(txList[i].hash)
