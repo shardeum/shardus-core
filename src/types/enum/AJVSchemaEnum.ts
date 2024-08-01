@@ -30,4 +30,6 @@ export enum AJVSchemaEnum {
   GlobalAccountReportResp = 'GlobalAccountReportResp',
   SyncTrieHashesRequest = 'SyncTrieHashesRequest',
   SyncTrieHashesReq = 'SyncTrieHashesReq',
+  GetAccountQueueCountReq = 'GetAccountQueueCountReq',
+  GetAccountQueueCountResp = 'GetAccountQueueCountResp',
 }

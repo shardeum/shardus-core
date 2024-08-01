@@ -1,11 +1,13 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export type GetAccountQueueCountReq = {
   accountIds: string[]
 }
 
-const cGetAccountQueueCountReqVersion = 1
+export const cGetAccountQueueCountReqVersion = 1
 
 export function serializeGetAccountQueueCountReq(
   stream: VectorBufferStream,
@@ -31,6 +33,10 @@ export function deserializeGetAccountQueueCountReq(stream: VectorBufferStream): 
   const accountIds = []
   for (let i = 0; i < length; i++) {
     accountIds.push(stream.readString())
+  }
+  const errors = verifyPayload(AJVSchemaEnum.GetAccountQueueCountReq, { accountIds })
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
   }
   return {
     accountIds,
