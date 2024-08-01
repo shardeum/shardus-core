@@ -28,4 +28,6 @@ export enum AJVSchemaEnum {
   SpreadAppliedVoteHashReq = 'SpreadAppliedVoteHashReq',
   GlobalAccountReportReq = 'GlobalAccountReportReq',
   GlobalAccountReportResp = 'GlobalAccountReportResp',
+  SyncTrieHashesRequest = 'SyncTrieHashesRequest',
+  SyncTrieHashesReq = 'SyncTrieHashesReq',
 }
