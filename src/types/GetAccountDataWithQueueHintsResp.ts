@@ -1,4 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import {
   deserializeWrappedDataFromQueue,
@@ -47,6 +49,10 @@ export function deserializeGetAccountDataWithQueueHintsResp(
     for (let i = 0; i < length; i++) {
       accountData.push(deserializeWrappedDataFromQueue(stream)) // Deserialize each WrappedDataFromQueueBinary
     }
+  }
+  const errors = verifyPayload(AJVSchemaEnum.GetAccountDataWithQueueHintsResp, { accountData })
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
   }
   return {
     accountData,

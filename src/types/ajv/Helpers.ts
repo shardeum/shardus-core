@@ -30,6 +30,9 @@ import { initGetCachedAppDataReq } from './GetCachedAppDataReq'
 import { initGetCachedAppDataResp } from './GetCachedAppDataResp'
 import { initGetTrieAccountHashesReq } from './GetTrieAccountHashesReq'
 import { initGetTrieAccountHashesResp } from './GetTrieAccountHashesResp'
+import { initWrappedDataFromQueueSerializable } from './WrappedDataFromQueueSerializable'
+import { initGetAccountDataWithQueueHintsReq } from './GetAccountDataWithQueueHintsReq'
+import { initGetAccountDataWithQueueHintsResp } from './GetAccountDataWithQueueHintsResp'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -61,6 +64,9 @@ export function initAjvSchemas(): void {
   initGetCachedAppDataResp()
   initGetTrieAccountHashesReq()
   initGetTrieAccountHashesResp()
+  initWrappedDataFromQueueSerializable()
+  initGetAccountDataWithQueueHintsReq()
+  initGetAccountDataWithQueueHintsResp()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {
