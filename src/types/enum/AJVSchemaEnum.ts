@@ -20,4 +20,6 @@ export enum AJVSchemaEnum {
   GetCachedAppDataResp = 'GetCachedAppDataResp',
   GetAccountDataByListReq = 'GetAccountDataByListReq',
   GetAccountDataByListResp = 'GetAccountDataByListResp',
+  GetTrieAccountHashesReq = 'GetTrieAccountHashesReq',
+  GetTrieAccountHashesResp = 'GetTrieAccountHashesResp',
 }
