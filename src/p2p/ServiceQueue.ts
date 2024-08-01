@@ -187,7 +187,7 @@ export function processNetworkTransactions(): void {
   const length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
   for (let i = 0; i < length; i++) {
     if (!txList[i]) {
-      console.log('txList[i] is undefined')
+      warn(`txList[${i}] is undefined`)
       continue
     }
     const record = txList[i].tx
@@ -200,10 +200,10 @@ export function processNetworkTransactions(): void {
         cycleNumber: record.cycle,
         additionalData: record,
       }
-      info('emit network transaction event', Utils.safeStringify(emitParams))
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) info('emit network transaction event', Utils.safeStringify(emitParams))
       Self.emitter.emit('try-network-transaction', emitParams)
     } else {
-      info('removeNetworkTx', txList[i].hash)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) info('removeNetworkTx', txList[i].hash)
       removeNetworkTx(txList[i].hash)
     }
   }
