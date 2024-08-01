@@ -39,6 +39,7 @@ import { initGlobalAccountReportResp } from './GlobalAccountReportResp'
 import { initSyncTrieHashesReq } from './SyncTrieHashesReq'
 import { initGetAccountQueueCountReq } from './GetAccountQueueCountReq'
 import { initGetAccountQueueCountResp } from './GetAccountQueueCountResp'
+import { initMakeReceiptReq } from './MakeReceiptReq'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -79,6 +80,7 @@ export function initAjvSchemas(): void {
   initSyncTrieHashesReq()
   initGetAccountQueueCountReq()
   initGetAccountQueueCountResp()
+  initMakeReceiptReq()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {
