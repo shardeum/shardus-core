@@ -1,5 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
 export const cGetTrieAccountHashesReqVersion = 1
 
@@ -30,6 +32,15 @@ export function deserializeGetTrieAccountHashesReq(stream: VectorBufferStream): 
   if (radixListLength > 0) {
     radixList = stream.readString().split(',')
   }
+
+  const errors = verifyPayload(AJVSchemaEnum.GetTrieAccountHashesReq, {
+    radixList,
+  })
+
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
+
   return {
     radixList,
   }

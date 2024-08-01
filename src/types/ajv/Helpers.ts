@@ -28,6 +28,8 @@ import { initBroadcastStateReq } from './BroadcastStateReq'
 import { initGetAccountDataRespSerializable } from './GetAccountDataResp'
 import { initGetCachedAppDataReq } from './GetCachedAppDataReq'
 import { initGetCachedAppDataResp } from './GetCachedAppDataResp'
+import { initGetTrieAccountHashesReq } from './GetTrieAccountHashesReq'
+import { initGetTrieAccountHashesResp } from './GetTrieAccountHashesResp'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -57,6 +59,8 @@ export function initAjvSchemas(): void {
   initGetAccountDataRespSerializable()
   initGetCachedAppDataReq()
   initGetCachedAppDataResp()
+  initGetTrieAccountHashesReq()
+  initGetTrieAccountHashesResp()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {
