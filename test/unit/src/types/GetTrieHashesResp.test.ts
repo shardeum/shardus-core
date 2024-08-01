@@ -1,4 +1,5 @@
 import { VectorBufferStream } from '../../../../src'
+import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import {
   GetTrieHashesResponse,
@@ -9,6 +10,10 @@ import {
 const cGetTrieHashesRespVersion = 1 // taken from getTrieHashesResponse
 
 describe('GetTrieHashesResponse Serialization & Deserialization', () => {
+  beforeAll(() => {
+    initAjvSchemas()
+  })
+
   describe('GetTrieHashesResponse Serialization', () => {
     test('should serialize with root true', () => {
       const obj: GetTrieHashesResponse = {
@@ -290,21 +295,23 @@ describe('GetTrieHashesResponse Serialization & Deserialization', () => {
   })
 
   describe('GetTrieHashesResponse Serialization & Deserialization Done Together', () => {
-    const obj: GetTrieHashesResponse = {
-      nodeHashes: [
-        { radix: 'abc123', hash: 'hash1' },
-        { radix: 'def456', hash: 'hash2' },
-        { radix: 'ghi789', hash: 'hash3' },
-      ],
-      nodeId: 'node123',
-    }
+    test('should serialize and deserialize successfully', () => {
+      const obj: GetTrieHashesResponse = {
+        nodeHashes: [
+          { radix: 'abc123', hash: 'hash1' },
+          { radix: 'def456', hash: 'hash2' },
+          { radix: 'ghi789', hash: 'hash3' },
+        ],
+        nodeId: 'node123',
+      }
 
-    const stream = new VectorBufferStream(0)
-    serializeGetTrieHashesResp(stream, obj)
-    stream.position = 0 // Reset position for reading
+      const stream = new VectorBufferStream(0)
+      serializeGetTrieHashesResp(stream, obj)
+      stream.position = 0 // Reset position for reading
 
-    const new_obj = deserializeGetTrieHashesResp(stream)
+      const new_obj = deserializeGetTrieHashesResp(stream)
 
-    expect(new_obj).toEqual(obj)
+      expect(new_obj).toEqual(obj)
+    })
   })
 })
