@@ -22,4 +22,7 @@ export enum AJVSchemaEnum {
   GetAccountDataByListResp = 'GetAccountDataByListResp',
   GetTrieAccountHashesReq = 'GetTrieAccountHashesReq',
   GetTrieAccountHashesResp = 'GetTrieAccountHashesResp',
+  WrappedDataFromQueueSerializable = 'WrappedDataFromQueueSerializable',
+  GetAccountDataWithQueueHintsReq = 'GetAccountDataWithQueueHintsReq',
+  GetAccountDataWithQueueHintsResp = 'GetAccountDataWithQueueHintsResp',
 }

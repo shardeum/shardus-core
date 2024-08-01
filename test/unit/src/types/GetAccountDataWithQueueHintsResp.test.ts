@@ -9,6 +9,7 @@ import {
   WrappedDataFromQueueSerializable,
   serializeWrappedDataFromQueue,
 } from '../../../../src/types/WrappedDataFromQueue'
+import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
 
 const cGetAccountDataWithQueueHintsRespVersion = 1 // taken from GetAccountDataWithQueueHintsResp
 
@@ -32,6 +33,10 @@ jest.mock('../../../../src/types/WrappedDataFromQueue', () => ({
 }))
 
 describe('GetAccountDataWithQueueHintsResp Serialization and Deserialization', () => {
+  beforeAll(() => {
+    initAjvSchemas()
+  })
+
   describe('Serialization', () => {
     test('should serialize GetAccountDataWithQueueHintsRespSerializable with accountData containing entries with syncData and root set to true', () => {
       const obj: GetAccountDataWithQueueHintsRespSerializable = {
