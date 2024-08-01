@@ -1,5 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
 const cSyncTrieHashesReqVersion = 1
 
@@ -38,6 +40,12 @@ export function deserializeSyncTrieHashesReq(stream: VectorBufferStream): SyncTr
     const hash = stream.readString()
     nodeHashes.push({ radix, hash })
   }
+
+  const errors = verifyPayload(AJVSchemaEnum.SyncTrieHashesReq, { cycle, nodeHashes })
+  if (errors && errors.length > 0) {
+    throw new Error('AJV: SyncTrieHashesRequest validation failed')
+  }
+
   return {
     cycle,
     nodeHashes,
