@@ -1,6 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
 export const cGetTrieAccountHashesRespVersion = 1
 export const cRadixAndChildHashesVersion = 1
@@ -63,7 +64,7 @@ export function deserializeGetTrieAccountHashesResp(stream: VectorBufferStream):
     childCount: stream.readUInt32(),
   }
 
-  const errors = verifyPayload('GetTrieAccountHashesResp', {
+  const errors = verifyPayload(AJVSchemaEnum.GetTrieAccountHashesResp, {
     nodeChildHashes,
     stats,
   })
