@@ -33,6 +33,7 @@ import { initGetTrieAccountHashesResp } from './GetTrieAccountHashesResp'
 import { initWrappedDataFromQueueSerializable } from './WrappedDataFromQueueSerializable'
 import { initGetAccountDataWithQueueHintsReq } from './GetAccountDataWithQueueHintsReq'
 import { initGetAccountDataWithQueueHintsResp } from './GetAccountDataWithQueueHintsResp'
+import { initSpreadAppliedVoteHashReq } from './SpreadAppliedVoteHashReq'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -67,6 +68,7 @@ export function initAjvSchemas(): void {
   initWrappedDataFromQueueSerializable()
   initGetAccountDataWithQueueHintsReq()
   initGetAccountDataWithQueueHintsResp()
+  initSpreadAppliedVoteHashReq()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {
