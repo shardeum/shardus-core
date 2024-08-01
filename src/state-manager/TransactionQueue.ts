@@ -8453,16 +8453,22 @@ getDebugStuckTxs(opts): unknown {
       }
     }
   }
-  clearQueueItems(): number {
+  clearQueueItems(minAge: number): number {
+    let count = 0
     try {
+      const currentTime = shardusGetTime()
       for(let i = this._transactionQueue.length-1; i>=0; i--){
         const queueEntry = this._transactionQueue[i]
-        this.removeFromQueue(queueEntry, i)
+        const txAge = currentTime - queueEntry.acceptedTx.timestamp
+        if (txAge > minAge) {
+          this.removeFromQueue(queueEntry, i)
+          count++
+        }
       }
     } catch (e) {
       console.error('clearQueueItems error:', e)
     }
-    return this._transactionQueue.length
+    return count
   }
   getQueueItems(): any[] {
     return this._transactionQueue.map((queueEntry) => {

@@ -2272,7 +2272,9 @@ class StateManager {
     })
 
     Context.network.registerExternalGet('debug-queue-clear', isDebugModeMiddleware, (req, res) => {
-      let result = this.transactionQueue.clearQueueItems()
+      let minAge = req.query.minAge ? parseInt(req.query.minAge as string) : -1
+      if (isNaN(minAge)) minAge = -1
+      let result = this.transactionQueue.clearQueueItems(minAge)
       res.write(Utils.safeStringify(result))
       res.end()
     })
