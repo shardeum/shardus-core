@@ -1570,6 +1570,7 @@ export type ShardusEvent = {
   time: number //Time for 'node-activated' and 'node-deactivated' are the cycle start time in seconds, other event may use ms in the future
   publicKey: string
   cycleNumber: number
+  activeCycle?: number
   additionalData?: any
 }
 

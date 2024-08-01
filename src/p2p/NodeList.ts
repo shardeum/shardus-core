@@ -275,6 +275,7 @@ export function removeNode(
         time: cycle.start,
         publicKey: node.publicKey,
         cycleNumber: cycle.counter,
+        activeCycle: node.activeCycle,
       }
       emitter.emit('node-deactivated', emitParams)
     }
