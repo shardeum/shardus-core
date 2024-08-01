@@ -1,4 +1,6 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export type GetCachedAppDataReq = {
@@ -28,5 +30,11 @@ export function deserializeGetCachedAppDataReq(stream: VectorBufferStream): GetC
   }
   const topic = stream.readString()
   const dataId = stream.readString()
-  return { topic, dataId }
+  const req = { topic, dataId }
+
+  const errors = verifyPayload(AJVSchemaEnum.GetCachedAppDataReq, req)
+  if (errors && errors.length > 0) {
+    throw new Error(`AJV: validation error -> ${errors.join(', ')}`)
+  }
+  return req
 }
