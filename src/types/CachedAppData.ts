@@ -1,5 +1,6 @@
 import { stateManager } from '../p2p/Context'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
 import { AppObjEnum } from './enum/AppObjEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
@@ -26,6 +27,12 @@ export function deserializeCachedAppData(stream: VectorBufferStream): CachedAppD
   const cycle = stream.readUInt32()
   const appData = stateManager.app.binaryDeserializeObject(AppObjEnum.CachedAppData, stream.readBuffer())
   const dataID = stream.readString()
+
+  const errors = verifyPayload(AppObjEnum.CachedAppData, { cycle, appData, dataID })
+  if(errors && errors.length > 0) {
+    throw new Error('AJV: CachedAppData validation failed')
+  }
+
   return {
     cycle,
     appData,

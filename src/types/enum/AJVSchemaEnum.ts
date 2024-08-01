@@ -33,4 +33,8 @@ export enum AJVSchemaEnum {
   GetAccountQueueCountReq = 'GetAccountQueueCountReq',
   GetAccountQueueCountResp = 'GetAccountQueueCountResp',
   MakeReceiptReq = 'MakeReceiptReq',
+  GetTrieHashesReq = 'GetTrieHashesReq',
+  GetTrieHashesResp = 'GetTrieHashesResp',
+  CachedAppData = 'CachedAppData',
+  SendCachedAppDataReq = 'SendCachedAppDataReq',
 }

@@ -1,4 +1,5 @@
 import { VectorBufferStream } from '../../../../src'
+import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import {
   GetTrieHashesRequest,
@@ -9,6 +10,10 @@ import {
 const cGetTrieHashesReqVersion = 1 // taken from getTrieHashesReq
 
 describe('GetTrieHashesRequest Serialization & Deserialization', () => {
+  beforeAll(() => {
+    initAjvSchemas()
+  })
+
   describe('GetTrieHashesRequest Serialization', () => {
     test('should serialize with root true', () => {
       const obj: GetTrieHashesRequest = {
@@ -206,16 +211,18 @@ describe('GetTrieHashesRequest Serialization & Deserialization', () => {
   })
 
   describe('GetTrieHashesRequesr Serialization & Deserialization Done Together', () => {
-    const obj: GetTrieHashesRequest = {
-      radixList: ['abc123', 'def456', 'ghi789', 'jkl012', 'mno345'],
-    }
+    test('should serialize and deserialize successfully', () => {
+      const obj: GetTrieHashesRequest = {
+        radixList: ['abc123', 'def456', 'ghi789', 'jkl012', 'mno345'],
+      }
 
-    const stream = new VectorBufferStream(0)
-    serializeGetTrieHashesReq(stream, obj)
-    stream.position = 0 // Reset position for reading
+      const stream = new VectorBufferStream(0)
+      serializeGetTrieHashesReq(stream, obj, false)
+      stream.position = 0 // Reset position for reading
 
-    const new_obj = deserializeGetTrieHashesReq(stream)
+      const newObj = deserializeGetTrieHashesReq(stream)
 
-    expect(new_obj).toEqual(obj)
+      expect(newObj).toEqual(obj)
+    })
   })
 })
