@@ -1,6 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { WrappedData, deserializeWrappedData, serializeWrappedData } from './WrappedData'
 import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export const cGetAccountDataByListRespVersion = 1
@@ -48,7 +49,7 @@ export function deserializeGetAccountDataByListResp(stream: VectorBufferStream):
     }
   }
 
-  const errors = verifyPayload('GetAccountDataByListResp', accountData)
+  const errors = verifyPayload(AJVSchemaEnum.GetAccountDataByListResp, accountData)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }
