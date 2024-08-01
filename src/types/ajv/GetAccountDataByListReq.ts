@@ -1,4 +1,5 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
 const schemaGetAccountDataByListReq = {
   properties: {
@@ -19,5 +20,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('GetAccountDataByListReq', schemaGetAccountDataByListReq)
+  addSchema(AJVSchemaEnum.GetAccountDataByListReq, schemaGetAccountDataByListReq)
 }
