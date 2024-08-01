@@ -1,5 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
 export type GlobalAccountReportRespSerializable =
   | {
@@ -60,6 +62,10 @@ export function deserializeGlobalAccountReportResp(
       })
     }
     const ready = stream.readUInt8() === 1
+    const errors = verifyPayload(AJVSchemaEnum.GlobalAccountReportResp, { combinedHash, accounts, ready })
+    if (errors && errors.length > 0) {
+      throw new Error('Data validation error')
+    }
     return { combinedHash, accounts, ready }
   }
 }

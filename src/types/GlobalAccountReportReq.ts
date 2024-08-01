@@ -1,5 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
 const cGlobalAccountReportReqVersion = 1
 
@@ -26,5 +28,9 @@ export function deserializeGlobalAccountReportReq(
   }
 
   const req: GlobalAccountReportReqSerializable = {}
+  const errors = verifyPayload(AJVSchemaEnum.GlobalAccountReportReq, req)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
   return req
 }

@@ -34,6 +34,8 @@ import { initWrappedDataFromQueueSerializable } from './WrappedDataFromQueueSeri
 import { initGetAccountDataWithQueueHintsReq } from './GetAccountDataWithQueueHintsReq'
 import { initGetAccountDataWithQueueHintsResp } from './GetAccountDataWithQueueHintsResp'
 import { initSpreadAppliedVoteHashReq } from './SpreadAppliedVoteHashReq'
+import { initGlobalAccountReportReq } from './GlobalAccountReportReq'
+import { initGlobalAccountReportResp } from './GlobalAccountReportResp'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -69,6 +71,8 @@ export function initAjvSchemas(): void {
   initGetAccountDataWithQueueHintsReq()
   initGetAccountDataWithQueueHintsResp()
   initSpreadAppliedVoteHashReq()
+  initGlobalAccountReportReq()
+  initGlobalAccountReportResp()
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {
