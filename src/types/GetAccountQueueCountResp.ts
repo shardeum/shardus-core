@@ -1,5 +1,7 @@
 import { stateManager } from '../p2p/Context'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { AppObjEnum } from './enum/AppObjEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
@@ -68,6 +70,14 @@ export function deserializeGetAccountQueueCountResp(stream: VectorBufferStream):
     const accounts = []
     for (let i = 0; i < accountsLength; i++) {
       accounts.push(stateManager.app.binaryDeserializeObject(AppObjEnum.AppData, stream.readBuffer()))
+    }
+    const errors = verifyPayload(AJVSchemaEnum.GetAccountQueueCountResp, {
+      counts,
+      committingAppData,
+      accounts,
+    })
+    if (errors && errors.length > 0) {
+      throw new Error('Data validation error')
     }
     return {
       counts,
