@@ -11,6 +11,9 @@ import { currentCycle, currentQuarter } from './CycleCreator'
 import { logFlags } from '../logger'
 import { byIdOrder, byPubKey } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { getFromArchiver } from './Archivers'
+import * as Context from './Context'
+import { Result } from 'neverthrow'
 
 /** ROUTES */
 
@@ -309,6 +312,28 @@ export async function processNetworkTransactions(): Promise<void> {
     } catch (e){
       error(`Failed to process network transaction ${txList[i]?.hash}: ${e instanceof Error ? e.stack : e}`)
     }
+  }
+}
+
+export async function syncTxListFromArchiver(): Promise<void> {
+  const archiver: P2P.SyncTypes.ActiveNode = Context.config.p2p.existingArchivers[0]
+  const txListResult: Result<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }[], Error> =
+    await getFromArchiver(archiver, 'network-txs-list')
+
+  if (txListResult.isErr()) {
+    const nodeListUrl = `http://${archiver.ip}:${archiver.port}/network-txs-list`
+    throw Error(`Fatal: Could not get tx list from archiver ${nodeListUrl}: ` + txListResult.error.message)
+  }
+
+  const latestTxListHash = CycleChain?.newest?.txlisthash
+
+  if (!latestTxListHash) {
+    warn('failled to get hash of latest tx list from cycle record')
+    return
+  }
+
+  if (latestTxListHash === crypto.hash(txListResult.value)) {
+    txList = txListResult.value
   }
 }
 
