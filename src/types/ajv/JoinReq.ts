@@ -1,13 +1,17 @@
 // JoinRequest.ts
 import { addSchema } from '../../utils/serialization/SchemaHelpers';
 
+// Define the regex for IPv4 validation, taken from https://github.com/ajv-validator/ajv-formats/blob/master/src/formats.ts
+const ipv4Regex = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
+
+
 const schemaP2PNode = {
     type: 'object',
     properties: {
         publicKey: { type: 'string' },
-        externalIp: { type: 'string' },
+        externalIp: { type: 'string' , pattern: ipv4Regex.source },
         externalPort: { type: 'integer', minimum: 1, maximum: 65535 },
-        internalIp: { type: 'string' },
+        internalIp: { type: 'string', pattern: ipv4Regex.source  },
         internalPort: { type: 'integer', minimum: 1, maximum: 65535 },
         address: { type: 'string' },
         joinRequestTimestamp: { type: 'integer' },
