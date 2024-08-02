@@ -1474,6 +1474,10 @@ class Shardus extends EventEmitter {
           status: 500,
         }
       }
+      if(this.app.isInternalTx(tx)){
+        let result = await this._timestampAndQueueTransaction(tx, appData, global, noConsensus)
+        return result
+      }
       if (shouldAddToNonceQueue) {
         const nonceQueueEntry: NonceQueueItem = {
           tx,
