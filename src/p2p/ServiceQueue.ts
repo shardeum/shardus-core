@@ -12,6 +12,102 @@ import { logFlags } from '../logger'
 import { byIdOrder, byPubKey } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 
+/** ROUTES */
+
+const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedAddNetworkTx> = async (
+  payload,
+  sender,
+  tracker
+) => {
+  profilerInstance.scopedProfileSectionStart('serviceQueue - addTx')
+  try {
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got addTx gossip: ${Utils.safeStringify(payload)}`)
+    let err = ''
+    err = validateTypes(payload, { type: 's', txData: 'o', cycle: 'n', sign: 'o' })
+    if (err) {
+      warn('addTxGossipRoute bad payload: ' + err)
+      return
+    }
+    err = validateTypes(payload.sign, { owner: 's', sig: 's' })
+    if (err) {
+      /* prettier-ignore */ if (logFlags.error) warn('gossip-addtx: bad input sign ' + err)
+      return
+    }
+
+    const signer = byPubKey.get(payload.sign.owner)
+    if (!signer) {
+      /* prettier-ignore */ if (logFlags.error) warn('gossip-addtx: Got request from unknown node')
+      return
+    }
+    if (!crypto.verify(payload, payload.sign.owner)) {
+      if (logFlags.console) console.log(`addTxGossipRoute(): signature invalid`, payload.sign.owner)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `addTxGossipRoute(): signature invalid`)
+      return
+    }
+    // todo: which quartes?
+    if ([1, 2].includes(currentQuarter)) {
+      if (await _addNetworkTx(payload)) {
+        Comms.sendGossip('gossip-addtx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
+      }
+    }
+  } finally {
+    profilerInstance.scopedProfileSectionEnd('serviceQueue - addTx')
+  }
+}
+
+const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedRemoveNetworkTx> = async (
+  payload,
+  sender,
+  tracker
+) => {
+  profilerInstance.scopedProfileSectionStart('serviceQueue - removeTx')
+  try {
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got removeTx gossip: ${Utils.safeStringify(payload)}`)
+    let err = validateTypes(payload, { txHash: 's', cycle: 'n', sign: 'o' })
+    if (err) {
+      warn('removeTxGossipRoute bad payload: ' + err)
+      return
+    }
+    err = validateTypes(payload.sign, { owner: 's', sig: 's' })
+    if (err) {
+      /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: bad input sign ' + err)
+      return
+    }
+
+    const signer = byPubKey.get(payload.sign.owner)
+    if (!signer) {
+      /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: Got request from unknown node')
+      return
+    }
+    if (!crypto.verify(payload, payload.sign.owner)) {
+      if (logFlags.console) console.log(`removeTxGossipRoute(): signature invalid`, payload.sign.owner)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `removeTxGossipRoute(): signature invalid`)
+      return
+    }
+    // todo: which quartes?
+    if ([1, 2].includes(currentQuarter)) {
+      if (await _removeNetworkTx(payload)) {
+        Comms.sendGossip('gossip-removetx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
+      }
+    }
+  } finally {
+    profilerInstance.scopedProfileSectionEnd('serviceQueue - removeTx')
+  }
+}
+
+
+const routes = {
+  external: [],
+  internal: [],
+  internalBinary: [],
+  gossip: {
+    ['gossip-addtx']: addTxGossipRoute,
+    ['gossip-removetx']: removeTxGossipRoute,
+  },
+}
+
+/** STATE */
+
 let p2pLogger: Logger
 let txList: Array<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }> = []
 let txAdd: P2P.ServiceQueueTypes.AddNetworkTx[] = []
@@ -21,13 +117,9 @@ const removeProposal: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
 const beforeAddVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
 const applyVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
 
-export function registerBeforeAddVerifier(type: string, verifier: (txData: OpaqueTransaction) => Promise<boolean>) {
-  beforeAddVerifier.set(type, verifier)
-}
+/** FUNCTIONS */
 
-export function registerApplyVerifier(type: string, verifier: (txData: OpaqueTransaction) => Promise<boolean>) {
-  applyVerifier.set(type, verifier)
-}
+/** CycleCreator Functions */
 
 export function init(): void {
   p2pLogger = logger.getLogger('p2p')
@@ -42,18 +134,6 @@ export function init(): void {
 export function reset(): void {
   txAdd = []
   txRemove = []
-}
-
-export function sendRequests(): void {
-  for (const add of addProposal) {
-    Comms.sendGossip('gossip-addtx', add, '', Self.id, byIdOrder, true)
-  }
-
-  for (const remove of removeProposal) {
-    Comms.sendGossip('gossip-removetx', remove, '', Self.id, byIdOrder, true)
-  }
-  addProposal.length = 0
-  removeProposal.length = 0
 }
 
 export function getTxs(): any {
@@ -83,6 +163,28 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
     removed: [],
     updated: [],
   }
+}
+
+export function sendRequests(): void {
+  for (const add of addProposal) {
+    Comms.sendGossip('gossip-addtx', add, '', Self.id, byIdOrder, true)
+  }
+
+  for (const remove of removeProposal) {
+    Comms.sendGossip('gossip-removetx', remove, '', Self.id, byIdOrder, true)
+  }
+  addProposal.length = 0
+  removeProposal.length = 0
+}
+
+/** Module Functions */
+
+export function registerBeforeAddVerifier(type: string, verifier: (txData: OpaqueTransaction) => Promise<boolean>) {
+  beforeAddVerifier.set(type, verifier)
+}
+
+export function registerApplyVerifier(type: string, verifier: (txData: OpaqueTransaction) => Promise<boolean>) {
+  applyVerifier.set(type, verifier)
 }
 
 export async function addNetworkTx(type: string, tx: OpaqueTransaction): Promise<void> {
@@ -210,87 +312,6 @@ export async function processNetworkTransactions(): Promise<void> {
   }
 }
 
-const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedAddNetworkTx> = async (
-  payload,
-  sender,
-  tracker
-) => {
-  profilerInstance.scopedProfileSectionStart('serviceQueue - addTx')
-  try {
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got addTx gossip: ${Utils.safeStringify(payload)}`)
-    let err = ''
-    err = validateTypes(payload, { type: 's', txData: 'o', cycle: 'n', sign: 'o' })
-    if (err) {
-      warn('addTxGossipRoute bad payload: ' + err)
-      return
-    }
-    err = validateTypes(payload.sign, { owner: 's', sig: 's' })
-    if (err) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-addtx: bad input sign ' + err)
-      return
-    }
-
-    const signer = byPubKey.get(payload.sign.owner)
-    if (!signer) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-addtx: Got request from unknown node')
-      return
-    }
-    if (!crypto.verify(payload, payload.sign.owner)) {
-      if (logFlags.console) console.log(`addTxGossipRoute(): signature invalid`, payload.sign.owner)
-      /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `addTxGossipRoute(): signature invalid`)
-      return
-    }
-    // todo: which quartes?
-    if ([1, 2].includes(currentQuarter)) {
-      if (await _addNetworkTx(payload)) {
-        Comms.sendGossip('gossip-addtx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
-      }
-    }
-  } finally {
-    profilerInstance.scopedProfileSectionEnd('serviceQueue - addTx')
-  }
-}
-
-const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedRemoveNetworkTx> = async (
-  payload,
-  sender,
-  tracker
-) => {
-  profilerInstance.scopedProfileSectionStart('serviceQueue - removeTx')
-  try {
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got removeTx gossip: ${Utils.safeStringify(payload)}`)
-    let err = validateTypes(payload, { txHash: 's', cycle: 'n', sign: 'o' })
-    if (err) {
-      warn('removeTxGossipRoute bad payload: ' + err)
-      return
-    }
-    err = validateTypes(payload.sign, { owner: 's', sig: 's' })
-    if (err) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: bad input sign ' + err)
-      return
-    }
-
-    const signer = byPubKey.get(payload.sign.owner)
-    if (!signer) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: Got request from unknown node')
-      return
-    }
-    if (!crypto.verify(payload, payload.sign.owner)) {
-      if (logFlags.console) console.log(`removeTxGossipRoute(): signature invalid`, payload.sign.owner)
-      /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `removeTxGossipRoute(): signature invalid`)
-      return
-    }
-    // todo: which quartes?
-    if ([1, 2].includes(currentQuarter)) {
-      if (await _removeNetworkTx(payload)) {
-        Comms.sendGossip('gossip-removetx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
-      }
-    }
-  } finally {
-    profilerInstance.scopedProfileSectionEnd('serviceQueue - removeTx')
-  }
-}
-
 export function getTxListHash() {
   return crypto.hash(txList)
 }
@@ -327,14 +348,4 @@ function warn(...msg: unknown[]) {
 function error(...msg: unknown[]) {
   const entry = `ServiceQueue: ${msg.join(' ')}`
   p2pLogger.error(entry)
-}
-
-const routes = {
-  external: [],
-  internal: [],
-  internalBinary: [],
-  gossip: {
-    ['gossip-addtx']: addTxGossipRoute,
-    ['gossip-removetx']: removeTxGossipRoute,
-  },
 }
