@@ -63,6 +63,20 @@ export function getTxs(): any {
   }
 }
 
+export function validateRecordTypes(): string {
+  return ''
+}
+
+export function updateRecord(
+  txs: P2P.ServiceQueueTypes.Txs,
+  record: P2P.CycleCreatorTypes.CycleRecord,
+  prev: P2P.CycleCreatorTypes.CycleRecord
+): void {
+  record.txadd = txAdd
+  record.txremove = txRemove
+  record.txlisthash = crypto.hash(txList)
+}
+
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   return {
     added: [],
@@ -159,20 +173,6 @@ export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
 
   txList.splice(index, 1)
   return true
-}
-
-export function updateRecord(
-  txs: P2P.ServiceQueueTypes.Txs,
-  record: P2P.CycleCreatorTypes.CycleRecord,
-  prev: P2P.CycleCreatorTypes.CycleRecord
-): void {
-  record.txadd = txAdd
-  record.txremove = txRemove
-  record.txlisthash = crypto.hash(txList)
-}
-
-export function validateRecordTypes(): string {
-  return ''
 }
 
 export async function processNetworkTransactions(): Promise<void> {
