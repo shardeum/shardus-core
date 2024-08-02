@@ -2733,9 +2733,8 @@ class TransactionQueue {
       }
     }
 
-
     queueEntry.collectedData[data.accountId] = data
-    queueEntry.dataCollected++
+    queueEntry.dataCollected = Object.keys(queueEntry.collectedData).length
 
     //make a deep copy of the data
     queueEntry.originalData[data.accountId] = Utils.safeJsonParse(Utils.safeStringify(data))
@@ -2748,7 +2747,7 @@ class TransactionQueue {
       if (queueEntry.executionGroup && queueEntry.executionGroup.length > 1) this.shareCompleteDataToNeighbours(queueEntry)
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
-          `queueEntryAddData hasAll: true for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id}`
+          `queueEntryAddData hasAll: true for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id} collected ${Object.keys(queueEntry.collectedData).length} uniqueKeys ${queueEntry.uniqueKeys.length}`
         )
       }
     }
