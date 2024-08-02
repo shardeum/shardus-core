@@ -15,6 +15,17 @@ import { getFromArchiver } from './Archivers'
 import * as Context from './Context'
 import { Result } from 'neverthrow'
 
+/** STATE */
+
+let p2pLogger: Logger
+let txList: Array<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }> = []
+let txAdd: P2P.ServiceQueueTypes.AddNetworkTx[] = []
+let txRemove: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
+const addProposal: P2P.ServiceQueueTypes.SignedAddNetworkTx[] = []
+const removeProposal: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
+const beforeAddVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
+const applyVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
+
 /** ROUTES */
 
 const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedAddNetworkTx> = async (
@@ -108,17 +119,6 @@ const routes = {
     ['gossip-removetx']: removeTxGossipRoute,
   },
 }
-
-/** STATE */
-
-let p2pLogger: Logger
-let txList: Array<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }> = []
-let txAdd: P2P.ServiceQueueTypes.AddNetworkTx[] = []
-let txRemove: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
-const addProposal: P2P.ServiceQueueTypes.SignedAddNetworkTx[] = []
-const removeProposal: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
-const beforeAddVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
-const applyVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
 
 /** FUNCTIONS */
 
