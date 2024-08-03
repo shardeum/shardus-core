@@ -12,7 +12,6 @@ import { logFlags } from '../logger'
 import { byIdOrder, byPubKey } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getFromArchiver } from './Archivers'
-import * as Context from './Context'
 import { Result } from 'neverthrow'
 import { getRandomAvailableArchiver } from './Utils'
 
