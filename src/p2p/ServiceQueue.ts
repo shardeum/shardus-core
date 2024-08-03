@@ -14,6 +14,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getFromArchiver } from './Archivers'
 import * as Context from './Context'
 import { Result } from 'neverthrow'
+import { getRandomAvailableArchiver } from './Utils'
 
 /** STATE */
 
@@ -326,7 +327,11 @@ export async function processNetworkTransactions(): Promise<void> {
 }
 
 export async function syncTxListFromArchiver(): Promise<void> {
-  const archiver: P2P.SyncTypes.ActiveNode = Context.config.p2p.existingArchivers[0]
+  const archiver: P2P.SyncTypes.ActiveNode = getRandomAvailableArchiver()
+  if (!archiver) {
+    throw Error('Fatal: Could not get random archiver')
+  }
+
   const txListResult: Result<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }[], Error> =
     await getFromArchiver(archiver, 'network-txs-list')
 
