@@ -1102,6 +1102,7 @@ class TransactionConsenus {
         try {
           const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid)
           if (queueEntry == null) {
+            nestedCountersInstance.countEvent('poqo', 'error: gossip skipped: no queue entry')
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip no queue entry for ${payload.txid}`)
             return
           }
@@ -1226,8 +1227,21 @@ class TransactionConsenus {
               _sender
             )
           if (isValidFinalDataSender === false) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid sender ${_sender} for data: ${queueEntry.acceptedTx.txId}`)
+            nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt: isValidFinalDataSender === false')
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid: sender ${_sender} for data: ${queueEntry.acceptedTx.txId}`)
             return
+          }
+
+
+          if(readableReq.receipt == null) {
+            nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt: readableReq.receipt == null')
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid: readableReq.receipt == null sender ${_sender}`)
+              return
+          }
+          if(readableReq.finalState.txid != readableReq.receipt.txid) {
+            nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt: readableReq.finalState.txid != readableReq.receipt.txid')
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid: readableReq.finalState.txid != readableReq.receipt.txid sender ${_sender}  ${readableReq.finalState.txid} != ${readableReq.receipt.txid}`)
+              return
           }
 
           if (!queueEntry.hasSentFinalReceipt) {

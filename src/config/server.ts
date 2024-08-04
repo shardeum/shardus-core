@@ -143,7 +143,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     extraNodesToAddInRestart: 5,
     secondsToCheckForQ1: 1000, // 1 seconds in ms
     hardenNewSyncingProtocol: true,
-    removeLostSyncingNodeFromList: false,
+    removeLostSyncingNodeFromList: true,  //set to true since 1.10
     compareCertBinary: true,
     makeReceiptBinary: true,
     lostArchiverInvestigateBinary: true,

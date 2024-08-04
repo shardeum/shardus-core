@@ -907,7 +907,7 @@ export interface ServerConfiguration {
     secondsToCheckForQ1: number
     /** hardenNewSyncingProtocol upgrades to syncing protocol */
     hardenNewSyncingProtocol: boolean
-    /** whether node shuld remove a lost syncing node from its syncing list */
+    /** whether node should remove a lost syncing node from its syncing list */
     removeLostSyncingNodeFromList: boolean
     /** Enable binary serilization by specific endpoint */
     compareCertBinary: boolean
@@ -1222,7 +1222,7 @@ export interface ServerConfiguration {
     forwardToLuckyNodes: boolean
     // should the network forward TXs to lucky nodes?  (only for the nonce queue)
     forwardToLuckyNodesNonceQueue: boolean
-    // forward to multiple lucy nodes (requires other configs to forward at all)
+    // forward to multiple lucky nodes (requires other configs to forward at all)
     forwardToLuckyMulti: boolean
     // only send to lucky nodes in the case that we did not already have this item in our nonce queue
     forwardToLuckyNodesNonceQueueLimitFix: boolean

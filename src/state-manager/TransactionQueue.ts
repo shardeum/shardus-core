@@ -433,19 +433,20 @@ class TransactionQueue {
           }
           /* prettier-ignore */ if (logFlags.verbose && logFlags.console) console.log(`${route}: txId: ${req.txid} stateSize: ${req.stateList.length} stateAddress: ${vStateAddress}`)
 
+          const senderNodeId = header.sender_id
+          let isSenderOurExeNeighbour = false
+          const senderIsInExecutionGroup = queueEntry.executionGroupMap.has(senderNodeId)
+          const neighbourNodes = utils.selectNeighbors(queueEntry.executionGroup, queueEntry.ourExGroupIndex, 2) as Shardus.Node[]
+          const neighbourNodeIds = neighbourNodes.map((node) => node.id)
+          isSenderOurExeNeighbour = senderIsInExecutionGroup && neighbourNodeIds.includes(senderNodeId)
+
           for (let i = 0; i < req.stateList.length; i++) {
             // eslint-disable-next-line security/detect-object-injection
             const state = req.stateList[i];
             let isSenderValid = false
-            const senderNodeId = header.sender_id
             if (configContext.p2p.useFactCorrespondingTell) {
-              let isSenderOurExeNeighbour = false
               // check if it is a neighbour exe node sharing data
               if (configContext.stateManager.shareCompleteData) {
-                const senderIsInExecutionGroup = queueEntry.executionGroupMap.has(senderNodeId)
-                const neighbourNodes = utils.selectNeighbors(queueEntry.executionGroup, queueEntry.ourExGroupIndex, 2) as Shardus.Node[]
-                const neighbourNodeIds = neighbourNodes.map((node) => node.id)
-                isSenderOurExeNeighbour = senderIsInExecutionGroup && neighbourNodeIds.includes(senderNodeId)
                 if (isSenderOurExeNeighbour) {
                   nestedCountersInstance.countEvent('stateManager', 'factValidateCorrespondingTellSender: sender is an execution node and a neighbour node')
                   isSenderValid = true
@@ -474,7 +475,7 @@ class TransactionQueue {
               isSenderValid = false
             }
 
-            if (i !== 0 && isSenderValid === false) {
+            if (isSenderValid === false) {
               this.mainLogger.error(`${route} validateCorrespondingTellSender failed for ${state.accountId}`);
               nestedCountersInstance.countEvent('processing', 'validateCorrespondingTellSender failed')
               return errorHandler(RequestErrorEnum.InvalidSender);
@@ -6331,7 +6332,7 @@ class TransactionQueue {
                 const receipt = this.stateManager.getReceipt2(queueEntry)
                 if(receipt != null){
                   //we saw a receipt so we can move to await final data
-
+                  nestedCountersInstance.countEvent('processing', 'awaitingDataCanBailOnReceipt: activated.  tx state changed from awaiting data to await final data')
                   this.updateTxState(queueEntry, 'await final data', 'receipt while waiting for initial data')
                   continue
                 }
@@ -6986,9 +6987,7 @@ class TransactionQueue {
                   const accountHash = vote.account_state_hash_after[i]
 
                   //only check for stored keys.
-                  if (
-                    ShardFunctions.testAddressInRange(accountID, nodeShardData.storedPartitions) === false
-                  ) {
+                  if ( ShardFunctions.testAddressInRange(accountID, nodeShardData.storedPartitions) === false ) {
                     skipped++
                     accountsNotStored.add(accountID)
                     continue
@@ -7002,11 +7001,10 @@ class TransactionQueue {
                     // break
                   }
                   if (wrappedAccount && wrappedAccount.stateId != accountHash) {
-                    if (logFlags.debug)
-                      this.mainLogger.debug(
-                        `shrd_awaitFinalData_failed : ${queueEntry.logID} wrappedAccount.stateId != accountHash from the vote`
-                      )
+                    if (logFlags.debug) this.mainLogger.debug( `shrd_awaitFinalData_failed : ${queueEntry.logID} wrappedAccount.stateId != accountHash from the vote` )
                     failed = true
+                    //we should be verifying the tate IDS that are pushed into collectedFinal data so this should not happen.  if it does that could cause a stuck TX / local oos
+                    nestedCountersInstance.countEvent('stateManager', `shrd_awaitFinalData failed state check wrappedAccount.stateId != accountHash`)
                     break
                   }
                 }
@@ -7051,6 +7049,8 @@ class TransactionQueue {
 
                 // This is the case where awaiting final data has succeeded. Store the final data and remove TX from the queue
                 if (failed === false && incomplete === false) {
+                  //setting this for completeness, but the TX will be removed from the queue at the end of this section
+                  queueEntry.hasValidFinalData = true
 
                   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_passed', `${shortID}`, `qId: ${queueEntry.entryID} skipped:${skipped}`)
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`shrd_awaitFinalData_passed : ${queueEntry.logID} skipped:${skipped}`)
@@ -7608,17 +7608,11 @@ class TransactionQueue {
       }
 
       if (!nodeToAsk) {
-        if (logFlags.error)
-          this.mainLogger.error('requestFinalData: could not find node from execution group')
-          throw new Error('requestFinalData: could not find node from execution group')
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('requestFinalData: could not find node from execution group')
+        throw new Error('requestFinalData: could not find node from execution group')
       }
 
-      if (logFlags.debug)
-        this.mainLogger.debug(
-          `requestFinalData: txid: ${queueEntry.acceptedTx.txId} accountIds: ${utils.stringifyReduce(
-            accountIds
-          )}, asking node: ${nodeToAsk.id} ${nodeToAsk.externalPort} at timestamp ${shardusGetTime()}`
-        )
+      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug( `requestFinalData: txid: ${queueEntry.acceptedTx.txId} accountIds: ${utils.stringifyReduce( accountIds )}, asking node: ${nodeToAsk.id} ${nodeToAsk.externalPort} at timestamp ${shardusGetTime()}` )
 
       let response
       if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestTxAndStateBinary) {
@@ -7634,10 +7628,12 @@ class TransactionQueue {
         )
       } else response = await Comms.ask(nodeToAsk, 'request_tx_and_state', message)
 
-      if (response && response.stateList) {
+      if (response && response.stateList && response.stateList.length > 0) {
         this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} received data for ${response.stateList.length} accounts`)
       } else {
         this.mainLogger.error(`requestFinalData: txid: ${queueEntry.logID} response is null`)
+        nestedCountersInstance.countEvent('stateManager', 'requestFinalData: failed: response or response.stateList null or statelist length 0')
+        return
       }
 
       for (const data of response.stateList) {
@@ -7658,14 +7654,18 @@ class TransactionQueue {
       if (successCount === accountIds.length) {
         nestedCountersInstance.countEvent('stateManager', 'requestFinalData: got all needed data')
         success = true
+        
+        //setting this for completeness. if our node is awaiting final data it will utilize what was looked up here
+        queueEntry.hasValidFinalData = true
       } else {
-        nestedCountersInstance.countEvent('stateManager', `requestFinalData: did not get enough data: ${successCount} <  ${accountIds.length}`)
+        nestedCountersInstance.countEvent('stateManager', `requestFinalData: failed: did not get enough data: ${successCount} <  ${accountIds.length}`)
       }
     } catch (e) {
-      nestedCountersInstance.countEvent('stateManager', 'requestFinalDataError')
+      nestedCountersInstance.countEvent('stateManager', 'requestFinalData: failed: Error')
       this.mainLogger.error(`requestFinalData: txid: ${queueEntry.logID} error: ${e.message}`)
     } finally {
       if (success === false) {
+        nestedCountersInstance.countEvent('stateManager', 'requestFinalData: failed: success === false')
         /* prettier-ignore */ this.mainLogger.error(`requestFinalData: txid: ${queueEntry.logID} failed. successCount: ${successCount} accountIds: ${accountIds.length}`);
       }
     }

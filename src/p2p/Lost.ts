@@ -549,13 +549,14 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
     }
   }
 
-  // If we see our node in the lostSyncing field of the cycle record, emit a sync timeout event
+  // For every node in the lostSyncing list, emit a sync timeout event
   for (const id of record.lostSyncing) {
     const node = NodeList.nodes.get(id)
     if (node == null) {
       error(`Lost syncing node ${id} is not in the network`)
       continue
     }
+    // this event will be handled and eventually raise the 'node-sync-timeout' event to the dapp for handling 
     NodeList.emitSyncTimeoutEvent(node, record)
     if (config.p2p.removeLostSyncingNodeFromList) NodeList.removeSyncingNode(id)
   }
