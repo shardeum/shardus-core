@@ -11,6 +11,11 @@ import { currentCycle, currentQuarter } from './CycleCreator'
 import { logFlags } from '../logger'
 import { byIdOrder, byPubKey } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { getFromArchiver } from './Archivers'
+import { Result } from 'neverthrow'
+import { getRandomAvailableArchiver } from './Utils'
+
+/** STATE */
 
 let p2pLogger: Logger
 let txList: Array<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }> = []
@@ -21,194 +26,7 @@ const removeProposal: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
 const beforeAddVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
 const applyVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
 
-export function registerBeforeAddVerifier(type: string, verifier: (txData: OpaqueTransaction) => Promise<boolean>) {
-  beforeAddVerifier.set(type, verifier)
-}
-
-export function registerApplyVerifier(type: string, verifier: (txData: OpaqueTransaction) => Promise<boolean>) {
-  applyVerifier.set(type, verifier)
-}
-
-export function init(): void {
-  p2pLogger = logger.getLogger('p2p')
-
-  reset()
-
-  for (const [name, handler] of Object.entries(routes.gossip)) {
-    Comms.registerGossipHandler(name, handler)
-  }
-}
-
-export function reset(): void {
-  txAdd = []
-  txRemove = []
-}
-
-export function sendRequests(): void {
-  for (const add of addProposal) {
-    Comms.sendGossip('gossip-addtx', add, '', Self.id, byIdOrder, true)
-  }
-
-  for (const remove of removeProposal) {
-    Comms.sendGossip('gossip-removetx', remove, '', Self.id, byIdOrder, true)
-  }
-  addProposal.length = 0
-  removeProposal.length = 0
-}
-
-export function getTxs(): any {
-  return {
-    txadd: [...txAdd],
-    txremove: [...txRemove],
-  }
-}
-
-export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
-  return {
-    added: [],
-    removed: [],
-    updated: [],
-  }
-}
-
-export async function addNetworkTx(type: string, tx: OpaqueTransaction): Promise<void> {
-  let networkTx = { type, txData: tx, cycle: currentCycle }
-  txAdd.push(networkTx)
-  if (await _addNetworkTx(networkTx)) {
-    makeAddNetworkTxProposals(networkTx)
-  }
-}
-
-function makeAddNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.AddNetworkTx): void {
-  addProposal.push(crypto.sign(networkTx))
-}
-
-function makeRemoveNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.RemoveNetworkTx): void {
-  removeProposal.push(crypto.sign(networkTx))
-}
-
-async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise<boolean> {
-  try {
-    if (!addTx || !addTx.txData) {
-      warn('Invalid addTx or missing addTx.txData', addTx)
-      return false
-    }
-
-    const txHash = crypto.hash(addTx.txData)
-    if (txList.find((entry) => entry.hash === txHash)) {
-      if (logFlags.p2pNonFatal) {
-        info('Transaction already exists in txList', txHash)
-      }
-      return false
-    }
-
-    if (!beforeAddVerifier.has(addTx.type)) {
-      warn('Adding network tx without a verify function!')
-      return false
-    }
-
-    const verifyFunction = beforeAddVerifier.get(addTx.type)
-    if (!verifyFunction) {
-      error('Verify function is undefined')
-      return false
-    }
-
-    if (!await verifyFunction(addTx.txData)) {
-      error(
-        `Failed add network tx verification of type ${addTx.type} \n tx: ${stringifyReduce(addTx.txData)}`
-      )
-      return false
-    }
-
-    info(`Adding network tx of type ${addTx.type} and payload ${stringifyReduce(addTx.txData)}`)
-    sortedInsert({ hash: txHash, tx: { txData: addTx.txData, type: addTx.type, cycle: addTx.cycle } })
-
-    return true
-  } catch (e) {
-    error(
-      `Failed add network tx verification of type ${addTx.type} \n tx: ${stringifyReduce(
-        addTx.txData
-      )}\n error: ${e instanceof Error ? e.stack : e}`
-    )
-    return
-  }
-}
-
-export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx): Promise<boolean> {
-  const index = txList.findIndex((entry) => entry.hash === removeTx.txHash)
-  if (index === -1) {
-    error(`TxHash ${removeTx.txHash} does not exist in txList`)
-    return false
-  }
-  const listEntry = txList[index]
-  try {
-    if (!applyVerifier.has(listEntry.tx.type)) {
-      // todo: should this throw or not?
-      warn('Remove network tx without a verify function!')
-    } else if (!await applyVerifier.get(listEntry.tx.type)(listEntry.tx.txData)) {
-      error(`Failed remove network tx verification of type ${listEntry.tx.type} \n
-                     tx: ${stringifyReduce(listEntry.tx.txData)}`)
-      return false
-    }
-  } catch (e) {
-    error(`Failed remove network tx verification of type ${listEntry.tx.type} \n
-                   tx: ${stringifyReduce(listEntry.tx.txData)}\n 
-                   error: ${e instanceof Error ? e.stack : e}`)
-    return false
-  }
-
-  txList.splice(index, 1)
-  return true
-}
-
-export function updateRecord(
-  txs: P2P.ServiceQueueTypes.Txs,
-  record: P2P.CycleCreatorTypes.CycleRecord,
-  prev: P2P.CycleCreatorTypes.CycleRecord
-): void {
-  record.txadd = txAdd
-  record.txremove = txRemove
-  record.txlisthash = crypto.hash(txList)
-}
-
-export function validateRecordTypes(): string {
-  return ''
-}
-
-export async function processNetworkTransactions(): Promise<void> {
-  info('Process Network Transactions')
-  const length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
-  for (let i = 0; i < length; i++) {
-    try {
-      if (!txList[i]) {
-        warn(`txList[${i}] is undefined`)
-        continue
-      }
-      const record = txList[i].tx
-      if (applyVerifier.has(record.type) && !(await applyVerifier.get(record.type)(record.txData))) {
-        const emitParams: Omit<ShardusEvent, 'type'> = {
-          nodeId: record.txData.nodeId,
-          reason: 'Try Network Transaction',
-          time: CycleChain.newest.start,
-          publicKey: record.txData.publicKey,
-          cycleNumber: record.cycle,
-          additionalData: record,
-        }
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) info('emit network transaction event', Utils.safeStringify(emitParams))
-        Self.emitter.emit('try-network-transaction', emitParams)
-      } else {
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) info('removeNetworkTx', txList[i].hash)
-        const removeTx = { txHash: txList[i].hash, cycle: currentCycle }
-        txRemove.push(removeTx)
-        if (await _removeNetworkTx(removeTx)) {
-          makeRemoveNetworkTxProposals(removeTx)
-        }
-      }
-    } catch (e){
-      error(`Failed to process network transaction ${txList[i]?.hash}: ${e instanceof Error ? e.stack : e}`)
-    }
-  }
-}
+/** ROUTES */
 
 const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedAddNetworkTx> = async (
   payload,
@@ -291,19 +109,261 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
   }
 }
 
-export function getTxListHash() {
+
+const routes = {
+  external: [],
+  internal: [],
+  internalBinary: [],
+  gossip: {
+    ['gossip-addtx']: addTxGossipRoute,
+    ['gossip-removetx']: removeTxGossipRoute,
+  },
+}
+
+/** FUNCTIONS */
+
+/** CycleCreator Functions */
+
+export function init(): void {
+  p2pLogger = logger.getLogger('p2p')
+
+  reset()
+
+  for (const [name, handler] of Object.entries(routes.gossip)) {
+    Comms.registerGossipHandler(name, handler)
+  }
+}
+
+export function reset(): void {
+  txAdd = []
+  txRemove = []
+}
+
+export function getTxs(): any {
+  return {
+    txadd: [...txAdd],
+    txremove: [...txRemove],
+  }
+}
+
+export function validateRecordTypes(): string {
+  return ''
+}
+
+export function updateRecord(
+  txs: P2P.ServiceQueueTypes.Txs,
+  record: P2P.CycleCreatorTypes.CycleRecord,
+  prev: P2P.CycleCreatorTypes.CycleRecord
+): void {
+  record.txadd = txAdd
+  record.txremove = txRemove
+  record.txlisthash = crypto.hash(txList)
+}
+
+export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
+  return {
+    added: [],
+    removed: [],
+    updated: [],
+  }
+}
+
+export function sendRequests(): void {
+  for (const add of addProposal) {
+    Comms.sendGossip('gossip-addtx', add, '', Self.id, byIdOrder, true)
+  }
+
+  for (const remove of removeProposal) {
+    Comms.sendGossip('gossip-removetx', remove, '', Self.id, byIdOrder, true)
+  }
+  addProposal.length = 0
+  removeProposal.length = 0
+}
+
+/** Module Functions */
+
+export function registerBeforeAddVerifier(
+  type: string,
+  verifier: (txData: OpaqueTransaction) => Promise<boolean>) {
+  beforeAddVerifier.set(type, verifier)
+}
+
+export function registerApplyVerifier(
+  type: string,
+  verifier: (txData: OpaqueTransaction) => Promise<boolean>) {
+  applyVerifier.set(type, verifier)
+}
+
+export async function addNetworkTx(type: string, tx: OpaqueTransaction): Promise<void> {
+  const networkTx = { type, txData: tx, cycle: currentCycle }
+  txAdd.push(networkTx)
+  if (await _addNetworkTx(networkTx)) {
+    makeAddNetworkTxProposals(networkTx)
+  }
+}
+
+function makeAddNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.AddNetworkTx): void {
+  addProposal.push(crypto.sign(networkTx))
+}
+
+function makeRemoveNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.RemoveNetworkTx): void {
+  removeProposal.push(crypto.sign(networkTx))
+}
+
+async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise<boolean> {
+  try {
+    if (!addTx || !addTx.txData) {
+      warn('Invalid addTx or missing addTx.txData', addTx)
+      return false
+    }
+
+    const txHash = crypto.hash(addTx.txData)
+    if (txList.find((entry) => entry.hash === txHash)) {
+      if (logFlags.p2pNonFatal) {
+        info('Transaction already exists in txList', txHash)
+      }
+      return false
+    }
+
+    if (!beforeAddVerifier.has(addTx.type)) {
+      warn('Adding network tx without a verify function!')
+      return false
+    }
+
+    const verifyFunction = beforeAddVerifier.get(addTx.type)
+    if (!verifyFunction) {
+      error('Verify function is undefined')
+      return false
+    }
+
+    if (!await verifyFunction(addTx.txData)) {
+      error(
+        `Failed add network tx verification of type ${addTx.type} \n tx: ${stringifyReduce(addTx.txData)}`
+      )
+      return false
+    }
+
+    info(`Adding network tx of type ${addTx.type} and payload ${stringifyReduce(addTx.txData)}`)
+    sortedInsert({ hash: txHash, tx: { txData: addTx.txData, type: addTx.type, cycle: addTx.cycle } })
+
+    return true
+  } catch (e) {
+    error(
+      `Failed add network tx verification of type ${addTx.type} \n tx: ${stringifyReduce(
+        addTx.txData
+      )}\n error: ${e instanceof Error ? e.stack : e}`
+    )
+    return
+  }
+}
+
+export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx): Promise<boolean> {
+  const index = txList.findIndex((entry) => entry.hash === removeTx.txHash)
+  if (index === -1) {
+    error(`TxHash ${removeTx.txHash} does not exist in txList`)
+    return false
+  }
+  // eslint-disable-next-line security/detect-object-injection
+  const listEntry = txList[index]
+  try {
+    if (!applyVerifier.has(listEntry.tx.type)) {
+      // todo: should this throw or not?
+      warn('Remove network tx without a verify function!')
+    } else if (!await applyVerifier.get(listEntry.tx.type)(listEntry.tx.txData)) {
+      error(`Failed remove network tx verification of type ${listEntry.tx.type} \n
+                     tx: ${stringifyReduce(listEntry.tx.txData)}`)
+      return false
+    }
+  } catch (e) {
+    error(`Failed remove network tx verification of type ${listEntry.tx.type} \n
+                   tx: ${stringifyReduce(listEntry.tx.txData)}\n 
+                   error: ${e instanceof Error ? e.stack : e}`)
+    return false
+  }
+
+  txList.splice(index, 1)
+  return true
+}
+
+export async function processNetworkTransactions(): Promise<void> {
+  info('Process Network Transactions')
+  const length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
+  for (let i = 0; i < length; i++) {
+    try {
+      // eslint-disable-next-line security/detect-object-injection
+      if (!txList[i]) {
+        warn(`txList[${i}] is undefined`)
+        continue
+      }
+      // eslint-disable-next-line security/detect-object-injection
+      const record = txList[i].tx
+      if (applyVerifier.has(record.type) && !(await applyVerifier.get(record.type)(record.txData))) {
+        const emitParams: Omit<ShardusEvent, 'type'> = {
+          nodeId: record.txData.nodeId,
+          reason: 'Try Network Transaction',
+          time: CycleChain.newest.start,
+          publicKey: record.txData.publicKey,
+          cycleNumber: record.cycle,
+          additionalData: record,
+        }
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) info('emit network transaction event', Utils.safeStringify(emitParams))
+        Self.emitter.emit('try-network-transaction', emitParams)
+      } else {
+        // eslint-disable-next-line security/detect-object-injection
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) info('removeNetworkTx', txList[i].hash)
+        // eslint-disable-next-line security/detect-object-injection
+        const removeTx = { txHash: txList[i].hash, cycle: currentCycle }
+        txRemove.push(removeTx)
+        if (await _removeNetworkTx(removeTx)) {
+          makeRemoveNetworkTxProposals(removeTx)
+        }
+      }
+    } catch (e){
+      // eslint-disable-next-line security/detect-object-injection
+      error(`Failed to process network transaction ${txList[i]?.hash}: ${e instanceof Error ? e.stack : e}`)
+    }
+  }
+}
+
+export async function syncTxListFromArchiver(): Promise<void> {
+  const archiver: P2P.SyncTypes.ActiveNode = getRandomAvailableArchiver()
+  if (!archiver) {
+    throw Error('Fatal: Could not get random archiver')
+  }
+
+  const txListResult: Result<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }[], Error> =
+    await getFromArchiver(archiver, 'network-txs-list')
+
+  if (txListResult.isErr()) {
+    const nodeListUrl = `http://${archiver.ip}:${archiver.port}/network-txs-list`
+    throw Error(`Fatal: Could not get tx list from archiver ${nodeListUrl}: ` + txListResult.error.message)
+  }
+
+  const latestTxListHash = CycleChain?.newest?.txlisthash
+
+  if (!latestTxListHash) {
+    warn('failled to get hash of latest tx list from cycle record')
+    return
+  }
+
+  if (latestTxListHash === crypto.hash(txListResult.value)) {
+    txList = txListResult.value
+  }
+}
+
+export function getTxListHash(): string {
   return crypto.hash(txList)
 }
 
-export function getTxList() {
+export function getTxList(): Array<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }> {
   return txList
 }
 
-export function setTxList(_txList: { hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }[]) {
+export function setTxList(_txList: { hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }[]): void {
   txList = _txList
 }
 
-function sortedInsert(entry: { hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }) {
+function sortedInsert(entry: { hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }): void {
   const index = txList.findIndex(
     (item) => item.tx.cycle > entry.tx.cycle || (item.tx.cycle === entry.tx.cycle && item.hash > entry.hash)
   )
@@ -314,27 +374,17 @@ function sortedInsert(entry: { hash: string; tx: P2P.ServiceQueueTypes.AddNetwor
   }
 }
 
-function info(...msg: unknown[]) {
+function info(...msg: unknown[]): void {
   const entry = `ServiceQueue: ${msg.join(' ')}`
   p2pLogger.info(entry)
 }
 
-function warn(...msg: unknown[]) {
+function warn(...msg: unknown[]): void {
   const entry = `ServiceQueue: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }
 
-function error(...msg: unknown[]) {
+function error(...msg: unknown[]): void {
   const entry = `ServiceQueue: ${msg.join(' ')}`
   p2pLogger.error(entry)
-}
-
-const routes = {
-  external: [],
-  internal: [],
-  internalBinary: [],
-  gossip: {
-    ['gossip-addtx']: addTxGossipRoute,
-    ['gossip-removetx']: removeTxGossipRoute,
-  },
 }
