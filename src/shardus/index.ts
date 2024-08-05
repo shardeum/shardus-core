@@ -133,11 +133,8 @@ interface Shardus {
   registerExternalPut: RouteHandlerRegister
   registerExternalDelete: RouteHandlerRegister
   registerExternalPatch: RouteHandlerRegister
-  registerBeforeAddVerify: (type: string, verifier: (tx: OpaqueTransaction) => boolean) => void
-  registerBeforeRemoveVerify: (
-    type: string,
-    verifier: (tx: OpaqueTransaction) => boolean
-  ) => void
+  registerBeforeAddVerifier: (type: string, verifier: (tx: OpaqueTransaction) => Promise<boolean>) => void
+  registerApplyVerifier: (type: string, verifier: (tx: OpaqueTransaction) => Promise<boolean>) => void
   _listeners: any
   appliedConfigChanges: Set<string>
 
@@ -255,9 +252,8 @@ class Shardus extends EventEmitter {
     this.registerExternalPatch = (route, authHandler, handler) =>
       this.network.registerExternalPatch(route, authHandler, handler)
 
-    this.registerBeforeAddVerify = (type, verifier) => ServiceQueue.registerBeforeAddVerify(type, verifier)
-    this.registerBeforeRemoveVerify = (type, verifier) =>
-      ServiceQueue.registerBeforeRemoveVerify(type, verifier)
+    this.registerBeforeAddVerifier = (type, verifier) => ServiceQueue.registerBeforeAddVerifier(type, verifier)
+    this.registerApplyVerifier = (type, verifier) => ServiceQueue.registerApplyVerifier(type, verifier)
 
     this.exitHandler.addSigListeners()
     this.exitHandler.registerSync('reporter', () => {

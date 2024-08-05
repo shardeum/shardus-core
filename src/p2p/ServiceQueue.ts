@@ -18,15 +18,15 @@ let txAdd: P2P.ServiceQueueTypes.AddNetworkTx[] = []
 let txRemove: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
 const addProposal: P2P.ServiceQueueTypes.SignedAddNetworkTx[] = []
 const removeProposal: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
-const beforeAddVerify = new Map()
-const beforeRemoveVerify = new Map()
+const beforeAddVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
+const applyVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
 
-export function registerBeforeAddVerify(type: string, verifier: (txData: OpaqueTransaction) => boolean) {
-  beforeAddVerify.set(type, verifier)
+export function registerBeforeAddVerifier(type: string, verifier: (txData: OpaqueTransaction) => Promise<boolean>) {
+  beforeAddVerifier.set(type, verifier)
 }
 
-export function registerBeforeRemoveVerify(type: string, verifier: (txData: OpaqueTransaction) => boolean) {
-  beforeRemoveVerify.set(type, verifier)
+export function registerApplyVerifier(type: string, verifier: (txData: OpaqueTransaction) => Promise<boolean>) {
+  applyVerifier.set(type, verifier)
 }
 
 export function init(): void {
@@ -71,10 +71,10 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   }
 }
 
-export function addNetworkTx(type: string, tx: OpaqueTransaction): void {
+export async function addNetworkTx(type: string, tx: OpaqueTransaction): Promise<void> {
   let networkTx = { type, txData: tx, cycle: currentCycle }
   txAdd.push(networkTx)
-  if (_addNetworkTx(networkTx)) {
+  if (await _addNetworkTx(networkTx)) {
     makeAddNetworkTxProposals(networkTx)
   }
 }
@@ -87,7 +87,7 @@ function makeRemoveNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.RemoveNet
   removeProposal.push(crypto.sign(networkTx))
 }
 
-function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): boolean {
+async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise<boolean> {
   try {
     if (!addTx || !addTx.txData) {
       warn('Invalid addTx or missing addTx.txData', addTx)
@@ -102,18 +102,18 @@ function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): boolean {
       return false
     }
 
-    if (!beforeAddVerify.has(addTx.type)) {
+    if (!beforeAddVerifier.has(addTx.type)) {
       warn('Adding network tx without a verify function!')
       return false
     }
 
-    const verifyFunction = beforeAddVerify.get(addTx.type)
+    const verifyFunction = beforeAddVerifier.get(addTx.type)
     if (!verifyFunction) {
       error('Verify function is undefined')
       return false
     }
 
-    if (!verifyFunction(addTx.txData)) {
+    if (!await verifyFunction(addTx.txData)) {
       error(
         `Failed add network tx verification of type ${addTx.type} \n tx: ${stringifyReduce(addTx.txData)}`
       )
@@ -134,14 +134,7 @@ function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): boolean {
   }
 }
 
-export function removeNetworkTx(txHash: string): void {
-  const removeTx = { txHash, cycle: currentCycle }
-  txRemove.push(removeTx)
-  _removeNetworkTx(removeTx)
-  makeRemoveNetworkTxProposals(removeTx)
-}
-
-export function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx): boolean {
+export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx): Promise<boolean> {
   const index = txList.findIndex((entry) => entry.hash === removeTx.txHash)
   if (index === -1) {
     error(`TxHash ${removeTx.txHash} does not exist in txList`)
@@ -149,10 +142,10 @@ export function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx
   }
   const listEntry = txList[index]
   try {
-    if (!beforeRemoveVerify.has(listEntry.tx.type)) {
+    if (!applyVerifier.has(listEntry.tx.type)) {
       // todo: should this throw or not?
       warn('Remove network tx without a verify function!')
-    } else if (!beforeRemoveVerify.get(listEntry.tx.type)(listEntry.tx.txData)) {
+    } else if (!await applyVerifier.get(listEntry.tx.type)(listEntry.tx.txData)) {
       error(`Failed remove network tx verification of type ${listEntry.tx.type} \n
                      tx: ${stringifyReduce(listEntry.tx.txData)}`)
       return false
@@ -182,34 +175,42 @@ export function validateRecordTypes(): string {
   return ''
 }
 
-export function processNetworkTransactions(): void {
+export async function processNetworkTransactions(): Promise<void> {
   info('Process Network Transactions')
   const length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
   for (let i = 0; i < length; i++) {
-    if (!txList[i]) {
-      warn(`txList[${i}] is undefined`)
-      continue
-    }
-    const record = txList[i].tx
-    if (beforeRemoveVerify.has(record.type) && !beforeRemoveVerify.get(record.type)(record.txData)) {
-      const emitParams: Omit<ShardusEvent, 'type'> = {
-        nodeId: record.txData.nodeId,
-        reason: 'Try Network Transaction',
-        time: CycleChain.newest.start,
-        publicKey: record.txData.publicKey,
-        cycleNumber: record.cycle,
-        additionalData: record,
+    try {
+      if (!txList[i]) {
+        warn(`txList[${i}] is undefined`)
+        continue
       }
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) info('emit network transaction event', Utils.safeStringify(emitParams))
-      Self.emitter.emit('try-network-transaction', emitParams)
-    } else {
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) info('removeNetworkTx', txList[i].hash)
-      removeNetworkTx(txList[i].hash)
+      const record = txList[i].tx
+      if (applyVerifier.has(record.type) && !(await applyVerifier.get(record.type)(record.txData))) {
+        const emitParams: Omit<ShardusEvent, 'type'> = {
+          nodeId: record.txData.nodeId,
+          reason: 'Try Network Transaction',
+          time: CycleChain.newest.start,
+          publicKey: record.txData.publicKey,
+          cycleNumber: record.cycle,
+          additionalData: record,
+        }
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) info('emit network transaction event', Utils.safeStringify(emitParams))
+        Self.emitter.emit('try-network-transaction', emitParams)
+      } else {
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) info('removeNetworkTx', txList[i].hash)
+        const removeTx = { txHash: txList[i].hash, cycle: currentCycle }
+        txRemove.push(removeTx)
+        if (await _removeNetworkTx(removeTx)) {
+          makeRemoveNetworkTxProposals(removeTx)
+        }
+      }
+    } catch (e){
+      error(`Failed to process network transaction ${txList[i]?.hash}: ${e instanceof Error ? e.stack : e}`)
     }
   }
 }
 
-const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedAddNetworkTx> = (
+const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedAddNetworkTx> = async (
   payload,
   sender,
   tracker
@@ -241,7 +242,7 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
     }
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
-      if (_addNetworkTx(payload)) {
+      if (await _addNetworkTx(payload)) {
         Comms.sendGossip('gossip-addtx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
       }
     }
@@ -250,7 +251,7 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
   }
 }
 
-const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedRemoveNetworkTx> = (
+const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedRemoveNetworkTx> = async (
   payload,
   sender,
   tracker
@@ -281,7 +282,7 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
     }
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
-      if (_removeNetworkTx(payload)) {
+      if (await _removeNetworkTx(payload)) {
         Comms.sendGossip('gossip-removetx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
       }
     }
