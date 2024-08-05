@@ -1,5 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { CachedAppDataSerializable, deserializeCachedAppData, serializeCachedAppData } from './CachedAppData'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 const cSendCachedAppDataReqVersion = 1
@@ -31,10 +33,19 @@ export function deserializeSendCachedAppDataReq(stream: VectorBufferStream): Sen
   if (version > cSendCachedAppDataReqVersion) {
     throw new Error('SendCachedAppDataReq version mismatch')
   }
-  return {
+
+  const data = {
     topic: stream.readString(),
     txId: stream.readString(),
     executionShardKey: stream.readString(),
     cachedAppData: deserializeCachedAppData(stream),
   }
+
+  const errors = verifyPayload(AJVSchemaEnum.SendCachedAppDataReq, data)
+
+  if (errors && errors.length > 0) {
+    throw new Error('AJV: SendCachedAppDataReq validation failed')
+  }
+
+  return data
 }
