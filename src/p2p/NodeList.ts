@@ -268,16 +268,15 @@ export function removeNode(
         cycleNumber: cycle.counter,
       }
       emitter.emit('node-left-early', emitParams)
-    } else {
-      const emitParams: Omit<ShardusEvent, 'type'> = {
-        nodeId: node.id,
-        reason: 'Node deactivated',
-        time: cycle.start,
-        publicKey: node.publicKey,
-        cycleNumber: cycle.counter,
-      }
-      emitter.emit('node-deactivated', emitParams)
     }
+    const emitParams: Omit<ShardusEvent, 'type'> = {
+      nodeId: node.id,
+      reason: 'Node deactivated',
+      time: cycle.start,
+      publicKey: node.publicKey,
+      cycleNumber: cycle.counter,
+    }
+    emitter.emit('node-deactivated', emitParams)
   }
 }
 
