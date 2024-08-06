@@ -633,21 +633,28 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
     }
     /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) console.log('header:', header)
     /* prettier-ignore */ if (logFlags.verbose && logFlags.p2pNonFatal) info(`registerInternalBinary: request info: route: ${route} header: ${Utils.safeStringify(header)} sign: ${Utils.safeStringify(sign)}`)
-    const isSignerUnknown = !NodeList.byPubKey.has(sign.owner)
-    const isSenderUnknown = !NodeList.nodes.has(header.sender_id)
-    const isSignerSenderMismatch =
-      !isSignerUnknown && NodeList.byPubKey.get(sign.owner).id !== header.sender_id
+    const isSignerKnown = NodeList.byPubKey.has(sign.owner)
+    const isSenderKnown = NodeList.nodes.has(header.sender_id)
+    const bothKnown = isSignerKnown && isSenderKnown
     const isTestMode = config.debug.enableTestMode
-    if ((isSignerUnknown || isSenderUnknown) && isSignerSenderMismatch && !isTestMode) {
+
+    if (bothKnown === false && !isTestMode) {
+      nestedCountersInstance.countEvent('comms-route', `signer_or_esender_missing`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('registerInternalBinary: internal route missing signer or sender...')
+      return
+    }
+    
+    const isSignerSenderMismatch = NodeList.byPubKey.get(sign.owner).id !== header.sender_id
+    if (isSignerSenderMismatch && !isTestMode) {
       nestedCountersInstance.countEvent('comms-route', `signer_sender_mismatch`)
-      warn('registerInternalBinary: internal routes can only be used by nodes in the network...')
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('registerInternalBinary: internal routes can only be used by nodes in the network...')
       return
     }
 
     // Checks to see if we can extract the actual payload from the wrapped message
     const requestPayload = _extractPayloadBinary(wrappedPayload)
     if (!requestPayload) {
-      warn('registerInternalBinary: payload unable to be extracted, possible missing signature...')
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('registerInternalBinary: payload unable to be extracted, possible missing signature...')
       return
     }
     if (route !== 'gossip') {
