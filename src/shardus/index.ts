@@ -1808,9 +1808,7 @@ class Shardus extends EventEmitter {
     this.stateManager?.transactionQueue.setDebugSetLastAppAwait(label, complete)
   }
 
-  addNetworkTx(type: string, tx: any) {
-    ServiceQueue.addNetworkTx(type, tx)
-  }
+  addNetworkTx = ServiceQueue.addNetworkTx
 
   validateActiveNodeSignatures(
     signedAppData: any,

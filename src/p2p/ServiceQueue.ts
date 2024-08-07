@@ -1,5 +1,5 @@
 import { Logger } from 'log4js'
-import { logger, config, crypto } from './Context'
+import { logger, config, crypto, network } from './Context';
 import * as CycleChain from './CycleChain'
 import { P2P, Utils } from '@shardus/types'
 import { OpaqueTransaction, ShardusEvent } from '../shardus/shardus-types'
@@ -14,6 +14,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getFromArchiver } from './Archivers'
 import { Result } from 'neverthrow'
 import { getRandomAvailableArchiver } from './Utils'
+import { isDebugModeMiddleware } from '../network/debugMiddleware';
 
 /** STATE */
 
@@ -132,6 +133,25 @@ export function init(): void {
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
   }
+
+  network.registerExternalGet('debug-network-txlist', isDebugModeMiddleware, (req, res) => {
+    res.send({ status: 'ok', txList })
+  })
+
+  network.registerExternalGet('debug-network-txlisthash', isDebugModeMiddleware, (req, res) => {
+    res.send({ status: 'ok', txListHash: crypto.hash(txList) })
+  })
+
+  network.registerExternalGet('debug-drop-network-txhash', isDebugModeMiddleware, (req, res) => {
+    const txHash = req.query.txHash
+    const index = txList.findIndex((entry) => entry.hash === txHash)
+    if (index === -1) {
+      res.send({ status: 'fail', error: 'txHash not found' })
+      return
+    }
+    txList.splice(index, 1)
+    res.send({ status: 'ok' })
+  })
 }
 
 export function reset(): void {
@@ -194,8 +214,8 @@ export function registerApplyVerifier(
   applyVerifier.set(type, verifier)
 }
 
-export async function addNetworkTx(type: string, tx: OpaqueTransaction): Promise<void> {
-  const networkTx = { type, txData: tx, cycle: currentCycle }
+export async function addNetworkTx(type: string, tx: OpaqueTransaction, subQueueKey?: string): Promise<void> {
+  const networkTx = { type, txData: tx, cycle: currentCycle, subQueueKey } as P2P.ServiceQueueTypes.AddNetworkTx
   txAdd.push(networkTx)
   if (await _addNetworkTx(networkTx)) {
     makeAddNetworkTxProposals(networkTx)
@@ -214,6 +234,11 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
   try {
     if (!addTx || !addTx.txData) {
       warn('Invalid addTx or missing addTx.txData', addTx)
+      return false
+    }
+
+    if (addTx.cycle < currentCycle - 1 || addTx.cycle > currentCycle) {
+      warn(`Invalid cycle ${addTx.cycle} for current cycle ${currentCycle}`)
       return false
     }
 
@@ -287,14 +312,22 @@ export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
 
 export async function processNetworkTransactions(): Promise<void> {
   info('Process Network Transactions')
-  const length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
+  const processedSubQueueKeys = new Set<string>()
+  let length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
   for (let i = 0; i < length; i++) {
     try {
       // eslint-disable-next-line security/detect-object-injection
       if (!txList[i]) {
         warn(`txList[${i}] is undefined`)
+        length += 1
         continue
       }
+
+      if (txList[i].tx.subQueueKey != null && processedSubQueueKeys.has(txList[i].tx.subQueueKey)) {
+        length += 1
+        continue
+      }
+
       // eslint-disable-next-line security/detect-object-injection
       const record = txList[i].tx
       if (applyVerifier.has(record.type) && !(await applyVerifier.get(record.type)(record.txData))) {
@@ -308,6 +341,9 @@ export async function processNetworkTransactions(): Promise<void> {
         }
         /* prettier-ignore */ if (logFlags.p2pNonFatal) info('emit network transaction event', Utils.safeStringify(emitParams))
         Self.emitter.emit('try-network-transaction', emitParams)
+        if (txList[i].tx.subQueueKey != null) {
+          processedSubQueueKeys.add(txList[i].tx.subQueueKey)
+        }
       } else {
         // eslint-disable-next-line security/detect-object-injection
         /* prettier-ignore */ if (logFlags.p2pNonFatal) info('removeNetworkTx', txList[i].hash)
