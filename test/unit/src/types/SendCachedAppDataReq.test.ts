@@ -1,16 +1,18 @@
-import { VectorBufferStream } from '../../../../src'
-import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
-import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
-import { stateManager } from '../../../../src/p2p/Context'
-import { AppObjEnum } from '../../../../src/types/enum/AppObjEnum'
 import { Utils } from '@shardus/types'
+import { VectorBufferStream } from '../../../../src'
+import { stateManager } from '../../../../src/p2p/Context'
+import { initAjvSchemas, verifyPayload } from '../../../../src/types/ajv/Helpers'
+import { AppObjEnum } from '../../../../src/types/enum/AppObjEnum'
+import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 
 import {
+  deserializeSendCachedAppDataReq,
   SendCachedAppDataReq,
   serializeSendCachedAppDataReq,
-  deserializeSendCachedAppDataReq,
 } from '../../../../src/types/SendCachedAppDataReq'
-import { deserialize } from 'v8'
+import { AJVSchemaEnum } from '../../../../src/types/enum/AJVSchemaEnum'
+import e from 'express'
+import { exec } from 'child_process'
 
 // Mock the Context module and its nested structure
 jest.mock('../../../../src/p2p/Context', () => ({
@@ -55,6 +57,8 @@ describe('SendCachedAppDataReq Serialization and Deserialization', () => {
       expectedStream.writeUInt16(TypeIdentifierEnum.cSendCachedAppDataReq)
       expectedStream.writeUInt8(cSendCachedAppDataReqVersion)
       expectedStream.writeString(obj.topic)
+      expectedStream.writeString(obj.txId)
+      expectedStream.writeString(obj.executionShardKey)
       expectedStream.writeUInt32(obj.cachedAppData.cycle)
       expectedStream.writeBuffer(
         stateManager.app.binarySerializeObject(AppObjEnum.CachedAppData, obj.cachedAppData.appData)
@@ -81,6 +85,8 @@ describe('SendCachedAppDataReq Serialization and Deserialization', () => {
       const expectedStream = new VectorBufferStream(0)
       expectedStream.writeUInt8(cSendCachedAppDataReqVersion)
       expectedStream.writeString(obj.topic)
+      expectedStream.writeString(obj.txId)
+      expectedStream.writeString(obj.executionShardKey)
       expectedStream.writeUInt32(obj.cachedAppData.cycle)
       expectedStream.writeBuffer(
         stateManager.app.binarySerializeObject(AppObjEnum.CachedAppData, obj.cachedAppData.appData)
@@ -106,6 +112,8 @@ describe('SendCachedAppDataReq Serialization and Deserialization', () => {
       const stream = new VectorBufferStream(0)
       stream.writeUInt8(cSendCachedAppDataReqVersion)
       stream.writeString(obj.topic)
+      stream.writeString(obj.txId)
+      stream.writeString(obj.executionShardKey)
       stream.writeUInt32(obj.cachedAppData.cycle)
       stream.writeBuffer(
         stateManager.app.binarySerializeObject(AppObjEnum.CachedAppData, obj.cachedAppData.appData)
@@ -166,20 +174,33 @@ describe('SendCachedAppDataReq Serialization and Deserialization', () => {
     test('should throw AJV validation failed error', () => {
       const obj = {
         topic: 'test',
+        txId: 'test',
+        executionShardKey: 'test',
         cachedAppData: {
           cycle: 1,
-          appData: 'invalid string',
-          dataID: 'test',
+          appData: { data: 'test' },
         },
       }
 
-      const stream = new VectorBufferStream(0)
-      serializeSendCachedAppDataReq(stream, obj as SendCachedAppDataReq)
+      const errors = verifyPayload(AJVSchemaEnum.SendCachedAppDataReq, obj)
+      expect(errors).not.toBeNull()
+      expect(errors?.length).toBeGreaterThan(0)
+    })
 
-      stream.position = 0
-      expect(() => deserializeSendCachedAppDataReq(stream)).toThrowError(
-        'AJV: CachedAppData validation failed'
-      )
+    test('AJV validation success', () => {
+      const obj = {
+        topic: 'test',
+        txId: 'test',
+        executionShardKey: 'test',
+        cachedAppData: {
+          dataID: 'test',
+          cycle: 1,
+          appData: { data: 'test' },
+        },
+      }
+
+      const errors = verifyPayload(AJVSchemaEnum.SendCachedAppDataReq, obj)
+      expect(errors).toBeNull()
     })
   })
 })

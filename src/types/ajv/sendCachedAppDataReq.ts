@@ -6,9 +6,12 @@ const schemaSendCachedAppDataReq = {
   type: 'object',
   properties: {
     topic: { type: 'string' },
+    txId: { type: 'string' },
+    executionShardKey: { type: 'string' },
     cachedAppData: schemaCachedAppData,
   },
-  required: ['topic', 'cachedAppData'],
+  required: ['topic', 'cachedAppData', 'executionShardKey', 'txId'],
+  additionalProperties: false,
 }
 
 export function initSendCachedAppDataReq(): void {
