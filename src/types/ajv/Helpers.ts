@@ -113,16 +113,3 @@ function parseAjvErrors(errors: Array<ErrorObject> | null): string[] | null {
     return errorMsg
   })
 }
-
-// function main() {
-//   const obj = {
-//     topic: 'test',
-//     txId: 'test',
-//     cachedAppData: {
-//       cycle: 1,
-//       appData: 'invalid string',
-//     },
-//   }
-
-//   verifyPayload(AJVSchemaEnum.SendCachedAppDataReq, obj)
-// }
