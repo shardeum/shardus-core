@@ -44,6 +44,7 @@ import { initGetTrieHashesReq } from './GetTrieHashesReq'
 import { initGetTrieHashesResp } from './GetTrieHashesResp'
 import { initCachedAppData } from './CachedAppData'
 import { initSendCachedAppDataReq } from './sendCachedAppDataReq'
+import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -112,3 +113,16 @@ function parseAjvErrors(errors: Array<ErrorObject> | null): string[] | null {
     return errorMsg
   })
 }
+
+// function main() {
+//   const obj = {
+//     topic: 'test',
+//     txId: 'test',
+//     cachedAppData: {
+//       cycle: 1,
+//       appData: 'invalid string',
+//     },
+//   }
+
+//   verifyPayload(AJVSchemaEnum.SendCachedAppDataReq, obj)
+// }

@@ -9,6 +9,7 @@ export const schemaCachedAppData = {
     dataID: { type: 'string' },
   },
   required: ['cycle', 'appData', 'dataID'],
+  additionalProperties: false,
 }
 
 export function initCachedAppData(): void {
