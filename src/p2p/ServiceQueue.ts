@@ -285,7 +285,7 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
 export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx): Promise<boolean> {
   const index = txList.findIndex((entry) => entry.hash === removeTx.txHash)
   if (index === -1) {
-    error(`TxHash ${removeTx.txHash} does not exist in txList`)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) warn(`TxHash ${removeTx.txHash} does not exist in txList`)
     return false
   }
   // eslint-disable-next-line security/detect-object-injection
