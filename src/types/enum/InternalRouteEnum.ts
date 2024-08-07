@@ -30,8 +30,8 @@ export enum InternalRouteEnum {
   binary_gossip = 'binary/gossip', // tell,
   binary_repair_oos_accounts = 'binary/repair_oos_accounts', // tell
   binary_poqo_send_receipt = 'binary/poqo_send_receipt', // tell
-  binary_poqo_data_and_receipt = "binary/poqo_data_and_receipt", // tell
-  binary_poqo_send_vote = 'binary/poqo_send_vote' // tell
+  binary_poqo_data_and_receipt = 'binary/poqo_data_and_receipt', // tell
+  binary_poqo_send_vote = 'binary/poqo_send_vote', // tell
 }
 
 const askRoutes = new Set([

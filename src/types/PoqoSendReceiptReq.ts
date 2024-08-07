@@ -1,6 +1,10 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
-import { AppliedReceipt2Serializable, deserializeAppliedReceipt2, serializeAppliedReceipt2 } from './AppliedReceipt2'
+import {
+  AppliedReceipt2Serializable,
+  deserializeAppliedReceipt2,
+  serializeAppliedReceipt2,
+} from './AppliedReceipt2'
 export type PoqoSendReceiptReq = AppliedReceipt2Serializable & { txGroupCycle: number }
 
 const cPoqoSendReceiptReqVersion = 1
@@ -17,7 +21,6 @@ export function serializePoqoSendReceiptReq(
 
   serializeAppliedReceipt2(stream, obj)
   stream.writeUInt32(obj.txGroupCycle)
-
 }
 
 export function deserializePoqoSendReceiptReq(stream: VectorBufferStream): PoqoSendReceiptReq {

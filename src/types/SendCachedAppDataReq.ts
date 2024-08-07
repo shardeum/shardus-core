@@ -7,10 +7,10 @@ import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 const cSendCachedAppDataReqVersion = 1
 
 export type SendCachedAppDataReq = {
-  topic: string,
-  txId: string,
+  topic: string
+  txId: string
   executionShardKey: string
-  cachedAppData: CachedAppDataSerializable,
+  cachedAppData: CachedAppDataSerializable
 }
 
 export function serializeSendCachedAppDataReq(

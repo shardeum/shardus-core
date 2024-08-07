@@ -1,6 +1,7 @@
 import { AccountIDAndHash } from '../state-manager/state-manager-types'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
 export type GetAccountDataByHashesReq = {
@@ -15,7 +16,7 @@ export const serializeGetAccountDataByHashesReq = (
   inp: GetAccountDataByHashesReq,
   root = false
 ): void => {
-  const errors = verifyPayload('GetAccountDataByHashesReq', inp)
+  const errors = verifyPayload(AJVSchemaEnum.GetAccountDataByHashesReq, inp)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }
@@ -55,7 +56,7 @@ export const deserializeGetAccountDataByHashesReq = (
       hash: stream.readString(),
     })
   }
-  const errors = verifyPayload('GetAccountDataByHashesReq', result)
+  const errors = verifyPayload(AJVSchemaEnum.GetAccountDataByHashesReq, result)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }

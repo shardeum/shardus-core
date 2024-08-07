@@ -14,7 +14,7 @@ export function serializeGetAccountDataByListReq(
   obj: GetAccountDataByListReq,
   root = false
 ): void {
-  const errors = verifyPayload('GetAccountDataByListReq', obj)
+  const errors = verifyPayload(AJVSchemaEnum.GetAccountDataByListReq, obj)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }

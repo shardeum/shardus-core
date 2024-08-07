@@ -37,4 +37,10 @@ export enum AJVSchemaEnum {
   GetTrieHashesResp = 'GetTrieHashesResp',
   CachedAppData = 'CachedAppData',
   SendCachedAppDataReq = 'SendCachedAppDataReq',
+  SpreadTxToGroupSyncingReq = 'SpreadTxToGroupSyncingReq',
+  CompareCertResp = 'CompareCertResp',
+  GetAccountDataByHashesReq = 'GetAccountDataByHashesReq',
+  GetTxTimestampReq = 'GetTxTimestampReq',
+  GetTxTimestampResp = 'GetTxTimestampResp',
+  GetAccountDataByHashesResp = 'GetAccountDataByHashesResp',
 }
