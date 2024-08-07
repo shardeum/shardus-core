@@ -100,6 +100,7 @@ import { isNodeInRotationBounds } from '../p2p/Utils'
 import { BadRequest, ResponseError, serializeResponseError } from '../types/ResponseError'
 import { error } from 'console'
 import { PoqoDataAndReceiptReq, serializePoqoDataAndReceiptReq } from '../types/PoqoDataAndReceiptReq'
+import { AJVSchemaEnum } from '../types/enum/AJVSchemaEnum'
 
 interface Receipt {
   tx: AcceptedTx
@@ -697,7 +698,7 @@ class TransactionQueue {
 
           const req: SpreadTxToGroupSyncingReq = deserializeSpreadTxToGroupSyncingReq(requestStream)
 
-          const ajvErrors = verifyPayload('SpreadTxToGroupSyncingReq', req)
+          const ajvErrors = verifyPayload(AJVSchemaEnum.SpreadTxToGroupSyncingReq, req)
           if (ajvErrors && ajvErrors.length > 0) {
             this.mainLogger.error(`${route}: request validation errors: ${ajvErrors}`)
             return errorHandler(RequestErrorEnum.InvalidPayload)

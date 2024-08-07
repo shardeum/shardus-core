@@ -29,7 +29,7 @@ export function deserializeCachedAppData(stream: VectorBufferStream): CachedAppD
   const dataID = stream.readString()
 
   const errors = verifyPayload(AppObjEnum.CachedAppData, { cycle, appData, dataID })
-  if(errors && errors.length > 0) {
+  if (errors && errors.length > 0) {
     throw new Error('AJV: CachedAppData validation failed')
   }
 

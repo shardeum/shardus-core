@@ -493,19 +493,25 @@ class AccountPatcher {
         nestedCountersInstance.countEvent('internal', route)
         this.profiler.scopedProfileSectionStart(route, false, payloadBuffer.length)
         try {
-          const requestStream = getStreamWithTypeCheck(payloadBuffer, TypeIdentifierEnum.cRepairOOSAccountsReq)
+          const requestStream = getStreamWithTypeCheck(
+            payloadBuffer,
+            TypeIdentifierEnum.cRepairOOSAccountsReq
+          )
           if (!requestStream) {
             return
           }
-          // (Optional) Check verification data in the header 
+          // (Optional) Check verification data in the header
           const payload = deserializeRepairOOSAccountsReq(requestStream)
-          // verifyPayload('RepairOOSAccountsReq', payload)
+          // verifyPayload(AJVSchemaEnum.RepairOOSAccountsReq', payload)
           for (const repairInstruction of payload?.repairInstructions) {
             const { accountID, txId, hash, accountData, targetNodeId, receipt2 } = repairInstruction
 
             // check if we are the target node
             if (targetNodeId !== Self.id) {
-              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: not target node for txId: ${txId}`)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `binary/repair_oos_accounts: not target node for txId: ${txId}`
+              )
               continue
             }
 
@@ -513,24 +519,39 @@ class AccountPatcher {
             const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(accountID)
             const isInStorageGroup = storageNodes.map((node) => node.id).includes(Self.id)
             if (!isInStorageGroup) {
-              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: not in storage group for account: ${accountID}`)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `binary/repair_oos_accounts: not in storage group for account: ${accountID}`
+              )
               continue
             }
             // check if we have already repaired this account
             const accountHashCache = this.stateManager.accountCache.getAccountHash(accountID)
             if (accountHashCache != null && accountHashCache.h === hash) {
-              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: already repaired account: ${accountID}`)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `binary/repair_oos_accounts: already repaired account: ${accountID}`
+              )
               continue
             }
             if (accountHashCache != null && accountHashCache.t > accountData.timestamp) {
-              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: we have newer account: ${accountID}`)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `binary/repair_oos_accounts: we have newer account: ${accountID}`
+              )
               continue
             }
 
-            const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, 'repair_oos_accounts')
+            const archivedQueueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
+              txId,
+              'repair_oos_accounts'
+            )
 
             if (archivedQueueEntry == null) {
-              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: no archivedQueueEntry for txId: ${txId}`)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `binary/repair_oos_accounts: no archivedQueueEntry for txId: ${txId}`
+              )
               this.mainLogger.debug(`repair_oos_accounts: no archivedQueueEntry for txId: ${txId}`)
               continue
             }
@@ -541,23 +562,37 @@ class AccountPatcher {
 
             if (receivedBestVote != null) {
               // Check if vote is from eligible list of voters for this TX
-              if(this.stateManager.transactionQueue.useNewPOQ && !archivedQueueEntry.eligibleNodeIdsToVote.has(receivedBestVote.node_id)) {
-                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: vote from ineligible node for txId: ${txId}`)
+              if (
+                this.stateManager.transactionQueue.useNewPOQ &&
+                !archivedQueueEntry.eligibleNodeIdsToVote.has(receivedBestVote.node_id)
+              ) {
+                nestedCountersInstance.countEvent(
+                  'accountPatcher',
+                  `binary/repair_oos_accounts: vote from ineligible node for txId: ${txId}`
+                )
                 continue
               }
 
               // Check signature of the vote
-              if (!this.crypto.verify(
-                receivedBestVote as SignedObject,
-                archivedQueueEntry.executionGroupMap.get(receivedBestVote.node_id).publicKey
-              )) {
-                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: vote signature invalid for txId: ${txId}`)
+              if (
+                !this.crypto.verify(
+                  receivedBestVote as SignedObject,
+                  archivedQueueEntry.executionGroupMap.get(receivedBestVote.node_id).publicKey
+                )
+              ) {
+                nestedCountersInstance.countEvent(
+                  'accountPatcher',
+                  `binary/repair_oos_accounts: vote signature invalid for txId: ${txId}`
+                )
                 continue
               }
 
               // Check transaction result from vote
               if (!receivedBestVote.transaction_result) {
-                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: vote result not true for txId ${txId}`)
+                nestedCountersInstance.countEvent(
+                  'accountPatcher',
+                  `binary/repair_oos_accounts: vote result not true for txId ${txId}`
+                )
                 continue
               }
 
@@ -568,7 +603,10 @@ class AccountPatcher {
               for (let i = 0; i < receivedBestVote.account_id.length; i++) {
                 if (receivedBestVote.account_id[i] === accountID) {
                   if (receivedBestVote.account_state_hash_after[i] !== calculatedAccountHash) {
-                    nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: account hash mismatch for txId: ${txId}`)
+                    nestedCountersInstance.countEvent(
+                      'accountPatcher',
+                      `binary/repair_oos_accounts: account hash mismatch for txId: ${txId}`
+                    )
                     accountHashMatch = false
                   } else {
                     accountHashMatch = true
@@ -577,12 +615,18 @@ class AccountPatcher {
                 }
               }
               if (accountHashMatch === false) {
-                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: vote account hash mismatch for txId: ${txId}`)
+                nestedCountersInstance.countEvent(
+                  'accountPatcher',
+                  `binary/repair_oos_accounts: vote account hash mismatch for txId: ${txId}`
+                )
                 continue
               }
             } else {
               // Skip this account apply as we were not able to get the best vote for this tx
-              nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: no vote for txId: ${txId}`)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `binary/repair_oos_accounts: no vote for txId: ${txId}`
+              )
               continue
             }
 
@@ -590,27 +634,41 @@ class AccountPatcher {
               if (bestMessage != null) {
                 // Skip if challenge receipt
                 if (bestMessage.message === 'challenge') {
-                  nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: challenge for txId: ${txId}`)
+                  nestedCountersInstance.countEvent(
+                    'accountPatcher',
+                    `binary/repair_oos_accounts: challenge for txId: ${txId}`
+                  )
                   continue
                 }
 
                 // Check if mesasge is from eligible list of responders for this TX
-                if(!archivedQueueEntry.eligibleNodeIdsToConfirm.has(bestMessage.nodeId)) {
-                  nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: confirmation from ineligible node for txId: ${txId}`)
+                if (!archivedQueueEntry.eligibleNodeIdsToConfirm.has(bestMessage.nodeId)) {
+                  nestedCountersInstance.countEvent(
+                    'accountPatcher',
+                    `binary/repair_oos_accounts: confirmation from ineligible node for txId: ${txId}`
+                  )
                   continue
                 }
 
                 // Check signature of the message
-                if(!this.crypto.verify(
-                  bestMessage as SignedObject,
-                  archivedQueueEntry.executionGroupMap.get(bestMessage.nodeId).publicKey
-                )) {
-                  nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: confirmation signature invalid for txId: ${txId}`)
+                if (
+                  !this.crypto.verify(
+                    bestMessage as SignedObject,
+                    archivedQueueEntry.executionGroupMap.get(bestMessage.nodeId).publicKey
+                  )
+                ) {
+                  nestedCountersInstance.countEvent(
+                    'accountPatcher',
+                    `binary/repair_oos_accounts: confirmation signature invalid for txId: ${txId}`
+                  )
                   continue
                 }
               } else {
                 // Skip this account apply as we were not able to get the best confirmation for this tx
-                nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts: no confirmation for txId: ${txId}`)
+                nestedCountersInstance.countEvent(
+                  'accountPatcher',
+                  `binary/repair_oos_accounts: no confirmation for txId: ${txId}`
+                )
                 continue
               }
             }
@@ -625,9 +683,21 @@ class AccountPatcher {
               true,
               updatedAccounts
             )
-            if (logFlags.debug) this.mainLogger.debug(`binary/repair_oos_accounts: ${updatedAccounts.length} updated, ${failedHashes.length} failed`)
-            nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts:${updatedAccounts.length} updated, accountId: ${utils.makeShortHash(accountID)}, cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
-            if (failedHashes.length > 0) nestedCountersInstance.countEvent('accountPatcher', `binary/repair_oos_accounts:${failedHashes.length} failed`)
+            if (logFlags.debug)
+              this.mainLogger.debug(
+                `binary/repair_oos_accounts: ${updatedAccounts.length} updated, ${failedHashes.length} failed`
+              )
+            nestedCountersInstance.countEvent(
+              'accountPatcher',
+              `binary/repair_oos_accounts:${updatedAccounts.length} updated, accountId: ${utils.makeShortHash(
+                accountID
+              )}, cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`
+            )
+            if (failedHashes.length > 0)
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `binary/repair_oos_accounts:${failedHashes.length} failed`
+              )
             let success = false
             if (updatedAccounts.length > 0 && failedHashes.length === 0) {
               success = true

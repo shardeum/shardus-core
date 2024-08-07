@@ -17,8 +17,12 @@ jest.mock('../../../../src/p2p/Context', () => ({
   stateManager: {
     app: {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      binarySerializeObject: jest.fn((enumType: AppObjEnum, data: any) => Buffer.from(Utils.safeStringify(data), 'utf8')),
-      binaryDeserializeObject: jest.fn((enumType: AppObjEnum, buffer: Buffer) => Utils.safeJsonParse(buffer.toString('utf8'))),
+      binarySerializeObject: jest.fn((enumType: AppObjEnum, data: any) =>
+        Buffer.from(Utils.safeStringify(data), 'utf8')
+      ),
+      binaryDeserializeObject: jest.fn((enumType: AppObjEnum, buffer: Buffer) =>
+        Utils.safeJsonParse(buffer.toString('utf8'))
+      ),
     },
   },
 }))

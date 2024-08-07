@@ -3,6 +3,7 @@ import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { Utils } from '@shardus/types'
 import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
 export interface CompareCertReqSerializable {
   certs: P2P.CycleCreatorTypes.CycleCert[]
@@ -30,7 +31,7 @@ export const deserializeCompareCertReq = (stream: VectorBufferStream): CompareCe
   }
   const obj: CompareCertReqSerializable = Utils.safeJsonParse(stream.readString())
 
-  const errors = verifyPayload('CompareCertReq', obj)
+  const errors = verifyPayload(AJVSchemaEnum.CompareCertReq, obj)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }

@@ -3,7 +3,12 @@ import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import { serializeWrappedDataResponse } from '../../../../src/types/WrappedDataResponse'
 import { VectorBufferStream } from '../../../../src'
-import { BroadcastFinalStateReq, cBroadcastFinalStateReqVersion, deserializeBroadcastFinalStateReq, serializeBroadcastFinalStateReq } from '../../../../src/types/BroadcastFinalStateReq'
+import {
+  BroadcastFinalStateReq,
+  cBroadcastFinalStateReqVersion,
+  deserializeBroadcastFinalStateReq,
+  serializeBroadcastFinalStateReq,
+} from '../../../../src/types/BroadcastFinalStateReq'
 
 // Mock the Context module and its nested structure
 jest.mock('../../../../src/p2p/Context', () => ({
@@ -150,7 +155,9 @@ describe('BroadcastFinalStateReq Deserialization Tests', () => {
     buffer[0] = cBroadcastFinalStateReqVersion + 1
     const alteredStream = VectorBufferStream.fromBuffer(buffer)
 
-    expect(() => deserializeBroadcastFinalStateReq(alteredStream)).toThrow('BroadcastFinalStateReq version mismatch')
+    expect(() => deserializeBroadcastFinalStateReq(alteredStream)).toThrow(
+      'BroadcastFinalStateReq version mismatch'
+    )
   })
 })
 

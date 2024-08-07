@@ -2,6 +2,7 @@ import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { Sign } from '../shardus/shardus-types'
 import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 
 export type getTxTimestampResp = {
   txId: string
@@ -19,7 +20,7 @@ export function serializeGetTxTimestampResp(
   obj: getTxTimestampResp,
   root = false
 ): void {
-  const errors = verifyPayload('GetTxTimestampResp', obj)
+  const errors = verifyPayload(AJVSchemaEnum.GetTxTimestampResp, obj)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }
@@ -91,7 +92,7 @@ export function deserializeGetTxTimestampResp(stream: VectorBufferStream): getTx
     }
   }
 
-  const errors = verifyPayload('GetTxTimestampResp', result)
+  const errors = verifyPayload(AJVSchemaEnum.GetTxTimestampResp, result)
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }

@@ -20,7 +20,7 @@ export const serializeRepairOOSAccountsReq = (
   inp: RepairOOSAccountsReq,
   root = false
 ): void => {
-  // const errors = verifyPayload('RepairOOSAccountsReq', inp)
+  // const errors = verifyPayload(AJVSchemaEnum.RepairOOSAccountsReq', inp)
   // if (errors && errors.length > 0) {
   //   throw new Error('Data validation error')
   // }
