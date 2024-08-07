@@ -22,18 +22,19 @@ A new module will be added with the path `shardus-global-server/src/p2p/Modes.ts
 The existing safety mode implementation is inside the module `shardus-global-server/src/p2p/SafetyMode.ts`
 
 ## Steps
+
 - if first node
-    - set mode to `forming`
+  - set mode to `forming`
 - elif needs to enter recovery
-    if not in recovery, set mode to recovery
+  if not in recovery, set mode to recovery
 - elif needs to enter safety
-    - if not in safety, set mode to safety
+  - if not in safety, set mode to safety
 - elif needs to enter processing
-    - if not in processing, set mode to processing
+  - if not in processing, set mode to processing
 
 ## Updating the Cycle Record
 
-- Inside the p2p directory, a `Modes.ts` will be added. 
+- Inside the p2p directory, a `Modes.ts` will be added.
 - Inside `CycleCreator.ts`, Modes will be added as a submodule
 - Inside the `makeCycleRecord()` function in `CycleCreator.ts`, the field `Mode` will be added to the cycle record
 - In Q3, inside the `runQ3()` function, the `updateRecord()` function of the `Mode` module will be called, which contains the code from the Steps section
@@ -44,13 +45,12 @@ The existing safety mode implementation is inside the module `shardus-global-ser
 - In other words mode argument should be added Shardus side so app can check mode and act accordingly
 
 - in Shardus-Core>join.ts
+
   - In the `addJoinRequest()` there an if statement check if (typeof shardus.app.validateJoinRequest === 'function') to check if overridden by app
     - In the if-statement add the mode argument i.e. `shardus.app.validateJoinRequest(joinRequest, mode)`
-  -In `isReadyToJoin()` add the mode argument
+      -In `isReadyToJoin()` add the mode argument
     - This function gets called by Shardus when trying to join the network and should say not ready to join until certificates needed are present
 
 - On Shardeum-Server
   - `isReadyToJoin()` and `validateJoinRequest()`, mode argument should be added to both functions
     - then logic for when in processing mode, require `stakeCert` and in other modes require `adminCert`
-
-    

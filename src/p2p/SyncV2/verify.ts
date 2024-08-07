@@ -3,12 +3,12 @@
  * given hashes.
  */
 
-import { P2P, hexstring } from '@shardus/types'
-import { err, ok, Result } from 'neverthrow'
-import { HashableObject } from '../../crypto'
-import { crypto } from '../Context'
-import { makeCycleMarker } from '../CycleCreator'
-import { Utils } from '@shardus/types'
+import { P2P, hexstring } from '@shardus/types';
+import { err, ok, Result } from 'neverthrow';
+import { HashableObject } from '../../crypto';
+import { crypto } from '../Context';
+import { makeCycleMarker } from '../CycleCreator';
+import { Utils } from '@shardus/types';
 
 /**
  * Verifies if the hash of a given object matches the expected hash.
@@ -27,11 +27,11 @@ function verify(
   objectName = 'some object'
 ): Result<boolean, Error> {
   console.log(`hashing ${objectName}:`, Utils.safeStringify(object));
-  const newHash = crypto.hash(object)
+  const newHash = crypto.hash(object);
   console.log(`got ${newHash}`);
   return newHash === expectedHash
     ? ok(true)
-    : err(new Error(`hash mismatch for ${objectName}: expected ${expectedHash}, got ${newHash}`))
+    : err(new Error(`hash mismatch for ${objectName}: expected ${expectedHash}, got ${newHash}`));
 }
 
 /** Verifies that the hash of the validator list matches the expected hash. */
@@ -39,7 +39,7 @@ export function verifyValidatorList(
   validatorList: P2P.NodeListTypes.Node[],
   expectedHash: hexstring
 ): Result<boolean, Error> {
-  return verify(validatorList, expectedHash, 'validator list')
+  return verify(validatorList, expectedHash, 'validator list');
 }
 
 /** Verifies that the hash of the archiver list matches the expected hash. */
@@ -47,7 +47,7 @@ export function verifyArchiverList(
   archiverList: P2P.ArchiversTypes.JoinedArchiver[],
   expectedHash: hexstring
 ): Result<boolean, Error> {
-  return verify(archiverList, expectedHash, 'archiver list')
+  return verify(archiverList, expectedHash, 'archiver list');
 }
 
 /** Verifies that the hash of the cycle record matches the expected hash. */
@@ -55,11 +55,11 @@ export function verifyCycleRecord(
   cycleRecord: P2P.CycleCreatorTypes.CycleRecord,
   expectedHash: hexstring
 ): Result<boolean, Error> {
-  const actualHash = makeCycleMarker(cycleRecord)
+  const actualHash = makeCycleMarker(cycleRecord);
 
   // verify that the hash of the CycleRecord matches the expected hash
   if (actualHash !== expectedHash)
-    return err(new Error(`hash mismatch for cycle: expected ${expectedHash}, got ${actualHash}`))
+    return err(new Error(`hash mismatch for cycle: expected ${expectedHash}, got ${actualHash}`));
 
-  return ok(true)
+  return ok(true);
 }

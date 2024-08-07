@@ -1,4 +1,4 @@
-import { SQLDataTypes } from '../utils/schemaDefintions'
+import { SQLDataTypes } from '../utils/schemaDefintions';
 
 const accountStates = [
   'accountStates',
@@ -9,9 +9,9 @@ const accountStates = [
     stateBefore: { type: SQLDataTypes.STRING, allowNull: false },
     stateAfter: { type: SQLDataTypes.STRING, allowNull: false },
   },
-]
+];
 
-export default accountStates
+export default accountStates;
 
 // these are the values in the documentation. converted them to naming standards
 // Acc_id

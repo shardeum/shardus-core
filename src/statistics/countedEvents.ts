@@ -1,12 +1,12 @@
-type EventCategory = string
-type EventName = string
+type EventCategory = string;
+type EventName = string;
 
 export type CountedEvent = {
-  eventCategory: EventCategory
-  eventName: EventName
-  eventCount: number
-  eventTimestamps: number[]
-  eventMessages: string[]
-}
+  eventCategory: EventCategory;
+  eventName: EventName;
+  eventCount: number;
+  eventTimestamps: number[];
+  eventMessages: string[];
+};
 
-export type CountedEventMap = Map<EventCategory, Map<EventName, CountedEvent>>
+export type CountedEventMap = Map<EventCategory, Map<EventName, CountedEvent>>;

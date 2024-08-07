@@ -30,8 +30,8 @@ export enum InternalRouteEnum {
   binary_gossip = 'binary/gossip', // tell,
   binary_repair_oos_accounts = 'binary/repair_oos_accounts', // tell
   binary_poqo_send_receipt = 'binary/poqo_send_receipt', // tell
-  binary_poqo_data_and_receipt = "binary/poqo_data_and_receipt", // tell
-  binary_poqo_send_vote = 'binary/poqo_send_vote' // tell
+  binary_poqo_data_and_receipt = 'binary/poqo_data_and_receipt', // tell
+  binary_poqo_send_vote = 'binary/poqo_send_vote', // tell
 }
 
 const askRoutes = new Set([
@@ -54,12 +54,12 @@ const askRoutes = new Set([
   InternalRouteEnum.binary_request_state_for_tx,
   InternalRouteEnum.binary_request_receipt_for_tx,
   InternalRouteEnum.binary_get_applied_vote,
-])
+]);
 
 export function isAskRoute(route: string): boolean {
-  return askRoutes.has(route as InternalRouteEnum)
+  return askRoutes.has(route as InternalRouteEnum);
 }
 
 export function isTellRoute(route: string): boolean {
-  return !isAskRoute(route) || route === InternalRouteEnum.apoptosize
+  return !isAskRoute(route) || route === InternalRouteEnum.apoptosize;
 }

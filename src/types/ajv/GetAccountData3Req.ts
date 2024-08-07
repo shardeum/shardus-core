@@ -1,4 +1,4 @@
-import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { addSchema } from '../../utils/serialization/SchemaHelpers';
 
 const schemaGetAccountData3Req = {
   type: 'object',
@@ -11,11 +11,11 @@ const schemaGetAccountData3Req = {
     accountOffset: { type: 'string' },
   },
   required: ['accountStart', 'accountEnd', 'tsStart', 'maxRecords', 'offset', 'accountOffset'],
-}
+};
 
 export function initGetAccountData3Req(): void {
-  addSchemaDependencies()
-  addSchemas()
+  addSchemaDependencies();
+  addSchemas();
 }
 
 // Function to add schema dependencies
@@ -25,5 +25,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('GetAccountData3Req', schemaGetAccountData3Req)
+  addSchema('GetAccountData3Req', schemaGetAccountData3Req);
 }

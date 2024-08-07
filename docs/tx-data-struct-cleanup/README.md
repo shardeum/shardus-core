@@ -5,6 +5,7 @@
 ![Overview of Shardus transaction processing](https://cdn.discordapp.com/attachments/910988453687218277/918644762033143838/20211209_171128.jpg)
 
 ## Implementation of Steps (1) - (5) in `shardus-global-server`
+
 ```
 1. App's /inject endpoint
 
@@ -30,13 +31,13 @@ sequenceDiagram
 	participant A as App
 
     S ->> A: Calls App fn to validate tx fields
-    Note over S, A: P2P.registerGossipHandler('spread_tx_to_group') callback » <br> StateManager.TransactionQueue.handleSharedTx » <br> App.validateTxnFields 
+    Note over S, A: P2P.registerGossipHandler('spread_tx_to_group') callback » <br> StateManager.TransactionQueue.handleSharedTx » <br> App.validateTxnFields
 
-    A -->> S: Returns tx fields passed/failed validation 
+    A -->> S: Returns tx fields passed/failed validation
 
     S ->> A: Calls App fn to crack open tx
     Note over S, A: StateManager.TransactionQueue.routeAndQueueAcceptedTransaction » <br> App.getKeyFromTransaction
-    A -->> S: Returns tx timestamp and involved accounts 
+    A -->> S: Returns tx timestamp and involved accounts
     Note over S: Validates tx timestamp within acceptable range
 
     S ->> A: Calls App fn to verify tx signature
@@ -80,5 +81,5 @@ sequenceDiagram
     Note over S, A: StateManager.TransactionQueue.commitConsensedTransaction » <br> StateManager.setAccount » <br> App.updateAccountFull || App.updateAccountPartial
     A -->> S: Returns whether update was successful or not
 ```
-[Differences betweeen diagrams and actual implementation](./TODO.md)
 
+[Differences betweeen diagrams and actual implementation](./TODO.md)

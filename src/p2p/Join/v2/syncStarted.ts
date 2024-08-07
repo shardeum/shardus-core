@@ -1,23 +1,23 @@
-import { logFlags } from '../../../logger'
-import * as NodeList from '../../NodeList'
-import { StartedSyncingRequest } from '@shardus/types/build/src/p2p/JoinTypes'
-import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
-import * as CycleChain from '../../CycleChain'
-import { crypto } from '../../Context'
+import { logFlags } from '../../../logger';
+import * as NodeList from '../../NodeList';
+import { StartedSyncingRequest } from '@shardus/types/build/src/p2p/JoinTypes';
+import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes';
+import * as CycleChain from '../../CycleChain';
+import { crypto } from '../../Context';
 // import * as utils from '../../../utils'
 // import { getRandomAvailableArchiver, getActiveNodesFromArchiver } from '../../Utils'
 //import * as http from '../../../http'
-import { currentQuarter } from '../../CycleCreator'
+import { currentQuarter } from '../../CycleCreator';
 // import { ok, Result } from 'neverthrow'
 
-export const nodesYetToStartSyncing: Map<string, number> = new Map()
-export let lostAfterSelection: string[] = []
-let newSyncStarted: string[] = []
+export const nodesYetToStartSyncing: Map<string, number> = new Map();
+export let lostAfterSelection: string[] = [];
+let newSyncStarted: string[] = [];
 
 export interface SyncStartedRequestResponse {
-  success: boolean
-  reason: string
-  fatal: boolean
+  success: boolean;
+  reason: string;
+  fatal: boolean;
 }
 
 /*
@@ -41,28 +41,29 @@ export async function submitSyncStarted(payload: SyncStarted): Promise<Result<vo
 */
 
 export function insertSyncStarted(nodeId: string): void {
-  newSyncStarted.push(nodeId)
+  newSyncStarted.push(nodeId);
 }
 
 export function addSyncStarted(syncStarted: StartedSyncingRequest): SyncStartedRequestResponse {
   // lookup node by id in payload and use pubkey and compare to sig.owner
-  const publicKeysMatch = ((NodeList.byIdOrder.find((node) => node.id === syncStarted.nodeId))?.publicKey) === syncStarted.sign.owner
+  const publicKeysMatch =
+    NodeList.byIdOrder.find((node) => node.id === syncStarted.nodeId)?.publicKey === syncStarted.sign.owner;
   if (!publicKeysMatch) {
     return {
       success: false,
       reason: 'public key in syncStarted request does not match public key of node',
       fatal: false,
-    }
+    };
   }
 
   // cycle number check
-  const cycleNumber = CycleChain.getNewest().counter
+  const cycleNumber = CycleChain.getNewest().counter;
   if (cycleNumber !== syncStarted.cycleNumber) {
     return {
       success: false,
       reason: 'cycle number in syncStarted request does not match current cycle number',
       fatal: false,
-    }
+    };
   }
 
   // return false if already in map
@@ -71,7 +72,7 @@ export function addSyncStarted(syncStarted: StartedSyncingRequest): SyncStartedR
       success: false,
       reason: 'node has already submitted syncStarted request',
       fatal: false,
-    }
+    };
   }
 
   if (!crypto.verify(syncStarted as unknown as SignedObject, syncStarted.sign.owner)) {
@@ -79,40 +80,39 @@ export function addSyncStarted(syncStarted: StartedSyncingRequest): SyncStartedR
       success: false,
       reason: 'verification of syncStarted request failed',
       fatal: false,
-    }
+    };
   }
 
-  insertSyncStarted(syncStarted.nodeId)
+  insertSyncStarted(syncStarted.nodeId);
 
   return {
     success: true,
     reason: 'syncStarted passed all checks and verification',
     fatal: false,
-  }
+  };
 }
-
 
 /**
  * Returns the list of nodeIds of nodes that started syncing empties the map.
  */
 export function drainSyncStarted(): string[] {
   if (currentQuarter === 3) {
-    if (logFlags.verbose) console.log('draining new syncStarted info:', newSyncStarted)
-    const tmp = newSyncStarted
-    newSyncStarted = []
-    return tmp.sort()
+    if (logFlags.verbose) console.log('draining new syncStarted info:', newSyncStarted);
+    const tmp = newSyncStarted;
+    newSyncStarted = [];
+    return tmp.sort();
   } else {
-    return []
+    return [];
   }
 }
 
 export function drainLostAfterSelectionNodes(): string[] {
   if (currentQuarter === 3) {
-    if (logFlags.verbose) console.log('draining lost after selection nodes:', lostAfterSelection)
-    const tmp = lostAfterSelection
-    lostAfterSelection = []
-    return tmp.sort()
+    if (logFlags.verbose) console.log('draining lost after selection nodes:', lostAfterSelection);
+    const tmp = lostAfterSelection;
+    lostAfterSelection = [];
+    return tmp.sort();
   } else {
-    return []
+    return [];
   }
 }

@@ -1,4 +1,4 @@
-import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { addSchema } from '../../utils/serialization/SchemaHelpers';
 
 const schemaSign = {
   type: 'object',
@@ -7,7 +7,7 @@ const schemaSign = {
     sig: { type: 'string' },
   },
   required: ['owner', 'sig'],
-}
+};
 
 const schemaAppliedVote = {
   type: 'object',
@@ -32,7 +32,7 @@ const schemaAppliedVote = {
     'node_id',
     'app_data_hash',
   ],
-}
+};
 
 const schemaConfirmOrChallengeMessage = {
   type: 'object',
@@ -43,7 +43,7 @@ const schemaConfirmOrChallengeMessage = {
     sign: { $ref: 'Sign' },
   },
   required: ['message', 'nodeId', 'appliedVote'],
-}
+};
 
 const schemaAppliedReceipt2 = {
   type: 'object',
@@ -56,7 +56,7 @@ const schemaAppliedReceipt2 = {
     app_data_hash: { type: 'string' },
   },
   required: ['txid', 'result', 'appliedVote', 'confirmOrChallenge', 'signatures', 'app_data_hash'],
-}
+};
 
 const schemaAccountRepairInstruction = {
   type: 'object',
@@ -69,7 +69,7 @@ const schemaAccountRepairInstruction = {
     receipt2: { $ref: 'AppliedReceipt2' },
   },
   required: ['accountID', 'hash', 'txId', 'accountData', 'targetNodeId', 'receipt2'],
-}
+};
 
 const schemaRepairMissingAccountsReq = {
   type: 'object',
@@ -80,11 +80,11 @@ const schemaRepairMissingAccountsReq = {
     },
   },
   required: ['repairInstructions'],
-}
+};
 
 export function initRepairMissingAccountsReq(): void {
-  addSchemaDependencies()
-  addSchemas()
+  addSchemaDependencies();
+  addSchemas();
 }
 
 // Function to add schema dependencies
@@ -94,9 +94,9 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('Sign', schemaSign)
-  addSchema('AppliedVote', schemaAppliedVote)
-  addSchema('ConfirmOrChallengeMessage', schemaConfirmOrChallengeMessage)
-  addSchema('AppliedReceipt2', schemaAppliedReceipt2)
-  addSchema('RepairMissingAccountsReq', schemaRepairMissingAccountsReq)
+  addSchema('Sign', schemaSign);
+  addSchema('AppliedVote', schemaAppliedVote);
+  addSchema('ConfirmOrChallengeMessage', schemaConfirmOrChallengeMessage);
+  addSchema('AppliedReceipt2', schemaAppliedReceipt2);
+  addSchema('RepairMissingAccountsReq', schemaRepairMissingAccountsReq);
 }

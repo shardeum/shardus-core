@@ -1,12 +1,12 @@
-import { logFlags } from '../../logger'
+import { logFlags } from '../../logger';
 
-type Comparator<T, E = T> = (a: E, b: T) => number
+type Comparator<T, E = T> = (a: E, b: T) => number;
 
 // From: https://stackoverflow.com/a/12646864
 export function shuffleArray<T>(array: T[]): void {
   for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[array[i], array[j]] = [array[j], array[i]] // eslint-disable-line security/detect-object-injection
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]]; // eslint-disable-line security/detect-object-injection
   }
 }
 
@@ -18,40 +18,39 @@ export function shuffleArray<T>(array: T[]): void {
  * @returns
  */
 export function getRandom<T>(arr: T[], n: number): T[] {
-  let len = arr.length
-  const taken = new Array(len)
+  let len = arr.length;
+  const taken = new Array(len);
   if (n > len) {
-    n = len
+    n = len;
   }
-  const result = new Array(n)
+  const result = new Array(n);
   while (n--) {
-    const x = Math.floor(Math.random() * len)
-    result[n] = arr[x in taken ? taken[x] : x] // eslint-disable-line security/detect-object-injection
-    taken[x] = --len in taken ? taken[len] : len // eslint-disable-line security/detect-object-injection
+    const x = Math.floor(Math.random() * len);
+    result[n] = arr[x in taken ? taken[x] : x]; // eslint-disable-line security/detect-object-injection
+    taken[x] = --len in taken ? taken[len] : len; // eslint-disable-line security/detect-object-injection
   }
-  return result
+  return result;
 }
 
 export function insertSorted<T>(arr: T[], item: T, comparator?: Comparator<T>): number {
-  let i = binarySearch(arr, item, comparator)
+  let i = binarySearch(arr, item, comparator);
   if (i < 0) {
-    i = -1 - i
+    i = -1 - i;
   }
-  arr.splice(i, 0, item)
-  return i
+  arr.splice(i, 0, item);
+  return i;
 }
 
-
 export function linearInsertSorted<T>(arr: T[], item: T, comparator: Comparator<T>): void {
-  let i = 0
+  let i = 0;
   while (i < arr.length) {
     if (comparator(item, arr[i]) < 0) {
-      break
+      break;
     }
-    i++
+    i++;
   }
 
-  arr.splice(i, 0, item)
+  arr.splice(i, 0, item);
 }
 
 /**
@@ -80,32 +79,32 @@ export function linearInsertSorted<T>(arr: T[], item: T, comparator: Comparator<
  * the returned value will be the index of the left most lowest element
  */
 export function binaryLowest<T>(ar: T[], comparator?: Comparator<T>): number {
-  if (ar.length < 1) return -1
+  if (ar.length < 1) return -1;
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
     comparator = (a, b) => {
-      return a > b ? 1 : a < b ? -1 : 0
-    }
+      return a > b ? 1 : a < b ? -1 : 0;
+    };
   }
-  if (ar.length < 2) return 0
-  let m = 0
-  let n = ar.length - 1
-  if (comparator(ar[m], ar[n]) < 0) return m // eslint-disable-line security/detect-object-injection
+  if (ar.length < 2) return 0;
+  let m = 0;
+  let n = ar.length - 1;
+  if (comparator(ar[m], ar[n]) < 0) return m; // eslint-disable-line security/detect-object-injection
   while (m <= n) {
-    const k = (n + m) >> 1
-    const cmp = comparator(ar[m], ar[k]) // eslint-disable-line security/detect-object-injection
-    if (logFlags.console) console.log(ar)
-    if (logFlags.console) console.log(m, k, ar[m], ar[k], cmp) // eslint-disable-line security/detect-object-injection
+    const k = (n + m) >> 1;
+    const cmp = comparator(ar[m], ar[k]); // eslint-disable-line security/detect-object-injection
+    if (logFlags.console) console.log(ar);
+    if (logFlags.console) console.log(m, k, ar[m], ar[k], cmp); // eslint-disable-line security/detect-object-injection
     if (cmp > 0) {
-      n = k
+      n = k;
     } else if (cmp < 0) {
-      m = k
+      m = k;
     } else {
-      if (k + 1 === n) return n
-      m = k
+      if (k + 1 === n) return n;
+      m = k;
     }
   }
-  return m
+  return m;
 }
 
 /**
@@ -135,44 +134,44 @@ export function binarySearch<T, E = Partial<T>>(
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
     comparator = (a, b) => {
-      return a.toString() > b.toString() ? 1 : a.toString() < b.toString() ? -1 : 0
-    }
+      return a.toString() > b.toString() ? 1 : a.toString() < b.toString() ? -1 : 0;
+    };
   }
-  let m = 0
-  let n = arr.length - 1
+  let m = 0;
+  let n = arr.length - 1;
   while (m <= n) {
-    const k = (n + m) >> 1
-    const cmp = comparator(el, arr[k]) // eslint-disable-line security/detect-object-injection
+    const k = (n + m) >> 1;
+    const cmp = comparator(el, arr[k]); // eslint-disable-line security/detect-object-injection
     if (cmp > 0) {
-      m = k + 1
+      m = k + 1;
     } else if (cmp < 0) {
-      n = k - 1
+      n = k - 1;
     } else {
-      return k
+      return k;
     }
   }
-  return -m - 1
+  return -m - 1;
 }
 
 export const computeMedian = (arr: number[] = [], sort = true): number => {
   if (sort) {
-    arr.sort((a, b) => a - b)
+    arr.sort((a, b) => a - b);
   }
-  const len = arr.length
+  const len = arr.length;
   switch (len) {
     case 0: {
-      return 0
+      return 0;
     }
     case 1: {
-      return arr[0]
+      return arr[0];
     }
     default: {
-      const mid = len / 2
+      const mid = len / 2;
       if (len % 2 === 0) {
-        return arr[mid] // eslint-disable-line security/detect-object-injection
+        return arr[mid]; // eslint-disable-line security/detect-object-injection
       } else {
-        return (arr[Math.floor(mid)] + arr[Math.ceil(mid)]) / 2
+        return (arr[Math.floor(mid)] + arr[Math.ceil(mid)]) / 2;
       }
     }
   }
-}
+};

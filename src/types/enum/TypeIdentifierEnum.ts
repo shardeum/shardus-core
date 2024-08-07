@@ -62,5 +62,5 @@ export enum TypeIdentifierEnum {
   cRepairOOSAccountsReq,
   cPoqoSendReceiptReq,
   cPoqoDataAndReceiptReq,
-  cPoqoSendVoteReq
+  cPoqoSendVoteReq,
 }

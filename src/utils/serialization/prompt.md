@@ -62,34 +62,34 @@ Example:
 ```ts
 export type Foo = {
   //io: int32
-  accountID: number
-  hash: string
-}
+  accountID: number;
+  hash: string;
+};
 ```
 
 Expected output:
 
 ```ts
-let cFoo = 1
-let cFooVersion = 1
+let cFoo = 1;
+let cFooVersion = 1;
 export function serializeFoo(stream: VectorBufferStream, obj: Foo, root: boolean = false) {
   if (root) {
-    stream.writeUInt16(cFoo)
+    stream.writeUInt16(cFoo);
   }
-  stream.writeUInt16(cFooVersion)
-  stream.writeString(obj.accountID)
-  stream.write(obj.hash)
+  stream.writeUInt16(cFooVersion);
+  stream.writeString(obj.accountID);
+  stream.write(obj.hash);
 }
 
 export function deserializeFoo(stream: VectorBufferStream): Foo {
-  const version = stream.readUInt16()
-  let accountID = stream.readInt32()
-  let hash = stream.readString()
+  const version = stream.readUInt16();
+  let accountID = stream.readInt32();
+  let hash = stream.readString();
   let obj = {
     accountID,
     hash,
-  }
-  return obj
+  };
+  return obj;
 }
 ```
 
@@ -176,14 +176,14 @@ the parent is different.
 //This is an example of the function to generate:
 export function addSchemaDependencies(): void {
   //all dependencies are added here (for types being worked on in this response)
-  addSchemaDependency('Foo2', 'FooParent') //FooParent is the type that requires this
+  addSchemaDependency('Foo2', 'FooParent'); //FooParent is the type that requires this
 }
 
 //This is an example of the function to generate:
 export function addSchemas(): void {
   //register schemas here: (for types being worked on in this response)
-  addSchema('Foo2', schemaFoo2) //here we register Foo2
-  addSchema('FooParent', schemaFooParent) //here we register FooParent
+  addSchema('Foo2', schemaFoo2); //here we register Foo2
+  addSchema('FooParent', schemaFooParent); //here we register FooParent
 }
 ```
 

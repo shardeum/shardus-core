@@ -1,46 +1,46 @@
-import { publicKey } from '@shardus/types'
-import { CycleMarker } from '@shardus/types/build/src/p2p/CycleCreatorTypes'
+import { publicKey } from '@shardus/types';
+import { CycleMarker } from '@shardus/types/build/src/p2p/CycleCreatorTypes';
 import {
   ArchiverDownMsg,
   ArchiverRefutesLostMsg,
   ArchiverUpMsg,
   InvestigateArchiverMsg,
-} from '@shardus/types/build/src/p2p/LostArchiverTypes'
-import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
-import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
-import * as http from '../../http'
-import * as CycleChain from '../../p2p/CycleChain'
-import * as Archivers from '../Archivers'
-import * as Comms from '../Comms'
-import * as Context from '../Context'
-import * as NodeList from '../NodeList'
-import { LostArchiverRecord, lostArchiversMap } from './state'
-import { info, warn, error } from './logging'
-import { id } from '../Self'
-import { binarySearch } from '../../utils/functions/arrays'
-import { activeByIdOrder } from '../NodeList'
-import { inspect } from 'util'
-import { formatErrorMessage } from '../../utils'
-import { nestedCountersInstance } from '../..'
-import { shardusGetTime } from '../../network'
+} from '@shardus/types/build/src/p2p/LostArchiverTypes';
+import { Node } from '@shardus/types/build/src/p2p/NodeListTypes';
+import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes';
+import * as http from '../../http';
+import * as CycleChain from '../../p2p/CycleChain';
+import * as Archivers from '../Archivers';
+import * as Comms from '../Comms';
+import * as Context from '../Context';
+import * as NodeList from '../NodeList';
+import { LostArchiverRecord, lostArchiversMap } from './state';
+import { info, warn, error } from './logging';
+import { id } from '../Self';
+import { binarySearch } from '../../utils/functions/arrays';
+import { activeByIdOrder } from '../NodeList';
+import { inspect } from 'util';
+import { formatErrorMessage } from '../../utils';
+import { nestedCountersInstance } from '../..';
+import { shardusGetTime } from '../../network';
 import {
   LostArchiverInvestigateReq,
   serializeLostArchiverInvestigateReq,
-} from '../../types/LostArchiverInvestigateReq'
-import { InternalRouteEnum } from '../../types/enum/InternalRouteEnum'
-import { tellBinary } from '../Comms'
-import { Utils } from '@shardus/types'
+} from '../../types/LostArchiverInvestigateReq';
+import { InternalRouteEnum } from '../../types/enum/InternalRouteEnum';
+import { tellBinary } from '../Comms';
+import { Utils } from '@shardus/types';
 
 /** Lost Archivers Functions */
 
 export function createLostArchiverRecord(obj: Partial<LostArchiverRecord>): LostArchiverRecord {
-  if (obj.isInvestigator == null) obj.isInvestigator = false
-  if (obj.gossippedDownMsg == null) obj.gossippedDownMsg = false
-  if (obj.gossippedUpMsg == null) obj.gossippedUpMsg = false
-  if (obj.target == null) throw 'Must specify a target for LostArchiverRecord'
-  if (obj.status == null) obj.status = 'reported'
-  if (obj.cyclesToWait == null) obj.cyclesToWait = Context.config.p2p.lostArchiversCyclesToWait
-  return obj as LostArchiverRecord
+  if (obj.isInvestigator == null) obj.isInvestigator = false;
+  if (obj.gossippedDownMsg == null) obj.gossippedDownMsg = false;
+  if (obj.gossippedUpMsg == null) obj.gossippedUpMsg = false;
+  if (obj.target == null) throw 'Must specify a target for LostArchiverRecord';
+  if (obj.status == null) obj.status = 'reported';
+  if (obj.cyclesToWait == null) obj.cyclesToWait = Context.config.p2p.lostArchiversCyclesToWait;
+  return obj as LostArchiverRecord;
 }
 
 /**
@@ -52,16 +52,16 @@ export function createLostArchiverRecord(obj: Partial<LostArchiverRecord>): Lost
  */
 export function reportLostArchiver(publicKey: publicKey, errorMsg: string): void {
   if (Context.config.p2p.enableLostArchiversCycles === false) {
-    info(`reportLostArchiver: not enabled, publicKey: ${publicKey}, errorMsg: ${errorMsg}`)
-    return
+    info(`reportLostArchiver: not enabled, publicKey: ${publicKey}, errorMsg: ${errorMsg}`);
+    return;
   }
-  info(`reportLostArchiver: publicKey: ${publicKey}, errorMsg: ${errorMsg}`)
+  info(`reportLostArchiver: publicKey: ${publicKey}, errorMsg: ${errorMsg}`);
   // Add new entry to lostArchiversMap for reported Archiver if it doesn't exist
   // This is to ensure that we don't overwrite existing entries
   if (lostArchiversMap.has(publicKey)) {
-    info('reportLostArchiver: already have LostArchiverRecord')
+    info('reportLostArchiver: already have LostArchiverRecord');
   } else {
-    info('reportLostArchiver: adding new LostArchiverRecord')
+    info('reportLostArchiver: adding new LostArchiverRecord');
     // Set status to 'reported'
     // This status indicates that the Archiver has been reported as lost, but not yet investigated
     lostArchiversMap.set(
@@ -70,7 +70,7 @@ export function reportLostArchiver(publicKey: publicKey, errorMsg: string): void
         target: publicKey,
         status: 'reported',
       })
-    )
+    );
   }
   // don't gossip here; that is initiated in sendRequests()
 }
@@ -83,24 +83,24 @@ export function reportLostArchiver(publicKey: publicKey, errorMsg: string): void
 export async function investigateArchiver(
   investigateMsg: SignedObject<InvestigateArchiverMsg>
 ): Promise<void> {
-  info(`investigateArchiver: investigateMsg: ${inspect(investigateMsg)}`)
-  const publicKey = investigateMsg.target
-  const archiver = Archivers.archivers.get(publicKey)
+  info(`investigateArchiver: investigateMsg: ${inspect(investigateMsg)}`);
+  const publicKey = investigateMsg.target;
+  const archiver = Archivers.archivers.get(publicKey);
   if (!archiver) {
     // don't know the archiver
     warn(
       `investigateArchiver: asked to investigate archiver '${publicKey}', but it's not in the archivers list`
-    )
-    return
+    );
+    return;
   }
 
   // Retrieve the record of the Archiver from the lostArchiversMap
-  info(`investigateArchiver: publicKey: ${publicKey}`)
-  let record = lostArchiversMap.get(publicKey)
+  info(`investigateArchiver: publicKey: ${publicKey}`);
+  let record = lostArchiversMap.get(publicKey);
   if (record && ['investigating', 'down', 'up'].includes(record.status)) {
-    info('investigateArchiver: already have LostArchiverRecord')
+    info('investigateArchiver: already have LostArchiverRecord');
     // already investigated
-    return
+    return;
   }
   // starting investigation
   record = createLostArchiverRecord({
@@ -109,21 +109,21 @@ export async function investigateArchiver(
     status: 'investigating',
     gossippedDownMsg: false,
     investigateMsg,
-  })
+  });
 
   // record it
-  lostArchiversMap.set(publicKey, record)
+  lostArchiversMap.set(publicKey, record);
 
   // ping the archiver
-  const isReachable = await pingArchiver(archiver.ip, archiver.port)
+  const isReachable = await pingArchiver(archiver.ip, archiver.port);
 
   // handle the result
   if (isReachable) {
-    info(`investigateArchiver: archiver is reachable`)
-    lostArchiversMap.delete(publicKey)
+    info(`investigateArchiver: archiver is reachable`);
+    lostArchiversMap.delete(publicKey);
   } else {
-    info(`investigateArchiver: archiver is not reachable`)
-    record.status = 'down'
+    info(`investigateArchiver: archiver is not reachable`);
+    record.status = 'down';
   }
   // don't gossip here; that is initiated in sendRequests()
 }
@@ -136,18 +136,18 @@ export async function investigateArchiver(
 export function getInvestigator(target: publicKey, marker: CycleMarker): Node {
   // Implement hashing target + marker and returning node from Nodelist with id closest to hash
   // This is to ensure that the investigator node is chosen in a deterministic manner
-  const obj = { target, marker }
-  const near = Context.crypto.hash(obj)
-  let idx = binarySearch(activeByIdOrder, near, (i, r) => i.localeCompare(r.id))
-  if (idx < 0) idx = (-1 - idx) % activeByIdOrder.length
+  const obj = { target, marker };
+  const near = Context.crypto.hash(obj);
+  let idx = binarySearch(activeByIdOrder, near, (i, r) => i.localeCompare(r.id));
+  if (idx < 0) idx = (-1 - idx) % activeByIdOrder.length;
   // eslint-disable-next-line security/detect-object-injection
-  const foundNode = activeByIdOrder[idx]
+  const foundNode = activeByIdOrder[idx];
   // eslint-disable-next-line security/detect-object-injection
   if (foundNode == null) {
-    throw new Error(`activeByIdOrder idx:${idx} length: ${activeByIdOrder.length}`)
+    throw new Error(`activeByIdOrder idx:${idx} length: ${activeByIdOrder.length}`);
   }
-  if (foundNode.id === id) idx = (idx + 1) % activeByIdOrder.length // skip to next node if the selected node is target
-  return foundNode
+  if (foundNode.id === id) idx = (idx + 1) % activeByIdOrder.length; // skip to next node if the selected node is target
+  return foundNode;
 }
 
 /**
@@ -158,12 +158,12 @@ export function informInvestigator(target: publicKey): void {
   // This is to initiate the investigation process
   try {
     // Compute investigator based off of hash(target + cycle marker)
-    const cycle = CycleChain.getCurrentCycleMarker()
-    const investigator = getInvestigator(target, cycle)
+    const cycle = CycleChain.getCurrentCycleMarker();
+    const investigator = getInvestigator(target, cycle);
     // Don't send yourself an InvestigateArchiverMsg
     if (id === investigator.id) {
-      info(`informInvestigator: investigator is self, not sending InvestigateArchiverMsg`)
-      return
+      info(`informInvestigator: investigator is self, not sending InvestigateArchiverMsg`);
+      return;
     }
 
     // Form msg
@@ -173,10 +173,10 @@ export function informInvestigator(target: publicKey): void {
       investigator: investigator.id,
       sender: id,
       cycle,
-    })
+    });
 
     // Send message to investigator
-    info(`informInvestigator: sending InvestigateArchiverMsg: ${inspect(investigateMsg)}`)
+    info(`informInvestigator: sending InvestigateArchiverMsg: ${inspect(investigateMsg)}`);
     if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.lostArchiverInvestigateBinary) {
       Comms.tellBinary<LostArchiverInvestigateReq>(
         [investigator],
@@ -184,14 +184,13 @@ export function informInvestigator(target: publicKey): void {
         investigateMsg,
         serializeLostArchiverInvestigateReq,
         {}
-      )
+      );
     } else {
-      Comms.tell([investigator], 'lost-archiver-investigate', investigateMsg)
+      Comms.tell([investigator], 'lost-archiver-investigate', investigateMsg);
     }
-    
   } catch (ex) {
-    nestedCountersInstance.countEvent('p2p', `informInvestigator error ${shardusGetTime()}`)
-    error('informInvestigator: ' + formatErrorMessage(ex))
+    nestedCountersInstance.countEvent('p2p', `informInvestigator error ${shardusGetTime()}`);
+    error('informInvestigator: ' + formatErrorMessage(ex));
   }
 }
 
@@ -200,16 +199,16 @@ export function informInvestigator(target: publicKey): void {
  * @param archiverKey - The public key of the down Archiver
  */
 export function tellNetworkArchiverIsDown(record: LostArchiverRecord): void {
-  const archiverKey = record.target
-  info(`tellNetworkArchiverIsDown: archiverKey: ${archiverKey}`)
+  const archiverKey = record.target;
+  info(`tellNetworkArchiverIsDown: archiverKey: ${archiverKey}`);
   const downMsg: SignedObject<ArchiverDownMsg> = Context.crypto.sign({
     type: 'down',
     cycle: CycleChain.getCurrentCycleMarker(),
     investigateMsg: record.investigateMsg,
-  })
-  info(`tellNetworkArchiverIsDown: downMsg: ${Utils.safeStringify(downMsg)}`)
-  record.archiverDownMsg = downMsg
-  Comms.sendGossip('lost-archiver-down', downMsg, '', null, NodeList.byIdOrder, /* isOrigin */ true)
+  });
+  info(`tellNetworkArchiverIsDown: downMsg: ${Utils.safeStringify(downMsg)}`);
+  record.archiverDownMsg = downMsg;
+  Comms.sendGossip('lost-archiver-down', downMsg, '', null, NodeList.byIdOrder, /* isOrigin */ true);
   // This is to inform the rest of the network that the Archiver is down
 }
 
@@ -224,11 +223,11 @@ export function tellNetworkArchiverIsUp(record: LostArchiverRecord): void {
     downMsg: record.archiverDownMsg,
     refuteMsg: record.archiverRefuteMsg,
     cycle: CycleChain.getCurrentCycleMarker(),
-  })
-  record.archiverUpMsg = upMsg
+  });
+  record.archiverUpMsg = upMsg;
   // Gossip the ArchiverUpMsg to the rest of the network
-  info(`tellNetworkArchiverIsUp: upMsg: ${Utils.safeStringify(upMsg)}`)
-  Comms.sendGossip('lost-archiver-up', upMsg, '', null, NodeList.byIdOrder, /* isOrigin */ true)
+  info(`tellNetworkArchiverIsUp: upMsg: ${Utils.safeStringify(upMsg)}`);
+  Comms.sendGossip('lost-archiver-up', upMsg, '', null, NodeList.byIdOrder, /* isOrigin */ true);
 }
 
 /**
@@ -240,7 +239,7 @@ export function tellNetworkArchiverIsUp(record: LostArchiverRecord): void {
  */
 async function pingArchiver(host: string, port: number): Promise<boolean> {
   // The Archiver is considered reachable if we can get its info
-  return (await getArchiverInfo(host, port)) !== null
+  return (await getArchiverInfo(host, port)) !== null;
 }
 
 /**
@@ -254,23 +253,23 @@ async function pingArchiver(host: string, port: number): Promise<boolean> {
 async function getArchiverInfo(host: string, port: number): Promise<object> | null {
   try {
     // Try to get the info of the Archiver
-    return await http.get<object>(`http://${host}:${port}/nodeInfo`)
+    return await http.get<object>(`http://${host}:${port}/nodeInfo`);
   } catch (e) {
     // If an error occurs (e.g., the Archiver is not reachable), return null
-    return null
+    return null;
   }
 }
 
 function missingProperties(obj: object, keys: string | string[]): string[] {
-  if (typeof keys === 'string') keys = keys.split(/\s+/)
-  if (obj == null) return keys
-  const missing = []
+  if (typeof keys === 'string') keys = keys.split(/\s+/);
+  if (obj == null) return keys;
+  const missing = [];
   for (const key of keys) {
-    if (!(key in obj)) missing.push(key)
+    if (!(key in obj)) missing.push(key);
     // eslint-disable-next-line security/detect-object-injection
-    if (obj[key] === undefined) missing.push(key)
+    if (obj[key] === undefined) missing.push(key);
   }
-  return missing
+  return missing;
 }
 
 /**
@@ -279,11 +278,11 @@ function missingProperties(obj: object, keys: string | string[]): string[] {
  * @returns null if there are no errors, and a string describing the error otherwise
  */
 export function errorForArchiverDownMsg(msg: SignedObject<ArchiverDownMsg> | null): string | null {
-  if (msg == null) return 'null message'
-  if (msg.sign == null) return 'no signature'
-  const missing = missingProperties(msg, 'type investigateMsg cycle')
-  if (missing.length) return `missing properties: ${missing.join(', ')}`
-  return _errorForInvestigateArchiverMsg(msg.investigateMsg)
+  if (msg == null) return 'null message';
+  if (msg.sign == null) return 'no signature';
+  const missing = missingProperties(msg, 'type investigateMsg cycle');
+  if (missing.length) return `missing properties: ${missing.join(', ')}`;
+  return _errorForInvestigateArchiverMsg(msg.investigateMsg);
   // to-do: check for valid signature
 }
 
@@ -293,17 +292,17 @@ export function errorForArchiverDownMsg(msg: SignedObject<ArchiverDownMsg> | nul
  * @returns null if there are no errors, and a string describing the error otherwise
  */
 export function errorForArchiverUpMsg(msg: SignedObject<ArchiverUpMsg> | null): string | null {
-  if (msg == null) return 'null message'
-  if (msg.sign == null) return 'no signature'
-  const missing = missingProperties(msg, 'type downMsg refuteMsg cycle')
-  if (missing.length) return `missing properties: ${missing.join(', ')}`
+  if (msg == null) return 'null message';
+  if (msg.sign == null) return 'no signature';
+  const missing = missingProperties(msg, 'type downMsg refuteMsg cycle');
+  if (missing.length) return `missing properties: ${missing.join(', ')}`;
   /*
   to-do:
     downMsg: ArchiverDownMsg;
     refuteMsg: ArchiverRefutesLostMsg;
   */
   // to-do: check for valid signature
-  return null
+  return null;
 }
 
 /**
@@ -314,12 +313,12 @@ export function errorForArchiverUpMsg(msg: SignedObject<ArchiverUpMsg> | null): 
 export function errorForArchiverRefutesLostMsg(
   msg: SignedObject<ArchiverRefutesLostMsg> | null
 ): string | null {
-  if (msg == null) return 'null message'
-  if (msg.sign == null) return 'no signature'
-  const missing = missingProperties(msg, 'archiver cycle')
-  if (missing.length) return `missing properties: ${missing.join(', ')}`
+  if (msg == null) return 'null message';
+  if (msg.sign == null) return 'no signature';
+  const missing = missingProperties(msg, 'archiver cycle');
+  if (missing.length) return `missing properties: ${missing.join(', ')}`;
   // to-do: check for valid signature
-  return null
+  return null;
 }
 
 /**
@@ -330,18 +329,18 @@ export function errorForArchiverRefutesLostMsg(
 export function errorForInvestigateArchiverMsg(
   msg: SignedObject<InvestigateArchiverMsg> | null
 ): string | null {
-  if (msg == null) return 'null message'
-  if (msg.sign == null) return 'no signature'
-  const error = _errorForInvestigateArchiverMsg(msg)
-  if (error) return error
+  if (msg == null) return 'null message';
+  if (msg.sign == null) return 'no signature';
+  const error = _errorForInvestigateArchiverMsg(msg);
+  if (error) return error;
   // to-do: check for valid signature
-  return null
+  return null;
 }
 
 function _errorForInvestigateArchiverMsg(msg: InvestigateArchiverMsg | null): string | null {
-  if (msg == null) return 'null message'
-  const missing = missingProperties(msg, 'type target investigator sender cycle')
-  if (missing.length) return `missing properties: ${missing.join(', ')}`
-  if (msg.type !== 'investigate') return `invalid type: ${msg.type}`
-  return null
+  if (msg == null) return 'null message';
+  const missing = missingProperties(msg, 'type target investigator sender cycle');
+  if (missing.length) return `missing properties: ${missing.join(', ')}`;
+  if (msg.type !== 'investigate') return `invalid type: ${msg.type}`;
+  return null;
 }

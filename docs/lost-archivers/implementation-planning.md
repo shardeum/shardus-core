@@ -3,9 +3,9 @@
 <img title="" src="./lost-archiver-detection-protocol-diagram.png" alt="lost-archiver-detection-protocol-diagram.png" width="738">
 
 > Notes:
-> 
-> * What if a rogue node spoofs the 'ping' route to pass lost detection but otherwise doesn't contribute to the network?
->   
+>
+> - What if a rogue node spoofs the 'ping' route to pass lost detection but otherwise doesn't contribute to the network?
+>
 >   One proposed solution is to have a route that returns data that cant be spoofed unless the node is actively participating in the network.
 
 ## Types of txs/msgs:
@@ -39,8 +39,6 @@
 ## Needed Logic/Functions:
 
 [WIP]
-
-
 
 ```mermaid
 stateDiagram-v2

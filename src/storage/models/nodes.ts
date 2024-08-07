@@ -1,4 +1,4 @@
-import { SQLDataTypes } from '../utils/schemaDefintions'
+import { SQLDataTypes } from '../utils/schemaDefintions';
 
 const nodes = [
   'nodes',
@@ -16,6 +16,6 @@ const nodes = [
     address: { type: SQLDataTypes.STRING, allowNull: false },
     status: { type: SQLDataTypes.STRING, allowNull: false },
   },
-]
+];
 
-export default nodes
+export default nodes;

@@ -1,4 +1,4 @@
-import { SQLDataTypes } from '../utils/schemaDefintions'
+import { SQLDataTypes } from '../utils/schemaDefintions';
 
 const partitions = [
   'partitions',
@@ -7,6 +7,6 @@ const partitions = [
     cycleNumber: { type: SQLDataTypes.STRING, allowNull: false, unique: 'compositeIndex' },
     hash: { type: SQLDataTypes.STRING, allowNull: false },
   },
-]
+];
 
-export default partitions
+export default partitions;

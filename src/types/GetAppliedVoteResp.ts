@@ -1,14 +1,14 @@
-import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
-import { AppliedVoteSerializable, deserializeAppliedVote, serializeAppliedVote } from './AppliedVote'
-import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { VectorBufferStream } from '../utils/serialization/VectorBufferStream';
+import { AppliedVoteSerializable, deserializeAppliedVote, serializeAppliedVote } from './AppliedVote';
+import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum';
 
-const cGetAppliedVoteRespVersion = 1
+const cGetAppliedVoteRespVersion = 1;
 
 export type GetAppliedVoteResp = {
-  txId: string
-  appliedVote: AppliedVoteSerializable
-  appliedVoteHash: string
-}
+  txId: string;
+  appliedVote: AppliedVoteSerializable;
+  appliedVoteHash: string;
+};
 
 export function serializeGetAppliedVoteResp(
   stream: VectorBufferStream,
@@ -16,25 +16,25 @@ export function serializeGetAppliedVoteResp(
   root = false
 ): void {
   if (root) {
-    stream.writeUInt16(TypeIdentifierEnum.cGetAppliedVoteResp)
+    stream.writeUInt16(TypeIdentifierEnum.cGetAppliedVoteResp);
   }
-  stream.writeUInt8(cGetAppliedVoteRespVersion)
-  stream.writeString(obj.txId)
-  serializeAppliedVote(stream, obj.appliedVote) // Serialize AppliedVote object
-  stream.writeString(obj.appliedVoteHash)
+  stream.writeUInt8(cGetAppliedVoteRespVersion);
+  stream.writeString(obj.txId);
+  serializeAppliedVote(stream, obj.appliedVote); // Serialize AppliedVote object
+  stream.writeString(obj.appliedVoteHash);
 }
 
 export function deserializeGetAppliedVoteResp(stream: VectorBufferStream): GetAppliedVoteResp {
-  const version = stream.readUInt8()
+  const version = stream.readUInt8();
   if (version > cGetAppliedVoteRespVersion) {
-    throw new Error('GetAppliedVoteResp version mismatch')
+    throw new Error('GetAppliedVoteResp version mismatch');
   }
-  const txId = stream.readString()
-  const appliedVote = deserializeAppliedVote(stream) // Deserialize AppliedVote object
-  const appliedVoteHash = stream.readString()
+  const txId = stream.readString();
+  const appliedVote = deserializeAppliedVote(stream); // Deserialize AppliedVote object
+  const appliedVoteHash = stream.readString();
   return {
     txId,
     appliedVote,
     appliedVoteHash,
-  }
+  };
 }

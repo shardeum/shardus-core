@@ -1,4 +1,4 @@
-import { SQLDataTypes } from '../utils/schemaDefintions'
+import { SQLDataTypes } from '../utils/schemaDefintions';
 
 const accountsCopy = [
   'accountsCopy',
@@ -10,6 +10,6 @@ const accountsCopy = [
     hash: { type: SQLDataTypes.STRING, allowNull: false },
     isGlobal: { type: SQLDataTypes.BOOLEAN, allowNull: false },
   },
-]
+];
 
-export default accountsCopy
+export default accountsCopy;

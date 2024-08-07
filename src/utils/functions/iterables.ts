@@ -1,18 +1,18 @@
 export function reversed<T>(thing: Iterable<T>): Iterable<T> {
-  const arr = Array.isArray(thing) ? thing : Array.from(thing)
-  let i = arr.length - 1
+  const arr = Array.isArray(thing) ? thing : Array.from(thing);
+  let i = arr.length - 1;
   const reverseIterator = {
     next: () => {
-      const done = i < 0
+      const done = i < 0;
       // eslint-disable-next-line security/detect-object-injection
-      const value = done ? undefined : arr[i]
-      i--
-      return { value, done }
+      const value = done ? undefined : arr[i];
+      i--;
+      return { value, done };
     },
-  }
+  };
   return {
     [Symbol.iterator]: () => reverseIterator,
-  }
+  };
 }
 
 /**
@@ -22,30 +22,30 @@ export function reversed<T>(thing: Iterable<T>): Iterable<T> {
  * @param thing
  */
 export function randomShifted<T>(thing: Iterable<T>): Iterable<T> {
-  const arr = Array.isArray(thing) ? thing : Array.from(thing)
-  let i = arr.length - 1
+  const arr = Array.isArray(thing) ? thing : Array.from(thing);
+  let i = arr.length - 1;
   const reverseIterator = {
     next: () => {
-      const done = i < 0
+      const done = i < 0;
       // eslint-disable-next-line security/detect-object-injection
-      const value = done ? undefined : arr[i]
-      i--
-      return { value, done }
+      const value = done ? undefined : arr[i];
+      i--;
+      return { value, done };
     },
-  }
+  };
   return {
     [Symbol.iterator]: () => reverseIterator,
-  }
+  };
 }
 
 /**
  * Creates a generator that yields the values of a given Map in random order.
  *
- * The function first creates an array of keys from the map, then shuffles 
+ * The function first creates an array of keys from the map, then shuffles
  * this array using the Fisher-Yates algorithm. Finally, it yields the map's
  * values in the order of the shuffled keys. The original Map is not modified.
  *
- * Note: This function is not space efficient for large maps as it creates 
+ * Note: This function is not space efficient for large maps as it creates
  * an additional array for the keys.
  *
  * @template K - The type of the keys of the map.
@@ -70,12 +70,12 @@ export function* shuffleMapIterator<K, V>(map: Map<K, V>): IterableIterator<V> {
 
   // Shuffle the keys array
   for (let i = keys.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [keys[i], keys[j]] = [keys[j], keys[i]];
+    const j = Math.floor(Math.random() * (i + 1));
+    [keys[i], keys[j]] = [keys[j], keys[i]];
   }
 
   // Yield values from the map in the order of the shuffled keys
   for (const key of keys) {
-      yield map.get(key);
+    yield map.get(key);
   }
 }

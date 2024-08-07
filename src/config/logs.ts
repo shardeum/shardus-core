@@ -1,4 +1,4 @@
-import { StrictLogsConfiguration } from '../shardus/shardus-types'
+import { StrictLogsConfiguration } from '../shardus/shardus-types';
 
 const LOGS_CONFIG: StrictLogsConfiguration = {
   saveConsoleOutput: true,
@@ -38,6 +38,6 @@ const LOGS_CONFIG: StrictLogsConfiguration = {
       statsDump: { appenders: ['statsDump'], level: 'trace' },
     },
   },
-}
+};
 
-export default LOGS_CONFIG
+export default LOGS_CONFIG;

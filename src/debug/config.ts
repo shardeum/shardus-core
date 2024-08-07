@@ -1,7 +1,7 @@
-import { ServerMode, StrictServerConfiguration, DevSecurityLevel } from '../shardus/shardus-types'
-import { config } from '../p2p/Context'
+import { ServerMode, StrictServerConfiguration, DevSecurityLevel } from '../shardus/shardus-types';
+import { config } from '../p2p/Context';
 
-export type DebugConfigurations = StrictServerConfiguration['debug']
+export type DebugConfigurations = StrictServerConfiguration['debug'];
 
 export function isDebugMode(): boolean {
   return !!(
@@ -9,17 +9,17 @@ export function isDebugMode(): boolean {
     config.mode &&
     config.mode.toLowerCase &&
     config.mode.toLowerCase() === ServerMode.Debug
-  )
+  );
 }
 
 export function isDebugModeAnd(
   predicate: (config: DebugConfigurations | Partial<DebugConfigurations>) => boolean
 ): boolean {
-  return isDebugMode() && !!predicate(config.debug || ({} as Partial<DebugConfigurations>))
+  return isDebugMode() && !!predicate(config.debug || ({} as Partial<DebugConfigurations>));
 }
 
 export function isServiceMode(): boolean {
-  return config && config.features && config.features.startInServiceMode
+  return config && config.features && config.features.startInServiceMode;
 }
 
 export function getHashedDevKey(): string {
@@ -31,38 +31,38 @@ export function getDevPublicKeys(): DebugConfigurations['devPublicKeys'] {
 }
 
 export function ensureKeySecurity(pubKey: string, level: DevSecurityLevel): boolean {
-  const devPublicKeys = getDevPublicKeys()
+  const devPublicKeys = getDevPublicKeys();
   // eslint-disable-next-line security/detect-object-injection
-  const pkClearance = devPublicKeys[pubKey]
-  return pkClearance !== undefined && pkClearance >= level
+  const pkClearance = devPublicKeys[pubKey];
+  return pkClearance !== undefined && pkClearance >= level;
 }
 
 export function getDevPublicKey(key: string): string | null {
-  const devPublicKeys = getDevPublicKeys()
+  const devPublicKeys = getDevPublicKeys();
   // eslint-disable-next-line security/detect-object-injection
-  const pkClearance = devPublicKeys[key]
-  if (pkClearance !== undefined) return key
-  return null
+  const pkClearance = devPublicKeys[key];
+  if (pkClearance !== undefined) return key;
+  return null;
 }
 
 export function getDevPublicKeyMaxLevel(clearance?: DevSecurityLevel): string | null {
-  const devPublicKeys = getDevPublicKeys()
-  let maxLevel = -Infinity
-  let maxKey = null
+  const devPublicKeys = getDevPublicKeys();
+  let maxLevel = -Infinity;
+  let maxKey = null;
   for (const key in devPublicKeys) {
     // eslint-disable-next-line security/detect-object-injection
     if (devPublicKeys[key]) {
       // eslint-disable-next-line security/detect-object-injection
-      if (clearance && devPublicKeys[key] >= clearance) return key
+      if (clearance && devPublicKeys[key] >= clearance) return key;
       else {
         // eslint-disable-next-line security/detect-object-injection
-        const level = devPublicKeys[key]
+        const level = devPublicKeys[key];
         if (level > maxLevel) {
-          maxLevel = level
-          maxKey = key
+          maxLevel = level;
+          maxKey = key;
         }
       }
     }
   }
-  return maxKey
+  return maxKey;
 }

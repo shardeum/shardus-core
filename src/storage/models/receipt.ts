@@ -1,4 +1,4 @@
-import { SQLDataTypes } from '../utils/schemaDefintions'
+import { SQLDataTypes } from '../utils/schemaDefintions';
 
 const receipt = [
   'receipt',
@@ -7,6 +7,6 @@ const receipt = [
     cycleNumber: { type: SQLDataTypes.STRING, allowNull: false, unique: 'compositeIndex' },
     hash: { type: SQLDataTypes.STRING, allowNull: false },
   },
-]
+];
 
-export default receipt
+export default receipt;

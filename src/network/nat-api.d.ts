@@ -1,1 +1,1 @@
-declare module 'nat-api'
+declare module 'nat-api';

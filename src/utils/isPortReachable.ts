@@ -1,6 +1,6 @@
 // Inspiration from https://github.com/sindresorhus/is-port-reachable/blob/main/index.js
 
-import net from 'node:net'
+import net from 'node:net';
 
 /**
  * Checks if a port at a given host can be reached
@@ -11,32 +11,32 @@ export const isPortReachable = async ({
   port,
   timeout = 1000,
 }: {
-  host: string
-  port: number
-  timeout?: number
+  host: string;
+  port: number;
+  timeout?: number;
 }): Promise<boolean> => {
   const promise = new Promise<void>((resolve, reject) => {
-    const socket = new net.Socket()
+    const socket = new net.Socket();
 
     const onError = (): void => {
-      socket.destroy()
-      reject()
-    }
+      socket.destroy();
+      reject();
+    };
 
-    socket.setTimeout(timeout)
-    socket.once('error', onError)
-    socket.once('timeout', onError)
+    socket.setTimeout(timeout);
+    socket.once('error', onError);
+    socket.once('timeout', onError);
 
     socket.connect(port, host, () => {
-      socket.end()
-      resolve()
-    })
-  })
+      socket.end();
+      resolve();
+    });
+  });
 
   try {
-    await promise
-    return true
+    await promise;
+    return true;
   } catch {
-    return false
+    return false;
   }
-}
+};

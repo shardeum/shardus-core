@@ -1,4 +1,4 @@
-import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { addSchema } from '../../utils/serialization/SchemaHelpers';
 
 const schemaCompareCert = {
   type: 'object',
@@ -60,11 +60,11 @@ const schemaCompareCert = {
     },
   },
   required: ['certs', 'record'],
-}
+};
 
 export function initCompareCertReq(): void {
-  addSchemaDependencies()
-  addSchemas()
+  addSchemaDependencies();
+  addSchemas();
 }
 
 // Function to add schema dependencies
@@ -74,5 +74,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('CompareCertReq', schemaCompareCert)
+  addSchema('CompareCertReq', schemaCompareCert);
 }
