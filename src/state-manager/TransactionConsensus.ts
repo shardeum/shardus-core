@@ -362,9 +362,16 @@ class TransactionConsenus {
 
           const readableReq = deserializeGetTxTimestampReq(requestStream)
           // handle rare race condition where we have seen the txId but not the timestamp
-          if (Context.config.p2p.timestampCacheFix && this.seenTimestampRequests[readableReq.txId] && this.txTimestampCacheByTxId[readableReq.txId] == null) {
-            nestedCountersInstance.countEvent('consensus', 'get_tx_timestamp seen txId but found no timestamp')
-            return respond(tsReceipt, serializeGetTxTimestampResp)
+          if (
+            Context.config.p2p.timestampCacheFix &&
+            this.seenTimestampRequests[readableReq.txId] &&
+            this.txTimestampCacheByTxId[readableReq.txId] == null
+          ) {
+            nestedCountersInstance.countEvent(
+              'consensus',
+              'get_tx_timestamp seen txId but found no timestamp'
+            )
+            return respond(BadRequest('get_tx_timestamp seen txId but found no timestamp'), serializeResponseError)
           }
           this.seenTimestampRequests[readableReq.txId] = true
 
@@ -377,7 +384,7 @@ class TransactionConsenus {
             tsReceipt = this.txTimestampCache[readableReq.cycleCounter][readableReq.txId]
             /* prettier-ignore */ this.mainLogger.debug(`get_tx_timestamp handler: Found timestamp cache for txId: ${readableReq.txId}, timestamp: ${Utils.safeStringify(tsReceipt)}`)
             return respond(tsReceipt, serializeGetTxTimestampResp)
-          } else if(Context.config.p2p.timestampCacheFix && this.txTimestampCacheByTxId[readableReq.txId]) {
+          } else if (Context.config.p2p.timestampCacheFix && this.txTimestampCacheByTxId[readableReq.txId]) {
             // eslint-disable-next-line security/detect-object-injection
             tsReceipt = this.txTimestampCacheByTxId[readableReq.txId]
             /* prettier-ignore */ this.mainLogger.debug(`get_tx_timestamp handler: Found timestamp cache for txId in cacheById: ${readableReq.txId}, timestamp: ${Utils.safeStringify(tsReceipt)}`)
