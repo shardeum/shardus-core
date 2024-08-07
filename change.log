@@ -1,0 +1,237 @@
+- Bump version to 2.12.30-65
+- updated to remove old entries from appliedConfigChanges that are no longer in the changes list
+- type fix in pruneNetworkChangeQueue dapp function
+- BLUE-119: Added useNewPOQ and devPublicKeys to the /netconfig endpoint
+- fix: emitSyncTimeoutEvent call position fixed
+- chore: fixes to make /debug-neverGoActive usable
+- Bump version to 2.12.30-64
+- additional corrections to receipt generation
+- add in collected votes
+- fix for failed TXs not clearing queue after consensus
+- Bump version to 2.12.30-63
+- get current max queueentry time in report
+- updated debug info
+- always concat extra wrap index and the receiver is okay with both indices.
+- set "filterReceivingNodesForTXData" to false by default to false for safety over optimization
+- extra useful debug info, counters and logs
+- fact tell functions should use shard data from deterministic txGroupCycle
+- use "concatCorrespondingTellUseUnwrapped" flag whether to concat extra corresponding indices or not
+- Bump version to 2.12.30-62
+- update settings for new rc
+- Added full txId in the debug queue item
+- Added debug-queue-item query by txId
+- Added txGroupCycle and uniqueKeys in the debug-queue-items
+- Bump version to 2.12.30-61
+- fix and logging for run-away forward to lucky TX
+- added fallbackToCurrentCycleFortxGroup for deterministicTXCycleEnabled feature
+- fix to exclude current cycle from txGroupCycle calculation. Better logs and counters
+- updated "queueEntryGetConsensusGroup" and "queueEntryGetConsensusGroupForAccount" to  consider deterministicTXCycleEnabled flag
+- set reduceTimeFromTxTimestamp:5000 by default
+- prevent "cycleToRecordOn" from using deterministic txGroupCycle
+- implement deterministic txGroupCycle and txGroup calculation. Put behind "deterministicTXCycleEnabled" flag. Set false by default
+- remove outdated patch that's breaking the CI
+- Apply suggestions from code review checks should be true to use env variables
+- added CODEOWNERS file
+- add build script for compile
+- RED-119 add github ci
+- updated config settings to be closer to prod ready
+- update endpoint-exception counter message
+- error handling for all external endpoints
+- Added to send txGroupCycle along with the receipt to debug txGroupCycle mismatch issue
+- fix: binary serialization for AppliedReceipt2
+- feat: reenable filtering in factTellCorrespondingNodes
+- refactor: update TransactionConsensus to use readableReq instead of payload
+- feat: implement using unwrapped index in tellFinallData
+- feat: poqo-request-data implementation (#175)
+- fix: bug in binary serialization for appliedReceipt2
+- Bump version to 2.12.30-60
+- add disabled diagnostic tx cancel.  add diagnostic forward to nonce. forward to local multi option
+- add cycle of recent run time sync
+- add flag to track if we have patched since going active
+- calculate and attach a flag to queueEntry if the sender group is wrapped and our node is on the left side of the wrapped range
+- wip fixes for unwrapping sender indexes
+- Convert the corresponding-test.js test script to unit test
+- Updated `forwardToLuckyNodesNonceQueue` flag to true
+- Add new debug endpoint to query for transactions in queue based on time and state
+- update endpoint-exception counter message
+- error handling for all external endpoints
+- crash fixes
+- missed this
+- additional logs and counters cleanup/fixes
+- fix: comparison bug in factTellCorrespondingNodes
+- fix: disable filtering of receiving nodes for tellCorrespondingNodes
+- Bump version to 2.12.30-59
+- support to allow awaiting data to bail when there is a valid receipt.   improved counters.  disable some unused code
+- fix for corresponding tell.  improved logs and counters
+- feat: debug-fails DO NOT MERGE
+- adjust fix flags for POQo
+- Add rejectSharedDataIfCovered flag to binary endpoint as well
+- add a flag to control to reject shared data if we cover it. set to "false" by default
+- remove duplicate collectedData check in "queueEntryAddData"
+- if ourVote mismatches the winning receipt, go to "await final data" and use the data attached. No need to repair tx.
+- collected data fix. use newer accounts if we receive the same account multiple times. prioritise to use our own data if we have it
+- tx timestamp caching improvements for robustness
+- also update time for other added votes
+- lastVoteReceivedTimestamp fix for old POQ
+- Move the receipt sig verification check before processing the accounts data in the poqo-data-and-receipt handler (#177)
+- GOLD-164: Signature majority validation for non locally produced receipts (#162)
+- GOLD-172 Migrating PoQo endpoints to Binary (#172)
+- fix: calculate numVotes in POQo
+- feat: add new conditions for initiating gossip
+- feat: POQo switch to requiredVotesPercentage config
+- refac: prepone check for null cache data
+- fix: edge case causing missing receipt
+- feat: populate receiveAppliedReceipt2 in POQo
+- feat: add logs to POQo endpoints
+- feat: add log for tracking sharing of cachedAppData
+- fix: tryProduceReceipt for POQo
+- fix: poqo handler for sendCorrNodesFinalData
+- fix: calculations in sendCorrespondingCachedAppData
+- feat: implement common origin non burst gossip
+- fix: gossip forwarding for poqo receipt
+- feat: voteHash calculation for POQo
+- feat: implement consensing step for poqo
+- feat: gossip handlers related to poqo
+- feat: implement poqo tryProduceReceipt
+- feat: implement POQo send vote loop
+- feat: implement configs for poqo
+- fix a bug in calculating the cachedAppData corresponding nodes
+- fix: target groups for send cached app data
+- fix: index calculation in fact send cached app data
+- feat: add fact function call
+- feat: only use factValidation when flag is active
+- fix: factValidateCorrespondingCachedAppDataSender
+- fix: remove not required async tag
+- fix: remove unused variable
+- feat: implement factValidateCorrespondingCachedAppDataSender
+- feat: Implement factSendCorrespondingCachedAppData
+- code refactor after rebases
+- refactor factTellCorrespondingNodesFinalData for better perf
+- implement `factTellCorrespondingNodesFinalData` and `factValidateCorrespondingTellFinalDataSender` using FACT algorithm
+- move neighbor execution node check to outside of factValidateCorrespondingTellSender function
+- verifyCorrespondingSender function update for handle edge case
+- set correct value for correspondingGlobalOffset
+- proposed a new way for verifyCorrespondingSender function
+- refactor factValidateCorrespondingTellSender()
+- selectNeighbors function improvement
+- fix bug in filtering the corresponding nodes and validating them. added temp logs (which will be removed later)
+- initial implementation of factTellCorrespondingNodes and factValidateCorrespondingTellSender functions
+- feat: TS port of getCorrespondingNodes and verfifyCorrespondingSender- Bump version to 2.12.30-65
+- updated to remove old entries from appliedConfigChanges that are no longer in the changes list
+- type fix in pruneNetworkChangeQueue dapp function
+- BLUE-119: Added useNewPOQ and devPublicKeys to the /netconfig endpoint
+- fix: emitSyncTimeoutEvent call position fixed
+- chore: fixes to make /debug-neverGoActive usable
+- Bump version to 2.12.30-64
+- additional corrections to receipt generation
+- add in collected votes
+- fix for failed TXs not clearing queue after consensus
+- Bump version to 2.12.30-63
+- get current max queueentry time in report
+- updated debug info
+- always concat extra wrap index and the receiver is okay with both indices.
+- set "filterReceivingNodesForTXData" to false by default to false for safety over optimization
+- extra useful debug info, counters and logs
+- fact tell functions should use shard data from deterministic txGroupCycle
+- use "concatCorrespondingTellUseUnwrapped" flag whether to concat extra corresponding indices or not
+- Bump version to 2.12.30-62
+- update settings for new rc
+- Added full txId in the debug queue item
+- Added debug-queue-item query by txId
+- Added txGroupCycle and uniqueKeys in the debug-queue-items
+- Bump version to 2.12.30-61
+- fix and logging for run-away forward to lucky TX
+- added fallbackToCurrentCycleFortxGroup for deterministicTXCycleEnabled feature
+- fix to exclude current cycle from txGroupCycle calculation. Better logs and counters
+- updated "queueEntryGetConsensusGroup" and "queueEntryGetConsensusGroupForAccount" to  consider deterministicTXCycleEnabled flag
+- set reduceTimeFromTxTimestamp:5000 by default
+- prevent "cycleToRecordOn" from using deterministic txGroupCycle
+- implement deterministic txGroupCycle and txGroup calculation. Put behind "deterministicTXCycleEnabled" flag. Set false by default
+- remove outdated patch that's breaking the CI
+- Apply suggestions from code review checks should be true to use env variables
+- added CODEOWNERS file
+- add build script for compile
+- RED-119 add github ci
+- updated config settings to be closer to prod ready
+- update endpoint-exception counter message
+- error handling for all external endpoints
+- Added to send txGroupCycle along with the receipt to debug txGroupCycle mismatch issue
+- fix: binary serialization for AppliedReceipt2
+- feat: reenable filtering in factTellCorrespondingNodes
+- refactor: update TransactionConsensus to use readableReq instead of payload
+- feat: implement using unwrapped index in tellFinallData
+- feat: poqo-request-data implementation (#175)
+- fix: bug in binary serialization for appliedReceipt2
+- Bump version to 2.12.30-60
+- add disabled diagnostic tx cancel.  add diagnostic forward to nonce. forward to local multi option
+- add cycle of recent run time sync
+- add flag to track if we have patched since going active
+- calculate and attach a flag to queueEntry if the sender group is wrapped and our node is on the left side of the wrapped range
+- wip fixes for unwrapping sender indexes
+- Convert the corresponding-test.js test script to unit test
+- Updated `forwardToLuckyNodesNonceQueue` flag to true
+- Add new debug endpoint to query for transactions in queue based on time and state
+- update endpoint-exception counter message
+- error handling for all external endpoints
+- crash fixes
+- missed this
+- additional logs and counters cleanup/fixes
+- fix: comparison bug in factTellCorrespondingNodes
+- fix: disable filtering of receiving nodes for tellCorrespondingNodes
+- Bump version to 2.12.30-59
+- support to allow awaiting data to bail when there is a valid receipt.   improved counters.  disable some unused code
+- fix for corresponding tell.  improved logs and counters
+- feat: debug-fails DO NOT MERGE
+- adjust fix flags for POQo
+- Add rejectSharedDataIfCovered flag to binary endpoint as well
+- add a flag to control to reject shared data if we cover it. set to "false" by default
+- remove duplicate collectedData check in "queueEntryAddData"
+- if ourVote mismatches the winning receipt, go to "await final data" and use the data attached. No need to repair tx.
+- collected data fix. use newer accounts if we receive the same account multiple times. prioritise to use our own data if we have it
+- tx timestamp caching improvements for robustness
+- also update time for other added votes
+- lastVoteReceivedTimestamp fix for old POQ
+- Move the receipt sig verification check before processing the accounts data in the poqo-data-and-receipt handler (#177)
+- GOLD-164: Signature majority validation for non locally produced receipts (#162)
+- GOLD-172 Migrating PoQo endpoints to Binary (#172)
+- fix: calculate numVotes in POQo
+- feat: add new conditions for initiating gossip
+- feat: POQo switch to requiredVotesPercentage config
+- refac: prepone check for null cache data
+- fix: edge case causing missing receipt
+- feat: populate receiveAppliedReceipt2 in POQo
+- feat: add logs to POQo endpoints
+- feat: add log for tracking sharing of cachedAppData
+- fix: tryProduceReceipt for POQo
+- fix: poqo handler for sendCorrNodesFinalData
+- fix: calculations in sendCorrespondingCachedAppData
+- feat: implement common origin non burst gossip
+- fix: gossip forwarding for poqo receipt
+- feat: voteHash calculation for POQo
+- feat: implement consensing step for poqo
+- feat: gossip handlers related to poqo
+- feat: implement poqo tryProduceReceipt
+- feat: implement POQo send vote loop
+- feat: implement configs for poqo
+- fix a bug in calculating the cachedAppData corresponding nodes
+- fix: target groups for send cached app data
+- fix: index calculation in fact send cached app data
+- feat: add fact function call
+- feat: only use factValidation when flag is active
+- fix: factValidateCorrespondingCachedAppDataSender
+- fix: remove not required async tag
+- fix: remove unused variable
+- feat: implement factValidateCorrespondingCachedAppDataSender
+- feat: Implement factSendCorrespondingCachedAppData
+- code refactor after rebases
+- refactor factTellCorrespondingNodesFinalData for better perf
+- implement `factTellCorrespondingNodesFinalData` and `factValidateCorrespondingTellFinalDataSender` using FACT algorithm
+- move neighbor execution node check to outside of factValidateCorrespondingTellSender function
+- verifyCorrespondingSender function update for handle edge case
+- set correct value for correspondingGlobalOffset
+- proposed a new way for verifyCorrespondingSender function
+- refactor factValidateCorrespondingTellSender()
+- selectNeighbors function improvement
+- fix bug in filtering the corresponding nodes and validating them. added temp logs (which will be removed later)
+- initial implementation of factTellCorrespondingNodes and factValidateCorrespondingTellSender functions
+- feat: TS port of getCorrespondingNodes and verfifyCorrespondingSender
