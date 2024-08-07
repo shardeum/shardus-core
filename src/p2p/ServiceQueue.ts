@@ -319,17 +319,17 @@ export async function processNetworkTransactions(): Promise<void> {
       // eslint-disable-next-line security/detect-object-injection
       if (!txList[i]) {
         warn(`txList[${i}] is undefined`)
-        length += 1
-        continue
-      }
-
-      if (txList[i].tx.subQueueKey != null && processedSubQueueKeys.has(txList[i].tx.subQueueKey)) {
-        length += 1
         continue
       }
 
       // eslint-disable-next-line security/detect-object-injection
       const record = txList[i].tx
+
+      if (record.subQueueKey != null && processedSubQueueKeys.has(record.subQueueKey)) {
+        length += 1
+        continue
+      }
+
       if (applyVerifier.has(record.type) && !(await applyVerifier.get(record.type)(record.txData))) {
         const emitParams: Omit<ShardusEvent, 'type'> = {
           nodeId: record.txData.nodeId,
@@ -341,16 +341,16 @@ export async function processNetworkTransactions(): Promise<void> {
         }
         /* prettier-ignore */ if (logFlags.p2pNonFatal) info('emit network transaction event', Utils.safeStringify(emitParams))
         Self.emitter.emit('try-network-transaction', emitParams)
-        if (txList[i].tx.subQueueKey != null) {
-          processedSubQueueKeys.add(txList[i].tx.subQueueKey)
+        if (record.subQueueKey != null) {
+          processedSubQueueKeys.add(record.subQueueKey)
         }
       } else {
         // eslint-disable-next-line security/detect-object-injection
         /* prettier-ignore */ if (logFlags.p2pNonFatal) info('removeNetworkTx', txList[i].hash)
         // eslint-disable-next-line security/detect-object-injection
         const removeTx = { txHash: txList[i].hash, cycle: currentCycle }
-        txRemove.push(removeTx)
         if (await _removeNetworkTx(removeTx)) {
+          txRemove.push(removeTx)
           makeRemoveNetworkTxProposals(removeTx)
         }
       }
