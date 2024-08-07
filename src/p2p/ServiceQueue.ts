@@ -215,9 +215,15 @@ export function registerApplyVerifier(
 }
 
 export async function addNetworkTx(type: string, tx: OpaqueTransaction, subQueueKey?: string): Promise<void> {
-  const networkTx = { type, txData: tx, cycle: currentCycle, subQueueKey } as P2P.ServiceQueueTypes.AddNetworkTx
+  const networkTx = {
+    type,
+    txData: tx,
+    cycle: currentCycle,
+    subQueueKey,
+  } as P2P.ServiceQueueTypes.AddNetworkTx
   txAdd.push(networkTx)
   if (await _addNetworkTx(networkTx)) {
+    txAdd.push(networkTx)
     makeAddNetworkTxProposals(networkTx)
   }
 }
@@ -243,7 +249,7 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
     }
 
     const txHash = crypto.hash(addTx.txData)
-    if (txList.find((entry) => entry.hash === txHash)) {
+    if (txList.some((entry) => entry.hash === txHash)) {
       if (logFlags.p2pNonFatal) {
         info('Transaction already exists in txList', txHash)
       }
@@ -261,7 +267,7 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
       return false
     }
 
-    if (!await verifyFunction(addTx.txData)) {
+    if (!(await verifyFunction(addTx.txData))) {
       error(
         `Failed add network tx verification of type ${addTx.type} \n tx: ${stringifyReduce(addTx.txData)}`
       )
@@ -269,7 +275,15 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
     }
 
     info(`Adding network tx of type ${addTx.type} and payload ${stringifyReduce(addTx.txData)}`)
-    sortedInsert({ hash: txHash, tx: { txData: addTx.txData, type: addTx.type, cycle: addTx.cycle } })
+    sortedInsert({
+      hash: txHash,
+      tx: {
+        txData: addTx.txData,
+        type: addTx.type,
+        cycle: addTx.cycle,
+        ...(addTx.subQueueKey && { subQueueKey: addTx.subQueueKey }),
+      },
+    })
 
     return true
   } catch (e) {
