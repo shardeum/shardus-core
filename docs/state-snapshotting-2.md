@@ -8,13 +8,13 @@ collected all partition hashes
 The gossip queue no longer uses a flag, its always listening for gossip and putting it into the queue
 
 When state-manager emits the 'cycleTxsFinalized' event, we need to:
-  1) create our own partition hashes for that cycle number
-  2) gossip our partitition hashes to the rest of the network with that cycle number
-  3) process gossip from the queue for that cycle number
-        change the hash that we have for a partition to the most common one from the gossip
-  4) create a network state hash once we have all partition hashes for that cycle number
-  5) save the partition and network hashes for that cycle number to the DB
 
+1. create our own partition hashes for that cycle number
+2. gossip our partitition hashes to the rest of the network with that cycle number
+3. process gossip from the queue for that cycle number
+   change the hash that we have for a partition to the most common one from the gossip
+4. create a network state hash once we have all partition hashes for that cycle number
+5. save the partition and network hashes for that cycle number to the DB
 
 ## `snapshot/index.ts`
 
@@ -48,7 +48,7 @@ function startSnapshotting() {
       ...
       // 5) save the partition and network hashes for that cycle number to the DB
       ...
-      // 6) clean up gossip and collector for that cycle number 
+      // 6) clean up gossip and collector for that cycle number
       PartitionGossip.clean(shard.cycleNumber)
     })
 

@@ -1,5 +1,5 @@
-import { addSchema } from '../../utils/serialization/SchemaHelpers'
-import { schemaWrappedData } from './WrappedData'
+import { addSchema } from '../../utils/serialization/SchemaHelpers';
+import { schemaWrappedData } from './WrappedData';
 
 export const schemaGetAccountDataByListResp = {
   properties: {
@@ -9,11 +9,11 @@ export const schemaGetAccountDataByListResp = {
     },
   },
   required: ['accountData'],
-}
+};
 
 export function initGetAccountDataByListResp(): void {
-  addSchemaDependencies()
-  addSchemas()
+  addSchemaDependencies();
+  addSchemas();
 }
 
 // Function to add schema dependencies
@@ -23,5 +23,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('GetAccountDataByListResp', schemaGetAccountDataByListResp)
+  addSchema('GetAccountDataByListResp', schemaGetAccountDataByListResp);
 }

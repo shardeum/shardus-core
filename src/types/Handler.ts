@@ -1,6 +1,6 @@
-import { AppHeader } from '@shardus/net/build/src/types'
-import { Sign } from '../shardus/shardus-types'
-import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { AppHeader } from '@shardus/net/build/src/types';
+import { Sign } from '../shardus/shardus-types';
+import { VectorBufferStream } from '../utils/serialization/VectorBufferStream';
 
 export declare type InternalBinaryHandler<Payload = unknown, Response = unknown> = (
   payload: Payload,
@@ -11,4 +11,4 @@ export declare type InternalBinaryHandler<Payload = unknown, Response = unknown>
   ) => void,
   header: AppHeader,
   sign: Sign
-) => void
+) => void;

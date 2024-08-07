@@ -1,17 +1,17 @@
-import { Signature } from '@shardus/types/build/src/p2p/P2PTypes'
-import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
-import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { Signature } from '@shardus/types/build/src/p2p/P2PTypes';
+import { VectorBufferStream } from '../utils/serialization/VectorBufferStream';
+import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum';
 
 export interface LostArchiverInvestigateReq {
-  type: 'investigate'
-  target: string
-  investigator: string
-  sender: string
-  cycle: string
-  sign: Signature
+  type: 'investigate';
+  target: string;
+  investigator: string;
+  sender: string;
+  cycle: string;
+  sign: Signature;
 }
 
-const cLostArchiverInvestigateReqVersion = 1
+const cLostArchiverInvestigateReqVersion = 1;
 
 export function serializeLostArchiverInvestigateReq(
   stream: VectorBufferStream,
@@ -19,28 +19,28 @@ export function serializeLostArchiverInvestigateReq(
   root = false
 ): void {
   if (root) {
-    stream.writeUInt16(TypeIdentifierEnum.cLostArchiverInvestigateReq)
+    stream.writeUInt16(TypeIdentifierEnum.cLostArchiverInvestigateReq);
   }
-  stream.writeUInt8(cLostArchiverInvestigateReqVersion)
-  stream.writeString(obj.type)
-  stream.writeString(obj.target)
-  stream.writeString(obj.investigator)
-  stream.writeString(obj.sender)
-  stream.writeString(obj.cycle)
-  stream.writeString(obj.sign.owner)
-  stream.writeString(obj.sign.sig)
+  stream.writeUInt8(cLostArchiverInvestigateReqVersion);
+  stream.writeString(obj.type);
+  stream.writeString(obj.target);
+  stream.writeString(obj.investigator);
+  stream.writeString(obj.sender);
+  stream.writeString(obj.cycle);
+  stream.writeString(obj.sign.owner);
+  stream.writeString(obj.sign.sig);
 }
 
 export function deserializeLostArchiverInvestigateReq(
   stream: VectorBufferStream
 ): LostArchiverInvestigateReq {
-  const version = stream.readUInt8()
+  const version = stream.readUInt8();
   if (version > cLostArchiverInvestigateReqVersion) {
-    throw new Error('cLostArchiverInvestigateReq version mismatch')
+    throw new Error('cLostArchiverInvestigateReq version mismatch');
   }
-  const type = stream.readString()
+  const type = stream.readString();
   if (type !== 'investigate') {
-    throw new Error(`Unexpected type value: ${type}`)
+    throw new Error(`Unexpected type value: ${type}`);
   }
   // eslint-disable-next-line prefer-const
   let obj: LostArchiverInvestigateReq = {
@@ -53,6 +53,6 @@ export function deserializeLostArchiverInvestigateReq(
       owner: stream.readString(),
       sig: stream.readString(),
     },
-  }
-  return obj
+  };
+  return obj;
 }

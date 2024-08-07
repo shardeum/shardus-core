@@ -1,5 +1,5 @@
 //get the target nodes for a given corresponding sender
-import { logFlags } from '../logger'
+import { logFlags } from '../logger';
 
 //this only has to be computed once time no matter how many facts are being shared
 export function getCorrespondingNodes(
@@ -10,50 +10,52 @@ export function getCorrespondingNodes(
   receiverGroupSize: number,
   sendGroupSize: number,
   transactionGroupSize: number,
-  note =  ''
+  note = ''
 ): number[] {
   if (logFlags.verbose) {
-    console.log(`getCorrespondingNodes ${note} ${ourIndex} ${startTargetIndex} ${endTargetIndex} ${globalOffset} ${receiverGroupSize} ${sendGroupSize} ${transactionGroupSize}`)
+    console.log(
+      `getCorrespondingNodes ${note} ${ourIndex} ${startTargetIndex} ${endTargetIndex} ${globalOffset} ${receiverGroupSize} ${sendGroupSize} ${transactionGroupSize}`
+    );
   }
-  let wrappedIndex: number
-  let targetNumber: number
-  let found = false
+  let wrappedIndex: number;
+  let targetNumber: number;
+  let found = false;
 
-  let unWrappedEndIndex = -1
+  let unWrappedEndIndex = -1;
   // handle case where receiver group is split (wraps around)
   if (startTargetIndex > endTargetIndex) {
-    unWrappedEndIndex = endTargetIndex
-    endTargetIndex = endTargetIndex + transactionGroupSize
+    unWrappedEndIndex = endTargetIndex;
+    endTargetIndex = endTargetIndex + transactionGroupSize;
   }
   //wrap our index to the send group size
-  ourIndex = ourIndex % sendGroupSize
+  ourIndex = ourIndex % sendGroupSize;
 
   //find our initial staring index into the receiver group (wrappedIndex)
   for (let i = startTargetIndex; i < endTargetIndex; i++) {
-    wrappedIndex = i
+    wrappedIndex = i;
     if (i >= transactionGroupSize) {
-      wrappedIndex = i - transactionGroupSize
+      wrappedIndex = i - transactionGroupSize;
     }
-    targetNumber = (i + globalOffset) % receiverGroupSize
+    targetNumber = (i + globalOffset) % receiverGroupSize;
     if (targetNumber === ourIndex) {
-      found = true
-      break
+      found = true;
+      break;
     }
   }
   if (!found) {
     //return empty array
-    return []
+    return [];
   }
 
-  const destinationNodes: number[] = []
+  const destinationNodes: number[] = [];
   //this loop is at most O(k) where k is  receiverGroupSize / sendGroupSize
   //effectively it is constant time it is required so that a smaller
   //group can send to a larger group
   while (targetNumber < receiverGroupSize) {
     //send all payload to this node
-    const destinationNode = wrappedIndex
+    const destinationNode = wrappedIndex;
 
-    destinationNodes.push(destinationNode)
+    destinationNodes.push(destinationNode);
     //console.log(`sender ${ourIndex} send all payload to node ${destinationNode} targetNumber ${targetNumber} `)
 
     // //in-place verification check
@@ -67,29 +69,29 @@ export function getCorrespondingNodes(
     //wrapped index will have various corrections so that it can
     //wrap past the end of a split span, or wrap within the range
     //of the receiver group
-    targetNumber += sendGroupSize
-    wrappedIndex += sendGroupSize
+    targetNumber += sendGroupSize;
+    wrappedIndex += sendGroupSize;
 
     //wrap to front of transaction group
     if (wrappedIndex >= transactionGroupSize) {
-      wrappedIndex = wrappedIndex - transactionGroupSize
+      wrappedIndex = wrappedIndex - transactionGroupSize;
     }
     //wrap to front of receiver group
     if (wrappedIndex >= endTargetIndex) {
-      wrappedIndex = wrappedIndex - receiverGroupSize
+      wrappedIndex = wrappedIndex - receiverGroupSize;
     }
     //special case to stay in bounds when we have a split index and
     //the unWrappedEndIndex is smaller than the start index.
     //i.e.  startTargetIndex = 45, endTargetIndex = 5  for a 50 node group
     if (unWrappedEndIndex != -1 && wrappedIndex >= unWrappedEndIndex) {
-      const howFarPastUnWrapped = wrappedIndex - unWrappedEndIndex
-      wrappedIndex = startTargetIndex + howFarPastUnWrapped
+      const howFarPastUnWrapped = wrappedIndex - unWrappedEndIndex;
+      wrappedIndex = startTargetIndex + howFarPastUnWrapped;
     }
   }
   if (logFlags.verbose) {
-    console.log(`note: ${note} destinationNodes ${destinationNodes}`)
+    console.log(`note: ${note} destinationNodes ${destinationNodes}`);
   }
-  return destinationNodes
+  return destinationNodes;
 }
 
 export function verifyCorrespondingSender(
@@ -105,32 +107,36 @@ export function verifyCorrespondingSender(
   note = ''
 ): boolean {
   if (logFlags.verbose) {
-    console.log(`verifyCorrespondingSender ${note} ${receivingNodeIndex} ${sendingNodeIndex} ${globalOffset} ${receiverGroupSize} ${sendGroupSize} ${receiverStartIndex} ${receiverEndIndex} ${transactionGroupSize}`)
+    console.log(
+      `verifyCorrespondingSender ${note} ${receivingNodeIndex} ${sendingNodeIndex} ${globalOffset} ${receiverGroupSize} ${sendGroupSize} ${receiverStartIndex} ${receiverEndIndex} ${transactionGroupSize}`
+    );
   }
   //note, in the gather case, we need to check the address range of the sender node also, to prove
   //that it does cover the given account range
-  let unwrappedReceivingNodeIndex = receivingNodeIndex
+  let unwrappedReceivingNodeIndex = receivingNodeIndex;
 
   // handle case where receiver group is split (wraps around)
   if (receiverStartIndex > unwrappedReceivingNodeIndex) {
-    unwrappedReceivingNodeIndex = unwrappedReceivingNodeIndex + transactionGroupSize
+    unwrappedReceivingNodeIndex = unwrappedReceivingNodeIndex + transactionGroupSize;
   }
-  let unwrappedSendingNodeIndex = sendingNodeIndex
-  if(shouldUnwrapSender) {
-    unwrappedSendingNodeIndex = sendingNodeIndex + transactionGroupSize
+  let unwrappedSendingNodeIndex = sendingNodeIndex;
+  if (shouldUnwrapSender) {
+    unwrappedSendingNodeIndex = sendingNodeIndex + transactionGroupSize;
   }
 
   // use unwrappedReceivingNodeIndex to calculate the target index
-  const targetIndex = ((unwrappedReceivingNodeIndex + globalOffset) % receiverGroupSize) % sendGroupSize
-  const targetIndex2 = unwrappedSendingNodeIndex % sendGroupSize
+  const targetIndex = ((unwrappedReceivingNodeIndex + globalOffset) % receiverGroupSize) % sendGroupSize;
+  const targetIndex2 = unwrappedSendingNodeIndex % sendGroupSize;
   if (targetIndex === targetIndex2) {
     if (logFlags.verbose)
       console.log(
         `note: ${note} verification passed ${targetIndex} === ${targetIndex2}  ${unwrappedSendingNodeIndex}->${receivingNodeIndex}`
-      )
-    return true
+      );
+    return true;
   } else {
-    console.log(`note: ${note} X verification failed ${targetIndex} !== ${targetIndex2} sender: ${unwrappedSendingNodeIndex} receiver: ${receivingNodeIndex}`)
-    return false
+    console.log(
+      `note: ${note} X verification failed ${targetIndex} !== ${targetIndex2} sender: ${unwrappedSendingNodeIndex} receiver: ${receivingNodeIndex}`
+    );
+    return false;
   }
 }

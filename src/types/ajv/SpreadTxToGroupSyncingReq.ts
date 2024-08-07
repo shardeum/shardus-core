@@ -1,4 +1,4 @@
-import { addSchema, addSchemaDependency } from '../../utils/serialization/SchemaHelpers'
+import { addSchema, addSchemaDependency } from '../../utils/serialization/SchemaHelpers';
 
 export const schemaSpreadTxToGroupSyncingReq = {
   type: 'object',
@@ -11,7 +11,7 @@ export const schemaSpreadTxToGroupSyncingReq = {
     shardusMemoryPatterns: { $ref: 'ShardusMemoryPatternsInput' },
   },
   required: ['timestamp', 'txId', 'keys', 'data', 'appData', 'shardusMemoryPatterns'],
-}
+};
 
 export const schemaTransactionKeys = {
   type: 'object',
@@ -23,9 +23,9 @@ export const schemaTransactionKeys = {
     debugInfo: { type: 'string' },
   },
   required: ['sourceKeys', 'targetKeys', 'allKeys', 'timestamp'],
-}
+};
 
-export const schemaOpaqueTransaction = { type: 'object' }
+export const schemaOpaqueTransaction = { type: 'object' };
 
 export const schemaShardusMemoryPatternsInput = {
   type: 'object',
@@ -37,22 +37,22 @@ export const schemaShardusMemoryPatternsInput = {
     ri: { type: 'array', items: { type: 'string' } },
   },
   required: ['ro', 'rw', 'wo', 'on', 'ri'],
-}
+};
 
 export function initSpreadTxToGroupSyncingReq(): void {
-  addSchemaDependencies()
-  addSchemas()
+  addSchemaDependencies();
+  addSchemas();
 }
 
 export function addSchemaDependencies(): void {
-  addSchemaDependency('TransactionKeys', 'SpreadTxToGroupSyncingReq')
-  addSchemaDependency('OpaqueTransaction', 'SpreadTxToGroupSyncingReq')
-  addSchemaDependency('ShardusMemoryPatternsInput', 'SpreadTxToGroupSyncingReq')
+  addSchemaDependency('TransactionKeys', 'SpreadTxToGroupSyncingReq');
+  addSchemaDependency('OpaqueTransaction', 'SpreadTxToGroupSyncingReq');
+  addSchemaDependency('ShardusMemoryPatternsInput', 'SpreadTxToGroupSyncingReq');
 }
 
 export function addSchemas(): void {
-  addSchema('TransactionKeys', schemaTransactionKeys)
-  addSchema('OpaqueTransaction', schemaOpaqueTransaction)
-  addSchema('ShardusMemoryPatternsInput', schemaShardusMemoryPatternsInput)
-  addSchema('SpreadTxToGroupSyncingReq', schemaSpreadTxToGroupSyncingReq)
+  addSchema('TransactionKeys', schemaTransactionKeys);
+  addSchema('OpaqueTransaction', schemaOpaqueTransaction);
+  addSchema('ShardusMemoryPatternsInput', schemaShardusMemoryPatternsInput);
+  addSchema('SpreadTxToGroupSyncingReq', schemaSpreadTxToGroupSyncingReq);
 }

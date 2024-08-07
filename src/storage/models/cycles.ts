@@ -1,5 +1,5 @@
-import P2PApoptosis = require('../../p2p/Apoptosis')
-import { SQLDataTypes } from '../utils/schemaDefintions'
+import P2PApoptosis = require('../../p2p/Apoptosis');
+import { SQLDataTypes } from '../utils/schemaDefintions';
 
 // dont forget to add the certificate field as JSON
 const cycles = [
@@ -61,6 +61,6 @@ const cycles = [
     ...P2PApoptosis.sequelizeCycleFieldModel,
     random: { type: SQLDataTypes.INTEGER, allowNull: false },
   },
-]
+];
 
-export default cycles
+export default cycles;

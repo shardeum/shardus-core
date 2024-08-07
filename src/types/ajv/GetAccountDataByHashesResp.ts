@@ -1,5 +1,5 @@
-import { addSchema } from '../../utils/serialization/SchemaHelpers'
-import { schemaWrappedData } from './WrappedData'
+import { addSchema } from '../../utils/serialization/SchemaHelpers';
+import { schemaWrappedData } from './WrappedData';
 
 const schemaGetAccountDataByHashesResp = {
   type: 'object',
@@ -24,11 +24,11 @@ const schemaGetAccountDataByHashesResp = {
     },
   },
   required: ['accounts', 'stateTableData'],
-}
+};
 
 export function initGetAccountDataByHashesResp(): void {
-  addSchemaDependencies()
-  addSchemas()
+  addSchemaDependencies();
+  addSchemas();
 }
 
 // Function to add schema dependencies
@@ -38,5 +38,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('GetAccountDataByHashesResp', schemaGetAccountDataByHashesResp)
+  addSchema('GetAccountDataByHashesResp', schemaGetAccountDataByHashesResp);
 }

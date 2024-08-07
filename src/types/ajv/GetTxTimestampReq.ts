@@ -1,4 +1,4 @@
-import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { addSchema } from '../../utils/serialization/SchemaHelpers';
 
 const schemaGetTxTimestampReq = {
   type: 'object',
@@ -8,11 +8,11 @@ const schemaGetTxTimestampReq = {
     cycleMarker: { type: 'string' },
   },
   required: ['txId', 'cycleCounter', 'cycleMarker'],
-}
+};
 
 export function initGetTxTimestampReq(): void {
-  addSchemaDependencies()
-  addSchemas()
+  addSchemaDependencies();
+  addSchemas();
 }
 
 // Function to add schema dependencies
@@ -22,5 +22,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('GetTxTimestampReq', schemaGetTxTimestampReq)
+  addSchema('GetTxTimestampReq', schemaGetTxTimestampReq);
 }

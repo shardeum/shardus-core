@@ -1,4 +1,4 @@
-import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { addSchema } from '../../utils/serialization/SchemaHelpers';
 
 const schemaApoptosisResp = {
   type: 'object',
@@ -7,11 +7,11 @@ const schemaApoptosisResp = {
     r: { type: 'number' },
   },
   required: ['s', 'r'],
-}
+};
 
 export function initApoptosisProposal(): void {
-  addSchemaDependencies()
-  addSchemas()
+  addSchemaDependencies();
+  addSchemas();
 }
 
 // Function to add schema dependencies
@@ -21,5 +21,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('ApoptosisProposalResp', schemaApoptosisResp)
+  addSchema('ApoptosisProposalResp', schemaApoptosisResp);
 }

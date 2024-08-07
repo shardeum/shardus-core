@@ -1,4 +1,4 @@
-import { SQLDataTypes } from '../utils/schemaDefintions'
+import { SQLDataTypes } from '../utils/schemaDefintions';
 
 const acceptedTx = [
   'acceptedTxs',
@@ -8,9 +8,9 @@ const acceptedTx = [
     data: { type: SQLDataTypes.JSON, allowNull: false },
     keys: { type: SQLDataTypes.JSON, allowNull: false },
   },
-]
+];
 
-export default acceptedTx
+export default acceptedTx;
 
 // these are the values in the documentation. converted them to naming standards
 // Tx_id

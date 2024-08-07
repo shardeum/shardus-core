@@ -12,8 +12,8 @@ export enum SQLDataTypes {
 }
 
 export type ColumnDescription = {
-  type: string
-  allowNull?: boolean
-  primaryKey?: boolean
-  unique?: boolean
-}
+  type: string;
+  allowNull?: boolean;
+  primaryKey?: boolean;
+  unique?: boolean;
+};

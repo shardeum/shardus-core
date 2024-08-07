@@ -1,4 +1,4 @@
-import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { addSchema } from '../../utils/serialization/SchemaHelpers';
 
 export const schemaWrappedData = {
   type: 'object',
@@ -19,11 +19,11 @@ export const schemaWrappedData = {
     },
   },
   required: ['accountId', 'stateId', 'data', 'timestamp'],
-}
+};
 
 export function initWrappedData(): void {
-  addSchemaDependencies()
-  addSchemas()
+  addSchemaDependencies();
+  addSchemas();
 }
 
 // Function to add schema dependencies
@@ -33,5 +33,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('WrappedData', schemaWrappedData)
+  addSchema('WrappedData', schemaWrappedData);
 }

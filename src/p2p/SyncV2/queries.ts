@@ -3,34 +3,34 @@
  * requires an external node to be queried, including robust queries.
  */
 
-import { hexstring, P2P } from '@shardus/types'
-import { errAsync, ResultAsync } from 'neverthrow'
-import { attempt, robustQuery } from '../Utils'
-import * as http from '../../http'
-import { logger } from '../Context'
-import { Logger } from 'log4js'
-import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
+import { hexstring, P2P } from '@shardus/types';
+import { errAsync, ResultAsync } from 'neverthrow';
+import { attempt, robustQuery } from '../Utils';
+import * as http from '../../http';
+import { logger } from '../Context';
+import { Logger } from 'log4js';
+import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes';
 
 /** A `ResultAsync` that wraps an `UnwrappedRobustResult`. */
-export type RobustQueryResultAsync<T> = ResultAsync<UnwrappedRobustResult<ActiveNode, T>, Error>
+export type RobustQueryResultAsync<T> = ResultAsync<UnwrappedRobustResult<ActiveNode, T>, Error>;
 
 /** A successful RobustQueryResult whose value is an unwrapped `Ok` `Result`. */
 type UnwrappedRobustResult<N, V> = {
-  winningNodes: N[]
-  value: V
-}
+  winningNodes: N[];
+  value: V;
+};
 
 // Convenience type aliases.
-type ActiveNode = P2P.SyncTypes.ActiveNode
-type Validator = P2P.NodeListTypes.Node
-type Archiver = P2P.ArchiversTypes.JoinedArchiver
-type CycleRecord = P2P.CycleCreatorTypes.CycleRecord
+type ActiveNode = P2P.SyncTypes.ActiveNode;
+type Validator = P2P.NodeListTypes.Node;
+type Archiver = P2P.ArchiversTypes.JoinedArchiver;
+type CycleRecord = P2P.CycleCreatorTypes.CycleRecord;
 
-const MAX_RETRIES = 3
+const MAX_RETRIES = 3;
 
-let mainLogger: Logger
+let mainLogger: Logger;
 export function initLogger(): void {
-  mainLogger = logger.getLogger('main')
+  mainLogger = logger.getLogger('main');
 }
 
 /**
@@ -50,18 +50,18 @@ export function initLogger(): void {
 function makeRobustQueryCall<T>(nodes: ActiveNode[], endpointName: string): RobustQueryResultAsync<T> {
   // query function that makes the endpoint call as specified
   const queryFn = (node: ActiveNode): ResultAsync<T, Error> => {
-    const ip = node.ip
-    const port = node.port
+    const ip = node.ip;
+    const port = node.port;
 
     // queries the cyclemarker endpoint defined in ../Join.ts
     return ResultAsync.fromPromise(
       http.get(`${ip}:${port}/${endpointName}`),
       (err) => new Error(`couldn't query ${endpointName}: ${err}`)
-    )
-  }
+    );
+  };
 
   // run the robust query, wrapped in an async Result return the unwrapped result (with `map`) if successful
-  const logPrefix = `syncv2-robust-query-${endpointName}`
+  const logPrefix = `syncv2-robust-query-${endpointName}`;
   return ResultAsync.fromPromise(
     attempt(async () => await robustQuery(nodes, queryFn), {
       maxRetries: MAX_RETRIES,
@@ -72,13 +72,13 @@ function makeRobustQueryCall<T>(nodes: ActiveNode[], endpointName: string): Robu
   ).andThen((robustResult) => {
     // ensuring the result was robust as well.
     if (!robustResult.isRobustResult) {
-      return errAsync(new Error(`result of ${endpointName} wasn't robust`))
+      return errAsync(new Error(`result of ${endpointName} wasn't robust`));
     }
     return robustResult.topResult.map((value) => ({
       winningNodes: robustResult.winningNodes,
       value,
-    }))
-  })
+    }));
+  });
 }
 
 /**
@@ -100,10 +100,10 @@ function attemptSimpleFetch<T>(
   params: Record<string, string> = {},
   timeout = 1000
 ): ResultAsync<T, Error> {
-  let url = `${node.ip}:${node.port}/${endpointName}`
+  let url = `${node.ip}:${node.port}/${endpointName}`;
   if (params) {
-    const encodedParams = new URLSearchParams(params).toString()
-    url += `?${encodedParams}`
+    const encodedParams = new URLSearchParams(params).toString();
+    url += `?${encodedParams}`;
   }
 
   return ResultAsync.fromPromise(
@@ -113,33 +113,35 @@ function attemptSimpleFetch<T>(
       logger: mainLogger,
     }),
     (err) => new Error(`simple fetch failed for ${endpointName}: ${err}`)
-  )
+  );
 }
 
 /** Executes a robust query to retrieve the cycle marker from the network. */
-export function robustQueryForCycleRecordHash(nodes: ActiveNode[]): RobustQueryResultAsync<{ currentCycleHash: hexstring }> {
-  return makeRobustQueryCall(nodes, 'current-cycle-hash')
+export function robustQueryForCycleRecordHash(
+  nodes: ActiveNode[]
+): RobustQueryResultAsync<{ currentCycleHash: hexstring }> {
+  return makeRobustQueryCall(nodes, 'current-cycle-hash');
 }
 
 /** Executes a robust query to retrieve the validator list hash and next cycle timestamp from the network. */
 export function robustQueryForValidatorListHash(
   nodes: ActiveNode[]
 ): RobustQueryResultAsync<{ nodeListHash: hexstring; nextCycleTimestamp: number }> {
-  return makeRobustQueryCall(nodes, 'validator-list-hash')
+  return makeRobustQueryCall(nodes, 'validator-list-hash');
 }
 
 /** Executes a robust query to retrieve the archiver list hash from the network. */
 export function robustQueryForArchiverListHash(
   nodes: ActiveNode[]
 ): RobustQueryResultAsync<{ archiverListHash: hexstring }> {
-  return makeRobustQueryCall(nodes, 'archiver-list-hash')
+  return makeRobustQueryCall(nodes, 'archiver-list-hash');
 }
 
 /** Executes a robust query to retrieve the standby list hash from the network. */
 export function robustQueryForStandbyNodeListHash(
   nodes: ActiveNode[]
 ): RobustQueryResultAsync<{ standbyNodeListHash: hexstring }> {
-  return makeRobustQueryCall(nodes, 'standby-list-hash')
+  return makeRobustQueryCall(nodes, 'standby-list-hash');
 }
 
 /** Retrives the cycle by marker from the node. */
@@ -149,7 +151,7 @@ export function getCycleDataFromNode(
 ): ResultAsync<CycleRecord, Error> {
   return attemptSimpleFetch(node, 'cycle-by-marker', {
     marker: expectedMarker,
-  })
+  });
 }
 
 /** Gets the full validator list from the specified node. */
@@ -164,7 +166,7 @@ export function getValidatorListFromNode(
       hash: expectedHash,
     },
     10000
-  )
+  );
 }
 
 /** Gets the full archiver list from the specified archiver. */
@@ -174,7 +176,7 @@ export function getArchiverListFromNode(
 ): ResultAsync<Archiver[], Error> {
   return attemptSimpleFetch(node, 'archiver-list', {
     hash: expectedHash,
-  })
+  });
 }
 
 /** Gets the full standby list from the specified standby. */
@@ -189,5 +191,5 @@ export function getStandbyNodeListFromNode(
       hash: expectedHash,
     },
     10000 //TODO need to make this scale when there could be millions of entries
-  )
+  );
 }

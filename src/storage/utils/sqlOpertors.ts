@@ -3,4 +3,4 @@ export const Op = {
   lte: Symbol('lte'),
   in: Symbol('in'),
   between: Symbol('between'),
-}
+};

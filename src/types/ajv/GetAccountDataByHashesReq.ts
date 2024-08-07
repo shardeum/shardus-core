@@ -1,4 +1,4 @@
-import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { addSchema } from '../../utils/serialization/SchemaHelpers';
 
 const schemaAccountIDAndHash = {
   type: 'object',
@@ -7,7 +7,7 @@ const schemaAccountIDAndHash = {
     hash: { type: 'string' },
   },
   required: ['accountID', 'hash'],
-}
+};
 
 const schemaGetAccountDataByHashesReq = {
   type: 'object',
@@ -19,11 +19,11 @@ const schemaGetAccountDataByHashesReq = {
     },
   },
   required: ['cycle', 'accounts'],
-}
+};
 
 export function initGetAccountDataByHashesReq(): void {
-  addSchemaDependencies()
-  addSchemas()
+  addSchemaDependencies();
+  addSchemas();
 }
 
 // Function to add schema dependencies
@@ -33,5 +33,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('GetAccountDataByHashesReq', schemaGetAccountDataByHashesReq)
+  addSchema('GetAccountDataByHashesReq', schemaGetAccountDataByHashesReq);
 }

@@ -1,15 +1,15 @@
-import { addSchema } from '../../utils/serialization/SchemaHelpers'
+import { addSchema } from '../../utils/serialization/SchemaHelpers';
 
 const schemaGetAccountDataByListReq = {
   properties: {
     accountIds: { type: 'array', items: { type: 'string' } },
   },
   required: ['accountIds'],
-}
+};
 
 export function initGetAccountDataByListReq(): void {
-  addSchemaDependencies()
-  addSchemas()
+  addSchemaDependencies();
+  addSchemas();
 }
 
 // Function to add schema dependencies
@@ -19,5 +19,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema('GetAccountDataByListReq', schemaGetAccountDataByListReq)
+  addSchema('GetAccountDataByListReq', schemaGetAccountDataByListReq);
 }

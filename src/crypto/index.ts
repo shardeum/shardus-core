@@ -1,83 +1,83 @@
-import * as crypto from '@shardus/crypto-utils'
-import { ChildProcess, fork, Serializable } from 'child_process'
-import fs from 'fs'
-import Log4js from 'log4js'
-import path from 'path'
-import Logger, { logFlags } from '../logger'
-import * as Shardus from '../shardus/shardus-types'
-import Storage from '../storage'
-import { Utils } from '@shardus/types'
+import * as crypto from '@shardus/crypto-utils';
+import { ChildProcess, fork, Serializable } from 'child_process';
+import fs from 'fs';
+import Log4js from 'log4js';
+import path from 'path';
+import Logger, { logFlags } from '../logger';
+import * as Shardus from '../shardus/shardus-types';
+import Storage from '../storage';
+import { Utils } from '@shardus/types';
 
-export type HashableObject = (object | string) & { sign?: Shardus.Sign }
+export type HashableObject = (object | string) & { sign?: Shardus.Sign };
 
 interface Keypair {
-  publicKey?: crypto.publicKey
-  secretKey?: crypto.secretKey
+  publicKey?: crypto.publicKey;
+  secretKey?: crypto.secretKey;
 }
 
 interface Crypto {
-  baseDir: string
-  config: Shardus.StrictServerConfiguration
-  mainLogger: Log4js.Logger
-  storage: Storage
-  keypair: Keypair
+  baseDir: string;
+  config: Shardus.StrictServerConfiguration;
+  mainLogger: Log4js.Logger;
+  storage: Storage;
+  keypair: Keypair;
   curveKeypair: {
-    publicKey?: crypto.curvePublicKey
-    secretKey?: crypto.curveSecretKey
-  }
-  powGenerators: { [name: string]: ChildProcess }
-  sharedKeys: { [name: string]: Buffer }
+    publicKey?: crypto.curvePublicKey;
+    secretKey?: crypto.curveSecretKey;
+  };
+  powGenerators: { [name: string]: ChildProcess };
+  sharedKeys: { [name: string]: Buffer };
 }
 
 class Crypto {
   constructor(baseDir: string, config: Shardus.StrictServerConfiguration, logger: Logger, storage: Storage) {
-    this.baseDir = baseDir
-    this.config = config
-    this.mainLogger = logger.getLogger('main')
-    this.storage = storage
-    this.keypair = {}
-    this.curveKeypair = {}
-    this.powGenerators = {}
-    this.sharedKeys = {}
+    this.baseDir = baseDir;
+    this.config = config;
+    this.mainLogger = logger.getLogger('main');
+    this.storage = storage;
+    this.keypair = {};
+    this.curveKeypair = {};
+    this.powGenerators = {};
+    this.sharedKeys = {};
   }
 
   async init(): Promise<void> {
-    crypto.init(this.config.crypto.hashKey)
-    crypto.setCustomStringifier(Utils.safeStringify, 'shardus_safeStringify')
+    crypto.init(this.config.crypto.hashKey);
+    crypto.setCustomStringifier(Utils.safeStringify, 'shardus_safeStringify');
 
     try {
-      this.storage._checkInit()
-      const keypair = await this.storage.getProperty('keypair')
+      this.storage._checkInit();
+      const keypair = await this.storage.getProperty('keypair');
       if (keypair) {
-        this.mainLogger.info('Keypair loaded from database', this.getKeyPairFile())
-        this.keypair = keypair
-        this.setCurveKeyPair(this.keypair)
-        return
+        this.mainLogger.info('Keypair loaded from database', this.getKeyPairFile());
+        this.keypair = keypair;
+        this.setCurveKeyPair(this.keypair);
+        return;
       }
     } catch (e) {
       if (logFlags.error)
-        this.mainLogger.error(`error fetching keypair from database ${Utils.safeStringify(e)}`)
+        this.mainLogger.error(`error fetching keypair from database ${Utils.safeStringify(e)}`);
     }
 
     if (this.config.crypto.keyPairConfig.useKeyPairFromFile) {
-      const fsKeypair = this.readKeypairFromFile()
+      const fsKeypair = this.readKeypairFromFile();
       if (fsKeypair && fsKeypair.secretKey && fsKeypair.publicKey) {
-        this.keypair = fsKeypair
-        this.mainLogger.info('Keypair loaded from file', this.getKeyPairFile())
-        this.setCurveKeyPair(this.keypair)
-        return
+        this.keypair = fsKeypair;
+        this.mainLogger.info('Keypair loaded from file', this.getKeyPairFile());
+        this.setCurveKeyPair(this.keypair);
+        return;
       }
     }
 
     try {
-      this.mainLogger.info('Unable to load keypair. Generating new...')
-      this.keypair = this._generateKeypair()
-      if (this.config.crypto.keyPairConfig.useKeyPairFromFile) this.writeKeypairToFile(this.keypair)
-      await this.storage.setProperty('keypair', this.keypair)
-      this.mainLogger.info('New keypair successfully generated and saved to database.')
-      this.setCurveKeyPair(this.keypair)
+      this.mainLogger.info('Unable to load keypair. Generating new...');
+      this.keypair = this._generateKeypair();
+      if (this.config.crypto.keyPairConfig.useKeyPairFromFile) this.writeKeypairToFile(this.keypair);
+      await this.storage.setProperty('keypair', this.keypair);
+      this.mainLogger.info('New keypair successfully generated and saved to database.');
+      this.setCurveKeyPair(this.keypair);
     } catch (e) {
-      if (logFlags.error) this.mainLogger.error(`error ${Utils.safeStringify(e)}`)
+      if (logFlags.error) this.mainLogger.error(`error ${Utils.safeStringify(e)}`);
     }
   }
 
@@ -86,18 +86,18 @@ class Crypto {
       this.curveKeypair = {
         secretKey: crypto.convertSkToCurve(this.keypair.secretKey),
         publicKey: crypto.convertPkToCurve(this.keypair.publicKey),
-      }
+      };
     }
   }
 
   getKeyPairFile(): string {
-    return path.join(this.baseDir, this.config.crypto.keyPairConfig.keyPairJsonFile)
+    return path.join(this.baseDir, this.config.crypto.keyPairConfig.keyPairJsonFile);
   }
 
   writeKeypairToFile(keypair: Keypair): void {
     // probably safe; accesses keypair defined by config
     // eslint-disable-next-line security/detect-non-literal-fs-filename
-    fs.writeFileSync(this.getKeyPairFile(), Utils.safeStringify(keypair))
+    fs.writeFileSync(this.getKeyPairFile(), Utils.safeStringify(keypair));
   }
 
   readKeypairFromFile(): crypto.Keypair {
@@ -105,46 +105,46 @@ class Crypto {
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     if (fs.existsSync(this.getKeyPairFile())) {
       // eslint-disable-next-line security/detect-non-literal-fs-filename
-      const fileData = fs.readFileSync(this.getKeyPairFile())
-      return Utils.safeJsonParse(fileData.toString())
+      const fileData = fs.readFileSync(this.getKeyPairFile());
+      return Utils.safeJsonParse(fileData.toString());
     }
-    return null
+    return null;
   }
 
   _generateKeypair(): crypto.Keypair {
-    const keypair = crypto.generateKeypair()
-    this.mainLogger.info('New keypair generated.')
-    return keypair
+    const keypair = crypto.generateKeypair();
+    this.mainLogger.info('New keypair generated.');
+    return keypair;
   }
 
   convertPublicKeyToCurve(pk: crypto.publicKey): string {
-    return crypto.convertPkToCurve(pk)
+    return crypto.convertPkToCurve(pk);
   }
 
   getPublicKey(): string {
-    return this.keypair.publicKey
+    return this.keypair.publicKey;
   }
 
   getCurvePublicKey(): string {
-    return this.curveKeypair.publicKey
+    return this.curveKeypair.publicKey;
   }
 
   getSharedKey(curvePk: crypto.curvePublicKey): Buffer {
     // eslint-disable-next-line security/detect-object-injection
-    let sharedKey = this.sharedKeys[curvePk]
+    let sharedKey = this.sharedKeys[curvePk];
     if (!sharedKey) {
-      sharedKey = crypto.generateSharedKey(this.curveKeypair.secretKey, curvePk)
+      sharedKey = crypto.generateSharedKey(this.curveKeypair.secretKey, curvePk);
       // eslint-disable-next-line security/detect-object-injection
-      this.sharedKeys[curvePk] = sharedKey
+      this.sharedKeys[curvePk] = sharedKey;
     }
-    return sharedKey
+    return sharedKey;
   }
 
   tag<T>(obj: T, recipientCurvePk: crypto.curvePublicKey): T & crypto.TaggedObject {
-    const objCopy = Utils.safeJsonParse(Utils.safeStringify(obj))
-    const sharedKey = this.getSharedKey(recipientCurvePk)
-    crypto.tagObj(objCopy, sharedKey)
-    return objCopy
+    const objCopy = Utils.safeJsonParse(Utils.safeStringify(obj));
+    const sharedKey = this.getSharedKey(recipientCurvePk);
+    crypto.tagObj(objCopy, sharedKey);
+    return objCopy;
   }
 
   /**
@@ -161,18 +161,18 @@ class Crypto {
     obj: T,
     recipientCurvePk: crypto.curvePublicKey
   ): T & { msgSize: number } & crypto.TaggedObject {
-    const strEncoded = Utils.safeStringify(obj)
-    const msgSize = strEncoded.length //get the message size
-    const objCopy = Utils.safeJsonParse(strEncoded)
-    objCopy.msgSize = msgSize // set the size
-    const sharedKey = this.getSharedKey(recipientCurvePk)
-    crypto.tagObj(objCopy, sharedKey)
-    return objCopy
+    const strEncoded = Utils.safeStringify(obj);
+    const msgSize = strEncoded.length; //get the message size
+    const objCopy = Utils.safeJsonParse(strEncoded);
+    objCopy.msgSize = msgSize; // set the size
+    const sharedKey = this.getSharedKey(recipientCurvePk);
+    crypto.tagObj(objCopy, sharedKey);
+    return objCopy;
   }
 
   signWithSize<T>(obj: T): T & crypto.SignedObject {
-    const wrappedMsgStr = Utils.safeStringify(obj)
-    const msgLength = wrappedMsgStr.length
+    const wrappedMsgStr = Utils.safeStringify(obj);
+    const msgLength = wrappedMsgStr.length;
     // What the linter wants:
     // const newObj = {
     //   ...obj,
@@ -185,93 +185,93 @@ class Crypto {
     // the compiler happy.
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     //@ts-ignore
-    obj.msgSize = msgLength
-    return this.sign(obj)
+    obj.msgSize = msgLength;
+    return this.sign(obj);
   }
 
   authenticate(obj: crypto.TaggedObject, senderCurvePk: crypto.curvePublicKey): boolean {
-    const sharedKey = this.getSharedKey(senderCurvePk)
-    return crypto.authenticateObj(obj, sharedKey)
+    const sharedKey = this.getSharedKey(senderCurvePk);
+    return crypto.authenticateObj(obj, sharedKey);
   }
 
   sign<T>(obj: T): T & crypto.SignedObject {
-    const objCopy = Utils.safeJsonParse(Utils.safeStringify(obj))
-    crypto.signObj(objCopy, this.keypair.secretKey, this.keypair.publicKey)
-    return objCopy
+    const objCopy = Utils.safeJsonParse(Utils.safeStringify(obj));
+    crypto.signObj(objCopy, this.keypair.secretKey, this.keypair.publicKey);
+    return objCopy;
   }
 
   verify(obj: crypto.SignedObject, expectedPk?: string): boolean {
     try {
       if (expectedPk) {
-        if (obj.sign.owner !== expectedPk) return false
+        if (obj.sign.owner !== expectedPk) return false;
       }
-      return crypto.verifyObj(obj)
+      return crypto.verifyObj(obj);
     } catch (e) {
-      this.mainLogger.error(`Error in verifying object ${Utils.safeStringify(obj)}`, e)
-      return false
+      this.mainLogger.error(`Error in verifying object ${Utils.safeStringify(obj)}`, e);
+      return false;
     }
   }
 
   hash(obj: HashableObject): string {
     if (!obj.sign) {
-      return crypto.hashObj(obj)
+      return crypto.hashObj(obj);
     }
-    return crypto.hashObj(obj, true)
+    return crypto.hashObj(obj, true);
   }
 
   isGreaterHash(hash1: string | number, hash2: string | number): boolean {
-    return hash1 > hash2
+    return hash1 > hash2;
   }
 
   getComputeProofOfWork(seed: unknown, difficulty: number): Promise<Serializable> {
-    return this._runProofOfWorkGenerator('./computePowGenerator.js', seed, difficulty)
+    return this._runProofOfWorkGenerator('./computePowGenerator.js', seed, difficulty);
   }
 
   stopAllGenerators(): void {
     for (const generator in this.powGenerators) {
       // eslint-disable-next-line security/detect-object-injection
-      this.powGenerators[generator].kill()
+      this.powGenerators[generator].kill();
     }
-    this.powGenerators = {}
+    this.powGenerators = {};
   }
 
   /* eslint-disable security/detect-object-injection */
   _runProofOfWorkGenerator(generator: string, seed: unknown, difficulty: number): Promise<Serializable> {
     // Fork a child process to compute the PoW, if it doesn't exist
     if (!this.powGenerators[generator]) {
-      this.powGenerators[generator] = fork(generator, undefined, { cwd: __dirname })
+      this.powGenerators[generator] = fork(generator, undefined, { cwd: __dirname });
     }
     const promise = new Promise<Serializable>((resolve) => {
       this.powGenerators[generator].on('message', (powObj: Serializable) => {
-        this._stopProofOfWorkGenerator(generator)
-        resolve(powObj)
-      })
-    })
+        this._stopProofOfWorkGenerator(generator);
+        resolve(powObj);
+      });
+    });
     // Tell child to compute PoW
     if (!this.powGenerators[generator].killed) {
-      this.powGenerators[generator].send({ seed, difficulty })
+      this.powGenerators[generator].send({ seed, difficulty });
     }
     // Return a promise the resolves to a valid { nonce, hash }
-    return promise
+    return promise;
   }
   /* eslint-enable security/detect-object-injection */
 
   /* eslint-disable security/detect-object-injection */
   _stopProofOfWorkGenerator(generator: string): Promise<number | string> {
-    if (!this.powGenerators[generator]) return Promise.resolve('not running')
+    if (!this.powGenerators[generator]) return Promise.resolve('not running');
     const promise = new Promise<number | string>((resolve) => {
       this.powGenerators[generator].on('close', (signal) => {
-        delete this.powGenerators[generator]
-        resolve(signal)
-      })
-    })
+        delete this.powGenerators[generator];
+        resolve(signal);
+      });
+    });
     if (!this.powGenerators[generator].killed) {
-      this.powGenerators[generator].kill()
+      this.powGenerators[generator].kill();
     }
-    return promise
+    return promise;
   }
   /* eslint-enable security/detect-object-injection */
 }
 
 // tslint:disable-next-line: no-default-export
-export default Crypto
+export default Crypto;

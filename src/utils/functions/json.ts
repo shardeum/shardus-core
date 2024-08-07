@@ -1,20 +1,20 @@
-import { Utils } from '@shardus/types'
-import { readdirSync, readFileSync } from 'fs'
-import { join } from 'path'
+import { Utils } from '@shardus/types';
+import { readdirSync, readFileSync } from 'fs';
+import { join } from 'path';
 
 export const readJSON = <T>(filename): T => {
-  const file = readFileSync(filename).toString()
-  const config = Utils.safeJsonParse(file)
-  return config
-}
+  const file = readFileSync(filename).toString();
+  const config = Utils.safeJsonParse(file);
+  return config;
+};
 
 export const readJSONDir = (dir): Record<string, unknown> => {
   // => filesObj
-  const filesObj = {}
+  const filesObj = {};
   readdirSync(dir).forEach((fileName) => {
-    const name = fileName.split('.')[0]
+    const name = fileName.split('.')[0];
     // eslint-disable-next-line security/detect-object-injection
-    filesObj[name] = readJSON(join(dir, fileName))
-  })
-  return filesObj
-}
+    filesObj[name] = readJSON(join(dir, fileName));
+  });
+  return filesObj;
+};

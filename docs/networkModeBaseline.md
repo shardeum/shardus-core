@@ -4,7 +4,7 @@ The `config.p2p.minNodes` setting impacts network behaviors, including safety + 
 
 ## Solution
 
-We suggest a new configuration parameter, `baselineNodes`, as baseline to going into safety + restore + recovery mode, separating it from `minNodes`. `baselineNodes` is the threshold for safety, recovery, and restore modes, 
+We suggest a new configuration parameter, `baselineNodes`, as baseline to going into safety + restore + recovery mode, separating it from `minNodes`. `baselineNodes` is the threshold for safety, recovery, and restore modes,
 while `minNodes` targets processing mode and growing the network without triggering safety + restore + recovery mode.
 
 ## Benefits
@@ -24,9 +24,11 @@ After reaching 600 nodes, `baselineNodes` can be increased to reflect network gr
 - Allows for flexible network growth and scalability without disrupting existing operations.
 
 ## Load Testing
-- Command to modify config in load-tester: 
+
+- Command to modify config in load-tester:
 - `npx hardhat change_server_config --networkbaselineenabled <boolean>`
 - `npx hardhat change_server_config --baselinenodes <number of nodes>`
 
-## Flag 
+## Flag
+
 - `networkBaselineEnabled` - Enables the baseline nodes feature. Migration for 1.9.1 will set this to true.

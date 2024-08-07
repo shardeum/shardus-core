@@ -1,11 +1,11 @@
-import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
-import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { VectorBufferStream } from '../utils/serialization/VectorBufferStream';
+import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum';
 
 export type GetConfirmOrChallengeReq = {
-  txId: string
-}
+  txId: string;
+};
 
-const cGetConfirmOrChallengeReqVersion = 1
+const cGetConfirmOrChallengeReqVersion = 1;
 
 export function serializeGetConfirmOrChallengeReq(
   stream: VectorBufferStream,
@@ -13,18 +13,18 @@ export function serializeGetConfirmOrChallengeReq(
   root = false
 ): void {
   if (root) {
-    stream.writeUInt16(TypeIdentifierEnum.cGetConfirmOrChallengeReq)
+    stream.writeUInt16(TypeIdentifierEnum.cGetConfirmOrChallengeReq);
   }
-  stream.writeUInt8(cGetConfirmOrChallengeReqVersion)
-  stream.writeString(obj.txId)
+  stream.writeUInt8(cGetConfirmOrChallengeReqVersion);
+  stream.writeString(obj.txId);
 }
 
 export function deserializeGetConfirmOrChallengeReq(stream: VectorBufferStream): GetConfirmOrChallengeReq {
-  const version = stream.readUInt8()
+  const version = stream.readUInt8();
   if (version > cGetConfirmOrChallengeReqVersion) {
-    throw new Error('GetConfirmOrChallengeReq version mismatch')
+    throw new Error('GetConfirmOrChallengeReq version mismatch');
   }
   return {
     txId: stream.readString(),
-  }
+  };
 }

@@ -3,22 +3,22 @@
  * to join the network.
  */
 
-import { crypto, shardus } from '../../Context'
-import * as Self from '../../Self'
-import * as CycleChain from '../../CycleChain'
-import * as NodeList from '../../NodeList'
-import * as http from '../../../http'
-import { getStandbyNodesInfoMap } from '.'
-import { calculateToAcceptV2 } from '../../ModeSystemFuncs'
-import { fastIsPicked, selectIndexesWithOffeset } from '../../../utils'
-import { getOurNodeIndex, getOurNodeIndexFromSyncingList } from '../../Utils'
-import { nestedCountersInstance } from '../../../utils/nestedCounters'
-import { logFlags } from '../../../logger'
+import { crypto, shardus } from '../../Context';
+import * as Self from '../../Self';
+import * as CycleChain from '../../CycleChain';
+import * as NodeList from '../../NodeList';
+import * as http from '../../../http';
+import { getStandbyNodesInfoMap } from '.';
+import { calculateToAcceptV2 } from '../../ModeSystemFuncs';
+import { fastIsPicked, selectIndexesWithOffeset } from '../../../utils';
+import { getOurNodeIndex, getOurNodeIndexFromSyncingList } from '../../Utils';
+import { nestedCountersInstance } from '../../../utils/nestedCounters';
+import { logFlags } from '../../../logger';
 
-const selectedPublicKeys: Set<string> = new Set()
+const selectedPublicKeys: Set<string> = new Set();
 
 /** The number of nodes that will try to contact a single joining node about its selection. */
-const NUM_NOTIFYING_NODES = 5
+const NUM_NOTIFYING_NODES = 5;
 
 /**
  * Decides how many nodes to accept into the network, then selects nodes that
@@ -28,12 +28,12 @@ const NUM_NOTIFYING_NODES = 5
 export function executeNodeSelection(): void {
   // Only if the node is active or if the network is in restart mode
   if (Self.isActive || (!Self.isActive && Self.isRestartNetwork)) {
-    const { add } = calculateToAcceptV2(CycleChain.newest)
+    const { add } = calculateToAcceptV2(CycleChain.newest);
     /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`selecting ${add} nodes to accept`)
-    selectNodes(add)
+    selectNodes(add);
   } else {
     /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.warn('not selecting nodes because we are not active yet')
-    return
+    return;
   }
 }
 
@@ -45,54 +45,54 @@ export function executeNodeSelection(): void {
  * @returns The list of public keys of the nodes that have been selected.
  */
 export function selectNodes(maxAllowed: number): void {
-  const standbyNodesInfo = getStandbyNodesInfoMap()
+  const standbyNodesInfo = getStandbyNodesInfoMap();
   /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('selecting from standbyNodesInfo', standbyNodesInfo)
 
   // construct a list of objects that we'll sort by `selectionNum`. we'll use
   // the public key to get the join request associated with the public key and
   // inform the node later that it has been accepted
   const objs: {
-    publicKey: string
-    selectionNum: string
-    appJoinData?: Record<string, any> | null //appJoinData is required for golden ticket
-  }[] = []
+    publicKey: string;
+    selectionNum: string;
+    appJoinData?: Record<string, any> | null; //appJoinData is required for golden ticket
+  }[] = [];
   for (const [publicKey, info] of standbyNodesInfo) {
     objs.push({
       publicKey,
       selectionNum: info.selectionNum,
       appJoinData: info.appJoinData,
-    })
+    });
   }
 
   // sort the objects by their selection numbers
-  objs.sort((a, b) => (a.selectionNum < b.selectionNum ? 1 : a.selectionNum > b.selectionNum ? -1 : 0))
+  objs.sort((a, b) => (a.selectionNum < b.selectionNum ? 1 : a.selectionNum > b.selectionNum ? -1 : 0));
 
-  let offset = 0
-  const cycleMarker = CycleChain.getCurrentCycleMarker()
+  let offset = 0;
+  const cycleMarker = CycleChain.getCurrentCycleMarker();
   if (cycleMarker) {
-    const first8HexChars = cycleMarker.substring(0, 8)
-    offset = parseInt(first8HexChars, 16)
+    const first8HexChars = cycleMarker.substring(0, 8);
+    offset = parseInt(first8HexChars, 16);
   }
 
   /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console)
   console.log('Input parameters to selectIndexesWithOffset - Max allowed:', maxAllowed, 'Offset:', offset, 'Array Size: ',objs.length);
 
-  if (maxAllowed > objs.length){
+  if (maxAllowed > objs.length) {
     /* prettier-ignore */ nestedCountersInstance.countEvent('joinV2', `selectNodes: capping maxAllowed ${maxAllowed} to ${objs.length}`)
-    maxAllowed = objs.length
+    maxAllowed = objs.length;
   }
 
   if (offset >= 0 && maxAllowed >= 1 && maxAllowed <= objs.length) {
-    const selectedIndexes = selectIndexesWithOffeset(objs.length, maxAllowed, offset)
+    const selectedIndexes = selectIndexesWithOffeset(objs.length, maxAllowed, offset);
 
     /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console)
     console.log("SelectedIndexes: ",selectedIndexes)
 
     for (let i = 0; i < selectedIndexes.length; i++) {
       // eslint-disable-next-line security/detect-object-injection
-      const selectedIndex = selectedIndexes[i]
+      const selectedIndex = selectedIndexes[i];
       // eslint-disable-next-line security/detect-object-injection
-      selectedPublicKeys.add(objs[selectedIndex].publicKey)
+      selectedPublicKeys.add(objs[selectedIndex].publicKey);
     }
   } else {
     /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(`Invalid input parameters for selection: array length: ${objs.length} maxAllowed:${maxAllowed} offset:${offset}`)
@@ -104,7 +104,7 @@ export function selectNodes(maxAllowed: number): void {
     for (const obj of objs) {
       if (obj.appJoinData?.adminCert?.goldenTicket === true && !selectedPublicKeys.has(obj.publicKey)) {
         /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log('selecting golden ticket nodes from standbyNodesInfo')
-        selectedPublicKeys.add(obj.publicKey)
+        selectedPublicKeys.add(obj.publicKey);
       }
     }
   }
@@ -114,7 +114,7 @@ export function selectNodes(maxAllowed: number): void {
  * calling their `accepted` endpoints.`
  */
 export async function notifyNewestJoinedConsensors(): Promise<void> {
-  return //accepted endpoint seem deprecated and always fails!
+  return; //accepted endpoint seem deprecated and always fails!
 
   //   const counter = CycleChain.getNewest().counter
 
@@ -165,21 +165,21 @@ export async function notifyNewestJoinedConsensors(): Promise<void> {
 }
 
 export async function notifyingNewestJoinedConsensors(): Promise<void> {
-  const marker = CycleChain.getCurrentCycleMarker()
-  const counter = CycleChain.getNewest().counter
+  const marker = CycleChain.getCurrentCycleMarker();
+  const counter = CycleChain.getNewest().counter;
 
   for (const joinedConsensor of CycleChain.newest.joinedConsensors) {
-    const publicKey = joinedConsensor.publicKey
+    const publicKey = joinedConsensor.publicKey;
 
     // no need to notify ourselves
-    if (publicKey === crypto.keypair.publicKey) continue
-    console.log(`C${counter} notifying node`, publicKey, 'that it has been selected')
+    if (publicKey === crypto.keypair.publicKey) continue;
+    console.log(`C${counter} notifying node`, publicKey, 'that it has been selected');
 
     // sign an acceptance offer
     const offer = crypto.sign({
       cycleMarker: marker,
       activeNodePublicKey: crypto.keypair.publicKey,
-    })
+    });
 
     // make the call, but don't await. it might take a while.
     http
@@ -188,9 +188,9 @@ export async function notifyingNewestJoinedConsensors(): Promise<void> {
         nestedCountersInstance.countEvent(
           'joinV2',
           `C${counter}: notifyingNewestJoinedConsensors: http post failed`
-        )
-        console.error(`C${counter} failed to notify node ${publicKey} that it has been selected:`, e)
-      })
+        );
+        console.error(`C${counter} failed to notify node ${publicKey} that it has been selected:`, e);
+      });
   }
 }
 /**
@@ -198,11 +198,11 @@ export async function notifyingNewestJoinedConsensors(): Promise<void> {
  * empties the list.
  */
 export function drainSelectedPublicKeys(): string[] {
-  const tmp = [...selectedPublicKeys.values()]
-  selectedPublicKeys.clear()
-  return tmp
+  const tmp = [...selectedPublicKeys.values()];
+  selectedPublicKeys.clear();
+  return tmp;
 }
 
 export function forceSelectSelf(): void {
-  selectedPublicKeys.add(crypto.keypair.publicKey)
+  selectedPublicKeys.add(crypto.keypair.publicKey);
 }

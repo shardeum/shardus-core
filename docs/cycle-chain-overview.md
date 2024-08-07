@@ -35,19 +35,19 @@ Cycles are created on a regular interval and contain the following data:
 
 ```typescript
 interface Cycle {
-  start: number // cycle start time (epoch)
-  duration: number // cycle duration (ms)
-  counter: number // cycle index number (starting from 0)
-  previous: string // hash of the previous cycle
-  joined: [] // array of collected join requests
-  removed: [] //
-  lost: []
-  apoptosized: []
-  returned: []
-  activated: []
-  certificate: {}
-  expired: number
-  desired: number
+  start: number; // cycle start time (epoch)
+  duration: number; // cycle duration (ms)
+  counter: number; // cycle index number (starting from 0)
+  previous: string; // hash of the previous cycle
+  joined: []; // array of collected join requests
+  removed: []; //
+  lost: [];
+  apoptosized: [];
+  returned: [];
+  activated: [];
+  certificate: {};
+  expired: number;
+  desired: number;
 }
 ```
 

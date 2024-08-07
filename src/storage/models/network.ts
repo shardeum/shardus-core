@@ -1,4 +1,4 @@
-import { SQLDataTypes } from '../utils/schemaDefintions'
+import { SQLDataTypes } from '../utils/schemaDefintions';
 
 const network = [
   'network',
@@ -10,6 +10,6 @@ const network = [
     },
     hash: { type: SQLDataTypes.STRING, allowNull: false },
   },
-]
+];
 
-export default network
+export default network;

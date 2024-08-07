@@ -44,8 +44,8 @@ Computing the hash occurs during cycleCreator() immediately after digesting the 
 // CycleCreator.ts
 // async function cycleCreator() {
 //   ...
-     if (!CycleChain.newest || CycleChain.newest.counter < prevRecord.counter) Sync.digestCycle(prevRecord)
-     // --> hash here
+if (!CycleChain.newest || CycleChain.newest.counter < prevRecord.counter) Sync.digestCycle(prevRecord);
+// --> hash here
 ```
 
 See https://gitlab.com/shardus/global/shardus-global-server/-/blob/master/src/p2p/CycleCreator.ts#L272
@@ -57,10 +57,10 @@ Be sure to compute the hash of the node list one time only and reuse that value 
 ```typescript
 // for reference
 type RobustQueryResult = {
-  topResult: any
-  winningNodes: any[]
-  isRobustResult: boolean
-}
+  topResult: any;
+  winningNodes: any[];
+  isRobustResult: boolean;
+};
 ```
 
 - func obtainNodeList(): NodeList

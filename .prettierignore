@@ -1,0 +1,12 @@
+#Ignore build files
+build/
+dist/
+
+#Ignore test folder
+test/
+
+#IDE
+.vscode/
+
+#Ignore Deprecated.ts, time consuming
+src/state-manager/Deprecated.ts

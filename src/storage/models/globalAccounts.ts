@@ -1,4 +1,4 @@
-import { SQLDataTypes } from '../utils/schemaDefintions'
+import { SQLDataTypes } from '../utils/schemaDefintions';
 
 const globalAccounts = [
   'globalAccounts',
@@ -9,6 +9,6 @@ const globalAccounts = [
     timestamp: { type: SQLDataTypes.BIGINT, allowNull: false },
     hash: { type: SQLDataTypes.STRING, allowNull: false },
   },
-]
+];
 
-export default globalAccounts
+export default globalAccounts;

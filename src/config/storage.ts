@@ -1,4 +1,4 @@
-import { StrictStorageConfiguration } from '../shardus/shardus-types'
+import { StrictStorageConfiguration } from '../shardus/shardus-types';
 
 const STORAGE_CONFIG: StrictStorageConfiguration = {
   database: 'database',
@@ -17,6 +17,6 @@ const STORAGE_CONFIG: StrictStorageConfiguration = {
     walMode: true,
     exclusiveLockMode: true,
   },
-}
+};
 
-export default STORAGE_CONFIG
+export default STORAGE_CONFIG;

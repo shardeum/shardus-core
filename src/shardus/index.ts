@@ -1,213 +1,214 @@
-import { NodeStatus, Route } from '@shardus/types/build/src/p2p/P2PTypes'
-import { RemoveCertificate } from '@shardus/types/build/src/p2p/LostTypes'
-import { EventEmitter } from 'events'
-import { Handler } from 'express'
-import Log4js from 'log4js'
-import path from 'path'
-import { inspect } from 'util'
-import SHARDUS_CONFIG from '../config'
-import Crypto from '../crypto'
+import { NodeStatus, Route } from '@shardus/types/build/src/p2p/P2PTypes';
+import { RemoveCertificate } from '@shardus/types/build/src/p2p/LostTypes';
+import { EventEmitter } from 'events';
+import { Handler } from 'express';
+import Log4js from 'log4js';
+import path from 'path';
+import { inspect } from 'util';
+import SHARDUS_CONFIG from '../config';
+import Crypto from '../crypto';
 import Debug, {
   getDevPublicKeys,
   getDevPublicKey,
   getDevPublicKeyMaxLevel,
   ensureKeySecurity,
-} from '../debug'
-import ExitHandler from '../exit-handler'
-import LoadDetection from '../load-detection'
-import Logger, { logFlags, LogFlags } from '../logger'
-import * as Network from '../network'
+} from '../debug';
+import ExitHandler from '../exit-handler';
+import LoadDetection from '../load-detection';
+import Logger, { logFlags, LogFlags } from '../logger';
+import * as Network from '../network';
 import {
   isDebugModeMiddleware,
   isDebugModeMiddlewareHigh,
   isDebugModeMiddlewareLow,
   isDebugModeMiddlewareMedium,
   isDebugModeMiddlewareMultiSig,
-} from '../network/debugMiddleware'
-import { apoptosizeSelf, isApopMarkedNode } from '../p2p/Apoptosis'
-import * as Archivers from '../p2p/Archivers'
-import * as Context from '../p2p/Context'
-import { config } from '../p2p/Context'
-import * as AutoScaling from '../p2p/CycleAutoScale'
-import * as CycleChain from '../p2p/CycleChain'
-import * as CycleCreator from '../p2p/CycleCreator'
-import { netConfig } from '../p2p/CycleCreator'
-import * as GlobalAccounts from '../p2p/GlobalAccounts'
-import { scheduleLostReport, removeNodeWithCertificiate } from '../p2p/Lost'
-import { activeIdToPartition, activeByIdOrder, getAgeIndexForNodeId, nodes } from '../p2p/NodeList'
-import * as Self from '../p2p/Self'
-import * as Wrapper from '../p2p/Wrapper'
-import RateLimiting from '../rate-limiting'
-import Reporter from '../reporter'
-import * as ShardusTypes from '../shardus/shardus-types'
-import { AppObjEnum, DevSecurityLevel, WrappedData } from "../shardus/shardus-types";
-import * as Snapshot from '../snapshot'
-import StateManager from '../state-manager'
-import { CachedAppData, NonceQueueItem, QueueCountsResult } from "../state-manager/state-manager-types";
-import { DebugComplete } from '../state-manager/TransactionQueue'
-import Statistics from '../statistics'
-import Storage from '../storage'
-import { initAjvSchemas } from '../types/ajv/Helpers'
-import * as utils from '../utils'
-import { groupResolvePromises, inRangeOfCurrentTime, isValidShardusAddress, logNode } from '../utils'
-import { getSocketReport } from '../utils/debugUtils'
-import MemoryReporting from '../utils/memoryReporting'
-import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
-import Profiler, { profilerInstance } from '../utils/profiler'
-import { startSaving } from './saveConsoleOutput'
-import { isDebugMode, isServiceMode } from '../debug'
-import * as JoinV2 from '../p2p/Join/v2'
-import { getNetworkTimeOffset, shardusGetTime } from '../network'
-import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
-import { networkMode, isInternalTxAllowed } from '../p2p/Modes'
-import { lostArchiversMap } from '../p2p/LostArchivers/state'
-import getCallstack from '../utils/getCallstack'
-import * as crypto from '@shardus/crypto-utils'
-import * as Comms from './../p2p/Comms'
-import { insertSyncFinished } from '../p2p/Join/v2/syncFinished'
-import { isFirst, waitForQ1SendRequests } from '../p2p/Self'
-import { currentQuarter } from '../p2p/CycleCreator'
-import { InternalBinaryHandler } from '../types/Handler'
-import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
-import { RequestErrorEnum } from '../types/enum/RequestErrorEnum'
-import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers'
-import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
-import { SignAppDataReq, deserializeSignAppDataReq, serializeSignAppDataReq } from '../types/SignAppDataReq'
+} from '../network/debugMiddleware';
+import { apoptosizeSelf, isApopMarkedNode } from '../p2p/Apoptosis';
+import * as Archivers from '../p2p/Archivers';
+import * as Context from '../p2p/Context';
+import { config } from '../p2p/Context';
+import * as AutoScaling from '../p2p/CycleAutoScale';
+import * as CycleChain from '../p2p/CycleChain';
+import * as CycleCreator from '../p2p/CycleCreator';
+import { netConfig } from '../p2p/CycleCreator';
+import * as GlobalAccounts from '../p2p/GlobalAccounts';
+import { scheduleLostReport, removeNodeWithCertificiate } from '../p2p/Lost';
+import { activeIdToPartition, activeByIdOrder, getAgeIndexForNodeId, nodes } from '../p2p/NodeList';
+import * as Self from '../p2p/Self';
+import * as Wrapper from '../p2p/Wrapper';
+import RateLimiting from '../rate-limiting';
+import Reporter from '../reporter';
+import * as ShardusTypes from '../shardus/shardus-types';
+import { AppObjEnum, DevSecurityLevel, WrappedData } from '../shardus/shardus-types';
+import * as Snapshot from '../snapshot';
+import StateManager from '../state-manager';
+import { CachedAppData, NonceQueueItem, QueueCountsResult } from '../state-manager/state-manager-types';
+import { DebugComplete } from '../state-manager/TransactionQueue';
+import Statistics from '../statistics';
+import Storage from '../storage';
+import { initAjvSchemas } from '../types/ajv/Helpers';
+import * as utils from '../utils';
+import { groupResolvePromises, inRangeOfCurrentTime, isValidShardusAddress, logNode } from '../utils';
+import { getSocketReport } from '../utils/debugUtils';
+import MemoryReporting from '../utils/memoryReporting';
+import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters';
+import Profiler, { profilerInstance } from '../utils/profiler';
+import { startSaving } from './saveConsoleOutput';
+import { isDebugMode, isServiceMode } from '../debug';
+import * as JoinV2 from '../p2p/Join/v2';
+import { getNetworkTimeOffset, shardusGetTime } from '../network';
+import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes';
+import { networkMode, isInternalTxAllowed } from '../p2p/Modes';
+import { lostArchiversMap } from '../p2p/LostArchivers/state';
+import getCallstack from '../utils/getCallstack';
+import * as crypto from '@shardus/crypto-utils';
+import * as Comms from './../p2p/Comms';
+import { insertSyncFinished } from '../p2p/Join/v2/syncFinished';
+import { isFirst, waitForQ1SendRequests } from '../p2p/Self';
+import { currentQuarter } from '../p2p/CycleCreator';
+import { InternalBinaryHandler } from '../types/Handler';
+import { InternalRouteEnum } from '../types/enum/InternalRouteEnum';
+import { RequestErrorEnum } from '../types/enum/RequestErrorEnum';
+import { getStreamWithTypeCheck, requestErrorHandler } from '../types/Helpers';
+import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum';
+import { SignAppDataReq, deserializeSignAppDataReq, serializeSignAppDataReq } from '../types/SignAppDataReq';
 import {
   SignAppDataResp,
   deserializeSignAppDataResp,
   serializeSignAppDataResp,
-} from '../types/SignAppDataResp'
-import { Utils } from '@shardus/types'
-import { isNodeInRotationBounds } from '../p2p/Utils'
-import ShardFunctions from '../state-manager/shardFunctions'
-import SocketIO from 'socket.io'
-import { nodeListFromStates, queueFinishedSyncingRequest } from '../p2p/Join'
-import * as NodeList from '../p2p/NodeList'
-import { P2P } from '@shardus/types'
-
+} from '../types/SignAppDataResp';
+import { Utils } from '@shardus/types';
+import { isNodeInRotationBounds } from '../p2p/Utils';
+import ShardFunctions from '../state-manager/shardFunctions';
+import SocketIO from 'socket.io';
+import { nodeListFromStates, queueFinishedSyncingRequest } from '../p2p/Join';
+import * as NodeList from '../p2p/NodeList';
+import { P2P } from '@shardus/types';
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
-const allZeroes64 = '0'.repeat(64)
+const allZeroes64 = '0'.repeat(64);
 
-const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG
+const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG;
 
-Context.setDefaultConfigs(defaultConfigs)
+Context.setDefaultConfigs(defaultConfigs);
 
-type RouteHandlerRegister = (route: string, authHandler: Handler, responseHandler?: Handler) => void
+type RouteHandlerRegister = (route: string, authHandler: Handler, responseHandler?: Handler) => void;
 
 //todo make this a config parameter set by the dapp
-const changeListGlobalAccount = defaultConfigs.server.globalAccount
+const changeListGlobalAccount = defaultConfigs.server.globalAccount;
 
 interface Shardus {
-  io: SocketIO.Server
-  profiler: Profiler
-  nestedCounters: NestedCounters
-  memoryReporting: MemoryReporting
-  config: ShardusTypes.StrictServerConfiguration
+  io: SocketIO.Server;
+  profiler: Profiler;
+  nestedCounters: NestedCounters;
+  memoryReporting: MemoryReporting;
+  config: ShardusTypes.StrictServerConfiguration;
 
-  logger: Logger
-  mainLogger: Log4js.Logger
-  seqLogger: Log4js.Logger
-  fatalLogger: Log4js.Logger
-  appLogger: Log4js.Logger
-  exitHandler: any
-  storage: Storage
-  crypto: Crypto
-  network: Network.NetworkClass
-  p2p: Wrapper.P2P
-  debug: Debug
-  appProvided: boolean
-  app: ShardusTypes.App
-  reporter: Reporter
-  stateManager: StateManager
-  statistics: Statistics
-  loadDetection: LoadDetection
-  rateLimiting: RateLimiting
-  heartbeatInterval: number
-  heartbeatTimer: NodeJS.Timeout
-  registerExternalGet: RouteHandlerRegister
-  registerExternalPost: RouteHandlerRegister
-  registerExternalPut: RouteHandlerRegister
-  registerExternalDelete: RouteHandlerRegister
-  registerExternalPatch: RouteHandlerRegister
-  _listeners: any
-  appliedConfigChanges: Set<string>
+  logger: Logger;
+  mainLogger: Log4js.Logger;
+  seqLogger: Log4js.Logger;
+  fatalLogger: Log4js.Logger;
+  appLogger: Log4js.Logger;
+  exitHandler: any;
+  storage: Storage;
+  crypto: Crypto;
+  network: Network.NetworkClass;
+  p2p: Wrapper.P2P;
+  debug: Debug;
+  appProvided: boolean;
+  app: ShardusTypes.App;
+  reporter: Reporter;
+  stateManager: StateManager;
+  statistics: Statistics;
+  loadDetection: LoadDetection;
+  rateLimiting: RateLimiting;
+  heartbeatInterval: number;
+  heartbeatTimer: NodeJS.Timeout;
+  registerExternalGet: RouteHandlerRegister;
+  registerExternalPost: RouteHandlerRegister;
+  registerExternalPut: RouteHandlerRegister;
+  registerExternalDelete: RouteHandlerRegister;
+  registerExternalPatch: RouteHandlerRegister;
+  _listeners: any;
+  appliedConfigChanges: Set<string>;
 
-  debugForeverLoopCounter: number
-  debugForeverLoopsEnabled: boolean
+  debugForeverLoopCounter: number;
+  debugForeverLoopsEnabled: boolean;
 }
 
 /**
  * The main module that is used by the app developer to interact with the shardus api
  */
 class Shardus extends EventEmitter {
-  constructor(
-    { server: config, logs: logsConfig, storage: storageConfig }: ShardusTypes.StrictShardusConfiguration,
-  ) {
-    super()
-    this.debugForeverLoopsEnabled = true
-    this.debugForeverLoopCounter = 0
-    this.nestedCounters = nestedCountersInstance
-    this.memoryReporting = new MemoryReporting(this)
-    this.config = config
-    Context.setConfig(this.config)
-    this.profiler = new Profiler()
-    logFlags.verbose = false
+  constructor({
+    server: config,
+    logs: logsConfig,
+    storage: storageConfig,
+  }: ShardusTypes.StrictShardusConfiguration) {
+    super();
+    this.debugForeverLoopsEnabled = true;
+    this.debugForeverLoopCounter = 0;
+    this.nestedCounters = nestedCountersInstance;
+    this.memoryReporting = new MemoryReporting(this);
+    this.config = config;
+    Context.setConfig(this.config);
+    this.profiler = new Profiler();
+    logFlags.verbose = false;
 
-    let startInFatalsLogMode = config && config.debug && config.debug.startInFatalsLogMode ? true : false
-    let startInErrorsLogMode = config && config.debug && config.debug.startInErrorLogMode ? true : false
+    let startInFatalsLogMode = config && config.debug && config.debug.startInFatalsLogMode ? true : false;
+    let startInErrorsLogMode = config && config.debug && config.debug.startInErrorLogMode ? true : false;
 
-    let dynamicLogMode = ''
+    let dynamicLogMode = '';
     if (startInFatalsLogMode === true) {
-      dynamicLogMode = 'fatal'
+      dynamicLogMode = 'fatal';
     } else if (startInErrorsLogMode === true) {
-      dynamicLogMode = 'error'
+      dynamicLogMode = 'error';
     }
 
-    initAjvSchemas()
-    this.logger = new Logger(config.baseDir, logsConfig, dynamicLogMode)
-    Context.setLoggerContext(this.logger)
-    Snapshot.initLogger()
+    initAjvSchemas();
+    this.logger = new Logger(config.baseDir, logsConfig, dynamicLogMode);
+    Context.setLoggerContext(this.logger);
+    Snapshot.initLogger();
 
-    const logDir = path.join(config.baseDir, logsConfig.dir)
+    const logDir = path.join(config.baseDir, logsConfig.dir);
     if (logsConfig.saveConsoleOutput) {
-      startSaving(logDir)
+      startSaving(logDir);
     }
 
-    this.mainLogger = this.logger.getLogger('main')
-    this.seqLogger = this.logger.getLogger('seq')
-    this.fatalLogger = this.logger.getLogger('fatal')
-    this.appLogger = this.logger.getLogger('app')
-    this.exitHandler = new ExitHandler(logDir, this.memoryReporting, this.nestedCounters)
-    this.storage = new Storage(config.baseDir, storageConfig, config, this.logger, this.profiler)
-    Context.setStorageContext(this.storage)
-    this.crypto = new Crypto(config.baseDir, this.config, this.logger, this.storage)
-    Context.setCryptoContext(this.crypto)
-    this.network = new Network.NetworkClass(config, this.logger)
-    Context.setNetworkContext(this.network)
+    this.mainLogger = this.logger.getLogger('main');
+    this.seqLogger = this.logger.getLogger('seq');
+    this.fatalLogger = this.logger.getLogger('fatal');
+    this.appLogger = this.logger.getLogger('app');
+    this.exitHandler = new ExitHandler(logDir, this.memoryReporting, this.nestedCounters);
+    this.storage = new Storage(config.baseDir, storageConfig, config, this.logger, this.profiler);
+    Context.setStorageContext(this.storage);
+    this.crypto = new Crypto(config.baseDir, this.config, this.logger, this.storage);
+    Context.setCryptoContext(this.crypto);
+    this.network = new Network.NetworkClass(config, this.logger);
+    Context.setNetworkContext(this.network);
 
     // Set the old P2P to a Wrapper into the new P2P
     // [TODO] Remove this once everything calls p2p/* modules directly
-    this.p2p = Wrapper.p2p
-    Context.setP2pContext(this.p2p)
+    this.p2p = Wrapper.p2p;
+    Context.setP2pContext(this.p2p);
 
-    this.debug = null
-    this.appProvided = null
-    this.app = null
-    this.reporter = null
-    this.stateManager = null
-    this.statistics = null
-    this.loadDetection = null
-    this.rateLimiting = null
+    this.debug = null;
+    this.appProvided = null;
+    this.app = null;
+    this.reporter = null;
+    this.stateManager = null;
+    this.statistics = null;
+    this.loadDetection = null;
+    this.rateLimiting = null;
 
-    this.appliedConfigChanges = new Set()
+    this.appliedConfigChanges = new Set();
 
     if (logFlags.info) {
-      this.mainLogger.info(`Server started with pid: ${process.pid}`)
-      this.mainLogger.info('===== Server config: =====')
-      this.mainLogger.info(JSON.stringify(config, null, 2))
+      this.mainLogger.info(`Server started with pid: ${process.pid}`);
+      this.mainLogger.info('===== Server config: =====');
+      this.mainLogger.info(JSON.stringify(config, null, 2));
     }
 
     // error log and console log on unacceptable minNodesToAllowTxs value
@@ -232,59 +233,59 @@ class Shardus extends EventEmitter {
     //   // this is not as error per technical definition rather logical error
     // }
 
-    this._listeners = {}
+    this._listeners = {};
 
-    this.heartbeatInterval = config.heartbeatInterval
-    this.heartbeatTimer = null
+    this.heartbeatInterval = config.heartbeatInterval;
+    this.heartbeatTimer = null;
 
     // alias the network register calls so that an app can get to them
     this.registerExternalGet = (route, authHandler, handler) =>
-      this.network.registerExternalGet(route, authHandler, handler)
+      this.network.registerExternalGet(route, authHandler, handler);
     this.registerExternalPost = (route, authHandler, handler) =>
-      this.network.registerExternalPost(route, authHandler, handler)
+      this.network.registerExternalPost(route, authHandler, handler);
     this.registerExternalPut = (route, authHandler, handler) =>
-      this.network.registerExternalPut(route, authHandler, handler)
+      this.network.registerExternalPut(route, authHandler, handler);
     this.registerExternalDelete = (route, authHandler, handler) =>
-      this.network.registerExternalDelete(route, authHandler, handler)
+      this.network.registerExternalDelete(route, authHandler, handler);
     this.registerExternalPatch = (route, authHandler, handler) =>
-      this.network.registerExternalPatch(route, authHandler, handler)
+      this.network.registerExternalPatch(route, authHandler, handler);
 
-    this.exitHandler.addSigListeners()
+    this.exitHandler.addSigListeners();
     this.exitHandler.registerSync('reporter', () => {
       if (this.reporter) {
-        this.mainLogger.info('Stopping reporter...')
-        this.reporter.stopReporting()
+        this.mainLogger.info('Stopping reporter...');
+        this.reporter.stopReporting();
       }
-    })
+    });
     this.exitHandler.registerAsync('application', async () => {
       if (this.app && this.app.close) {
-        this.mainLogger.info('Shutting down the application...')
-        await this.app.close() // this needs to be awaited since it is async
+        this.mainLogger.info('Shutting down the application...');
+        await this.app.close(); // this needs to be awaited since it is async
       }
-    })
+    });
     this.exitHandler.registerSync('crypto', () => {
-      this.mainLogger.info('Stopping POW generators...')
-      this.crypto.stopAllGenerators()
-    })
+      this.mainLogger.info('Stopping POW generators...');
+      this.crypto.stopAllGenerators();
+    });
     this.exitHandler.registerSync('cycleCreator', () => {
       // [TODO] - need to make an exitHandler for P2P; otherwise CycleCreator is continuing even after rest of the system cleans up and is ready to exit
-      this.mainLogger.info('Shutting down p2p...')
-      this.p2p.shutdown()
-    })
+      this.mainLogger.info('Shutting down p2p...');
+      this.p2p.shutdown();
+    });
     this.exitHandler.registerAsync('network', async () => {
-      this.mainLogger.info('Shutting down networking...')
-      await this.network.shutdown() // this is taking a long time
-    })
+      this.mainLogger.info('Shutting down networking...');
+      await this.network.shutdown(); // this is taking a long time
+    });
     this.exitHandler.registerAsync('storage', async () => {
-      this.mainLogger.info('Closing Database connections...')
-      await this.storage.close()
-    })
+      this.mainLogger.info('Closing Database connections...');
+      await this.storage.close();
+    });
     this.exitHandler.registerAsync('unjoin', async () => {
       if (networkMode !== 'shutdown') {
-        this.mainLogger.info('Submitting unjoin request...')
-        await JoinV2.shutdown()
+        this.mainLogger.info('Submitting unjoin request...');
+        await JoinV2.shutdown();
       }
-    })
+    });
     /* moved stopping the application to earlier
     this.exitHandler.registerAsync('application', async () => {
       if (this.app && this.app.close) {
@@ -294,16 +295,16 @@ class Shardus extends EventEmitter {
     })
     */
     this.exitHandler.registerAsync('logger', async () => {
-      this.mainLogger.info('Shutting down logs...')
-      await this.logger.shutdown()
-    })
+      this.mainLogger.info('Shutting down logs...');
+      await this.logger.shutdown();
+    });
 
-    this.profiler.registerEndpoints()
-    this.nestedCounters.registerEndpoints()
-    this.memoryReporting.registerEndpoints()
-    this.logger.registerEndpoints(Context)
+    this.profiler.registerEndpoints();
+    this.nestedCounters.registerEndpoints();
+    this.memoryReporting.registerEndpoints();
+    this.logger.registerEndpoints(Context);
 
-    this.logger.playbackLogState('constructed', '', '')
+    this.logger.playbackLogState('constructed', '', '');
   }
 
   /**
@@ -312,15 +313,15 @@ class Shardus extends EventEmitter {
    */
   setup(app: ShardusTypes.App) {
     if (app === null) {
-      this.appProvided = false
+      this.appProvided = false;
     } else if (app === Object(app)) {
-      this.app = this._getApplicationInterface(app)
-      this.appProvided = true
-      this.logger.playbackLogState('appProvided', '', '')
+      this.app = this._getApplicationInterface(app);
+      this.appProvided = true;
+      this.logger.playbackLogState('appProvided', '', '');
     } else {
-      throw new Error('Please provide an App object or null to Shardus.setup.')
+      throw new Error('Please provide an App object or null to Shardus.setup.');
     }
-    return this
+    return this;
   }
 
   /**
@@ -436,75 +437,75 @@ class Shardus extends EventEmitter {
 
   async start() {
     // Check network up & time synced
-    await Network.init()
+    await Network.init();
 
-    const isInTimeLimit = await Network.checkAndUpdateTimeSyncedOffset(this.config.p2p.timeServers)
+    const isInTimeLimit = await Network.checkAndUpdateTimeSyncedOffset(this.config.p2p.timeServers);
 
     if (isInTimeLimit === false) {
-      this.mainLogger.error(`Time is not synced with the network`)
+      this.mainLogger.error(`Time is not synced with the network`);
       //this is TBD
       // throw new Error(`Time is not synced with the network`)
     }
 
     if (!isServiceMode()) {
       // Setup storage
-      await this.storage.init()
+      await this.storage.init();
     }
 
     // Setup crypto
-    await this.crypto.init()
+    await this.crypto.init();
 
     try {
-      const sk: string = this.crypto.keypair.secretKey
-      this.io = (await this.network.setup(Network.ipInfo, sk)) as SocketIO.Server
-      Context.setIOContext(this.io)
+      const sk: string = this.crypto.keypair.secretKey;
+      this.io = (await this.network.setup(Network.ipInfo, sk)) as SocketIO.Server;
+      Context.setIOContext(this.io);
       this.io.on('connection', (socket: any) => {
         if (!Self || !Self.isActive) {
           if (!Self.allowConnectionToFirstNode) {
-            socket.disconnect()
-            console.log(`This node is not active yet and kill the socket connection!`)
+            socket.disconnect();
+            console.log(`This node is not active yet and kill the socket connection!`);
           }
         }
         if (this.config.features.archiverDataSubscriptionsUpdate) {
-          console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
+          console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`);
           socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
-            console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
+            console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY);
             // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
             if (!Archivers.recipients || !Archivers.connectedSockets) {
-              socket.disconnect()
-              console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
-              return
+              socket.disconnect();
+              console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`);
+              return;
             }
             if (Archivers.recipients.get(ARCHIVER_PUBLIC_KEY)) {
               if (Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY]) {
-                Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+                Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY);
               }
-              Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
+              Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id);
             } else {
-              socket.disconnect()
+              socket.disconnect();
               console.log(
                 'Archiver is not found in the recipients list and kill the socket connection',
                 ARCHIVER_PUBLIC_KEY
-              )
+              );
             }
-          })
+          });
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
-            console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
-            Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
-          })
+            console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`);
+            Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY);
+          });
         } else {
-          console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
+          console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`);
           socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
-            console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
+            console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY);
             // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
             if (!Archivers.recipients || !Archivers.connectedSockets) {
-              socket.disconnect()
-              console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
-              return
+              socket.disconnect();
+              console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`);
+              return;
             }
             for (const [key, value] of Object.entries(Archivers.connectedSockets)) {
               if (key === ARCHIVER_PUBLIC_KEY) {
-                Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+                Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY);
               }
             }
 
@@ -512,58 +513,59 @@ class Shardus extends EventEmitter {
               Object.keys(Archivers.connectedSockets).length >= config.p2p.maxArchiversSubscriptionPerNode
             ) {
               /* prettier-ignore */ console.log( `There are already ${config.p2p.maxArchiversSubscriptionPerNode} archivers connected for data transfer!` )
-              socket.disconnect()
-              return
+              socket.disconnect();
+              return;
             }
-            Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
-          })
+            Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id);
+          });
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
-            console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
-            Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
-            Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
-          })
+            console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`);
+            Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY);
+            Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY);
+          });
         }
-      })
+      });
     } catch (e) {
-      this.mainLogger.error('Socket connection break', e)
+      this.mainLogger.error('Socket connection break', e);
     }
     this.network.on('timeout', (node, requestId: string, context: string, route: string) => {
-      const ipPort = `${node.internalIp}:${node.internalPort}`
+      const ipPort = `${node.internalIp}:${node.internalPort}`;
       //this console log is probably redundant but are disabled most of the time anyhow.
       //They may help slighly in the case of adding some context to the out.log file when full debugging is on.
       /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`In Shardus got network timeout-${context}-${route} for request ID - ${requestId} from node: ${utils.logNode(node)} ${ipPort}` )
-      const result = isApopMarkedNode(node.id)
+      const result = isApopMarkedNode(node.id);
       if (result) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `timeout-apop-${context}-${route}`)
-        return
+        return;
       }
-      if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'timeout', requestId)
+      if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'timeout', requestId);
       /** [TODO] Report lost */
       /* prettier-ignore */ if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('lostNodes', `timeout-${context}`)
       // context has been added to provide info on the type of timeout and where it happened
       /* prettier-ignore */ if (logFlags.p2pNonFatal) nestedCountersInstance.countRareEvent( 'lostNodes', `timeout-${context}  ${ipPort}` )
-      if (this.network.statisticsInstance) this.network.statisticsInstance.incrementCounter('lostNodeTimeout')
-    })
+      if (this.network.statisticsInstance)
+        this.network.statisticsInstance.incrementCounter('lostNodeTimeout');
+    });
     this.network.on(
       'error',
       (node, requestId: string, context: string, errorGroup: string, route: string, subRoute = '') => {
-        const ipPort = `${node.internalIp}:${node.internalPort}`
+        const ipPort = `${node.internalIp}:${node.internalPort}`;
         //this console log is probably redundant but are disabled most of the time anyhow.
         //They may help slighly in the case of adding some context to the out.log file when full debugging is on.
         /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`In Shardus got network error-${context} ${route}-${subRoute} for request ID ${requestId} from node: ${utils.logNode(node)} ${ipPort} error:${errorGroup}` )
         /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`node:`, node)
         /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`requestId: ${requestId}, context: ${context}, route: ${route}, subRoute: ${subRoute}, errorGroup: ${errorGroup}`)
-        if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'error', requestId)
+        if (!config.debug.disableLostNodeReports) scheduleLostReport(node, 'error', requestId);
         /** [TODO] Report lost */
         /* prettier-ignore */ nestedCountersInstance.countEvent('lostNodes', `error-${context}-${route}-${subRoute}`)
         /* prettier-ignore */ nestedCountersInstance.countRareEvent( 'lostNodes', `error-${context}  ${ipPort}` )
       }
-    )
+    );
 
     // Setup other modules
-    this.debug = new Debug(this.config.baseDir, this.network)
-    this.debug.addToArchive(this.logger.logDir, './logs')
-    this.debug.addToArchive(path.parse(this.storage.storage.storageConfig.options.storage).dir, './db')
+    this.debug = new Debug(this.config.baseDir, this.network);
+    this.debug.addToArchive(this.logger.logDir, './logs');
+    this.debug.addToArchive(path.parse(this.storage.storage.storageConfig.options.storage).dir, './db');
 
     if (!isServiceMode()) {
       this.statistics = new Statistics(
@@ -593,43 +595,43 @@ class Shardus extends EventEmitter {
           fifoOverrides: { cpuPercent: 240 },
         },
         this
-      )
+      );
     }
-    this.debug.addToArchive('./statistics.tsv', './statistics.tsv')
+    this.debug.addToArchive('./statistics.tsv', './statistics.tsv');
 
-    this.profiler.setStatisticsInstance(this.statistics)
-    this.network.setStatisticsInstance(this.statistics)
+    this.profiler.setStatisticsInstance(this.statistics);
+    this.network.setStatisticsInstance(this.statistics);
 
-    this.statistics
+    this.statistics;
 
-    this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
+    this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics);
     this.loadDetection.on('highLoad', () => {
       // console.log(`High load detected Cycle ${currentCycle}, Quarter: ${currentQuarter}`)
-      nestedCountersInstance.countEvent('loadRelated', 'highLoad')
-      AutoScaling.requestNetworkUpsize()
-    })
+      nestedCountersInstance.countEvent('loadRelated', 'highLoad');
+      AutoScaling.requestNetworkUpsize();
+    });
     this.loadDetection.on('lowLoad', () => {
       // console.log(`Low load detected Cycle ${currentCycle}, Quarter: ${currentQuarter}`)
-      nestedCountersInstance.countEvent('loadRelated', 'lowLoad')
-      AutoScaling.requestNetworkDownsize()
-    })
+      nestedCountersInstance.countEvent('loadRelated', 'lowLoad');
+      AutoScaling.requestNetworkDownsize();
+    });
 
-    if (!isServiceMode()) this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
+    if (!isServiceMode()) this.statistics.on('snapshot', () => this.loadDetection.updateLoad());
 
-    this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.seqLogger)
+    this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.seqLogger);
 
     if (this.app) {
-      this._createAndLinkStateManager()
-      this._attemptCreateAppliedListener()
+      this._createAndLinkStateManager();
+      this._attemptCreateAppliedListener();
 
       let disableSnapshots = !!(
         this.config &&
         this.config.debug &&
         this.config.debug.disableSnapshots === true
-      )
+      );
       if (disableSnapshots != true) {
         // Start state snapshotting once you go active with an app
-        this.once('active', Snapshot.startSnapshotting)
+        this.once('active', Snapshot.startSnapshotting);
       }
     }
 
@@ -643,111 +645,117 @@ class Shardus extends EventEmitter {
             this.profiler,
             this.loadDetection
           )
-        : null
-    Context.setReporterContext(this.reporter)
+        : null;
+    Context.setReporterContext(this.reporter);
 
-    this._registerRoutes()
+    this._registerRoutes();
 
     // this.io.on('disconnect')
 
     // Register listeners for P2P events
     Self.emitter.on('witnessing', async (publicKey) => {
-      this.logger.playbackLogState('witnessing', '', publicKey)
-      await Snapshot.startWitnessMode()
-    })
+      this.logger.playbackLogState('witnessing', '', publicKey);
+      await Snapshot.startWitnessMode();
+    });
     Self.emitter.on('joining', (publicKey) => {
       // this.io.emit('DATA', `NODE JOINING ${publicKey}`)
-      this.logger.playbackLogState('joining', '', publicKey)
-      if (this.reporter) this.reporter.reportJoining(publicKey)
-    })
+      this.logger.playbackLogState('joining', '', publicKey);
+      if (this.reporter) this.reporter.reportJoining(publicKey);
+    });
     Self.emitter.on('joined', (nodeId, publicKey) => {
       // this.io.emit('DATA', `NODE JOINED ${nodeId}`)
-      this.logger.playbackLogState('joined', nodeId, publicKey)
-      this.logger.setPlaybackID(nodeId)
-      if (this.reporter) this.reporter.reportJoined(nodeId, publicKey)
-    })
+      this.logger.playbackLogState('joined', nodeId, publicKey);
+      this.logger.setPlaybackID(nodeId);
+      if (this.reporter) this.reporter.reportJoined(nodeId, publicKey);
+    });
     Self.emitter.on('initialized', async () => {
       // If network is in safety mode
-      const newest = CycleChain.getNewest()
+      const newest = CycleChain.getNewest();
       // changed from using safetyMode to mode
       if (newest && (newest.mode === 'restart' || newest.mode === 'recovery')) {
         // Stay in syncing mode and let other nodes join
-        Self.setp2pIgnoreJoinRequests(false)
-        console.log('p2pIgnoreJoinRequests = false')
-        nestedCountersInstance.countEvent('restore', `intialized: ${newest.mode}. ${shardusGetTime()}`)
+        Self.setp2pIgnoreJoinRequests(false);
+        console.log('p2pIgnoreJoinRequests = false');
+        nestedCountersInstance.countEvent('restore', `intialized: ${newest.mode}. ${shardusGetTime()}`);
       } else {
         // not doing a safety sync
         // todo hook this up later cant deal with it now.
         // await this.storage.deleteOldDBPath()
 
-        await this.syncAppData()
+        await this.syncAppData();
       }
-    })
+    });
     Self.emitter.on('restore', async (cycleNumber: number) => {
-      console.log('restore mode triggered on cycle', cycleNumber)
-      this.logger.playbackLogState('restore', '', `Restore mode triggered on cycle ${cycleNumber}`)
+      console.log('restore mode triggered on cycle', cycleNumber);
+      this.logger.playbackLogState('restore', '', `Restore mode triggered on cycle ${cycleNumber}`);
 
       nestedCountersInstance.countEvent(
         'restore',
         `restore event: entered. seen on cycle:${cycleNumber} ${shardusGetTime()}`
-      )
-      await this.stateManager.waitForShardCalcs()
-      nestedCountersInstance.countEvent('restore', `restore event: got shard calcs. ${shardusGetTime()}`)
+      );
+      await this.stateManager.waitForShardCalcs();
+      nestedCountersInstance.countEvent('restore', `restore event: got shard calcs. ${shardusGetTime()}`);
       // Start restoring state data
       try {
-        this.stateManager.renewState()
-        await this.stateManager.accountSync.initialSyncMain(3)
-        console.log('restore - initialSyncMain finished')
+        this.stateManager.renewState();
+        await this.stateManager.accountSync.initialSyncMain(3);
+        console.log('restore - initialSyncMain finished');
         nestedCountersInstance.countEvent(
           'restore',
           `restore event: syncAppData finished. ${shardusGetTime()}`
-        )
+        );
       } catch (err) {
-        console.log()
-        this.fatalLogger.fatal(
-          'restore-failed with Error: ' +
-          utils.formatErrorMessage(err)
-        )
-        nestedCountersInstance.countEvent('restore', `restore event: fail and apop self. ${shardusGetTime()}`)
-        apoptosizeSelf(`restore-failed: ${err?.message}`)
-        return
+        console.log();
+        this.fatalLogger.fatal('restore-failed with Error: ' + utils.formatErrorMessage(err));
+        nestedCountersInstance.countEvent(
+          'restore',
+          `restore event: fail and apop self. ${shardusGetTime()}`
+        );
+        apoptosizeSelf(`restore-failed: ${err?.message}`);
+        return;
       }
       // After restoring state data, set syncing flags to true and go active
-      await this.stateManager.startCatchUpQueue()
-      console.log('restore - startCatchUpQueue')
-      nestedCountersInstance.countEvent('restore', `restore event: finished startCatchUpQueue. ${shardusGetTime()}`)
+      await this.stateManager.startCatchUpQueue();
+      console.log('restore - startCatchUpQueue');
+      nestedCountersInstance.countEvent(
+        'restore',
+        `restore event: finished startCatchUpQueue. ${shardusGetTime()}`
+      );
 
-      queueFinishedSyncingRequest()
-      console.log('syncAppData - queueFinishedSyncingRequest')
-      nestedCountersInstance.countEvent('restore', `restore event: queue finished-syncing-request ${shardusGetTime()}`)
+      queueFinishedSyncingRequest();
+      console.log('syncAppData - queueFinishedSyncingRequest');
+      nestedCountersInstance.countEvent(
+        'restore',
+        `restore event: queue finished-syncing-request ${shardusGetTime()}`
+      );
 
-      this.stateManager.appFinishedSyncing = true
-      this.stateManager.startProcessingCycleSummaries()
-    })
+      this.stateManager.appFinishedSyncing = true;
+      this.stateManager.startProcessingCycleSummaries();
+    });
     Self.emitter.on('active', (nodeId) => {
       // this.io.emit('DATA', `NODE ACTIVE ${nodeId}`)
-      this.logger.playbackLogState('active', nodeId, '')
+      this.logger.playbackLogState('active', nodeId, '');
       if (this.reporter) {
-        this.reporter.reportActive(nodeId)
-        this.reporter.startReporting()
+        this.reporter.reportActive(nodeId);
+        this.reporter.startReporting();
       }
-      if (this.statistics) this.statistics.startSnapshots()
-      this.emit('active', nodeId)
-    })
+      if (this.statistics) this.statistics.startSnapshots();
+      this.emit('active', nodeId);
+    });
     Self.emitter.on('failed', () => {
-      this.mainLogger.info('shutdown: on failed event')
-      this.shutdown(true)
-    })
+      this.mainLogger.info('shutdown: on failed event');
+      this.shutdown(true);
+    });
     Self.emitter.on('error', (e) => {
-      console.log(e.message + ' at ' + e.stack)
-      if (logFlags.debug) this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
+      console.log(e.message + ' at ' + e.stack);
+      if (logFlags.debug) this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack);
       // normally fatal error keys should not be variable ut this seems like an ok exception for now
       this.shardus_fatal(
         `onError_ex` + e.message + ' at ' + e.stack,
         'shardus.start() ' + e.message + ' at ' + e.stack
-      )
-      throw new Error(e)
-    })
+      );
+      throw new Error(e);
+    });
     Self.emitter.on('removed', async () => {
       // Omar - Why are we trying to call the functions in modules directly before exiting.
       //        The modules have already registered shutdown functions with the exitHandler.
@@ -771,21 +779,21 @@ class Shardus extends EventEmitter {
       // Shutdown cleanly
       process.exit()
 */
-      this.mainLogger.info(`exitCleanly: removed`)
+      this.mainLogger.info(`exitCleanly: removed`);
       if (this.reporter) {
-        this.reporter.stopReporting()
-        await this.reporter.reportRemoved(Self.id)
+        this.reporter.stopReporting();
+        await this.reporter.reportRemoved(Self.id);
       }
-      this.exitHandler.exitCleanly(`removed`, `removed from network in normal conditions`) // exits with status 0 so that PM2 can restart the process
-    })
+      this.exitHandler.exitCleanly(`removed`, `removed from network in normal conditions`); // exits with status 0 so that PM2 can restart the process
+    });
     Self.emitter.on('app-removed', async () => {
-      this.mainLogger.info(`exitCleanly: app removed`)
+      this.mainLogger.info(`exitCleanly: app removed`);
       if (this.reporter) {
-        this.reporter.stopReporting()
-        await this.reporter.reportRemoved(Self.id)
+        this.reporter.stopReporting();
+        await this.reporter.reportRemoved(Self.id);
       }
-      this.exitHandler.exitCleanly(`removed`, `removed from network requested by app`) // exits with status 0 so that
-    })
+      this.exitHandler.exitCleanly(`removed`, `removed from network requested by app`); // exits with status 0 so that
+    });
     Self.emitter.on(
       'invoke-exit',
       async (tag: string, callstack: string, message: string, restart: boolean) => {
@@ -812,109 +820,109 @@ class Shardus extends EventEmitter {
         'Shardus: caught apoptosized event; finished clean up'
       )
 */
-        const exitType = restart ? 'exitCleanly' : 'exitUncleanly'
-        nestedCountersInstance.countRareEvent('fatal', `invoke-exit: ${tag} ${exitType}`)
-        this.mainLogger.error(`invoke-exit: ${tag} ${exitType}`)
-        this.mainLogger.error(message)
-        this.mainLogger.error(callstack)
+        const exitType = restart ? 'exitCleanly' : 'exitUncleanly';
+        nestedCountersInstance.countRareEvent('fatal', `invoke-exit: ${tag} ${exitType}`);
+        this.mainLogger.error(`invoke-exit: ${tag} ${exitType}`);
+        this.mainLogger.error(message);
+        this.mainLogger.error(callstack);
         if (this.reporter) {
-          this.reporter.stopReporting()
-          await this.reporter.reportRemoved(Self.id)
+          this.reporter.stopReporting();
+          await this.reporter.reportRemoved(Self.id);
         }
         if (restart)
           this.exitHandler.exitCleanly(
             `invoke-exit: ${tag}`,
             `invoke-exit: ${tag}. but exiting cleanly for a restart`
-          )
+          );
         // exits with status 0 so that PM2 can restart the process
-        else this.exitHandler.exitUncleanly(`invoke-exit: ${tag}`, `invoke-exit: ${tag} ${exitType}`) // exits with status 1 so that PM2 CANNOT restart the process
+        else this.exitHandler.exitUncleanly(`invoke-exit: ${tag}`, `invoke-exit: ${tag} ${exitType}`); // exits with status 1 so that PM2 CANNOT restart the process
       }
-    )
+    );
     Self.emitter.on('node-activated', ({ ...params }) => {
       try {
-        this.app.eventNotify?.({ type: 'node-activated', ...params })
+        this.app.eventNotify?.({ type: 'node-activated', ...params });
       } catch (e) {
-        this.mainLogger.error(`Error: while processing node-activated event stack: ${e.stack}`)
+        this.mainLogger.error(`Error: while processing node-activated event stack: ${e.stack}`);
       }
-    })
+    });
     Self.emitter.on('node-deactivated', ({ ...params }) => {
       try {
-        this.app.eventNotify?.({ type: 'node-deactivated', ...params })
+        this.app.eventNotify?.({ type: 'node-deactivated', ...params });
       } catch (e) {
-        this.mainLogger.error(`Error: while processing node-deactivated event stack: ${e.stack}`)
+        this.mainLogger.error(`Error: while processing node-deactivated event stack: ${e.stack}`);
       }
-    })
+    });
     Self.emitter.on('node-refuted', ({ ...params }) => {
       try {
-        if (!this.stateManager.currentCycleShardData) throw new Error('No current cycle data')
-        if (params.publicKey == null) throw new Error('No node publicKey provided for node-refuted event')
-        const consensusNodes = this.getConsenusGroupForAccount(params.publicKey)
+        if (!this.stateManager.currentCycleShardData) throw new Error('No current cycle data');
+        if (params.publicKey == null) throw new Error('No node publicKey provided for node-refuted event');
+        const consensusNodes = this.getConsenusGroupForAccount(params.publicKey);
         for (let node of consensusNodes) {
           if (node.id === Self.id) {
-            this.app.eventNotify?.({ type: 'node-refuted', ...params })
+            this.app.eventNotify?.({ type: 'node-refuted', ...params });
           }
         }
       } catch (e) {
-        this.mainLogger.error(`Error: while processing node-refuted event stack: ${e.stack}`)
+        this.mainLogger.error(`Error: while processing node-refuted event stack: ${e.stack}`);
       }
-    })
+    });
     Self.emitter.on('node-left-early', ({ ...params }) => {
       try {
-        if (!this.stateManager.currentCycleShardData) throw new Error('No current cycle data')
-        if (params.publicKey == null) throw new Error('No node publicKey provided for node-left-early event')
-        const consensusNodes = this.getConsenusGroupForAccount(params.publicKey)
+        if (!this.stateManager.currentCycleShardData) throw new Error('No current cycle data');
+        if (params.publicKey == null) throw new Error('No node publicKey provided for node-left-early event');
+        const consensusNodes = this.getConsenusGroupForAccount(params.publicKey);
         for (let node of consensusNodes) {
           if (node.id === Self.id) {
-            this.app.eventNotify?.({ type: 'node-left-early', ...params })
+            this.app.eventNotify?.({ type: 'node-left-early', ...params });
           }
         }
       } catch (e) {
-        this.mainLogger.error(`Error: while processing node-left-early event stack: ${e.stack}`)
+        this.mainLogger.error(`Error: while processing node-left-early event stack: ${e.stack}`);
       }
-    })
+    });
     Self.emitter.on('node-sync-timeout', ({ ...params }) => {
       try {
-        if (!this.stateManager.currentCycleShardData) throw new Error('No current cycle data')
+        if (!this.stateManager.currentCycleShardData) throw new Error('No current cycle data');
         if (params.publicKey == null)
-          throw new Error('No node publicKey provided for node-sync-timeout event')
-        const consensusNodes = this.getConsenusGroupForAccount(params.publicKey)
+          throw new Error('No node publicKey provided for node-sync-timeout event');
+        const consensusNodes = this.getConsenusGroupForAccount(params.publicKey);
         for (let node of consensusNodes) {
           if (node.id === Self.id) {
-            this.app.eventNotify?.({ type: 'node-sync-timeout', ...params })
-            break
+            this.app.eventNotify?.({ type: 'node-sync-timeout', ...params });
+            break;
           }
         }
       } catch (e) {
-        this.mainLogger.error(`Error: while processing node-sync-timeout event stack: ${e.stack}`)
+        this.mainLogger.error(`Error: while processing node-sync-timeout event stack: ${e.stack}`);
       }
-    })
+    });
 
-    Context.setShardusContext(this)
+    Context.setShardusContext(this);
 
     // Init new P2P
-    Self.init()
+    Self.init();
 
     // Start P2P
-    await Self.startupV2()
+    await Self.startupV2();
 
     // handle config queue changes and debug logic updates
     this._registerListener(this.p2p.state, 'cycle_q1_start', async () => {
-      let lastCycle = CycleChain.getNewest()
+      let lastCycle = CycleChain.getNewest();
 
       // need to make sure sync is finish or we may not have the global account
       // even worse, the dapp may not have initialized storage yet
       if (this.stateManager.appFinishedSyncing === true) {
         //query network account from the app for changes
-        const account = await this.app.getNetworkAccount()
+        const account = await this.app.getNetworkAccount();
 
-        this.updateConfigChangeQueue(account, lastCycle)
+        this.updateConfigChangeQueue(account, lastCycle);
       }
 
-      this.updateDebug(lastCycle)
-    })
+      this.updateDebug(lastCycle);
+    });
 
     //setup debug endpoints
-    this.setupDebugEndpoints()
+    this.setupDebugEndpoints();
   }
 
   /**
@@ -929,11 +937,11 @@ class Shardus extends EventEmitter {
         `_registerListener_dupe`,
         'Shardus can only register one listener per event! EVENT: ',
         event
-      )
-      return
+      );
+      return;
     }
-    emitter.on(event, callback)
-    this._listeners[event] = [emitter, callback]
+    emitter.on(event, callback);
+    this._listeners[event] = [emitter, callback];
   }
 
   /**
@@ -942,13 +950,13 @@ class Shardus extends EventEmitter {
    */
   _unregisterListener(event) {
     if (!this._listeners[event]) {
-      this.mainLogger.warn(`This event listener doesn't exist! Event: \`${event}\` in Shardus`)
-      return
+      this.mainLogger.warn(`This event listener doesn't exist! Event: \`${event}\` in Shardus`);
+      return;
     }
-    const entry = this._listeners[event]
-    const [emitter, callback] = entry
-    emitter.removeListener(event, callback)
-    delete this._listeners[event]
+    const entry = this._listeners[event];
+    const [emitter, callback] = entry;
+    emitter.removeListener(event, callback);
+    delete this._listeners[event];
   }
 
   /**
@@ -956,11 +964,16 @@ class Shardus extends EventEmitter {
    */
   _cleanupListeners() {
     for (const event of Object.keys(this._listeners)) {
-      this._unregisterListener(event)
+      this._unregisterListener(event);
     }
   }
 
-  async _timestampAndQueueTransaction(tx: ShardusTypes.OpaqueTransaction, appData: any, global = false, noConsensus = false) {
+  async _timestampAndQueueTransaction(
+    tx: ShardusTypes.OpaqueTransaction,
+    appData: any,
+    global = false,
+    noConsensus = false
+  ) {
     const injectedTimestamp = this.app.getTimestampFromTransaction(tx, appData);
 
     const txId = this.app.calculateTxId(tx);
@@ -977,22 +990,22 @@ class Shardus extends EventEmitter {
     }
     if (!injectedTimestamp && !timestampReceipt) {
       this.shardus_fatal(
-        "put_noTimestamp",
+        'put_noTimestamp',
         `Transaction timestamp cannot be determined ${utils.stringifyReduce(tx)} `
       );
-      this.statistics.incrementCounter("txRejected");
-      nestedCountersInstance.countEvent("rejected", "_timestampNotDetermined");
+      this.statistics.incrementCounter('txRejected');
+      nestedCountersInstance.countEvent('rejected', '_timestampNotDetermined');
       return {
         success: false,
-        reason: "Transaction timestamp cannot be determined.",
-        status: 500
+        reason: 'Transaction timestamp cannot be determined.',
+        status: 500,
       };
     }
-    let timestampedTx: ShardusTypes.TimestampedTx
+    let timestampedTx: ShardusTypes.TimestampedTx;
     if (timestampReceipt && timestampReceipt.timestamp) {
       timestampedTx = {
         tx,
-        timestampReceipt
+        timestampReceipt,
       };
     } else {
       timestampedTx = { tx };
@@ -1016,9 +1029,9 @@ class Shardus extends EventEmitter {
         `put_invalidAddress`,
         `Invalid Shardus Address found: allKeys:${keys.allKeys} ${utils.stringifyReduce(tx)}`
       );
-      this.statistics.incrementCounter("txRejected");
-      nestedCountersInstance.countEvent("rejected", "_hasInvalidShardusAddresses");
-      return { success: false, reason: "Invalid Shardus Addresses", status: 400 };
+      this.statistics.incrementCounter('txRejected');
+      nestedCountersInstance.countEvent('rejected', '_hasInvalidShardusAddresses');
+      return { success: false, reason: 'Invalid Shardus Addresses', status: 400 };
     }
     // Validate the transaction timestamp
     let txExpireTimeMs = this.config.transactionExpireTime * 1000;
@@ -1030,12 +1043,12 @@ class Shardus extends EventEmitter {
     if (inRangeOfCurrentTime(timestamp, txExpireTimeMs, txExpireTimeMs) === false) {
       /* prettier-ignore */
       this.shardus_fatal(`tx_outofrange`, `Transaction timestamp out of range: timestamp:${timestamp} now:${shardusGetTime()} diff(now-ts):${shardusGetTime() - timestamp}  ${utils.stringifyReduce(tx)} our offset: ${getNetworkTimeOffset()} `);
-      this.statistics.incrementCounter("txRejected");
-      nestedCountersInstance.countEvent("rejected", "transaction timestamp out of range");
-      return { success: false, reason: "Transaction timestamp out of range", status: 400 };
+      this.statistics.incrementCounter('txRejected');
+      nestedCountersInstance.countEvent('rejected', 'transaction timestamp out of range');
+      return { success: false, reason: 'Transaction timestamp out of range', status: 400 };
     }
 
-    this.profiler.profileSectionStart("put");
+    this.profiler.profileSectionStart('put');
 
     //as ShardusMemoryPatternsInput
     // Pack into acceptedTx, and pass to StateManager
@@ -1045,15 +1058,15 @@ class Shardus extends EventEmitter {
       keys,
       data: timestampedTx,
       appData,
-      shardusMemoryPatterns: shardusMemoryPatterns
+      shardusMemoryPatterns: shardusMemoryPatterns,
     };
-    if (logFlags.verbose) this.mainLogger.debug("Transaction validated");
+    if (logFlags.verbose) this.mainLogger.debug('Transaction validated');
     if (global === false) {
       //temp way to make global modifying TXs not over count
-      this.statistics.incrementCounter("txInjected");
+      this.statistics.incrementCounter('txInjected');
     }
     this.logger.playbackLogNote(
-      "tx_injected",
+      'tx_injected',
       `${txId}`,
       `Transaction: ${utils.stringifyReduce(timestampedTx)}`
     );
@@ -1070,9 +1083,9 @@ class Shardus extends EventEmitter {
 
     return {
       success: true,
-      reason: "Transaction queued, poll for results.",
+      reason: 'Transaction queued, poll for results.',
       status: 200, // 200 status code means transaction is generally successful
-      txId
+      txId,
     };
   }
 
@@ -1080,40 +1093,40 @@ class Shardus extends EventEmitter {
    * Function used to register listeners for transaction related events
    */
   _attemptCreateAppliedListener() {
-    if (!this.statistics || !this.stateManager) return
+    if (!this.statistics || !this.stateManager) return;
     this._registerListener(this.stateManager.eventEmitter, 'txQueued', (txId) =>
       this.statistics.startTimer('txTimeInQueue', txId)
-    )
+    );
     this._registerListener(this.stateManager.eventEmitter, 'txPopped', (txId) =>
       this.statistics.stopTimer('txTimeInQueue', txId)
-    )
+    );
     this._registerListener(this.stateManager.eventEmitter, 'txApplied', () =>
       this.statistics.incrementCounter('txApplied')
-    )
+    );
     this._registerListener(this.stateManager.eventEmitter, 'txProcessed', () =>
       this.statistics.incrementCounter('txProcessed')
-    )
+    );
     this._registerListener(this.stateManager.eventEmitter, 'txExpired', () =>
       this.statistics.incrementCounter('txExpired')
-    )
+    );
   }
 
   /**
    * Function to unregister all transaction related events
    */
   _attemptRemoveAppliedListener() {
-    if (!this.statistics || !this.stateManager) return
-    this._unregisterListener('txQueued')
-    this._unregisterListener('txPopped')
-    this._unregisterListener('txApplied')
-    this._unregisterListener('txProcessed')
+    if (!this.statistics || !this.stateManager) return;
+    this._unregisterListener('txQueued');
+    this._unregisterListener('txPopped');
+    this._unregisterListener('txApplied');
+    this._unregisterListener('txProcessed');
   }
 
   /**
    * function to unregister listener for the "accepted" event
    */
   _unlinkStateManager() {
-    this._unregisterListener('accepted')
+    this._unregisterListener('accepted');
   }
 
   /**
@@ -1129,10 +1142,10 @@ class Shardus extends EventEmitter {
       this.crypto,
       this.config,
       this
-    )
+    );
 
-    this.storage.stateManager = this.stateManager
-    Context.setStateManagerContext(this.stateManager)
+    this.storage.stateManager = this.stateManager;
+    Context.setStateManagerContext(this.stateManager);
   }
 
   /**
@@ -1144,8 +1157,8 @@ class Shardus extends EventEmitter {
       let readyPayload = {
         nodeId: Self.id,
         cycleNumber: CycleChain.getNewest()?.counter,
-      }
-      readyPayload = Context.crypto.sign(readyPayload)
+      };
+      readyPayload = Context.crypto.sign(readyPayload);
       Comms.sendGossip(
         'gossip-sync-finished',
         readyPayload,
@@ -1156,60 +1169,60 @@ class Shardus extends EventEmitter {
           P2P.P2PTypes.NodeStatus.READY,
           P2P.P2PTypes.NodeStatus.SYNCING,
         ])
-      )
+      );
       if (this.stateManager) {
-        this.stateManager.appFinishedSyncing = true
+        this.stateManager.appFinishedSyncing = true;
       }
-      return
+      return;
     }
-    console.log('syncAppData')
+    console.log('syncAppData');
     if (this.stateManager) {
       try {
-        await this.stateManager.accountSync.initialSyncMain(3)
-        console.log('syncAppData - initialSyncMain finished')
+        await this.stateManager.accountSync.initialSyncMain(3);
+        console.log('syncAppData - initialSyncMain finished');
       } catch (err) {
-        this.fatalLogger.fatal(
-          'initialSyncMain-failed with Error: ' +
-          utils.formatErrorMessage(err)
-        )
-        nestedCountersInstance.countEvent('syncAppData', `initialSyncMain event: fail and apop self. ${shardusGetTime()}`)
-        apoptosizeSelf(`initialSyncMain-failed: ${err?.message}`)
-        return
+        this.fatalLogger.fatal('initialSyncMain-failed with Error: ' + utils.formatErrorMessage(err));
+        nestedCountersInstance.countEvent(
+          'syncAppData',
+          `initialSyncMain event: fail and apop self. ${shardusGetTime()}`
+        );
+        apoptosizeSelf(`initialSyncMain-failed: ${err?.message}`);
+        return;
       }
     }
     // if (this.stateManager) await this.stateManager.accountSync.syncStateDataFast(3) // fast mode
     if (this.p2p.isFirstSeed) {
-      console.log('syncAppData - isFirstSeed')
+      console.log('syncAppData - isFirstSeed');
       // the following comment of delay is probably not relavent now as we are using cycle txs
       // we don't have a delay here as there's practically no time between sync-started and sync-finished for the first node
       // since we already wait fro sync-finished, its very unlikely we'll be in the wrong quarter
-      queueFinishedSyncingRequest()
-      console.log('syncAppData - queueFinishedSyncingRequest')
-      nestedCountersInstance.countEvent('p2p', `queue finished-syncing-request ${shardusGetTime()}`)
-      await this.stateManager.waitForShardCalcs()
-      await this.app.sync()
-      console.log('syncAppData - sync')
-      this.stateManager.appFinishedSyncing = true
-      Self.setp2pIgnoreJoinRequests(false)
-      console.log('p2pIgnoreJoinRequests = false')
+      queueFinishedSyncingRequest();
+      console.log('syncAppData - queueFinishedSyncingRequest');
+      nestedCountersInstance.countEvent('p2p', `queue finished-syncing-request ${shardusGetTime()}`);
+      await this.stateManager.waitForShardCalcs();
+      await this.app.sync();
+      console.log('syncAppData - sync');
+      this.stateManager.appFinishedSyncing = true;
+      Self.setp2pIgnoreJoinRequests(false);
+      console.log('p2pIgnoreJoinRequests = false');
     } else {
-      await this.stateManager.startCatchUpQueue()
-      console.log('syncAppData - startCatchUpQueue')
-      await this.app.sync()
-      console.log('syncAppData - sync')
-      Self.setp2pIgnoreJoinRequests(false)
-      console.log('p2pIgnoreJoinRequests = false')
+      await this.stateManager.startCatchUpQueue();
+      console.log('syncAppData - startCatchUpQueue');
+      await this.app.sync();
+      console.log('syncAppData - sync');
+      Self.setp2pIgnoreJoinRequests(false);
+      console.log('p2pIgnoreJoinRequests = false');
 
-      queueFinishedSyncingRequest()
-      console.log('syncAppData - queueFinishedSyncingRequest')
-      nestedCountersInstance.countEvent('p2p', `queue finished-syncing-request ${shardusGetTime()}`)
-      this.stateManager.appFinishedSyncing = true
+      queueFinishedSyncingRequest();
+      console.log('syncAppData - queueFinishedSyncingRequest');
+      nestedCountersInstance.countEvent('p2p', `queue finished-syncing-request ${shardusGetTime()}`);
+      this.stateManager.appFinishedSyncing = true;
     }
     // Set network joinable to true
-    this.p2p.setJoinRequestToggle(true)
-    console.log('Server ready!')
+    this.p2p.setJoinRequestToggle(true);
+    console.log('Server ready!');
     if (this.stateManager) {
-      await utils.sleep(3000)
+      await utils.sleep(3000);
       // Original sync check
       // this.stateManager.enableSyncCheck()
 
@@ -1217,7 +1230,7 @@ class Shardus extends EventEmitter {
       // disable and compare this.stateManager.startSyncPartitions()
 
       //this.stateManager.partitionObjects.startSyncPartitions()
-      this.stateManager.startProcessingCycleSummaries()
+      this.stateManager.startProcessingCycleSummaries();
     }
   }
 
@@ -1226,7 +1239,7 @@ class Shardus extends EventEmitter {
    * @param {*} tx The transaction data
    */
   set(tx: any) {
-    return this.put(tx, true, false)
+    return this.put(tx, true, false);
   }
 
   /**
@@ -1235,7 +1248,7 @@ class Shardus extends EventEmitter {
    */
   log(...data: any[]) {
     if (logFlags.debug) {
-      this.appLogger.debug(new Date(), ...data)
+      this.appLogger.debug(new Date(), ...data);
     }
   }
 
@@ -1246,7 +1259,7 @@ class Shardus extends EventEmitter {
    * Also good for controlling console logging
    */
   getLogFlags(): LogFlags {
-    return logFlags
+    return logFlags;
   }
 
   /**
@@ -1271,29 +1284,31 @@ class Shardus extends EventEmitter {
     set = false,
     global = false,
     inputAppData = null
-  ): Promise<{ success: boolean; reason: string; status: number, txId?: string }> {
-    const noConsensus = set || global
+  ): Promise<{ success: boolean; reason: string; status: number; txId?: string }> {
+    const noConsensus = set || global;
     const txId = this.app.calculateTxId(tx);
     /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: inject:${shardusGetTime()}`)
 
     // Check if Consensor is ready to receive txs before processing it further
     if (!this.appProvided)
-      throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
+      throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put');
     if (logFlags.verbose)
-      this.mainLogger.debug(`Start of injectTransaction ${Utils.safeStringify(tx)} set:${set} global:${global}`) // not reducing tx here so we can get the long hashes
+      this.mainLogger.debug(
+        `Start of injectTransaction ${Utils.safeStringify(tx)} set:${set} global:${global}`
+      ); // not reducing tx here so we can get the long hashes
     if (!this.stateManager.accountSync.dataSyncMainPhaseComplete) {
-      this.statistics.incrementCounter('txRejected')
-      nestedCountersInstance.countEvent('rejected', '!dataSyncMainPhaseComplete')
-      return { success: false, reason: 'Node is still syncing.', status: 500 }
+      this.statistics.incrementCounter('txRejected');
+      nestedCountersInstance.countEvent('rejected', '!dataSyncMainPhaseComplete');
+      return { success: false, reason: 'Node is still syncing.', status: 500 };
     }
     if (!this.stateManager.hasCycleShardData()) {
-      this.statistics.incrementCounter('txRejected')
-      nestedCountersInstance.countEvent('rejected', '!hasCycleShardData')
+      this.statistics.incrementCounter('txRejected');
+      nestedCountersInstance.countEvent('rejected', '!hasCycleShardData');
       return {
         success: false,
         reason: 'Not ready to accept transactions, shard calculations pending',
         status: 500,
-      }
+      };
     }
     // set === true (which is handled in the else case here) is a special kind of TX that is allowed only be the first node in the network
     // this is used to create global network settings and other dawn of time accounts
@@ -1303,60 +1318,60 @@ class Shardus extends EventEmitter {
           // This ok because we are initializing a global at the set time period
         } else {
           if (logFlags.verbose)
-            this.mainLogger.debug(`txRejected ${Utils.safeStringify(tx)} set:${set} global:${global}`)
+            this.mainLogger.debug(`txRejected ${Utils.safeStringify(tx)} set:${set} global:${global}`);
 
-          this.statistics.incrementCounter('txRejected')
-          nestedCountersInstance.countEvent('rejected', '!allowTransactions')
+          this.statistics.incrementCounter('txRejected');
+          nestedCountersInstance.countEvent('rejected', '!allowTransactions');
           return {
             success: false,
             reason: 'Network conditions to allow transactions are not met.',
             status: 500,
-          }
+          };
         }
       }
     } else {
       // this is where set is true.  check if we allow it (i.e. only one node active). if not, reject early
       if (!this.p2p.allowSet()) {
-        this.statistics.incrementCounter('txRejected')
-        nestedCountersInstance.countEvent('rejected', '!allowTransactions2')
+        this.statistics.incrementCounter('txRejected');
+        nestedCountersInstance.countEvent('rejected', '!allowTransactions2');
         return {
           success: false,
           reason: 'Network conditions to allow app init via set',
           status: 500,
-        }
+        };
       }
     }
 
     // Now it is time to check rate limiting to see if our node can accept more transactions
     if (this.rateLimiting.isOverloaded(txId)) {
       /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: reject_overload`)
-      this.statistics.incrementCounter('txRejected')
-      nestedCountersInstance.countEvent('rejected', 'isOverloaded')
-      return { success: false, reason: 'Maximum load exceeded.', status: 500 }
+      this.statistics.incrementCounter('txRejected');
+      nestedCountersInstance.countEvent('rejected', 'isOverloaded');
+      return { success: false, reason: 'Maximum load exceeded.', status: 500 };
     }
 
     try {
       // Perform basic validation of the transaction fields
-      if (logFlags.verbose) this.mainLogger.debug('Performing initial validation of the transaction')
+      if (logFlags.verbose) this.mainLogger.debug('Performing initial validation of the transaction');
 
       // inputAppData is a new concept that allows the JSON RPC Server to pass in a TX as well as additional
       // metadata for the dapp.  This data is then passed into precrack to be used for whatever calculations are needed
-      let appData: any = inputAppData ?? {}
+      let appData: any = inputAppData ?? {};
 
-      const internalTx = this.app.isInternalTx(tx)
+      const internalTx = this.app.isInternalTx(tx);
       if (internalTx && !isInternalTxAllowed()) {
         return {
           success: false,
           reason: `Internal transactions are not allowed in ${networkMode} Mode.`,
           status: 500,
-        }
+        };
       }
       if (!internalTx && networkMode !== 'processing') {
         return {
           success: false,
           reason: `Application transactions are only allowed in processing Mode.`,
           status: 500,
-        }
+        };
       }
 
       const senderAddress = this.app.getTxSenderAddress(tx);
@@ -1367,25 +1382,38 @@ class Shardus extends EventEmitter {
           return {
             success: false,
             reason: `Sender address is not available.`,
-            status: 500
+            status: 500,
           };
         }
-        const consensusGroup = this.getConsenusGroupForAccount(senderAddress)
-        const isConsensusNode = consensusGroup.some((node) => node.id === Self.id)
+        const consensusGroup = this.getConsenusGroupForAccount(senderAddress);
+        const isConsensusNode = consensusGroup.some((node) => node.id === Self.id);
 
-        if(Context.config.stateManager.forwardToLuckyNodes) {
+        if (Context.config.stateManager.forwardToLuckyNodes) {
           if (isConsensusNode === false) {
             // send transaction to lucky consensus group node
-            const result = await this.forwardTransactionToLuckyNodes(senderAddress, tx, 'non-consensus to consensus', '1')
-            return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
+            const result = await this.forwardTransactionToLuckyNodes(
+              senderAddress,
+              tx,
+              'non-consensus to consensus',
+              '1'
+            );
+            return result as Promise<{ success: boolean; reason: string; status: number; txId?: string }>;
           }
           // careful we may be consensus node but if we are not lucky we should forward to lucky nodes
-          let luckyNodeIds = this.getClosestNodes(senderAddress, Context.config.stateManager.numberOfReInjectNodes, false)
-          let isLuckyNode = luckyNodeIds.some((nodeId) => nodeId === Self.id)
+          let luckyNodeIds = this.getClosestNodes(
+            senderAddress,
+            Context.config.stateManager.numberOfReInjectNodes,
+            false
+          );
+          let isLuckyNode = luckyNodeIds.some((nodeId) => nodeId === Self.id);
           if (isLuckyNode === false) {
-            const result = await this.forwardTransactionToLuckyNodes(senderAddress, tx, 'non-lucky consensus to lucky' +
-              ' consensus', '2')
-            return result as Promise<{ success: boolean; reason: string; status: number, txId?: string }>;
+            const result = await this.forwardTransactionToLuckyNodes(
+              senderAddress,
+              tx,
+              'non-lucky consensus to lucky' + ' consensus',
+              '2'
+            );
+            return result as Promise<{ success: boolean; reason: string; status: number; txId?: string }>;
           }
         }
       }
@@ -1404,7 +1432,7 @@ class Shardus extends EventEmitter {
             return {
               success: false,
               reason: `Sender account nonce is not available. ${utils.stringifyReduce(tx)}`,
-              status: 500
+              status: 500,
             };
           }
           senderAccountNonce = BigInt(0);
@@ -1413,37 +1441,54 @@ class Shardus extends EventEmitter {
         // app layer should return -1 if the account or tx does not have a nonce field
         if (txNonce >= 0 && senderAccountNonce >= 0) {
           if (txNonce < senderAccountNonce) {
-            if (logFlags.debug) this.mainLogger.debug(`txNonce < senderAccountNonce ${txNonce} < ${senderAccountNonce}`);
-            nestedCountersInstance.countEvent('rejected', 'txNonce < senderAccountNonce')
+            if (logFlags.debug)
+              this.mainLogger.debug(`txNonce < senderAccountNonce ${txNonce} < ${senderAccountNonce}`);
+            nestedCountersInstance.countEvent('rejected', 'txNonce < senderAccountNonce');
             return {
               success: false,
-              reason: `Transaction nonce is less than the account nonce. ${txNonce} < ${senderAccountNonce} ${utils.stringifyReduce(tx)}  `,
-              status: 500
+              reason: `Transaction nonce is less than the account nonce. ${txNonce} < ${senderAccountNonce} ${utils.stringifyReduce(
+                tx
+              )}  `,
+              status: 500,
             };
           } else if (txNonce > senderAccountNonce) {
             // if the tx is already in the nonceQueue (based on txid not nonce), return an accepted response
-            const txInNonceQueue = this.stateManager.transactionQueue.isTxInPendingNonceQueue(senderAddress, txId)
+            const txInNonceQueue = this.stateManager.transactionQueue.isTxInPendingNonceQueue(
+              senderAddress,
+              txId
+            );
             if (txInNonceQueue) {
               return {
                 success: true,
                 reason: `Transaction is already in pending nonce queue.`,
-                status: 200
-              }
+                status: 200,
+              };
             }
-            if (logFlags.debug) this.mainLogger.debug(`txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce} but txId is not in nonce queue yet`)
+            if (logFlags.debug)
+              this.mainLogger.debug(
+                `txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce} but txId is not in nonce queue yet`
+              );
 
             // decide whether to put it in the nonce queue or not
-            const maxAllowedPendingNonce = senderAccountNonce + BigInt(Context.config.stateManager.maxPendingNonceTxs)
-            if ( txNonce <= maxAllowedPendingNonce) {
+            const maxAllowedPendingNonce =
+              senderAccountNonce + BigInt(Context.config.stateManager.maxPendingNonceTxs);
+            if (txNonce <= maxAllowedPendingNonce) {
               shouldAddToNonceQueue = true;
-              if (logFlags.debug) this.mainLogger.debug(`txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce}`);
+              if (logFlags.debug)
+                this.mainLogger.debug(`txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce}`);
             } else {
-              if (logFlags.debug) this.mainLogger.debug(`txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce} + ${Context.config.stateManager.maxPendingNonceTxs}`);
-              nestedCountersInstance.countEvent('rejected', 'txNonce > senderAccountNonce + maxPendingNonceTxs')
+              if (logFlags.debug)
+                this.mainLogger.debug(
+                  `txNonce > senderAccountNonce ${txNonce} > ${senderAccountNonce} + ${Context.config.stateManager.maxPendingNonceTxs}`
+                );
+              nestedCountersInstance.countEvent(
+                'rejected',
+                'txNonce > senderAccountNonce + maxPendingNonceTxs'
+              );
               return {
                 success: false,
                 reason: `Transaction nonce ${txNonce.toString()} is greater than max allowed pending nonce of ${maxAllowedPendingNonce.toString()}`,
-                status: 500
+                status: 500,
               };
             }
           }
@@ -1452,27 +1497,27 @@ class Shardus extends EventEmitter {
 
       // Give the dapp an opportunity to do some up front work and generate
       // appData metadata for the applied TX
-      const { status: preCrackSuccess, reason } = await this.app.txPreCrackData(tx, appData)
+      const { status: preCrackSuccess, reason } = await this.app.txPreCrackData(tx, appData);
       if (this.config.stateManager.checkPrecrackStatus === true && preCrackSuccess === false) {
         return {
           success: false,
           reason: `PreCrack has failed. ${reason}`,
           status: 500,
-        }
+        };
       }
       const shouldQueueNonceButPoolIsFull =
         shouldAddToNonceQueue &&
         this.config.stateManager.maxNonceQueueSize <= this.stateManager.transactionQueue.nonceQueue.size;
 
       //ITN fix. There will be separate effort to protect the pool more intelligently for mainnet.
-      if(shouldQueueNonceButPoolIsFull) {
+      if (shouldQueueNonceButPoolIsFull) {
         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: reject_nonce_full`)
-        nestedCountersInstance.countEvent('rejected', `Nonce pool is full, try again later`)
+        nestedCountersInstance.countEvent('rejected', `Nonce pool is full, try again later`);
         return {
           success: false,
           reason: `Nonce pool is full, try again later`,
           status: 500,
-        }
+        };
       }
       if (shouldAddToNonceQueue) {
         const nonceQueueEntry: NonceQueueItem = {
@@ -1483,168 +1528,189 @@ class Shardus extends EventEmitter {
           appData,
           global,
           noConsensus,
-        }
+        };
         let nonceQueueAddResult =
-          this.stateManager.transactionQueue.addTransactionToNonceQueue(nonceQueueEntry)
+          this.stateManager.transactionQueue.addTransactionToNonceQueue(nonceQueueEntry);
 
-        if(Context.config.stateManager.forwardToLuckyNodesNonceQueue){
-          // if we ever support cancellation by using replacment for a TX that will change how we 
+        if (Context.config.stateManager.forwardToLuckyNodesNonceQueue) {
+          // if we ever support cancellation by using replacment for a TX that will change how we
           // need to handle this run-away protection.  may need to re-evaluate later
-          if(nonceQueueAddResult?.alreadyAdded === true && Context.config.stateManager.forwardToLuckyNodesNonceQueueLimitFix){
-            nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: nonce queue skipped. we already have it`)
+          if (
+            nonceQueueAddResult?.alreadyAdded === true &&
+            Context.config.stateManager.forwardToLuckyNodesNonceQueueLimitFix
+          ) {
+            nestedCountersInstance.countEvent(
+              'statistics',
+              `forwardTxToConsensusGroup: nonce queue skipped. we already have it`
+            );
             return {
               success: true,
               reason: `Transaction already added to pending nonce queue.`,
-              status: 200
-            }
+              status: 200,
+            };
           }
-          let result = this.forwardTransactionToLuckyNodes(senderAddress, tx, txId, 'consensus to consensus', '3') // don't wait here
-          return result as Promise<{ success: boolean; reason: string; status: number; txId?: string }>
+          let result = this.forwardTransactionToLuckyNodes(
+            senderAddress,
+            tx,
+            txId,
+            'consensus to consensus',
+            '3'
+          ); // don't wait here
+          return result as Promise<{ success: boolean; reason: string; status: number; txId?: string }>;
         } else {
           return {
             success: true,
             reason: `Transaction added to pending nonce queue.`,
-            status: 200
-          }
+            status: 200,
+          };
         }
       } else {
         // tx nonce is equal to account nonce
-        let result = await this._timestampAndQueueTransaction(tx, appData, global, noConsensus)
-        return result
+        let result = await this._timestampAndQueueTransaction(tx, appData, global, noConsensus);
+        return result;
       }
       // Pass received txs to any subscribed 'DATA' receivers
       // this.io.emit('DATA', tx)
     } catch (err) {
-      this.shardus_fatal(`put_ex_` + err.message, `Put: Failed to process transaction. Exception: ${err}`)
-      this.fatalLogger.fatal('Put: ' + err.name + ': ' + err.message + ' at ' + err.stack)
+      this.shardus_fatal(`put_ex_` + err.message, `Put: Failed to process transaction. Exception: ${err}`);
+      this.fatalLogger.fatal('Put: ' + err.name + ': ' + err.message + ' at ' + err.stack);
       return {
         success: false,
         reason: `Failed to process transaction: ${utils.stringifyReduce(tx)} ${inspect(err)}`,
         status: 500, // 500 status code means transaction is generally failed
-      }
+      };
     } finally {
-      this.profiler.profileSectionEnd('put')
+      this.profiler.profileSectionEnd('put');
     }
   }
 
-  async forwardTransactionToLuckyNodes(senderAddress: string, tx: ShardusTypes.OpaqueTransaction, txId: string, message = '', context = ''): Promise<unknown> {
+  async forwardTransactionToLuckyNodes(
+    senderAddress: string,
+    tx: ShardusTypes.OpaqueTransaction,
+    txId: string,
+    message = '',
+    context = ''
+  ): Promise<unknown> {
     let closetNodeIds = this.getClosestNodes(
       senderAddress,
       Context.config.stateManager.numberOfReInjectNodes,
       false
-    )
-    const cycleShardData = this.stateManager.currentCycleShardData
+    );
+    const cycleShardData = this.stateManager.currentCycleShardData;
     const homeNode = ShardFunctions.findHomeNode(
       cycleShardData.shardGlobals,
       senderAddress,
       cycleShardData.parititionShardDataMap
-    )
+    );
     if (homeNode == null) {
-      return { success: false, reason: `Home node not found for account ${senderAddress}`, status: 500 }
+      return { success: false, reason: `Home node not found for account ${senderAddress}`, status: 500 };
     }
     /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `forwardTransactionToLuckyNodes: homeNode: ${homeNode.node.id} closetNodeIds: ${Utils.safeStringify( closetNodeIds.sort() )}` )
 
-    let selectedValidators = []
+    let selectedValidators = [];
     if (Self.id != homeNode.node.id)
       selectedValidators.push({
         id: homeNode.node.id,
         ip: homeNode.node.externalIp,
         port: homeNode.node.externalPort,
         publicKey: homeNode.node.publicKey,
-      })
+      });
     /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_homenode_${context} ${activeIdToPartition.get(homeNode.node.id)}`)
 
-    let  stats ={
-      skippedSelf:0,
-      skippedRotation:0,
-      skippedHome:0,
-      ok_inQ:0,
-      ok_inQ2:0,
-      ok_addQ:0
-    }
+    let stats = {
+      skippedSelf: 0,
+      skippedRotation: 0,
+      skippedHome: 0,
+      ok_inQ: 0,
+      ok_inQ2: 0,
+      ok_addQ: 0,
+    };
 
     for (const id of closetNodeIds) {
       /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_closetnode_${context} ${activeIdToPartition.get(id)}`)
       if (id === Self.id) {
-        stats.skippedSelf++
-        continue
+        stats.skippedSelf++;
+        continue;
       }
-      if (id === homeNode.node.id){
-        stats.skippedHome++
-        continue // we already added the home node
+      if (id === homeNode.node.id) {
+        stats.skippedHome++;
+        continue; // we already added the home node
       }
-      let node = nodes.get(id)
+      let node = nodes.get(id);
 
       //is this node safe in terms of rotation
-      let rotationCheckPassed = true
-      if(Context.config.stateManager.forwardToLuckyNodesCheckRotation) {
+      let rotationCheckPassed = true;
+      if (Context.config.stateManager.forwardToLuckyNodesCheckRotation) {
         //is in rotation means it in the edge
-        rotationCheckPassed = isNodeInRotationBounds(id) === false
+        rotationCheckPassed = isNodeInRotationBounds(id) === false;
       }
 
       // if the node is not active or not in rotation bounds, skip it
-      if (node.status !== 'active' || (rotationCheckPassed === false)) {
+      if (node.status !== 'active' || rotationCheckPassed === false) {
         /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `forwardTransactionToLuckyNodes: node ${id} is not active or in rotation bounds. node.status: ${ node.status } isNodeInRotationBounds: ${isNodeInRotationBounds(id)}` )
-        stats.skippedRotation++
-        continue
+        stats.skippedRotation++;
+        continue;
       }
       const validatorDetails = {
         id: node.id,
         ip: node.externalIp,
         port: node.externalPort,
         publicKey: node.publicKey,
-      }
-      selectedValidators.push(validatorDetails)
+      };
+      selectedValidators.push(validatorDetails);
     }
 
-    let successCount = 0
-    let failedCount = 0
-    for(const validator of selectedValidators) {
+    let successCount = 0;
+    let failedCount = 0;
+    for (const validator of selectedValidators) {
       try {
         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_req_${context} ${activeIdToPartition.get(validator.id)}`)
 
         if (validator.id === homeNode.node.id) {
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to home node ${validator.id} reason: ${message} ${Utils.safeStringify(tx)}` )
-          nestedCountersInstance.countEvent('statistics', `forwardTxToHomeNode: ${message}`)
+          nestedCountersInstance.countEvent('statistics', `forwardTxToHomeNode: ${message}`);
         } else {
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Forwarding injected tx ${txId} to consensus group. reason: ${message} ${Utils.safeStringify(tx)}` )
-          nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: ${message}`)
+          nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: ${message}`);
         }
 
-        const result: ShardusTypes.InjectTxResponse = await this.app.injectTxToConsensor([validator], tx)
+        const result: ShardusTypes.InjectTxResponse = await this.app.injectTxToConsensor([validator], tx);
 
         if (result == null) {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_null_${context} ${activeIdToPartition.get(validator.id)}`)
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got null/undefined response upon forwarding injected tx: ${txId} to node ${validator.id}` )
-          failedCount++
-          continue
+          failedCount++;
+          continue;
         }
         if (result && result.success === false) {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_false_${context} ${activeIdToPartition.get(validator.id)}`)
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got unsuccessful response upon forwarding injected tx: ${validator.id}. ${message} ${Utils.safeStringify(tx)}` )
-          failedCount++
-          continue
+          failedCount++;
+          continue;
         }
         if (result && result.success === true) {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_success_${context} ${activeIdToPartition.get(validator.id)}`)
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got successful response upon forwarding injected tx: ${validator.id}. ${message} ${Utils.safeStringify(tx)}` )
-          
-          if(result.reason === 'Transaction is already in pending nonce queue.'){
-            stats.ok_inQ++
+
+          if (result.reason === 'Transaction is already in pending nonce queue.') {
+            stats.ok_inQ++;
           }
-          if(result.reason === `Transaction already added to pending nonce queue.`){
-            stats.ok_inQ2++
+          if (result.reason === `Transaction already added to pending nonce queue.`) {
+            stats.ok_inQ2++;
           }
-          if(result.reason === `Transaction added to pending nonce queue.`){
-            stats.ok_addQ++
+          if (result.reason === `Transaction added to pending nonce queue.`) {
+            stats.ok_addQ++;
           }
-            
-          nestedCountersInstance.countEvent('statistics', `forward to lucky node success ${message} ${Utils.safeStringify(stats)}`)
-          if(Context.config.stateManager.forwardToLuckyMulti){
-            successCount++
-            continue
+
+          nestedCountersInstance.countEvent(
+            'statistics',
+            `forward to lucky node success ${message} ${Utils.safeStringify(stats)}`
+          );
+          if (Context.config.stateManager.forwardToLuckyMulti) {
+            successCount++;
+            continue;
           }
-          return { success: true, reason: 'Transaction forwarded to validators', status: 200 }
+          return { success: true, reason: 'Transaction forwarded to validators', status: 200 };
         }
       } catch (e) {
         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_ex_${context} ${activeIdToPartition.get(validator.id)}`)
@@ -1655,20 +1721,26 @@ class Shardus extends EventEmitter {
     if (successCount > 0) {
       /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_success_${context}`)
       /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got successful response upon forwarding injected tx: ${message} ${Utils.safeStringify(tx)}` )
-      nestedCountersInstance.countEvent('statistics', `forward to luck success ${message} failed/success/total: ${failedCount}/${successCount}/${selectedValidators.length}`)
-      return { success: true, reason: 'Transaction forwarded to validators', status: 200 }
+      nestedCountersInstance.countEvent(
+        'statistics',
+        `forward to luck success ${message} failed/success/total: ${failedCount}/${successCount}/${selectedValidators.length}`
+      );
+      return { success: true, reason: 'Transaction forwarded to validators', status: 200 };
     }
 
-    nestedCountersInstance.countEvent('statistics', `forward failed: ${message} ${Utils.safeStringify(stats)}`)
+    nestedCountersInstance.countEvent(
+      'statistics',
+      `forward failed: ${message} ${Utils.safeStringify(stats)}`
+    );
     /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.error( `Forwarding injected tx out of tries. ${Utils.safeStringify(stats)} ${Utils.safeStringify(tx)} ` )
-    return { success: false, reason: 'No validators found to forward the transaction', status: 500 }
+    return { success: false, reason: 'No validators found to forward the transaction', status: 500 };
   }
 
   /**
    * Returns the nodeId for this node
    */
   getNodeId() {
-    return this.p2p.getNodeId()
+    return this.p2p.getNodeId();
   }
 
   /**
@@ -1676,41 +1748,41 @@ class Shardus extends EventEmitter {
    * @param {*} id The nodeId of this node
    */
   getNode(id: string): ShardusTypes.Node | undefined {
-    return this.p2p.state.getNode(id)
+    return this.p2p.state.getNode(id);
   }
 
   getNodeByPubKey(id: string): ShardusTypes.Node {
-    return this.p2p.state.getNodeByPubKey(id)
+    return this.p2p.state.getNodeByPubKey(id);
   }
 
   getNodeRotationIndex(id: string): { idx: number; total: number } {
-    return getAgeIndexForNodeId(id)
+    return getAgeIndexForNodeId(id);
   }
 
   isNodeInRotationBounds(nodeId: string) {
-    return isNodeInRotationBounds(nodeId)
+    return isNodeInRotationBounds(nodeId);
   }
 
   isNodeActiveByPubKey(pubKey: string): boolean {
-    const node = this.p2p.state.getNodeByPubKey(pubKey)
+    const node = this.p2p.state.getNodeByPubKey(pubKey);
     if (node == null) {
-      return false
+      return false;
     }
     if (node.status !== NodeStatus.ACTIVE) {
-      return false
+      return false;
     }
-    return true
+    return true;
   }
 
   isNodeActive(id: string): boolean {
-    const node = this.p2p.state.getNode(id)
+    const node = this.p2p.state.getNode(id);
     if (node == null) {
-      return false
+      return false;
     }
     if (node.status !== NodeStatus.ACTIVE) {
-      return false
+      return false;
     }
-    return true
+    return true;
   }
 
   /**
@@ -1718,29 +1790,29 @@ class Shardus extends EventEmitter {
    * @param {*} amount The number cycles to fetch from the recent cycle history
    */
   getLatestCycles(amount = 1) {
-    return this.p2p.getLatestCycles(amount)
+    return this.p2p.getLatestCycles(amount);
   }
 
   /**
    * This function return number of active in the latest cycle.
    */
   getNumActiveNodes() {
-    let lastCycle = CycleChain.getNewest()
+    let lastCycle = CycleChain.getNewest();
     if (lastCycle == null) {
-      nestedCountersInstance.countEvent('debug', 'getNumActiveNodes lastCycle == null')
-      return 0
+      nestedCountersInstance.countEvent('debug', 'getNumActiveNodes lastCycle == null');
+      return 0;
     }
-    nestedCountersInstance.countEvent('debug', `getNumActiveNodes lastCycle.active: ${lastCycle.active}`)
+    nestedCountersInstance.countEvent('debug', `getNumActiveNodes lastCycle.active: ${lastCycle.active}`);
 
-    const latestCycle = this.p2p.getLatestCycles(1)[0]
+    const latestCycle = this.p2p.getLatestCycles(1)[0];
 
     if (latestCycle == null) {
-      nestedCountersInstance.countEvent('debug', 'getNumActiveNodes latestCycle == null')
-      return 0
+      nestedCountersInstance.countEvent('debug', 'getNumActiveNodes latestCycle == null');
+      return 0;
     }
-    nestedCountersInstance.countEvent('debug', `getNumActiveNodes latestCycle.active: ${latestCycle.active}`)
+    nestedCountersInstance.countEvent('debug', `getNumActiveNodes latestCycle.active: ${latestCycle.active}`);
 
-    return latestCycle ? latestCycle.active : 0
+    return latestCycle ? latestCycle.active : 0;
   }
 
   /**
@@ -1748,7 +1820,7 @@ class Shardus extends EventEmitter {
    * @returns {ShardusTypes.Cycle['mode']} returns the current network mode
    */
   getNetworkMode(): ShardusTypes.Cycle['mode'] {
-    return networkMode
+    return networkMode;
   }
 
   /**
@@ -1762,32 +1834,32 @@ class Shardus extends EventEmitter {
    * @returns {string[]} returns a list of nodes ids that are closest. roughly in order of closeness
    */
   getClosestNodes(hash: string, count: number = 1, selfExclude: boolean = false): string[] {
-    return this.stateManager.getClosestNodes(hash, count, selfExclude).map((node) => node.id)
+    return this.stateManager.getClosestNodes(hash, count, selfExclude).map((node) => node.id);
   }
 
   getClosestNodesGlobal(hash, count) {
-    return this.stateManager.getClosestNodesGlobal(hash, count)
+    return this.stateManager.getClosestNodesGlobal(hash, count);
   }
 
   removeNodeWithCertificiate(cert: RemoveCertificate) {
-    return removeNodeWithCertificiate(cert)
+    return removeNodeWithCertificiate(cert);
   }
 
   computeNodeRank(nodeId: string, txId: string, timestamp: number): bigint {
-    return this.stateManager.transactionQueue.computeNodeRank(nodeId, txId, timestamp)
+    return this.stateManager.transactionQueue.computeNodeRank(nodeId, txId, timestamp);
   }
 
   getShardusProfiler() {
-    return profilerInstance
+    return profilerInstance;
   }
 
   /** Get the time in MS a replacement for Date.Now().  If p2p.useNTPOffsets===true then adds the NPT offset  */
   shardusGetTime(): number {
-    return shardusGetTime()
+    return shardusGetTime();
   }
 
   setDebugSetLastAppAwait(label: string, complete = DebugComplete.Incomplete) {
-    this.stateManager?.transactionQueue.setDebugSetLastAppAwait(label, complete)
+    this.stateManager?.transactionQueue.setDebugSetLastAppAwait(label, complete);
   }
 
   validateActiveNodeSignatures(
@@ -1795,19 +1867,19 @@ class Shardus extends EventEmitter {
     signs: ShardusTypes.Sign[],
     minRequired: number
   ): { success: boolean; reason: string } {
-    let validNodeCount = 0
+    let validNodeCount = 0;
     // let validNodes = []
-    let appData = { ...signedAppData }
-    if (appData.signs) delete appData.signs
-    if (appData.sign) delete appData.sign
+    let appData = { ...signedAppData };
+    if (appData.signs) delete appData.signs;
+    if (appData.sign) delete appData.sign;
     for (let i = 0; i < signs.length; i++) {
-      const sign = signs[i]
-      const nodePublicKey = sign.owner
-      appData.sign = sign // attach the node's sig for verification
-      const node = this.p2p.state.getNodeByPubKey(nodePublicKey)
-      const isValid = this.crypto.verify(appData, nodePublicKey)
+      const sign = signs[i];
+      const nodePublicKey = sign.owner;
+      appData.sign = sign; // attach the node's sig for verification
+      const node = this.p2p.state.getNodeByPubKey(nodePublicKey);
+      const isValid = this.crypto.verify(appData, nodePublicKey);
       if (node && isValid) {
-        validNodeCount++
+        validNodeCount++;
       }
       // early break loop
       if (validNodeCount >= minRequired) {
@@ -1815,13 +1887,13 @@ class Shardus extends EventEmitter {
         return {
           success: true,
           reason: `Validated by ${minRequired} valid nodes!`,
-        }
+        };
       }
     }
     return {
       success: false,
       reason: `Fail to verify enough valid nodes signatures`,
-    }
+    };
   }
 
   validateClosestActiveNodeSignatures(
@@ -1831,32 +1903,32 @@ class Shardus extends EventEmitter {
     nodesToSign: number,
     allowedBackupNodes: number
   ): { success: boolean; reason: string } {
-    let validNodeCount = 0
+    let validNodeCount = 0;
     // let validNodes = []
-    let appData = { ...signedAppData }
-    if (appData.signs) delete appData.signs
-    if (appData.sign) delete appData.sign
-    const hash = crypto.hashObj(appData)
-    const closestNodes = this.getClosestNodes(hash, nodesToSign + allowedBackupNodes)
-    const closestNodesByPubKey = new Map()
+    let appData = { ...signedAppData };
+    if (appData.signs) delete appData.signs;
+    if (appData.sign) delete appData.sign;
+    const hash = crypto.hashObj(appData);
+    const closestNodes = this.getClosestNodes(hash, nodesToSign + allowedBackupNodes);
+    const closestNodesByPubKey = new Map();
     for (let i = 0; i < closestNodes.length; i++) {
-      const node = this.p2p.state.getNode(closestNodes[i])
+      const node = this.p2p.state.getNode(closestNodes[i]);
       if (node) {
-        closestNodesByPubKey.set(node.publicKey, node)
+        closestNodesByPubKey.set(node.publicKey, node);
       }
     }
     for (let i = 0; i < signs.length; i++) {
-      const sign = signs[i]
-      const nodePublicKey = sign.owner
-      appData.sign = sign // attach the node's sig for verification
+      const sign = signs[i];
+      const nodePublicKey = sign.owner;
+      appData.sign = sign; // attach the node's sig for verification
       if (!closestNodesByPubKey.has(nodePublicKey)) {
-        this.mainLogger.warn(`Node ${nodePublicKey} is not in the closest nodes list. Skipping`)
-        continue
+        this.mainLogger.warn(`Node ${nodePublicKey} is not in the closest nodes list. Skipping`);
+        continue;
       }
-      const node = closestNodesByPubKey.get(nodePublicKey)
-      const isValid = this.crypto.verify(appData, nodePublicKey)
+      const node = closestNodesByPubKey.get(nodePublicKey);
+      const isValid = this.crypto.verify(appData, nodePublicKey);
       if (node && isValid) {
-        validNodeCount++
+        validNodeCount++;
       }
       // early break loop
       if (validNodeCount >= minRequired) {
@@ -1864,13 +1936,13 @@ class Shardus extends EventEmitter {
         return {
           success: true,
           reason: `Validated by ${minRequired} valid nodes!`,
-        }
+        };
       }
     }
     return {
       success: false,
       reason: `Fail to verify enough valid nodes signatures`,
-    }
+    };
   }
 
   /**
@@ -1882,7 +1954,7 @@ class Shardus extends EventEmitter {
    */
   isNodeInDistance(hash: string, nodeId: string, distance: number) {
     //@ts-ignore
-    return this.stateManager.isNodeInDistance(hash, nodeId, distance)
+    return this.stateManager.isNodeInDistance(hash, nodeId, distance);
   }
 
   // USED BY SIMPLECOINAPP
@@ -1898,28 +1970,28 @@ class Shardus extends EventEmitter {
       failMessage: null,
       appReceiptData: null,
       appReceiptDataHash: null,
-    }
-    return replyObject
+    };
+    return replyObject;
   }
 
   async shutdownFromDapp(tag: string, message: string, restart: boolean) {
-    const exitType = restart ? 'exitCleanly' : 'exitUncleanly'
-    nestedCountersInstance.countRareEvent('fatal', `invoke-exit: ${exitType}: ${tag}`)
-    this.mainLogger.error(`invoke-exit: ${exitType}: ${tag}`)
-    this.mainLogger.error(message)
-    this.mainLogger.error(getCallstack())
+    const exitType = restart ? 'exitCleanly' : 'exitUncleanly';
+    nestedCountersInstance.countRareEvent('fatal', `invoke-exit: ${exitType}: ${tag}`);
+    this.mainLogger.error(`invoke-exit: ${exitType}: ${tag}`);
+    this.mainLogger.error(message);
+    this.mainLogger.error(getCallstack());
     if (this.reporter) {
-      this.reporter.stopReporting()
-      await this.reporter.reportRemoved(Self.id)
+      this.reporter.stopReporting();
+      await this.reporter.reportRemoved(Self.id);
     }
     if (restart)
       // exits with status 0 so that PM2 can restart the process
       this.exitHandler.exitCleanly(
         `invoke-exit: ${tag}`,
         `invoke-exit: ${tag}. but exiting cleanly for a restart`
-      )
+      );
     // exits with status 1 so that PM2 CANNOT restart the process
-    else this.exitHandler.exitUncleanly(`invoke-exit: ${tag}`, `invoke-exit: ${exitType}: ${tag}`)
+    else this.exitHandler.exitUncleanly(`invoke-exit: ${tag}`, `invoke-exit: ${exitType}: ${tag}`);
   }
 
   applyResponseAddReceiptData(
@@ -1927,13 +1999,13 @@ class Shardus extends EventEmitter {
     appReceiptData: any,
     appReceiptDataHash: string
   ) {
-    resultObject.appReceiptData = appReceiptData
-    resultObject.appReceiptDataHash = appReceiptDataHash
+    resultObject.appReceiptData = appReceiptData;
+    resultObject.appReceiptDataHash = appReceiptDataHash;
   }
 
   applyResponseSetFailed(resultObject: ShardusTypes.ApplyResponse, failMessage: string) {
-    resultObject.failed = true
-    resultObject.failMessage = failMessage
+    resultObject.failed = true;
+    resultObject.failMessage = failMessage;
   }
 
   // USED BY SIMPLECOINAPP
@@ -1948,13 +2020,13 @@ class Shardus extends EventEmitter {
     stateAfter: string,
     accountCreated: boolean
   ) {
-    const state = { accountId, txId, txTimestamp, stateBefore, stateAfter }
+    const state = { accountId, txId, txTimestamp, stateBefore, stateAfter };
     if (accountCreated) {
-      state.stateBefore = allZeroes64
+      state.stateBefore = allZeroes64;
     }
     //@ts-ignore
-    resultObject.stateTableResults.push(state)
-    let foundAccountData = resultObject.accountData.find((a) => a.accountId === accountId)
+    resultObject.stateTableResults.push(state);
+    let foundAccountData = resultObject.accountData.find((a) => a.accountId === accountId);
     if (foundAccountData) {
       foundAccountData = {
         ...foundAccountData,
@@ -1966,7 +2038,7 @@ class Shardus extends EventEmitter {
         hash: stateAfter,
         stateId: stateAfter, // duplicate of hash.., really need to go back and add types to this
         localCache,
-      }
+      };
     } else {
       resultObject.accountData.push({
         accountId,
@@ -1977,7 +2049,7 @@ class Shardus extends EventEmitter {
         hash: stateAfter,
         stateId: stateAfter, // duplicate of hash.., really need to go back and add types to this
         localCache,
-      })
+      });
     }
   }
   // USED BY SIMPLECOINAPP
@@ -1993,69 +2065,69 @@ class Shardus extends EventEmitter {
       data: account,
       txId,
       timestamp: txTimestamp,
-    })
+    });
   }
 
   useAccountWrites() {
-    console.log('Using accountWrites only')
-    this.stateManager.useAccountWritesOnly = true
+    console.log('Using accountWrites only');
+    this.stateManager.useAccountWritesOnly = true;
   }
 
   tryInvolveAccount(txId: string, address: string, isRead: boolean): boolean {
     try {
-      const result = this.stateManager.transactionQueue.tryInvloveAccount(txId, address, isRead)
-      return result
+      const result = this.stateManager.transactionQueue.tryInvloveAccount(txId, address, isRead);
+      return result;
     } catch (err) {
       this.fatalLogger.fatal(
         'Error while checking tryInvolveAccount ' + err.name + ': ' + err.message + ' at ' + err.stack
-      )
-      return false
+      );
+      return false;
     }
   }
   signAsNode(obj) {
-    return this.crypto.sign(obj)
+    return this.crypto.sign(obj);
   }
   // USED BY SIMPLECOINAPP
   async resetAppRelatedState() {
-    await this.storage.clearAppRelatedState()
+    await this.storage.clearAppRelatedState();
   }
 
   // USED BY SIMPLECOINAPP
   async getLocalOrRemoteAccount(
     address,
     opts: {
-      useRICache: boolean // enables the RI cache. enable only for immutable data
-      canThrowException?: boolean
+      useRICache: boolean; // enables the RI cache. enable only for immutable data
+      canThrowException?: boolean;
     } = { useRICache: false, canThrowException: false }
   ) {
     if (this.p2p.allowTransactions() || isServiceMode()) {
-      return this.stateManager.getLocalOrRemoteAccount(address, opts)
+      return this.stateManager.getLocalOrRemoteAccount(address, opts);
     } else {
-      return null
+      return null;
     }
   }
 
   async getLocalOrRemoteCachedAppData(topic, dataId): Promise<CachedAppData | null> {
     if (this.p2p.allowTransactions()) {
-      return this.stateManager.cachedAppDataManager.getLocalOrRemoteCachedAppData(topic, dataId)
+      return this.stateManager.cachedAppDataManager.getLocalOrRemoteCachedAppData(topic, dataId);
     } else {
-      return null
+      return null;
     }
   }
 
   async getLocalOrRemoteAccountQueueCount(address): Promise<QueueCountsResult> {
     if (this.p2p.allowTransactions()) {
-      return this.stateManager.getLocalOrRemoteAccountQueueCount(address)
+      return this.stateManager.getLocalOrRemoteAccountQueueCount(address);
     } else {
-      return { count: 0, committingAppData: [] }
+      return { count: 0, committingAppData: [] };
     }
   }
 
   async registerCacheTopic(topic: string, maxCycleAge: number, maxCacheElements: number) {
     try {
-      return this.stateManager.cachedAppDataManager.registerTopic(topic, maxCycleAge, maxCacheElements)
+      return this.stateManager.cachedAppDataManager.registerTopic(topic, maxCycleAge, maxCacheElements);
     } catch (e) {
-      this.mainLogger.error(`Error while registerCacheTopic`, e)
+      this.mainLogger.error(`Error while registerCacheTopic`, e);
     }
   }
 
@@ -2076,7 +2148,7 @@ class Shardus extends EventEmitter {
           cycle,
           fromId,
           txId
-        )
+        );
       } else {
         await this.stateManager.cachedAppDataManager.sendCorrespondingCachedAppData(
           topic,
@@ -2085,10 +2157,10 @@ class Shardus extends EventEmitter {
           cycle,
           fromId,
           txId
-        )
+        );
       }
     } catch (e) {
-      this.mainLogger.error(`Error while sendCorrespondingCachedAppData`, e)
+      this.mainLogger.error(`Error while sendCorrespondingCachedAppData`, e);
     }
   }
 
@@ -2097,19 +2169,19 @@ class Shardus extends EventEmitter {
    * @param {*} address The address / publicKey of the account in which to query
    */
   async getRemoteAccount(address) {
-    return this.stateManager.getRemoteAccount(address)
+    return this.stateManager.getRemoteAccount(address);
   }
 
   getConsenusGroupForAccount(address: string): ShardusTypes.Node[] {
-    return this.stateManager.transactionQueue.getConsenusGroupForAccount(address)
+    return this.stateManager.transactionQueue.getConsenusGroupForAccount(address);
   }
 
   getRandomConsensusNodeForAccount(address: string): ShardusTypes.Node {
-    return this.stateManager.transactionQueue.getRandomConsensusNodeForAccount(address)
+    return this.stateManager.transactionQueue.getRandomConsensusNodeForAccount(address);
   }
 
   isAccountRemote(address: string): boolean {
-    return this.stateManager.transactionQueue.isAccountRemote(address)
+    return this.stateManager.transactionQueue.isAccountRemote(address);
   }
 
   /**
@@ -2130,30 +2202,30 @@ class Shardus extends EventEmitter {
   ): boolean {
     //MAIN-NET disable this.
     if (this.stateManager.testFailChance(failChance, debugName, key, message, verboseRequired)) {
-      return true
+      return true;
     } else {
-      return false
+      return false;
     }
   }
 
   async debugForeverLoop(tag: string) {
-    this.debugForeverLoopCounter++
+    this.debugForeverLoopCounter++;
     /* prettier-ignore */ this.stateManager.transactionQueue.setDebugSetLastAppAwait('debugForeverLoop'+tag)
     while (this.debugForeverLoopsEnabled) {
-      await utils.sleep(1000)
+      await utils.sleep(1000);
     }
     /* prettier-ignore */ this.stateManager.transactionQueue.setDebugSetLastAppAwait('debugForeverLoop'+tag, DebugComplete.Completed)
   }
 
   setupDebugEndpoints() {
     Context.network.registerExternalGet('debug-toggle-foreverloop', isDebugModeMiddleware, (req, res) => {
-      this.debugForeverLoopsEnabled = !this.debugForeverLoopsEnabled
+      this.debugForeverLoopsEnabled = !this.debugForeverLoopsEnabled;
       //optionally check the query param set and use that instead
       if (req.query.set) {
-        this.debugForeverLoopsEnabled = req.query.set === 'true'
+        this.debugForeverLoopsEnabled = req.query.set === 'true';
       }
-      res.send(`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`)
-    })
+      res.send(`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`);
+    });
   }
 
   /**
@@ -2173,7 +2245,7 @@ class Shardus extends EventEmitter {
       stateId: hash,
       timestamp,
       data: fullData,
-    }
+    };
   }
 
   /**
@@ -2185,20 +2257,20 @@ class Shardus extends EventEmitter {
   setPartialData(response, partialData, userTag) {
     // if the account was just created we have to do something special and ignore partial data
     if (response.accountCreated) {
-      response.localCache = response.data
-      return
+      response.localCache = response.data;
+      return;
     }
-    response.isPartial = true
+    response.isPartial = true;
     // otherwise we will convert this response to be using partial data
-    response.localCache = response.data
-    response.data = partialData
-    response.userTag = userTag
+    response.localCache = response.data;
+    response.data = partialData;
+    response.userTag = userTag;
   }
 
   genericApplyPartialUpate(fullObject, updatedPartialObject) {
-    const dataKeys = Object.keys(updatedPartialObject)
+    const dataKeys = Object.keys(updatedPartialObject);
     for (const key of dataKeys) {
-      fullObject[key] = updatedPartialObject[key]
+      fullObject[key] = updatedPartialObject[key];
     }
   }
 
@@ -2216,31 +2288,31 @@ class Shardus extends EventEmitter {
    * @param accountCopies
    */
   async debugCommitAccountCopies(accountCopies: ShardusTypes.AccountsCopy[]) {
-    await this.stateManager._commitAccountCopies(accountCopies)
+    await this.stateManager._commitAccountCopies(accountCopies);
   }
 
   async forwardAccounts(data: Archivers.InitialAccountsData) {
-    await Archivers.forwardAccounts(data)
+    await Archivers.forwardAccounts(data);
   }
 
   // Expose dev public key to verify things on the app
   getDevPublicKeys() {
-    return getDevPublicKeys()
+    return getDevPublicKeys();
   }
 
   // Expose dev public key to verify things on the app
   getDevPublicKey(keyName?: string) {
-    return getDevPublicKey(keyName)
+    return getDevPublicKey(keyName);
   }
 
   // Expose dev key with highest security level
   getDevPublicKeyMaxLevel(clearance?: DevSecurityLevel) {
-    return getDevPublicKeyMaxLevel(clearance)
+    return getDevPublicKeyMaxLevel(clearance);
   }
 
   // Verify that the key is the dev key and has the required security level
   ensureKeySecurity(keyName: string, clearance: DevSecurityLevel) {
-    return ensureKeySecurity(keyName, clearance)
+    return ensureKeySecurity(keyName, clearance);
   }
 
   /**
@@ -2249,12 +2321,12 @@ class Shardus extends EventEmitter {
    */
   async shutdown(exitProcess = true) {
     try {
-      this.mainLogger.info('exitCleanly: shutdown')
-      await this.exitHandler.exitCleanly(exitProcess)
+      this.mainLogger.info('exitCleanly: shutdown');
+      await this.exitHandler.exitCleanly(exitProcess);
       // consider if we want this.  it can help for debugging:
       // await this.exitHandler.exitUncleanly()
     } catch (e) {
-      throw e
+      throw e;
     }
   }
 
@@ -2264,19 +2336,19 @@ class Shardus extends EventEmitter {
    * @returns {App}
    */
   _getApplicationInterface(application: ShardusTypes.App): ShardusTypes.App {
-    if (logFlags.debug) this.mainLogger.debug('Start of _getApplicationInterfaces()')
-    const applicationInterfaceImpl: Partial<ShardusTypes.App> = {}
+    if (logFlags.debug) this.mainLogger.debug('Start of _getApplicationInterfaces()');
+    const applicationInterfaceImpl: Partial<ShardusTypes.App> = {};
     try {
       if (application == null) {
         // throw new Error('Invalid Application Instance')
-        return null
+        return null;
       }
       if (typeof application.isInternalTx === 'function') {
-        applicationInterfaceImpl.isInternalTx = (tx) => application.isInternalTx(tx)
+        applicationInterfaceImpl.isInternalTx = (tx) => application.isInternalTx(tx);
       }
 
       if (typeof application.validate === 'function') {
-        applicationInterfaceImpl.validate = (inTx, appData) => application.validate(inTx, appData)
+        applicationInterfaceImpl.validate = (inTx, appData) => application.validate(inTx, appData);
       } else if (typeof application.validateTxnFields === 'function') {
         /**
          * Compatibility layer for Apps that use the old validateTxnFields fn
@@ -2286,20 +2358,20 @@ class Shardus extends EventEmitter {
           const oldResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(
             inTx,
             appData
-          )
+          );
           const newResult = {
             success: oldResult.success,
             reason: oldResult.reason,
             status: oldResult.status,
-          }
-          return newResult
-        }
+          };
+          return newResult;
+        };
       } else {
-        throw new Error('Missing required interface function. validate()')
+        throw new Error('Missing required interface function. validate()');
       }
 
       if (typeof application.crack === 'function') {
-        applicationInterfaceImpl.crack = (inTx, appData) => application.crack(inTx, appData)
+        applicationInterfaceImpl.crack = (inTx, appData) => application.crack(inTx, appData);
       } else if (
         typeof application.getKeyFromTransaction === 'function' &&
         typeof application.validateTxnFields === 'function'
@@ -2310,19 +2382,19 @@ class Shardus extends EventEmitter {
          */
         applicationInterfaceImpl.crack = (inTx) => {
           const oldGetKeyFromTransactionResult: ShardusTypes.TransactionKeys =
-            application.getKeyFromTransaction(inTx)
+            application.getKeyFromTransaction(inTx);
           const oldValidateTxnFieldsResult: ShardusTypes.IncomingTransactionResult =
-            application.validateTxnFields(inTx, null)
+            application.validateTxnFields(inTx, null);
           const newResult = {
             timestamp: oldValidateTxnFieldsResult.txnTimestamp,
             id: this.crypto.hash(inTx), // [TODO] [URGENT] We really shouldn't be doing this and should change all apps to use the new way and do their own hash
             keys: oldGetKeyFromTransactionResult,
             shardusMemoryPatterns: null,
-          }
-          return newResult
-        }
+          };
+          return newResult;
+        };
       } else {
-        throw new Error('Missing required interface function. validate()')
+        throw new Error('Missing required interface function. validate()');
       }
 
       if (typeof application.txPreCrackData === 'function') {
@@ -2330,86 +2402,99 @@ class Shardus extends EventEmitter {
           tx,
           appData
         ): Promise<{ status: boolean; reason: string }> => {
-          this.profiler.scopedProfileSectionStart('process-dapp.txPreCrackData', false)
-          let { status: success, reason } = await application.txPreCrackData(tx, appData)
-          this.profiler.scopedProfileSectionEnd('process-dapp.txPreCrackData')
-          return { status: success, reason }
-        }
+          this.profiler.scopedProfileSectionStart('process-dapp.txPreCrackData', false);
+          let { status: success, reason } = await application.txPreCrackData(tx, appData);
+          this.profiler.scopedProfileSectionEnd('process-dapp.txPreCrackData');
+          return { status: success, reason };
+        };
       } else {
         applicationInterfaceImpl.txPreCrackData = async function () {
-          return { status: true, reason: '' }
-        }
+          return { status: true, reason: '' };
+        };
       }
 
       if (typeof application.getTimestampFromTransaction === 'function') {
         applicationInterfaceImpl.getTimestampFromTransaction = (inTx, appData) =>
-          application.getTimestampFromTransaction(inTx, appData)
+          application.getTimestampFromTransaction(inTx, appData);
       } else {
-        throw new Error('Missing requried interface function.getTimestampFromTransaction()')
+        throw new Error('Missing requried interface function.getTimestampFromTransaction()');
       }
 
       if (typeof application.calculateTxId === 'function') {
-        applicationInterfaceImpl.calculateTxId = (inTx) => application.calculateTxId(inTx)
+        applicationInterfaceImpl.calculateTxId = (inTx) => application.calculateTxId(inTx);
       } else {
-        throw new Error('Missing requried interface function.calculateTxId()')
+        throw new Error('Missing requried interface function.calculateTxId()');
       }
 
       if (typeof application.apply === 'function') {
         applicationInterfaceImpl.apply = (inTx, wrappedStates, appData) =>
-          application.apply(inTx, wrappedStates, appData)
+          application.apply(inTx, wrappedStates, appData);
       } else {
-        throw new Error('Missing required interface function. apply()')
+        throw new Error('Missing required interface function. apply()');
       }
 
       if (typeof application.transactionReceiptPass === 'function') {
-        applicationInterfaceImpl.transactionReceiptPass = async (tx, wrappedStates, applyResponse, isExecutionGroup) =>
-          application.transactionReceiptPass(tx, wrappedStates, applyResponse, isExecutionGroup)
+        applicationInterfaceImpl.transactionReceiptPass = async (
+          tx,
+          wrappedStates,
+          applyResponse,
+          isExecutionGroup
+        ) => application.transactionReceiptPass(tx, wrappedStates, applyResponse, isExecutionGroup);
       } else {
-        applicationInterfaceImpl.transactionReceiptPass = async function (tx, wrappedStates, applyResponse, isExecutionGroup) {}
+        applicationInterfaceImpl.transactionReceiptPass = async function (
+          tx,
+          wrappedStates,
+          applyResponse,
+          isExecutionGroup
+        ) {};
       }
 
       if (typeof application.transactionReceiptFail === 'function') {
         applicationInterfaceImpl.transactionReceiptFail = async (tx, wrappedStates, applyResponse) =>
-          application.transactionReceiptFail(tx, wrappedStates, applyResponse)
+          application.transactionReceiptFail(tx, wrappedStates, applyResponse);
       } else {
-        applicationInterfaceImpl.transactionReceiptFail = async function (tx, wrappedStates, applyResponse) {}
+        applicationInterfaceImpl.transactionReceiptFail = async function (
+          tx,
+          wrappedStates,
+          applyResponse
+        ) {};
       }
 
       if (typeof application.updateAccountFull === 'function') {
         applicationInterfaceImpl.updateAccountFull = async (wrappedStates, localCache, applyResponse) => {
-          this.profiler.scopedProfileSectionStart('process-dapp.updateAccountFull', false)
-          await application.updateAccountFull(wrappedStates, localCache, applyResponse)
-          this.profiler.scopedProfileSectionEnd('process-dapp.updateAccountFull')
-        }
+          this.profiler.scopedProfileSectionStart('process-dapp.updateAccountFull', false);
+          await application.updateAccountFull(wrappedStates, localCache, applyResponse);
+          this.profiler.scopedProfileSectionEnd('process-dapp.updateAccountFull');
+        };
       } else {
-        throw new Error('Missing required interface function. updateAccountFull()')
+        throw new Error('Missing required interface function. updateAccountFull()');
       }
 
       if (typeof application.updateAccountPartial === 'function') {
         applicationInterfaceImpl.updateAccountPartial = async (wrappedStates, localCache, applyResponse) =>
-          application.updateAccountPartial(wrappedStates, localCache, applyResponse)
+          application.updateAccountPartial(wrappedStates, localCache, applyResponse);
       } else {
-        throw new Error('Missing required interface function. updateAccountPartial()')
+        throw new Error('Missing required interface function. updateAccountPartial()');
       }
 
       if (typeof application.getRelevantData === 'function') {
         applicationInterfaceImpl.getRelevantData = async (accountId, tx, appData: any) =>
-          application.getRelevantData(accountId, tx, appData)
+          application.getRelevantData(accountId, tx, appData);
       } else {
-        throw new Error('Missing required interface function. getRelevantData()')
+        throw new Error('Missing required interface function. getRelevantData()');
       }
 
       if (typeof application.getStateId === 'function') {
         applicationInterfaceImpl.getStateId = async (accountAddress, mustExist) =>
-          application.getStateId(accountAddress, mustExist)
+          application.getStateId(accountAddress, mustExist);
       } else {
-        if (logFlags.debug) this.mainLogger.debug('getStateId not used by global server')
+        if (logFlags.debug) this.mainLogger.debug('getStateId not used by global server');
       }
 
       if (typeof application.close === 'function') {
-        applicationInterfaceImpl.close = async () => application.close()
+        applicationInterfaceImpl.close = async () => application.close();
       } else {
-        throw new Error('Missing required interface function. close()')
+        throw new Error('Missing required interface function. close()');
       }
 
       // App.get_account_data (Acc_start, Acc_end, Max_records)
@@ -2417,36 +2502,36 @@ class Shardus extends EventEmitter {
       // Max_records - limits the number of records returned
       if (typeof application.getAccountData === 'function') {
         applicationInterfaceImpl.getAccountData = async (accountStart, accountEnd, maxRecords) => {
-          this.profiler.scopedProfileSectionStart('process-dapp.getAccountData', false)
-          const res = await application.getAccountData(accountStart, accountEnd, maxRecords)
-          this.profiler.scopedProfileSectionEnd('process-dapp.getAccountData')
-          return res
-        }
+          this.profiler.scopedProfileSectionStart('process-dapp.getAccountData', false);
+          const res = await application.getAccountData(accountStart, accountEnd, maxRecords);
+          this.profiler.scopedProfileSectionEnd('process-dapp.getAccountData');
+          return res;
+        };
       } else {
-        throw new Error('Missing required interface function. getAccountData()')
+        throw new Error('Missing required interface function. getAccountData()');
       }
 
       if (typeof application.getCachedRIAccountData === 'function') {
         applicationInterfaceImpl.getCachedRIAccountData = async (addressList: string[]) => {
-          this.profiler.scopedProfileSectionStart('process-dapp.getCachedRIAccountData', false)
-          const res = await application.getCachedRIAccountData(addressList)
-          this.profiler.scopedProfileSectionEnd('process-dapp.getCachedRIAccountData')
-          return res
-        }
+          this.profiler.scopedProfileSectionStart('process-dapp.getCachedRIAccountData', false);
+          const res = await application.getCachedRIAccountData(addressList);
+          this.profiler.scopedProfileSectionEnd('process-dapp.getCachedRIAccountData');
+          return res;
+        };
       } else {
         applicationInterfaceImpl.getCachedRIAccountData = async (addressList: string[]) => {
-          return []
-        }
+          return [];
+        };
       }
 
       if (typeof application.setCachedRIAccountData === 'function') {
         applicationInterfaceImpl.setCachedRIAccountData = async (accountRecords: any[]) => {
-          this.profiler.scopedProfileSectionStart('process-dapp.setCachedRIAccountData', false)
-          await application.setCachedRIAccountData(accountRecords)
-          this.profiler.scopedProfileSectionEnd('process-dapp.setCachedRIAccountData')
-        }
+          this.profiler.scopedProfileSectionStart('process-dapp.setCachedRIAccountData', false);
+          await application.setCachedRIAccountData(accountRecords);
+          this.profiler.scopedProfileSectionEnd('process-dapp.setCachedRIAccountData');
+        };
       } else {
-        applicationInterfaceImpl.setCachedRIAccountData = async (accountRecords: any[]) => {}
+        applicationInterfaceImpl.setCachedRIAccountData = async (accountRecords: any[]) => {};
       }
 
       if (typeof application.getAccountDataByRange === 'function') {
@@ -2459,7 +2544,7 @@ class Shardus extends EventEmitter {
           offset,
           accountOffset
         ) => {
-          this.profiler.scopedProfileSectionStart('process-dapp.getAccountDataByRange', false)
+          this.profiler.scopedProfileSectionStart('process-dapp.getAccountDataByRange', false);
           const res = await application.getAccountDataByRange(
             accountStart,
             accountEnd,
@@ -2468,18 +2553,19 @@ class Shardus extends EventEmitter {
             maxRecords,
             offset,
             accountOffset
-          )
-          this.profiler.scopedProfileSectionEnd('process-dapp.getAccountDataByRange')
-          return res
-        }
+          );
+          this.profiler.scopedProfileSectionEnd('process-dapp.getAccountDataByRange');
+          return res;
+        };
       } else {
-        throw new Error('Missing required interface function. getAccountDataByRange()')
+        throw new Error('Missing required interface function. getAccountDataByRange()');
       }
 
       if (typeof application.calculateAccountHash === 'function') {
-        applicationInterfaceImpl.calculateAccountHash = (account) => application.calculateAccountHash(account)
+        applicationInterfaceImpl.calculateAccountHash = (account) =>
+          application.calculateAccountHash(account);
       } else {
-        throw new Error('Missing required interface function. calculateAccountHash()')
+        throw new Error('Missing required interface function. calculateAccountHash()');
       }
 
       // App.set_account_data (Acc_records)
@@ -2488,174 +2574,174 @@ class Shardus extends EventEmitter {
       // Returns a list of failed Acc_id
       if (typeof application.setAccountData === 'function') {
         applicationInterfaceImpl.setAccountData = async (accountRecords) => {
-          this.profiler.scopedProfileSectionStart('process-dapp.setAccountData', false)
-          application.setAccountData(accountRecords)
-          this.profiler.scopedProfileSectionEnd('process-dapp.setAccountData')
-        }
+          this.profiler.scopedProfileSectionStart('process-dapp.setAccountData', false);
+          application.setAccountData(accountRecords);
+          this.profiler.scopedProfileSectionEnd('process-dapp.setAccountData');
+        };
       } else {
-        throw new Error('Missing required interface function. setAccountData()')
+        throw new Error('Missing required interface function. setAccountData()');
       }
 
       // pass array of account ids to this and it will delete the accounts
       if (typeof application.deleteAccountData === 'function') {
         applicationInterfaceImpl.deleteAccountData = async (addressList) =>
-          application.deleteAccountData(addressList)
+          application.deleteAccountData(addressList);
       } else {
-        throw new Error('Missing required interface function. deleteAccountData()')
+        throw new Error('Missing required interface function. deleteAccountData()');
       }
 
       if (typeof application.getAccountDataByList === 'function') {
         applicationInterfaceImpl.getAccountDataByList = async (addressList) => {
-          this.profiler.scopedProfileSectionStart('process-dapp.getAccountDataByList', false)
-          const accData = await application.getAccountDataByList(addressList)
-          this.profiler.scopedProfileSectionEnd('process-dapp.getAccountDataByList')
-          return accData
-        }
+          this.profiler.scopedProfileSectionStart('process-dapp.getAccountDataByList', false);
+          const accData = await application.getAccountDataByList(addressList);
+          this.profiler.scopedProfileSectionEnd('process-dapp.getAccountDataByList');
+          return accData;
+        };
       } else {
-        throw new Error('Missing required interface function. getAccountDataByList()')
+        throw new Error('Missing required interface function. getAccountDataByList()');
       }
 
       if (typeof application.getNetworkAccount === 'function') {
-        applicationInterfaceImpl.getNetworkAccount = () => application.getNetworkAccount()
+        applicationInterfaceImpl.getNetworkAccount = () => application.getNetworkAccount();
       } else {
-        applicationInterfaceImpl.getNetworkAccount = () => null
+        applicationInterfaceImpl.getNetworkAccount = () => null;
       }
 
       if (typeof application.deleteLocalAccountData === 'function') {
         applicationInterfaceImpl.deleteLocalAccountData = async () => {
-          this.profiler.scopedProfileSectionStart('process-dapp.deleteLocalAccountData', false)
-          await application.deleteLocalAccountData()
-          this.profiler.scopedProfileSectionEnd('process-dapp.deleteLocalAccountData')
-        }
+          this.profiler.scopedProfileSectionStart('process-dapp.deleteLocalAccountData', false);
+          await application.deleteLocalAccountData();
+          this.profiler.scopedProfileSectionEnd('process-dapp.deleteLocalAccountData');
+        };
       } else {
-        throw new Error('Missing required interface function. deleteLocalAccountData()')
+        throw new Error('Missing required interface function. deleteLocalAccountData()');
       }
       if (typeof application.getAccountDebugValue === 'function') {
         applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) =>
-          application.getAccountDebugValue(wrappedAccount)
+          application.getAccountDebugValue(wrappedAccount);
       } else {
         applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) =>
-          'getAccountDebugValue() missing on app'
+          'getAccountDebugValue() missing on app';
       }
 
       //getSimpleTxDebugValue(tx)
       if (typeof application.getSimpleTxDebugValue === 'function') {
-        applicationInterfaceImpl.getSimpleTxDebugValue = (tx) => application.getSimpleTxDebugValue(tx)
+        applicationInterfaceImpl.getSimpleTxDebugValue = (tx) => application.getSimpleTxDebugValue(tx);
       } else {
-        applicationInterfaceImpl.getSimpleTxDebugValue = (tx) => ''
+        applicationInterfaceImpl.getSimpleTxDebugValue = (tx) => '';
       }
 
       if (typeof application.canDebugDropTx === 'function') {
-        applicationInterfaceImpl.canDebugDropTx = (tx) => application.canDebugDropTx(tx)
+        applicationInterfaceImpl.canDebugDropTx = (tx) => application.canDebugDropTx(tx);
       } else {
-        applicationInterfaceImpl.canDebugDropTx = (tx) => true
+        applicationInterfaceImpl.canDebugDropTx = (tx) => true;
       }
 
       if (typeof application.sync === 'function') {
         applicationInterfaceImpl.sync = async () => {
-          this.profiler.scopedProfileSectionStart('process-dapp.sync', false)
-          const res = await application.sync()
-          this.profiler.scopedProfileSectionEnd('process-dapp.sync')
-          return res
-        }
+          this.profiler.scopedProfileSectionStart('process-dapp.sync', false);
+          const res = await application.sync();
+          this.profiler.scopedProfileSectionEnd('process-dapp.sync');
+          return res;
+        };
       } else {
-        const thisPtr = this
+        const thisPtr = this;
         applicationInterfaceImpl.sync = async function () {
-          thisPtr.mainLogger.debug('no app.sync() function defined')
-        }
+          thisPtr.mainLogger.debug('no app.sync() function defined');
+        };
       }
 
       if (typeof application.dataSummaryInit === 'function') {
         applicationInterfaceImpl.dataSummaryInit = async (blob, accountData) =>
-          application.dataSummaryInit(blob, accountData)
+          application.dataSummaryInit(blob, accountData);
       } else {
-        applicationInterfaceImpl.dataSummaryInit = async function (blob, accountData) {}
+        applicationInterfaceImpl.dataSummaryInit = async function (blob, accountData) {};
       }
       if (typeof application.dataSummaryUpdate === 'function') {
         applicationInterfaceImpl.dataSummaryUpdate = async (blob, accountDataBefore, accountDataAfter) =>
-          application.dataSummaryUpdate(blob, accountDataBefore, accountDataAfter)
+          application.dataSummaryUpdate(blob, accountDataBefore, accountDataAfter);
       } else {
         applicationInterfaceImpl.dataSummaryUpdate = async function (
           blob,
           accountDataBefore,
           accountDataAfter
-        ) {}
+        ) {};
       }
       if (typeof application.txSummaryUpdate === 'function') {
         applicationInterfaceImpl.txSummaryUpdate = async (blob, tx, wrappedStates) =>
-          application.txSummaryUpdate(blob, tx, wrappedStates)
+          application.txSummaryUpdate(blob, tx, wrappedStates);
       } else {
-        applicationInterfaceImpl.txSummaryUpdate = async function (blob, tx, wrappedStates) {}
+        applicationInterfaceImpl.txSummaryUpdate = async function (blob, tx, wrappedStates) {};
       }
 
       if (typeof application.getAccountTimestamp === 'function') {
         applicationInterfaceImpl.getAccountTimestamp = async (accountAddress, mustExist) =>
-          application.getAccountTimestamp(accountAddress, mustExist)
+          application.getAccountTimestamp(accountAddress, mustExist);
       } else {
         applicationInterfaceImpl.getAccountTimestamp = async function (accountAddress, mustExist) {
-          return 0
-        }
+          return 0;
+        };
       }
 
       if (typeof application.getTimestampAndHashFromAccount === 'function') {
         applicationInterfaceImpl.getTimestampAndHashFromAccount = (account) =>
-          application.getTimestampAndHashFromAccount(account)
+          application.getTimestampAndHashFromAccount(account);
       } else {
         applicationInterfaceImpl.getTimestampAndHashFromAccount = function (account) {
           return {
             timestamp: 0,
             hash: 'getTimestampAndHashFromAccount not impl',
-          }
-        }
+          };
+        };
       }
       if (typeof application.validateJoinRequest === 'function') {
         applicationInterfaceImpl.validateJoinRequest = (data, mode, latestCycle, minNodes) =>
-          application.validateJoinRequest(data, mode, latestCycle, minNodes)
+          application.validateJoinRequest(data, mode, latestCycle, minNodes);
       }
       if (typeof application.validateArchiverJoinRequest === 'function') {
         applicationInterfaceImpl.validateArchiverJoinRequest = (data) =>
-          application.validateArchiverJoinRequest(data)
+          application.validateArchiverJoinRequest(data);
       }
       if (typeof application.getJoinData === 'function') {
-        applicationInterfaceImpl.getJoinData = () => application.getJoinData()
+        applicationInterfaceImpl.getJoinData = () => application.getJoinData();
       }
       if (typeof application.eventNotify === 'function') {
-        applicationInterfaceImpl.eventNotify = application.eventNotify
+        applicationInterfaceImpl.eventNotify = application.eventNotify;
       }
       if (typeof application.isReadyToJoin === 'function') {
         applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes, mode) =>
-          application.isReadyToJoin(latestCycle, publicKey, activeNodes, mode)
+          application.isReadyToJoin(latestCycle, publicKey, activeNodes, mode);
       } else {
         // If the app doesn't provide isReadyToJoin, assume it is always ready to join
-        applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes, mode) => true
+        applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes, mode) => true;
       }
       if (typeof application.getNodeInfoAppData === 'function') {
-        applicationInterfaceImpl.getNodeInfoAppData = () => application.getNodeInfoAppData()
+        applicationInterfaceImpl.getNodeInfoAppData = () => application.getNodeInfoAppData();
       } else {
         // If the app doesn't provide getNodeInfoAppData, assume it returns empty obj
-        applicationInterfaceImpl.getNodeInfoAppData = () => {}
+        applicationInterfaceImpl.getNodeInfoAppData = () => {};
       }
       if (typeof application.updateNetworkChangeQueue === 'function') {
         applicationInterfaceImpl.updateNetworkChangeQueue = async (
           account: ShardusTypes.WrappedData,
           appData: any
-        ) => application.updateNetworkChangeQueue(account, appData)
+        ) => application.updateNetworkChangeQueue(account, appData);
       } else {
         // If the app doesn't provide updateNetworkChangeQueue, just return empty arr
-        applicationInterfaceImpl.updateNetworkChangeQueue = async (account, appData) => []
+        applicationInterfaceImpl.updateNetworkChangeQueue = async (account, appData) => [];
       }
       if (typeof application.pruneNetworkChangeQueue === 'function') {
         applicationInterfaceImpl.pruneNetworkChangeQueue = async (
           account: ShardusTypes.WrappedData,
           cycle: number
-        ) => application.pruneNetworkChangeQueue(account, cycle)
+        ) => application.pruneNetworkChangeQueue(account, cycle);
       } else {
         // If the app doesn't provide pruneNetworkChangeQueue, just return empty arr
-        applicationInterfaceImpl.pruneNetworkChangeQueue = async (account, cycle) => []
+        applicationInterfaceImpl.pruneNetworkChangeQueue = async (account, cycle) => [];
       }
       if (typeof application.canStayOnStandby === 'function') {
         applicationInterfaceImpl.canStayOnStandby = (joinInfo: JoinRequest) =>
-          application.canStayOnStandby(joinInfo)
+          application.canStayOnStandby(joinInfo);
       }
 
       if (typeof application.signAppData === 'function') {
@@ -2665,65 +2751,66 @@ class Shardus extends EventEmitter {
           nodesToSign,
           appData
         ): Promise<ShardusTypes.SignAppDataResult> => {
-          this.profiler.scopedProfileSectionStart('process-dapp.signAppData', false)
-          const res = await application.signAppData(type, hash, nodesToSign, appData)
-          this.profiler.scopedProfileSectionEnd('process-dapp.signAppData')
-          return res
-        }
+          this.profiler.scopedProfileSectionStart('process-dapp.signAppData', false);
+          const res = await application.signAppData(type, hash, nodesToSign, appData);
+          this.profiler.scopedProfileSectionEnd('process-dapp.signAppData');
+          return res;
+        };
       }
       if (typeof application.beforeStateAccountFilter === 'function') {
-        applicationInterfaceImpl.beforeStateAccountFilter = application.beforeStateAccountFilter
+        applicationInterfaceImpl.beforeStateAccountFilter = application.beforeStateAccountFilter;
       }
       if (typeof application.binarySerializeObject === 'function') {
         applicationInterfaceImpl.binarySerializeObject = (identifier: AppObjEnum, obj: any): Buffer => {
-          this.profiler.scopedProfileSectionStart('process-dapp.binarySerializeObject', false)
-          const res = application.binarySerializeObject(identifier, obj)
-          this.profiler.scopedProfileSectionEnd('process-dapp.binarySerializeObject')
-          return res
-        }
+          this.profiler.scopedProfileSectionStart('process-dapp.binarySerializeObject', false);
+          const res = application.binarySerializeObject(identifier, obj);
+          this.profiler.scopedProfileSectionEnd('process-dapp.binarySerializeObject');
+          return res;
+        };
       } else {
-        console.log('binarySerializeObject not implemented')
+        console.log('binarySerializeObject not implemented');
         applicationInterfaceImpl.binarySerializeObject = (identifier: string, obj: any): Buffer => {
-          return Buffer.from(Utils.safeStringify(obj), 'utf8')
-        }
+          return Buffer.from(Utils.safeStringify(obj), 'utf8');
+        };
       }
       if (typeof application.binaryDeserializeObject === 'function') {
         applicationInterfaceImpl.binaryDeserializeObject = (identifier: AppObjEnum, buffer: Buffer): any => {
-          this.profiler.scopedProfileSectionStart('process-dapp.binaryDeserializeObject', false)
-          const res = application.binaryDeserializeObject(identifier, buffer)
-          this.profiler.scopedProfileSectionEnd('process-dapp.binaryDeserializeObject')
-          return res
-        }
+          this.profiler.scopedProfileSectionStart('process-dapp.binaryDeserializeObject', false);
+          const res = application.binaryDeserializeObject(identifier, buffer);
+          this.profiler.scopedProfileSectionEnd('process-dapp.binaryDeserializeObject');
+          return res;
+        };
       } else {
-        console.log('binaryDeserializeObject not implemented')
+        console.log('binaryDeserializeObject not implemented');
         applicationInterfaceImpl.binaryDeserializeObject = (identifier: string, buffer: Buffer): any => {
-          return Utils.safeJsonParse(buffer.toString('utf8'))
-        }
+          return Utils.safeJsonParse(buffer.toString('utf8'));
+        };
       }
       if (typeof application.getTxSenderAddress === 'function') {
-        applicationInterfaceImpl.getTxSenderAddress = (tx) => application.getTxSenderAddress(tx)
+        applicationInterfaceImpl.getTxSenderAddress = (tx) => application.getTxSenderAddress(tx);
       }
       if (typeof application.injectTxToConsensor === 'function') {
-        applicationInterfaceImpl.injectTxToConsensor = (consensor, tx) => application.injectTxToConsensor(consensor, tx)
+        applicationInterfaceImpl.injectTxToConsensor = (consensor, tx) =>
+          application.injectTxToConsensor(consensor, tx);
       }
-      if (typeof application.getNonceFromTx === "function") {
+      if (typeof application.getNonceFromTx === 'function') {
         applicationInterfaceImpl.getNonceFromTx = (tx) => application.getNonceFromTx(tx);
       }
-      if (typeof application.getAccountNonce === "function") {
+      if (typeof application.getAccountNonce === 'function') {
         applicationInterfaceImpl.getAccountNonce = (accountId) => application.getAccountNonce(accountId);
       }
     } catch (ex) {
       this.shardus_fatal(
         `getAppInterface_ex`,
         `Required application interface not implemented. Exception: ${ex}`
-      )
-      this.fatalLogger.fatal('_getApplicationInterface: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      throw new Error(ex)
+      );
+      this.fatalLogger.fatal('_getApplicationInterface: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack);
+      throw new Error(ex);
     }
-    if (logFlags.debug) this.mainLogger.debug('End of _getApplicationInterfaces()')
+    if (logFlags.debug) this.mainLogger.debug('End of _getApplicationInterfaces()');
 
     // At this point, we have validated all the fields so a cast is appropriate
-    return applicationInterfaceImpl as ShardusTypes.App
+    return applicationInterfaceImpl as ShardusTypes.App;
   }
 
   /**
@@ -2732,27 +2819,27 @@ class Shardus extends EventEmitter {
   _registerRoutes() {
     // DEBUG routes
     this.network.registerExternalPost('exit', isDebugModeMiddlewareHigh, async (req, res) => {
-      res.send({ success: true })
-      await this.shutdown()
-    })
+      res.send({ success: true });
+      await this.shutdown();
+    });
     // TODO elevate security beyond high when we get multi sig.  or is that too slow when needed?
     this.network.registerExternalPost('exit-apop', isDebugModeMiddlewareHigh, async (req, res) => {
-      apoptosizeSelf('Apoptosis called at exit-apop route')
-      res.send({ success: true })
-    })
+      apoptosizeSelf('Apoptosis called at exit-apop route');
+      res.send({ success: true });
+    });
 
     this.network.registerExternalGet('config', isDebugModeMiddlewareLow, async (req, res) => {
-      res.send({ config: this.config })
-    })
+      res.send({ config: this.config });
+    });
     this.network.registerExternalGet('netconfig', async (req, res) => {
-      res.send({ config: netConfig })
-    })
+      res.send({ config: netConfig });
+    });
 
     this.network.registerExternalGet('nodeInfo', async (req, res) => {
-      let reportIntermediateStatus = req.query.reportIntermediateStatus === 'true'
-      const nodeInfo = Self.getPublicNodeInfo(reportIntermediateStatus)
-      const appData = this.app.getNodeInfoAppData()
-      let result = { nodeInfo: { ...nodeInfo, appData } } as any
+      let reportIntermediateStatus = req.query.reportIntermediateStatus === 'true';
+      const nodeInfo = Self.getPublicNodeInfo(reportIntermediateStatus);
+      const appData = this.app.getNodeInfoAppData();
+      let result = { nodeInfo: { ...nodeInfo, appData } } as any;
       if (isDebugMode() && req.query.debug === 'true') {
         result.debug = {
           queriedWhen: new Date().toISOString(),
@@ -2764,13 +2851,13 @@ class Shardus extends EventEmitter {
           currentCycleMarker: CycleChain.getCurrentCycleMarker() ?? null,
           newestCycle: CycleChain.getNewest() ?? null,
           lostArchiversMap: lostArchiversMap,
-        }
+        };
       }
-      res.send(result)
-    })
+      res.send(result);
+    });
 
     this.network.registerExternalGet('joinInfo', isDebugModeMiddlewareMedium, async (req, res) => {
-      const nodeInfo = Self.getPublicNodeInfo(true)
+      const nodeInfo = Self.getPublicNodeInfo(true);
       let result = {
         respondedWhen: new Date().toISOString(),
         //Note we can't convert to shardusGetTime because process.uptime() uses Date.now() internally
@@ -2786,123 +2873,123 @@ class Shardus extends EventEmitter {
         getStandbyListHash: JoinV2.getStandbyListHash(),
         getLastHashedStandbyList: JoinV2.getLastHashedStandbyList(),
         getSortedStandbyNodeList: JoinV2.getSortedStandbyJoinRequests(),
-      }
-      res.send(deepReplace(result, undefined, '__undefined__'))
-    })
+      };
+      res.send(deepReplace(result, undefined, '__undefined__'));
+    });
 
     this.network.registerExternalGet('standby-list-debug', isDebugModeMiddlewareLow, async (req, res) => {
-      let getSortedStandbyNodeList = JoinV2.getSortedStandbyJoinRequests()
+      let getSortedStandbyNodeList = JoinV2.getSortedStandbyJoinRequests();
       let result = getSortedStandbyNodeList.map((node) => ({
         pubKey: node.nodeInfo.publicKey,
         ip: node.nodeInfo.externalIp,
         port: node.nodeInfo.externalPort,
-      }))
-      res.send(result)
-    })
+      }));
+      res.send(result);
+    });
 
     this.network.registerExternalGet('status-history', isDebugModeMiddlewareLow, async (req, res) => {
-      let result = Self.getStatusHistoryCopy()
-      res.send(deepReplace(result, undefined, '__undefined__'))
-    })
+      let result = Self.getStatusHistoryCopy();
+      res.send(deepReplace(result, undefined, '__undefined__'));
+    });
 
     this.network.registerExternalGet('socketReport', isDebugModeMiddlewareLow, async (req, res) => {
-      res.send(await getSocketReport())
-    })
+      res.send(await getSocketReport());
+    });
     this.network.registerExternalGet('forceCycleSync', isDebugModeMiddleware, async (req, res) => {
-      let enable = req.query.enable === 'true' || false
-      config.p2p.hackForceCycleSyncComplete = enable
-      res.send(await getSocketReport())
-    })
+      let enable = req.query.enable === 'true' || false;
+      config.p2p.hackForceCycleSyncComplete = enable;
+      res.send(await getSocketReport());
+    });
 
     this.p2p.registerInternal(
       'sign-app-data',
       async (
         payload: {
-          type: string
-          nodesToSign: string
-          hash: string
-          appData: any
+          type: string;
+          nodesToSign: string;
+          hash: string;
+          appData: any;
         },
         respond: (arg0: any) => any
       ) => {
-        const { type, nodesToSign, hash, appData } = payload
-        const { success, signature } = await this.app.signAppData?.(type, hash, Number(nodesToSign), appData)
+        const { type, nodesToSign, hash, appData } = payload;
+        const { success, signature } = await this.app.signAppData?.(type, hash, Number(nodesToSign), appData);
 
-        await respond({ success, signature })
+        await respond({ success, signature });
       }
-    )
+    );
 
     const signAppDataBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_sign_app_data,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       handler: async (payload, respond, header, sign) => {
-        const route = InternalRouteEnum.binary_sign_app_data
-        nestedCountersInstance.countEvent('internal', route)
-        this.profiler.scopedProfileSectionStart(route)
+        const route = InternalRouteEnum.binary_sign_app_data;
+        nestedCountersInstance.countEvent('internal', route);
+        this.profiler.scopedProfileSectionStart(route);
         const errorHandler = (
           errorType: RequestErrorEnum,
           opts?: { customErrorLog?: string; customCounterSuffix?: string }
-        ): void => requestErrorHandler(route, errorType, header, opts)
+        ): void => requestErrorHandler(route, errorType, header, opts);
         try {
-          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cSignAppDataReq)
+          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cSignAppDataReq);
           if (!requestStream) {
-            errorHandler(RequestErrorEnum.InvalidRequest)
-            respond({ success: false, signature: { owner: '', sig: '' } }, serializeSignAppDataResp)
-            return
+            errorHandler(RequestErrorEnum.InvalidRequest);
+            respond({ success: false, signature: { owner: '', sig: '' } }, serializeSignAppDataResp);
+            return;
           }
 
-          const request: SignAppDataReq = deserializeSignAppDataReq(requestStream)
-          const { type, nodesToSign, hash, appData } = request
+          const request: SignAppDataReq = deserializeSignAppDataReq(requestStream);
+          const { type, nodesToSign, hash, appData } = request;
           const { success, signature } = await this.app.signAppData?.(
             type,
             hash,
             Number(nodesToSign),
             appData
-          )
-          const response = { success: success, signature: signature } as SignAppDataResp
-          respond(response, serializeSignAppDataResp)
+          );
+          const response = { success: success, signature: signature } as SignAppDataResp;
+          respond(response, serializeSignAppDataResp);
         } catch (err) {
-          nestedCountersInstance.countEvent('internal', `${route}-exception`)
-          this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(err)}`)
-          respond({ success: false, signature: { owner: '', sig: '' } }, serializeSignAppDataResp)
+          nestedCountersInstance.countEvent('internal', `${route}-exception`);
+          this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(err)}`);
+          respond({ success: false, signature: { owner: '', sig: '' } }, serializeSignAppDataResp);
         } finally {
-          this.profiler.scopedProfileSectionEnd(route)
+          this.profiler.scopedProfileSectionEnd(route);
         }
       },
-    }
+    };
 
-    this.p2p.registerInternalBinary(signAppDataBinaryHandler.name, signAppDataBinaryHandler.handler)
+    this.p2p.registerInternalBinary(signAppDataBinaryHandler.name, signAppDataBinaryHandler.handler);
 
     // FOR internal testing. NEEDS to be removed for security purposes
     this.network.registerExternalPost('testGlobalAccountTX', isDebugModeMiddleware, async (req, res) => {
       try {
-        this.mainLogger.debug(`testGlobalAccountTX: req:${utils.stringifyReduce(req.body)}`)
-        const tx = req.body.tx
-        this.put(tx, false, true)
-        res.send({ success: true })
+        this.mainLogger.debug(`testGlobalAccountTX: req:${utils.stringifyReduce(req.body)}`);
+        const tx = req.body.tx;
+        this.put(tx, false, true);
+        res.send({ success: true });
       } catch (ex) {
-        this.mainLogger.debug('testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.mainLogger.debug('testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack);
         this.shardus_fatal(
           `registerExternalPost_ex`,
           'testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack
-        )
+        );
       }
-    })
+    });
 
     this.network.registerExternalPost('testGlobalAccountTXSet', isDebugModeMiddleware, async (req, res) => {
       try {
-        this.mainLogger.debug(`testGlobalAccountTXSet: req:${utils.stringifyReduce(req.body)}`)
-        const tx = req.body.tx
-        this.put(tx, true, true)
-        res.send({ success: true })
+        this.mainLogger.debug(`testGlobalAccountTXSet: req:${utils.stringifyReduce(req.body)}`);
+        const tx = req.body.tx;
+        this.put(tx, true, true);
+        res.send({ success: true });
       } catch (ex) {
-        this.mainLogger.debug('testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.mainLogger.debug('testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack);
         this.shardus_fatal(
           `registerExternalPost2_ex`,
           'testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack
-        )
+        );
       }
-    })
+    });
   }
 
   /**
@@ -2910,35 +2997,35 @@ class Shardus extends EventEmitter {
    */
   registerExceptionHandler() {
     const logFatalAndExit = (err) => {
-      console.log('Encountered a fatal error. Check fatal log for details.')
+      console.log('Encountered a fatal error. Check fatal log for details.');
       this.shardus_fatal(
         `unhandledRejection_ex_` + err.stack.substring(0, 100),
         'unhandledRejection: ' + err.stack
-      )
+      );
       // this.exitHandler.exitCleanly()
 
       // If the networks active node count is < some percentage of minNodes, don't exit on exceptions and log a counter instead
       if (config.p2p.continueOnException === true) {
-        const activeNodes = activeByIdOrder
-        const minNodesToExit = config.p2p.baselineNodes * config.p2p.minNodesPerctToAllowExitOnException
+        const activeNodes = activeByIdOrder;
+        const minNodesToExit = config.p2p.baselineNodes * config.p2p.minNodesPerctToAllowExitOnException;
         if (activeNodes.length < minNodesToExit) {
           // Log a counter to say node is not going to apoptosize
-          const msg = `Not enough active nodes to exit on exception. Active nodes: ${activeNodes.length}, minNodesToExit: ${minNodesToExit}, baselineNodes: ${config.p2p.baselineNodes}, minNodesPerctToAllowExitOnException: ${config.p2p.minNodesPerctToAllowExitOnException}`
-          this.mainLogger.warn(msg)
-          nestedCountersInstance.countEvent('continueOnException', msg)
-          return
+          const msg = `Not enough active nodes to exit on exception. Active nodes: ${activeNodes.length}, minNodesToExit: ${minNodesToExit}, baselineNodes: ${config.p2p.baselineNodes}, minNodesPerctToAllowExitOnException: ${config.p2p.minNodesPerctToAllowExitOnException}`;
+          this.mainLogger.warn(msg);
+          nestedCountersInstance.countEvent('continueOnException', msg);
+          return;
         }
       }
 
-      this.mainLogger.info(`exitUncleanly: logFatalAndExit`)
-      this.exitHandler.exitUncleanly('Unhandled Exception', err.message)
-    }
+      this.mainLogger.info(`exitUncleanly: logFatalAndExit`);
+      this.exitHandler.exitUncleanly('Unhandled Exception', err.message);
+    };
     process.on('uncaughtException', (err) => {
-      logFatalAndExit(err)
-    })
+      logFatalAndExit(err);
+    });
     process.on('unhandledRejection', (err) => {
-      logFatalAndExit(err)
-    })
+      logFatalAndExit(err);
+    });
   }
 
   /**
@@ -2967,62 +3054,63 @@ class Shardus extends EventEmitter {
   // }
 
   async updateConfigChangeQueue(account: ShardusTypes.WrappedData, lastCycle: ShardusTypes.Cycle) {
-    if (account == null || lastCycle == null) return
+    if (account == null || lastCycle == null) return;
 
     // @ts-ignore // TODO where is listOfChanges coming from here? I don't think it should exist on data
     let changes = account.data.listOfChanges as {
-      cycle: number
-      change: any
-      appData: any
-    }[]
+      cycle: number;
+      change: any;
+      appData: any;
+    }[];
     if (!changes || !Array.isArray(changes)) {
       //this may get logged if we have a changeListGlobalAccount that does not have config settings on it.
       //The fix is to let the dapp set the global account to use for this
       // this.mainLogger.error(
       //   `Invalid changes in global account ${changeListGlobalAccount}`
       // )
-      return
+      return;
     }
-    const activeConfigChanges = new Set<string>()
+    const activeConfigChanges = new Set<string>();
     for (let change of changes) {
       //skip future changes
       if (change.cycle > lastCycle.counter) {
-        continue
+        continue;
       }
-      const changeHash = this.crypto.hash(change)
+      const changeHash = this.crypto.hash(change);
       //skip handled changes
       if (this.appliedConfigChanges.has(changeHash)) {
-        activeConfigChanges.add(changeHash)
-        continue
+        activeConfigChanges.add(changeHash);
+        continue;
       }
       //apply this change
-      this.appliedConfigChanges.add(changeHash)
-      activeConfigChanges.add(changeHash)
-      let changeObj = change.change
-      let appData = change.appData
+      this.appliedConfigChanges.add(changeHash);
+      activeConfigChanges.add(changeHash);
+      let changeObj = change.change;
+      let appData = change.appData;
 
       // If there is initShutdown change, if the latest cycle is greater than the cycle of the change, then skip it
-      if (changeObj['p2p'] && changeObj['p2p']['initShutdown'] && change.cycle !== lastCycle.counter) continue
+      if (changeObj['p2p'] && changeObj['p2p']['initShutdown'] && change.cycle !== lastCycle.counter)
+        continue;
 
-      this.patchObject(this.config, changeObj, appData)
+      this.patchObject(this.config, changeObj, appData);
 
-      const prunedData: WrappedData[] = await this.app.pruneNetworkChangeQueue(account, lastCycle.counter)
-      await this.stateManager.checkAndSetAccountData(prunedData, 'global network account update', true)
+      const prunedData: WrappedData[] = await this.app.pruneNetworkChangeQueue(account, lastCycle.counter);
+      await this.stateManager.checkAndSetAccountData(prunedData, 'global network account update', true);
 
       if (appData) {
-        const data: WrappedData[] = await this.app.updateNetworkChangeQueue(account, appData)
-        await this.stateManager.checkAndSetAccountData(data, 'global network account update', true)
+        const data: WrappedData[] = await this.app.updateNetworkChangeQueue(account, appData);
+        await this.stateManager.checkAndSetAccountData(data, 'global network account update', true);
       }
 
-      this.p2p.configUpdated()
-      this.loadDetection.configUpdated()
-      this.rateLimiting.configUpdated()
+      this.p2p.configUpdated();
+      this.loadDetection.configUpdated();
+      this.rateLimiting.configUpdated();
     }
     if (activeConfigChanges.size > 0) {
       // clear the entries from appliedConfigChanges that are no longer in the changes list
       for (let changeHash of this.appliedConfigChanges) {
         if (!activeConfigChanges.has(changeHash)) {
-          this.appliedConfigChanges.delete(changeHash)
+          this.appliedConfigChanges.delete(changeHash);
         }
       }
     }
@@ -3033,14 +3121,14 @@ class Shardus extends EventEmitter {
       if (existingObject[key] != null) {
         /* handle dev key rotation where both keys and values are required */
         if (key === 'devPublicKeys') {
-          existingObject[key] = value
-          this.mainLogger.info(`patched ${key} to ${value}`)
+          existingObject[key] = value;
+          this.mainLogger.info(`patched ${key} to ${value}`);
         } else if (typeof value === 'object') {
-          this.patchObject(existingObject[key], value, appData)
+          this.patchObject(existingObject[key], value, appData);
         } else {
-          existingObject[key] = value
-          this.mainLogger.info(`patched ${key} to ${value}`)
-          nestedCountersInstance.countEvent('config', `patched ${key} to ${value}`)
+          existingObject[key] = value;
+          this.mainLogger.info(`patched ${key} to ${value}`);
+          nestedCountersInstance.countEvent('config', `patched ${key} to ${value}`);
         }
       }
     }
@@ -3051,83 +3139,83 @@ class Shardus extends EventEmitter {
    * @param lastCycle
    */
   updateDebug(lastCycle: ShardusTypes.Cycle) {
-    if (lastCycle == null) return
-    let countEndpointStart = this.config?.debug?.countEndpointStart
-    let countEndpointStop = this.config?.debug?.countEndpointStop
+    if (lastCycle == null) return;
+    let countEndpointStart = this.config?.debug?.countEndpointStart;
+    let countEndpointStop = this.config?.debug?.countEndpointStop;
 
     if (countEndpointStart == null || countEndpointStart < 0) {
-      return
+      return;
     }
 
     //reset counters
     if (countEndpointStart === lastCycle.counter) {
       //nestedCountersInstance.resetCounters()
       //nestedCountersInstance.resetRareCounters()
-      profilerInstance.clearScopedTimes()
+      profilerInstance.clearScopedTimes();
 
       if (countEndpointStop === -1 || countEndpointStop <= countEndpointStart || countEndpointStop == null) {
-        this.config.debug.countEndpointStop = countEndpointStart + 2
+        this.config.debug.countEndpointStop = countEndpointStart + 2;
       }
     }
 
     if (countEndpointStop === lastCycle.counter && countEndpointStop != null) {
       //nestedCountersInstance.resetRareCounters()
       //convert a scoped report into rare counter report blob
-      let scopedReport = profilerInstance.scopedTimesDataReport()
-      scopedReport.cycle = lastCycle.counter
-      scopedReport.node = `${Self.ip}:${Self.port}`
-      scopedReport.id = utils.makeShortHash(Self.id)
-      nestedCountersInstance.countRareEvent('scopedTimeReport', Utils.safeStringify(scopedReport))
+      let scopedReport = profilerInstance.scopedTimesDataReport();
+      scopedReport.cycle = lastCycle.counter;
+      scopedReport.node = `${Self.ip}:${Self.port}`;
+      scopedReport.id = utils.makeShortHash(Self.id);
+      nestedCountersInstance.countRareEvent('scopedTimeReport', Utils.safeStringify(scopedReport));
     }
   }
 
   setGlobal(address, value, when, source) {
-    GlobalAccounts.setGlobal(address, value, when, source)
+    GlobalAccounts.setGlobal(address, value, when, source);
   }
 
   getDebugModeMiddleware() {
-    return isDebugModeMiddleware
+    return isDebugModeMiddleware;
   }
   getDebugModeMiddlewareLow() {
-    return isDebugModeMiddlewareLow
+    return isDebugModeMiddlewareLow;
   }
   getDebugModeMiddlewareMedium() {
-    return isDebugModeMiddlewareMedium
+    return isDebugModeMiddlewareMedium;
   }
   getDebugModeMiddlewareHigh() {
-    return isDebugModeMiddlewareHigh
+    return isDebugModeMiddlewareHigh;
   }
 
   getDebugModeMiddlewareMultiSig() {
-    return isDebugModeMiddlewareMultiSig
+    return isDebugModeMiddlewareMultiSig;
   }
 
   shardus_fatal(key, log, log2 = null) {
-    nestedCountersInstance.countEvent('fatal-log', key)
+    nestedCountersInstance.countEvent('fatal-log', key);
 
     if (log2 != null) {
-      this.fatalLogger.fatal(log, log2)
+      this.fatalLogger.fatal(log, log2);
     } else {
-      this.fatalLogger.fatal(log)
+      this.fatalLogger.fatal(log);
     }
   }
 
   monitorEvent(category: string, name: string, count: number, message: string) {
-    nestedCountersInstance.countEvent(category, name, count)
+    nestedCountersInstance.countEvent(category, name, count);
 
     if (logFlags.verbose) {
       this.mainLogger.info(`Event received with info: {
         eventCategory: ${category},
         eventName: ${name},
         eventMessage: ${count},
-      }`)
+      }`);
     }
 
-    this.statistics.countEvent(category, name, count, message)
+    this.statistics.countEvent(category, name, count, message);
   }
 
   setMemoryLimit(topic: string, cacheCountLimit: number) {
-    this.stateManager.cachedAppDataManager.setMemoryLimit(topic, cacheCountLimit)
+    this.stateManager.cachedAppDataManager.setMemoryLimit(topic, cacheCountLimit);
   }
 
   async getAppDataSignatures(
@@ -3137,13 +3225,13 @@ class Shardus extends EventEmitter {
     appData: any,
     allowedBackupNodes: number = 0
   ): Promise<ShardusTypes.GetAppDataSignaturesResult> {
-    const closestNodesIds = this.getClosestNodes(hash, nodesToSign + allowedBackupNodes)
+    const closestNodesIds = this.getClosestNodes(hash, nodesToSign + allowedBackupNodes);
 
-    const filterNodeIds = closestNodesIds.filter((id) => id !== Self.id)
+    const filterNodeIds = closestNodesIds.filter((id) => id !== Self.id);
 
-    const closestNodes = filterNodeIds.map((nodeId) => this.p2p.state.getNode(nodeId))
+    const closestNodes = filterNodeIds.map((nodeId) => this.p2p.state.getNode(nodeId));
 
-    let responses = []
+    let responses = [];
     if (filterNodeIds.length > 0) {
       const groupPromiseResp = await groupResolvePromises(
         closestNodes.map((node) => {
@@ -3153,7 +3241,7 @@ class Shardus extends EventEmitter {
               hash,
               nodesToSign,
               appData,
-            }
+            };
             return this.p2p.askBinary<SignAppDataReq, SignAppDataResp>(
               node,
               InternalRouteEnum.binary_sign_app_data,
@@ -3161,48 +3249,48 @@ class Shardus extends EventEmitter {
               serializeSignAppDataReq,
               deserializeSignAppDataResp,
               {}
-            )
+            );
           } else
             return this.p2p.ask(node, 'sign-app-data', {
               type,
               hash,
               nodesToSign,
               appData,
-            })
+            });
         }),
         (res) => {
-          if (res.success) return true
-          return false
+          if (res.success) return true;
+          return false;
         },
         allowedBackupNodes,
         Math.min(nodesToSign, filterNodeIds.length)
-      )
+      );
 
-      if (groupPromiseResp.success) responses = groupPromiseResp.wins
+      if (groupPromiseResp.success) responses = groupPromiseResp.wins;
       else
         return {
           success: groupPromiseResp.success,
           signatures: [],
-        }
+        };
     }
 
     if (closestNodesIds.includes(Self.id)) {
-      const { success, signature } = await this.app.signAppData?.(type, hash, Number(nodesToSign), appData)
+      const { success, signature } = await this.app.signAppData?.(type, hash, Number(nodesToSign), appData);
       /* prettier-ignore */ if (logFlags.p2pNonFatal && logFlags.console) console.log(success, signature)
-      responses = [...responses, ...[{ success, signature }]]
+      responses = [...responses, ...[{ success, signature }]];
     }
 
-    const signatures = responses.map(({ signature }) => signature)
-    if (logFlags.verbose) this.mainLogger.debug('Signatures for get signed app data request', signatures)
+    const signatures = responses.map(({ signature }) => signature);
+    if (logFlags.verbose) this.mainLogger.debug('Signatures for get signed app data request', signatures);
 
     return {
       success: true,
       signatures: signatures,
-    }
+    };
   }
 
   isOnStandbyList(publicKey: string): boolean {
-    return JoinV2.isOnStandbyList(publicKey)
+    return JoinV2.isOnStandbyList(publicKey);
   }
 }
 
@@ -3210,23 +3298,23 @@ function deepReplace(obj: object | ArrayLike<any>, find: any, replace: any): any
   if (Array.isArray(obj)) {
     for (let i = 0; i < obj.length; i++) {
       if (obj[i] === find) {
-        obj[i] = replace
+        obj[i] = replace;
       } else if (typeof obj[i] === 'object' && obj[i] !== null) {
-        deepReplace(obj[i], find, replace)
+        deepReplace(obj[i], find, replace);
       }
     }
   } else if (typeof obj === 'object' && obj !== null) {
     for (const key in obj) {
       if (obj[key] === find) {
-        obj[key] = replace
+        obj[key] = replace;
       } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-        deepReplace(obj[key], find, replace)
+        deepReplace(obj[key], find, replace);
       }
     }
   }
-  return obj
+  return obj;
 }
 
 // tslint:disable-next-line: no-default-export
-export default Shardus
-export * as ShardusTypes from '../shardus/shardus-types'
+export default Shardus;
+export * as ShardusTypes from '../shardus/shardus-types';

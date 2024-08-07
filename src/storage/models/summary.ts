@@ -1,4 +1,4 @@
-import { SQLDataTypes } from '../utils/schemaDefintions'
+import { SQLDataTypes } from '../utils/schemaDefintions';
 
 const summary = [
   'summary',
@@ -7,6 +7,6 @@ const summary = [
     cycleNumber: { type: SQLDataTypes.STRING, allowNull: false, unique: 'compositeIndex' },
     hash: { type: SQLDataTypes.STRING, allowNull: false },
   },
-]
+];
 
-export default summary
+export default summary;

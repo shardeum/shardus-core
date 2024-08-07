@@ -1,13 +1,13 @@
-import { Logger } from 'log4js'
-import { P2P } from '@shardus/types'
-import * as Snapshot from '../snapshot'
-import * as Comms from './Comms'
-import * as Context from './Context'
-import * as Self from './Self'
+import { Logger } from 'log4js';
+import { P2P } from '@shardus/types';
+import * as Snapshot from '../snapshot';
+import * as Comms from './Comms';
+import * as Context from './Context';
+import * as Self from './Self';
 
 /** STATE */
 
-let p2pLogger: Logger
+let p2pLogger: Logger;
 
 /** ROUTES */
 
@@ -22,9 +22,9 @@ const routes = {
 }
 */
 
-let cycleNumberForNetworkDataHash: number = 0
-let cycleNumberForNetworkReceiptHash: number = 0
-let cycleNumberForNetworkSummaryHash: number = 0
+let cycleNumberForNetworkDataHash: number = 0;
+let cycleNumberForNetworkReceiptHash: number = 0;
+let cycleNumberForNetworkSummaryHash: number = 0;
 
 /** FUNCTIONS */
 
@@ -37,10 +37,10 @@ let cycleNumberForNetworkSummaryHash: number = 0
 
 export function init() {
   // Init logger
-  p2pLogger = Context.logger.getLogger('p2p')
+  p2pLogger = Context.logger.getLogger('p2p');
 
   // Init state
-  reset()
+  reset();
 
   // Register routes
   /*
@@ -56,11 +56,11 @@ export function init() {
 export function reset() {}
 
 export function getTxs(): P2P.SafetyModeTypes.Txs {
-  return
+  return;
 }
 
 export function dropInvalidTxs(txs: P2P.SafetyModeTypes.Txs): P2P.SafetyModeTypes.Txs {
-  return
+  return;
 }
 
 /*
@@ -74,15 +74,15 @@ export function updateRecord(
   // If you're the first node
   if (Self.isFirst) {
     // Get saftey mode field values from snapshot
-    Object.assign(record, Snapshot.safetyModeVals)
+    Object.assign(record, Snapshot.safetyModeVals);
   }
   // If you're not the first node
   else {
     // Just copy the safety mode, safteyNum, and networkStateHash vals for now
     if (prev) {
-      record.safetyMode = prev.safetyMode
-      record.safetyNum = prev.safetyNum
-      record.networkStateHash = prev.networkStateHash
+      record.safetyMode = prev.safetyMode;
+      record.safetyNum = prev.safetyNum;
+      record.networkStateHash = prev.networkStateHash;
     }
   }
 
@@ -92,61 +92,61 @@ export function updateRecord(
    */
   if (record.safetyMode === true && prev) {
     if (prev.active >= prev.safetyNum) {
-      record.safetyMode = false
+      record.safetyMode = false;
     }
   }
 
-  const stateHashes = Snapshot.getStateHashes(cycleNumberForNetworkDataHash)
+  const stateHashes = Snapshot.getStateHashes(cycleNumberForNetworkDataHash);
   if (stateHashes && stateHashes.length > 0) {
     record.networkDataHash = stateHashes.map((stateHash) => {
       return {
         cycle: stateHash.counter,
         hash: stateHash.networkHash,
-      }
-    })
+      };
+    });
     if (record.networkDataHash.length > 0) {
-      cycleNumberForNetworkDataHash = record.networkDataHash[record.networkDataHash.length - 1].cycle + 1
+      cycleNumberForNetworkDataHash = record.networkDataHash[record.networkDataHash.length - 1].cycle + 1;
     }
   } else {
-    record.networkDataHash = []
+    record.networkDataHash = [];
   }
 
-  const receiptHashes = Snapshot.getReceiptHashes(cycleNumberForNetworkReceiptHash)
+  const receiptHashes = Snapshot.getReceiptHashes(cycleNumberForNetworkReceiptHash);
   if (receiptHashes && receiptHashes.length > 0) {
     record.networkReceiptHash = receiptHashes.map((receiptHash) => {
       return {
         cycle: receiptHash.counter,
         hash: receiptHash.networkReceiptHash,
-      }
-    })
+      };
+    });
     if (record.networkReceiptHash.length > 0) {
       cycleNumberForNetworkReceiptHash =
-        record.networkReceiptHash[record.networkReceiptHash.length - 1].cycle + 1
+        record.networkReceiptHash[record.networkReceiptHash.length - 1].cycle + 1;
     }
   } else {
-    record.networkReceiptHash = []
+    record.networkReceiptHash = [];
   }
 
-  const summaryHashes = Snapshot.getSummaryHashes(cycleNumberForNetworkSummaryHash)
+  const summaryHashes = Snapshot.getSummaryHashes(cycleNumberForNetworkSummaryHash);
   if (summaryHashes && summaryHashes.length > 0) {
     record.networkSummaryHash = summaryHashes.map((stateHash) => {
       return {
         cycle: stateHash.counter,
         hash: stateHash.networkSummaryHash,
-      }
-    })
+      };
+    });
     if (record.networkSummaryHash.length > 0) {
       cycleNumberForNetworkSummaryHash =
-        record.networkSummaryHash[record.networkSummaryHash.length - 1].cycle + 1
+        record.networkSummaryHash[record.networkSummaryHash.length - 1].cycle + 1;
     }
   } else {
-    record.networkSummaryHash = []
+    record.networkSummaryHash = [];
   }
 }
 
 export function validateRecordTypes(rec: P2P.SafetyModeTypes.Record): string {
   // [TODO] Implement actual validation
-  return ''
+  return '';
 }
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
@@ -154,7 +154,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
     added: [],
     removed: [],
     updated: [],
-  }
+  };
 }
 
 export function queueRequest(request) {}

@@ -1,44 +1,44 @@
-import { shardusGetTime } from '../../network'
+import { shardusGetTime } from '../../network';
 
 export const sleep = (ms): Promise<void> => {
   return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
-}
+    setTimeout(resolve, ms);
+  });
+};
 
 /** Be very careful this uses shardusGetTime() the timetamp passed in must repect this */
 export const getTime = (format = 'ms'): number => {
-  let time
+  let time;
   switch (format) {
     case 'ms':
-      time = shardusGetTime()
-      break
+      time = shardusGetTime();
+      break;
     case 's':
-      time = Math.floor(shardusGetTime() / 1000)
-      break
+      time = Math.floor(shardusGetTime() / 1000);
+      break;
     default:
-      throw Error('Error: Invalid format given.')
+      throw Error('Error: Invalid format given.');
   }
-  return time
-}
+  return time;
+};
 
 /** Be very careful this uses shardusGetTime() the timetamp passed in must repect this */
 export const setAlarm = (callback, timestamp): void => {
-  const now = shardusGetTime()
+  const now = shardusGetTime();
   if (timestamp <= now) {
-    callback()
-    return
+    callback();
+    return;
   }
-  const toWait = timestamp - now
-  setTimeout(callback, toWait)
-}
+  const toWait = timestamp - now;
+  setTimeout(callback, toWait);
+};
 
 export function inRangeOfCurrentTime(timestamp: number, before: number, after: number): boolean {
-  const currentTime = shardusGetTime()
+  const currentTime = shardusGetTime();
   if (timestamp - currentTime <= after) {
     if (currentTime - timestamp <= before) {
-      return true
+      return true;
     }
   }
-  return false
+  return false;
 }
