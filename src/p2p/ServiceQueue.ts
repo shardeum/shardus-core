@@ -110,7 +110,6 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
   }
 }
 
-
 const routes = {
   external: [],
   internal: [],
@@ -204,13 +203,15 @@ export function sendRequests(): void {
 
 export function registerBeforeAddVerifier(
   type: string,
-  verifier: (txData: OpaqueTransaction) => Promise<boolean>) {
+  verifier: (txData: OpaqueTransaction) => Promise<boolean>
+): void {
   beforeAddVerifier.set(type, verifier)
 }
 
 export function registerApplyVerifier(
   type: string,
-  verifier: (txData: OpaqueTransaction) => Promise<boolean>) {
+  verifier: (txData: OpaqueTransaction) => Promise<boolean>
+): void {
   applyVerifier.set(type, verifier)
 }
 
@@ -307,7 +308,7 @@ export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
     if (!applyVerifier.has(listEntry.tx.type)) {
       // todo: should this throw or not?
       warn('Remove network tx without a verify function!')
-    } else if (!await applyVerifier.get(listEntry.tx.type)(listEntry.tx.txData)) {
+    } else if (!(await applyVerifier.get(listEntry.tx.type)(listEntry.tx.txData))) {
       error(`Failed remove network tx verification of type ${listEntry.tx.type} \n
                      tx: ${stringifyReduce(listEntry.tx.txData)}`)
       return false
@@ -369,7 +370,7 @@ export async function processNetworkTransactions(): Promise<void> {
           makeRemoveNetworkTxProposals(removeTx)
         }
       }
-    } catch (e){
+    } catch (e) {
       // eslint-disable-next-line security/detect-object-injection
       error(`Failed to process network transaction ${txList[i]?.hash}: ${e instanceof Error ? e.stack : e}`)
     }
