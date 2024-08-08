@@ -15,8 +15,11 @@ import { getFromArchiver } from './Archivers'
 import { Result } from 'neverthrow'
 import { getRandomAvailableArchiver } from './Utils'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import rfdc from 'rfdc'
 
 /** STATE */
+
+const clone = rfdc()
 
 let p2pLogger: Logger
 let txList: Array<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }> = []
@@ -176,7 +179,29 @@ export function updateRecord(
 ): void {
   record.txadd = txAdd
   record.txremove = txRemove
-  record.txlisthash = crypto.hash(txList)
+
+  // we need to get the hash of the txlist after the txadd and txremove
+  // but we dont want to alter the txList, so we make a copy
+  const txListCopy = clone(txList)
+
+  for (const txadd of record.txadd) {
+    const txHash = crypto.hash(txadd.txData)
+    sortedInsert(txListCopy, {
+      hash: txHash,
+      tx: { txData: txadd.txData, type: txadd.type, cycle: txadd.cycle },
+    })
+  }
+
+  for (const txremove of record.txremove) {
+    const index = txListCopy.findIndex((entry) => entry.hash === txremove.txHash)
+    if (index === -1) {
+      error(`updateRecord: TxHash ${txremove.txHash} does not exist in txListCopy`)
+    } else {
+      txListCopy.splice(index, 1)
+    }
+  }
+
+  record.txlisthash = crypto.hash(txListCopy)
 }
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
