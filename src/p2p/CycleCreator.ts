@@ -505,8 +505,6 @@ async function runQ1() {
 
   if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 
-  ServiceQueue.processNetworkTransactions()
-
   const SECOND = 1000
   const cycleDuration = record.duration * SECOND
   const quarterDuration = cycleDuration / 4
@@ -630,6 +628,8 @@ async function runQ3() {
 
   // Gossip your cert for this cycle with the network
   gossipMyCycleCert()
+
+  ServiceQueue.processNetworkTransactions()
 
   profilerInstance.profileSectionEnd('CycleCreator-runQ3')
 }
