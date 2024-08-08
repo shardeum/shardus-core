@@ -59,6 +59,12 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
       /* prettier-ignore */ if (logFlags.error) warn('gossip-addtx: Got request from unknown node')
       return
     }
+
+    const { sign, ...unsignedAddNetworkTx } = payload
+    if (txAdd.includes(unsignedAddNetworkTx)) {
+      return
+    }
+
     if (!crypto.verify(payload, payload.sign.owner)) {
       if (logFlags.console) console.log(`addTxGossipRoute(): signature invalid`, payload.sign.owner)
       /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `addTxGossipRoute(): signature invalid`)
@@ -66,8 +72,8 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
     }
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
-      const { sign, ...txDataWithoutSign } = payload
-      if (await _addNetworkTx(txDataWithoutSign)) {
+      if (await _addNetworkTx(unsignedAddNetworkTx)) {
+        txAdd.push(unsignedAddNetworkTx)
         Comms.sendGossip(
           'gossip-addtx',
           payload,
@@ -111,6 +117,12 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
       /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: Got request from unknown node')
       return
     }
+
+    const { sign, ...unsignedRemoveNetworkTx } = payload
+    if (txRemove.includes(unsignedRemoveNetworkTx)) {
+      return
+    }
+
     if (!crypto.verify(payload, payload.sign.owner)) {
       if (logFlags.console) console.log(`removeTxGossipRoute(): signature invalid`, payload.sign.owner)
       /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `removeTxGossipRoute(): signature invalid`)
@@ -118,8 +130,8 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
     }
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
-      const { sign, ...txDataWithoutSign } = payload
-      if (await _removeNetworkTx(txDataWithoutSign)) {
+      if (await _removeNetworkTx(unsignedRemoveNetworkTx)) {
+        txRemove.push(unsignedRemoveNetworkTx)
         Comms.sendGossip(
           'gossip-removetx',
           payload,
