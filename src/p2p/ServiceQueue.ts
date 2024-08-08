@@ -161,7 +161,7 @@ export function reset(): void {
   txRemove = []
 }
 
-export function getTxs(): any {
+export function getTxs(): P2P.ServiceQueueTypes.Txs {
   return {
     txadd: [...txAdd],
     txremove: [...txRemove],
