@@ -186,9 +186,15 @@ export function updateRecord(
 
   for (const txadd of record.txadd) {
     const txHash = crypto.hash(txadd.txData)
+    const { ...txDataWithoutSign } = txadd.txData
     sortedInsert(txListCopy, {
       hash: txHash,
-      tx: { txData: txadd.txData, type: txadd.type, cycle: txadd.cycle },
+      tx: {
+        txData: txDataWithoutSign,
+        type: txadd.type,
+        cycle: txadd.cycle,
+        ...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
+      },
     })
   }
 
@@ -208,7 +214,16 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   for (const txadd of record.txadd) {
     info(`Adding network tx of type ${txadd.type} and payload ${stringifyReduce(txadd.txData)}`)
     const txHash = crypto.hash(txadd.txData)
-    sortedInsert(txList, { hash: txHash, tx: { txData: txadd.txData, type: txadd.type, cycle: txadd.cycle } })
+    const { ...txDataWithoutSign } = txadd.txData
+    sortedInsert(txList, {
+      hash: txHash,
+      tx: {
+        txData: txDataWithoutSign,
+        type: txadd.type,
+        cycle: txadd.cycle,
+        ...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
+      },
+    })
   }
 
   for (const txremove of record.txremove) {
@@ -287,7 +302,7 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
       warn(`Invalid cycle ${addTx.cycle} for current cycle ${currentCycle}`)
       return false
     }
-    const { sign, ...txDataWithoutSign } = addTx.txData
+    const { ...txDataWithoutSign } = addTx.txData
     const txHash = crypto.hash(txDataWithoutSign)
     if (txList.some((entry) => entry.hash === txHash)) {
       if (logFlags.p2pNonFatal) {
