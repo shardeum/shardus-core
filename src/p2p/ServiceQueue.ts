@@ -208,7 +208,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   for (const txadd of record.txadd) {
     info(`Adding network tx of type ${txadd.type} and payload ${stringifyReduce(txadd.txData)}`)
     const txHash = crypto.hash(txadd.txData)
-    sortedInsert({ hash: txHash, tx: { txData: txadd.txData, type: txadd.type, cycle: txadd.cycle } })
+    sortedInsert(txList, { hash: txHash, tx: { txData: txadd.txData, type: txadd.type, cycle: txadd.cycle } })
   }
 
   for (const txremove of record.txremove) {
