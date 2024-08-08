@@ -274,10 +274,11 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
     }
 
     info(`Adding network tx of type ${addTx.type} and payload ${stringifyReduce(addTx.txData)}`)
+    const { sign, ...txDataWithoutSign } = addTx.txData
     sortedInsert({
       hash: txHash,
       tx: {
-        txData: addTx.txData,
+        txData: txDataWithoutSign,
         type: addTx.type,
         cycle: addTx.cycle,
         ...(addTx.subQueueKey && { subQueueKey: addTx.subQueueKey }),
