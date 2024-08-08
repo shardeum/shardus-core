@@ -246,8 +246,8 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
       warn(`Invalid cycle ${addTx.cycle} for current cycle ${currentCycle}`)
       return false
     }
-
-    const txHash = crypto.hash(addTx.txData)
+    const { sign, ...txDataWithoutSign } = addTx.txData
+    const txHash = crypto.hash(txDataWithoutSign)
     if (txList.some((entry) => entry.hash === txHash)) {
       if (logFlags.p2pNonFatal) {
         info('Transaction already exists in txList', txHash)
@@ -274,7 +274,6 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
     }
 
     info(`Adding network tx of type ${addTx.type} and payload ${stringifyReduce(addTx.txData)}`)
-    const { sign, ...txDataWithoutSign } = addTx.txData
     sortedInsert({
       hash: txHash,
       tx: {
