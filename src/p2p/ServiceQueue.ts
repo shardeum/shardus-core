@@ -221,7 +221,6 @@ export async function addNetworkTx(type: string, tx: OpaqueTransaction, subQueue
     cycle: currentCycle,
     subQueueKey,
   } as P2P.ServiceQueueTypes.AddNetworkTx
-  txAdd.push(networkTx)
   if (await _addNetworkTx(networkTx)) {
     txAdd.push(networkTx)
     makeAddNetworkTxProposals(networkTx)
@@ -340,7 +339,9 @@ export async function processNetworkTransactions(): Promise<void> {
       const record = txList[i].tx
 
       if (record.subQueueKey != null && processedSubQueueKeys.has(record.subQueueKey)) {
-        length += 1
+        if (length < txList.length) {
+          length += 1
+        }
         continue
       }
 
