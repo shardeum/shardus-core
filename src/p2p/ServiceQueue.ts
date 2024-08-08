@@ -1,5 +1,5 @@
 import { Logger } from 'log4js'
-import { logger, config, crypto, network } from './Context';
+import { logger, config, crypto, network } from './Context'
 import * as CycleChain from './CycleChain'
 import { P2P, Utils } from '@shardus/types'
 import { OpaqueTransaction, ShardusEvent } from '../shardus/shardus-types'
@@ -14,7 +14,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getFromArchiver } from './Archivers'
 import { Result } from 'neverthrow'
 import { getRandomAvailableArchiver } from './Utils'
-import { isDebugModeMiddleware } from '../network/debugMiddleware';
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 /** STATE */
 
@@ -180,6 +180,21 @@ export function updateRecord(
 }
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
+  for (const txadd of record.txadd) {
+    info(`Adding network tx of type ${txadd.type} and payload ${stringifyReduce(txadd.txData)}`)
+    const txHash = crypto.hash(txadd.txData)
+    sortedInsert({ hash: txHash, tx: { txData: txadd.txData, type: txadd.type, cycle: txadd.cycle } })
+  }
+
+  for (const txremove of record.txremove) {
+    const index = txList.findIndex((entry) => entry.hash === txremove.txHash)
+    if (index === -1) {
+      error(`TxHash ${txremove.txHash} does not exist in txList`)
+    } else {
+      txList.splice(index, 1)
+    }
+  }
+
   return {
     added: [],
     removed: [],
@@ -274,17 +289,6 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
       return false
     }
 
-    info(`Adding network tx of type ${addTx.type} and payload ${stringifyReduce(addTx.txData)}`)
-    sortedInsert({
-      hash: txHash,
-      tx: {
-        txData: txDataWithoutSign,
-        type: addTx.type,
-        cycle: addTx.cycle,
-        ...(addTx.subQueueKey && { subQueueKey: addTx.subQueueKey }),
-      },
-    })
-
     return true
   } catch (e) {
     error(
@@ -320,7 +324,6 @@ export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
     return false
   }
 
-  txList.splice(index, 1)
   return true
 }
 
