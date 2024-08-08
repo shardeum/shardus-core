@@ -418,14 +418,17 @@ export function setTxList(_txList: { hash: string; tx: P2P.ServiceQueueTypes.Add
   txList = _txList
 }
 
-function sortedInsert(entry: { hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }): void {
-  const index = txList.findIndex(
+function sortedInsert(
+  list: { hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }[],
+  entry: { hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }
+): void {
+  const index = list.findIndex(
     (item) => item.tx.cycle > entry.tx.cycle || (item.tx.cycle === entry.tx.cycle && item.hash > entry.hash)
   )
   if (index === -1) {
-    txList.push(entry)
+    list.push(entry)
   } else {
-    txList.splice(index, 0, entry)
+    list.splice(index, 0, entry)
   }
 }
 
