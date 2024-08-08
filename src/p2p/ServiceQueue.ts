@@ -65,6 +65,8 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
       if (await _addNetworkTx(payload)) {
+        const { sign, ...unsignedAddNetworkTx } = payload
+        txAdd.push(unsignedAddNetworkTx)
         Comms.sendGossip('gossip-addtx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
       }
     }
@@ -105,6 +107,8 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
       if (await _removeNetworkTx(payload)) {
+        const { sign, ...unsignedRemoveNetworkTx } = payload
+        txRemove.push(unsignedRemoveNetworkTx)
         Comms.sendGossip('gossip-removetx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
       }
     }
@@ -244,10 +248,14 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
 export function sendRequests(): void {
   for (const add of addProposal) {
+    const { sign, ...unsignedAddNetworkTx } = add
+    txAdd.push(unsignedAddNetworkTx)
     Comms.sendGossip('gossip-addtx', add, '', Self.id, byIdOrder, true)
   }
 
   for (const remove of removeProposal) {
+    const { sign, ...unsignedRemoveNetworkTx } = remove
+    txRemove.push(unsignedRemoveNetworkTx)
     Comms.sendGossip('gossip-removetx', remove, '', Self.id, byIdOrder, true)
   }
   addProposal.length = 0
@@ -278,7 +286,6 @@ export async function addNetworkTx(type: string, tx: OpaqueTransaction, subQueue
     subQueueKey,
   } as P2P.ServiceQueueTypes.AddNetworkTx
   if (await _addNetworkTx(networkTx)) {
-    txAdd.push(networkTx)
     makeAddNetworkTxProposals(networkTx)
   }
 }
@@ -409,7 +416,6 @@ export async function processNetworkTransactions(): Promise<void> {
         // eslint-disable-next-line security/detect-object-injection
         const removeTx = { txHash: txList[i].hash, cycle: currentCycle }
         if (await _removeNetworkTx(removeTx)) {
-          txRemove.push(removeTx)
           makeRemoveNetworkTxProposals(removeTx)
         }
       }
