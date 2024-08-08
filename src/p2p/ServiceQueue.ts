@@ -22,7 +22,7 @@ import rfdc from 'rfdc'
 const clone = rfdc()
 
 let p2pLogger: Logger
-let txList: Array<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }> = []
+let txList: P2P.ServiceQueueTypes.NetworkTxEntry[] = []
 let txAdd: P2P.ServiceQueueTypes.AddNetworkTx[] = []
 let txRemove: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
 const addProposal: P2P.ServiceQueueTypes.SignedAddNetworkTx[] = []
@@ -411,8 +411,10 @@ export async function syncTxListFromArchiver(): Promise<void> {
     throw Error('Fatal: Could not get random archiver')
   }
 
-  const txListResult: Result<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }[], Error> =
-    await getFromArchiver(archiver, 'network-txs-list')
+  const txListResult: Result<P2P.ServiceQueueTypes.NetworkTxEntry[], Error> = await getFromArchiver(
+    archiver,
+    'network-txs-list'
+  )
 
   if (txListResult.isErr()) {
     const nodeListUrl = `http://${archiver.ip}:${archiver.port}/network-txs-list`
@@ -435,11 +437,11 @@ export function getTxListHash(): string {
   return crypto.hash(txList)
 }
 
-export function getTxList(): Array<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }> {
+export function getTxList(): Array<P2P.ServiceQueueTypes.NetworkTxEntry> {
   return txList
 }
 
-export function setTxList(_txList: { hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }[]): void {
+export function setTxList(_txList: P2P.ServiceQueueTypes.NetworkTxEntry[]): void {
   txList = _txList
 }
 
