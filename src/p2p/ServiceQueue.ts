@@ -30,6 +30,7 @@ const addProposals: P2P.ServiceQueueTypes.SignedAddNetworkTx[] = []
 const removeProposals: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
 const beforeAddVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
 const applyVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
+const tryCounts = new Map<string, number>()
 
 /** ROUTES */
 
@@ -177,6 +178,10 @@ export function init(): void {
     }
     txList.splice(index, 1)
     res.send({ status: 'ok' })
+  })
+
+  network.registerExternalGet('debug-network-txcount', isDebugModeMiddleware, (req, res) => {
+    res.send({ status: 'ok', tryCounts: Array.from(tryCounts) })
   })
 }
 
@@ -458,6 +463,7 @@ export async function processNetworkTransactions(): Promise<void> {
         }
         /* prettier-ignore */ if (logFlags.p2pNonFatal) info('emit network transaction event', Utils.safeStringify(emitParams))
         Self.emitter.emit('try-network-transaction', emitParams)
+        countTry(txList[i].hash)
         if (record.subQueueKey != null) {
           processedSubQueueKeys.add(record.subQueueKey)
         }
@@ -502,6 +508,14 @@ export async function syncTxListFromArchiver(): Promise<void> {
 
   if (latestTxListHash === crypto.hash(txListResult.value)) {
     txList = txListResult.value
+  }
+}
+
+function countTry(txHash: string) {
+  if (tryCounts.has(txHash)) {
+    tryCounts.set(txHash, tryCounts.get(txHash) + 1)
+  } else {
+    tryCounts.set(txHash, 1)
   }
 }
 
