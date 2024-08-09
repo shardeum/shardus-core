@@ -5609,7 +5609,12 @@ class TransactionQueue {
         this.clearDebugAwaitStrings()
 
         // eslint-disable-next-line security/detect-object-injection
-        const queueEntry: QueueEntry = this._transactionQueue[currentIndex]
+        const queueEntry: QueueEntry | undefined = this._transactionQueue[currentIndex]
+        if (!queueEntry) {
+          this.statemanager_fatal(`queueEntry is null`, `currentIndex:${currentIndex}`)
+          nestedCountersInstance.countEvent('processing', 'error: null queue entry. skipping to next TX')
+          continue
+        }
         if (logFlags.seqdiagram)  this.mainLogger.info(`0x10052024 ${ipInfo.externalIp} ${shardusGetTime()} 0x0001 currentIndex:${currentIndex} txId:${queueEntry.acceptedTx.txId} state:${queueEntry.state}`)
         const txTime = queueEntry.txKeys.timestamp
         const txAge = currentTime - txTime
