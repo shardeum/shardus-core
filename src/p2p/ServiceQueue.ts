@@ -9,12 +9,13 @@ import { profilerInstance } from '../utils/profiler'
 import * as Self from './Self'
 import { currentCycle, currentQuarter } from './CycleCreator'
 import { logFlags } from '../logger'
-import { byIdOrder, byPubKey } from './NodeList'
+import { byPubKey } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getFromArchiver } from './Archivers'
 import { Result } from 'neverthrow'
 import { getRandomAvailableArchiver } from './Utils'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { nodeListFromStates } from './Join'
 import rfdc from 'rfdc'
 
 /** STATE */
@@ -25,8 +26,8 @@ let p2pLogger: Logger
 let txList: P2P.ServiceQueueTypes.NetworkTxEntry[] = []
 let txAdd: P2P.ServiceQueueTypes.AddNetworkTx[] = []
 let txRemove: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
-const addProposal: P2P.ServiceQueueTypes.SignedAddNetworkTx[] = []
-const removeProposal: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
+const addProposals: P2P.ServiceQueueTypes.SignedAddNetworkTx[] = []
+const removeProposals: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
 const beforeAddVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
 const applyVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
 
@@ -64,10 +65,20 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
     }
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
-      if (await _addNetworkTx(payload)) {
-        const { sign, ...unsignedAddNetworkTx } = payload
-        txAdd.push(unsignedAddNetworkTx)
-        Comms.sendGossip('gossip-addtx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
+      const { sign, ...unsignedAddNetworkTx } = payload
+      if (await _addNetworkTx(unsignedAddNetworkTx)) {
+        Comms.sendGossip(
+          'gossip-addtx',
+          payload,
+          tracker,
+          Self.id,
+          nodeListFromStates([
+            P2P.P2PTypes.NodeStatus.ACTIVE,
+            P2P.P2PTypes.NodeStatus.READY,
+            P2P.P2PTypes.NodeStatus.SYNCING,
+          ]),
+          false
+        ) // use Self.id so we don't gossip to ourself
       }
     }
   } finally {
@@ -107,9 +118,18 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
       if (await _removeNetworkTx(payload)) {
-        const { sign, ...unsignedRemoveNetworkTx } = payload
-        txRemove.push(unsignedRemoveNetworkTx)
-        Comms.sendGossip('gossip-removetx', payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
+        Comms.sendGossip(
+          'gossip-removetx',
+          payload,
+          tracker,
+          Self.id,
+          nodeListFromStates([
+            P2P.P2PTypes.NodeStatus.ACTIVE,
+            P2P.P2PTypes.NodeStatus.READY,
+            P2P.P2PTypes.NodeStatus.SYNCING,
+          ]),
+          false
+        ) // use Self.id so we don't gossip to ourself
       }
     }
   } finally {
@@ -189,11 +209,11 @@ export function updateRecord(
   const txListCopy = clone(txList)
 
   for (const txadd of record.txadd) {
-    const txHash = crypto.hash(txadd.txData)
     const { sign, ...txDataWithoutSign } = txadd.txData
     sortedInsert(txListCopy, {
-      hash: txHash,
+      hash: txadd.hash,
       tx: {
+        hash: txadd.hash,
         txData: txDataWithoutSign,
         type: txadd.type,
         cycle: txadd.cycle,
@@ -217,11 +237,11 @@ export function updateRecord(
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   for (const txadd of record.txadd) {
     info(`Adding network tx of type ${txadd.type} and payload ${stringifyReduce(txadd.txData)}`)
-    const txHash = crypto.hash(txadd.txData)
     const { sign, ...txDataWithoutSign } = txadd.txData
     sortedInsert(txList, {
-      hash: txHash,
+      hash: txadd.hash,
       tx: {
+        hash: txadd.hash,
         txData: txDataWithoutSign,
         type: txadd.type,
         cycle: txadd.cycle,
@@ -247,19 +267,41 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 }
 
 export function sendRequests(): void {
-  for (const add of addProposal) {
+  for (const add of addProposals) {
     const { sign, ...unsignedAddNetworkTx } = add
     txAdd.push(unsignedAddNetworkTx)
-    Comms.sendGossip('gossip-addtx', add, '', Self.id, byIdOrder, true)
+    Comms.sendGossip(
+      'gossip-addtx',
+      add,
+      '',
+      Self.id,
+      nodeListFromStates([
+        P2P.P2PTypes.NodeStatus.ACTIVE,
+        P2P.P2PTypes.NodeStatus.READY,
+        P2P.P2PTypes.NodeStatus.SYNCING,
+      ]),
+      true
+    )
   }
 
-  for (const remove of removeProposal) {
+  for (const remove of removeProposals) {
     const { sign, ...unsignedRemoveNetworkTx } = remove
     txRemove.push(unsignedRemoveNetworkTx)
-    Comms.sendGossip('gossip-removetx', remove, '', Self.id, byIdOrder, true)
+    Comms.sendGossip(
+      'gossip-removetx',
+      remove,
+      '',
+      Self.id,
+      nodeListFromStates([
+        P2P.P2PTypes.NodeStatus.ACTIVE,
+        P2P.P2PTypes.NodeStatus.READY,
+        P2P.P2PTypes.NodeStatus.SYNCING,
+      ]),
+      true
+    )
   }
-  addProposal.length = 0
-  removeProposal.length = 0
+  addProposals.length = 0
+  removeProposals.length = 0
 }
 
 /** Module Functions */
@@ -279,7 +321,9 @@ export function registerApplyVerifier(
 }
 
 export async function addNetworkTx(type: string, tx: OpaqueTransaction, subQueueKey?: string): Promise<void> {
+  const hash = crypto.hash(tx)
   const networkTx = {
+    hash,
     type,
     txData: tx,
     cycle: currentCycle,
@@ -291,11 +335,11 @@ export async function addNetworkTx(type: string, tx: OpaqueTransaction, subQueue
 }
 
 function makeAddNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.AddNetworkTx): void {
-  addProposal.push(crypto.sign(networkTx))
+  addProposals.push(crypto.sign(networkTx))
 }
 
 function makeRemoveNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.RemoveNetworkTx): void {
-  removeProposal.push(crypto.sign(networkTx))
+  removeProposals.push(crypto.sign(networkTx))
 }
 
 async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise<boolean> {
@@ -309,11 +353,10 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
       warn(`Invalid cycle ${addTx.cycle} for current cycle ${currentCycle}`)
       return false
     }
-    const { sign, ...txDataWithoutSign } = addTx.txData
-    const txHash = crypto.hash(txDataWithoutSign)
-    if (txList.some((entry) => entry.hash === txHash)) {
+
+    if (txList.some((entry) => entry.hash === addTx.hash)) {
       if (logFlags.p2pNonFatal) {
-        info('Transaction already exists in txList', txHash)
+        info('Transaction already exists in txList', addTx.hash)
       }
       return false
     }
@@ -336,6 +379,9 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
       return false
     }
 
+    if (!txAdd.some((tx) => tx.hash === addTx.hash)) {
+      txAdd.push(addTx)
+    }
     return true
   } catch (e) {
     error(
@@ -371,6 +417,11 @@ export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
     return false
   }
 
+  const alreadyAdded = txRemove.some((tx) => tx.txHash === removeTx.txHash && tx.cycle === removeTx.cycle)
+
+  if (!alreadyAdded) {
+    txRemove.push(removeTx)
+  }
   return true
 }
 
@@ -471,7 +522,8 @@ function sortedInsert(
   entry: { hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }
 ): void {
   const index = list.findIndex(
-    (item) => item.tx.cycle > entry.tx.cycle || (item.tx.cycle === entry.tx.cycle && item.hash > entry.hash)
+    (item) =>
+      item.tx.cycle > entry.tx.cycle || (item.tx.cycle === entry.tx.cycle && item.hash > entry.tx.hash)
   )
   if (index === -1) {
     list.push(entry)
