@@ -60,8 +60,7 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
       return
     }
 
-    const { sign, ...unsignedAddNetworkTx } = payload
-    if (txAdd.includes(unsignedAddNetworkTx)) {
+    if (txAdd.some((entry) => entry.hash === payload.hash)) {
       return
     }
 
@@ -72,8 +71,8 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
     }
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
+      const { sign, ...unsignedAddNetworkTx } = payload
       if (await _addNetworkTx(unsignedAddNetworkTx)) {
-        txAdd.push(unsignedAddNetworkTx)
         Comms.sendGossip(
           'gossip-addtx',
           payload,
@@ -118,8 +117,7 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
       return
     }
 
-    const { sign, ...unsignedRemoveNetworkTx } = payload
-    if (txRemove.includes(unsignedRemoveNetworkTx)) {
+    if (txRemove.some((entry) => entry.txHash === payload.txHash)) {
       return
     }
 
@@ -130,8 +128,8 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
     }
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
+      const { sign, ...unsignedRemoveNetworkTx } = payload
       if (await _removeNetworkTx(unsignedRemoveNetworkTx)) {
-        txRemove.push(unsignedRemoveNetworkTx)
         Comms.sendGossip(
           'gossip-removetx',
           payload,
@@ -393,12 +391,11 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
       return false
     }
 
-    if (!txAdd.some((tx) => tx.hash === addTx.hash)) {
-      const addTxCopy = clone(addTx)
-      const { sign, ...txDataWithoutSign } = addTxCopy.txData
-      addTxCopy.txData = txDataWithoutSign
-      txAdd.push(addTxCopy)
-    }
+    const addTxCopy = clone(addTx)
+    const { sign, ...txDataWithoutSign } = addTxCopy.txData
+    addTxCopy.txData = txDataWithoutSign
+    txAdd.push(addTxCopy)
+
     return true
   } catch (e) {
     error(
@@ -434,9 +431,8 @@ export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
     return false
   }
 
-  if (!txRemove.some((tx) => tx.txHash === removeTx.txHash)) {
-    txRemove.push(removeTx)
-  }
+  txRemove.push(removeTx)
+
   return true
 }
 
