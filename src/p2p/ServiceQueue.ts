@@ -73,6 +73,11 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
     if ([1, 2].includes(currentQuarter)) {
       const { sign, ...unsignedAddNetworkTx } = payload
       if (await _addNetworkTx(unsignedAddNetworkTx)) {
+        const addTxCopy = clone(unsignedAddNetworkTx)
+        const { sign, ...txDataWithoutSign } = addTxCopy.txData
+        addTxCopy.txData = txDataWithoutSign
+        txAdd.push(addTxCopy)
+
         Comms.sendGossip(
           'gossip-addtx',
           payload,
@@ -130,6 +135,8 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
     if ([1, 2].includes(currentQuarter)) {
       const { sign, ...unsignedRemoveNetworkTx } = payload
       if (await _removeNetworkTx(unsignedRemoveNetworkTx)) {
+        txRemove.push(unsignedRemoveNetworkTx)
+
         Comms.sendGossip(
           'gossip-removetx',
           payload,
@@ -284,6 +291,12 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
 export function sendRequests(): void {
   for (const add of addProposals) {
+    const { sign: sign1, ...unsignedAddNetworkTx } = add
+    const addTxCopy = clone(unsignedAddNetworkTx)
+    const { sign: sign2, ...txDataWithoutSign } = addTxCopy.txData
+    addTxCopy.txData = txDataWithoutSign
+    txAdd.push(addTxCopy)
+
     Comms.sendGossip(
       'gossip-addtx',
       add,
@@ -299,6 +312,9 @@ export function sendRequests(): void {
   }
 
   for (const remove of removeProposals) {
+    const { sign, ...unsignedRemoveNetworkTx } = remove
+    txRemove.push(unsignedRemoveNetworkTx)
+
     Comms.sendGossip(
       'gossip-removetx',
       remove,
@@ -391,11 +407,6 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
       return false
     }
 
-    const addTxCopy = clone(addTx)
-    const { sign, ...txDataWithoutSign } = addTxCopy.txData
-    addTxCopy.txData = txDataWithoutSign
-    txAdd.push(addTxCopy)
-
     return true
   } catch (e) {
     error(
@@ -430,8 +441,6 @@ export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
                    error: ${e instanceof Error ? e.stack : e}`)
     return false
   }
-
-  txRemove.push(removeTx)
 
   return true
 }
@@ -517,7 +526,7 @@ export async function syncTxListFromArchiver(): Promise<void> {
   }
 }
 
-function countTry(txHash: string) {
+function countTry(txHash: string): void {
   if (tryCounts.has(txHash)) {
     tryCounts.set(txHash, tryCounts.get(txHash) + 1)
   } else {
