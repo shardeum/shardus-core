@@ -306,9 +306,10 @@ class Reporter {
     // Server load
     const currentNetworkLoad = this.loadDetection.getCurrentLoad()
     const currentNodeLoad = this.loadDetection.getCurrentNodeLoad()
-    let queueLength = this.statistics.getPreviousElement('queueLength')
+    const queueLengthAll = this.statistics.getPreviousElement('queueLength')
     const executeQueueLength = this.statistics.getPreviousElement('executeQueueLength')
-    queueLength = executeQueueLength //debug hack until the monitor client can show this
+    const queueLength = executeQueueLength
+    const queueLengthBuckets = this.stateManager.transactionQueue.getQueueLengthBuckets()
     const txTimeInQueue = this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
     const maxTxTimeInQueue = this.statistics.getMax('txTimeInQueue') / 1000
     const isNodeLost = this.checkIsNodeLost(Self.id)
@@ -365,8 +366,10 @@ class Reporter {
           networkLoad: currentNetworkLoad,
           nodeLoad: currentNodeLoad,
         },
+        queueLengthAll,
         queueLength,
         executeQueueLength,
+        queueLengthBuckets,
         txTimeInQueue,
         maxTxTimeInQueue,
         rareCounters,
