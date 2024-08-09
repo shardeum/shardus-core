@@ -66,8 +66,8 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
     }
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
-      const { sign, ...unsignedAddNetworkTx } = payload
-      if (await _addNetworkTx(unsignedAddNetworkTx)) {
+      const { sign, ...txDataWithoutSign } = payload
+      if (await _addNetworkTx(txDataWithoutSign)) {
         Comms.sendGossip(
           'gossip-addtx',
           payload,
@@ -118,7 +118,8 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
     }
     // todo: which quartes?
     if ([1, 2].includes(currentQuarter)) {
-      if (await _removeNetworkTx(payload)) {
+      const { sign, ...txDataWithoutSign } = payload
+      if (await _removeNetworkTx(txDataWithoutSign)) {
         Comms.sendGossip(
           'gossip-removetx',
           payload,
@@ -273,8 +274,6 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
 export function sendRequests(): void {
   for (const add of addProposals) {
-    const { sign, ...unsignedAddNetworkTx } = add
-    txAdd.push(unsignedAddNetworkTx)
     Comms.sendGossip(
       'gossip-addtx',
       add,
@@ -290,8 +289,6 @@ export function sendRequests(): void {
   }
 
   for (const remove of removeProposals) {
-    const { sign, ...unsignedRemoveNetworkTx } = remove
-    txRemove.push(unsignedRemoveNetworkTx)
     Comms.sendGossip(
       'gossip-removetx',
       remove,
@@ -385,7 +382,10 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
     }
 
     if (!txAdd.some((tx) => tx.hash === addTx.hash)) {
-      txAdd.push(addTx)
+      const addTxCopy = clone(addTx)
+      const { sign, ...txDataWithoutSign } = addTxCopy.txData
+      addTxCopy.txData = txDataWithoutSign
+      txAdd.push(addTxCopy)
     }
     return true
   } catch (e) {
@@ -422,9 +422,7 @@ export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
     return false
   }
 
-  const alreadyAdded = txRemove.some((tx) => tx.txHash === removeTx.txHash && tx.cycle === removeTx.cycle)
-
-  if (!alreadyAdded) {
+  if (!txRemove.some((tx) => tx.txHash === removeTx.txHash)) {
     txRemove.push(removeTx)
   }
   return true
