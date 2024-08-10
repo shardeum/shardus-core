@@ -224,8 +224,8 @@ export function updateRecord(
   record: P2P.CycleCreatorTypes.CycleRecord,
   prev: P2P.CycleCreatorTypes.CycleRecord
 ): void {
-  record.txadd = txAdd
-  record.txremove = txRemove
+  record.txadd = txAdd.sort((a, b) => a.hash.localeCompare(b.hash))
+  record.txremove = txRemove.sort((a, b) => a.txHash.localeCompare(b.txHash))
 
   // we need to get the hash of the txlist after the txadd and txremove
   // but we dont want to alter the txList, so we make a copy
