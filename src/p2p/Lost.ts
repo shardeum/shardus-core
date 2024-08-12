@@ -1286,7 +1286,7 @@ async function isDownCheck(node) {
 
       return 'up'
     } else if (config.p2p.useProxyForDownCheck) {
-      //using the 'get_trie_hashes' route to check if the node is up.
+      //using proxy node to check if the node is up.
       let obj = { counter: currentCycle, checker: Self.id, target: node.id, timestamp: shardusGetTime() }
       let hash = crypto.hash(obj)
       let closestNodes = stateManager.getClosestNodes(hash, 5, true)
