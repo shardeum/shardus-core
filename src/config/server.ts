@@ -134,6 +134,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     rotationMaxRemovePercent: 0.05,
     allowActivePerCycle: 7,
     useProxyForDownCheck: false,
+    useNearNodeForDownCheck: false,
     numCheckerNodes: 1,
     minChecksForDown: 1,
     minChecksForUp: 1,
