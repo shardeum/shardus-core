@@ -349,6 +349,8 @@ async function cycleCreator() {
   /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log('cycleCreator: currentCycle', currentCycle)
   // Set current quater to 0 while we are setting up the previous record
   //   Routes should use this to not process and just single-forward gossip
+
+  // I think setting the current cycle here as well is intuitive, but I don't want to do it right now
   currentQuarter = 0
 
   createCycleTag++
