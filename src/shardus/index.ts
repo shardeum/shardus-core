@@ -58,7 +58,7 @@ import Profiler, { profilerInstance } from '../utils/profiler'
 import { startSaving } from './saveConsoleOutput'
 import { isDebugMode, isServiceMode } from '../debug'
 import * as JoinV2 from '../p2p/Join/v2'
-import { getNetworkTimeOffset, shardusGetTime } from '../network'
+import { getNetworkTimeOffset, shardusGetTime, calculateFakeTimeOffset, clearFakeTimeOffset } from '../network'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { networkMode, isInternalTxAllowed } from '../p2p/Modes'
 import { lostArchiversMap } from '../p2p/LostArchivers/state'
@@ -2831,6 +2831,19 @@ class Shardus extends EventEmitter {
       config.p2p.hackForceCycleSyncComplete = enable
       res.send(await getSocketReport())
     })
+
+    this.network.registerExternalGet('calculate-fake-time-offset', isDebugModeMiddlewareHigh, async (req, res) => {
+      let shift = req.query.shift ? parseInt(req.query.shift as string) : 0
+      let spread = req.query.spread ? parseInt(req.query.spread as string) : 0
+      calculateFakeTimeOffset(shift, spread)
+      res.send({ success: true })
+    })
+
+    this.network.registerExternalGet('clear-fake-time-offset', isDebugModeMiddlewareHigh, async (req, res) => {
+      clearFakeTimeOffset()
+      res.send({ success: true })
+    })
+
 
     this.p2p.registerInternal(
       'sign-app-data',

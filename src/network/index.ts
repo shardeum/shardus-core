@@ -38,6 +38,7 @@ let natClient: any
 export let ipInfo: IPInfo
 
 let ntpOffsetMs: number = 0
+let fakeTimeOffsetMs: number = 0
 
 let lastNTPTimeObj = {}
 
@@ -88,6 +89,7 @@ export class NetworkClass extends EventEmitter {
     this.debugNetworkDelay = 0
     this.statisticsInstance = null
     ntpOffsetMs = 0
+    fakeTimeOffsetMs = 0
 
     if (config && config.debug && config.debug.fakeNetworkDelay) {
       this.debugNetworkDelay = config.debug.fakeNetworkDelay
@@ -872,10 +874,17 @@ export async function checkAndUpdateTimeSyncedOffset(timeServers) {
 }
 
 export function shardusGetTime(): number {
+  let time = Date.now()
+  
   if (config.p2p.useNTPOffsets === true) {
-    return Date.now() + ntpOffsetMs
+    time += ntpOffsetMs
   }
-  return Date.now()
+
+  if (config.p2p.useFakeTimeOffsets === true) {
+    time += fakeTimeOffsetMs
+  }
+
+  return time
 }
 
 export function getNetworkTimeOffset(): number {
@@ -883,6 +892,33 @@ export function getNetworkTimeOffset(): number {
     return ntpOffsetMs
   }
   return ntpOffsetMs
+}
+
+export function calculateFakeTimeOffset(shift: number, spread: number) {
+  shift = isNaN(shift) ? 0 : shift
+  spread = isNaN(spread) ? 0 : spread
+
+  const minShift = -5000
+  const maxShift = 5000
+  const minSpread = 0
+  const maxSpread = 5000
+  shift = Math.min(Math.max(shift, minShift), maxShift);
+  spread = Math.min(Math.max(spread, minSpread), maxSpread);
+
+  const begin = shift - (spread / 2)
+  const end = shift + (spread / 2) 
+  fakeTimeOffsetMs = Math.round(begin + (end - begin) * Math.random())
+}
+
+export function clearFakeTimeOffset() {
+  fakeTimeOffsetMs = 0
+}
+
+export function getFakeTimeOffset(): number {
+  if (config.p2p.useFakeTimeOffsets === true) {
+    return fakeTimeOffsetMs
+  }
+  return 0
 }
 
 export function getLastNTPObject(): any {
