@@ -6,6 +6,8 @@ import * as CycleCreator from '../p2p/CycleCreator'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { logFlags } from '../logger'
 import * as utils from '../utils'
+import { getStandbyNodesInfoMap } from '../p2p/Join/v2'
+import * as CycleChain from '../p2p/CycleChain'
 
 interface GossipPayload {
   nodeId?: string
@@ -51,11 +53,31 @@ export function checkGossipPayload<T extends GossipPayload>(
     return false
   }
 
-  // Verify if the original sender is correct and if the transaction is in quarter 1
-  const signer = NodeList.byPubKey.get(payload.sign.owner)
-  if (!signer) {
-    if (logFlags.error) warn(`${logContext}: Got ${logContext} from unknown node`)
-    return false
+  // Verify if the original sender is known to us
+  let signer = null
+  if (logContext === 'gossip-unjoin') {
+    const nodeIfSelectedLastCycle = CycleChain.newest.joinedConsensors.find(
+      (node) => node.publicKey === payload.sign.owner
+    )
+    if (nodeIfSelectedLastCycle) {
+      signer = NodeList.byPubKey.get(payload.sign.owner)
+      if (!signer) {
+        if (logFlags.error) warn(`${logContext}: Got ${logContext} from standby node that was selected to join, but can't find it in NodeList.byPubKey`)
+        return false
+      }
+    } else {
+      signer = getStandbyNodesInfoMap().get(payload.sign.owner)
+      if (!signer) {
+        if (logFlags.error) warn(`${logContext}: Got ${logContext} from unknown standby node`)
+        return false
+      }
+    }
+  } else {
+    signer = NodeList.byPubKey.get(payload.sign.owner)
+    if (!signer) {
+      if (logFlags.error) warn(`${logContext}: Got ${logContext} from unknown node`)
+      return false
+    }
   }
 
   // Only accept original transactions in quarter 1
