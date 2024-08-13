@@ -17,6 +17,7 @@ import { reset as resetAcceptance } from './acceptance'
 import { stringifyReduce } from '../../../utils/functions/stringifyReduce'
 import { logFlags } from '../../../logger'
 import { Utils } from '@shardus/types'
+import { deepCopy } from '../../../utils'
 
 const clone = rfdc()
 
@@ -145,7 +146,8 @@ export function getSortedStandbyJoinRequests(): JoinRequest[] {
 export function computeNewStandbyListHash(): hexstring {
   if (config.p2p.standbyListFastHash) {
     //this field must be udpated as it is used by other functions
-    lastHashedList = Array.from(getSortedStandbyJoinRequests())
+    const standbyNodeList = Array.from(getSortedStandbyJoinRequests())
+    lastHashedList = deepCopy(standbyNodeList) // Using deepCopy to avoid mutating the original list by standbyRefresh later
     //sort hashes by value.  could sort by ID, but this is a bit faster
 
     const hashes = Array.from(standbyNodesInfoHashes.values())
