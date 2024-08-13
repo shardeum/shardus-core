@@ -2833,19 +2833,16 @@ class Shardus extends EventEmitter {
     })
 
     this.network.registerExternalGet('calculate-fake-time-offset', isDebugModeMiddlewareHigh, async (req, res) => {
-      let shift = req.query.shift ? parseInt(req.query.shift as string) : 0
-      let spread = req.query.spread ? parseInt(req.query.spread as string) : 0
+      const shift = req.query.shift ? parseInt(req.query.shift as string) : 0
+      const spread = req.query.spread ? parseInt(req.query.spread as string) : 0
       const offset = calculateFakeTimeOffset(shift, spread)
-      this.mainLogger.debug({
-        message: "updated fake time offset",
-        data: { shift, spread, offset }
-      });
-
+      /* prettier-ignore */ this.mainLogger.debug({ message: "Calculated fakeTimeOffset", data: { shift, spread, offset } });
       res.send({ success: true })
     })
 
     this.network.registerExternalGet('clear-fake-time-offset', isDebugModeMiddlewareHigh, async (req, res) => {
-      clearFakeTimeOffset()
+      const offset = clearFakeTimeOffset()
+      /* prettier-ignore */ this.mainLogger.debug({ message: "Cleared fakeTimeOffset", data: { offset } });
       res.send({ success: true })
     })
 
