@@ -31,7 +31,7 @@ import { checkGossipPayload } from '../../utils/GossipValidation'
 import * as acceptance from './v2/acceptance'
 import { getStandbyNodesInfoMap, saveJoinRequest, isOnStandbyList } from './v2'
 import { addFinishedSyncing } from './v2/syncFinished'
-import { processNewUnjoinRequest } from './v2/unjoin'
+import { processNewUnjoinRequest, removeUnjoinRequest } from './v2/unjoin'
 import { isActive } from '../Self'
 import { logFlags } from '../../logger'
 import {
@@ -229,7 +229,9 @@ const unjoinRoute: P2P.P2PTypes.Route<Handler> = {
     removeUnjoinRequest(unjoinRequest.publicKey)
 
     queueUnjoinRequest(unjoinRequest)
-  }
+
+    return res.status(200).send()
+  },
 }
 
 /*
@@ -721,7 +723,6 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<
   }
 }
 
-
 export const routes = {
   external: [cycleMarkerRoute, joinRoute, joinedRoute, joinedV2Route, acceptedRoute, unjoinRoute, standbyRefreshRoute],
   gossip: {
@@ -730,6 +731,6 @@ export const routes = {
     'gossip-unjoin': gossipUnjoinRequests,
     'gossip-sync-started': gossipSyncStartedRoute,
     'gossip-sync-finished': gossipSyncFinishedRoute,
-    'gossip-standby-refresh' : gossipStandbyRefresh,
+    'gossip-standby-refresh': gossipStandbyRefresh,
   },
 }
