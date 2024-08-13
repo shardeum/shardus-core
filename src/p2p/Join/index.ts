@@ -27,7 +27,7 @@ import {
 } from './v2'
 import { err, ok, Result } from 'neverthrow'
 import { drainSelectedPublicKeys, forceSelectSelf } from './v2/select'
-import { deleteStandbyNode, drainNewUnjoinRequests, UnjoinRequest, processNewUnjoinRequest } from './v2/unjoin'
+import { deleteStandbyNode, drainNewUnjoinRequests, processNewUnjoinRequest } from './v2/unjoin'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { updateNodeState } from '../Self'
 import { HTTPError } from 'got'
@@ -57,8 +57,8 @@ let queuedJoinRequestsForGossip: JoinRequest[] = []
 let queuedStartedSyncingId: string
 let queuedFinishedSyncingId: string
 let queuedStandbyRefreshPubKeys: string[] = []
-let queuedUnjoinRequestsForNextCycle: UnjoinRequest[] = []
-let queuedUnjoinRequestsForThisCycle: UnjoinRequest[] = []
+let queuedUnjoinRequestsForNextCycle: P2P.JoinTypes.SignedUnjoinRequest[] = []
+let queuedUnjoinRequestsForThisCycle: P2P.JoinTypes.SignedUnjoinRequest[] = []
 
 // whats this for? I was just going to use newStandbyRefreshRequests
 //let keepInStandbyCollector: Map<string, StandbyRefreshRequest>
@@ -266,17 +266,6 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
     // for join v2, add new standby nodes to the standbyAdd field ...
     for (const request of txs.standbyAdd) {
       record.standbyAdd.push(request)
-    }
-
-    // ... and unjoining nodes to the standbyRemove field ...
-    for (const request of txs.standbyRemove) {
-      const publicKey = request.sign.owner
-      const node = getStandbyNodesInfoMap().get(publicKey)
-      if (node) {
-        record.standbyRemove.push(publicKey)
-      } else {
-        /* prettier-ignore */ if(logFlags.important_as_error) warn(`join:updateRecord:standbyRemove: node not found: ${publicKey}`)
-      }
     }
 
     for (const request of txs.startedSyncing) {
@@ -507,12 +496,12 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
 
     // add unjoining nodes to the standbyRemove field ...
     // unless they were selected last cycle, in which case they are placed in removed
-    for (const publicKey of drainNewUnjoinRequests()) {
+    for (const signedUnjoinRequest of txs.standbyRemove) {
       const nodeIfSelectedLastCycle = CycleChain.newest.joinedConsensors.find(
-        (node) => node.publicKey === publicKey
+        (node) => node.publicKey === signedUnjoinRequest.publicKey
       )
       const nodeIfSelectedThisCycle = record.joinedConsensors.find(
-        (node) => node.publicKey === publicKey
+        (node) => node.publicKey === signedUnjoinRequest.publicKey
       )
 
       if (nodeIfSelectedLastCycle) {
@@ -522,7 +511,7 @@ export function updateRecord(txs: P2P.JoinTypes.Txs, record: P2P.CycleCreatorTyp
         record.apoptosized.push(nodeIfSelectedThisCycle.id)
         nestedCountersInstance.countEvent('p2p', `node that requested to unjoin but was selected to go active was added to apoptosized`) 
       } else {
-        record.standbyRemove.push(publicKey)
+        record.standbyRemove.push(signedUnjoinRequest.publicKey)
       }
     }
 
@@ -852,7 +841,7 @@ export function queueJoinRequest(joinRequest: JoinRequest): void {
   queuedReceivedJoinRequests.push(joinRequest)
 }
 
-export function queueUnjoinRequest(unjoinRequest: UnjoinRequest): void {
+export function queueUnjoinRequest(unjoinRequest: P2P.JoinTypes.SignedUnjoinRequest): void {
   queuedUnjoinRequestsForNextCycle.push(unjoinRequest)
 }
 

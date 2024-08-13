@@ -62,7 +62,8 @@ export function processNewUnjoinRequest(unjoinRequest: SignedUnjoinRequest): Res
  */
 export function validateUnjoinRequest(unjoinRequest: SignedUnjoinRequest): Result<void, Error> {
   // ignore if the unjoin request already exists
-  if (newUnjoinRequests.has(unjoinRequest)) {
+  const newUnjoinRequestsArray = Array.from(newUnjoinRequests)
+  if (newUnjoinRequestsArray.some((req) => req.publicKey === unjoinRequest.publicKey)) {
     return err(new Error(`unjoin request from ${unjoinRequest.publicKey} already exists`))
   }
 
@@ -114,5 +115,9 @@ export function deleteStandbyNode(publicKey: hexstring): void {
 }
 
 export function removeUnjoinRequest(publicKey: hexstring): void {
-  newUnjoinRequests.delete(publicKey)
+  newUnjoinRequests.forEach((unjoinRequest) => {
+    if (unjoinRequest.publicKey === publicKey) {
+      newUnjoinRequests.delete(unjoinRequest)
+    }
+  })
 }
