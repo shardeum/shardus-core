@@ -38,6 +38,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     ],
     syncLimit: 180, //180 seconds seems way to high to allow.
     useNTPOffsets: true,
+    useFakeTimeOffsets: true,
     cycleDuration: 30,
     maxRejoinTime: 20,
     difficulty: 2,

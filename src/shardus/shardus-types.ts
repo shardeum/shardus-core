@@ -670,6 +670,9 @@ export interface ServerConfiguration {
     syncLimit?: number
     /** use ntp offset in our ShardusDateNow() Funtion */
     useNTPOffsets?: boolean
+    /** use fake time offset in our ShardusDateNow() Function (debug-test only)*/
+    useFakeTimeOffsets?: boolean
+
     /** The cycleDuration parameter is an Integer specifying the amount of time (in seconds) it takes for a shardus network cycle to complete. */
     cycleDuration?: number
     /** The maxRejoinTime parameter is an Integer specifying the amount of time (in seconds) between network heartbeats before a node must ask to rejoin. */
