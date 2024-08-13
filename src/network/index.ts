@@ -894,7 +894,7 @@ export function getNetworkTimeOffset(): number {
   return ntpOffsetMs
 }
 
-export function calculateFakeTimeOffset(shift: number, spread: number) {
+export function calculateFakeTimeOffset(shift: number, spread: number): number {
   shift = isNaN(shift) ? 0 : shift
   spread = isNaN(spread) ? 0 : spread
 
@@ -908,11 +908,12 @@ export function calculateFakeTimeOffset(shift: number, spread: number) {
   const begin = shift - (spread / 2)
   const end = shift + (spread / 2) 
   fakeTimeOffsetMs = Math.round(begin + (end - begin) * Math.random())
-  return fakeTimeOffsetMs;
+  return fakeTimeOffsetMs
 }
 
-export function clearFakeTimeOffset() {
+export function clearFakeTimeOffset(): number {
   fakeTimeOffsetMs = 0
+  return fakeTimeOffsetMs
 }
 
 export function getFakeTimeOffset(): number {
