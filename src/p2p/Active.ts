@@ -172,8 +172,12 @@ export function updateRecord(
     let cycleCounter = CycleChain.newest ? CycleChain.newest.counter : 0
     let addedCount = 0
 
+    // make sure there are no nodes in syncTimes that are not in activeByIdOrder
+    syncTimes = syncTimes.filter((item) => NodeList.activeByIdOrder.find((node) => node.id === item.nodeId))
+
     for (const node of NodeList.activeByIdOrder) {
-      if (node.id === Self.id) continue
+      // not sure why we used to skip our own node. it seems like it could cause nodes to end upw ith different maxSyncTimes
+      // if (node.id === Self.id) continue
       const included = syncTimes.filter(
         (item) => item.nodeId === node.id && item.activeTimestamp === node.activeTimestamp
       )
