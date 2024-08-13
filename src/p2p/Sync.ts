@@ -319,7 +319,8 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
     cycle.archiverListHash = Archivers.computeNewArchiverListHash()
 
     // for join v2, also get the standby node list hash
-    if (config.p2p.useJoinProtocolV2) {
+    // [TODO] We can remove `source !== 'syncV2'` once we shut down ITN2
+    if (config.p2p.useJoinProtocolV2 && source !== 'syncV2') {
       cycle.standbyNodeListHash = JoinV2.computeNewStandbyListHash()
     }
   }
