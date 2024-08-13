@@ -83,20 +83,20 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
         const { sign, ...txDataWithoutSign } = addTxCopy.txData
         addTxCopy.txData = txDataWithoutSign
         txAdd.push(addTxCopy)
-      }
 
-      Comms.sendGossip(
-        'gossip-addtx',
-        payload,
-        tracker,
-        Self.id,
-        nodeListFromStates([
-          P2P.P2PTypes.NodeStatus.ACTIVE,
-          P2P.P2PTypes.NodeStatus.READY,
-          P2P.P2PTypes.NodeStatus.SYNCING,
-        ]),
-        false
-      ) // use Self.id so we don't gossip to ourself
+        Comms.sendGossip(
+          'gossip-addtx',
+          payload,
+          tracker,
+          Self.id,
+          nodeListFromStates([
+            P2P.P2PTypes.NodeStatus.ACTIVE,
+            P2P.P2PTypes.NodeStatus.READY,
+            P2P.P2PTypes.NodeStatus.SYNCING,
+          ]),
+          false
+        ) // use Self.id so we don't gossip to ourself
+      }
     }
   } finally {
     profilerInstance.scopedProfileSectionEnd('serviceQueue - addTx')
@@ -155,20 +155,20 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
       // could also place check inside _removeNetworkTx
       if (!txRemove.some((entry) => entry.txHash === payload.txHash)) {
         txRemove.push(unsignedRemoveNetworkTx)
-      }
 
-      Comms.sendGossip(
-        'gossip-removetx',
-        payload,
-        tracker,
-        Self.id,
-        nodeListFromStates([
-          P2P.P2PTypes.NodeStatus.ACTIVE,
-          P2P.P2PTypes.NodeStatus.READY,
-          P2P.P2PTypes.NodeStatus.SYNCING,
-        ]),
-        false
-      ) // use Self.id so we don't gossip to ourself
+        Comms.sendGossip(
+          'gossip-removetx',
+          payload,
+          tracker,
+          Self.id,
+          nodeListFromStates([
+            P2P.P2PTypes.NodeStatus.ACTIVE,
+            P2P.P2PTypes.NodeStatus.READY,
+            P2P.P2PTypes.NodeStatus.SYNCING,
+          ]),
+          false
+        ) // use Self.id so we don't gossip to ourself
+      }
     }
   } finally {
     profilerInstance.scopedProfileSectionEnd('serviceQueue - removeTx')
