@@ -899,7 +899,6 @@ class Shardus extends EventEmitter {
       }
     })
     Self.emitter.on('try-network-transaction', ({ ...params }) => {
-      console.log('try-network-transaction event', params)
       try {
         this.app.eventNotify?.({ type: 'try-network-transaction', ...params })
       } catch (e) {
