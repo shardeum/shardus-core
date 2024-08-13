@@ -28,8 +28,8 @@ let txAdd: P2P.ServiceQueueTypes.AddNetworkTx[] = []
 let txRemove: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
 const addProposals: P2P.ServiceQueueTypes.SignedAddNetworkTx[] = []
 const removeProposals: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
-const beforeAddVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
-const applyVerifier = new Map<string, (txData: OpaqueTransaction) => Promise<boolean>>()
+const beforeAddVerifier = new Map<string, (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>>()
+const applyVerifier = new Map<string, (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>>()
 const tryCounts = new Map<string, number>()
 
 /** ROUTES */
@@ -75,7 +75,6 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
       /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `addTxGossipRoute(): signature invalid`)
       return
     }
-    // todo: which quartes?
 
     const { sign, ...unsignedAddNetworkTx } = payload
     if (await _addNetworkTx(unsignedAddNetworkTx)) {
@@ -151,7 +150,6 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
       /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `removeTxGossipRoute(): signature invalid`)
       return
     }
-    // todo: which quartes?
     const { sign, ...unsignedRemoveNetworkTx } = payload
     if (await _removeNetworkTx(unsignedRemoveNetworkTx)) {
       // could also place check inside _removeNetworkTx
@@ -379,14 +377,14 @@ export function sendRequests(): void {
 
 export function registerBeforeAddVerifier(
   type: string,
-  verifier: (txData: OpaqueTransaction) => Promise<boolean>
+  verifier: (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>
 ): void {
   beforeAddVerifier.set(type, verifier)
 }
 
 export function registerApplyVerifier(
   type: string,
-  verifier: (txData: OpaqueTransaction) => Promise<boolean>
+  verifier: (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>
 ): void {
   applyVerifier.set(type, verifier)
 }
@@ -443,7 +441,7 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
       return false
     }
 
-    if (!(await verifyFunction(addTx.txData))) {
+    if (!(await verifyFunction(addTx))) {
       error(
         `Failed add network tx verification of type ${addTx.type} \n tx: ${stringifyReduce(addTx.txData)}`
       )
@@ -457,7 +455,7 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
         addTx.txData
       )}\n error: ${e instanceof Error ? e.stack : e}`
     )
-    return
+    return false
   }
 }
 
@@ -479,7 +477,7 @@ export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
     if (!applyVerifier.has(listEntry.tx.type)) {
       // todo: should this throw or not?
       warn('Remove network tx without a verify function!')
-    } else if (!(await applyVerifier.get(listEntry.tx.type)(listEntry.tx.txData))) {
+    } else if (!(await applyVerifier.get(listEntry.tx.type)(listEntry.tx))) {
       error(`Failed remove network tx verification of type ${listEntry.tx.type} \n
                      tx: ${stringifyReduce(listEntry.tx.txData)}`)
       return false
@@ -516,7 +514,7 @@ export async function processNetworkTransactions(): Promise<void> {
         continue
       }
 
-      if (applyVerifier.has(record.type) && !(await applyVerifier.get(record.type)(record.txData))) {
+      if (applyVerifier.has(record.type) && !(await applyVerifier.get(record.type)(record))) {
         const emitParams: Omit<ShardusEvent, 'type'> = {
           nodeId: record.txData.nodeId,
           reason: 'Try Network Transaction',
@@ -639,4 +637,16 @@ function warn(...msg: unknown[]): void {
 function error(...msg: unknown[]): void {
   const entry = `ServiceQueue: ${msg.join(' ')}`
   p2pLogger.error(entry)
+}
+
+function omitKey(obj: any, keyToOmit: string) {
+  // deep emit key from object
+  const newObj = { ...obj };
+  for (const key in newObj) {
+    if (key === keyToOmit) {
+      delete newObj[key];
+    } else if (typeof newObj[key] === 'object') {
+      newObj[key] = omitKey(newObj[key], keyToOmit);
+    }
+  }
 }
