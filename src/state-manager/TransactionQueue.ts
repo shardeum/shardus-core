@@ -8569,31 +8569,34 @@ getDebugStuckTxs(opts): unknown {
   }
 
   getQueueLengthBuckets(): any {
-  const buckets = { c15: 0, c60: 0, c120: 0, c600: 0 };
+    try {
+      const buckets = { c15: 0, c60: 0, c120: 0, c600: 0 };
 
-  if (!this._transactionQueue || this._transactionQueue.length === 0) {
-    return buckets;
-  }
-
-  const currentTime = shardusGetTime();
-
-  this._transactionQueue.forEach((queueEntry) => {
-    if (queueEntry && queueEntry.acceptedTx && queueEntry.acceptedTx.timestamp) {
-      const txAgeInSeconds = (currentTime - queueEntry.acceptedTx.timestamp) / 1000
-
-      if (txAgeInSeconds >= 15 && txAgeInSeconds < 60) {
-        buckets.c15++
-      } else if (txAgeInSeconds >= 60 && txAgeInSeconds < 120) {
-        buckets.c60++
-      } else if (txAgeInSeconds >= 120 && txAgeInSeconds < 600) {
-        buckets.c120++
-      } else if (txAgeInSeconds >= 600) {
-        buckets.c600++
+      if (!this._transactionQueue || this._transactionQueue.length === 0) {
+        return buckets;
       }
-    }
-  })
 
-  return buckets;
+      const currentTime = shardusGetTime();
+
+      this._transactionQueue.forEach((queueEntry) => {
+        if (queueEntry && queueEntry.acceptedTx && queueEntry.acceptedTx.timestamp) {
+          const txAgeInSeconds = (currentTime - queueEntry.acceptedTx.timestamp) / 1000
+
+          if (txAgeInSeconds >= 15 && txAgeInSeconds < 60) {
+            buckets.c15++
+          } else if (txAgeInSeconds >= 60 && txAgeInSeconds < 120) {
+            buckets.c60++
+          } else if (txAgeInSeconds >= 120 && txAgeInSeconds < 600) {
+            buckets.c120++
+          } else if (txAgeInSeconds >= 600) {
+            buckets.c600++
+          }
+        }
+      })
+      return buckets;
+    } catch (e) {
+      return {}
+    }
   }
 }
 
