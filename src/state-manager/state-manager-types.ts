@@ -663,6 +663,16 @@ export type AppliedVoteCore = {
 //     sign?: Shardus.Sign
 // };
 
+export type Proposal = {
+  applied: boolean
+  cant_preApply: boolean
+  accountIDs: string[]
+  beforeStateHashes: string[]
+  afterStateHashes: string[]
+  appReceiptDataHash: string
+  txid: string
+}
+
 export type AppliedVote = {
   txid: string
   transaction_result: boolean
