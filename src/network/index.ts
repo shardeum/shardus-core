@@ -908,6 +908,7 @@ export function calculateFakeTimeOffset(shift: number, spread: number) {
   const begin = shift - (spread / 2)
   const end = shift + (spread / 2) 
   fakeTimeOffsetMs = Math.round(begin + (end - begin) * Math.random())
+  return fakeTimeOffsetMs;
 }
 
 export function clearFakeTimeOffset() {

@@ -2817,7 +2817,12 @@ class Shardus extends EventEmitter {
     this.network.registerExternalGet('calculate-fake-time-offset', isDebugModeMiddlewareHigh, async (req, res) => {
       let shift = req.query.shift ? parseInt(req.query.shift as string) : 0
       let spread = req.query.spread ? parseInt(req.query.spread as string) : 0
-      calculateFakeTimeOffset(shift, spread)
+      const offset = calculateFakeTimeOffset(shift, spread)
+      this.mainLogger.debug({
+        message: "updated fake time offset",
+        data: { shift, spread, offset }
+      });
+
       res.send({ success: true })
     })
 
