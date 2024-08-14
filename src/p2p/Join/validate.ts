@@ -200,7 +200,7 @@ export function validateVersion(joinRequestVersion: string): JoinRequestResponse
     nestedCountersInstance.countEvent('p2p', `join-reject-version ${joinRequestVersion}`)
     return {
       success: false,
-      reason: `Old shardus core version, please statisfy at least ${version}`,
+      reason: `Old shardus core version, please satisfy at least ${version}`,
       fatal: true,
     }
   } else return null
