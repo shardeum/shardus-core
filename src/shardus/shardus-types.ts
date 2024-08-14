@@ -963,6 +963,8 @@ export interface ServerConfiguration {
     requiredVotesPercentage: number
     // /** a fix to prevent node from producing different ts for same txId */
     timestampCacheFix: boolean
+    // to allow internal transactions to have network generated timestamps
+    networkGeneratedTimestampFixes: boolean
   }
   /** Server IP configuration */
   ip?: {
