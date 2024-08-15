@@ -74,6 +74,21 @@ export function validateJoinRequestHost(externalIp: string): JoinRequestResponse
   return null
 }
 
+export const BAD_STRUCTURE_ERROR = {
+  success: false,
+  reason: `Bad join request object structure`,
+  fatal: true,
+}
+export const BAD_NODE_INFO_STRUCTURE_ERROR = {
+  success: false,
+  reason: 'Bad nodeInfo object structure within join request',
+  fatal: true,
+}
+export const BAD_SIGNATURE_STRUCTURE_ERROR = {
+  success: false,
+  reason: 'Bad signature object structure within join request',
+  fatal: true,
+}
 /**
  * This function is a little weird because it was taken directly from
  * `addJoinRequest`, but here's how it works:
@@ -95,11 +110,7 @@ export function verifyJoinRequestTypes(joinRequest: P2P.JoinTypes.JoinRequest): 
   })
   if (err) {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('join bad joinRequest ' + err)
-    return {
-      success: false,
-      reason: `Bad join request object structure`,
-      fatal: true,
-    }
+    return BAD_STRUCTURE_ERROR
   }
   err = utils.validateTypes(joinRequest.nodeInfo, {
     activeTimestamp: 'n',
@@ -113,25 +124,27 @@ export function verifyJoinRequestTypes(joinRequest: P2P.JoinTypes.JoinRequest): 
   })
   if (err) {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('join bad joinRequest.nodeInfo ' + err)
-    return {
-      success: false,
-      reason: 'Bad nodeInfo object structure within join request',
-      fatal: true,
-    }
+    return BAD_NODE_INFO_STRUCTURE_ERROR
   }
   err = utils.validateTypes(joinRequest.sign, { owner: 's', sig: 's' })
   if (err) {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('join bad joinRequest.sign ' + err)
-    return {
-      success: false,
-      reason: 'Bad signature object structure within join request',
-      fatal: true,
-    }
+    return BAD_SIGNATURE_STRUCTURE_ERROR
   }
 
   return null
 }
 
+export const ALREADY_KNOWN_PK_ERROR = {
+  success: false,
+  reason: 'Cannot add join request for this node, already a known node (by public key).',
+  fatal: false,
+}
+export const ALREADY_KNOWN_IP_ERROR = {
+  success: false,
+  reason: 'Cannot add join request for this node, already a known node (by IP address).',
+  fatal: true,
+}
 /**
  * Makes sure that the given `nodeInfo` is not already known to the network.
  * If it is, it returns a `JoinRequestResponse` object with `success` set to
@@ -141,30 +154,25 @@ export function verifyJoinRequestTypes(joinRequest: P2P.JoinTypes.JoinRequest): 
  * If the `nodeInfo` is not already known to the network, it returns `null`.
  */
 function verifyNodeUnknown(nodeInfo: P2P.P2PTypes.P2PNode): JoinRequestResponse | null {
-  if (NodeList.byPubKey.has(nodeInfo.publicKey)) {
-    const message = 'Cannot add join request for this node, already a known node (by public key).'
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) warn(message)
-    return {
-      success: false,
-      reason: message,
-      fatal: false,
-    }
+  if (NodeList.getByPubKeyMap().has(nodeInfo.publicKey)) {
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) warn(ALREADY_KNOWN_PK_ERROR.reason)
+    return ALREADY_KNOWN_PK_ERROR
   }
   const ipPort = NodeList.ipPort(nodeInfo.internalIp, nodeInfo.internalPort)
-  if (NodeList.byIpPort.has(ipPort)) {
-    const message = 'Cannot add join request for this node, already a known node (by IP address).'
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(message, Utils.safeStringify(NodeList.byIpPort.get(ipPort)))
+  if (NodeList.getByIpPortMap().has(ipPort)) {
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) info(ALREADY_KNOWN_IP_ERROR.reason, Utils.safeStringify(NodeList.getByIpPortMap().get(ipPort)))
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-already-known`)
-    return {
-      success: false,
-      reason: message,
-      fatal: true,
-    }
+    return ALREADY_KNOWN_IP_ERROR
   }
 
   return null
 }
 
+export const IPV6_ERROR = {
+  success: false,
+  reason: `Bad ip version, IPv6 are not accepted`,
+  fatal: true,
+}
 /**
  * Makes sure that the given `externalIp` is not an IPv6 address. If it
  * is, it returns a `JoinRequestResponse` object with `success` set to `false`
@@ -177,15 +185,16 @@ export function verifyNotIPv6(externalIp: string): JoinRequestResponse | null {
   if (isIPv6(externalIp)) {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('Got join request from IPv6')
     nestedCountersInstance.countEvent('p2p', `join-reject-ipv6`)
-    return {
-      success: false,
-      reason: `Bad ip version, IPv6 are not accepted`,
-      fatal: true,
-    }
+    return IPV6_ERROR
   }
   return null
 }
 
+export const BAD_VERSION_ERROR = {
+  success: false,
+  reason: `Old shardus core version, please satisfy at least ${version}`,
+  fatal: true,
+}
 /**
  * Makes sure that the given `joinRequestVersion` is not older than the
  * current version of the node. If it is, it returns a `JoinRequestResponse`
@@ -199,14 +208,15 @@ export function validateVersion(joinRequestVersion: string): JoinRequestResponse
   if (config.p2p.checkVersion && !isEqualOrNewerVersion(version, joinRequestVersion)) {
     /* prettier-ignore */ warn(`version number is old. Our node version is ${version}. Join request node version is ${joinRequestVersion}`)
     nestedCountersInstance.countEvent('p2p', `join-reject-version ${joinRequestVersion}`)
-    return {
-      success: false,
-      reason: `Old shardus core version, please satisfy at least ${version}`,
-      fatal: true,
-    }
+    return BAD_VERSION_ERROR
   } else return null
 }
 
+export const BAD_SIGNATURE_ERROR = {
+  success: false,
+  reason: 'Bad signature, sign owner and node attempted joining mismatched',
+  fatal: true,
+}
 /**
  * Makes sure that the given `joinRequest` is signed by the node that is
  * attempting to join. If it is not, it returns a `JoinRequestResponse` object
@@ -221,16 +231,17 @@ export function verifyJoinRequestSigner(joinRequest: P2P.JoinTypes.JoinRequest):
   if (joinRequest.sign.owner != joinRequest.nodeInfo.publicKey) {
     /* prettier-ignore */ warn(`join-reject owner != publicKey ${{ sign: joinRequest.sign.owner, info: joinRequest.nodeInfo.publicKey }}`)
     nestedCountersInstance.countEvent('p2p', `join-reject owner != publicKey`)
-    return {
-      success: false,
-      reason: `Bad signature, sign owner and node attempted joining mismatched`,
-      fatal: true,
-    }
+    return BAD_SIGNATURE_ERROR
   }
 
   return null
 }
 
+export const ALREADY_SEEN_ERROR = {
+  success: false,
+  reason: 'Node has already been seen this cycle. Unable to add join request.',
+  fatal: false,
+}
 /**
  * Makes sure that the given `joinRequest`'s node  has not already been seen this
  * cycle. If it has, it returns a `JoinRequestResponse` object with `success`
@@ -244,12 +255,8 @@ function verifyUnseen(publicKey: hexstring): JoinRequestResponse | null {
   // Check if this node has already been seen this cycle
   if (getSeen().has(publicKey)) {
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-seen-pubkey`)
-    if (logFlags.p2pNonFatal) info('Node has already been seen this cycle. Unable to add join request.')
-    return {
-      success: false,
-      reason: 'Node has already been seen this cycle. Unable to add join request.',
-      fatal: false,
-    }
+    if (logFlags.p2pNonFatal) info(ALREADY_SEEN_ERROR.reason)
+    return ALREADY_SEEN_ERROR
   }
 
   // Mark node as seen for this cycle
@@ -258,6 +265,16 @@ function verifyUnseen(publicKey: hexstring): JoinRequestResponse | null {
   return null
 }
 
+export const EARLY_TIMESTAMP_ERROR = {
+  success: false,
+  reason: 'Cannot add join request for this node, timestamp is earlier than allowed cycle range',
+  fatal: false,
+}
+export const LATE_TIMESTAMP_ERROR = {
+  success: false,
+  reason: 'Cannot add join request, timestamp exceeds allowed cycle range',
+  fatal: false,
+}
 function validateJoinRequestTimestamp(joinRequestTimestamp: number): JoinRequestResponse | null {
   //TODO - figure out why joinRequest is send with previous cycle marker instead of current cycle marker
   /*
@@ -277,21 +294,13 @@ function validateJoinRequestTimestamp(joinRequestTimestamp: number): JoinRequest
 
   if (joinRequestTimestamp < requestValidLowerBound) {
     nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-not-meet-lowerbound`)
-    /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, timestamp is earlier than allowed cycle range')
-    return {
-      success: false,
-      reason: 'Cannot add join request, timestamp is earlier than allowed cycle range',
-      fatal: false,
-    }
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) warn(EARLY_TIMESTAMP_ERROR.reason)
+    return EARLY_TIMESTAMP_ERROR
   }
 
   if (joinRequestTimestamp > requestValidUpperBound) {
     nestedCountersInstance.countEvent('p2p', `join-skip-timestamp-beyond-upperbound`)
     /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, its timestamp exceeds allowed cycle range')
-    return {
-      success: false,
-      reason: 'Cannot add join request, timestamp exceeds allowed cycle range',
-      fatal: false,
-    }
+    return LATE_TIMESTAMP_ERROR
   }
 }
