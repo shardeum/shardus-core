@@ -186,6 +186,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     requiredVotesPercentage: 2 / 3.0,
     timestampCacheFix: true,
     networkTransactionsToProcessPerCycle: 20,
+    serviceQueueAggregators: 3,
   },
   ip: {
     externalIp: '0.0.0.0',
