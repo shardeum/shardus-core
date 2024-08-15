@@ -41,7 +41,7 @@ const removeProposals: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
 const beforeAddVerifier = new Map<string, (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>>()
 const applyVerifier = new Map<string, (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>>()
 const tryCounts = new Map<string, number>()
-const verifierEntryQueue = new Map<string, VerifierEntry>()
+const processingVerifiers = new Map<string, VerifierEntry>()
 
 /** ROUTES */
 
@@ -199,12 +199,12 @@ const sendVoteHandler: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<any>> = {
         return
       }
 
-      if (!verifierEntryQueue.has(collectedVote.txHash)) {
+      if (!processingVerifiers.has(collectedVote.txHash)) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: tx not found in txList')
         return
       }
 
-      tryAppendVote(verifierEntryQueue.get(collectedVote.txHash), collectedVote)
+      tryAppendVote(processingVerifiers.get(collectedVote.txHash), collectedVote)
     } catch (e) {
       console.error(`Error processing sendVoteHandler handler: ${e}`)
       nestedCountersInstance.countEvent('internal', `${route}-exception`)
@@ -331,7 +331,7 @@ async function initVotingProcess(): Promise<void> {
     if (Self.id !== executionGroup[0]) {
       continue
     }
-    verifierEntryQueue.set(txList[i].hash, {
+    processingVerifiers.set(txList[i].hash, {
       hash: txList[i].hash,
       votes: [],
       executionGroup,
@@ -343,7 +343,7 @@ async function initVotingProcess(): Promise<void> {
     // Init the voting process here
   }
 
-  for (const [hash, entry] of verifierEntryQueue) {
+  for (const [hash, entry] of processingVerifiers) {
     ;(async function retryUntilSuccess(entry) {
       while (!entry.hasSentFinalReceipt && currentQuarter === 2) {
         await tryProduceReceipt(entry)
