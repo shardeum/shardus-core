@@ -9,14 +9,24 @@ import { profilerInstance } from '../utils/profiler'
 import * as Self from './Self'
 import { currentCycle, currentQuarter } from './CycleCreator'
 import { logFlags } from '../logger'
-import { byPubKey } from './NodeList'
+import { byIdOrder, byPubKey } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getFromArchiver } from './Archivers'
 import { Result } from 'neverthrow'
 import { getRandomAvailableArchiver } from './Utils'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { nodeListFromStates } from './Join'
+import * as utils from '../utils'
 import rfdc from 'rfdc'
+
+interface VerifierEntry {
+  hash: string
+  votes: { result: boolean; sign: any }[]
+  newVotes: boolean
+  executionGroup: []
+  appliedReceipt: any
+  hasSentFinalReceipt: boolean
+}
 
 /** STATE */
 
@@ -31,6 +41,7 @@ const removeProposals: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
 const beforeAddVerifier = new Map<string, (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>>()
 const applyVerifier = new Map<string, (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>>()
 const tryCounts = new Map<string, number>()
+const verifierEntryQueue = new Map<string, VerifierEntry>()
 
 /** ROUTES */
 
@@ -175,15 +186,172 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
   }
 }
 
+const sendVoteHandler: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<any>> = {
+  name: 'send_service_queue_vote',
+  handler: (payload, respond, header, sign) => {
+    const route = 'send_service_queue_vote'
+    profilerInstance.scopedProfileSectionStart(route, false)
+    try {
+      const collectedVote = payload
+
+      if (!collectedVote.sign) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: no sign found')
+        return
+      }
+
+      if (!verifierEntryQueue.has(collectedVote.txHash)) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: tx not found in txList')
+        return
+      }
+
+      tryAppendVote(verifierEntryQueue.get(collectedVote.txHash), collectedVote)
+    } catch (e) {
+      console.error(`Error processing sendVoteHandler handler: ${e}`)
+      nestedCountersInstance.countEvent('internal', `${route}-exception`)
+      error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+    } finally {
+      profilerInstance.scopedProfileSectionEnd(route)
+    }
+  },
+}
+
 const routes = {
   external: [],
-  internal: [],
+  internal: [sendVoteHandler],
   internalBinary: [],
   gossip: {
     ['gossip-addtx']: addTxGossipRoute,
     ['gossip-removetx']: removeTxGossipRoute,
   },
 }
+
+function tryAppendVote(queueEntry: VerifierEntry, collectedVote: any): boolean {
+  if (!queueEntry.executionGroup.some((node) => node === collectedVote.sign.owner)) {
+    nestedCountersInstance.countEvent('serviceQueue', 'Vote sender not in execution group')
+    return false
+  }
+
+  const numVotes = queueEntry.votes.length
+
+  if (numVotes === 0) {
+    queueEntry.votes.push(collectedVote)
+    queueEntry.newVotes = true
+    return true
+  }
+
+  for (let i = 0; i < numVotes; i++) {
+    // eslint-disable-next-line security/detect-object-injection
+    const currentVote = queueEntry.votes[i]
+
+    if (currentVote.sign.owner === collectedVote.sign.owner) {
+      queueEntry.newVotes = false
+      return false
+    }
+  }
+
+  queueEntry.votes.push(collectedVote)
+  queueEntry.newVotes = true
+  return true
+}
+
+function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
+  try {
+    if (queueEntry.appliedReceipt != null) {
+      nestedCountersInstance.countEvent(`serviceQueue`, 'tryProduceReceipt appliedReceipt != null')
+      return queueEntry.appliedReceipt
+    }
+
+    let votingGroup = queueEntry.executionGroup
+    const majorityCount = Math.ceil(votingGroup.length * this.config.p2p.requiredVotesPercentage)
+    const numVotes = queueEntry.votes.length
+
+    if (numVotes < majorityCount) {
+      return null
+    }
+    if (queueEntry.newVotes === false) {
+      return null
+    }
+    queueEntry.newVotes = false
+    let winningVote: boolean
+    const hashCounts: Map<boolean, number> = new Map()
+
+    for (let i = 0; i < numVotes; i++) {
+      // eslint-disable-next-line security/detect-object-injection
+      const currentVote = queueEntry.votes[i]
+      const voteCount = hashCounts.get(currentVote.result) || 0
+      hashCounts.set(currentVote.result, voteCount + 1)
+      if (voteCount + 1 > majorityCount) {
+        winningVote = currentVote.result
+        break
+      }
+    }
+
+    if (winningVote != undefined) {
+      const appliedReceipt: any = {
+        txid: queueEntry.hash,
+        result: undefined,
+      }
+      for (let i = 0; i < numVotes; i++) {
+        // eslint-disable-next-line security/detect-object-injection
+        const currentVote = queueEntry.votes[i]
+        if (currentVote.result === winningVote) {
+          appliedReceipt.signatures.push(currentVote.sign)
+        }
+      }
+
+      appliedReceipt.result = winningVote
+      queueEntry.appliedReceipt = appliedReceipt
+
+      queueEntry.hasSentFinalReceipt = true
+      Comms.sendGossip(
+        'serviceQueue-poqo-receipt-gossip',
+        appliedReceipt,
+        null,
+        null,
+        byIdOrder,
+        false,
+        4,
+        queueEntry.hash,
+        '',
+        true
+      )
+      return appliedReceipt
+    }
+    return null
+  } catch (e) {
+    /* prettier-ignore */ if (logFlags.error) error(`serviceQueue - tryProduceReceipt: error ${queueEntry.hash} error: ${utils.formatErrorMessage(e)}`)
+  }
+}
+
+//NEED TO FIGURE OUT WHERE TO CALL THIS
+async function initVotingProcess(): Promise<void> {
+  let length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
+  for (let i = 0; i < length; i++) {
+    const executionGroup = this.stateManager.getClosestNodes(txList[i].hash, 5, false)
+    if (Self.id !== executionGroup[0]) {
+      continue
+    }
+    verifierEntryQueue.set(txList[i].hash, {
+      hash: txList[i].hash,
+      votes: [],
+      executionGroup,
+      newVotes: false,
+      hasSentFinalReceipt: false,
+      appliedReceipt: null,
+    })
+
+    // Init the voting process here
+  }
+
+  for (const [hash, entry] of verifierEntryQueue) {
+    ;(async function retryUntilSuccess(entry) {
+      while (!entry.hasSentFinalReceipt && currentQuarter === 2) {
+        await tryProduceReceipt(entry)
+      }
+    })(entry)
+  }
+}
+
 
 /** FUNCTIONS */
 
