@@ -1,21 +1,47 @@
 import { Logger } from 'log4js'
-import { logger, config, crypto, network, shardus } from './Context'
+import { logger, config, crypto, network, stateManager, shardus } from './Context'
 import * as CycleChain from './CycleChain'
 import { P2P, Utils } from '@shardus/types'
-import { OpaqueTransaction, ShardusEvent } from '../shardus/shardus-types'
-import { stringifyReduce, validateTypes } from '../utils'
+import { ShardusEvent } from '../shardus/shardus-types'
+import { isValidShardusAddress, stringifyReduce, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { profilerInstance } from '../utils/profiler'
 import * as Self from './Self'
 import { currentCycle, currentQuarter } from './CycleCreator'
 import { logFlags } from '../logger'
+import { byIdOrder, byPubKey } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getFromArchiver } from './Archivers'
 import { Result } from 'neverthrow'
 import { getRandomAvailableArchiver } from './Utils'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { nodeListFromStates } from './Join'
+import * as utils from '../utils'
+import * as Shardus from '../shardus/shardus-types'
+import { ShardusTypes } from '../index'
+import ShardFunctions from '../state-manager/shardFunctions'
+import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 import * as Nodelist from './NodeList'
+
+interface VerifierEntry {
+  hash: string
+  tx: P2P.ServiceQueueTypes.AddNetworkTx
+  votes: { txHash: string; verifierType: 'beforeAdd' | 'apply'; result: boolean; sign: any }[]
+  newVotes: boolean
+  executionGroup: string[]
+  appliedReceipt: any
+  hasSentFinalReceipt: boolean
+}
+
+type VotingProposal =
+  | {
+      networkTx: P2P.ServiceQueueTypes.AddNetworkTx
+      verifierType: 'beforeAdd'
+    }
+  | {
+      networkTx: P2P.ServiceQueueTypes.RemoveNetworkTx
+      verifierType: 'apply'
+    }
 
 /** STATE */
 
@@ -35,10 +61,13 @@ const removeProposals: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
 const beforeAddVerifier = new Map<string, (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>>()
 const applyVerifier = new Map<string, (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>>()
 const tryCounts = new Map<string, number>()
+const processTxVerifiers = new Map<string, VerifierEntry>()
+const addProposals: P2P.ServiceQueueTypes.AddNetworkTx[] = []
+const removeProposals: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
 
 /** ROUTES */
 
-const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedAddNetworkTx> = async (
+const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObject> = async (
   payload,
   sender,
   tracker
@@ -54,14 +83,18 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
   try {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got addTx gossip: ${Utils.safeStringify(payload)}`)
     let err = ''
-    err = validateTypes(payload, { type: 's', txData: 'o', cycle: 'n', sign: 'o' })
+    err = validateTypes(payload, {
+      hash: 's',
+      tx: 'o',
+      votes: 'a',
+      newVotes: 'b',
+      executionGroup: 'a',
+      appliedReceipt: 'o',
+      hasSentFinalReceipt: 'b',
+      sign: 'o',
+    })
     if (err) {
       warn('addTxGossipRoute bad payload: ' + err)
-      return
-    }
-    err = validateTypes(payload.sign, { owner: 's', sig: 's' })
-    if (err) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-addtx: bad input sign ' + err)
       return
     }
 
@@ -81,15 +114,16 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
       return
     }
 
-    const { sign, ...unsignedAddNetworkTx } = payload
-    if (await _addNetworkTx(unsignedAddNetworkTx)) {
-      if (!txAdd.some((entry) => entry.hash === payload.hash)) {
-        const addTxCopy = structuredClone(unsignedAddNetworkTx)
-        const { sign, ...txDataWithoutSign } = addTxCopy.txData
-        addTxCopy.txData = txDataWithoutSign
-        txAdd.push(addTxCopy)
+    if (!verifyAppliedReceipt(payload.appliedReceipt, payload.executionGroup)) {
+      warn('addTxGossipRoute: appliedReceipt verification failed')
+      return
+    }
+    const addTxCopy = structuredClone(payload.tx)
+    const { sign, ...txDataWithoutSign } = addTxCopy.txData
+    addTxCopy.txData = txDataWithoutSign
+    txAdd.push(addTxCopy)
 
-        /* prettier-ignore */ nestedCountersInstance.countEvent(`gossip-addtx`, `gossip send - ${payload.hash}`)
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`gossip-addtx`, `gossip send - ${payload.hash}`)
         Comms.sendGossip(
           'gossip-addtx',
           payload,
@@ -102,14 +136,13 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
           ]),
           false
         ) // use Self.id so we don't gossip to ourself
-      }
-    }
+
   } finally {
     profilerInstance.scopedProfileSectionEnd('serviceQueue - addTx')
   }
 }
 
-const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedRemoveNetworkTx> = async (
+const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObject> = async (
   payload,
   sender,
   tracker
@@ -124,31 +157,31 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
 
   try {
     // this will be checked in _removeNetworkTx, but more performant to check it before crypto.verify as well
-    const index = txList.findIndex((entry) => entry.hash === payload.txHash)
+    const index = txList.findIndex((entry) => entry.hash === payload.hash)
     if (index === -1) {
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) warn(`TxHash ${payload.txHash} does not exist in txList`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) warn(`TxHash ${payload.hash} does not exist in txList`)
       return false
     }
 
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got removeTx gossip: ${Utils.safeStringify(payload)}`)
-    let err = validateTypes(payload, { txHash: 's', cycle: 'n', sign: 'o' })
-    if (err) {
-      warn('removeTxGossipRoute bad payload: ' + err)
-      return
-    }
-    err = validateTypes(payload.sign, { owner: 's', sig: 's' })
-    if (err) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: bad input sign ' + err)
-      return
-    }
+    // let err = validateTypes(payload, { txHash: 's', cycle: 'n', sign: 'o' })
+    // if (err) {
+    //   warn('removeTxGossipRoute bad payload: ' + err)
+    //   return
+    // }
+    // err = validateTypes(payload.sign, { owner: 's', sig: 's' })
+    // if (err) {
+    //   /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: bad input sign ' + err)
+    //   return
+    // }
 
-    const signer = Nodelist.byPubKey.get(payload.sign.owner)
-    if (!signer) {
-      /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: Got request from unknown node')
-      return
-    }
+    // const signer = Nodelist.byPubKey.get(payload.sign.owner)
+    // if (!signer) {
+    //   /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: Got request from unknown node')
+    //   return
+    // }
 
-    if (txRemove.some((entry) => entry.txHash === payload.txHash)) {
+    if (txRemove.some((entry) => entry.txHash === payload.hash)) {
       return
     }
 
@@ -157,13 +190,14 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
       /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `removeTxGossipRoute(): signature invalid`)
       return
     }
-    const { sign, ...unsignedRemoveNetworkTx } = payload
-    if (await _removeNetworkTx(unsignedRemoveNetworkTx)) {
-      // could also place check inside _removeNetworkTx
-      if (!txRemove.some((entry) => entry.txHash === payload.txHash)) {
-        txRemove.push(unsignedRemoveNetworkTx)
 
-        /* prettier-ignore */ nestedCountersInstance.countEvent(`gossip-removetx`, `gossip send - ${payload.txHash}`)
+    // could also place check inside _removeNetworkTx
+    if (!verifyAppliedReceipt(payload.appliedReceipt, payload.executionGroup)) {
+      return
+    }
+    txRemove.push({ txHash: payload.hash, cycle: payload.tx.cycle })
+
+    /* prettier-ignore */ nestedCountersInstance.countEvent(`gossip-removetx`, `gossip send - ${payload.txHash}`)
         Comms.sendGossip(
           'gossip-removetx',
           payload,
@@ -176,21 +210,202 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
           ]),
           false
         ) // use Self.id so we don't gossip to ourself
-      }
-    }
+
   } finally {
     profilerInstance.scopedProfileSectionEnd('serviceQueue - removeTx')
   }
 }
 
+const sendVoteHandler: P2P.P2PTypes.Route<
+  P2P.P2PTypes.InternalHandler<{
+    txHash: string
+    verifierType: 'beforeAdd' | 'apply'
+    result: boolean
+    sign: any
+  }>
+> = {
+  name: 'service_queue_vote',
+  handler: async (payload, respond, header, sign) => {
+    const route = 'service_queue_vote'
+    profilerInstance.scopedProfileSectionStart(route, false)
+    try {
+      const collectedVote = payload
+      console.log(' red - collectedVote', collectedVote)
+
+      if (![1, 2].includes(currentQuarter)) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: quarter not 1 or 2')
+        return
+      }
+
+      if (!collectedVote.sign) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: no sign found')
+        return
+      }
+
+      if (!processTxVerifiers.has(collectedVote.txHash)) {
+        console.log(' red - processTxVerifiers.has(collectedVote.txHash)', processTxVerifiers)
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: tx not in processTxVerifiers')
+        return
+      }
+
+      if (processTxVerifiers.get(collectedVote.txHash).hasSentFinalReceipt) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: tx already has sent final receipt')
+        return
+      }
+
+      tryAppendVote(processTxVerifiers.get(collectedVote.txHash), collectedVote)
+      await tryProduceReceipt(processTxVerifiers.get(collectedVote.txHash))
+    } catch (e) {
+      console.error(`Error processing sendVoteHandler handler: ${e}`)
+      nestedCountersInstance.countEvent('internal', `${route}-exception`)
+      error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+    } finally {
+      profilerInstance.scopedProfileSectionEnd(route)
+    }
+  },
+}
+
 const routes = {
   external: [],
-  internal: [],
+  internal: [sendVoteHandler],
   internalBinary: [],
   gossip: {
     ['gossip-addtx']: addTxGossipRoute,
     ['gossip-removetx']: removeTxGossipRoute,
   },
+}
+
+function tryAppendVote(
+  queueEntry: VerifierEntry,
+  collectedVote: { txHash: string; verifierType: 'beforeAdd' | 'apply'; result: boolean; sign: any }
+): boolean {
+  console.log(' red - tryAppendVote', queueEntry, collectedVote)
+  if (!queueEntry.executionGroup.some((node) => node === collectedVote.sign.owner)) {
+    console.log(' red - tryAppendVote not in execution group', queueEntry, collectedVote.sign.owner)
+    nestedCountersInstance.countEvent('serviceQueue', 'Vote sender not in execution group')
+    return false
+  }
+
+  const numVotes = queueEntry.votes.length
+
+  if (numVotes === 0) {
+    console.log(' red - tryAppendVote numVotes === 0', queueEntry, collectedVote)
+    queueEntry.votes.push(collectedVote)
+    queueEntry.newVotes = true
+    return true
+  }
+
+  for (let i = 0; i < numVotes; i++) {
+    // eslint-disable-next-line security/detect-object-injection
+    const currentVote = queueEntry.votes[i]
+
+    if (currentVote.sign.owner === collectedVote.sign.owner) {
+      queueEntry.newVotes = false
+      return false
+    }
+  }
+
+  console.log(' red - tryAppendVote appended', queueEntry, collectedVote)
+  queueEntry.votes.push(collectedVote)
+  queueEntry.newVotes = true
+  return true
+}
+
+function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
+  try {
+    console.log(' red - tryProduceReceipt starting', queueEntry)
+    if (queueEntry.appliedReceipt != null) {
+      nestedCountersInstance.countEvent(`serviceQueue`, 'tryProduceReceipt appliedReceipt != null')
+      return queueEntry.appliedReceipt
+    }
+
+    let votingGroup = queueEntry.executionGroup
+    const majorityCount = Math.ceil(votingGroup.length * config.p2p.requiredVotesPercentage)
+    const numVotes = queueEntry.votes.length
+    console.log(' red - tryProduceReceipt votes', queueEntry, majorityCount, numVotes)
+    if (numVotes < majorityCount) {
+      return null
+    }
+    if (queueEntry.newVotes === false) {
+      return null
+    }
+    queueEntry.newVotes = false
+    let winningVote: { txHash: string; verifierType: 'beforeAdd' | 'apply'; result: boolean; sign: any }
+    const hashCounts: Map<boolean, number> = new Map()
+
+    for (let i = 0; i < numVotes; i++) {
+      // eslint-disable-next-line security/detect-object-injection
+      const currentVote = queueEntry.votes[i]
+      const voteCount = hashCounts.get(currentVote.result) || 0
+      hashCounts.set(currentVote.result, voteCount + 1)
+      if (voteCount + 1 > majorityCount) {
+        winningVote = currentVote
+        break
+      }
+    }
+
+    if (winningVote != undefined) {
+      const appliedReceipt: any = {
+        txid: queueEntry.hash,
+        result: winningVote.result,
+        type: winningVote.verifierType,
+        signatures: [],
+      }
+      for (let i = 0; i < numVotes; i++) {
+        // eslint-disable-next-line security/detect-object-injection
+        const currentVote = queueEntry.votes[i]
+        if (currentVote.result === winningVote.result) {
+          appliedReceipt.signatures.push(currentVote.sign)
+        }
+      }
+
+      queueEntry.appliedReceipt = appliedReceipt
+
+      queueEntry.hasSentFinalReceipt = true
+      console.log(' red - tryProduceReceipt appliedReceipt', appliedReceipt)
+      let route = ''
+      if (queueEntry.appliedReceipt.type === 'beforeAdd') {
+        route = 'gossip-addtx'
+      } else {
+        route = 'gossip-removetx'
+      }
+      console.log(' red - tryProduceReceipt sendGossip', route, appliedReceipt)
+      const signedPayload = crypto.sign(queueEntry)
+      Comms.sendGossip(route, signedPayload, null, null, byIdOrder, false, 4, queueEntry.hash, '', true)
+      return appliedReceipt
+    }
+    return null
+  } catch (e) {
+    /* prettier-ignore */ if (logFlags.error) error(`serviceQueue - tryProduceReceipt: error ${queueEntry.hash} error: ${utils.formatErrorMessage(e)}`)
+  }
+}
+
+function initVotingProcess(propsals: VotingProposal[]): void {
+  console.log(' red - initVotingProcess', propsals)
+  startVoting(propsals)
+}
+
+async function startVoting(proposals: VotingProposal[]): Promise<void> {
+  console.log(' red - startVoting', proposals)
+  for (const proposal of proposals) {
+    if (proposal.verifierType === 'apply') {
+      const voteResult = await validateRemoveTx(proposal.networkTx)
+      const index = txList.findIndex((entry) => entry.hash === proposal.networkTx.txHash)
+      if (index === -1) {
+        error(`TxHash ${proposal.networkTx.txHash} does not exist in txList`)
+        return
+      }
+
+      voteForNetworkTx(txList[index].tx, proposal.verifierType, voteResult)
+    } else {
+      const voteResult = await validateAddTx(proposal.networkTx)
+      voteForNetworkTx(
+        proposal.networkTx as P2P.ServiceQueueTypes.AddNetworkTx,
+        proposal.verifierType,
+        voteResult
+      )
+    }
+  }
 }
 
 /** FUNCTIONS */
@@ -201,6 +416,10 @@ export function init(): void {
   p2pLogger = logger.getLogger('p2p')
 
   reset()
+
+  for (const route of routes.internal) {
+    Comms.registerInternal(route.name, route.handler)
+  }
 
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
@@ -246,6 +465,12 @@ export function init(): void {
 export function reset(): void {
   txAdd = []
   txRemove = []
+
+  for (const [hash, entry] of processTxVerifiers) {
+    if (entry.hasSentFinalReceipt) {
+      processTxVerifiers.delete(hash)
+    }
+  }
 }
 
 export function getTxs(): P2P.ServiceQueueTypes.Txs {
@@ -282,7 +507,7 @@ export function updateRecord(
           type: txadd.type,
           cycle: txadd.cycle,
           priority: txadd.priority,
-          ...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
+          involvedAddress: txadd.involvedAddress,...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
         },
       })
     }
@@ -361,6 +586,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
           txData: txDataWithoutSign,
           type: txadd.type,
           cycle: txadd.cycle,
+          involvedAddress: txadd.involvedAddress,
           priority: txadd.priority,
           ...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
         },
@@ -385,55 +611,19 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 }
 
 export function sendRequests(): void {
+  const proposals: VotingProposal[] = []
   for (const add of addProposals) {
     if (!txAdd.some((entry) => entry.hash === add.hash)) {
-      const { sign: sign1, ...unsignedAddNetworkTx } = add
-      const addTxCopy = structuredClone(unsignedAddNetworkTx)
-      const { sign: sign2, ...txDataWithoutSign } = addTxCopy.txData
-      addTxCopy.txData = txDataWithoutSign
-      txAdd.push(addTxCopy)
+      proposals.push({ networkTx: add, verifierType: 'beforeAdd' })
     }
-
-    /* prettier-ignore */ nestedCountersInstance.countEvent(`gossip-addtx`, `gossip send - ${add.hash}`)
-    Comms.sendGossip(
-      'gossip-addtx',
-      add,
-      '',
-      Self.id,
-      nodeListFromStates([
-        P2P.P2PTypes.NodeStatus.ACTIVE,
-        P2P.P2PTypes.NodeStatus.READY,
-        P2P.P2PTypes.NodeStatus.SYNCING,
-      ]),
-      true
-    )
   }
-
   for (const remove of removeProposals) {
-    const notInTxRemove = !txRemove.some((entry) => entry.txHash === remove.txHash)
-    const inTxList = txList.some((entry) => entry.hash === remove.txHash)
-
-    if (inTxList) {
-      if (notInTxRemove) {
-        const { sign, ...unsignedRemoveNetworkTx } = remove
-        txRemove.push(unsignedRemoveNetworkTx)
-      }
-
-      /* prettier-ignore */ nestedCountersInstance.countEvent(`gossip-removetx`, `gossip send - ${remove.txHash}`)
-      Comms.sendGossip(
-        'gossip-removetx',
-        remove,
-        '',
-        Self.id,
-        nodeListFromStates([
-          P2P.P2PTypes.NodeStatus.ACTIVE,
-          P2P.P2PTypes.NodeStatus.READY,
-          P2P.P2PTypes.NodeStatus.SYNCING,
-        ]),
-        true
-      )
+    if (!txRemove.some((entry) => entry.txHash === remove.txHash)) {
+      proposals.push({ networkTx: remove, verifierType: 'apply' })
     }
   }
+
+  initVotingProcess(proposals)
   addProposals.length = 0
   removeProposals.length = 0
 }
@@ -465,22 +655,16 @@ export function registerApplyVerifier(
 }
 
 export async function addNetworkTx(
-  type: string,
-  tx: OpaqueTransaction,
-  subQueueKey?: string,
-  priority: number = 0
+  networkTx: Omit<P2P.ServiceQueueTypes.AddNetworkTx, 'hash' | 'cycle'>
 ): Promise<void> {
-  const hash = crypto.hash(tx)
-  const networkTx = {
+  const hash = crypto.hash(networkTx.txData)
+  const fullNetworkTx = {
     hash,
-    type,
-    txData: tx,
     cycle: currentCycle,
-    priority,
-    subQueueKey,
+    ...networkTx,
   } as P2P.ServiceQueueTypes.AddNetworkTx
-  if (await _addNetworkTx(networkTx)){
-    makeAddNetworkTxProposals(networkTx)
+  if (await validateAddTx(fullNetworkTx)) {
+    makeAddNetworkTxProposals(fullNetworkTx)
   }
 }
 
@@ -496,22 +680,111 @@ export function getLatestNetworkTxEntryForSubqueueKey(
 }
 
 function makeAddNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.AddNetworkTx): void {
-  addProposals.push(crypto.sign(networkTx))
+  if (
+    pickAggregators(networkTx.involvedAddress)
+      .map((node) => node.id)
+      .includes(Self.id)
+  ) {
+    processTxVerifiers.set(networkTx.hash, {
+      hash: networkTx.hash,
+      tx: networkTx,
+      votes: [],
+      executionGroup: executionGroupForAddress(networkTx.involvedAddress),
+      newVotes: false,
+      hasSentFinalReceipt: false,
+      appliedReceipt: null,
+    })
+  }
+  addProposals.push(networkTx)
 }
 
-function makeRemoveNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.RemoveNetworkTx): void {
-  removeProposals.push(crypto.sign(networkTx))
+function makeRemoveNetworkTxProposals(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx): void {
+  const index = txList.findIndex((entry) => entry.hash === removeTx.txHash)
+  if (index === -1) {
+    error(`TxHash ${removeTx.txHash} does not exist in txList`)
+    return
+  }
+  const networkTx = txList[index].tx
+  if (
+    pickAggregators(networkTx.involvedAddress)
+      .map((node) => node.id)
+      .includes(Self.id)
+  ) {
+    processTxVerifiers.set(networkTx.hash, {
+      hash: networkTx.hash,
+      tx: networkTx,
+      votes: [],
+      executionGroup: executionGroupForAddress(networkTx.involvedAddress),
+      newVotes: false,
+      hasSentFinalReceipt: false,
+      appliedReceipt: null,
+    })
+  }
+  removeProposals.push(removeTx)
 }
 
-async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise<boolean> {
+function voteForNetworkTx(
+  networkTx: P2P.ServiceQueueTypes.AddNetworkTx,
+  type: 'beforeAdd' | 'apply',
+  result: boolean
+): void {
+  console.log(' red - voteForNetworkTx', networkTx.hash, type, result)
+  const vote = crypto.sign({ txHash: networkTx.hash, result, verifierType: type })
+  let aggregators = pickAggregators(networkTx.involvedAddress)
+  Comms.tell(aggregators, 'service_queue_vote', vote)
+}
+
+function executionGroupForAddress(address: string): string[] {
+  const { homePartition } = ShardFunctions.addressToPartition(
+    stateManager.currentCycleShardData.shardGlobals,
+    address
+  )
+  const homeShardData = stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
+  const consensusGroup: string[] = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.map(
+    (node: ShardusTypes.Node) => node.publicKey
+  )
+  return consensusGroup
+}
+
+function pickAggregators(address: string): ShardusTypes.Node[] {
+  const closestNodes = stateManager.getClosestNodes(address, config.sharding.nodesPerConsensusGroup, false)
+  const consensusGroup = executionGroupForAddress(address)
+
+  // now find the first n occurrences of closest nodes that are also in consensusGroup
+  const aggregators: ShardusTypes.Node[] = []
+  for (const node of closestNodes) {
+    if (consensusGroup.includes(node.publicKey)) {
+      aggregators.push(node)
+      if (aggregators.length === config.p2p.serviceQueueAggregators) break
+    }
+  }
+  return aggregators
+}
+
+async function validateAddTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise<boolean> {
   try {
     if (!addTx || !addTx.txData) {
       warn('Invalid addTx or missing addTx.txData', addTx)
       return false
     }
 
-    if (addTx.cycle < currentCycle - 1 || addTx.cycle > currentCycle) {
+    if (addTx.cycle < currentCycle - 2 || addTx.cycle > currentCycle) {
       warn(`Invalid cycle ${addTx.cycle} for current cycle ${currentCycle}`)
+      return false
+    }
+
+    if (addTx.involvedAddress == null || !isValidShardusAddress([addTx.involvedAddress])) {
+      warn(`Invalid involvedAddress ${addTx.involvedAddress}`)
+      return false
+    }
+
+    const involvedAddresses = addTx.involvedAddress
+    const selfPubKey = crypto.getPublicKey()
+    const isSelfInExecutionGroup = executionGroupForAddress(involvedAddresses).includes(selfPubKey)
+    if (!isSelfInExecutionGroup) {
+      if (logFlags.p2pNonFatal) {
+        info('Not in execution group for network tx', addTx.hash)
+      }
       return false
     }
 
@@ -551,20 +824,26 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
   }
 }
 
-export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx): Promise<boolean> {
+export async function validateRemoveTx(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx): Promise<boolean> {
   const index = txList.findIndex((entry) => entry.hash === removeTx.txHash)
   if (index === -1) {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) warn(`TxHash ${removeTx.txHash} does not exist in txList`)
     return false
   }
 
-  if (removeProposals.some((entry) => entry.txHash === removeTx.txHash)) {
-    warn(`Remove proposal already exists for ${removeTx.txHash}`)
+  // eslint-disable-next-line security/detect-object-injection
+  const listEntry = txList[index]
+
+  const involvedAddresses = listEntry.tx.involvedAddress
+  const selfPubKey = crypto.getPublicKey()
+  const isSelfInExecutionGroup = executionGroupForAddress(involvedAddresses).includes(selfPubKey)
+  if (!isSelfInExecutionGroup) {
+    if (logFlags.p2pNonFatal) {
+      info('Not in execution group for network tx remove', listEntry.hash)
+    }
     return false
   }
 
-  // eslint-disable-next-line security/detect-object-injection
-  const listEntry = txList[index]
   try {
     if (!applyVerifier.has(listEntry.tx.type)) {
       // todo: should this throw or not?
@@ -629,7 +908,7 @@ export async function processNetworkTransactions(record: P2P.CycleCreatorTypes.C
         /* prettier-ignore */ if (logFlags.p2pNonFatal) info('removeNetworkTx', txList[i].hash)
         // eslint-disable-next-line security/detect-object-injection
         const removeTx = { txHash: txList[i].hash, cycle: currentCycle }
-        if (await _removeNetworkTx(removeTx)) {
+        if (await validateRemoveTx(removeTx)) {
           makeRemoveNetworkTxProposals(removeTx)
         }
       }
@@ -726,6 +1005,40 @@ function sortedInsert(
   }
 }
 
+function verifyAppliedReceipt(receipt: any, executionGroupNodes: string[]): boolean {
+  console.log(' red - verifyAppliedReceipt', receipt, executionGroupNodes)
+  const ownerToSignMap = new Map<string, Shardus.Sign>()
+  let validSignatures = 0
+  for (const sign of receipt.signatures) {
+    if (executionGroupNodes.includes(sign.owner)) {
+      ownerToSignMap.set(sign.owner, sign)
+      validSignatures++
+    }
+  }
+  const totalNodes = executionGroupNodes.length
+  const requiredMajority = Math.ceil(totalNodes * config.p2p.requiredVotesPercentage)
+  if (ownerToSignMap.size < requiredMajority) {
+    return false
+  }
+
+  // const vote = receipt.appliedVote
+  // const voteHash = this.calculateVoteHash(vote)
+  // const appliedVoteHash = {
+  //   txid: vote.txid,
+  //   voteHash,
+  // }
+
+  // let validSignatures = 0
+  // for (const owner of ownerToSignMap.keys()) {
+  //   const signedObject = { ...appliedVoteHash, sign: ownerToSignMap.get(owner) }
+  //   if (this.crypto.verify(signedObject, owner)) {
+  //     validSignatures++
+  //   }
+  // }
+  console.log(' red - verifyAppliedReceipt validSignatures', validSignatures, requiredMajority)
+  return validSignatures >= requiredMajority
+}
+
 function info(...msg: unknown[]): void {
   const entry = `ServiceQueue: ${msg.join(' ')}`
   p2pLogger.info(entry)
@@ -739,16 +1052,4 @@ function warn(...msg: unknown[]): void {
 function error(...msg: unknown[]): void {
   const entry = `ServiceQueue: ${msg.join(' ')}`
   p2pLogger.error(entry)
-}
-
-function omitKey(obj: any, keyToOmit: string) {
-  // deep emit key from object
-  const newObj = { ...obj }
-  for (const key in newObj) {
-    if (key === keyToOmit) {
-      delete newObj[key]
-    } else if (typeof newObj[key] === 'object') {
-      newObj[key] = omitKey(newObj[key], keyToOmit)
-    }
-  }
 }

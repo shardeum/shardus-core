@@ -975,6 +975,8 @@ export interface ServerConfiguration {
     timestampCacheFix: boolean
     // /** The number of network transactions to try to process per cycle from txAdd in cycle record */
     networkTransactionsToProcessPerCycle: number
+    // /** The number of aggregators to use when collecting verifier votes in serviceQueue */
+    serviceQueueAggregators: number
   }
   /** Server IP configuration */
   ip?: {
