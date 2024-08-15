@@ -515,6 +515,14 @@ export function changeNodeListInRestore(cycleStartTimestamp: number) {
   }
 }
 
+export function getByPubKeyMap() {
+  return byPubKey
+}
+
+export function getByIpPortMap() {
+  return byIpPort
+}
+
 /** ROUTES */
 
 function info(...msg: string[]) {
