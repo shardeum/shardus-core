@@ -23,6 +23,7 @@ import { JoinRequestResponse } from '../../../src/p2p/Join/types'
 import { getAllowBogon, getSeen } from '../../../src/p2p/Join/state'
 import { getByIpPortMap, getByPubKeyMap } from '../../../src/p2p/NodeList'
 
+// mock some required functions from the Context module
 jest.mock('../../../src/p2p/Context', () => ({
   setDefaultConfigs: jest.fn(),
   config: {
@@ -32,6 +33,8 @@ jest.mock('../../../src/p2p/Context', () => ({
     },
   },
 }))
+
+// set up mocking for NodeList maps
 jest.mock('../../../src/p2p/NodeList', () => {
   const actual = jest.requireActual('../../../src/p2p/NodeList')
   return {
@@ -40,51 +43,83 @@ jest.mock('../../../src/p2p/NodeList', () => {
     getByIpPortMap: jest.fn().mockReturnValue(new Map()),
   }
 })
+
+// mock some CycleChain fields
 jest.mock('../../../src/p2p/CycleChain', () => ({
   newest: {
     duration: 60,
     start: 1723322908, // validJoinRequest.nodeInfo.joinRequestTimestamp - 10
   },
 }))
+
+// mock logging functions
 jest.mock('../../../src/p2p/Join/logging', () => ({
   info: jest.fn(),
   warn: jest.fn(),
   error: jest.fn(),
 }))
+
+// mock state functions to allow modification at test-time
 jest.mock('../../../src/p2p/Join/state', () => ({
   getAllowBogon: jest.fn().mockReturnValue(true),
   getSeen: jest.fn().mockReturnValue(new Set()),
 }))
 
+/** A test case for modifying and testing a JoinRequest. */
 interface ValidateJoinRequestTest {
+  /** `it` description of the test. */
   it: string
+
+  /** How the `validJoinRequest` should be mutated for this test. Overrides
+   * fields in the `validJoinRequest` when tests are run. */
   mutation?: object
+
+  /** The expected error response from the validation function. If `null` or
+   * `undefined`, the test is expected to be successful instead of failing with
+   * an error. */
   expectedError?: JoinRequestResponse
+
+  /** Optional function to run before the test, for e.g. mocking adjustments. */
   before?: () => void
 }
 
+/**
+ * Runs a collection of tests using the provided function, which will receive
+ * a mutated JoinRequest (depending on ValidateJoinRequestTest.mutation) and
+ * return a `JoinRequestResponse` (if unsuccessful) or `null` (if validation
+ * passes).
+ */
 const runTestsWith = (
   fn: (jr: JoinRequest) => null | JoinRequestResponse,
   tests: ValidateJoinRequestTest[]
 ): void => {
   for (const test of tests) {
+    // create an `it` call
     it(test.it, () => {
+      // run before hook if provided
       if (test.before) test.before()
 
+      // warn if the test is expecting an error, but `success` is expected to be
+      // `true`
       if (test.expectedError?.success) {
         console.warn('this test is expecting an error, but `success` is expected to be `true`')
       }
 
+      // create the mutated JoinRequest, asserting that it is a valid
+      // JoinRequest (even though it's very likely not, haha, joke's on you,
+      // TypeScript)
       const joinRequest = {
         ...validJoinRequest,
         ...(test.mutation || {}),
       } as JoinRequest
 
+      // run the validation function and get the result
       const result = fn(joinRequest)
 
       // seen set needs to be cleared after every test
       getSeen().clear()
 
+      // check if the result is what was expected
       if (!test.expectedError) {
         expect(result).toBeNull()
       } else {
@@ -94,6 +129,7 @@ const runTestsWith = (
   }
 }
 
+/** A valid JoinRequest, sourced organically from a local network. */
 const validJoinRequest: JoinRequest = Object.freeze({
   appJoinData: { adminCert: null, mustUseAdminCert: false, stakeCert: null, version: '1.12.1' },
   cycleMarker: '45da5452eb8e45d73eee05a973375ef824f43d8a3f67186e24222e3bdd5e7940',
