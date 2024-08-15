@@ -27,7 +27,8 @@ export function validateJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest): Joi
     validateJoinRequestHost(joinRequest.nodeInfo.externalIp) ||
     verifyUnseen(joinRequest.nodeInfo.publicKey) ||
     verifyNodeUnknown(joinRequest.nodeInfo) ||
-    validateJoinRequestTimestamp(joinRequest.nodeInfo.joinRequestTimestamp)
+    validateJoinRequestTimestamp(joinRequest.nodeInfo.joinRequestTimestamp) ||
+    null
   )
 }
 
