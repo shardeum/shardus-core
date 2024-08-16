@@ -328,7 +328,7 @@ async function initVotingProcess(): Promise<void> {
   let length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
   for (let i = 0; i < length; i++) {
     const executionGroup = this.stateManager.getClosestNodes(txList[i].hash, 5, false)
-    if (!executionGroup.slice(0, 3).includes(Self.id)) {
+    if (!executionGroup.slice(0, config.p2p.serviceQueueAggregators).includes(Self.id)) {
       continue
     }
     processTxVerifiers.set(txList[i].hash, {
