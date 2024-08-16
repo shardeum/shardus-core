@@ -251,7 +251,7 @@ export const ALREADY_SEEN_ERROR = {
  * If the `joinRequest`'s node has not already been seen this cycle, it returns
  * `null`.
  */
-function verifyUnseen(publicKey: hexstring): JoinRequestResponse | null {
+export function verifyUnseen(publicKey: hexstring): JoinRequestResponse | null {
   // Check if this node has already been seen this cycle
   if (getSeen().has(publicKey)) {
     if (logFlags.p2pNonFatal) nestedCountersInstance.countEvent('p2p', `join-skip-seen-pubkey`)
