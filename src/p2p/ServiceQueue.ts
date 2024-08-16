@@ -328,7 +328,7 @@ async function initVotingProcess(): Promise<void> {
   let length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
   for (let i = 0; i < length; i++) {
     const executionGroup = this.stateManager.getClosestNodes(txList[i].hash, 5, false)
-    if (Self.id !== executionGroup[0]) {
+    if (!executionGroup.slice(0, 3).includes(Self.id)) {
       continue
     }
     processTxVerifiers.set(txList[i].hash, {
@@ -351,7 +351,6 @@ async function initVotingProcess(): Promise<void> {
     })(entry)
   }
 }
-
 
 /** FUNCTIONS */
 
@@ -393,6 +392,7 @@ export function init(): void {
 export function reset(): void {
   txAdd = []
   txRemove = []
+  processTxVerifiers.clear()
 }
 
 export function getTxs(): P2P.ServiceQueueTypes.Txs {
