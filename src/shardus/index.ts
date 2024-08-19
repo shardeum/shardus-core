@@ -719,9 +719,6 @@ class Shardus extends EventEmitter {
         return
       }
 
-      // sync the network generated tx list from the archiver
-      await ServiceQueue.syncTxListFromArchiver()
-
       // After restoring state data, set syncing flags to true and go active
       await this.stateManager.startCatchUpQueue()
       console.log('restore - startCatchUpQueue')
