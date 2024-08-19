@@ -153,7 +153,7 @@ export const ALREADY_KNOWN_IP_ERROR = {
  *
  * If the `nodeInfo` is not already known to the network, it returns `null`.
  */
-function verifyNodeUnknown(nodeInfo: P2P.P2PTypes.P2PNode): JoinRequestResponse | null {
+export function verifyNodeUnknown(nodeInfo: P2P.P2PTypes.P2PNode): JoinRequestResponse | null {
   if (NodeList.getByPubKeyMap().has(nodeInfo.publicKey)) {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) warn(ALREADY_KNOWN_PK_ERROR.reason)
     return ALREADY_KNOWN_PK_ERROR
