@@ -2,8 +2,8 @@ import { Logger } from 'log4js'
 import { logger, config, crypto, network, stateManager } from './Context'
 import * as CycleChain from './CycleChain'
 import { P2P, Utils } from '@shardus/types'
-import { OpaqueTransaction, ShardusEvent } from '../shardus/shardus-types'
-import { stringifyReduce, validateTypes } from '../utils'
+import { ShardusEvent } from '../shardus/shardus-types'
+import { isValidShardusAddress, stringifyReduce, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { profilerInstance } from '../utils/profiler'
 import * as Self from './Self'
@@ -432,6 +432,7 @@ export function updateRecord(
         txData: txDataWithoutSign,
         type: txadd.type,
         cycle: txadd.cycle,
+        involvedAddress: txadd.involvedAddress,
         ...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
       },
     })
@@ -472,6 +473,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
           txData: txDataWithoutSign,
           type: txadd.type,
           cycle: txadd.cycle,
+          involvedAddress: txadd.involvedAddress,
           ...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
         },
       })
@@ -515,24 +517,19 @@ export function registerApplyVerifier(
 }
 
 export async function addNetworkTx(
-  type: string,
-  tx: OpaqueTransaction,
-  involvedAddress: string,
-  subQueueKey?: string
+  networkTx: Omit<P2P.ServiceQueueTypes.AddNetworkTx, 'hash' | 'cycle'>
 ): Promise<void> {
-  const isRemote = stateManager.transactionQueue.isAccountRemote(involvedAddress)
+  const isRemote = stateManager.transactionQueue.isAccountRemote(networkTx.involvedAddress)
   if (isRemote) {
     return
   }
-  const hash = crypto.hash(tx)
-  const networkTx = {
+  const hash = crypto.hash(networkTx.txData)
+  const fullNetworkTx = {
     hash,
-    type,
-    txData: tx,
     cycle: currentCycle,
-    subQueueKey,
+    ...networkTx
   } as P2P.ServiceQueueTypes.AddNetworkTx
-  if (await _addNetworkTx(networkTx)) {
+  if (await _addNetworkTx(fullNetworkTx)) {
     voteForNetworkTx(hash, 'add', true)
   } else {
     voteForNetworkTx(hash, 'add', false)
@@ -540,18 +537,15 @@ export async function addNetworkTx(
 }
 
 function voteForNetworkTx(txHash: string, type: 'add' | 'remove', result: boolean): void {
-  const isRemote = stateManager.transactionQueue.isAccountRemote(txHash)
-  if (isRemote) {
-    return
-  }
-
   const vote = crypto.sign({ txHash, result, type })
   Comms.tell(pickAggregators(txHash), 'send_service_queue_vote', vote)
 }
 
 function pickAggregators(hash: string): ShardusTypes.Node[] {
+  // todo: fix how we pick the aggregators. this is not stable enough for production
   const executionGroup = stateManager.getClosestNodes(hash, config.sharding.nodesPerConsensusGroup, false)
-  return executionGroup.slice(0, config.p2p.serviceQueueAggregators)
+  const localAccounts = executionGroup.filter((node) => stateManager.transactionQueue.isAccountRemote(node.publicKey))
+  return localAccounts.slice(0, config.p2p.serviceQueueAggregators)
 }
 
 async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise<boolean> {
@@ -563,6 +557,11 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
 
     if (addTx.cycle < currentCycle - 1 || addTx.cycle > currentCycle) {
       warn(`Invalid cycle ${addTx.cycle} for current cycle ${currentCycle}`)
+      return false
+    }
+
+    if (addTx.involvedAddress == null || !isValidShardusAddress([addTx.involvedAddress])) {
+      warn(`Invalid involvedAddress ${addTx.involvedAddress}`)
       return false
     }
 
@@ -668,6 +667,10 @@ export async function processNetworkTransactions(): Promise<void> {
           processedSubQueueKeys.add(record.subQueueKey)
         }
       } else {
+        const isRemote = stateManager.transactionQueue.isAccountRemote(txList[i].tx.involvedAddress)
+        if (isRemote) {
+          return
+        }
         // eslint-disable-next-line security/detect-object-injection
         /* prettier-ignore */ if (logFlags.p2pNonFatal) info('removeNetworkTx', txList[i].hash)
         // eslint-disable-next-line security/detect-object-injection
