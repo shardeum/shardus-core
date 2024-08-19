@@ -9,13 +9,13 @@ import { profilerInstance } from '../utils/profiler'
 import * as Self from './Self'
 import { currentCycle, currentQuarter } from './CycleCreator'
 import { logFlags } from '../logger'
-import { byPubKey } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getFromArchiver } from './Archivers'
 import { Result } from 'neverthrow'
 import { getRandomAvailableArchiver } from './Utils'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { nodeListFromStates } from './Join'
+import * as Nodelist from './NodeList'
 import rfdc from 'rfdc'
 
 /** STATE */
@@ -274,6 +274,32 @@ export function updateRecord(
   }
 
   record.txlisthash = crypto.hash(txListCopy)
+
+  // add all active nodes to the cycle record in the event of a shutdown
+  if (record.mode === 'shutdown') {
+    for (const node of Nodelist.activeByIdOrder) {
+      const emitParams: Omit<ShardusEvent, 'type'> = {
+        nodeId: node.id,
+        reason: 'Node deactivated',
+        time: record.start,
+        publicKey: node.publicKey,
+        cycleNumber: record.counter,
+        activeCycle: node.activeCycle,
+      }
+      const { txData, subQueueKey } = this.app.getDeactivatedTxData(emitParams)
+
+      const hash = crypto.hash(txData)
+      const addTx = {
+        hash,
+        type: 'nodeReward',
+        txData: txData,
+        cycle: currentCycle,
+        subQueueKey,
+      } as P2P.ServiceQueueTypes.AddNetworkTx
+
+      record.txadd.push(addTx)
+    }
+  }
 }
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
