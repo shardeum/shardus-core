@@ -110,7 +110,9 @@ export type QueueEntry = {
   hasSentFinalReceipt?: boolean
 
   // Consensus tracking:
-  ourVote?: AppliedVote
+  ourProposal: Proposal
+  ourVote?: Vote
+  signedReceipt?: SignedReceipt
   ourVoteHash?: string
   collectedVotes: AppliedVote[]
   collectedVoteHashes: AppliedVoteHash[]

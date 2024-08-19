@@ -36,6 +36,8 @@ import {
   WrappedResponses,
   TimestampRemoveRequest,
   Proposal,
+  Vote,
+  SignedReceipt,
 } from './state-manager-types'
 import { ipInfo, shardusGetTime } from '../network'
 import { robustQuery } from '../p2p/Utils'
@@ -1096,10 +1098,10 @@ class TransactionConsenus {
 
     Comms.registerGossipHandler(
       'poqo-receipt-gossip',
-      (payload: AppliedReceipt2 & { txGroupCycle: number }) => {
+      (payload: SignedReceipt & { txGroupCycle: number }) => {
         profilerInstance.scopedProfileSectionStart('poqo-receipt-gossip')
         try {
-          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid)
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.proposal.txid)
           if (queueEntry == null) {
             nestedCountersInstance.countEvent('poqo', 'error: gossip skipped: no queue entry')
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip no queue entry for ${payload.txid}`)
@@ -1110,7 +1112,7 @@ class TransactionConsenus {
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip mismatch txGroupCycle for txid: ${payload.txid}, sender's txGroupCycle: ${payload.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
               nestedCountersInstance.countEvent(
                 'poqo',
-                'poqo-receipt-gossip: mismatch txGroupCycle for txid ' + payload.txid
+                'poqo-receipt-gossip: mismatch txGroupCycle for txid ' + payload.proposal.txid
               )
             }
             delete payload.txGroupCycle
@@ -1131,9 +1133,7 @@ class TransactionConsenus {
             return
           }
 
-          queueEntry.poqoReceipt = payload
-          queueEntry.appliedReceipt2 = payload
-          queueEntry.recievedAppliedReceipt2 = payload
+          queueEntry.signedReceipt = payload
           payload.txGroupCycle = queueEntry.txGroupCycle
           Comms.sendGossip(
             'poqo-receipt-gossip',
@@ -1143,7 +1143,7 @@ class TransactionConsenus {
             queueEntry.transactionGroup,
             false,
             4,
-            payload.txid,
+            payload.proposal.txid,
             '',
             true
           )
@@ -1164,11 +1164,11 @@ class TransactionConsenus {
                 'final data timeout, making explicit request'
               )
 
-              const nodesToAskKeys = payload.signatures?.map((signature) => signature.owner)
+              const nodesToAskKeys = payload.signaturePack?.map((signature) => signature.owner)
 
               await this.stateManager.transactionQueue.requestFinalData(
                 queueEntry,
-                payload.appliedVote.account_id,
+                payload.proposal.accountIDs,
                 nodesToAskKeys
               )
 
@@ -1561,23 +1561,23 @@ class TransactionConsenus {
 
           const readableReq = deserializePoqoSendReceiptReq(requestStream)
 
-          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(readableReq.txid)
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(readableReq.proposal.txid)
           if (queueEntry == null) {
             /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'binary/poqo_send_receipt: no queue entry found')
             return
           }
           if (readableReq.txGroupCycle) {
             if (queueEntry.txGroupCycle !== readableReq.txGroupCycle) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`binary_poqo_send_receipt mismatch txGroupCycle for txid: ${readableReq.txid}, sender's txGroupCycle: ${readableReq.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`binary_poqo_send_receipt mismatch txGroupCycle for txid: ${readableReq.proposal.txid}, sender's txGroupCycle: ${readableReq.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
               nestedCountersInstance.countEvent(
                 'poqo',
-                'binary_poqo_send_receipt: mismatch txGroupCycle for tx ' + readableReq.txid
+                'binary_poqo_send_receipt: mismatch txGroupCycle for tx ' + readableReq.proposal.txid
               )
             }
             delete readableReq.txGroupCycle
           }
 
-          if (queueEntry.poqoReceipt) {
+          if (queueEntry.signedReceipt) {
             // We've already handled this
             return
           }
@@ -1585,7 +1585,7 @@ class TransactionConsenus {
           const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
           const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq, executionGroupNodes)
           if (!hasTwoThirdsMajority) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.txid}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.proposal.txid}`)
               nestedCountersInstance.countEvent('poqo', 'poqo-send-receipt: Rejecting receipt because no majority')
             return
           }
@@ -1594,10 +1594,8 @@ class TransactionConsenus {
             this.mainLogger.debug(
               `POQo: Received receipt from aggregator for ${queueEntry.logID} starting CT2 for data & receipt`
             )
-          const receivedReceipt = readableReq as AppliedReceipt2
-          queueEntry.poqoReceipt = receivedReceipt
-          queueEntry.appliedReceipt2 = receivedReceipt
-          queueEntry.recievedAppliedReceipt2 = receivedReceipt
+          const receivedReceipt = readableReq as SignedReceipt
+          queueEntry.signedReceipt = receivedReceipt
           queueEntry.hasSentFinalReceipt = true
           const receiptToGossip = { ...readableReq, txGroupCycle: queueEntry.txGroupCycle }
           Comms.sendGossip(
@@ -1608,7 +1606,7 @@ class TransactionConsenus {
             queueEntry.transactionGroup,
             false,
             4,
-            readableReq.txid,
+            readableReq.proposal.txid,
             '',
             true
           )
@@ -1715,9 +1713,9 @@ class TransactionConsenus {
     Comms.registerInternalBinary(poqoSendVoteBinaryHandler.name, poqoSendVoteBinaryHandler.handler)
   }
 
-  verifyAppliedReceipt(receipt: AppliedReceipt2, executionGroupNodes: Set<string>): boolean {
+  verifyAppliedReceipt(receipt: SignedReceipt, executionGroupNodes: Set<string>): boolean {
     const ownerToSignMap = new Map<string, Shardus.Sign>();
-    for (const sign of receipt.signatures) {
+    for (const sign of receipt.signaturePack) {
       if (executionGroupNodes.has(sign.owner)) {
         ownerToSignMap.set(sign.owner, sign);
       }
@@ -1728,11 +1726,9 @@ class TransactionConsenus {
       return false;
     }
 
-    const vote = receipt.appliedVote; 
-    const voteHash = this.calculateVoteHash(vote);
     const appliedVoteHash = {
-      txid: vote.txid,
-      voteHash,
+      txid: receipt.proposal.txid,
+      voteHash: receipt.proposalHash,
     }
 
     let validSignatures = 0;    
@@ -2024,12 +2020,12 @@ class TransactionConsenus {
     }
 
     if (appliedReceipt != null) {
-      if (appliedReceipt.result !== queueEntry.ourVote.transaction_result) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ${appliedReceipt.result}, ${queueEntry.ourVote.transaction_result} appliedReceipt.result !== queueEntry.ourVote.transaction_result`)
+      if (appliedReceipt.result !== queueEntry.ourProposal.applied) {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ${appliedReceipt.result}, ${queueEntry.ourProposal.applied} appliedReceipt.result !== queueEntry.ourProposal.applied`)
         return false
       }
-      if (appliedReceipt.txid !== queueEntry.ourVote.txid) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.txid !== queueEntry.ourVote.txid`)
+      if (appliedReceipt.txid !== queueEntry.ourProposal.txid) {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.txid !== queueEntry.ourProposal.txid`)
         return false
       }
       if (appliedReceipt.appliedVotes.length === 0) {
@@ -2128,7 +2124,7 @@ class TransactionConsenus {
    *
    * @param queueEntry
    */
-  async tryProduceReceipt(queueEntry: QueueEntry): Promise<AppliedReceipt> {
+  async tryProduceReceipt(queueEntry: QueueEntry): Promise<SignedReceipt> {
     this.profiler.profileSectionStart('tryProduceReceipt')
     if (logFlags.profiling_verbose) this.profiler.scopedProfileSectionStart('tryProduceReceipt')
     try {
@@ -2144,10 +2140,10 @@ class TransactionConsenus {
       //   return null
       // }
 
-      if (queueEntry.appliedReceipt != null) {
+      if (queueEntry.signedReceipt != null) {
         nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt appliedReceipt != null')
         if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt ${queueEntry.logID} appliedReceipt != null`)
-        return queueEntry.appliedReceipt
+        return queueEntry.signedReceipt
       }
 
       if (queueEntry.queryingRobustConfirmOrChallenge === true) {
@@ -2222,25 +2218,18 @@ class TransactionConsenus {
           }
 
           //make the new receipt.
-          const appliedReceipt2: AppliedReceipt2 = {
-            txid: queueEntry.acceptedTx.txId,
-            result: undefined,
-            appliedVote: undefined,
-            signatures: [],
-            app_data_hash: '',
-            // transaction_result: false //this was missing before..
+          const signedReceipt: SignedReceipt = {
+            proposal: queueEntry.ourProposal,
+            proposalHash: queueEntry.ourVoteHash,
+            signaturePack: []
           }
           for (let i = 0; i < numVotes; i++) {
             // eslint-disable-next-line security/detect-object-injection
             const currentVote = queueEntry.collectedVoteHashes[i]
             if (currentVote.voteHash === winningVoteHash) {
-              appliedReceipt2.signatures.push(currentVote.sign)
+              signedReceipt.signaturePack.push(currentVote.sign)
             }
           }
-
-          appliedReceipt2.result = queueEntry.ourVote.transaction_result
-          appliedReceipt2.appliedVote = queueEntry.ourVote
-          appliedReceipt2.app_data_hash = queueEntry.ourVote.app_data_hash
           // now send it !!!
 
           // for (let i = 0; i < queueEntry.ourVote.account_id.length; i++) {
@@ -2252,20 +2241,20 @@ class TransactionConsenus {
           //   /* eslint-enable security/detect-object-injection */
           // }
 
-          queueEntry.appliedReceipt2 = appliedReceipt2
-          queueEntry.poqoReceipt = appliedReceipt2
+          queueEntry.signedReceipt = signedReceipt
+          
 
           //this is a temporary hack to reduce the ammount of refactor needed.
-          const appliedReceipt: AppliedReceipt = {
-            txid: queueEntry.acceptedTx.txId,
-            result: queueEntry.ourVote.transaction_result,
-            appliedVotes: [queueEntry.ourVote],
-            confirmOrChallenge: [], // TODO: Do we remove this for POQo??
-            app_data_hash: appliedReceipt2.app_data_hash,
-          }
-          queueEntry.appliedReceipt = appliedReceipt
+          // const appliedReceipt: AppliedReceipt = {
+          //   txid: queueEntry.acceptedTx.txId,
+          //   result: queueEntry.ourVote.transaction_result,
+          //   appliedVotes: [queueEntry.ourVote],
+          //   confirmOrChallenge: [], // TODO: Do we remove this for POQo??
+          //   app_data_hash: appliedReceipt2.app_data_hash,
+          // }
+          // queueEntry.appliedReceipt = appliedReceipt
 
-          const payload = { ...appliedReceipt2, txGroupCycle: queueEntry.txGroupCycle }
+          const payload = { ...signedReceipt, txGroupCycle: queueEntry.txGroupCycle }
           // tellx128 the receipt to the entire execution group
           // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.poqoSendReceiptBinary) {
            
@@ -2293,7 +2282,7 @@ class TransactionConsenus {
             // note: appliedReceipt2.result comes from queueEntry.ourVote.transaction_result which comes from PreApplyAcceptedTransactionResult.passed
             // it will be false if the apply funciton throws an error to signal that it was not possible apply
 
-            if(appliedReceipt2.result === true){
+            if(signedReceipt.proposal.applied === true){
               // if we have a receipt with a positive result we should not have a null preApplyTXResult
               /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', `error: unexpected preApplyTXResult == null while result === true.  preApplyTXResult:${queueEntry.preApplyTXResult != null} applyResponse:${queueEntry.preApplyTXResult?.applyResponse != null}`)
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`error: unexpected preApplyTXResult == null while result === true ${queueEntry.logID}   preApplyTXResult:${queueEntry.preApplyTXResult != null}  applyResponse:${queueEntry.preApplyTXResult?.applyResponse != null}`)
@@ -2315,7 +2304,7 @@ class TransactionConsenus {
             '',
             true
           )
-          return appliedReceipt
+          return signedReceipt
         }
       } else if (this.stateManager.transactionQueue.useNewPOQ === false) {
         const requiredVotes = Math.round(votingGroup.length * this.config.p2p.requiredVotesPercentage) //hacky for now.  debug code:
@@ -3505,28 +3494,22 @@ class TransactionConsenus {
       let isReceivedBetterVote = false
 
       // create our vote (for later use) even if we have received a better vote
-      let ourVote: AppliedVote = {
+      const proposal: Proposal = {
         txid: queueEntry.acceptedTx.txId,
-        transaction_result: queueEntry.preApplyTXResult.passed,
-        account_id: [],
-        account_state_hash_after: [],
-        account_state_hash_before: [],
-        node_id: ourNodeId,
-        cant_apply: queueEntry.preApplyTXResult.applied === false,
-        app_data_hash: '',
+        applied: queueEntry.preApplyTXResult.passed,
+        accountIDs: [],
+        afterStateHashes: [],
+        beforeStateHashes: [],
+        cant_preApply: queueEntry.preApplyTXResult.applied === false,
+        appReceiptDataHash: '',
       }
 
-      // BAD NODE SIMULATION
-      if (this.produceBadVote) {
-        ourVote.transaction_result = !ourVote.transaction_result
-      }
-
-      ourVote.app_data_hash = queueEntry?.preApplyTXResult?.applyResponse?.appReceiptDataHash || ''
+      proposal.appReceiptDataHash = queueEntry?.preApplyTXResult?.applyResponse?.appReceiptDataHash || ''
 
       if (queueEntry.debugFail_voteFlip === true) {
         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
 
-        ourVote.transaction_result = !ourVote.transaction_result
+          proposal.applied = !proposal.applied
       }
 
       let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
@@ -3576,26 +3559,30 @@ class TransactionConsenus {
           wrappedState.stateId = updatedHash
 
           // populate accountIds
-          ourVote.account_id.push(wrappedState.accountId)
+          proposal.accountIDs.push(wrappedState.accountId)
           // popoulate after state hashes
-          ourVote.account_state_hash_after.push(wrappedState.stateId) // account hash for nonce 100
+          proposal.afterStateHashes.push(wrappedState.stateId) // account hash for nonce 100
           const wrappedResponse = queueEntry.collectedData[wrappedState.accountId]
           // populate before state hashes
-          if (wrappedResponse != null) ourVote.account_state_hash_before.push(wrappedResponse.stateId)
+          if (wrappedResponse != null) proposal.beforeStateHashes.push(wrappedResponse.stateId)
         }
       }
 
       let appliedVoteHash: AppliedVoteHash
       //let temp = ourVote.node_id
       // ourVote.node_id = '' //exclue this from hash
-      ourVote = this.crypto.sign(ourVote)
-      const voteHash = this.calculateVoteHash(ourVote)
+      // proposal = this.crypto.sign(proposal)
+      const voteHash = this.calculateVoteHash(proposal)
       //ourVote.node_id = temp
       appliedVoteHash = {
-        txid: ourVote.txid,
+        txid: proposal.txid,
         voteHash,
       }
       queueEntry.ourVoteHash = voteHash
+
+      const ourVote: Vote = {
+        proposalHash: voteHash,
+      }
 
       if (logFlags.debug || this.stateManager.consensusLog)
         this.mainLogger.debug(
@@ -3610,7 +3597,10 @@ class TransactionConsenus {
         this.tryAppendVoteHash(queueEntry, appliedVoteHash)
 
       // save our vote to our queueEntry
+      this.crypto.sign(ourVote)
+      this.crypto.sign(proposal)
       queueEntry.ourVote = ourVote
+      queueEntry.ourProposal = proposal
       if (queueEntry.firstVoteReceivedTimestamp === 0) {
         queueEntry.firstVoteReceivedTimestamp = shardusGetTime()
       }

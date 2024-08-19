@@ -1,11 +1,7 @@
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
-import {
-  AppliedReceipt2Serializable,
-  deserializeAppliedReceipt2,
-  serializeAppliedReceipt2,
-} from './AppliedReceipt2'
-export type PoqoSendReceiptReq = AppliedReceipt2Serializable & { txGroupCycle: number }
+import { deserializeSignedReceipt, serializeSignedReceipt, SignedReceiptSerializable } from './SignedReceipt'
+export type PoqoSendReceiptReq = SignedReceiptSerializable & { txGroupCycle: number }
 
 const cPoqoSendReceiptReqVersion = 1
 
@@ -19,7 +15,7 @@ export function serializePoqoSendReceiptReq(
   }
   stream.writeUInt8(cPoqoSendReceiptReqVersion)
 
-  serializeAppliedReceipt2(stream, obj)
+  serializeSignedReceipt(stream, obj)
   stream.writeUInt32(obj.txGroupCycle)
 }
 
@@ -29,5 +25,5 @@ export function deserializePoqoSendReceiptReq(stream: VectorBufferStream): PoqoS
     throw new Error('PoQoSendReceiptReq Unsupported version')
   }
 
-  return { ...deserializeAppliedReceipt2(stream), txGroupCycle: stream.readUInt32() }
+  return { ...deserializeSignedReceipt(stream), txGroupCycle: stream.readUInt32() }
 }
