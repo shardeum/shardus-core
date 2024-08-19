@@ -110,7 +110,7 @@ export type QueueEntry = {
   hasSentFinalReceipt?: boolean
 
   // Consensus tracking:
-  ourProposal: Proposal
+  ourProposal?: Proposal
   ourVote?: Vote
   signedReceipt?: SignedReceipt
   ourVoteHash?: string
@@ -160,14 +160,20 @@ export type QueueEntry = {
   recievedAppliedReceipt?: AppliedReceipt
   // receipt that we need to repair to
   appliedReceiptForRepair?: AppliedReceipt
+  // receipt we need to repair to
+  signedReceiptForRepair?: SignedReceipt
   // receipt coalesced in getReceipt().
   appliedReceiptFinal?: AppliedReceipt
+  // receipt coalesced in getReceipt().
+  signedReceiptFinal?: SignedReceipt
 
   // For config.debug.optimizedTXConsenus === true
   // receipt that we created
   appliedReceipt2?: AppliedReceipt2
   // receipt that we got from gossip
   recievedAppliedReceipt2?: AppliedReceipt2
+  // receipt that we got from gossip
+  receivedSignedReceipt?: SignedReceipt
   // receipt that we need to repair to
   appliedReceiptForRepair2?: AppliedReceipt2
   // receipt coalesced in getReceipt().

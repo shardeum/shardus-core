@@ -1104,12 +1104,12 @@ class TransactionConsenus {
           const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.proposal.txid)
           if (queueEntry == null) {
             nestedCountersInstance.countEvent('poqo', 'error: gossip skipped: no queue entry')
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip no queue entry for ${payload.txid}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip no queue entry for ${payload.proposal.txid}`)
             return
           }
           if (payload.txGroupCycle) {
             if (queueEntry.txGroupCycle !== payload.txGroupCycle) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip mismatch txGroupCycle for txid: ${payload.txid}, sender's txGroupCycle: ${payload.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip mismatch txGroupCycle for txid: ${payload.proposal.txid}, sender's txGroupCycle: ${payload.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
               nestedCountersInstance.countEvent(
                 'poqo',
                 'poqo-receipt-gossip: mismatch txGroupCycle for txid ' + payload.proposal.txid
@@ -1128,7 +1128,7 @@ class TransactionConsenus {
           const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
           const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload, executionGroupNodes)
           if (!hasTwoThirdsMajority) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.txid}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.proposal.txid}`)
               nestedCountersInstance.countEvent('poqo', 'poqo-receipt-gossip: Rejecting receipt because no majority')
             return
           }
@@ -1237,9 +1237,9 @@ class TransactionConsenus {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid: readableReq.receipt == null sender ${_sender}`)
               return
           }
-          if(readableReq.finalState.txid != readableReq.receipt.txid) {
+          if(readableReq.finalState.txid != readableReq.receipt.proposal.txid) {
             nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt: readableReq.finalState.txid != readableReq.receipt.txid')
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid: readableReq.finalState.txid != readableReq.receipt.txid sender ${_sender}  ${readableReq.finalState.txid} != ${readableReq.receipt.txid}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid: readableReq.finalState.txid != readableReq.receipt.txid sender ${_sender}  ${readableReq.finalState.txid} != ${readableReq.receipt.proposal.txid}`)
               return
           }
 
@@ -1247,7 +1247,7 @@ class TransactionConsenus {
             const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
             const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq.receipt, executionGroupNodes)
             if(!hasTwoThirdsMajority) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.receipt.txid}`)
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.receipt.proposal.txid}`)
               nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt because no majority')
               return
             }
@@ -1255,9 +1255,7 @@ class TransactionConsenus {
               this.mainLogger.debug(
                 `POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`
               )
-            queueEntry.poqoReceipt = readableReq.receipt
-            queueEntry.appliedReceipt2 = readableReq.receipt
-            queueEntry.recievedAppliedReceipt2 = readableReq.receipt
+            queueEntry.signedReceipt = readableReq.receipt
             const receiptToGossip = { ...readableReq.receipt, txGroupCycle: queueEntry.txGroupCycle }
             Comms.sendGossip(
               'poqo-receipt-gossip',
