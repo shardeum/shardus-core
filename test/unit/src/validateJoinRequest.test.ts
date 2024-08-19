@@ -17,11 +17,12 @@ import {
   validateVersion,
   verifyJoinRequestSigner,
   verifyJoinRequestTypes,
+  verifyNodeUnknown,
   verifyNotIPv6,
 } from '../../../src/p2p/Join/validate'
 import { JoinRequestResponse } from '../../../src/p2p/Join/types'
 import { getAllowBogon, getSeen } from '../../../src/p2p/Join/state'
-import { getByIpPortMap, getByPubKeyMap } from '../../../src/p2p/NodeList'
+import { getByIpPortMap, getByPubKeyMap, ipPort as mkIpPort } from '../../../src/p2p/NodeList'
 
 // mock some required functions from the Context module
 jest.mock('../../../src/p2p/Context', () => ({
@@ -429,12 +430,25 @@ describe('validateJoinRequestHost', () => {
 //   it('should pass if node is unseen', () => {})
 //   it('should fail if node is already seen', () => {})
 // })
-//
-// describe('verifyNodeUnknown', () => {
-//   it('should pass if joining node is unknown', () => {})
-//   it('should fail if joining node is known', () => {})
-// })
-//
+
+describe('verifyNodeUnknown', () => {
+  it('should pass if node is unknown', () => {
+    const result = verifyNodeUnknown(validJoinRequest.nodeInfo)
+    expect(result).toBeNull()
+  })
+  it('should fail if node is known by public key', () => {
+    ;(getByPubKeyMap as jest.Mock).mockReturnValueOnce(new Map([[validJoinRequest.nodeInfo.publicKey, {}]]))
+    const result = verifyNodeUnknown(validJoinRequest.nodeInfo)
+    expect(result).toStrictEqual(ALREADY_KNOWN_PK_ERROR)
+  })
+  it('should fail if node is known by internal IP address', () => {
+    const ipPort = mkIpPort(validJoinRequest.nodeInfo.internalIp, validJoinRequest.nodeInfo.internalPort)
+    ;(getByIpPortMap as jest.Mock).mockReturnValueOnce(new Map([[ipPort, {}]]))
+    const result = verifyNodeUnknown(validJoinRequest.nodeInfo)
+    expect(result).toStrictEqual(ALREADY_KNOWN_IP_ERROR)
+  })
+})
+
 // describe('validateJoinRequestTimestamp', () => {
 //   it('should pass with correct timestamp', () => {})
 //   it('should fail with invalid timestamp', () => {})
