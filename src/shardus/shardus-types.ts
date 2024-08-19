@@ -982,6 +982,11 @@ export interface ServerConfiguration {
   network?: {
     /** The timeout parameter is an Integer specifying the amount of time (in seconds) given to an internal network request made by the node until it gets timed out. */
     timeout?: number
+    /**
+     * The requestTimeout parameter is an Integer specifying the amount of time (in seconds) given to an external network request made by the node until it gets timed out.
+     * This is used to prevent the server from hanging on a request.
+     */
+    requestTimeout?: number
   }
   /** Server Report module configuration */
   reporting?: {

@@ -193,7 +193,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     internalIp: '0.0.0.0',
     internalPort: 10001,
   },
-  network: { timeout: 5 },
+  network: { timeout: 5, requestTimeout: 5 },
   reporting: {
     report: true,
     recipient: 'http://127.0.0.1:3000/api',

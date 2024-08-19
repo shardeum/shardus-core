@@ -112,20 +112,24 @@ export class NetworkClass extends EventEmitter {
   customSendJsonMiddleware(req, res, next) {
     const originalSend = res.send;
     res.send = function (data) {
-      if (typeof data === 'object' && data !== null) {
+      if (!res.headersSent) {
+        if (typeof data === 'object' && data !== null) {
+          const jsonString = Utils.safeStringify(data)
+          res.setHeader('Content-Type', 'application/json')
+          return originalSend.call(this, jsonString)
+        }
+        return originalSend.call(this, data)
+      }
+    };
+  
+    res.json = function (data) {
+      if (!res.headersSent) {
         const jsonString = Utils.safeStringify(data)
         res.setHeader('Content-Type', 'application/json')
         return originalSend.call(this, jsonString)
       }
-      return originalSend.call(this, data)
-    };
-
-    res.json = function (data) {
-      const jsonString = Utils.safeStringify(data)
-      res.setHeader('Content-Type', 'application/json')
-      return originalSend.call(this, jsonString)
     }
-
+  
     next()
   }
 
@@ -162,11 +166,33 @@ export class NetworkClass extends EventEmitter {
         next()
       }
 
+      const timeoutMiddleware = function (req, res, next) {
+        const timeout = config.network.requestTimeout * 1000 || 5000
+        let timer = setTimeout(() => {
+          if (!res.headersSent) {
+            res.status(408).json({ error: 'Request Timeout' })
+          }
+        }, timeout)
+
+        const clearTimer = () => {
+          if (timer) {
+            clearTimeout(timer)
+            timer = null
+          }
+        }
+
+        res.on('finish', clearTimer)
+        res.on('close', clearTimer)
+
+        next()
+      }
+      
       this.app.use(bodyParser.json({ limit: '50mb', reviver: Utils.typeReviver}))
       this.app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }))
       this.app.use(cors())
       this.app.use(this.customSendJsonMiddleware)
       this.app.use(storeRequests)
+      this.app.use(timeoutMiddleware)
       this._applyExternal()
       this.extServer = this.app.listen(this.ipInfo.externalPort, () => {
         const msg = `External server running on port ${this.ipInfo.externalPort}...`
