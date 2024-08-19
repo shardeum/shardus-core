@@ -564,12 +564,17 @@ export async function syncTxListFromArchiver(): Promise<void> {
   const latestTxListHash = CycleChain?.newest?.txlisthash
 
   if (!latestTxListHash) {
-    warn('failled to get hash of latest tx list from cycle record')
+    warn('failed to get hash of latest tx list from cycle record')
     return
   }
 
   if (latestTxListHash === crypto.hash(txListResult.value)) {
     txList = txListResult.value
+    info('first nodes successfully synced tx list from archiver in restart mode')
+  } else {
+    throw Error(
+      'Fatal: Hash of tx list from archiver does not match hash of latest tx list from cycle record'
+    )
   }
 }
 
