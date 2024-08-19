@@ -60,7 +60,7 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
       return
     }
 
-    const signer = byPubKey.get(payload.sign.owner)
+    const signer = Nodelist.byPubKey.get(payload.sign.owner)
     if (!signer) {
       /* prettier-ignore */ if (logFlags.error) warn('gossip-addtx: Got request from unknown node')
       return
@@ -135,7 +135,7 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
       return
     }
 
-    const signer = byPubKey.get(payload.sign.owner)
+    const signer = Nodelist.byPubKey.get(payload.sign.owner)
     if (!signer) {
       /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: Got request from unknown node')
       return
@@ -672,12 +672,12 @@ function error(...msg: unknown[]): void {
 
 function omitKey(obj: any, keyToOmit: string) {
   // deep emit key from object
-  const newObj = { ...obj };
+  const newObj = { ...obj }
   for (const key in newObj) {
     if (key === keyToOmit) {
-      delete newObj[key];
+      delete newObj[key]
     } else if (typeof newObj[key] === 'object') {
-      newObj[key] = omitKey(newObj[key], keyToOmit);
+      newObj[key] = omitKey(newObj[key], keyToOmit)
     }
   }
 }
