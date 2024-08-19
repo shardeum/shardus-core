@@ -18,6 +18,7 @@ import {
   verifyJoinRequestSigner,
   verifyJoinRequestTypes,
   verifyNotIPv6,
+  verifyUnseen,
 } from '../../../src/p2p/Join/validate'
 import { JoinRequestResponse } from '../../../src/p2p/Join/types'
 import { getAllowBogon, getSeen } from '../../../src/p2p/Join/state'
@@ -425,11 +426,19 @@ describe('validateJoinRequestHost', () => {
   }
 })
 
-// describe('verifyUnseen', () => {
-//   it('should pass if node is unseen', () => {})
-//   it('should fail if node is already seen', () => {})
-// })
-//
+describe('verifyUnseen', () => {
+  it('should pass if node is unseen', () => {
+    ;(getSeen as jest.Mock).mockReturnValueOnce(new Set())
+    const result = verifyUnseen('unseen node')
+    expect(result).toBeNull()
+  })
+  it('should fail if node is already seen', () => {
+    ;(getSeen as jest.Mock).mockReturnValueOnce(new Set(['seen node']))
+    const result = verifyUnseen('seen node')
+    expect(result).toStrictEqual(ALREADY_SEEN_ERROR)
+  })
+})
+
 // describe('verifyNodeUnknown', () => {
 //   it('should pass if joining node is unknown', () => {})
 //   it('should fail if joining node is known', () => {})
