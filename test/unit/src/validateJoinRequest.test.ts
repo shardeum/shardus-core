@@ -14,6 +14,7 @@ import {
   RESERVED_IP_REJECTED_ERROR,
   validateJoinRequest,
   validateJoinRequestHost,
+  validateJoinRequestTimestamp,
   validateVersion,
   verifyJoinRequestSigner,
   verifyJoinRequestTypes,
@@ -434,8 +435,18 @@ describe('validateJoinRequestHost', () => {
 //   it('should pass if joining node is unknown', () => {})
 //   it('should fail if joining node is known', () => {})
 // })
-//
-// describe('validateJoinRequestTimestamp', () => {
-//   it('should pass with correct timestamp', () => {})
-//   it('should fail with invalid timestamp', () => {})
-// })
+
+describe('validateJoinRequestTimestamp', () => {
+  it('should pass with timestamp in range', () => {
+    const result = validateJoinRequestTimestamp(validJoinRequest.nodeInfo.joinRequestTimestamp)
+    expect(result).toBeNull()
+  })
+  it('should fail with timestamp too early', () => {
+    const result = validateJoinRequestTimestamp(0)
+    expect(result).toStrictEqual(EARLY_TIMESTAMP_ERROR)
+  })
+  it('should fail with timestamp too late', () => {
+    const result = validateJoinRequestTimestamp(999999999999999)
+    expect(result).toStrictEqual(LATE_TIMESTAMP_ERROR)
+  })
+})
