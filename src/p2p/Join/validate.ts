@@ -275,7 +275,7 @@ export const LATE_TIMESTAMP_ERROR = {
   reason: 'Cannot add join request, timestamp exceeds allowed cycle range',
   fatal: false,
 }
-function validateJoinRequestTimestamp(joinRequestTimestamp: number): JoinRequestResponse | null {
+export function validateJoinRequestTimestamp(joinRequestTimestamp: number): JoinRequestResponse | null {
   //TODO - figure out why joinRequest is send with previous cycle marker instead of current cycle marker
   /*
    CONTEXT: when node create join request the cycleMarker is (current - 1).
