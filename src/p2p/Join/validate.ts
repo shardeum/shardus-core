@@ -303,4 +303,7 @@ export function validateJoinRequestTimestamp(joinRequestTimestamp: number): Join
     /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('Cannot add join request for this node, its timestamp exceeds allowed cycle range')
     return LATE_TIMESTAMP_ERROR
   }
+
+  // when successful, return null
+  return null
 }
