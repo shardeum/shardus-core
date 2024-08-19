@@ -18,6 +18,7 @@ import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { nodeListFromStates } from './Join'
 import * as utils from '../utils'
 import rfdc from 'rfdc'
+import * as Shardus from '../shardus/shardus-types'
 import { ShardusTypes } from '../index'
 
 interface VerifierEntry {
@@ -86,25 +87,26 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry> = async (paylo
     // }
 
     // const { sign, ...unsignedAddNetworkTx } = payload
-    if (!txAdd.some((entry) => entry.hash === payload.hash)) {
-      const addTxCopy = clone(payload.tx.tx)
-      const { sign, ...txDataWithoutSign } = addTxCopy.txData
-      addTxCopy.txData = txDataWithoutSign
-      txAdd.push(addTxCopy)
-
-      Comms.sendGossip(
-        'gossip-addtx',
-        payload,
-        tracker,
-        Self.id,
-        nodeListFromStates([
-          P2P.P2PTypes.NodeStatus.ACTIVE,
-          P2P.P2PTypes.NodeStatus.READY,
-          P2P.P2PTypes.NodeStatus.SYNCING,
-        ]),
-        false
-      ) // use Self.id so we don't gossip to ourself
+    if (!verifyAppliedReceipt(payload.appliedReceipt, new Set(payload.executionGroup))) {
+      return
     }
+    const addTxCopy = clone(payload.tx.tx)
+    const { sign, ...txDataWithoutSign } = addTxCopy.txData
+    addTxCopy.txData = txDataWithoutSign
+    txAdd.push(addTxCopy)
+
+    Comms.sendGossip(
+      'gossip-addtx',
+      payload,
+      tracker,
+      Self.id,
+      nodeListFromStates([
+        P2P.P2PTypes.NodeStatus.ACTIVE,
+        P2P.P2PTypes.NodeStatus.READY,
+        P2P.P2PTypes.NodeStatus.SYNCING,
+      ]),
+      false
+    ) // use Self.id so we don't gossip to ourself
   } finally {
     profilerInstance.scopedProfileSectionEnd('serviceQueue - addTx')
   }
@@ -155,22 +157,23 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry> = async (pa
     // }
     // const { sign, ...unsignedRemoveNetworkTx } = payload
     // could also place check inside _removeNetworkTx
-    if (!txRemove.some((entry) => entry.txHash === payload.hash)) {
-      txRemove.push({ txHash: payload.hash, cycle: payload.tx.tx.cycle })
-
-      Comms.sendGossip(
-        'gossip-removetx',
-        payload,
-        tracker,
-        Self.id,
-        nodeListFromStates([
-          P2P.P2PTypes.NodeStatus.ACTIVE,
-          P2P.P2PTypes.NodeStatus.READY,
-          P2P.P2PTypes.NodeStatus.SYNCING,
-        ]),
-        false
-      ) // use Self.id so we don't gossip to ourself
+    if (!verifyAppliedReceipt(payload.appliedReceipt, new Set(payload.executionGroup))) {
+      return
     }
+    txRemove.push({ txHash: payload.hash, cycle: payload.tx.tx.cycle })
+
+    Comms.sendGossip(
+      'gossip-removetx',
+      payload,
+      tracker,
+      Self.id,
+      nodeListFromStates([
+        P2P.P2PTypes.NodeStatus.ACTIVE,
+        P2P.P2PTypes.NodeStatus.READY,
+        P2P.P2PTypes.NodeStatus.SYNCING,
+      ]),
+      false
+    ) // use Self.id so we don't gossip to ourself
   } finally {
     profilerInstance.scopedProfileSectionEnd('serviceQueue - removeTx')
   }
@@ -332,11 +335,9 @@ async function initVotingProcess(): Promise<void> {
       hash: txList[i].hash,
       tx: txList[i],
       votes: [],
-      executionGroup: this.stateManager.getClosestNodes(
-        txList[i].hash,
-        config.sharding.nodesPerConsensusGroup,
-        false
-      ),
+      executionGroup: this.stateManager
+        .getClosestNodes(txList[i].hash, config.sharding.nodesPerConsensusGroup, false)
+        .map((node) => node.publicKey),
       newVotes: false,
       hasSentFinalReceipt: false,
       appliedReceipt: null,
@@ -761,6 +762,36 @@ function sortedInsert(
   } else {
     list.splice(index, 0, entry)
   }
+}
+
+function verifyAppliedReceipt(receipt: any, executionGroupNodes: Set<string>): boolean {
+  const ownerToSignMap = new Map<string, Shardus.Sign>()
+  for (const sign of receipt.signatures) {
+    if (executionGroupNodes.has(sign.owner)) {
+      ownerToSignMap.set(sign.owner, sign)
+    }
+  }
+  const totalNodes = executionGroupNodes.size
+  const requiredMajority = Math.ceil(totalNodes * this.config.p2p.requiredVotesPercentage)
+  if (ownerToSignMap.size < requiredMajority) {
+    return false
+  }
+
+  const vote = receipt.appliedVote
+  const voteHash = this.calculateVoteHash(vote)
+  const appliedVoteHash = {
+    txid: vote.txid,
+    voteHash,
+  }
+
+  let validSignatures = 0
+  for (const owner of ownerToSignMap.keys()) {
+    const signedObject = { ...appliedVoteHash, sign: ownerToSignMap.get(owner) }
+    if (this.crypto.verify(signedObject, owner)) {
+      validSignatures++
+    }
+  }
+  return validSignatures >= requiredMajority
 }
 
 function info(...msg: unknown[]): void {
