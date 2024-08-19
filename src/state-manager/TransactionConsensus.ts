@@ -1988,16 +1988,16 @@ class TransactionConsenus {
    *
    * @param queueEntry
    */
-  hasAppliedReceiptMatchingPreApply(queueEntry: QueueEntry, appliedReceipt: AppliedReceipt): boolean {
+  hasAppliedReceiptMatchingPreApply(queueEntry: QueueEntry, signedReceipt: SignedReceipt): boolean {
     if (queueEntry.preApplyTXResult == null || queueEntry.preApplyTXResult.applyResponse == null) {
       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} preApplyTXResult == null or applyResponse == null`)
       return false
     }
     // This is much easier than the old way
     if (queueEntry.ourVote) {
-      const receipt = queueEntry.appliedReceipt2 ?? queueEntry.recievedAppliedReceipt2
+      const receipt = queueEntry.signedReceipt
       if (receipt != null && queueEntry.ourVoteHash != null) {
-        const receiptVoteHash = this.calculateVoteHash(receipt.appliedVote)
+        const receiptVoteHash = this.calculateVoteHash(receipt.proposal)
         if (receiptVoteHash === queueEntry.ourVoteHash) {
           return true
         } else {
@@ -2008,7 +2008,7 @@ class TransactionConsenus {
       return false
     }
 
-    if (appliedReceipt == null) {
+    if (signedReceipt == null) {
       return false
     }
 
@@ -2017,23 +2017,23 @@ class TransactionConsenus {
       return false
     }
 
-    if (appliedReceipt != null) {
-      if (appliedReceipt.result !== queueEntry.ourProposal.applied) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ${appliedReceipt.result}, ${queueEntry.ourProposal.applied} appliedReceipt.result !== queueEntry.ourProposal.applied`)
+    if (signedReceipt != null) {
+      if (signedReceipt.proposal.applied !== queueEntry.ourProposal.applied) {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ${signedReceipt.proposal.applied}, ${queueEntry.ourProposal.applied} signedReceipt.result !== queueEntry.ourProposal.applied`)
         return false
       }
-      if (appliedReceipt.txid !== queueEntry.ourProposal.txid) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.txid !== queueEntry.ourProposal.txid`)
+      if (signedReceipt.proposal.txid !== queueEntry.ourProposal.txid) {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} signedReceipt.txid !== queueEntry.ourProposal.txid`)
         return false
       }
-      if (appliedReceipt.appliedVotes.length === 0) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes.length == 0`)
+      if (signedReceipt.signaturePack.length === 0) {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} signedReceipt.signaturePack.length == 0`)
         return false
       }
 
-      if (appliedReceipt.appliedVotes[0].cant_apply === true) {
+      if (signedReceipt.proposal.cant_preApply === true) {
         // TODO STATESHARDING4 NEGATIVECASE    need to figure out what to do here
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes[0].cant_apply === true`)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} signedReceipt.proposal.cant_preApply === true`)
         //If the network votes for cant_apply then we wouldn't need to patch.  We return true here
         //but outside logic will have to know to check cant_apply flag and make sure to not commit data
         return true
@@ -2041,8 +2041,8 @@ class TransactionConsenus {
 
       //we return true for a false receipt because there is no need to repair our data to match the receipt
       //it is already checked above if we matched the result
-      if (appliedReceipt.result === false) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} result===false Good Match`)
+      if (signedReceipt.proposal.applied === false) {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} applied===false Good Match`)
         return true
       }
 
@@ -2050,7 +2050,7 @@ class TransactionConsenus {
       let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
 
       let wrappedStateKeys = Object.keys(queueEntry.collectedData)
-      const vote = appliedReceipt.appliedVotes[0] //all votes are equivalent, so grab the first
+      // const vote = appliedReceipt.appliedVotes[0] //all votes are equivalent, so grab the first
 
       // Iff we have accountWrites, then overwrite the keys and wrapped data
       const appOrderedKeys = []
@@ -2082,10 +2082,10 @@ class TransactionConsenus {
       //   /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply collectedFinalData tx:${queueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
       // }
 
-      for (let j = 0; j < vote.account_id.length; j++) {
+      for (let j = 0; j < signedReceipt.proposal.accountIDs.length; j++) {
         /* eslint-disable security/detect-object-injection */
-        const id = vote.account_id[j]
-        const hash = vote.account_state_hash_after[j]
+        const id = signedReceipt.proposal.accountIDs[j]
+        const hash = signedReceipt.proposal.afterStateHashes[j]
         let found = false
         for (const key of wrappedStateKeys) {
           const wrappedState = wrappedStates[key]
