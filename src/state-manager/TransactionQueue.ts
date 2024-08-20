@@ -7490,17 +7490,19 @@ class TransactionQueue {
       }
     }
 
-    const receipt2 = this.stateManager.getReceipt2(queueEntry)
-    const appliedReceipt = receipt2 ? Utils.safeJsonParse(Utils.safeStringify(receipt2)) : ({} as AppliedReceipt2)
-    if (this.useNewPOQ === false) {
-      if (appliedReceipt.appliedVote) {
-        delete appliedReceipt.appliedVote.node_id
-        delete appliedReceipt.appliedVote.sign
-        delete appliedReceipt.confirmOrChallenge
-        // Update the app_data_hash with the app_data_hash from the appliedVote
-        appliedReceipt.app_data_hash = appliedReceipt.appliedVote.app_data_hash
-      }
-    }
+    const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
+    // const receipt = signedReceipt ? Utils.safeJsonParse(Utils.safeStringify(signedReceipt)) : ({} as SignedReceipt)
+    
+    // MIGHT NOT NEED THIS NOW WITH THE POQo RECEIPT REWRITE. NEED TO CONFIRM
+    // if (this.useNewPOQ === false) {
+    //   if (appliedReceipt.appliedVote) {
+    //     delete appliedReceipt.appliedVote.node_id
+    //     delete appliedReceipt.appliedVote.sign
+    //     delete appliedReceipt.confirmOrChallenge
+    //     // Update the app_data_hash with the app_data_hash from the appliedVote
+    //     appliedReceipt.app_data_hash = appliedReceipt.appliedVote.app_data_hash
+    //   }
+    // }
 
     const archiverReceipt: ArchiverReceipt = {
       tx: {
@@ -7508,13 +7510,13 @@ class TransactionQueue {
         txId: queueEntry.acceptedTx.txId,
         timestamp: queueEntry.acceptedTx.timestamp,
       },
-      cycle: queueEntry.txGroupCycle, // Updated to use txGroupCycle instead of cycleToRecordOn because when the receipt is arrived at the archiver, the cycleToRecordOn cycle might not exist yet.
-      beforeStateAccounts: [...Object.values(beforeAccountsToAdd)],
-      accounts: [...Object.values(accountsToAdd)],
+      signedReceipt: signedReceipt,
       appReceiptData: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
-      appliedReceipt,
+      beforeStates: [...Object.values(beforeAccountsToAdd)],
+      afterStates: [...Object.values(accountsToAdd)],
+      cycle: queueEntry.txGroupCycle,
       executionShardKey: queueEntry.executionShardKey || '',
-      globalModification: queueEntry.globalModification,
+      globalModification: queueEntry.globalModification
     }
     return archiverReceipt
   }

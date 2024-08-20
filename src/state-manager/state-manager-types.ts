@@ -694,10 +694,18 @@ export type Vote = {
 
 // ArchiverReceipt2 referring to POQo
 export type ArchiverReceipt = {
+  tx: {
+    originalTxData: Shardus.OpaqueTransaction
+    txId: string
+    timestamp: number
+  }
   signedReceipt: SignedReceipt
   appReceiptData: any
   beforeStates?: Shardus.AccountsCopy[]
   afterStates?: Shardus.AccountsCopy[]
+  cycle: number
+  executionShardKey: string
+  globalModification: boolean
 }
 
 export type AppliedVote = {
