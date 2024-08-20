@@ -8512,10 +8512,11 @@ getDebugStuckTxs(opts): unknown {
   }
   updateTxState(queueEntry: QueueEntry, nextState: string, context = ''): void {
     if (logFlags.seqdiagram)
-      if (context == '')
+      if (context == '') {
         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: ${queueEntry.state}-${nextState}`)
-      else 
+      } else {
         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: ${queueEntry.state}-${nextState}:${context}`)
+      }
     const currentState = queueEntry.state
     this.txDebugMarkEndTime(queueEntry, currentState)
     queueEntry.state = nextState
