@@ -42,6 +42,8 @@ import { initGetAccountQueueCountResp } from './GetAccountQueueCountResp'
 import { initMakeReceiptReq } from './MakeReceiptReq'
 import { initGetTrieHashesReq } from './GetTrieHashesReq'
 import { initGetTrieHashesResp } from './GetTrieHashesResp'
+import { initSignAppDataReq } from './SignAppDataReq'
+import { initSignAppDataResp } from './SignAppDataResp'
 import { initCachedAppData } from './CachedAppData'
 import { initSendCachedAppDataReq } from './sendCachedAppDataReq'
 import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
@@ -88,6 +90,8 @@ export function initAjvSchemas(): void {
   initMakeReceiptReq()
   initGetTrieHashesReq()
   initGetTrieHashesResp()
+  initSignAppDataReq()
+  initSignAppDataResp()
   initCachedAppData()
   initSendCachedAppDataReq()
 }

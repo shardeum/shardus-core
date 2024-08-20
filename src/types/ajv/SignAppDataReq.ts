@@ -1,19 +1,18 @@
 import { addSchema } from '../../utils/serialization/SchemaHelpers'
 import { AJVSchemaEnum } from '../enum/AJVSchemaEnum'
 
-export const schemaCachedAppData = {
+export const schemaSignAppDataReq = {
   type: 'object',
   properties: {
-    cycle: { type: 'number' },
-    appData: { type: 'object' },
-    dataID: { type: 'string' },
+    type: { type: 'string' },
+    nodesToSign: { type: 'number' },
+    hash: { type: 'string' },
+    appData: {}, // type unknown
   },
-  required: ['cycle', 'appData', 'dataID'],
-  additionalProperties: false,
-
+  required: ['type', 'nodesToSign', 'hash', 'appData'],
 }
 
-export function initCachedAppData(): void {
+export function initSignAppDataReq(): void {
   addSchemaDependencies()
   addSchemas()
 }
@@ -25,5 +24,5 @@ function addSchemaDependencies(): void {
 
 // Function to register the schema
 function addSchemas(): void {
-  addSchema(AJVSchemaEnum.CachedAppData, schemaCachedAppData)
+  addSchema(AJVSchemaEnum.SignAppDataReq, schemaSignAppDataReq)
 }

@@ -93,6 +93,7 @@ export function deserializeGetTxTimestampResp(stream: VectorBufferStream): getTx
   }
 
   const errors = verifyPayload(AJVSchemaEnum.GetTxTimestampResp, result)
+
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }

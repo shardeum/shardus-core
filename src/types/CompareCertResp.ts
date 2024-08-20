@@ -32,6 +32,7 @@ export const deserializeCompareCertResp = (stream: VectorBufferStream): CompareC
   const obj: CompareCertRespSerializable = Utils.safeJsonParse(stream.readString())
 
   const errors = verifyPayload(AJVSchemaEnum.CompareCertResp, obj)
+
   if (errors && errors.length > 0) {
     throw new Error('Data validation error')
   }

@@ -1,5 +1,7 @@
 import { stateManager } from '../p2p/Context'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
+import { verifyPayload } from './ajv/Helpers'
+import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { AppObjEnum } from './enum/AppObjEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 
@@ -28,10 +30,15 @@ export function deserializeSignAppDataReq(stream: VectorBufferStream): SignAppDa
   if (version > cSignAppDataReqVersion) {
     throw new Error(`SignAppDataReq version mismatch, version: ${version}`)
   }
-  return {
+  const result = {
     type: stream.readString(),
     nodesToSign: stream.readUInt8(),
     hash: stream.readString(),
     appData: stateManager.app.binaryDeserializeObject(AppObjEnum.AppData, stream.readBuffer()),
   }
+  const errors = verifyPayload(AJVSchemaEnum.SignAppDataReq, result)
+  if (errors && errors.length > 0) {
+    throw new Error('Data validation error')
+  }
+  return result
 }
