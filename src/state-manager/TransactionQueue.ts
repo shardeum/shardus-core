@@ -29,14 +29,12 @@ import * as NodeList from '../p2p/NodeList'
 import {
   AcceptedTx,
   AccountFilter,
-  AppliedReceipt,
   AppliedReceipt2,
   CommitConsensedTransactionResult,
   PreApplyAcceptedTransactionResult,
   ProcessQueueStats,
   QueueCountsResult,
   QueueEntry,
-  RequestReceiptForTxResp,
   RequestReceiptForTxResp_old,
   RequestStateForTxReq,
   RequestStateForTxResp,
@@ -48,7 +46,7 @@ import {
   WrappedResponses,
   ArchiverReceipt,
   NonceQueueItem,
-  AppliedVote
+  SignedReceipt
 } from './state-manager-types'
 import { isInternalTxAllowed, networkMode } from '../p2p/Modes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
@@ -5135,7 +5133,7 @@ class TransactionQueue {
               InternalRouteEnum.binary_poqo_data_and_receipt,
               {
                 finalState: message,
-                receipt: queueEntry.appliedReceipt2,
+                receipt: queueEntry.signedReceipt,
                 txGroupCycle: queueEntry.txGroupCycle
               },
               serializePoqoDataAndReceiptReq,
@@ -6541,13 +6539,13 @@ class TransactionQueue {
               let didNotMatchReceipt = false
 
               let finishedConsensing = false
-              let result: AppliedReceipt
+              let result: SignedReceipt
 
-              if (this.usePOQo) {
+              // if (this.usePOQo) {
                 // Try to produce receipt
                 // If receipt made, tellx128 it to execution group
                 // that endpoint should then factTellCorrespondingNodesFinalData
-                const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+                const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.signedReceipt
                 if (receipt2 != null) {
                   if (logFlags.debug)
                     this.mainLogger.debug(
@@ -6555,77 +6553,71 @@ class TransactionQueue {
                     )
                   nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
                   //we have a receipt2, so we can make a receipt
-                  result = {
-                    result: receipt2.result,
-                    appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
-                    confirmOrChallenge: [receipt2.confirmOrChallenge],
-                    txid: receipt2.txid,
-                    app_data_hash: receipt2.app_data_hash,
-                  }
+                  result = queueEntry.signedReceipt
                 } else {
                   result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
                 }
-              }
-              else if (this.useNewPOQ) {
-                this.stateManager.transactionConsensus.confirmOrChallenge(queueEntry)
+              // }
+              // else if (this.useNewPOQ) {
+              //   this.stateManager.transactionConsensus.confirmOrChallenge(queueEntry)
 
-                if (queueEntry.pendingConfirmOrChallenge.size > 0 && queueEntry.robustQueryVoteCompleted === true && queueEntry.acceptVoteMessage === false) {
-                  this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} pendingConfirmOrChallenge.size = ${queueEntry.pendingConfirmOrChallenge.size}`)
-                  for (const [nodeId, confirmOrChallenge] of queueEntry.pendingConfirmOrChallenge) {
-                    const appendSuccessful = this.stateManager.transactionConsensus.tryAppendMessage(queueEntry, confirmOrChallenge)
-                    if (appendSuccessful) {
-                      // we need forward the message to other nodes if append is successful
-                      const payload  = confirmOrChallenge
-                      const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-                      Comms.sendGossip('spread_confirmOrChallenge', payload, '', null, gossipGroup, false, 10, queueEntry.acceptedTx.txId)
-                      queueEntry.gossipedConfirmOrChallenge = true
-                    }
-                  }
-                  queueEntry.pendingConfirmOrChallenge = new Map()
-                  this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} reset pendingConfirmOrChallenge.size = ${queueEntry.pendingConfirmOrChallenge.size}`)
-                }
+              //   if (queueEntry.pendingConfirmOrChallenge.size > 0 && queueEntry.robustQueryVoteCompleted === true && queueEntry.acceptVoteMessage === false) {
+              //     this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} pendingConfirmOrChallenge.size = ${queueEntry.pendingConfirmOrChallenge.size}`)
+              //     for (const [nodeId, confirmOrChallenge] of queueEntry.pendingConfirmOrChallenge) {
+              //       const appendSuccessful = this.stateManager.transactionConsensus.tryAppendMessage(queueEntry, confirmOrChallenge)
+              //       if (appendSuccessful) {
+              //         // we need forward the message to other nodes if append is successful
+              //         const payload  = confirmOrChallenge
+              //         const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+              //         Comms.sendGossip('spread_confirmOrChallenge', payload, '', null, gossipGroup, false, 10, queueEntry.acceptedTx.txId)
+              //         queueEntry.gossipedConfirmOrChallenge = true
+              //       }
+              //     }
+              //     queueEntry.pendingConfirmOrChallenge = new Map()
+              //     this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} reset pendingConfirmOrChallenge.size = ${queueEntry.pendingConfirmOrChallenge.size}`)
+              //   }
 
-                // try to produce a receipt
-                /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
+              //   // try to produce a receipt
+              //   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
 
-                const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
-                if (receipt2 != null) {
-                  nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
-                  //we have a receipt2, so we can make a receipt
-                  result = {
-                    result: receipt2.result,
-                    appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
-                    confirmOrChallenge: [receipt2.confirmOrChallenge],
-                    txid: receipt2.txid,
-                    app_data_hash: receipt2.app_data_hash,
-                  }
-                } else {
-                  result = queueEntry.appliedReceipt
-                }
+              //   const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+              //   if (receipt2 != null) {
+              //     nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
+              //     //we have a receipt2, so we can make a receipt
+              //     result = {
+              //       result: receipt2.result,
+              //       appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
+              //       confirmOrChallenge: [receipt2.confirmOrChallenge],
+              //       txid: receipt2.txid,
+              //       app_data_hash: receipt2.app_data_hash,
+              //     }
+              //   } else {
+              //     result = queueEntry.appliedReceipt
+              //   }
 
-                if (result == null) {
-                  this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
-                }
-              } else {
-                const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
-                if (receipt2 != null) {
-                  if (logFlags.debug)
-                    this.mainLogger.debug(
-                      `processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`
-                    )
-                  nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
-                  //we have a receipt2, so we can make a receipt
-                  result = {
-                    result: receipt2.result,
-                    appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
-                    confirmOrChallenge: [receipt2.confirmOrChallenge],
-                    txid: receipt2.txid,
-                    app_data_hash: receipt2.app_data_hash,
-                  }
-                } else {
-                  result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
-                }
-              }
+              //   if (result == null) {
+              //     this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
+              //   }
+              // } else {
+              //   const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+              //   if (receipt2 != null) {
+              //     if (logFlags.debug)
+              //       this.mainLogger.debug(
+              //         `processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`
+              //       )
+              //     nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
+              //     //we have a receipt2, so we can make a receipt
+              //     result = {
+              //       result: receipt2.result,
+              //       appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
+              //       confirmOrChallenge: [receipt2.confirmOrChallenge],
+              //       txid: receipt2.txid,
+              //       app_data_hash: receipt2.app_data_hash,
+              //     }
+              //   } else {
+              //     result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
+              //   }
+              // }
 
               /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt result : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
 
@@ -6775,9 +6767,9 @@ class TransactionQueue {
                     continue
                   }
                   didNotMatchReceipt = true
-                  queueEntry.appliedReceiptForRepair = result
+                  queueEntry.signedReceiptForRepair = result
 
-                  queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
+                  // queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
                   if (queueEntry.isInExecutionHome === false && queueEntry.appliedReceipt2 != null) {
                     if (this.stateManager.consensusLog)
                       this.mainLogger.debug(
@@ -6789,11 +6781,11 @@ class TransactionQueue {
               }
               if (finishedConsensing === false) {
                 // if we got a reciept while waiting see if we should use it (if our own vote matches)
-                if (hasReceivedApplyReceipt && queueEntry.recievedAppliedReceipt != null) {
+                if (hasReceivedApplyReceipt && queueEntry.receivedSignedReceipt != null) {
                   if (
                     this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(
                       queueEntry,
-                      queueEntry.recievedAppliedReceipt
+                      queueEntry.receivedSignedReceipt
                     )
                   ) {
                     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
@@ -6931,9 +6923,8 @@ class TransactionQueue {
 
               //collectedFinalData
               //PURPL-74 todo: get the vote from queueEntry.receivedBestVote or receivedBestConfirmation instead of receipt2
-              const receipt2 = this.stateManager.getReceipt2(queueEntry)
+              const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
               const timeSinceAwaitFinalStart = queueEntry.txDebug.startTimestamp['await final data'] > 0 ? shardusGetTime() - queueEntry.txDebug.startTimestamp['await final data'] : 0
-              let vote: AppliedVote
 
               // if(configContext.stateManager.removeStuckChallengedTXs && this.useNewPOQ) {
               //   // first check if this is a challenge receipt
@@ -6960,26 +6951,10 @@ class TransactionQueue {
               //   }
               // }
 
-              // see if we can find a good vote to use
-              if (receipt2) {
-                vote = receipt2.appliedVote
-              } else if (queueEntry.receivedBestConfirmation?.appliedVote) {
-                // I think this is POQ-LS and will go away
-                vote = queueEntry.receivedBestConfirmation.appliedVote
-              } else if (queueEntry.receivedBestVote) {
-                // I think this is POQ-LS and will go away
-                vote = queueEntry.receivedBestVote
-              } else if (queueEntry.ourVote && configContext.stateManager.stuckTxQueueFix) {
-                // allow node to request missing data if it has an own vote
-                // 20240709 this does not seem right.  We should not use our own vote to request missing data
-                // going to add counters to confirm
-                nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData used ourVote')
-                vote = queueEntry.ourVote
-              }
               const accountsNotStored = new Set()
               //if we got a vote above then build a list of accounts that we store but are missing in our
               //collectedFinalData
-              if (vote) {
+              if (signedReceipt) {
                 let failed = false
                 let incomplete = false
                 let skipped = 0
@@ -6988,9 +6963,9 @@ class TransactionQueue {
                   this.stateManager.currentCycleShardData.nodeShardData
 
                 /* eslint-disable security/detect-object-injection */
-                for (let i = 0; i < vote.account_id.length; i++) {
-                  const accountID = vote.account_id[i]
-                  const accountHash = vote.account_state_hash_after[i]
+                for (let i = 0; i < signedReceipt.proposal.accountIDs.length; i++) {
+                  const accountID = signedReceipt.proposal.accountIDs[i]
+                  const accountHash = signedReceipt.proposal.afterStateHashes[i]
 
                   //only check for stored keys.
                   if ( ShardFunctions.testAddressInRange(accountID, nodeShardData.storedPartitions) === false ) {
@@ -7066,8 +7041,8 @@ class TransactionQueue {
                   const rawAccounts = []
                   const accountRecords: Shardus.WrappedData[] = []
                   /* eslint-disable security/detect-object-injection */
-                  for (let i = 0; i < vote.account_id.length; i++) {
-                    const accountID = vote.account_id[i]
+                  for (let i = 0; i < signedReceipt.proposal.accountIDs.length; i++) {
+                    const accountID = signedReceipt.proposal.accountIDs[i]
                     //skip accounts we don't store
                     if (accountsNotStored.has(accountID)) {
                       continue
