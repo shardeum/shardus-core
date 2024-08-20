@@ -48,7 +48,8 @@ import {
   WrappedResponses,
   ArchiverReceipt,
   NonceQueueItem,
-  AppliedVote
+  AppliedVote,
+  CycleShardData
 } from './state-manager-types'
 import { isInternalTxAllowed, networkMode } from '../p2p/Modes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
@@ -1879,6 +1880,33 @@ class TransactionQueue {
     }
     return true
   }
+
+  getExecutionGroup(txQueueEntry: QueueEntry, cycleShardData: CycleShardData):  Shardus.NodeWithRank[] | Shardus.Node[] {
+    if (Context.config.stateManager.useRandomExecutionGroup) {
+      txQueueEntry.executionShardKey = txQueueEntry.acceptedTx.txId
+    } else {
+      txQueueEntry.executionShardKey = txQueueEntry.txKeys.allKeys[0]
+    }
+    /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction set executionShardKey tx:${txQueueEntry.logID} ts:${txQueueEntry.acceptedTx.timestamp} executionShardKey: ${utils.stringifyReduce(txQueueEntry.executionShardKey)}  `)
+    // we were doing this in queueEntryGetTransactionGroup.  moved it earlier.
+    const { homePartition } = ShardFunctions.addressToPartition(
+      cycleShardData.shardGlobals,
+      txQueueEntry.executionShardKey
+    )
+
+    const homeShardData = cycleShardData.parititionShardDataMap.get(homePartition)
+
+    //set the nodes that are in the executionGroup.
+    //This is needed so that consensus will expect less nodes to be voting
+    const unRankedExecutionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
+    if (this.usePOQo) {
+      return this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
+    } else if (this.useNewPOQ) {
+      return this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
+    } else {
+      return unRankedExecutionGroup
+    }
+  }
   /* eslint-enable security/detect-object-injection */
 
   /***
@@ -2168,27 +2196,10 @@ class TransactionQueue {
         if (txQueueEntry.globalModification === false && this.executeInOneShard) {
           //USE the first key in the list of all keys.  Applications much carefully sort this list
           //so that we start in the optimal shard.  This will matter less when shard hopping is implemented
-          txQueueEntry.executionShardKey = txQueueEntry.txKeys.allKeys[0]
-          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction set executionShardKey tx:${txQueueEntry.logID} ts:${timestamp} executionShardKey: ${utils.stringifyReduce(txQueueEntry.executionShardKey)}  `)
 
-          // we were doing this in queueEntryGetTransactionGroup.  moved it earlier.
-          const { homePartition } = ShardFunctions.addressToPartition(
-            cycleShardData.shardGlobals,
-            txQueueEntry.executionShardKey
-          )
+          // calculate execution group
+          txQueueEntry.executionGroup = this.getExecutionGroup(txQueueEntry, cycleShardData)
 
-          const homeShardData = cycleShardData.parititionShardDataMap.get(homePartition)
-
-          //set the nodes that are in the executionGroup.
-          //This is needed so that consensus will expect less nodes to be voting
-          const unRankedExecutionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
-          if (this.usePOQo) {
-            txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
-          } else if (this.useNewPOQ) {
-            txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
-          } else {
-            txQueueEntry.executionGroup = unRankedExecutionGroup
-          }
           // for the new FACT algorithm
           txQueueEntry.executionNodeIdSorted = txQueueEntry.executionGroup.map((node) => node.id).sort()
 

@@ -1311,6 +1311,8 @@ export interface ServerConfiguration {
     fallbackToCurrentCycleFortxGroup: boolean
     // max number of recent cycle shard data to keep
     maxCyclesShardDataToKeep: number
+    // whether to use random execution group
+    useRandomExecutionGroup: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
