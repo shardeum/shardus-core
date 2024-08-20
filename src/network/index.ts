@@ -171,6 +171,8 @@ export class NetworkClass extends EventEmitter {
         let timer = setTimeout(() => {
           if (!res.headersSent) {
             res.status(408).json({ error: 'Request Timeout' })
+            req.timedOut = true
+            req.destroy() // Abort the request processing
           }
         }, timeout)
 
@@ -183,6 +185,14 @@ export class NetworkClass extends EventEmitter {
 
         res.on('finish', clearTimer)
         res.on('close', clearTimer)
+
+        // Listen for the 'close' event to handle any necessary cleanup
+        req.on('close', () => {
+          if (req.timedOut) {
+            // Perform any additional cleanup if needed
+            this.mainLogger.info('Request processing aborted due to timeout')
+          }
+        })
 
         next()
       }
