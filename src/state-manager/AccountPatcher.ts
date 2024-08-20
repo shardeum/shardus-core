@@ -1388,7 +1388,7 @@ class AccountPatcher {
             delete hashTrieNode.children
           }
           if (!hashTrieNode) {
-            console.error('debug-patcher-dumpTree-partial - Radix not found. Returning 404')
+             /* prettier-ignore */ if (logFlags.error) console.error('debug-patcher-dumpTree-partial - Radix not found. Returning 404')
             return res.status(404).json({error: 'Radix not found'})
           }
           //strip noisy fields
