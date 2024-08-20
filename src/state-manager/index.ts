@@ -73,7 +73,8 @@ import {
   QueueCountsResponse,
   QueueCountsResult,
   ConfirmOrChallengeMessage,
-  TimestampRemoveRequest
+  TimestampRemoveRequest,
+  SignedReceipt
 } from './state-manager-types'
 import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
@@ -3975,6 +3976,26 @@ class StateManager {
     }
     queueEntry.appliedReceiptFinal = receipt
     return receipt
+  }
+
+  getSignedReceipt(queueEntry: QueueEntry): SignedReceipt {
+    if (queueEntry.signedReceiptFinal != null) {
+      return queueEntry.signedReceiptFinal
+    }
+    let finalReceipt: SignedReceipt
+    if (queueEntry.signedReceipt && queueEntry.receivedSignedReceipt == null) {
+      finalReceipt = queueEntry.signedReceipt
+    }
+    if (queueEntry.signedReceipt == null && queueEntry.receivedSignedReceipt) {
+      // or see if we got one
+      finalReceipt = queueEntry.receivedSignedReceipt
+    }
+    // if we had to repair use that instead. this stomps the other ones
+    if (queueEntry.signedReceiptForRepair != null) {
+      finalReceipt = queueEntry.signedReceiptForRepair
+    }
+    queueEntry.signedReceiptFinal = finalReceipt
+    return finalReceipt
   }
 
   getReceipt2(queueEntry: QueueEntry): AppliedReceipt2 {
