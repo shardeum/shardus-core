@@ -340,13 +340,13 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
 }
 
 async function initVotingProcess(propsals: VotingProposal[]): Promise<void> {
-  processTxVerifiers.clear()
   console.log(' red - initVotingProcess', propsals)
   setUpAggregators()
   startVoting(propsals)
 }
 
 function setUpAggregators(): void {
+  console.log(' red - setUpAggregators', processTxVerifiers)
   for (const [hash, entry] of processTxVerifiers) {
     ;(async function retryUntilSuccess(entry) {
       while (!entry.hasSentFinalReceipt && [1, 2].includes(currentQuarter) === true) {
@@ -367,11 +367,7 @@ function startVoting(proposals: VotingProposal[]): void {
         return
       }
 
-      voteForNetworkTx(
-        txList[index].tx,
-        proposal.verifierType,
-        voteResult
-      )
+      voteForNetworkTx(txList[index].tx, proposal.verifierType, voteResult)
     } else {
       const voteResult = await validateAddTx(proposal.networkTx)
       voteForNetworkTx(
@@ -427,7 +423,6 @@ export function init(): void {
 export function reset(): void {
   txAdd = []
   txRemove = []
-  processTxVerifiers.clear()
 }
 
 export function getTxs(): P2P.ServiceQueueTypes.Txs {
