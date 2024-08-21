@@ -1,5 +1,5 @@
 import { Logger } from 'log4js'
-import { logger, config, crypto, network } from './Context'
+import { logger, config, crypto, network, shardus } from './Context'
 import * as CycleChain from './CycleChain'
 import { P2P, Utils } from '@shardus/types'
 import { OpaqueTransaction, ShardusEvent } from '../shardus/shardus-types'
@@ -273,33 +273,51 @@ export function updateRecord(
     }
   }
 
-  record.txlisthash = crypto.hash(txListCopy)
-
   // add all active nodes to the cycle record in the event of a shutdown
   if (record.mode === 'shutdown') {
     for (const node of Nodelist.activeByIdOrder) {
-      const emitParams: Omit<ShardusEvent, 'type'> = {
+      if (record.txadd.some((entry) => entry.txData.nodeId === node.id)) {
+        warn(`shutdown condition: active node with id ${node.id} is already in txadd; this should not happen`)
+        continue
+      }
+
+      const txParams: ShardusEvent = {
         nodeId: node.id,
         reason: 'Node deactivated',
+        type: 'node-deactivated',
         time: record.start,
         publicKey: node.publicKey,
         cycleNumber: record.counter,
         activeCycle: node.activeCycle,
       }
-      const { txData, subQueueKey } = this.app.getDeactivatedTxData(emitParams)
+      const { txData, subQueueKey } = shardus.app.getDeactivatedTxData(txParams)
 
       const hash = crypto.hash(txData)
-      const addTx = {
+      const addTx: P2P.ServiceQueueTypes.AddNetworkTx = {
         hash,
         type: 'nodeReward',
         txData: txData,
         cycle: currentCycle,
         subQueueKey,
-      } as P2P.ServiceQueueTypes.AddNetworkTx
+      }
+
+      sortedInsert(txListCopy, {
+        hash: addTx.hash,
+        tx: {
+          hash: addTx.hash,
+          txData: txData,
+          type: addTx.type,
+          cycle: addTx.cycle,
+          ...(addTx.subQueueKey && { subQueueKey: addTx.subQueueKey }),
+        },
+      })
 
       record.txadd.push(addTx)
     }
+    record.txadd = txAdd.sort((a, b) => a.hash.localeCompare(b.hash))
   }
+
+  record.txlisthash = crypto.hash(txListCopy)
 }
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
