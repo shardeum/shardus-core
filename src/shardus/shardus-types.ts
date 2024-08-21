@@ -354,6 +354,7 @@ export interface App {
   validateArchiverJoinRequest?: (data: any) => any
   getJoinData?: () => any
   eventNotify?: (event: ShardusEvent) => void
+  getDeactivatedTxData?: (data: ShardusEvent) => any
   isReadyToJoin: (
     latestCycle: Cycle,
     nodePublicKey: string,
