@@ -575,7 +575,7 @@ export async function addNetworkTx(
 }
 
 function makeAddNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.AddNetworkTx): void {
-  if (!pickAggregators(networkTx.involvedAddress)
+  if (pickAggregators(networkTx.involvedAddress)
     .map((node) => node.id)
     .includes(Self.id)) {
     processTxVerifiers.set(networkTx.hash, {
@@ -598,7 +598,7 @@ function makeRemoveNetworkTxProposals(removeTx: P2P.ServiceQueueTypes.RemoveNetw
     return
   }
   const networkTx = txList[index].tx
-  if (!pickAggregators(networkTx.involvedAddress)
+  if (pickAggregators(networkTx.involvedAddress)
     .map((node) => node.id)
     .includes(Self.id)) {
     processTxVerifiers.set(networkTx.hash, {
