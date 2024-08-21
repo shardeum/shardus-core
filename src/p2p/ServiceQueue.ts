@@ -315,8 +315,7 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
       return null
     }
     queueEntry.newVotes = false
-    let winningVote: boolean
-    let type: string
+    let winningVote: { txHash: string; verifierType: 'beforeAdd' | 'apply'; result: boolean; sign: any }
     const hashCounts: Map<boolean, number> = new Map()
 
     for (let i = 0; i < numVotes; i++) {
@@ -325,8 +324,7 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
       const voteCount = hashCounts.get(currentVote.result) || 0
       hashCounts.set(currentVote.result, voteCount + 1)
       if (voteCount + 1 > majorityCount) {
-        winningVote = currentVote.result
-        type = currentVote.verifierType
+        winningVote = currentVote
         break
       }
     }
@@ -334,14 +332,14 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
     if (winningVote != undefined) {
       const appliedReceipt: any = {
         txid: queueEntry.hash,
-        result: winningVote,
-        type,
+        result: winningVote.result,
+        type: winningVote.verifierType,
         signatures: [],
       }
       for (let i = 0; i < numVotes; i++) {
         // eslint-disable-next-line security/detect-object-injection
         const currentVote = queueEntry.votes[i]
-        if (currentVote.result === winningVote) {
+        if (currentVote.result === winningVote.result) {
           appliedReceipt.signatures.push(currentVote.sign)
         }
       }
@@ -351,13 +349,13 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
       queueEntry.hasSentFinalReceipt = true
       console.log(' red - tryProduceReceipt appliedReceipt', appliedReceipt)
       let route = ''
-      if (queueEntry.appliedReceipt.type === 'addBefore') {
+      if (queueEntry.appliedReceipt.type === 'beforeAdd') {
         route = 'gossip-addtx'
       } else {
         route = 'gossip-removetx'
       }
       console.log(' red - tryProduceReceipt sendGossip', route, appliedReceipt)
-      const signedPayload = crypto.sign(appliedReceipt)
+      const signedPayload = crypto.sign(queueEntry)
       Comms.sendGossip(route, signedPayload, null, null, byIdOrder, false, 4, queueEntry.hash, '', true)
       return appliedReceipt
     }
@@ -641,7 +639,7 @@ function voteForNetworkTx(
   result: boolean
 ): void {
   console.log(' red - voteForNetworkTx', networkTx.hash, type, result)
-  const vote = crypto.sign({ txHash: networkTx.hash, result, type })
+  const vote = crypto.sign({ txHash: networkTx.hash, result, verifierType: type })
   let aggregators = pickAggregators(networkTx.involvedAddress)
   Comms.tell(aggregators, 'service_queue_vote', vote)
 }
