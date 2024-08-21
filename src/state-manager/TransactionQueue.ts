@@ -341,50 +341,50 @@ class TransactionQueue {
     //   }
     // )
 
-    this.p2p.registerInternal(
-      'broadcast_state_complete_data',
-      async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
-        profilerInstance.scopedProfileSectionStart('broadcast_state_complete_data')
-        try {
-          const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            nestedCountersInstance.countEvent('processing', 'broadcast_state_complete_data_noQueueEntry')
-            return
-          }
-          if (queueEntry.gossipedCompleteData === true) {
-            return
-          }
-          for (const data of payload.stateList) {
-            if (configContext.stateManager.collectedDataFix && configContext.stateManager.rejectSharedDataIfCovered) {
-              const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(data.accountId)
-              const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
-              if (coveredByUs) {
-                nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
-                /* prettier-ignore */ if (logFlags.verbose) console.log(`broadcast_state: coveredByUs: ${data.accountId} no need to accept this data`)
-                continue
-              } else {
-                this.queueEntryAddData(queueEntry, data)
-              }
-            } else {
-              this.queueEntryAddData(queueEntry, data)
-            }
-          }
-          Comms.sendGossip(
-            'broadcast_state_complete_data',
-            payload,
-            undefined,
-            undefined,
-            queueEntry.executionGroup,
-            false,
-            6,
-            queueEntry.acceptedTx.txId
-          )
-          queueEntry.gossipedCompleteData = true
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('broadcast_state_complete_data')
-        }
-      }
-    )
+    // this.p2p.registerInternal(
+    //   'broadcast_state_complete_data',
+    //   async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
+    //     profilerInstance.scopedProfileSectionStart('broadcast_state_complete_data')
+    //     try {
+    //       const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         nestedCountersInstance.countEvent('processing', 'broadcast_state_complete_data_noQueueEntry')
+    //         return
+    //       }
+    //       if (queueEntry.gossipedCompleteData === true) {
+    //         return
+    //       }
+    //       for (const data of payload.stateList) {
+    //         if (configContext.stateManager.collectedDataFix && configContext.stateManager.rejectSharedDataIfCovered) {
+    //           const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(data.accountId)
+    //           const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
+    //           if (coveredByUs) {
+    //             nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
+    //             /* prettier-ignore */ if (logFlags.verbose) console.log(`broadcast_state: coveredByUs: ${data.accountId} no need to accept this data`)
+    //             continue
+    //           } else {
+    //             this.queueEntryAddData(queueEntry, data)
+    //           }
+    //         } else {
+    //           this.queueEntryAddData(queueEntry, data)
+    //         }
+    //       }
+    //       Comms.sendGossip(
+    //         'broadcast_state_complete_data',
+    //         payload,
+    //         undefined,
+    //         undefined,
+    //         queueEntry.executionGroup,
+    //         false,
+    //         6,
+    //         queueEntry.acceptedTx.txId
+    //       )
+    //       queueEntry.gossipedCompleteData = true
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('broadcast_state_complete_data')
+    //     }
+    //   }
+    // )
 
     const broadcastStateRoute: P2PTypes.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_broadcast_state,
@@ -2822,7 +2822,7 @@ class TransactionQueue {
     const payload = {txid: queueEntry.acceptedTx.txId, stateList}
     if (stateList.length > 0) {
       Comms.sendGossip(
-        'broadcast_state_complete_data',
+        'broadcast_state_complete_data', // deprecated
         payload,
         '',
         Self.id,

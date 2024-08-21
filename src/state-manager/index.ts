@@ -1866,34 +1866,34 @@ class StateManager {
 
     // TODO STATESHARDING4 ENDPOINTS ok, I changed this to tell, but we still need to check sender!
     //this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
-    this.p2p.registerInternal(
-      'spread_appliedVote',
-      async (
-        payload: AppliedVote,
-        _respond: unknown,
-        _sender: unknown,
-        _tracker: string,
-        msgSize: number
-      ) => {
-        profilerInstance.scopedProfileSectionStart('spread_appliedVote', false, msgSize)
-        try {
-          const queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'spread_appliedVote_no_queue_entry')
-            return
-          }
-          const newVote = payload as AppliedVote
-          // TODO STATESHARDING4 ENDPOINTS check payload format
-          // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
+    // this.p2p.registerInternal(
+    //   'spread_appliedVote',
+    //   async (
+    //     payload: AppliedVote,
+    //     _respond: unknown,
+    //     _sender: unknown,
+    //     _tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     profilerInstance.scopedProfileSectionStart('spread_appliedVote', false, msgSize)
+    //     try {
+    //       const queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         /* prettier-ignore */ nestedCountersInstance.countEvent('stateManager', 'spread_appliedVote_no_queue_entry')
+    //         return
+    //       }
+    //       const newVote = payload as AppliedVote
+    //       // TODO STATESHARDING4 ENDPOINTS check payload format
+    //       // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
 
-          if (this.transactionConsensus.tryAppendVote(queueEntry, newVote)) {
-            // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
-          }
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('spread_appliedVote')
-        }
-      }
-    )
+    //       if (this.transactionConsensus.tryAppendVote(queueEntry, newVote)) {
+    //         // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
+    //       }
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('spread_appliedVote')
+    //     }
+    //   }
+    // )
 
     // this.p2p.registerInternal(
     //   'spread_appliedVoteHash',
@@ -2338,7 +2338,7 @@ class StateManager {
     this.p2p.unregisterGossipHandler('spread_tx_to_group')
     // this.p2p.unregisterInternal('get_account_data_with_queue_hints')
     // this.p2p.unregisterInternal('get_globalaccountreport')
-    this.p2p.unregisterInternal('spread_appliedVote')
+    // this.p2p.unregisterInternal('spread_appliedVote')
     this.p2p.unregisterGossipHandler('spread_appliedReceipt')
 
     // this.p2p.unregisterInternal('get_trie_hashes')
@@ -4390,7 +4390,7 @@ class StateManager {
     // attach challenge receipt to payload
     const payload: TimestampRemoveRequest = {txId: acceptedTx.txId, signedReceipt, cycleCounter}
     try {
-      await this.p2p.tell([homeNode.node], 'remove_timestamp_cache', payload)
+      await this.p2p.tell([homeNode.node], 'remove_timestamp_cache', payload) //deprecated
     } catch (e) {
       nestedCountersInstance.countEvent('askToRemoveTimestampCache', `error: ${e.message}`)
       this.mainLogger.error(`askToRemoveTimestampCache error: ${e.message}`)

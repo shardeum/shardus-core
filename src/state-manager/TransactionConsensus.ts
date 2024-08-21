@@ -320,23 +320,24 @@ class TransactionConsenus {
     //   }
     // )
 
-    this.p2p.registerInternal(
-      'remove_timestamp_cache',
-      async (
-        payload: TimestampRemoveRequest,
-        respond: (result: boolean) => unknown
-      ) => {
-        const { txId, cycleCounter } = payload
-        if (this.txTimestampCache.has(cycleCounter) && this.txTimestampCache.get(cycleCounter).has(txId)) {
-
-          /* prettier-ignore */ this.mainLogger.debug(`Removed timestamp cache for txId: ${txId}, timestamp: ${Utils.safeStringify(this.txTimestampCache.get(cycleCounter).get(txId))}`)
-          // remove the timestamp from the cache
-          this.txTimestampCache.get(cycleCounter).delete(txId)
-          nestedCountersInstance.countEvent('consensus', 'remove_timestamp_cache')
-        }
-        await respond(true)
-      }
-    )
+    // this.p2p.registerInternal(
+    //   'remove_timestamp_cache',
+    //   async (
+    //     payload: TimestampRemoveRequest,
+    //     respond: (result: boolean) => unknown
+    //   ) => {
+    //     const { txId, receipt2, cycleCounter } = payload
+    //     /* eslint-disable security/detect-object-injection */
+    //     if (this.txTimestampCache[cycleCounter] && this.txTimestampCache[cycleCounter][txId]) {
+    //       // remove the timestamp from the cache
+    //       delete this.txTimestampCache[cycleCounter][txId]
+    //       this.txTimestampCache[cycleCounter][txId] = null
+    //       /* prettier-ignore */ this.mainLogger.debug(`Removed timestamp cache for txId: ${txId}, timestamp: ${Utils.safeStringify(this.txTimestampCache[cycleCounter][txId])}`)
+    //       nestedCountersInstance.countEvent('consensus', 'remove_timestamp_cache')
+    //     }
+    //     await respond(true)
+    //   }
+    // )
 
     const getTxTimestampBinary: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_get_tx_timestamp,
