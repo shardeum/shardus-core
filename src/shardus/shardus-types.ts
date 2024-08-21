@@ -1056,6 +1056,10 @@ export interface ServerConfiguration {
     devPublicKeys?: {
       [pubKey: string]: DevSecurityLevel
     }
+    /** keys that are used for multisig operations */
+    multisigKeys?: {
+      [pubKey: string]: DevSecurityLevel
+    }
     /** minimum approvals need for multisig operations*/
     minApprovalsMultiAuth: number
     /** dump extra data for robust query even if in error/fatal logggin only mode */

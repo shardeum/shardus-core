@@ -12,6 +12,9 @@ import Debug, {
   getDevPublicKey,
   getDevPublicKeyMaxLevel,
   ensureKeySecurity,
+  getMultisigPublicKeys,
+  getMultisigPublicKey,
+  ensureMultisigKeySecurity,
 } from '../debug'
 import ExitHandler from '../exit-handler'
 import LoadDetection from '../load-detection'
@@ -2242,6 +2245,19 @@ class Shardus extends EventEmitter {
     return ensureKeySecurity(keyName, clearance)
   }
 
+
+  getMultisigPublicKeys() {
+    return getMultisigPublicKeys()
+  }
+
+  getMultisigPublicKey(key: string) {
+    return getMultisigPublicKey(key)
+  }
+
+  ensureMultisigKeySecurity(pubKey: string, level: DevSecurityLevel) {
+    return ensureMultisigKeySecurity(pubKey, level)
+  }
+
   /**
    * Shutdown this node in the network
    * @param {boolean} exitProcess Exit the process when shutting down
@@ -3046,10 +3062,11 @@ class Shardus extends EventEmitter {
     for (const [key, value] of Object.entries(changeObj)) {
       if (existingObject[key] != null) {
         /* handle dev key rotation where both keys and values are required */
-        if (key === 'devPublicKeys') {
+        if (key === 'devPublicKeys' || key === 'multisigKeys') {
           existingObject[key] = value
           this.mainLogger.info(`patched ${key} to ${value}`)
-        } else if (typeof value === 'object') {
+        }
+        else if (typeof value === 'object') {
           this.patchObject(existingObject[key], value, appData)
         } else {
           existingObject[key] = value
