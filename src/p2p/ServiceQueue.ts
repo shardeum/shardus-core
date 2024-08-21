@@ -603,7 +603,7 @@ function executionGroupForAddress(address: string): string[] {
   )
   const homeShardData = stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
   const consensusGroup: string[] = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.map(
-    (node: ShardusTypes.Node) => node.id
+    (node: ShardusTypes.Node) => node.publicKey
   )
   return consensusGroup
 }
