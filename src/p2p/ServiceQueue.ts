@@ -24,10 +24,10 @@ import ShardFunctions from '../state-manager/shardFunctions'
 
 interface VerifierEntry {
   hash: string
-  tx: P2P.ServiceQueueTypes.NetworkTxEntry
+  tx: P2P.ServiceQueueTypes.AddNetworkTx
   votes: { txHash: string; type: 'add' | 'remove'; result: boolean; sign: any }[]
   newVotes: boolean
-  executionGroup: []
+  executionGroup: string[]
   appliedReceipt: any
   hasSentFinalReceipt: boolean
 }
@@ -91,7 +91,7 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry> = async (paylo
     if (!verifyAppliedReceipt(payload.appliedReceipt, new Set(payload.executionGroup))) {
       return
     }
-    const addTxCopy = clone(payload.tx.tx)
+    const addTxCopy = clone(payload.tx)
     const { sign, ...txDataWithoutSign } = addTxCopy.txData
     addTxCopy.txData = txDataWithoutSign
     txAdd.push(addTxCopy)
@@ -161,7 +161,7 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry> = async (pa
     if (!verifyAppliedReceipt(payload.appliedReceipt, new Set(payload.executionGroup))) {
       return
     }
-    txRemove.push({ txHash: payload.hash, cycle: payload.tx.tx.cycle })
+    txRemove.push({ txHash: payload.hash, cycle: payload.tx.cycle })
 
     Comms.sendGossip(
       'gossip-removetx',
@@ -189,6 +189,7 @@ const sendVoteHandler: P2P.P2PTypes.Route<
     profilerInstance.scopedProfileSectionStart(route, false)
     try {
       const collectedVote = payload
+      console.log(' red - collectedVote', collectedVote)
 
       if (!collectedVote.sign) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: no sign found')
@@ -196,6 +197,7 @@ const sendVoteHandler: P2P.P2PTypes.Route<
       }
 
       if (!processTxVerifiers.has(collectedVote.txHash)) {
+        console.log(' red - processTxVerifiers.has(collectedVote.txHash)', processTxVerifiers)
         /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: tx not found in txList')
         return
       }
@@ -225,7 +227,9 @@ function tryAppendVote(
   queueEntry: VerifierEntry,
   collectedVote: { txHash: string; type: 'add' | 'remove'; result: boolean; sign: any }
 ): boolean {
+  console.log(' red - tryAppendVote', queueEntry, collectedVote)
   if (!queueEntry.executionGroup.some((node) => node === collectedVote.sign.owner)) {
+    console.log(' red - tryAppendVote not in execution group', queueEntry, collectedVote.sign.owner)
     nestedCountersInstance.countEvent('serviceQueue', 'Vote sender not in execution group')
     return false
   }
@@ -233,6 +237,7 @@ function tryAppendVote(
   const numVotes = queueEntry.votes.length
 
   if (numVotes === 0) {
+    console.log(' red - tryAppendVote numVotes === 0', queueEntry, collectedVote)
     queueEntry.votes.push(collectedVote)
     queueEntry.newVotes = true
     return true
@@ -248,6 +253,7 @@ function tryAppendVote(
     }
   }
 
+  console.log(' red - tryAppendVote appended', queueEntry, collectedVote)
   queueEntry.votes.push(collectedVote)
   queueEntry.newVotes = true
   return true
@@ -255,6 +261,7 @@ function tryAppendVote(
 
 function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
   try {
+    console.log(' red - tryProduceReceipt starting', queueEntry)
     if (queueEntry.appliedReceipt != null) {
       nestedCountersInstance.countEvent(`serviceQueue`, 'tryProduceReceipt appliedReceipt != null')
       return queueEntry.appliedReceipt
@@ -322,6 +329,7 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
 
 async function initVotingProcess(): Promise<void> {
   processTxVerifiers.clear()
+  console.log(' red - initVotingProcess', txList)
 
   let length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
   for (let i = 0; i < length; i++) {
@@ -334,11 +342,9 @@ async function initVotingProcess(): Promise<void> {
     }
     processTxVerifiers.set(txList[i].hash, {
       hash: txList[i].hash,
-      tx: txList[i],
+      tx: txList[i].tx,
       votes: [],
-      executionGroup: this.stateManager
-        .getClosestNodes(txList[i].hash, config.sharding.nodesPerConsensusGroup, false)
-        .map((node) => node.publicKey),
+      executionGroup: executionGroupForAddress(txList[i].tx.involvedAddress),
       newVotes: false,
       hasSentFinalReceipt: false,
       appliedReceipt: null,
@@ -348,6 +354,7 @@ async function initVotingProcess(): Promise<void> {
   for (const [hash, entry] of processTxVerifiers) {
     ;(async function retryUntilSuccess(entry) {
       while (!entry.hasSentFinalReceipt && currentQuarter === 2) {
+        console.log(' red - retryUntilSuccess', entry)
         await tryProduceReceipt(entry)
       }
     })(entry)
@@ -531,19 +538,36 @@ export async function addNetworkTx(
     ...networkTx
   } as P2P.ServiceQueueTypes.AddNetworkTx
   if (await _addNetworkTx(fullNetworkTx)) {
-    voteForNetworkTx(networkTx.involvedAddress, 'add', true)
+    voteForNetworkTx(fullNetworkTx, 'add', true)
   } else {
-    voteForNetworkTx(networkTx.involvedAddress, 'add', false)
+    voteForNetworkTx(fullNetworkTx, 'add', false)
   }
 }
 
-function voteForNetworkTx(txHash: string, type: 'add' | 'remove', result: boolean): void {
-  const vote = crypto.sign({ txHash, result, type })
-  Comms.tell(pickAggregators(txHash), 'send_service_queue_vote', vote)
+function voteForNetworkTx(
+  networkTx: P2P.ServiceQueueTypes.AddNetworkTx,
+  type: 'add' | 'remove',
+  result: boolean
+): void {
+  console.log(' red - voteForNetworkTx', networkTx.hash, type, result)
+  const vote = crypto.sign({ txHash: networkTx.hash, result, type })
+  let aggregators = pickAggregators(networkTx.involvedAddress)
+  if (aggregators.map((node) => node.id).includes(Self.id)) {
+    console.log(' red - voteForNetworkTx is aggregator', networkTx.hash, type, result)
+    processTxVerifiers.set(networkTx.hash, {
+      hash: networkTx.hash,
+      tx: networkTx,
+      votes: [],
+      executionGroup: executionGroupForAddress(networkTx.involvedAddress),
+      newVotes: false,
+      hasSentFinalReceipt: false,
+      appliedReceipt: null,
+    })
+  }
+  Comms.tell(aggregators, 'send_service_queue_vote', vote)
 }
 
-function pickAggregators(address: string): ShardusTypes.Node[] {
-  const closestNodes = stateManager.getClosestNodes(address, config.sharding.nodesPerConsensusGroup, false)
+function executionGroupForAddress(address: string): string[] {
   const { homePartition } = ShardFunctions.addressToPartition(
     stateManager.currentCycleShardData.shardGlobals,
     address
@@ -551,6 +575,12 @@ function pickAggregators(address: string): ShardusTypes.Node[] {
   const homeShardData = stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
   const consensusGroup: string[] = homeShardData.homeNodes[0].consensusNodeForOurNodeFull
     .map((node: ShardusTypes.Node) => node.id)
+  return consensusGroup
+}
+
+function pickAggregators(address: string): ShardusTypes.Node[] {
+  const closestNodes = stateManager.getClosestNodes(address, config.sharding.nodesPerConsensusGroup, false)
+  const consensusGroup = executionGroupForAddress(address)
 
   // now find the first n occurrences of closest nodes that are also in consensusGroup
   const aggregators: ShardusTypes.Node[] = []
@@ -691,9 +721,9 @@ export async function processNetworkTransactions(): Promise<void> {
         // eslint-disable-next-line security/detect-object-injection
         const removeTx = { txHash: txList[i].hash, cycle: currentCycle }
         if (await _removeNetworkTx(removeTx)) {
-          voteForNetworkTx(txList[i].hash, 'remove', true)
+          voteForNetworkTx(txList[i].tx, 'remove', true)
         } else {
-          voteForNetworkTx(txList[i].hash, 'remove', false)
+          voteForNetworkTx(txList[i].tx, 'remove', false)
         }
       }
     } catch (e) {
@@ -783,6 +813,7 @@ function sortedInsert(
 }
 
 function verifyAppliedReceipt(receipt: any, executionGroupNodes: Set<string>): boolean {
+  console.log(' red - verifyAppliedReceipt', receipt, executionGroupNodes)
   const ownerToSignMap = new Map<string, Shardus.Sign>()
   for (const sign of receipt.signatures) {
     if (executionGroupNodes.has(sign.owner)) {
