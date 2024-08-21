@@ -296,7 +296,7 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
     }
 
     let votingGroup = queueEntry.executionGroup
-    const majorityCount = Math.ceil(votingGroup.length * this.config.p2p.requiredVotesPercentage)
+    const majorityCount = Math.ceil(votingGroup.length * config.p2p.requiredVotesPercentage)
     const numVotes = queueEntry.votes.length
     console.log(' red - tryProduceReceipt votes', queueEntry, majorityCount, numVotes)
     if (numVotes < majorityCount) {
@@ -668,7 +668,7 @@ async function validateAddTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
       return false
     }
 
-    if (addTx.cycle < currentCycle - 1 || addTx.cycle > currentCycle) {
+    if (addTx.cycle < currentCycle - 2 || addTx.cycle > currentCycle) {
       warn(`Invalid cycle ${addTx.cycle} for current cycle ${currentCycle}`)
       return false
     }
@@ -904,7 +904,7 @@ function verifyAppliedReceipt(receipt: any, executionGroupNodes: Set<string>): b
     }
   }
   const totalNodes = executionGroupNodes.size
-  const requiredMajority = Math.ceil(totalNodes * this.config.p2p.requiredVotesPercentage)
+  const requiredMajority = Math.ceil(totalNodes * config.p2p.requiredVotesPercentage)
   if (ownerToSignMap.size < requiredMajority) {
     return false
   }
