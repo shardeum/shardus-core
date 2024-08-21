@@ -423,6 +423,12 @@ export function init(): void {
 export function reset(): void {
   txAdd = []
   txRemove = []
+
+  for (const [hash, entry] of processTxVerifiers) {
+    if (entry.hasSentFinalReceipt) {
+      processTxVerifiers.delete(hash)
+    }
+  }
 }
 
 export function getTxs(): P2P.ServiceQueueTypes.Txs {
