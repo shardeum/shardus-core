@@ -77,8 +77,9 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObject>
     let err = ''
     err = validateTypes(payload, {
       hash: 's',
-      votes: 'o',
-      newVotes: 'n',
+      tx: 'o',
+      votes: 'a',
+      newVotes: 'b',
       executionGroup: 'a',
       appliedReceipt: 'o',
       hasSentFinalReceipt: 'b',
@@ -106,6 +107,7 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObject>
     }
 
     if (!verifyAppliedReceipt(payload.appliedReceipt, payload.executionGroup)) {
+      warn('addTxGossipRoute: appliedReceipt verification failed')
       return
     }
     const addTxCopy = clone(payload.tx)
@@ -908,9 +910,11 @@ function sortedInsert(
 function verifyAppliedReceipt(receipt: any, executionGroupNodes: string[]): boolean {
   console.log(' red - verifyAppliedReceipt', receipt, executionGroupNodes)
   const ownerToSignMap = new Map<string, Shardus.Sign>()
+  let validSignatures = 0
   for (const sign of receipt.signatures) {
     if (executionGroupNodes.includes(sign.owner)) {
       ownerToSignMap.set(sign.owner, sign)
+      validSignatures++
     }
   }
   const totalNodes = executionGroupNodes.length
@@ -919,20 +923,21 @@ function verifyAppliedReceipt(receipt: any, executionGroupNodes: string[]): bool
     return false
   }
 
-  const vote = receipt.appliedVote
-  const voteHash = this.calculateVoteHash(vote)
-  const appliedVoteHash = {
-    txid: vote.txid,
-    voteHash,
-  }
+  // const vote = receipt.appliedVote
+  // const voteHash = this.calculateVoteHash(vote)
+  // const appliedVoteHash = {
+  //   txid: vote.txid,
+  //   voteHash,
+  // }
 
-  let validSignatures = 0
-  for (const owner of ownerToSignMap.keys()) {
-    const signedObject = { ...appliedVoteHash, sign: ownerToSignMap.get(owner) }
-    if (this.crypto.verify(signedObject, owner)) {
-      validSignatures++
-    }
-  }
+  // let validSignatures = 0
+  // for (const owner of ownerToSignMap.keys()) {
+  //   const signedObject = { ...appliedVoteHash, sign: ownerToSignMap.get(owner) }
+  //   if (this.crypto.verify(signedObject, owner)) {
+  //     validSignatures++
+  //   }
+  // }
+  console.log(' red - verifyAppliedReceipt validSignatures', validSignatures, requiredMajority)
   return validSignatures >= requiredMajority
 }
 
