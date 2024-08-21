@@ -639,7 +639,7 @@ function pickAggregators(address: string): ShardusTypes.Node[] {
   // now find the first n occurrences of closest nodes that are also in consensusGroup
   const aggregators: ShardusTypes.Node[] = []
   for (const node of closestNodes) {
-    if (consensusGroup.includes(node.id)) {
+    if (consensusGroup.includes(node.publicKey)) {
       aggregators.push(node)
       if (aggregators.length === config.p2p.serviceQueueAggregators) break
     }
