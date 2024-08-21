@@ -429,7 +429,6 @@ export function reset(): void {
   txAdd = []
   txRemove = []
   processTxVerifiers.clear()
-  addProposals.length = 0
 }
 
 export function getTxs(): P2P.ServiceQueueTypes.Txs {
@@ -539,6 +538,7 @@ export function sendRequests(): void {
   txToTry.push(...txList.slice(0, length))
 
   initVotingProcess(txToTry)
+  addProposals.length = 0
 }
 
 /** Module Functions */
