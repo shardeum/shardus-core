@@ -20,6 +20,7 @@ import * as utils from '../utils'
 import rfdc from 'rfdc'
 import * as Shardus from '../shardus/shardus-types'
 import { ShardusTypes } from '../index'
+import ShardFunctions from '../state-manager/shardFunctions'
 
 interface VerifierEntry {
   hash: string
@@ -325,7 +326,7 @@ async function initVotingProcess(): Promise<void> {
   let length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
   for (let i = 0; i < length; i++) {
     if (
-      !pickAggregators(txList[i].hash)
+      !pickAggregators(txList[i].tx.involvedAddress)
         .map((node) => node.id)
         .includes(Self.id)
     ) {
@@ -530,9 +531,9 @@ export async function addNetworkTx(
     ...networkTx
   } as P2P.ServiceQueueTypes.AddNetworkTx
   if (await _addNetworkTx(fullNetworkTx)) {
-    voteForNetworkTx(hash, 'add', true)
+    voteForNetworkTx(networkTx.involvedAddress, 'add', true)
   } else {
-    voteForNetworkTx(hash, 'add', false)
+    voteForNetworkTx(networkTx.involvedAddress, 'add', false)
   }
 }
 
@@ -541,11 +542,25 @@ function voteForNetworkTx(txHash: string, type: 'add' | 'remove', result: boolea
   Comms.tell(pickAggregators(txHash), 'send_service_queue_vote', vote)
 }
 
-function pickAggregators(hash: string): ShardusTypes.Node[] {
-  // todo: fix how we pick the aggregators. this is not stable enough for production
-  const executionGroup = stateManager.getClosestNodes(hash, config.sharding.nodesPerConsensusGroup, false)
-  const localAccounts = executionGroup.filter((node) => stateManager.transactionQueue.isAccountRemote(node.publicKey))
-  return localAccounts.slice(0, config.p2p.serviceQueueAggregators)
+function pickAggregators(address: string): ShardusTypes.Node[] {
+  const closestNodes = stateManager.getClosestNodes(address, config.sharding.nodesPerConsensusGroup, false)
+  const { homePartition } = ShardFunctions.addressToPartition(
+    stateManager.currentCycleShardData.shardGlobals,
+    address
+  )
+  const homeShardData = stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
+  const consensusGroup: string[] = homeShardData.homeNodes[0].consensusNodeForOurNodeFull
+    .map((node: ShardusTypes.Node) => node.id)
+
+  // now find the first n occurrences of closest nodes that are also in consensusGroup
+  const aggregators: ShardusTypes.Node[] = []
+  for (const node of closestNodes) {
+    if (consensusGroup.includes(node.id)) {
+      aggregators.push(node)
+      if (aggregators.length === config.p2p.serviceQueueAggregators) break
+    }
+  }
+  return aggregators
 }
 
 async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise<boolean> {
@@ -810,16 +825,4 @@ function warn(...msg: unknown[]): void {
 function error(...msg: unknown[]): void {
   const entry = `ServiceQueue: ${msg.join(' ')}`
   p2pLogger.error(entry)
-}
-
-function omitKey(obj: any, keyToOmit: string) {
-  // deep emit key from object
-  const newObj = { ...obj };
-  for (const key in newObj) {
-    if (key === keyToOmit) {
-      delete newObj[key];
-    } else if (typeof newObj[key] === 'object') {
-      newObj[key] = omitKey(newObj[key], keyToOmit);
-    }
-  }
 }
