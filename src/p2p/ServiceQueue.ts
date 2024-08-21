@@ -25,7 +25,7 @@ import ShardFunctions from '../state-manager/shardFunctions'
 interface VerifierEntry {
   hash: string
   tx: P2P.ServiceQueueTypes.AddNetworkTx
-  votes: { txHash: string; verifierType: 'add' | 'remove'; result: boolean; sign: any }[]
+  votes: { txHash: string; verifierType: 'beforeAdd' | 'apply'; result: boolean; sign: any }[]
   newVotes: boolean
   executionGroup: string[]
   appliedReceipt: any
@@ -34,13 +34,13 @@ interface VerifierEntry {
 
 type VotingProposal =
   | {
-  networkTx: P2P.ServiceQueueTypes.AddNetworkTx;
-  verifierType: 'add';
-}
+      networkTx: P2P.ServiceQueueTypes.AddNetworkTx
+      verifierType: 'beforeAdd'
+    }
   | {
-  networkTx: P2P.ServiceQueueTypes.RemoveNetworkTx;
-  verifierType: 'remove';
-};
+      networkTx: P2P.ServiceQueueTypes.RemoveNetworkTx
+      verifierType: 'apply'
+    }
 
 /** STATE */
 
@@ -193,15 +193,25 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry> = async (pa
 }
 
 const sendVoteHandler: P2P.P2PTypes.Route<
-  P2P.P2PTypes.InternalHandler<{ txHash: string; verifierType: 'add' | 'remove'; result: boolean; sign: any }>
+  P2P.P2PTypes.InternalHandler<{
+    txHash: string
+    verifierType: 'beforeAdd' | 'apply'
+    result: boolean
+    sign: any
+  }>
 > = {
   name: 'send_service_queue_vote',
-  handler: (payload, respond, header, sign) => {
+  handler: async (payload, respond, header, sign) => {
     const route = 'send_service_queue_vote'
     profilerInstance.scopedProfileSectionStart(route, false)
     try {
       const collectedVote = payload
       console.log(' red - collectedVote', collectedVote)
+
+      if (![1, 2].includes(currentQuarter)) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: quarter not 1 or 2')
+        return
+      }
 
       if (!collectedVote.sign) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: no sign found')
@@ -210,11 +220,17 @@ const sendVoteHandler: P2P.P2PTypes.Route<
 
       if (!processTxVerifiers.has(collectedVote.txHash)) {
         console.log(' red - processTxVerifiers.has(collectedVote.txHash)', processTxVerifiers)
-        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: tx not found in txList')
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: tx not in processTxVerifiers')
+        return
+      }
+
+      if (processTxVerifiers.get(collectedVote.txHash).hasSentFinalReceipt) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: tx already has sent final receipt')
         return
       }
 
       tryAppendVote(processTxVerifiers.get(collectedVote.txHash), collectedVote)
+      await tryProduceReceipt(processTxVerifiers.get(collectedVote.txHash))
     } catch (e) {
       console.error(`Error processing sendVoteHandler handler: ${e}`)
       nestedCountersInstance.countEvent('internal', `${route}-exception`)
@@ -237,7 +253,7 @@ const routes = {
 
 function tryAppendVote(
   queueEntry: VerifierEntry,
-  collectedVote: { txHash: string; verifierType: 'add' | 'remove'; result: boolean; sign: any }
+  collectedVote: { txHash: string; verifierType: 'beforeAdd' | 'apply'; result: boolean; sign: any }
 ): boolean {
   console.log(' red - tryAppendVote', queueEntry, collectedVote)
   if (!queueEntry.executionGroup.some((node) => node === collectedVote.sign.owner)) {
@@ -282,7 +298,7 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
     let votingGroup = queueEntry.executionGroup
     const majorityCount = Math.ceil(votingGroup.length * this.config.p2p.requiredVotesPercentage)
     const numVotes = queueEntry.votes.length
-
+    console.log(' red - tryProduceReceipt votes', queueEntry, majorityCount, numVotes)
     if (numVotes < majorityCount) {
       return null
     }
@@ -325,7 +341,7 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
 
       queueEntry.hasSentFinalReceipt = true
       let route = ''
-      if (queueEntry.appliedReceipt.type === 'add') {
+      if (queueEntry.appliedReceipt.type === 'addBefore') {
         route = 'gossip-addtx'
       } else {
         route = 'gossip-removetx'
@@ -339,27 +355,15 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
   }
 }
 
-async function initVotingProcess(propsals: VotingProposal[]): Promise<void> {
+function initVotingProcess(propsals: VotingProposal[]): void {
   console.log(' red - initVotingProcess', propsals)
-  setUpAggregators()
   startVoting(propsals)
 }
 
-function setUpAggregators(): void {
-  console.log(' red - setUpAggregators', processTxVerifiers)
-  for (const [hash, entry] of processTxVerifiers) {
-    ;(async function retryUntilSuccess(entry) {
-      while (!entry.hasSentFinalReceipt && [1, 2].includes(currentQuarter) === true) {
-        console.log(' red - retryUntilSuccess', entry)
-        await tryProduceReceipt(entry)
-      }
-    })(entry)
-  }
-}
-
-function startVoting(proposals: VotingProposal[]): void {
-  proposals.forEach(async (proposal: VotingProposal) => {
-    if (proposal.verifierType === 'remove') {
+async function startVoting(proposals: VotingProposal[]): Promise<void> {
+  console.log(' red - startVoting', proposals)
+  for (const proposal of proposals) {
+    if (proposal.verifierType === 'apply') {
       const voteResult = await validateRemoveTx(proposal.networkTx)
       const index = txList.findIndex((entry) => entry.hash === proposal.networkTx.txHash)
       if (index === -1) {
@@ -376,7 +380,7 @@ function startVoting(proposals: VotingProposal[]): void {
         voteResult
       )
     }
-  })
+  }
 }
 
 /** FUNCTIONS */
@@ -531,12 +535,12 @@ export function sendRequests(): void {
   const proposals: VotingProposal[] = []
   for (const add of addProposals) {
     if (!txAdd.some((entry) => entry.hash === add.hash)) {
-      proposals.push({ networkTx: add, verifierType: 'add' })
+      proposals.push({ networkTx: add, verifierType: 'beforeAdd' })
     }
   }
   for (const remove of removeProposals) {
     if (!txRemove.some((entry) => entry.txHash === remove.txHash)) {
-      proposals.push({ networkTx: remove, verifierType: 'remove' })
+      proposals.push({ networkTx: remove, verifierType: 'apply' })
     }
   }
 
@@ -576,9 +580,11 @@ export async function addNetworkTx(
 }
 
 function makeAddNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.AddNetworkTx): void {
-  if (pickAggregators(networkTx.involvedAddress)
-    .map((node) => node.id)
-    .includes(Self.id)) {
+  if (
+    pickAggregators(networkTx.involvedAddress)
+      .map((node) => node.id)
+      .includes(Self.id)
+  ) {
     processTxVerifiers.set(networkTx.hash, {
       hash: networkTx.hash,
       tx: networkTx,
@@ -599,9 +605,11 @@ function makeRemoveNetworkTxProposals(removeTx: P2P.ServiceQueueTypes.RemoveNetw
     return
   }
   const networkTx = txList[index].tx
-  if (pickAggregators(networkTx.involvedAddress)
-    .map((node) => node.id)
-    .includes(Self.id)) {
+  if (
+    pickAggregators(networkTx.involvedAddress)
+      .map((node) => node.id)
+      .includes(Self.id)
+  ) {
     processTxVerifiers.set(networkTx.hash, {
       hash: networkTx.hash,
       tx: networkTx,
@@ -617,7 +625,7 @@ function makeRemoveNetworkTxProposals(removeTx: P2P.ServiceQueueTypes.RemoveNetw
 
 function voteForNetworkTx(
   networkTx: P2P.ServiceQueueTypes.AddNetworkTx,
-  type: 'add' | 'remove',
+  type: 'beforeAdd' | 'apply',
   result: boolean
 ): void {
   console.log(' red - voteForNetworkTx', networkTx.hash, type, result)
