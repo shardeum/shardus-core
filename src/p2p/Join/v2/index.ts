@@ -251,12 +251,6 @@ export function isOnStandbyList(publicKey: string): boolean {
 export function isInNewJoinRequests(publicKey: string): boolean {
   return newJoinRequests.some((node) => node.nodeInfo.publicKey === publicKey);
 }
-  if (newJoinRequests.find((node) => node.nodeInfo.publicKey === publicKey)) {
-    return true
-  } else {
-    return false
-  }
-}
 
 export function debugDumpJoinRequestList(list: JoinRequest[], message: string): void {
   list.sort((a, b) => (a.nodeInfo.publicKey > b.nodeInfo.publicKey ? 1 : -1))
