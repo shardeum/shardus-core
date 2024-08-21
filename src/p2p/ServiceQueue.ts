@@ -21,17 +21,26 @@ import rfdc from 'rfdc'
 import * as Shardus from '../shardus/shardus-types'
 import { ShardusTypes } from '../index'
 import ShardFunctions from '../state-manager/shardFunctions'
-import { NetworkTxEntry } from '@shardus/types/build/src/p2p/ServiceQueueTypes'
 
 interface VerifierEntry {
   hash: string
   tx: P2P.ServiceQueueTypes.AddNetworkTx
-  votes: { txHash: string; type: 'add' | 'remove'; result: boolean; sign: any }[]
+  votes: { txHash: string; verifierType: 'add' | 'remove'; result: boolean; sign: any }[]
   newVotes: boolean
   executionGroup: string[]
   appliedReceipt: any
   hasSentFinalReceipt: boolean
 }
+
+type VotingProposal =
+  | {
+  networkTx: P2P.ServiceQueueTypes.AddNetworkTx;
+  verifierType: 'add';
+}
+  | {
+  networkTx: P2P.ServiceQueueTypes.RemoveNetworkTx;
+  verifierType: 'remove';
+};
 
 /** STATE */
 
@@ -46,6 +55,7 @@ const applyVerifier = new Map<string, (txEntry: P2P.ServiceQueueTypes.AddNetwork
 const tryCounts = new Map<string, number>()
 const processTxVerifiers = new Map<string, VerifierEntry>()
 const addProposals: P2P.ServiceQueueTypes.AddNetworkTx[] = []
+const removeProposals: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
 
 /** ROUTES */
 
@@ -183,7 +193,7 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry> = async (pa
 }
 
 const sendVoteHandler: P2P.P2PTypes.Route<
-  P2P.P2PTypes.InternalHandler<{ txHash: string; type: 'add' | 'remove'; result: boolean; sign: any }>
+  P2P.P2PTypes.InternalHandler<{ txHash: string; verifierType: 'add' | 'remove'; result: boolean; sign: any }>
 > = {
   name: 'send_service_queue_vote',
   handler: (payload, respond, header, sign) => {
@@ -227,7 +237,7 @@ const routes = {
 
 function tryAppendVote(
   queueEntry: VerifierEntry,
-  collectedVote: { txHash: string; type: 'add' | 'remove'; result: boolean; sign: any }
+  collectedVote: { txHash: string; verifierType: 'add' | 'remove'; result: boolean; sign: any }
 ): boolean {
   console.log(' red - tryAppendVote', queueEntry, collectedVote)
   if (!queueEntry.executionGroup.some((node) => node === collectedVote.sign.owner)) {
@@ -291,7 +301,7 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
       hashCounts.set(currentVote.result, voteCount + 1)
       if (voteCount + 1 > majorityCount) {
         winningVote = currentVote.result
-        type = currentVote.type
+        type = currentVote.verifierType
         break
       }
     }
@@ -329,33 +339,14 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
   }
 }
 
-async function initVotingProcess(txToTry: NetworkTxEntry[]): Promise<void> {
+async function initVotingProcess(propsals: VotingProposal[]): Promise<void> {
   processTxVerifiers.clear()
-  console.log(' red - initVotingProcess', txToTry)
-  setUpAggregators(txToTry)
-  startVoting(txToTry)
+  console.log(' red - initVotingProcess', propsals)
+  setUpAggregators()
+  startVoting(propsals)
 }
 
-function setUpAggregators(txToTry: NetworkTxEntry[]): void {
-  for (let i = 0; i < txToTry.length; i++) {
-    if (
-      !pickAggregators(txToTry[i].tx.involvedAddress)
-        .map((node) => node.id)
-        .includes(Self.id)
-    ) {
-      continue
-    }
-    processTxVerifiers.set(txToTry[i].hash, {
-      hash: txToTry[i].hash,
-      tx: txToTry[i].tx,
-      votes: [],
-      executionGroup: executionGroupForAddress(txToTry[i].tx.involvedAddress),
-      newVotes: false,
-      hasSentFinalReceipt: false,
-      appliedReceipt: null,
-    })
-  }
-
+function setUpAggregators(): void {
   for (const [hash, entry] of processTxVerifiers) {
     ;(async function retryUntilSuccess(entry) {
       while (!entry.hasSentFinalReceipt && [1, 2].includes(currentQuarter) === true) {
@@ -366,20 +357,28 @@ function setUpAggregators(txToTry: NetworkTxEntry[]): void {
   }
 }
 
-function startVoting(txToTry: NetworkTxEntry[]): void {
-  txToTry.forEach(async (entry: NetworkTxEntry) => {
-    const involvedAddresses = entry.tx.involvedAddress
-    const selfPubKey = crypto.getPublicKey()
-    const isSelfInExecutionGroup = executionGroupForAddress(involvedAddresses).includes(selfPubKey)
-    const isSelfAggregator = pickAggregators(involvedAddresses).some((node) => node.id === Self.id)
+function startVoting(proposals: VotingProposal[]): void {
+  proposals.forEach(async (proposal: VotingProposal) => {
+    if (proposal.verifierType === 'remove') {
+      const voteResult = await validateRemoveTx(proposal.networkTx)
+      const index = txList.findIndex((entry) => entry.hash === proposal.networkTx.txHash)
+      if (index === -1) {
+        error(`TxHash ${proposal.networkTx.txHash} does not exist in txList`)
+        return
+      }
 
-    if (!isSelfAggregator && isSelfInExecutionGroup) {
-      const type: 'add' | 'remove' = entry.tx.type as 'add' | 'remove'
-      const voteResult = await (type === 'add'
-        ? _addNetworkTx(entry.tx)
-        : _removeNetworkTx({ txHash: entry.hash, cycle: currentCycle }))
-
-      voteForNetworkTx(entry.tx, type, voteResult)
+      voteForNetworkTx(
+        txList[index].tx,
+        proposal.verifierType,
+        voteResult
+      )
+    } else {
+      const voteResult = await validateAddTx(proposal.networkTx)
+      voteForNetworkTx(
+        proposal.networkTx as P2P.ServiceQueueTypes.AddNetworkTx,
+        proposal.verifierType,
+        voteResult
+      )
     }
   })
 }
@@ -528,17 +527,21 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 }
 
 export function sendRequests(): void {
-  const txToTry: NetworkTxEntry[] = []
+  const proposals: VotingProposal[] = []
   for (const add of addProposals) {
     if (!txAdd.some((entry) => entry.hash === add.hash)) {
-      txToTry.push({ hash: add.hash, tx: add })
+      proposals.push({ networkTx: add, verifierType: 'add' })
     }
   }
-  let length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
-  txToTry.push(...txList.slice(0, length))
+  for (const remove of removeProposals) {
+    if (!txRemove.some((entry) => entry.txHash === remove.txHash)) {
+      proposals.push({ networkTx: remove, verifierType: 'remove' })
+    }
+  }
 
-  initVotingProcess(txToTry)
+  initVotingProcess(proposals)
   addProposals.length = 0
+  removeProposals.length = 0
 }
 
 /** Module Functions */
@@ -566,13 +569,49 @@ export async function addNetworkTx(
     cycle: currentCycle,
     ...networkTx,
   } as P2P.ServiceQueueTypes.AddNetworkTx
-  if (await _addNetworkTx(fullNetworkTx)) {
+  if (await validateAddTx(fullNetworkTx)) {
     makeAddNetworkTxProposals(fullNetworkTx)
   }
 }
 
 function makeAddNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.AddNetworkTx): void {
+  if (!pickAggregators(networkTx.involvedAddress)
+    .map((node) => node.id)
+    .includes(Self.id)) {
+    processTxVerifiers.set(networkTx.hash, {
+      hash: networkTx.hash,
+      tx: networkTx,
+      votes: [],
+      executionGroup: executionGroupForAddress(networkTx.involvedAddress),
+      newVotes: false,
+      hasSentFinalReceipt: false,
+      appliedReceipt: null,
+    })
+  }
   addProposals.push(networkTx)
+}
+
+function makeRemoveNetworkTxProposals(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx): void {
+  const index = txList.findIndex((entry) => entry.hash === removeTx.txHash)
+  if (index === -1) {
+    error(`TxHash ${removeTx.txHash} does not exist in txList`)
+    return
+  }
+  const networkTx = txList[index].tx
+  if (!pickAggregators(networkTx.involvedAddress)
+    .map((node) => node.id)
+    .includes(Self.id)) {
+    processTxVerifiers.set(networkTx.hash, {
+      hash: networkTx.hash,
+      tx: networkTx,
+      votes: [],
+      executionGroup: executionGroupForAddress(networkTx.involvedAddress),
+      newVotes: false,
+      hasSentFinalReceipt: false,
+      appliedReceipt: null,
+    })
+  }
+  removeProposals.push(removeTx)
 }
 
 function voteForNetworkTx(
@@ -613,7 +652,7 @@ function pickAggregators(address: string): ShardusTypes.Node[] {
   return aggregators
 }
 
-async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise<boolean> {
+async function validateAddTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise<boolean> {
   try {
     if (!addTx || !addTx.txData) {
       warn('Invalid addTx or missing addTx.txData', addTx)
@@ -627,6 +666,16 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
 
     if (addTx.involvedAddress == null || !isValidShardusAddress([addTx.involvedAddress])) {
       warn(`Invalid involvedAddress ${addTx.involvedAddress}`)
+      return false
+    }
+
+    const involvedAddresses = addTx.involvedAddress
+    const selfPubKey = crypto.getPublicKey()
+    const isSelfInExecutionGroup = executionGroupForAddress(involvedAddresses).includes(selfPubKey)
+    if (!isSelfInExecutionGroup) {
+      if (logFlags.p2pNonFatal) {
+        info('Not in execution group for network tx', addTx.hash)
+      }
       return false
     }
 
@@ -666,7 +715,7 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
   }
 }
 
-export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx): Promise<boolean> {
+export async function validateRemoveTx(removeTx: P2P.ServiceQueueTypes.RemoveNetworkTx): Promise<boolean> {
   const index = txList.findIndex((entry) => entry.hash === removeTx.txHash)
   if (index === -1) {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) warn(`TxHash ${removeTx.txHash} does not exist in txList`)
@@ -675,6 +724,17 @@ export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
 
   // eslint-disable-next-line security/detect-object-injection
   const listEntry = txList[index]
+
+  const involvedAddresses = listEntry.tx.involvedAddress
+  const selfPubKey = crypto.getPublicKey()
+  const isSelfInExecutionGroup = executionGroupForAddress(involvedAddresses).includes(selfPubKey)
+  if (!isSelfInExecutionGroup) {
+    if (logFlags.p2pNonFatal) {
+      info('Not in execution group for network tx remove', listEntry.hash)
+    }
+    return false
+  }
+
   try {
     if (!applyVerifier.has(listEntry.tx.type)) {
       // todo: should this throw or not?
@@ -730,6 +790,14 @@ export async function processNetworkTransactions(): Promise<void> {
         countTry(txList[i].hash)
         if (record.subQueueKey != null) {
           processedSubQueueKeys.add(record.subQueueKey)
+        }
+      } else {
+        // eslint-disable-next-line security/detect-object-injection
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) info('removeNetworkTx', txList[i].hash)
+        // eslint-disable-next-line security/detect-object-injection
+        const removeTx = { txHash: txList[i].hash, cycle: currentCycle }
+        if (await validateRemoveTx(removeTx)) {
+          makeRemoveNetworkTxProposals(removeTx)
         }
       }
     } catch (e) {
