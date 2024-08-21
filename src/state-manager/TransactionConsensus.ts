@@ -363,7 +363,6 @@ class TransactionConsenus {
           // handle rare race condition where we have seen the txId but not the timestamp
           if (Context.config.p2p.timestampCacheFix && this.seenTimestampRequests.has(readableReq.txId) && !this.txTimestampCacheByTxId.has(readableReq.txId)) {
               nestedCountersInstance.countEvent('consensus', 'get_tx_timestamp seen txId but found no timestamp')
-            )
             return respond(BadRequest('get_tx_timestamp seen txId but found no timestamp'), serializeResponseError)
           }
           this.seenTimestampRequests.add(readableReq.txId) 
