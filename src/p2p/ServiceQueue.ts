@@ -369,7 +369,8 @@ function setUpAggregators(txToTry: NetworkTxEntry[]): void {
 function startVoting(txToTry: NetworkTxEntry[]): void {
   txToTry.forEach(async (entry: NetworkTxEntry) => {
     const involvedAddresses = entry.tx.involvedAddress
-    const isSelfInExecutionGroup = executionGroupForAddress(involvedAddresses).includes(Self.id)
+    const selfPubKey = crypto.getPublicKey()
+    const isSelfInExecutionGroup = executionGroupForAddress(involvedAddresses).includes(selfPubKey)
     const isSelfAggregator = pickAggregators(involvedAddresses).some((node) => node.id === Self.id)
 
     if (!isSelfAggregator && isSelfInExecutionGroup) {
