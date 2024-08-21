@@ -358,7 +358,7 @@ function setUpAggregators(txToTry: NetworkTxEntry[]): void {
 
   for (const [hash, entry] of processTxVerifiers) {
     ;(async function retryUntilSuccess(entry) {
-      while (!entry.hasSentFinalReceipt && currentQuarter === 2) {
+      while (!entry.hasSentFinalReceipt && [1, 2].includes(currentQuarter) === true) {
         console.log(' red - retryUntilSuccess', entry)
         await tryProduceReceipt(entry)
       }
@@ -429,6 +429,7 @@ export function reset(): void {
   txAdd = []
   txRemove = []
   processTxVerifiers.clear()
+  addProposals.length = 0
 }
 
 export function getTxs(): P2P.ServiceQueueTypes.Txs {
@@ -582,18 +583,6 @@ function voteForNetworkTx(
   console.log(' red - voteForNetworkTx', networkTx.hash, type, result)
   const vote = crypto.sign({ txHash: networkTx.hash, result, type })
   let aggregators = pickAggregators(networkTx.involvedAddress)
-  if (aggregators.map((node) => node.id).includes(Self.id)) {
-    console.log(' red - voteForNetworkTx is aggregator', networkTx.hash, type, result)
-    processTxVerifiers.set(networkTx.hash, {
-      hash: networkTx.hash,
-      tx: networkTx,
-      votes: [],
-      executionGroup: executionGroupForAddress(networkTx.involvedAddress),
-      newVotes: false,
-      hasSentFinalReceipt: false,
-      appliedReceipt: null,
-    })
-  }
   Comms.tell(aggregators, 'send_service_queue_vote', vote)
 }
 
