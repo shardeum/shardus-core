@@ -805,7 +805,7 @@ export function sendRequests(): void {
         unjoinRequest,
         '',
         null,
-        nodeListFromStates([
+        nodelistFromStates([
           P2P.P2PTypes.NodeStatus.ACTIVE,
           P2P.P2PTypes.NodeStatus.READY,
           P2P.P2PTypes.NodeStatus.SYNCING,
