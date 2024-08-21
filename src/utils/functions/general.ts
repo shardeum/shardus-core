@@ -260,7 +260,7 @@ export function generateObjectSchema(obj, options = { arrTypeDiversity: false })
   for (const [key, value] of Object.entries(obj)) {
     /* eslint-disable security/detect-object-injection */
     if (Object.prototype.hasOwnProperty.call(obj, key) && obj[key] !== null) {
-      if (key === 'devPublicKeys' && isDevPublicKeysValid(schema[key])) {
+      if ((key === 'devPublicKeys' || key === 'multisigKeys') && isDevPublicKeysValid(schema[key])) {
         schema[key] = '{ [publicKey: string]: DevSecurityLevel }'
       } else if (value.constructor === Object) {
         schema[key] = generateObjectSchema(value, { arrTypeDiversity: options.arrTypeDiversity })

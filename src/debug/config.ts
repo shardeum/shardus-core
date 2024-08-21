@@ -23,46 +23,45 @@ export function isServiceMode(): boolean {
 }
 
 export function getHashedDevKey(): string {
-  return config?.debug?.hashedDevAuth || '';
+  return config?.debug?.hashedDevAuth || ''
 }
 
 export function getDevPublicKeys(): DebugConfigurations['devPublicKeys'] {
-  return config?.debug?.devPublicKeys || {};
+  return config?.debug?.devPublicKeys || {}
 }
 
 export function ensureKeySecurity(pubKey: string, level: DevSecurityLevel): boolean {
-  const devPublicKeys = getDevPublicKeys()
-  // eslint-disable-next-line security/detect-object-injection
-  const pkClearance = devPublicKeys[pubKey]
+  const pkClearance = getDevPublicKeys()[pubKey]
   return pkClearance !== undefined && pkClearance >= level
 }
 
 export function getDevPublicKey(key: string): string | null {
-  const devPublicKeys = getDevPublicKeys()
-  // eslint-disable-next-line security/detect-object-injection
-  const pkClearance = devPublicKeys[key]
-  if (pkClearance !== undefined) return key
-  return null
+  return getDevPublicKeys()[key] !== undefined ? key : null
 }
 
 export function getDevPublicKeyMaxLevel(clearance?: DevSecurityLevel): string | null {
   const devPublicKeys = getDevPublicKeys()
   let maxLevel = -Infinity
   let maxKey = null
-  for (const key in devPublicKeys) {
-    // eslint-disable-next-line security/detect-object-injection
-    if (devPublicKeys[key]) {
-      // eslint-disable-next-line security/detect-object-injection
-      if (clearance && devPublicKeys[key] >= clearance) return key
-      else {
-        // eslint-disable-next-line security/detect-object-injection
-        const level = devPublicKeys[key]
-        if (level > maxLevel) {
-          maxLevel = level
-          maxKey = key
-        }
-      }
+  for (const [key, level] of Object.entries(devPublicKeys)) {
+    if (clearance && level >= clearance) return key
+    if (level > maxLevel) {
+      maxLevel = level
+      maxKey = key
     }
   }
   return maxKey
+}
+
+export function getMultisigPublicKeys(): DebugConfigurations['multisigKeys'] {
+  return config?.debug?.multisigKeys || {}
+}
+
+export function getMultisigPublicKey(key: string): string | null {
+  return getMultisigPublicKeys()[key] !== undefined ? key : null
+}
+
+export function ensureMultisigKeySecurity(pubKey: string, level: DevSecurityLevel): boolean {
+  const pkClearance = getMultisigPublicKeys()[pubKey]
+  return pkClearance !== undefined && pkClearance >= level
 }
