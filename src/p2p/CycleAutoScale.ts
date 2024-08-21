@@ -61,9 +61,7 @@ const gossipScaleRoute: P2P.P2PTypes.GossipHandler<P2P.CycleAutoScaleTypes.Signe
       tracker,
       sender,
       nodelistFromStates([
-        P2P.P2PTypes.NodeStatus.ACTIVE,
-        P2P.P2PTypes.NodeStatus.READY,
-        P2P.P2PTypes.NodeStatus.SYNCING,
+        P2P.P2PTypes.NodeStatus.ACTIVE
       ]),
       false,
       2
@@ -150,9 +148,7 @@ function _requestNetworkScaling(upOrDown) {
       '',
       null,
       nodelistFromStates([
-        P2P.P2PTypes.NodeStatus.ACTIVE,
-        P2P.P2PTypes.NodeStatus.READY,
-        P2P.P2PTypes.NodeStatus.SYNCING,
+        P2P.P2PTypes.NodeStatus.ACTIVE
       ]),
       true,
       2
