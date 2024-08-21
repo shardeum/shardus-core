@@ -9,7 +9,7 @@ import { profilerInstance } from '../utils/profiler'
 import * as Self from './Self'
 import { currentCycle, currentQuarter } from './CycleCreator'
 import { logFlags } from '../logger'
-import { byIdOrder } from './NodeList'
+import { byIdOrder, byPubKey } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { getFromArchiver } from './Archivers'
 import { Result } from 'neverthrow'
@@ -21,6 +21,7 @@ import rfdc from 'rfdc'
 import * as Shardus from '../shardus/shardus-types'
 import { ShardusTypes } from '../index'
 import ShardFunctions from '../state-manager/shardFunctions'
+import { SignedObject } from '@shardus/types/build/src/p2p/P2PTypes'
 
 interface VerifierEntry {
   hash: string
@@ -59,7 +60,11 @@ const removeProposals: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
 
 /** ROUTES */
 
-const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry> = async (payload, sender, tracker) => {
+const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObject> = async (
+  payload,
+  sender,
+  tracker
+) => {
   profilerInstance.scopedProfileSectionStart('serviceQueue - addTx')
 
   if ([1, 2].includes(currentQuarter) === false) {
@@ -77,30 +82,30 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry> = async (paylo
       executionGroup: 'a',
       appliedReceipt: 'o',
       hasSentFinalReceipt: 'b',
+      sign: 'o',
     })
     if (err) {
       warn('addTxGossipRoute bad payload: ' + err)
       return
     }
 
-    // const signer = byPubKey.get(payload.sign.owner)
-    // if (!signer) {
-    //   /* prettier-ignore */ if (logFlags.error) warn('gossip-addtx: Got request from unknown node')
-    //   return
-    // }
+    const signer = byPubKey.get(payload.sign.owner)
+    if (!signer) {
+      /* prettier-ignore */ if (logFlags.error) warn('gossip-addtx: Got request from unknown node')
+      return
+    }
 
     if (txAdd.some((entry) => entry.hash === payload.hash)) {
       return
     }
 
-    // if (!crypto.verify(payload, payload.sign.owner)) {
-    //   if (logFlags.console) console.log(`addTxGossipRoute(): signature invalid`, payload.sign.owner)
-    //   /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `addTxGossipRoute(): signature invalid`)
-    //   return
-    // }
+    if (!crypto.verify(payload, payload.sign.owner)) {
+      if (logFlags.console) console.log(`addTxGossipRoute(): signature invalid`, payload.sign.owner)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `addTxGossipRoute(): signature invalid`)
+      return
+    }
 
-    // const { sign, ...unsignedAddNetworkTx } = payload
-    if (!verifyAppliedReceipt(payload.appliedReceipt, new Set(payload.executionGroup))) {
+    if (!verifyAppliedReceipt(payload.appliedReceipt, payload.executionGroup)) {
       return
     }
     const addTxCopy = clone(payload.tx)
@@ -125,7 +130,11 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry> = async (paylo
   }
 }
 
-const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry> = async (payload, sender, tracker) => {
+const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObject> = async (
+  payload,
+  sender,
+  tracker
+) => {
   profilerInstance.scopedProfileSectionStart('serviceQueue - removeTx')
 
   if ([1, 2].includes(currentQuarter) === false) {
@@ -163,14 +172,14 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry> = async (pa
       return
     }
 
-    // if (!crypto.verify(payload, payload.sign.owner)) {
-    //   if (logFlags.console) console.log(`removeTxGossipRoute(): signature invalid`, payload.sign.owner)
-    //   /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `removeTxGossipRoute(): signature invalid`)
-    //   return
-    // }
-    // const { sign, ...unsignedRemoveNetworkTx } = payload
+    if (!crypto.verify(payload, payload.sign.owner)) {
+      if (logFlags.console) console.log(`removeTxGossipRoute(): signature invalid`, payload.sign.owner)
+      /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue.ts', `removeTxGossipRoute(): signature invalid`)
+      return
+    }
+
     // could also place check inside _removeNetworkTx
-    if (!verifyAppliedReceipt(payload.appliedReceipt, new Set(payload.executionGroup))) {
+    if (!verifyAppliedReceipt(payload.appliedReceipt, payload.executionGroup)) {
       return
     }
     txRemove.push({ txHash: payload.hash, cycle: payload.tx.cycle })
@@ -200,9 +209,9 @@ const sendVoteHandler: P2P.P2PTypes.Route<
     sign: any
   }>
 > = {
-  name: 'send_service_queue_vote',
+  name: 'service_queue_vote',
   handler: async (payload, respond, header, sign) => {
-    const route = 'send_service_queue_vote'
+    const route = 'service_queue_vote'
     profilerInstance.scopedProfileSectionStart(route, false)
     try {
       const collectedVote = payload
@@ -325,8 +334,9 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
     if (winningVote != undefined) {
       const appliedReceipt: any = {
         txid: queueEntry.hash,
-        result: undefined,
+        result: winningVote,
         type,
+        signatures: [],
       }
       for (let i = 0; i < numVotes; i++) {
         // eslint-disable-next-line security/detect-object-injection
@@ -336,17 +346,19 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
         }
       }
 
-      appliedReceipt.result = winningVote
       queueEntry.appliedReceipt = appliedReceipt
 
       queueEntry.hasSentFinalReceipt = true
+      console.log(' red - tryProduceReceipt appliedReceipt', appliedReceipt)
       let route = ''
       if (queueEntry.appliedReceipt.type === 'addBefore') {
         route = 'gossip-addtx'
       } else {
         route = 'gossip-removetx'
       }
-      Comms.sendGossip(route, appliedReceipt, null, null, byIdOrder, false, 4, queueEntry.hash, '', true)
+      console.log(' red - tryProduceReceipt sendGossip', route, appliedReceipt)
+      const signedPayload = crypto.sign(appliedReceipt)
+      Comms.sendGossip(route, signedPayload, null, null, byIdOrder, false, 4, queueEntry.hash, '', true)
       return appliedReceipt
     }
     return null
@@ -631,7 +643,7 @@ function voteForNetworkTx(
   console.log(' red - voteForNetworkTx', networkTx.hash, type, result)
   const vote = crypto.sign({ txHash: networkTx.hash, result, type })
   let aggregators = pickAggregators(networkTx.involvedAddress)
-  Comms.tell(aggregators, 'send_service_queue_vote', vote)
+  Comms.tell(aggregators, 'service_queue_vote', vote)
 }
 
 function executionGroupForAddress(address: string): string[] {
@@ -895,15 +907,15 @@ function sortedInsert(
   }
 }
 
-function verifyAppliedReceipt(receipt: any, executionGroupNodes: Set<string>): boolean {
+function verifyAppliedReceipt(receipt: any, executionGroupNodes: string[]): boolean {
   console.log(' red - verifyAppliedReceipt', receipt, executionGroupNodes)
   const ownerToSignMap = new Map<string, Shardus.Sign>()
   for (const sign of receipt.signatures) {
-    if (executionGroupNodes.has(sign.owner)) {
+    if (executionGroupNodes.includes(sign.owner)) {
       ownerToSignMap.set(sign.owner, sign)
     }
   }
-  const totalNodes = executionGroupNodes.size
+  const totalNodes = executionGroupNodes.length
   const requiredMajority = Math.ceil(totalNodes * config.p2p.requiredVotesPercentage)
   if (ownerToSignMap.size < requiredMajority) {
     return false
