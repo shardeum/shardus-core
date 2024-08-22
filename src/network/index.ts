@@ -173,6 +173,7 @@ export class NetworkClass extends EventEmitter {
         console.log(msg)
         this.mainLogger.info('Network: ' + msg)
       })
+      this.extServer.setTimeout(config.network.timeout * 1000)
 
       this.io = require('socket.io')(this.extServer)
       resolve(this.io)
