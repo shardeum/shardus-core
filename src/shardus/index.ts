@@ -2380,14 +2380,14 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.transactionReceiptPass = async (tx, wrappedStates, applyResponse, isExecutionGroup) =>
           application.transactionReceiptPass(tx, wrappedStates, applyResponse, isExecutionGroup)
       } else {
-        applicationInterfaceImpl.transactionReceiptPass = async function (tx, wrappedStates, applyResponse, isExecutionGroup) {}
+        applicationInterfaceImpl.transactionReceiptPass = async function (_tx, _wrappedStates, _applyResponse, _isExecutionGroup) {}
       }
 
       if (typeof application.transactionReceiptFail === 'function') {
         applicationInterfaceImpl.transactionReceiptFail = async (tx, wrappedStates, applyResponse) =>
           application.transactionReceiptFail(tx, wrappedStates, applyResponse)
       } else {
-        applicationInterfaceImpl.transactionReceiptFail = async function (tx, wrappedStates, applyResponse) {}
+        applicationInterfaceImpl.transactionReceiptFail = async function (_tx, _wrappedStates, _applyResponse) {}
       }
 
       if (typeof application.updateAccountFull === 'function') {
@@ -2449,7 +2449,7 @@ class Shardus extends EventEmitter {
           return res
         }
       } else {
-        applicationInterfaceImpl.getCachedRIAccountData = async (addressList: string[]) => {
+        applicationInterfaceImpl.getCachedRIAccountData = async (_addressList: string[]) => {
           return []
         }
       }
@@ -2461,7 +2461,7 @@ class Shardus extends EventEmitter {
           this.profiler.scopedProfileSectionEnd('process-dapp.setCachedRIAccountData')
         }
       } else {
-        applicationInterfaceImpl.setCachedRIAccountData = async (accountRecords: any[]) => {}
+        applicationInterfaceImpl.setCachedRIAccountData = async (_accountRecords: any[]) => {}
       }
 
       if (typeof application.getAccountDataByRange === 'function') {
@@ -2549,7 +2549,7 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) =>
           application.getAccountDebugValue(wrappedAccount)
       } else {
-        applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) =>
+        applicationInterfaceImpl.getAccountDebugValue = (_wrappedAccount) =>
           'getAccountDebugValue() missing on app'
       }
 
@@ -2557,13 +2557,13 @@ class Shardus extends EventEmitter {
       if (typeof application.getSimpleTxDebugValue === 'function') {
         applicationInterfaceImpl.getSimpleTxDebugValue = (tx) => application.getSimpleTxDebugValue(tx)
       } else {
-        applicationInterfaceImpl.getSimpleTxDebugValue = (tx) => ''
+        applicationInterfaceImpl.getSimpleTxDebugValue = (_tx) => ''
       }
 
       if (typeof application.canDebugDropTx === 'function') {
         applicationInterfaceImpl.canDebugDropTx = (tx) => application.canDebugDropTx(tx)
       } else {
-        applicationInterfaceImpl.canDebugDropTx = (tx) => true
+        applicationInterfaceImpl.canDebugDropTx = (_tx) => true
       }
 
       if (typeof application.sync === 'function') {
@@ -2584,30 +2584,30 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.dataSummaryInit = async (blob, accountData) =>
           application.dataSummaryInit(blob, accountData)
       } else {
-        applicationInterfaceImpl.dataSummaryInit = async function (blob, accountData) {}
+        applicationInterfaceImpl.dataSummaryInit = async function (_blob, _accountData) {}
       }
       if (typeof application.dataSummaryUpdate === 'function') {
         applicationInterfaceImpl.dataSummaryUpdate = async (blob, accountDataBefore, accountDataAfter) =>
           application.dataSummaryUpdate(blob, accountDataBefore, accountDataAfter)
       } else {
         applicationInterfaceImpl.dataSummaryUpdate = async function (
-          blob,
-          accountDataBefore,
-          accountDataAfter
+          _blob,
+          _accountDataBefore,
+          _accountDataAfter
         ) {}
       }
       if (typeof application.txSummaryUpdate === 'function') {
         applicationInterfaceImpl.txSummaryUpdate = async (blob, tx, wrappedStates) =>
           application.txSummaryUpdate(blob, tx, wrappedStates)
       } else {
-        applicationInterfaceImpl.txSummaryUpdate = async function (blob, tx, wrappedStates) {}
+        applicationInterfaceImpl.txSummaryUpdate = async function (_blob, _tx, _wrappedStates) {}
       }
 
       if (typeof application.getAccountTimestamp === 'function') {
         applicationInterfaceImpl.getAccountTimestamp = async (accountAddress, mustExist) =>
           application.getAccountTimestamp(accountAddress, mustExist)
       } else {
-        applicationInterfaceImpl.getAccountTimestamp = async function (accountAddress, mustExist) {
+        applicationInterfaceImpl.getAccountTimestamp = async function (_accountAddress, _mustExist) {
           return 0
         }
       }
@@ -2616,7 +2616,7 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.getTimestampAndHashFromAccount = (account) =>
           application.getTimestampAndHashFromAccount(account)
       } else {
-        applicationInterfaceImpl.getTimestampAndHashFromAccount = function (account) {
+        applicationInterfaceImpl.getTimestampAndHashFromAccount = function (_account) {
           return {
             timestamp: 0,
             hash: 'getTimestampAndHashFromAccount not impl',
@@ -2642,7 +2642,7 @@ class Shardus extends EventEmitter {
           application.isReadyToJoin(latestCycle, publicKey, activeNodes, mode)
       } else {
         // If the app doesn't provide isReadyToJoin, assume it is always ready to join
-        applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes, mode) => true
+        applicationInterfaceImpl.isReadyToJoin = async (_latestCycle, _publicKey, _activeNodes, _mode) => true
       }
       if (typeof application.getNodeInfoAppData === 'function') {
         applicationInterfaceImpl.getNodeInfoAppData = () => application.getNodeInfoAppData()
@@ -2657,7 +2657,7 @@ class Shardus extends EventEmitter {
         ) => application.updateNetworkChangeQueue(account, appData)
       } else {
         // If the app doesn't provide updateNetworkChangeQueue, just return empty arr
-        applicationInterfaceImpl.updateNetworkChangeQueue = async (account, appData) => []
+        applicationInterfaceImpl.updateNetworkChangeQueue = async (_account, _appData) => []
       }
       if (typeof application.pruneNetworkChangeQueue === 'function') {
         applicationInterfaceImpl.pruneNetworkChangeQueue = async (
@@ -2666,7 +2666,7 @@ class Shardus extends EventEmitter {
         ) => application.pruneNetworkChangeQueue(account, cycle)
       } else {
         // If the app doesn't provide pruneNetworkChangeQueue, just return empty arr
-        applicationInterfaceImpl.pruneNetworkChangeQueue = async (account, cycle) => []
+        applicationInterfaceImpl.pruneNetworkChangeQueue = async (_account, _cycle) => []
       }
       if (typeof application.canStayOnStandby === 'function') {
         applicationInterfaceImpl.canStayOnStandby = (joinInfo: JoinRequest) =>
@@ -2698,7 +2698,7 @@ class Shardus extends EventEmitter {
         }
       } else {
         console.log('binarySerializeObject not implemented')
-        applicationInterfaceImpl.binarySerializeObject = (identifier: string, obj: any): Buffer => {
+        applicationInterfaceImpl.binarySerializeObject = (_identifier: string, obj: any): Buffer => {
           return Buffer.from(Utils.safeStringify(obj), 'utf8')
         }
       }
@@ -2711,7 +2711,7 @@ class Shardus extends EventEmitter {
         }
       } else {
         console.log('binaryDeserializeObject not implemented')
-        applicationInterfaceImpl.binaryDeserializeObject = (identifier: string, buffer: Buffer): any => {
+        applicationInterfaceImpl.binaryDeserializeObject = (_identifier: string, buffer: Buffer): any => {
           return Utils.safeJsonParse(buffer.toString('utf8'))
         }
       }
@@ -2725,7 +2725,27 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.getNonceFromTx = (tx) => application.getNonceFromTx(tx);
       }
       if (typeof application.getAccountNonce === "function") {
-        applicationInterfaceImpl.getAccountNonce = (accountId) => application.getAccountNonce(accountId);
+        applicationInterfaceImpl.getAccountNonce = (accountId) => application.getAccountNonce(accountId)
+      }
+      if (typeof application.verifyMultiSigs === 'function') {
+        applicationInterfaceImpl.verifyMultiSigs = (
+          rawPayload,
+          sigs,
+          allowedPubkeys,
+          minSigRequired,
+          requiredSecurityLevel
+        ) =>
+          application.verifyMultiSigs(rawPayload, sigs, allowedPubkeys, minSigRequired, requiredSecurityLevel)
+      } else {
+        applicationInterfaceImpl.verifyMultiSigs = (
+          _rawPayload,
+          _sigs,
+          _allowedPubkeys,
+          _minSigRequired,
+          _requiredSecurityLevel
+        ) => {
+          return true
+        }
       }
     } catch (ex) {
       this.shardus_fatal(
@@ -2746,20 +2766,20 @@ class Shardus extends EventEmitter {
    */
   _registerRoutes() {
     // DEBUG routes
-    this.network.registerExternalPost('exit', isDebugModeMiddlewareHigh, async (req, res) => {
+    this.network.registerExternalPost('exit', isDebugModeMiddlewareHigh, async (_req, res) => {
       res.send({ success: true })
       await this.shutdown()
     })
     // TODO elevate security beyond high when we get multi sig.  or is that too slow when needed?
-    this.network.registerExternalPost('exit-apop', isDebugModeMiddlewareHigh, async (req, res) => {
+    this.network.registerExternalPost('exit-apop', isDebugModeMiddlewareHigh, async (_req, res) => {
       apoptosizeSelf('Apoptosis called at exit-apop route')
       res.send({ success: true })
     })
 
-    this.network.registerExternalGet('config', isDebugModeMiddlewareLow, async (req, res) => {
+    this.network.registerExternalGet('config', isDebugModeMiddlewareLow, async (_req, res) => {
       res.send({ config: this.config })
     })
-    this.network.registerExternalGet('netconfig', async (req, res) => {
+    this.network.registerExternalGet('netconfig', async (_req, res) => {
       res.send({ config: netConfig })
     })
 
@@ -2784,7 +2804,7 @@ class Shardus extends EventEmitter {
       res.send(result)
     })
 
-    this.network.registerExternalGet('joinInfo', isDebugModeMiddlewareMedium, async (req, res) => {
+    this.network.registerExternalGet('joinInfo', isDebugModeMiddlewareMedium, async (_req, res) => {
       const nodeInfo = Self.getPublicNodeInfo(true)
       let result = {
         respondedWhen: new Date().toISOString(),
@@ -2805,7 +2825,7 @@ class Shardus extends EventEmitter {
       res.send(deepReplace(result, undefined, '__undefined__'))
     })
 
-    this.network.registerExternalGet('standby-list-debug', isDebugModeMiddlewareLow, async (req, res) => {
+    this.network.registerExternalGet('standby-list-debug', isDebugModeMiddlewareLow, async (_req, res) => {
       let getSortedStandbyNodeList = JoinV2.getSortedStandbyJoinRequests()
       let result = getSortedStandbyNodeList.map((node) => ({
         pubKey: node.nodeInfo.publicKey,
@@ -2815,12 +2835,12 @@ class Shardus extends EventEmitter {
       res.send(result)
     })
 
-    this.network.registerExternalGet('status-history', isDebugModeMiddlewareLow, async (req, res) => {
+    this.network.registerExternalGet('status-history', isDebugModeMiddlewareLow, async (_req, res) => {
       let result = Self.getStatusHistoryCopy()
       res.send(deepReplace(result, undefined, '__undefined__'))
     })
 
-    this.network.registerExternalGet('socketReport', isDebugModeMiddlewareLow, async (req, res) => {
+    this.network.registerExternalGet('socketReport', isDebugModeMiddlewareLow, async (_req, res) => {
       res.send(await getSocketReport())
     })
     this.network.registerExternalGet('forceCycleSync', isDebugModeMiddleware, async (req, res) => {
@@ -2837,7 +2857,7 @@ class Shardus extends EventEmitter {
       res.send({ success: true })
     })
 
-    this.network.registerExternalGet('clear-fake-time-offset', isDebugModeMiddlewareHigh, async (req, res) => {
+    this.network.registerExternalGet('clear-fake-time-offset', isDebugModeMiddlewareHigh, async (_req, res) => {
       const offset = clearFakeTimeOffset()
       /* prettier-ignore */ this.mainLogger.debug({ message: "Cleared fakeTimeOffset", data: { offset } });
       res.send({ success: true })
@@ -2865,7 +2885,7 @@ class Shardus extends EventEmitter {
     const signAppDataBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_sign_app_data,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      handler: async (payload, respond, header, sign) => {
+      handler: async (payload, respond, header, _sign) => {
         const route = InternalRouteEnum.binary_sign_app_data
         nestedCountersInstance.countEvent('internal', route)
         this.profiler.scopedProfileSectionStart(route)
