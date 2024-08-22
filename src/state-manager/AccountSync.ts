@@ -430,6 +430,14 @@ class AccountSync {
             return respond(BadRequest(`${route} invalid request`), serializeResponseError)
           }
           const readableReq = deserializeGetAccountDataByListReq(requestStream)
+
+          // Limit the number of accounts to prevent abuse
+          const MAX_ACCOUNTS = this.config.stateManager.accountBucketSize // default 200
+          if (readableReq.accountIds.length > MAX_ACCOUNTS) {
+            nestedCountersInstance.countEvent('internal', `${route}-too_many_accounts`)
+            return respond(BadRequest(`${route} too many accounts requested`), serializeResponseError)
+          }
+
           if (utils.isValidShardusAddress(readableReq.accountIds) === false) {
             nestedCountersInstance.countEvent('internal', `${route}-invalid_account_ids`)
             return respond(BadRequest(`${route} invalid account_ids`), serializeResponseError)
@@ -972,20 +980,20 @@ class AccountSync {
         //   this.stateManager.config.p2p.useBinarySerializedEndpoints &&
         //   this.stateManager.config.p2p.getGloablAccountReportBinary
         // ) {
-          const request = {} as GlobalAccountReportReqSerializable
-          result = await this.p2p.askBinary<
-            GlobalAccountReportReqSerializable,
-            GlobalAccountReportRespSerializable
-          >(
-            node,
-            InternalRouteEnum.binary_get_globalaccountreport,
-            request,
-            serializeGlobalAccountReportReq,
-            deserializeGlobalAccountReportResp,
-            {}
-          )
+        const request = {} as GlobalAccountReportReqSerializable
+        result = await this.p2p.askBinary<
+          GlobalAccountReportReqSerializable,
+          GlobalAccountReportRespSerializable
+        >(
+          node,
+          InternalRouteEnum.binary_get_globalaccountreport,
+          request,
+          serializeGlobalAccountReportReq,
+          deserializeGlobalAccountReportResp,
+          {}
+        )
         // } else {
-          // result = await this.p2p.ask(node, 'get_globalaccountreport', {})
+        // result = await this.p2p.ask(node, 'get_globalaccountreport', {})
         // }
         return checkResultFn(result, node.id)
       } catch (error) {
