@@ -10,8 +10,8 @@ import { SignedObject } from '@shardus/crypto-utils'
 import * as CycleChain from '../p2p/CycleChain'
 
 const MAX_COUNTER_BUFFER_MILLISECONDS = 10000 // <- Nonce are essentially just timestamp. This number dictate how much time range we will tolerance.
-let lastCounter = Date.now()  // <- when node is first load onto mem this used to be 0, but that would cause a replay attack. So now it is set to the current time with ntp offset accounted
-let multiSigLstCounter = Date.now() 
+let lastCounter = Date.now() // <- when node is first load onto mem this used to be 0, but that would cause a replay attack. So now it is set to the current time with ntp offset accounted
+let multiSigLstCounter = Date.now()
 
 // This function is used to check if the request is authorized to access the debug endpoint
 function handleDebugAuth(_req, res, next, authLevel) {
@@ -19,14 +19,14 @@ function handleDebugAuth(_req, res, next, authLevel) {
     //auth with a signature
     if (_req.query.sig != null && _req.query.sig_counter != null) {
       const nodes = String(_req.query.nodeIds).split(',')
-      const ourNodeId = Context.p2p.getNodeId().slice(0,4)
+      const ourNodeId = Context.p2p.getNodeId().slice(0, 4)
       let intentedForOurNode = false
       nodes.forEach((id) => {
-        if(ourNodeId === id) {
+        if (ourNodeId === id) {
           intentedForOurNode = true
         }
       })
-      if(!intentedForOurNode) {
+      if (!intentedForOurNode) {
         return res.status(401).json({
           status: 401,
           message: 'Unauthorized!',
@@ -36,7 +36,7 @@ function handleDebugAuth(_req, res, next, authLevel) {
       // trim sig and sig_counter from the originalUrl
       // when the debug call is signed it include the hash of baseurl and counter to prevent replay at later time and replay at different node or the same endpoint different query params
       let payload = {
-        route: stripQueryParams(_req.originalUrl, ['sig', 'sig_counter', 'nodeIds']), //<- we're gonna hash, these query artificats need to be excluded from the hash 
+        route: stripQueryParams(_req.originalUrl, ['sig', 'sig_counter', 'nodeIds']), //<- we're gonna hash, these query artificats need to be excluded from the hash
         count: _req.query.sig_counter,
         nodes: _req.query.nodeIds, // example 8f35,8b3a,85f1
         networkId: CycleChain.newest.networkId,
@@ -60,7 +60,7 @@ function handleDebugAuth(_req, res, next, authLevel) {
 
         //reguire a larger counter than before. This prevents replay attacks
         const currentCounter = parseInt(payload.count)
-        const currentTime = Date.now();
+        const currentTime = Date.now()
         if (currentCounter > lastCounter && currentCounter <= currentTime + MAX_COUNTER_BUFFER_MILLISECONDS) {
           let verified = Context.crypto.verify(hashIncluded, hashIncluded.sign.owner)
           if (verified === true) {
@@ -119,14 +119,14 @@ function handleMultiDebugAuth(_req, res, next, authLevel: DevSecurityLevel) {
       }
 
       const nodes = String(_req.query.nodeIds).split(',')
-      const ourNodeId = Context.p2p.getNodeId().slice(0,4)
+      const ourNodeId = Context.p2p.getNodeId().slice(0, 4)
       let intentedForOurNode = false
       nodes.forEach((id) => {
-        if(ourNodeId === id) {
+        if (ourNodeId === id) {
           intentedForOurNode = true
         }
       })
-      if(!intentedForOurNode) {
+      if (!intentedForOurNode) {
         return res.status(401).json({
           status: 401,
           message: 'Unauthorized!',
@@ -175,7 +175,9 @@ function handleMultiDebugAuth(_req, res, next, authLevel: DevSecurityLevel) {
         let validSignaturesCount = 0
         const seen = new Set()
         for (let i = 0; i < parsedSignatures.length; i++) {
-          if(seen.has(parsedSignatures[i])) { break }
+          if (seen.has(parsedSignatures[i])) {
+            break
+          }
           // Check each signature against all public keys
           seen.add(parsedSignatures[i])
           for (const publicKey of Object.keys(devPublicKeys)) {
