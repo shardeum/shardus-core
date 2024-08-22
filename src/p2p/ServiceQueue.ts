@@ -17,6 +17,7 @@ import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { nodeListFromStates } from './Join'
 import * as Nodelist from './NodeList'
 import rfdc from 'rfdc'
+import { networkMode } from './Modes'
 
 /** STATE */
 
@@ -273,13 +274,23 @@ export function updateRecord(
     }
   }
 
+  const reversedTxList = txListCopy.slice().reverse()
   // add all active nodes to the cycle record in the event of a shutdown
   if (record.mode === 'shutdown') {
     for (const node of Nodelist.activeByIdOrder) {
-      if (record.txadd.some((entry) => entry.txData.nodeId === node.id)) {
+      if (record.txadd.some((entry) => entry.txData.nodeId === node.id && entry.type === 'nodeReward')) {
         warn(`shutdown condition: active node with id ${node.id} is already in txadd; this should not happen`)
         continue
       }
+
+      // get latest entry for node in txList. and if it is init then we inject otherwise continue
+      // first iterate over txlist backwards and get first entry that has public key of node
+      const txListEntry = reversedTxList.find((entry) => entry.tx.txData.publicKey === node.publicKey)
+      if (txListEntry && txListEntry.tx.type !== 'nodeInitReward') {
+        /** prettier-ignore */ if (logFlags.p2pNonFatal) info(`Skipping creation of shutdown reward tx (last entry already is of type ${txListEntry.tx.type})`, Utils.safeStringify(txListEntry))
+        continue
+      }
+      /** prettier-ignore */ if (logFlags.p2pNonFatal) info(`Creating a shutdown reward tx`, Utils.safeStringify(txListEntry), Utils.safeStringify(node))
 
       const txParams: ShardusEvent = {
         nodeId: node.id,
@@ -568,8 +579,10 @@ export async function processNetworkTransactions(): Promise<void> {
           additionalData: record,
         }
         /* prettier-ignore */ if (logFlags.p2pNonFatal) info('emit network transaction event', Utils.safeStringify(emitParams))
-        Self.emitter.emit('try-network-transaction', emitParams)
-        countTry(txList[i].hash)
+        if (networkMode === 'processing') {
+          Self.emitter.emit('try-network-transaction', emitParams)
+          countTry(txList[i].hash)
+        }
         if (record.subQueueKey != null) {
           processedSubQueueKeys.add(record.subQueueKey)
         }
