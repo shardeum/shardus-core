@@ -1799,8 +1799,16 @@ class Shardus extends EventEmitter {
     let appData = { ...signedAppData }
     if (appData.signs) delete appData.signs
     if (appData.sign) delete appData.sign
+    const seen = new Set();
     for (let i = 0; i < signs.length; i++) {
       const sign = signs[i]
+
+      if (seen.has(sign.owner)) {
+        continue
+      }else{
+        seen.add(sign.owner)
+      }
+
       const nodePublicKey = sign.owner
       appData.sign = sign // attach the node's sig for verification
       const node = this.p2p.state.getNodeByPubKey(nodePublicKey)
