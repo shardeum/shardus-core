@@ -17,6 +17,7 @@ import { getStandbyNodesInfoMap, standbyNodesInfo } from "./Join/v2";
 import { getDesiredCount } from "./CycleAutoScale";
 import { Utils } from '@shardus/types'
 import { networkMode } from './Modes'
+import { getNewestCycle } from './Sync'
 
 const clone = rfdc()
 
@@ -278,7 +279,7 @@ export function removeNode(
         cycleNumber: cycle.counter,
         activeCycle: node.activeCycle,
       }
-      if (networkMode === 'shutdown') {
+      if (cycle.mode === 'shutdown' || networkMode === 'shutdown') {
         return
       }
       emitter.emit('node-deactivated', emitParams)
@@ -350,7 +351,7 @@ export function updateNode(
             publicKey: node.publicKey,
             cycleNumber: cycle.counter,
           }
-          if (networkMode === 'shutdown') {
+          if (cycle.mode === 'shutdown' || networkMode === 'shutdown') {
             return
           }
           emitter.emit('node-activated', emitParams)
