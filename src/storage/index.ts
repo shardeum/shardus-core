@@ -167,7 +167,7 @@ class Storage {
           '`txadd` JSON NOT NULL',
           '`txremove` JSON NOT NULL',
           '`txlisthash` TEXT NOT NULL',
-          '`archiversAtShutdown` TEXT NOT NULL',
+          '`archiversAtShutdown` JSON',
         ].join(', ') +
         ')'
     )
