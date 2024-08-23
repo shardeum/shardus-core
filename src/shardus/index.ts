@@ -2645,9 +2645,6 @@ class Shardus extends EventEmitter {
         // If the app doesn't provide isReadyToJoin, assume it is always ready to join
         applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes, mode) => true
       }
-      if (typeof application.getDeactivatedTxData == 'function') {
-        applicationInterfaceImpl.getDeactivatedTxData = (txParams) => application.getDeactivatedTxData(txParams)
-      }
       if (typeof application.getNodeInfoAppData === 'function') {
         applicationInterfaceImpl.getNodeInfoAppData = () => application.getNodeInfoAppData()
       } else {

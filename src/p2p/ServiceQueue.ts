@@ -296,16 +296,13 @@ export function updateRecord(
       }
       /** prettier-ignore */ if (logFlags.p2pNonFatal) info(`Creating a shutdown reward tx`, Utils.safeStringify(txListEntry), Utils.safeStringify(node))
 
-      const txParams: ShardusEvent = {
-        nodeId: node.id,
-        reason: 'Node deactivated',
-        type: 'node-deactivated',
-        time: record.start,
+      const txData = {
+        start: node.activeCycle,
+        end: record.counter,
+        endTime: record.start,
         publicKey: node.publicKey,
-        cycleNumber: record.counter,
-        activeCycle: node.activeCycle,
+        nodeId: node.id,
       }
-      const { txData, subQueueKey } = shardus.app.getDeactivatedTxData(txParams)
 
       const hash = crypto.hash(txData)
       const addTx: P2P.ServiceQueueTypes.AddNetworkTx = {
@@ -313,7 +310,7 @@ export function updateRecord(
         type: 'nodeReward',
         txData: txData,
         cycle: currentCycle,
-        subQueueKey,
+        subQueueKey: node.publicKey,
       }
 
       sortedInsert(txListCopy, {
