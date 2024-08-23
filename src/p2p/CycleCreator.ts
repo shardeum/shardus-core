@@ -631,7 +631,7 @@ async function runQ3() {
   // Gossip your cert for this cycle with the network
   gossipMyCycleCert()
 
-  ServiceQueue.processNetworkTransactions()
+  ServiceQueue.processNetworkTransactions(record)
 
   profilerInstance.profileSectionEnd('CycleCreator-runQ3')
 }

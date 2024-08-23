@@ -548,9 +548,9 @@ export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
   return true
 }
 
-export async function processNetworkTransactions(): Promise<void> {
+export async function processNetworkTransactions(record: P2P.CycleCreatorTypes.CycleRecord): Promise<void> {
   info('Process Network Transactions')
-  if (networkMode != 'processing') {
+  if (record.mode !== 'processing') {
     return
   }
   const processedSubQueueKeys = new Set<string>()
