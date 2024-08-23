@@ -549,6 +549,9 @@ export async function _removeNetworkTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
 
 export async function processNetworkTransactions(): Promise<void> {
   info('Process Network Transactions')
+  if (networkMode != 'processing') {
+    return
+  }
   const processedSubQueueKeys = new Set<string>()
   let length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
   for (let i = 0; i < length; i++) {
@@ -579,10 +582,8 @@ export async function processNetworkTransactions(): Promise<void> {
           additionalData: record,
         }
         /* prettier-ignore */ if (logFlags.p2pNonFatal) info('emit network transaction event', Utils.safeStringify(emitParams))
-        if (networkMode === 'processing') {
-          Self.emitter.emit('try-network-transaction', emitParams)
-          countTry(txList[i].hash)
-        }
+        Self.emitter.emit('try-network-transaction', emitParams)
+        countTry(txList[i].hash)
         if (record.subQueueKey != null) {
           processedSubQueueKeys.add(record.subQueueKey)
         }
