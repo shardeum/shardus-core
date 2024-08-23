@@ -838,6 +838,7 @@ class Shardus extends EventEmitter {
       }
     )
     Self.emitter.on('node-activated', ({ ...params }) => {
+      if (networkMode === 'shutdown') return
       try {
         this.app.eventNotify?.({ type: 'node-activated', ...params })
       } catch (e) {
@@ -845,6 +846,7 @@ class Shardus extends EventEmitter {
       }
     })
     Self.emitter.on('node-deactivated', ({ ...params }) => {
+      if (networkMode === 'shutdown') return
       try {
         this.app.eventNotify?.({ type: 'node-deactivated', ...params })
       } catch (e) {
