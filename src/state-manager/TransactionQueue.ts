@@ -29,7 +29,6 @@ import * as NodeList from '../p2p/NodeList'
 import {
   AcceptedTx,
   AccountFilter,
-  AppliedReceipt2,
   CommitConsensedTransactionResult,
   PreApplyAcceptedTransactionResult,
   ProcessQueueStats,
@@ -46,7 +45,8 @@ import {
   WrappedResponses,
   ArchiverReceipt,
   NonceQueueItem,
-  SignedReceipt
+  SignedReceipt,
+  Proposal
 } from './state-manager-types'
 import { isInternalTxAllowed, networkMode } from '../p2p/Modes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
@@ -967,7 +967,7 @@ class TransactionQueue {
     this.p2p.registerInternalBinary(requestStateForTxRoute.name, requestStateForTxRoute.handler)
 
     networkContext.registerExternalPost('get-tx-receipt', async (req, res) => {
-      let result: { success: boolean; receipt?: ArchiverReceipt | AppliedReceipt2; reason?: string }
+      let result: { success: boolean; receipt?: ArchiverReceipt | SignedReceipt; reason?: string }
       try {
         let error = utils.validateTypes(req.body, {
           txId: 's',
@@ -1010,7 +1010,7 @@ class TransactionQueue {
               if (fullReceipt === null) return res.status(400).json({ success: false, reason: 'Receipt Not Found.' })
               result = Utils.safeJsonParse(Utils.safeStringify({ success: true, receipt: fullReceipt }))
             } else {
-              result = { success: true, receipt: this.stateManager.getReceipt2(queueEntry) }
+              result = { success: true, receipt: this.stateManager.getSignedReceipt(queueEntry) }
             }
           } else {
             result = { success: false, reason: 'Invalid Signature.' }
@@ -2613,27 +2613,28 @@ class TransactionQueue {
       for (const queueEntry of this.archivedQueueEntriesByID.values()) {
         if (queueEntry.uniqueKeys.includes(accountId)) {
           foundQueueEntry = true
-          const receipt2: AppliedReceipt2 = this.stateManager.getReceipt2(queueEntry)
-          let bestReceivedVote
-          if (receipt2 !=  null) {
-            bestReceivedVote = receipt2.appliedVote
-            if (receipt2.appliedVote) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get vote from' +
-              ' receipt2')
+          const signedReceipt: SignedReceipt = this.stateManager.getSignedReceipt(queueEntry)
+          let proposal: Proposal | null = null
+          if (signedReceipt !=  null) {
+            proposal = signedReceipt.proposal
+            if (signedReceipt.proposal) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get proposal from signedReceipt')
           }
-          if (bestReceivedVote == null) {
-            bestReceivedVote = queueEntry.receivedBestVote
-            if (queueEntry.receivedBestVote) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get vote' +
+          if (proposal == null) {
+            proposal = queueEntry.ourProposal
+            if (queueEntry.receivedBestVote) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get proposal' +
               ' from' +
-              ' receipt2')
+              ' queueEntry.ourProposal')
           }
-          if (bestReceivedVote == null) {
+          if (proposal == null) {
             continue
           }
           foundVote = true
           // this node might not have a vote for this tx
-          for (let i = 0; i < bestReceivedVote.account_id.length; i++) {
-            if (bestReceivedVote.account_id[i] === accountId) {
-              if (bestReceivedVote.account_state_hash_after[i] === hash) {
+          for (let i = 0; i < proposal.accountIDs.length; i++) {
+            // eslint-disable-next-line security/detect-object-injection
+            if (proposal.accountIDs[i] === accountId) {
+              // eslint-disable-next-line security/detect-possible-timing-attacks, security/detect-object-injection
+              if (proposal.afterStateHashes[i] === hash) {
                 foundVoteMatchingHash = true
                 return queueEntry
               }
