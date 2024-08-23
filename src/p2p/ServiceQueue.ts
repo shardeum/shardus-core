@@ -219,8 +219,12 @@ export function init(): void {
   })
 
   network.registerExternalGet('debug-network-txcount', isDebugModeMiddleware, (req, res) => {
-    res.send({ status: 'ok', tryCounts: Array.from(tryCounts) })
-  })
+    const copy = txList.map(entry => ({
+      ...entry,
+      count: tryCounts.get(entry.hash) || 0
+    }));
+    res.send({ status: 'ok', tryCounts: copy });
+  });
 }
 
 export function reset(): void {
