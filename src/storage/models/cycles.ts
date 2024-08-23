@@ -63,6 +63,7 @@ const cycles = [
     txadd: { type: SQLDataTypes.JSON, allowNull: false },
     txremove: { type: SQLDataTypes.JSON, allowNull: false },
     txlisthash: { type: SQLDataTypes.TEXT, allowNull: false },
+    archiversAtShutdown: { type: SQLDataTypes.JSON, allowNull: true },
   },
 ]
 
