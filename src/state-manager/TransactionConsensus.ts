@@ -30,8 +30,6 @@ import {
   GetAccountData3Req,
   GetAccountData3Resp,
   QueueEntry,
-  RequestReceiptForTxReq,
-  RequestReceiptForTxResp,
   WrappedResponses,
   TimestampRemoveRequest,
   Proposal,

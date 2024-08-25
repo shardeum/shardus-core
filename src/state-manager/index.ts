@@ -64,7 +64,6 @@ import {
   LocalCachedData,
   AccountFilter,
   StringBoolObjectMap,
-  AppliedReceipt,
   CycleDebugNotes,
   AppliedVoteHash,
   RequestReceiptForTxResp_old,

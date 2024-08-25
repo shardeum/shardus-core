@@ -8,10 +8,10 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import ShardFunctions from './shardFunctions'
-import { ipInfo, shardusGetTime } from '../network'
+import { shardusGetTime } from '../network'
 import StateManager from '.'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { QueueEntry, AppliedVote, AccountHashCache, RequestStateForTxResp } from './state-manager-types'
+import { QueueEntry, AccountHashCache, RequestStateForTxResp, Proposal } from './state-manager-types'
 import { Logger as log4jsLogger } from 'log4js'
 import { RequestStateForTxPostReq, serializeRequestStateForTxPostReq } from '../types/RequestStateForTxPostReq'
 import { RequestStateForTxPostResp, deserializeRequestStateForTxPostResp } from '../types/RequestStateForTxPostResp'
@@ -136,7 +136,7 @@ class TransactionRepair {
       // Need to build a list of what accounts we need, what state they should be in and who to get them from
       const requestObjects: {
         [id: string]: {
-          appliedVote: AppliedVote
+          proposal: Proposal
           voteIndex: number
           accountHash: string
           accountId: string
@@ -145,20 +145,20 @@ class TransactionRepair {
         }
       } = {}
 
-      const receivedReceipt = queueEntry?.appliedReceiptForRepair2
+      const receivedReceipt = queueEntry?.signedReceiptForRepair
       if(!receivedReceipt) {
         nestedCountersInstance.countEvent('repair1', 'receivedReceipt is falsy')
         return
       }
-      if (receivedReceipt.result === false) {
+      if (receivedReceipt.proposal.applied === false) {
         nestedCountersInstance.countEvent('repair1', 'receivedReceipt.result is false')
         /* prettier-ignore */  if (logFlags.debug) this.mainLogger.debug(`receivedReceipt.result is false for queueEntry: ${Utils.safeStringify(queueEntry)}`)
         return
       }
-      const appliedVote = queueEntry?.appliedReceiptForRepair2?.appliedVote
-      if(!appliedVote) {
-        nestedCountersInstance.countEvent('repair1', 'appliedVote is falsy')
-        /* prettier-ignore */  if (logFlags.debug) this.mainLogger.debug(`appliedVote is undefined for queueEntry: ${Utils.safeStringify(queueEntry)}`)
+      const proposal = queueEntry?.signedReceiptForRepair?.proposal
+      if(!proposal) {
+        nestedCountersInstance.countEvent('repair1', 'proposal is falsy')
+        /* prettier-ignore */  if (logFlags.debug) this.mainLogger.debug(`proposal is undefined for queueEntry: ${Utils.safeStringify(queueEntry)}`)
         return
       }
 
@@ -196,9 +196,9 @@ class TransactionRepair {
       const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
         this.stateManager.currentCycleShardData.nodeShardData
 
-      for (let i = 0; i < appliedVote.account_id.length; i++) {
+      for (let i = 0; i < proposal.accountIDs.length; i++) {
         /* eslint-disable security/detect-object-injection */
-        const accountID = appliedVote.account_id[i]
+        const accountID = proposal.accountIDs[i]
         //only check for stored keys.  TODO task. make sure nodeShardData is from correct cycle!
         //TODO is there a better way/time to build this knowlege set?
         if (ShardFunctions.testAddressInRange(accountID, nodeShardData.storedPartitions) === false) {
@@ -207,7 +207,7 @@ class TransactionRepair {
           continue
         }
 
-        voteHashMap.set(appliedVote.account_id[i], appliedVote.account_state_hash_after[i])
+        voteHashMap.set(proposal.accountIDs[i], proposal.afterStateHashes[i])
         /* eslint-enable security/detect-object-injection */
       }
 
@@ -294,23 +294,24 @@ class TransactionRepair {
         const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(key)
         const shortKey = utils.stringifyReduce(key)
         const eligibleNodeIdMap: any = {}
-        if (this.stateManager.transactionQueue.useNewPOQ === false) {
-          for (let i = 0; i < voters.length; i++) {
-            const voter = voters[i]
-            const node = this.stateManager.p2p.state.getNodeByPubKey(voter.owner)
-            if (node == null) {
-              continue
-            }
-            eligibleNodeIdMap[node.id] = true
+        //if (this.stateManager.transactionQueue.useNewPOQ === false) {
+        for (let i = 0; i < voters.length; i++) {
+          // eslint-disable-next-line security/detect-object-injection
+          const voter = voters[i]
+          const node = this.stateManager.p2p.state.getNodeByPubKey(voter.owner)
+          if (node == null) {
+            continue
           }
-        } else {
-          // loop through topConfirmations and add to eligibleNodeIdMap
-          for (const nodeId of queueEntry.topConfirmations) {
-            eligibleNodeIdMap[nodeId] = true
-          }
-          eligibleNodeIdMap[receivedReceipt.confirmOrChallenge.nodeId] = true
-          eligibleNodeIdMap[receivedReceipt.appliedVote.node_id] = true
+          eligibleNodeIdMap[node.id] = true
         }
+        // } else {
+        //   // loop through topConfirmations and add to eligibleNodeIdMap
+        //   for (const nodeId of queueEntry.topConfirmations) {
+        //     eligibleNodeIdMap[nodeId] = true
+        //   }
+        //   eligibleNodeIdMap[receivedReceipt.confirmOrChallenge.nodeId] = true
+        //   eligibleNodeIdMap[receivedReceipt.appliedVote.node_id] = true
+        // }
         const eligibleNodeIdsArray = Object.keys(eligibleNodeIdMap)
         utils.shuffleArray(eligibleNodeIdsArray)
         const eligibleNodeIds = new Set(eligibleNodeIdsArray)
@@ -322,10 +323,10 @@ class TransactionRepair {
         for (const node_id of eligibleNodeIds) {
           /* eslint-disable security/detect-object-injection */
           stats.rLoop2++
-          for (let j = 0; j < appliedVote.account_id.length; j++) {
+          for (let j = 0; j < proposal.accountIDs.length; j++) {
             stats.rLoop3++
-            const accountId = appliedVote.account_id[j]
-            const hash = appliedVote.account_state_hash_after[j]
+            const accountId = proposal.accountIDs[j]
+            const hash = proposal.afterStateHashes[j]
             if (accountId === key && hash != null) {
               if (upToDateAccounts[accountId] === true) {
                 continue
@@ -403,7 +404,7 @@ class TransactionRepair {
               }
 
               const objectToSet = {
-                appliedVote,
+                proposal,
                 voteIndex: j,
                 accountHash: hash,
                 accountId: accountId,
@@ -461,13 +462,13 @@ class TransactionRepair {
               //if node == null, find a node to request data from. go down alternates list as needed.
               while (node == null) {
                 //possibly make this not at an error once verified
-                /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt while(node == null) look for other node txId. idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
+                /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt while(node == null) look for other node txId. idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.proposal.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
                 //find alternate
                 if (alternateIndex >= requestObject.alternates.length) {
                   /* prettier-ignore */ if (logFlags.error) this.statemanager_fatal(
                     `repairToMatchReceipt_1`,
                     `ASK FAIL repairToMatchReceipt failed to find alternate node to ask for receipt data. txId. ${utils.stringifyReduce(
-                      requestObject.appliedVote.txid
+                      requestObject.proposal.txid
                     )} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`
                   )
                   attemptsRemaining = false
@@ -501,7 +502,7 @@ class TransactionRepair {
                   this.stateManager.currentCycleShardData.nodeShardDataMap.get(altId)
                 if (nodeShardInfo != null) {
                   node = nodeShardInfo.node
-                  /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt got alt source node: idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(node.id)}  acc:${shortKey}`)
+                  /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt got alt source node: idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.proposal.txid)} alts: ${utils.stringifyReduce(node.id)}  acc:${shortKey}`)
                 } else {
                   /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null for ${utils.stringifyReduce(altId)}  tx:${txLogID}  acc:${shortKey}`)
                 }
