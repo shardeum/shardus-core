@@ -19,7 +19,7 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import * as Context from '../p2p/Context'
-import { potentiallyRemoved, activeByIdOrder, byIdOrder } from '../p2p/NodeList'
+import { activeByIdOrder, byIdOrder } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as NodeList from '../p2p/NodeList'
 import * as CycleChain from '../p2p/CycleChain'
@@ -67,14 +67,13 @@ import {
   AppliedReceipt,
   CycleDebugNotes,
   AppliedVoteHash,
-  AppliedReceipt2,
   RequestReceiptForTxResp_old,
   RequestAccountQueueCounts,
   QueueCountsResponse,
   QueueCountsResult,
-  ConfirmOrChallengeMessage,
   TimestampRemoveRequest,
-  SignedReceipt
+  SignedReceipt,
+  Proposal
 } from './state-manager-types'
 import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
@@ -82,7 +81,6 @@ import { Logger as Log4jsLogger } from 'log4js'
 import { timingSafeEqual } from 'crypto'
 import { shardusGetTime } from '../network'
 import { isServiceMode } from '../debug'
-import { modeAllowsValidNodeChecks } from '../p2p/Comms'
 import { InternalRouteEnum } from '../types/enum/InternalRouteEnum'
 import { InternalBinaryHandler } from '../types/Handler'
 import { Route } from '@shardus/types/build/src/p2p/P2PTypes'
@@ -1431,7 +1429,7 @@ class StateManager {
             return
           }
 
-          response.receipt = this.getReceipt2(queueEntry)
+          response.receipt = this.getSignedReceipt(queueEntry)
           if (response.receipt != null) {
             response.success = true
           } else {
@@ -1808,7 +1806,7 @@ class StateManager {
             return
           }
 
-          let receipt2 = this.getReceipt2(queueEntry)
+          let receipt2 = this.getSignedReceipt(queueEntry)
           if (receipt2 == null) {
             response.note = `${route} does not have valid receipt2: ${utils.stringifyReduce(txid)}`
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(response.note)
@@ -1836,13 +1834,13 @@ class StateManager {
           //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
 
           if (wrappedStates != null) {
-            for (let i = 0; i < receipt2.appliedVote.account_id.length; i++) {
-              let key = receipt2.appliedVote.account_id[i]
+            for (let i = 0; i < receipt2.proposal.accountIDs.length; i++) {
+              let key = receipt2.proposal.accountIDs[i]
               let accountData = wrappedStates[key]
               if (accountData && requestedAccountIds.includes(key)) {
                 // eslint-disable-next-line security/detect-object-injection
-                response.account_state_hash_before[key] = receipt2.appliedVote.account_state_hash_before[i]
-                response.account_state_hash_after[key] = receipt2.appliedVote.account_state_hash_after[i]
+                response.account_state_hash_before[key] = receipt2.proposal.beforeStateHashes[i]
+                response.account_state_hash_after[key] = receipt2.proposal.afterStateHashes[i]
                 response.stateList.push(accountData)
               }
             }
@@ -3998,103 +3996,106 @@ class StateManager {
     return finalReceipt
   }
 
-  getReceipt2(queueEntry: QueueEntry): AppliedReceipt2 {
-    if (queueEntry.appliedReceiptFinal2 != null) {
-      return queueEntry.appliedReceiptFinal2
-    }
-    if (Context.config.stateManager.useNewPOQ === false) {
-      // start with a receipt we made
-      let receipt: AppliedReceipt2 = queueEntry.appliedReceipt2
-      if (receipt == null) {
-        // or see if we got one
-        receipt = queueEntry.recievedAppliedReceipt2
-      }
-      // if we had to repair use that instead. this stomps the other ones
-      if (queueEntry.appliedReceiptForRepair2 != null) {
-        receipt = queueEntry.appliedReceiptForRepair2
-      }
-      queueEntry.appliedReceiptFinal2 = receipt
-      return receipt
-    } else {
-      let finalReceipt: AppliedReceipt2
-      if (queueEntry.appliedReceipt2 && queueEntry.recievedAppliedReceipt2 == null) {
-        finalReceipt = queueEntry.appliedReceipt2
-      }
-      if (queueEntry.appliedReceipt2 == null && queueEntry.recievedAppliedReceipt2) {
-        // or see if we got one
-        finalReceipt = queueEntry.recievedAppliedReceipt2
-      } else if (queueEntry.appliedReceipt2 && queueEntry.recievedAppliedReceipt2) {
-        // if we have 2 receipts, use a challenge one if there is any
-        const isOurReceiptChallenge = queueEntry.appliedReceipt2.confirmOrChallenge && queueEntry.appliedReceipt2.confirmOrChallenge.message === 'challenge'
-        const isReceivedReceiptChallenge = queueEntry.recievedAppliedReceipt2.confirmOrChallenge && queueEntry.recievedAppliedReceipt2.confirmOrChallenge.message === 'challenge'
-        if (isOurReceiptChallenge && !isReceivedReceiptChallenge) {
-          nestedCountersInstance.countEvent('stateManager', 'getReceipt2: isOurReceiptChallenge: true')
-          if (logFlags.verbose) this.mainLogger.debug(`getReceipt2: isOurReceiptChallenge: true`)
-          finalReceipt = queueEntry.appliedReceipt2
-          return finalReceipt
-        } else if (!isOurReceiptChallenge && isReceivedReceiptChallenge) {
-          nestedCountersInstance.countEvent('stateManager', 'getReceipt2: isReceivedReceiptChallenge: true')
-          if (logFlags.verbose) this.mainLogger.debug(`getReceipt2: isReceivedReceiptChallenge: true`)
-          finalReceipt = queueEntry.recievedAppliedReceipt2
-          return finalReceipt
-        }
+  // DEPRECATED AFTER POQO
+  // getReceipt2(queueEntry: QueueEntry): AppliedReceipt2 {
+  //   if (queueEntry.appliedReceiptFinal2 != null) {
+  //     return queueEntry.appliedReceiptFinal2
+  //   }
+  //   if (Context.config.stateManager.useNewPOQ === false) {
+  //     // start with a receipt we made
+  //     let receipt: AppliedReceipt2 = queueEntry.appliedReceipt2
+  //     if (receipt == null) {
+  //       // or see if we got one
+  //       receipt = queueEntry.recievedAppliedReceipt2
+  //     }
+  //     // if we had to repair use that instead. this stomps the other ones
+  //     if (queueEntry.appliedReceiptForRepair2 != null) {
+  //       receipt = queueEntry.appliedReceiptForRepair2
+  //     }
+  //     queueEntry.appliedReceiptFinal2 = receipt
+  //     return receipt
+  //   } else {
+  //     let finalReceipt: AppliedReceipt2
+  //     if (queueEntry.appliedReceipt2 && queueEntry.recievedAppliedReceipt2 == null) {
+  //       finalReceipt = queueEntry.appliedReceipt2
+  //     }
+  //     if (queueEntry.appliedReceipt2 == null && queueEntry.recievedAppliedReceipt2) {
+  //       // or see if we got one
+  //       finalReceipt = queueEntry.recievedAppliedReceipt2
+  //     } else if (queueEntry.appliedReceipt2 && queueEntry.recievedAppliedReceipt2) {
+  //       // if we have 2 receipts, use a challenge one if there is any
+  //       const isOurReceiptChallenge = queueEntry.appliedReceipt2.confirmOrChallenge && queueEntry.appliedReceipt2.confirmOrChallenge.message === 'challenge'
+  //       const isReceivedReceiptChallenge = queueEntry.recievedAppliedReceipt2.confirmOrChallenge && queueEntry.recievedAppliedReceipt2.confirmOrChallenge.message === 'challenge'
+  //       if (isOurReceiptChallenge && !isReceivedReceiptChallenge) {
+  //         nestedCountersInstance.countEvent('stateManager', 'getReceipt2: isOurReceiptChallenge: true')
+  //         if (logFlags.verbose) this.mainLogger.debug(`getReceipt2: isOurReceiptChallenge: true`)
+  //         finalReceipt = queueEntry.appliedReceipt2
+  //         return finalReceipt
+  //       } else if (!isOurReceiptChallenge && isReceivedReceiptChallenge) {
+  //         nestedCountersInstance.countEvent('stateManager', 'getReceipt2: isReceivedReceiptChallenge: true')
+  //         if (logFlags.verbose) this.mainLogger.debug(`getReceipt2: isReceivedReceiptChallenge: true`)
+  //         finalReceipt = queueEntry.recievedAppliedReceipt2
+  //         return finalReceipt
+  //       }
 
-        // we have 2 receipts. Could be both challenges or confirmation, use a better one
-        const localReceiptNodeId = queueEntry.appliedReceipt2.confirmOrChallenge.nodeId
-        const receivedReceiptNodeId = queueEntry.recievedAppliedReceipt2.confirmOrChallenge.nodeId
+  //       // we have 2 receipts. Could be both challenges or confirmation, use a better one
+  //       const localReceiptNodeId = queueEntry.appliedReceipt2.confirmOrChallenge.nodeId
+  //       const receivedReceiptNodeId = queueEntry.recievedAppliedReceipt2.confirmOrChallenge.nodeId
 
-        const localReceiptNodeRank = this.transactionQueue.computeNodeRank(
-          localReceiptNodeId,
-          queueEntry.acceptedTx.txId,
-          queueEntry.acceptedTx.timestamp
-        )
-        const receivedReceiptNodeRank = this.transactionQueue.computeNodeRank(
-          receivedReceiptNodeId,
-          queueEntry.acceptedTx.txId,
-          queueEntry.acceptedTx.timestamp
-        )
-        if (localReceiptNodeRank < receivedReceiptNodeRank) {
-          // lower the rank, the better the receipt
-          finalReceipt = queueEntry.appliedReceipt2
-        } else {
-          finalReceipt = queueEntry.recievedAppliedReceipt2
-        }
-      }
-      // if we had to repair use that instead. this stomps the other ones
-      if (queueEntry.appliedReceiptForRepair2 != null) {
-        finalReceipt = queueEntry.appliedReceiptForRepair2
-      }
-      queueEntry.appliedReceiptFinal2 = finalReceipt
-      return finalReceipt
-    }
-  }
+  //       const localReceiptNodeRank = this.transactionQueue.computeNodeRank(
+  //         localReceiptNodeId,
+  //         queueEntry.acceptedTx.txId,
+  //         queueEntry.acceptedTx.timestamp
+  //       )
+  //       const receivedReceiptNodeRank = this.transactionQueue.computeNodeRank(
+  //         receivedReceiptNodeId,
+  //         queueEntry.acceptedTx.txId,
+  //         queueEntry.acceptedTx.timestamp
+  //       )
+  //       if (localReceiptNodeRank < receivedReceiptNodeRank) {
+  //         // lower the rank, the better the receipt
+  //         finalReceipt = queueEntry.appliedReceipt2
+  //       } else {
+  //         finalReceipt = queueEntry.recievedAppliedReceipt2
+  //       }
+  //     }
+  //     // if we had to repair use that instead. this stomps the other ones
+  //     if (queueEntry.appliedReceiptForRepair2 != null) {
+  //       finalReceipt = queueEntry.appliedReceiptForRepair2
+  //     }
+  //     queueEntry.appliedReceiptFinal2 = finalReceipt
+  //     return finalReceipt
+  //   }
+  // }
 
   hasReceipt(queueEntry: QueueEntry) {
-    return this.getReceipt2(queueEntry) != null
+    return this.getSignedReceipt(queueEntry) != null
   }
   getReceiptResult(queueEntry: QueueEntry) {
-    const receipt = this.getReceipt2(queueEntry)
+    const receipt = this.getSignedReceipt(queueEntry)
     if (receipt) {
-      return receipt.result
-    }
-    return false
-  }
-  getReceiptConfirmation(queueEntry: QueueEntry) {
-    if (this.transactionQueue.useNewPOQ === false) return true
-    const receipt = this.getReceipt2(queueEntry)
-    if (receipt) {
-      return receipt.result
-    }
-    if (receipt.confirmOrChallenge && receipt.confirmOrChallenge.message === 'confirm') {
-      return true
+      return receipt.proposal.applied
     }
     return false
   }
 
-  getReceiptVote(queueEntry: QueueEntry): AppliedVote {
-    const receipt = this.getReceipt2(queueEntry)
+  // DEPRECATED AFTER POQO
+  // getReceiptConfirmation(queueEntry: QueueEntry) {
+  //   if (this.transactionQueue.useNewPOQ === false) return true
+  //   const receipt = this.getReceipt2(queueEntry)
+  //   if (receipt) {
+  //     return receipt.result
+  //   }
+  //   if (receipt.confirmOrChallenge && receipt.confirmOrChallenge.message === 'confirm') {
+  //     return true
+  //   }
+  //   return false
+  // }
+
+  getReceiptProposal(queueEntry: QueueEntry): Proposal {
+    const receipt = this.getSignedReceipt(queueEntry)
     if (receipt) {
-      return receipt.appliedVote
+      return receipt.proposal
     }
   }
 
@@ -4129,7 +4130,7 @@ class StateManager {
     for (const queueEntry of this.transactionQueue._transactionQueue) {
       if (queueEntry.cycleToRecordOn === cycleToSave) {
         // make sure we have a receipt
-        const receipt: AppliedReceipt2 = this.getReceipt2(queueEntry)
+        const receipt: SignedReceipt = this.getSignedReceipt(queueEntry)
 
         if (receipt == null) {
           //check  && queueEntry.globalModification === false because global accounts will not get a receipt, should this change?
@@ -4147,7 +4148,7 @@ class StateManager {
     for (const queueEntry of this.transactionQueue.archivedQueueEntries) {
       if (queueEntry.cycleToRecordOn === cycleToSave) {
         // make sure we have a receipt
-        const receipt: AppliedReceipt2 = this.getReceipt2(queueEntry)
+        const receipt: SignedReceipt = this.getSignedReceipt(queueEntry)
 
         if (receipt == null) {
           //check  && queueEntry.globalModification === false
@@ -4176,9 +4177,9 @@ class StateManager {
       }
       // console.log('accountData accountData', accountData)
       for (const partition of queueEntry.involvedPartitions) {
-        const receipt: AppliedReceipt2 = this.getReceipt2(queueEntry)
+        const receipt: SignedReceipt = this.getSignedReceipt(queueEntry)
 
-        const status = receipt.result === true ? 'applied' : 'rejected'
+        const status = receipt.proposal.applied === true ? 'applied' : 'rejected'
         const txHash = queueEntry.acceptedTx.txId
         const obj = { tx: queueEntry.acceptedTx.data, status, netId }
         const txResultFullHash = this.crypto.hash(obj)
@@ -4199,10 +4200,10 @@ class StateManager {
 
           let gotAppReceipt = false
           //set receipt data.  todo get evmReceiptForTX from receipt.
-          if (receipt.app_data_hash != null && receipt.app_data_hash != '') {
+          if (receipt.proposal.appReceiptDataHash != null && receipt.proposal.appReceiptDataHash != '') {
             const applyResponse = queueEntry?.preApplyTXResult?.applyResponse
             // we may not always have appReceiptData... especially in execute in local shard
-            if (applyResponse && applyResponse.appReceiptDataHash === receipt.app_data_hash) {
+            if (applyResponse && applyResponse.appReceiptDataHash === receipt.proposal.appReceiptDataHash) {
               mapResult.txsMapEVMReceipt[txIdShort] = applyResponse.appReceiptData
               gotAppReceipt = true
             }
@@ -4367,27 +4368,27 @@ class StateManager {
       return this.transactionRepair
     }
   }
-  async askToRemoveTimestampCache(acceptedTx: QueueEntry['acceptedTx'], receipt2: AppliedReceipt2) {
+  async askToRemoveTimestampCache(acceptedTx: QueueEntry['acceptedTx'], signedReceipt: SignedReceipt) {
     const homeNode = ShardFunctions.findHomeNode(
       Context.stateManager.currentCycleShardData.shardGlobals,
       acceptedTx.txId,
       Context.stateManager.currentCycleShardData.parititionShardDataMap
     )
-    if (receipt2 == null) {
-      this.mainLogger.error(`askToRemoveTimestampCache receipt2 == null ${utils.stringifyReduce(acceptedTx)}`)
+    if (signedReceipt == null) {
+      this.mainLogger.error(`askToRemoveTimestampCache signedReceipt == null ${utils.stringifyReduce(acceptedTx)}`)
       return
     }
-    if (receipt2.confirmOrChallenge.message !== 'challenge') {
-      this.mainLogger.error(`askToRemoveTimestampCache receipt2.confirmOrChallenge.message !== 'challenge' ${utils.stringifyReduce(acceptedTx)}`)
-      return
-    }
+    // if (receipt2.confirmOrChallenge.message !== 'challenge') {
+    //   this.mainLogger.error(`askToRemoveTimestampCache receipt2.confirmOrChallenge.message !== 'challenge' ${utils.stringifyReduce(acceptedTx)}`)
+    //   return
+    // }
     if (acceptedTx.data.timestampReceipt == null) {
       this.mainLogger.error(`askToRemoveTimestampCache queueEntry.acceptedTx.data.timestampReceipt == null ${utils.stringifyReduce(acceptedTx)}`)
       return
     }
     const cycleCounter = acceptedTx.data.timestampReceipt.cycleCounter
     // attach challenge receipt to payload
-    const payload: TimestampRemoveRequest = {txId: acceptedTx.txId, receipt2, cycleCounter}
+    const payload: TimestampRemoveRequest = {txId: acceptedTx.txId, signedReceipt, cycleCounter}
     try {
       await this.p2p.tell([homeNode.node], 'remove_timestamp_cache', payload)
     } catch (e) {
