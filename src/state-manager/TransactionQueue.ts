@@ -5631,14 +5631,10 @@ class TransactionQueue {
         }
 
         this.stateManager.debugTXHistory[queueEntry.logID] = queueEntry.state
-        let hasApplyReceipt = queueEntry.appliedReceipt != null
-        let hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt != null
-        let hasReceivedApplyReceiptForRepair = queueEntry.appliedReceiptForRepair != null
+        const hasApplyReceipt = queueEntry.signedReceipt != null
+        const hasReceivedApplyReceipt = queueEntry.receivedSignedReceipt != null
+        const hasReceivedApplyReceiptForRepair = queueEntry.signedReceiptForRepair != null
         const shortID = queueEntry.logID //`${utils.makeShortHash(queueEntry.acceptedTx.id)}`
-
-        hasApplyReceipt = queueEntry.appliedReceipt2 != null
-        hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt2 != null
-        hasReceivedApplyReceiptForRepair = queueEntry.appliedReceiptForRepair2 != null
 
         // on the off chance we are here with a pass of fail state remove this from the queue.
         // log fatal because we do not want to get to this situation.
@@ -5777,7 +5773,7 @@ class TransactionQueue {
                 ) {
                   if (queueEntry.state == 'awaiting data') {
                     // no receipt yet, and state not committing
-                    if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null) {
+                    if (queueEntry.receivedSignedReceipt == null && queueEntry.signedReceipt == null) {
                       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`Wait for reciept only: txAge > timeM2_5 txid:${shortID} `)
                       /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt3', `${shortID}`, `processAcceptedTxQueue ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
 
@@ -6770,7 +6766,7 @@ class TransactionQueue {
                   queueEntry.signedReceiptForRepair = result
 
                   // queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
-                  if (queueEntry.isInExecutionHome === false && queueEntry.appliedReceipt2 != null) {
+                  if (queueEntry.isInExecutionHome === false && queueEntry.signedReceipt != null) {
                     if (this.stateManager.consensusLog)
                       this.mainLogger.debug(
                         `processTransactions ${queueEntry.logID} we are not execution home, but we have a receipt2, go to await final data`
@@ -6811,7 +6807,7 @@ class TransactionQueue {
                   } else {
                     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                     didNotMatchReceipt = true
-                    queueEntry.appliedReceiptForRepair = queueEntry.recievedAppliedReceipt
+                    queueEntry.signedReceiptForRepair = queueEntry.receivedSignedReceipt
 
                     // queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
                     queueEntry.signedReceiptForRepair = this.stateManager.getSignedReceipt(queueEntry)
@@ -6837,9 +6833,9 @@ class TransactionQueue {
                     continue
                   }
 
-                  /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_didNotMatchReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
+                  /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_didNotMatchReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.signedReceiptForRepair.proposal.applied} `)
                   queueEntry.repairFinished = false
-                  if (queueEntry.appliedReceiptForRepair.result === true) {
+                  if (queueEntry.signedReceiptForRepair.proposal.applied === true) {
                     // need to start repair process and wait
                     //await note: it is best to not await this.  it should be an async operation.
                     if (configContext.stateManager.noRepairIfDataAttached && configContext.stateManager.attachDataToReceipt) {
@@ -6876,8 +6872,8 @@ class TransactionQueue {
 
             // Special state that we are put in if we are waiting for a repair to receipt operation to conclude
             if (queueEntry.repairFinished === true) {
-              /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} txAge:${txAge} `)
-              if (queueEntry.appliedReceiptForRepair.result === true) {
+              /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.signedReceiptForRepair.proposal.applied} txAge:${txAge} `)
+              if (queueEntry.signedReceiptForRepair.proposal.applied === true) {
                 this.updateTxState(queueEntry, 'pass')
               } else {
                 // technically should never get here, because we dont need to repair to a receipt when the network did not apply the TX
@@ -7088,14 +7084,13 @@ class TransactionQueue {
                   }
 
                   if (
-                    queueEntry.recievedAppliedReceipt?.result === true ||
-                    queueEntry.recievedAppliedReceipt2?.result === true ||
-                    queueEntry.appliedReceipt2?.result === true
+                    queueEntry.receivedSignedReceipt?.proposal?.applied === true ||
+                    queueEntry.signedReceipt?.proposal?.applied === true
                   ) {
                     this.updateTxState(queueEntry, 'pass')
                   } else {
                     /* prettier-ignore */
-                    if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_fail : ${queueEntry.logID} no receivedAppliedRecipt or recievedAppliedReceipt2. appliedReceipt2: ${utils.stringifyReduce(queueEntry.appliedReceipt2)}`);
+                    if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_fail : ${queueEntry.logID} no receivedAppliedRecipt or recievedAppliedReceipt2. signedReceipt: ${utils.stringifyReduce(queueEntry.signedReceipt)}`);
                     this.updateTxState(queueEntry, 'fail')
                   }
                   this.removeFromQueue(queueEntry, currentIndex)
@@ -7179,15 +7174,15 @@ class TransactionQueue {
                   if (queueEntry.preApplyTXResult.passed === false) {
                     canCommitTX = false
                   }
-                } else if (queueEntry.appliedReceipt2 != null) {
+                } else if (queueEntry.signedReceipt != null) {
                   // the final state of the queue entry will be pass or fail based on the receipt
-                  if (queueEntry.appliedReceipt2.result === false) {
+                  if (queueEntry.signedReceipt.proposal.applied === false) {
                     canCommitTX = false
                     hasReceiptFail = true
                   }
-                } else if (queueEntry.recievedAppliedReceipt2 != null) {
+                } else if (queueEntry.receivedSignedReceipt != null) {
                   // the final state of the queue entry will be pass or fail based on the receipt
-                  if (queueEntry.recievedAppliedReceipt2.result === false) {
+                  if (queueEntry.receivedSignedReceipt.proposal.applied === false) {
                     canCommitTX = false
                     if(configContext.stateManager.receiptRemoveFix){
                       hasReceiptFail = true
@@ -7275,9 +7270,9 @@ class TransactionQueue {
                     this.updateTxState(queueEntry, 'fail')
                   }
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : noConsensus:${queueEntry.state} ${queueEntry.logID} `)
-                } else if (queueEntry.appliedReceipt2 != null) {
+                } else if (queueEntry.signedReceipt != null) {
                   // the final state of the queue entry will be pass or fail based on the receipt
-                  if (queueEntry.appliedReceipt2.result === true) {
+                  if (queueEntry.signedReceipt.proposal.applied === true) {
                     this.updateTxState(queueEntry, 'pass')
                   } else {
                     this.updateTxState(queueEntry, 'fail')
@@ -7425,12 +7420,12 @@ class TransactionQueue {
 
     //This is really important.  If we are going to expire a TX, then look to see if we already have a receipt for it.
     //If so, then just go into async receipt repair mode for the TX AFTER it has been expired and removed from the queue
-    if (queueEntry.appliedReceiptFinal2 != null) {
+    if (queueEntry.signedReceiptFinal != null) {
       const startRepair = queueEntry.repairStarted === false
       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`setTXExpired. ${queueEntry.logID} start repair:${startRepair}. update `)
       if (startRepair) {
         nestedCountersInstance.countEvent('repair1', 'setTXExpired: start repair')
-        queueEntry.appliedReceiptForRepair2 = queueEntry.appliedReceiptFinal2
+        queueEntry.signedReceiptForRepair = queueEntry.signedReceiptFinal
         //todo any limits to how many repairs at once to allow?
         this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
       }

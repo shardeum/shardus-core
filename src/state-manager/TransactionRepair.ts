@@ -162,16 +162,13 @@ class TransactionRepair {
         return
       }
 
-      const voters = queueEntry.appliedReceiptForRepair2.signatures
+      const voters = queueEntry.signedReceiptForRepair.signaturePack
       //shuffle the array
       utils.shuffleArray(voters)
 
       if (queueEntry.ourVoteHash != null) {
         if (
-          queueEntry.ourVoteHash ===
-          this.stateManager.transactionConsensus.calculateVoteHash(
-            queueEntry.appliedReceiptForRepair2.appliedVote
-          )
+          queueEntry.ourVoteHash === queueEntry.signedReceiptForRepair.proposalHash
         ) {
           //This case is ok.  A tx in the queue may get expired after it pre-applied and cast a vote.
           //This method should detect that we already have correct state available for the accounts and
@@ -861,11 +858,10 @@ class TransactionRepair {
             // This still needs checking of the our votehash matches with the winning votehash or our appReceiptDataHash matches with the winning appReceiptDataHash
             if (
               queueEntry.ourVoteHash &&
-              queueEntry.appliedReceiptForRepair2 &&
-              queueEntry.appliedReceiptForRepair2.appliedVote
+              queueEntry.signedReceiptForRepair?.proposalHash
             )
               if (
-                queueEntry.ourVoteHash === this.crypto.hash(queueEntry.appliedReceiptForRepair2.appliedVote)
+                queueEntry.ourVoteHash === queueEntry.signedReceiptForRepair.proposalHash
               ) {
                 if (this.config.p2p.experimentalSnapshot)
                   if (logFlags.verbose)

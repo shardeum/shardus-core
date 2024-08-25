@@ -3953,28 +3953,29 @@ class StateManager {
    *    ##     ## ########  ######  ######## #### ##           ##     ######
    */
 
-  /**
-   * getReceipt
-   * Since there are few places where receipts can be stored on a QueueEntry this determines the correct one to return
-   * @param queueEntry
-   */
-  getReceipt(queueEntry: QueueEntry): AppliedReceipt {
-    if (queueEntry.appliedReceiptFinal != null) {
-      return queueEntry.appliedReceiptFinal
-    }
-    // start with a receipt we made
-    let receipt: AppliedReceipt = queueEntry.appliedReceipt
-    if (receipt == null) {
-      // or see if we got one
-      receipt = queueEntry.recievedAppliedReceipt
-    }
-    // if we had to repair use that instead. this stomps the other ones
-    if (queueEntry.appliedReceiptForRepair != null) {
-      receipt = queueEntry.appliedReceiptForRepair
-    }
-    queueEntry.appliedReceiptFinal = receipt
-    return receipt
-  }
+  // DEPRECATED AFTER POQO
+  // /**
+  //  * getReceipt
+  //  * Since there are few places where receipts can be stored on a QueueEntry this determines the correct one to return
+  //  * @param queueEntry
+  //  */
+  // getReceipt(queueEntry: QueueEntry): AppliedReceipt {
+  //   if (queueEntry.appliedReceiptFinal != null) {
+  //     return queueEntry.appliedReceiptFinal
+  //   }
+  //   // start with a receipt we made
+  //   let receipt: AppliedReceipt = queueEntry.appliedReceipt
+  //   if (receipt == null) {
+  //     // or see if we got one
+  //     receipt = queueEntry.recievedAppliedReceipt
+  //   }
+  //   // if we had to repair use that instead. this stomps the other ones
+  //   if (queueEntry.appliedReceiptForRepair != null) {
+  //     receipt = queueEntry.appliedReceiptForRepair
+  //   }
+  //   queueEntry.appliedReceiptFinal = receipt
+  //   return receipt
+  // }
 
   getSignedReceipt(queueEntry: QueueEntry): SignedReceipt {
     if (queueEntry.signedReceiptFinal != null) {

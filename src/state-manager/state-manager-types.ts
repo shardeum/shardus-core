@@ -886,7 +886,7 @@ export type RequestTxResp = {
 }
 
 export type RequestReceiptForTxReq = { txid: string; timestamp: number }
-export type RequestReceiptForTxResp_old = { receipt: AppliedReceipt; note: string; success: boolean }
+export type RequestReceiptForTxResp_old = { receipt: SignedReceipt; note: string; success: boolean }
 
 export type RequestReceiptForTxResp = { receipt: SignedReceipt; note: string; success: boolean }
 
