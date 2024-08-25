@@ -3255,7 +3255,7 @@ class TransactionQueue {
 
         if (result.success === true && result.receipt != null) {
           //TODO implement this!!!
-          queueEntry.recievedAppliedReceipt2 = result.receipt
+          queueEntry.receivedSignedReceipt = result.receipt
           keepTrying = false
           gotReceipt = true
 
@@ -5347,7 +5347,7 @@ class TransactionQueue {
     delete queueEntry.appliedReceiptForRepair
 
     // coalesce the receipt2s into applied receipt. maybe not as descriptive, but save memory.
-    this.stateManager.getReceipt2(queueEntry)
+    queueEntry.signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
     queueEntry.recievedAppliedReceipt2 = null
     queueEntry.appliedReceiptForRepair2 = null
 
@@ -6018,8 +6018,8 @@ class TransactionQueue {
           const isAwaitingFinalData = queueEntry.state === 'await final data'
           const isInExecutionHome = queueEntry.isInExecutionHome
           //note this wont work with old receipts but we can depricate old receipts soon
-          const receipt2 = this.stateManager.getReceipt2(queueEntry)
-          const hasReceipt = receipt2 != null
+          const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
+          const hasReceipt = signedReceipt != null
           const hasCastVote = queueEntry.ourVote != null
 
           let extraTime = 0
@@ -6334,8 +6334,8 @@ class TransactionQueue {
               //TODO check for receipt and move to repair state / await final data
 
               if(this.config.stateManager.awaitingDataCanBailOnReceipt){
-                const receipt = this.stateManager.getReceipt2(queueEntry)
-                if(receipt != null){
+                const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
+                if(signedReceipt != null){
                   //we saw a receipt so we can move to await final data
                   nestedCountersInstance.countEvent('processing', 'awaitingDataCanBailOnReceipt: activated.  tx state changed from awaiting data to await final data')
                   this.updateTxState(queueEntry, 'await final data', 'receipt while waiting for initial data')
@@ -6624,8 +6624,8 @@ class TransactionQueue {
 
               //todo this is false.. and prevents some important stuff.
               //need to look at appliedReceipt2
-              if (this.stateManager.getReceipt2(queueEntry) != null) {
-                const receipt2 = this.stateManager.getReceipt2(queueEntry)
+              if (this.stateManager.getSignedReceipt(queueEntry) != null) {
+                const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
                 //TODO share receipt with corresponding index
 
                 if (logFlags.debug || this.stateManager.consensusLog) {
@@ -6645,51 +6645,51 @@ class TransactionQueue {
                 }
 
                 // we should send the receipt if we are in the top 5 nodes
-                const isConfirmedReceipt = receipt2.confirmOrChallenge?.message === 'confirm'
-                const isChallengedReceipt = receipt2.confirmOrChallenge?.message === 'challenge'
-                let shouldSendReceipt = false
-                if (queueEntry.isInExecutionHome) {
-                  if (this.usePOQo) {
-                    // Already handled above
-                    shouldSendReceipt = false
-                  }
-                  else if (this.useNewPOQ) {
-                    let numberOfSharingNodes = configContext.stateManager.nodesToGossipAppliedReceipt
-                    if (numberOfSharingNodes > queueEntry.executionGroup.length) numberOfSharingNodes = queueEntry.executionGroup.length
-                    const highestRankedNodeIds = queueEntry.executionGroup.slice(0, numberOfSharingNodes).map(n => n.id)
-                    if (highestRankedNodeIds.includes(Self.id)) {
-                      if (isChallengedReceipt) shouldSendReceipt = true
-                      else if (isConfirmedReceipt && isReceiptMatchPreApply) shouldSendReceipt = true
-                    }
-                  } else {
-                    shouldSendReceipt = true
-                  }
+                // const isConfirmedReceipt = receipt2.confirmOrChallenge?.message === 'confirm'
+                // const isChallengedReceipt = receipt2.confirmOrChallenge?.message === 'challenge'
+                // let shouldSendReceipt = false
+                // if (queueEntry.isInExecutionHome) {
+                //   if (this.usePOQo) {
+                //     // Already handled above
+                //     shouldSendReceipt = false
+                //   }
+                //   else if (this.useNewPOQ) {
+                //     let numberOfSharingNodes = configContext.stateManager.nodesToGossipAppliedReceipt
+                //     if (numberOfSharingNodes > queueEntry.executionGroup.length) numberOfSharingNodes = queueEntry.executionGroup.length
+                //     const highestRankedNodeIds = queueEntry.executionGroup.slice(0, numberOfSharingNodes).map(n => n.id)
+                //     if (highestRankedNodeIds.includes(Self.id)) {
+                //       if (isChallengedReceipt) shouldSendReceipt = true
+                //       else if (isConfirmedReceipt && isReceiptMatchPreApply) shouldSendReceipt = true
+                //     }
+                //   } else {
+                //     shouldSendReceipt = true
+                //   }
 
-                  if (shouldSendReceipt) {
-                    // Broadcast the receipt, only if we made one (try produce can early out if we received one)
-                    const awaitStart = shardusGetTime()
-                    /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()' )
-                    this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
-                    /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()', DebugComplete.Completed )
+                //   if (shouldSendReceipt) {
+                //     // Broadcast the receipt, only if we made one (try produce can early out if we received one)
+                //     const awaitStart = shardusGetTime()
+                //     /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()' )
+                //     this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
+                //     /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()', DebugComplete.Completed )
 
-                    this.updateSimpleStatsObject(
-                      processStats.awaitStats,
-                      'shareAppliedReceipt',
-                      shardusGetTime() - awaitStart
-                    )
-                  }
-                }
+                //     this.updateSimpleStatsObject(
+                //       processStats.awaitStats,
+                //       'shareAppliedReceipt',
+                //       shardusGetTime() - awaitStart
+                //     )
+                //   }
+                // }
 
                 // remove from the queue if receipt2 is a challenged receipt
-                if (isChallengedReceipt && this.useNewPOQ) {
-                  const txId = queueEntry.acceptedTx.txId
-                  const logID = queueEntry.logID
-                  this.updateTxState(queueEntry, 'fail')
-                  this.removeFromQueue(queueEntry, currentIndex, true) // we don't want to archive this
-                  nestedCountersInstance.countEvent('consensus', 'isChallengedReceipt: true removing from queue')
-                  this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isChallengedReceipt : ${logID}. remove from queue`)
-                  continue
-                }
+                // if (isChallengedReceipt && this.useNewPOQ) {
+                //   const txId = queueEntry.acceptedTx.txId
+                //   const logID = queueEntry.logID
+                //   this.updateTxState(queueEntry, 'fail')
+                //   this.removeFromQueue(queueEntry, currentIndex, true) // we don't want to archive this
+                //   nestedCountersInstance.countEvent('consensus', 'isChallengedReceipt: true removing from queue')
+                //   this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isChallengedReceipt : ${logID}. remove from queue`)
+                //   continue
+                // }
 
                 // not a challenge receipt but check the tx result
                 if (isReceiptMatchPreApply && queueEntry.isInExecutionHome) {
@@ -6699,9 +6699,8 @@ class TransactionQueue {
                   //todo check cant_apply flag to make sure a vote can form with it!
                   //also check if failed votes will work...?
                   if (
-                    this.stateManager.getReceiptVote(queueEntry).cant_apply === false &&
-                    this.stateManager.getReceiptResult(queueEntry) === true &&
-                    this.stateManager.getReceiptConfirmation(queueEntry) === true
+                    this.stateManager.getReceiptProposal(queueEntry).cant_preApply === false &&
+                    this.stateManager.getReceiptResult(queueEntry) === true
                   ) {
                     this.updateTxState(queueEntry, 'commiting')
                     queueEntry.hasValidFinalData = true
@@ -6793,7 +6792,7 @@ class TransactionQueue {
 
                     //todo check cant_apply flag to make sure a vote can form with it!
                     if (
-                      this.stateManager.getReceiptVote(queueEntry).cant_apply === false &&
+                      this.stateManager.getReceiptProposal(queueEntry).cant_preApply === false &&
                       this.stateManager.getReceiptResult(queueEntry) === true
                     ) {
                       this.updateTxState(queueEntry, 'commiting')
@@ -6814,7 +6813,8 @@ class TransactionQueue {
                     didNotMatchReceipt = true
                     queueEntry.appliedReceiptForRepair = queueEntry.recievedAppliedReceipt
 
-                    queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
+                    // queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
+                    queueEntry.signedReceiptForRepair = this.stateManager.getSignedReceipt(queueEntry)
                   }
                 } else {
                   //just keep waiting for a reciept
@@ -8495,7 +8495,7 @@ getDebugStuckTxs(opts): unknown {
       executionDebug: queueEntry.executionDebug,
       waitForReceiptOnly: queueEntry.waitForReceiptOnly,
       ourVote: queueEntry.ourVote || null,
-      receipt2: this.stateManager.getReceipt2(queueEntry) || null,
+      signedReceipt: this.stateManager.getSignedReceipt(queueEntry) || null,
       // uniqueChallenges: queueEntry.uniqueChallengesCount,
       collectedVoteCount: queueEntry.collectedVoteHashes.length,
       simpleDebugStr: this.app.getSimpleTxDebugValue ? this.app.getSimpleTxDebugValue(queueEntry.acceptedTx?.data) : "",

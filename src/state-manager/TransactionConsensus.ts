@@ -20,7 +20,6 @@ import ShardFunctions from './shardFunctions'
 import * as NodeList from '../p2p/NodeList'
 import {
   AppliedReceipt,
-  AppliedReceipt2,
   AppliedVote,
   AppliedVoteHash,
   AppliedVoteQuery,
@@ -329,7 +328,7 @@ class TransactionConsenus {
         payload: TimestampRemoveRequest,
         respond: (result: boolean) => unknown
       ) => {
-        const { txId, receipt2, cycleCounter } = payload
+        const { txId, cycleCounter } = payload
         if (this.txTimestampCache.has(cycleCounter) && this.txTimestampCache.get(cycleCounter).has(txId)) {
 
           /* prettier-ignore */ this.mainLogger.debug(`Removed timestamp cache for txId: ${txId}, timestamp: ${Utils.safeStringify(this.txTimestampCache.get(cycleCounter).get(txId))}`)
@@ -763,293 +762,294 @@ class TransactionConsenus {
       }
     )
 
-    this.p2p.registerGossipHandler(
-      'spread_appliedReceipt2',
-      async (
-        payload: any,
-        tracker: string,
-        msgSize: number
-      ) => {
-        nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 handler')
-        profilerInstance.scopedProfileSectionStart('spread_appliedReceipt2', false, msgSize)
-        const respondSize = cUninitializedSize
+    // DEPRECATED AFTER POQO
+    // this.p2p.registerGossipHandler(
+    //   'spread_appliedReceipt2',
+    //   async (
+    //     payload: any,
+    //     tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 handler')
+    //     profilerInstance.scopedProfileSectionStart('spread_appliedReceipt2', false, msgSize)
+    //     const respondSize = cUninitializedSize
 
-        // ignore the message for debugging purpose
-        if (
-          this.stateManager.testFailChance(
-            this.stateManager.ignoreRecieptChance,
-            'spread_appliedReceipt2',
-            utils.stringifyReduce(payload.txid),
-            '',
-            logFlags.verbose
-          ) === true
-        ) {
-          return
-        }
+    //     // ignore the message for debugging purpose
+    //     if (
+    //       this.stateManager.testFailChance(
+    //         this.stateManager.ignoreRecieptChance,
+    //         'spread_appliedReceipt2',
+    //         utils.stringifyReduce(payload.txid),
+    //         '',
+    //         logFlags.verbose
+    //       ) === true
+    //     ) {
+    //       return
+    //     }
 
-        try {
-          // extract txId
-          let txId: string
-          let receivedAppliedReceipt2: AppliedReceipt2
-          if (Context.config.stateManager.attachDataToReceipt) {
-            txId = payload.receipt?.txid
-            receivedAppliedReceipt2 = payload.receipt as AppliedReceipt2
-          } else {
-            receivedAppliedReceipt2 = payload as AppliedReceipt2
-            txId = receivedAppliedReceipt2.txid
-          }
-          if (receivedAppliedReceipt2 == null) {
-            /* prettier-ignore */ this.mainLogger.error(`spread_appliedReceipt2 ${txId} received null receipt`)
-            nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null receipt`)
-            return
-          }
+    //     try {
+    //       // extract txId
+    //       let txId: string
+    //       let receivedSignedReceipt: SignedReceipt
+    //       if (Context.config.stateManager.attachDataToReceipt) {
+    //         txId = payload.receipt?.txid
+    //         receivedSignedReceipt = payload.receipt as SignedReceipt
+    //       } else {
+    //         receivedAppliedReceipt2 = payload as AppliedReceipt2
+    //         txId = receivedAppliedReceipt2.txid
+    //       }
+    //       if (receivedAppliedReceipt2 == null) {
+    //         /* prettier-ignore */ this.mainLogger.error(`spread_appliedReceipt2 ${txId} received null receipt`)
+    //         nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null receipt`)
+    //         return
+    //       }
 
-          // we need confirmation in new POQ
-          if (this.stateManager.transactionQueue.useNewPOQ && receivedAppliedReceipt2.confirmOrChallenge == null) {
-            /* prettier-ignore */ this.mainLogger.error(`spread_appliedReceipt2 ${txId} received null receipt`)
-            nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null confirm message`)
-            return
-          }
+    //       // we need confirmation in new POQ
+    //       if (this.stateManager.transactionQueue.useNewPOQ && receivedAppliedReceipt2.confirmOrChallenge == null) {
+    //         /* prettier-ignore */ this.mainLogger.error(`spread_appliedReceipt2 ${txId} received null receipt`)
+    //         nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null confirm message`)
+    //         return
+    //       }
 
-          // check if we have the queue entry
-          let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId) // , payload.timestamp)
-          if (queueEntry == null) {
-            if (queueEntry == null) {
-              // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
-              queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
-                txId,
-                'spread_appliedReceipt2'
-              ) // , payload.timestamp)
-              if (queueEntry != null) {
-                // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
-                // would need to make sure we send gossip though.
-              }
-            }
-            if (queueEntry == null) {
-              /* prettier-ignore */
-              if (logFlags.error || this.stateManager.consensusLog)
-                this.mainLogger.error(
-                  `spread_appliedReceipt no queue entry for ${txId} txId:${txId}`
-                )
-              // NEW start repair process that will find the TX then apply repairs
-              // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(receivedAppliedReceipt2)
-              return
-            }
-          }
-          if (queueEntry.hasValidFinalData || queueEntry.accountDataSet) {
-            /* prettier-ignore */
-            if (logFlags.debug || this.stateManager.consensusLog)
-              this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} Already Shared`)
-            nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 skipped Already Shared`)
-            return
-          }
+    //       // check if we have the queue entry
+    //       let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         if (queueEntry == null) {
+    //           // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
+    //           queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
+    //             txId,
+    //             'spread_appliedReceipt2'
+    //           ) // , payload.timestamp)
+    //           if (queueEntry != null) {
+    //             // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
+    //             // would need to make sure we send gossip though.
+    //           }
+    //         }
+    //         if (queueEntry == null) {
+    //           /* prettier-ignore */
+    //           if (logFlags.error || this.stateManager.consensusLog)
+    //             this.mainLogger.error(
+    //               `spread_appliedReceipt no queue entry for ${txId} txId:${txId}`
+    //             )
+    //           // NEW start repair process that will find the TX then apply repairs
+    //           // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(receivedAppliedReceipt2)
+    //           return
+    //         }
+    //       }
+    //       if (queueEntry.hasValidFinalData || queueEntry.accountDataSet) {
+    //         /* prettier-ignore */
+    //         if (logFlags.debug || this.stateManager.consensusLog)
+    //           this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} Already Shared`)
+    //         nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 skipped Already Shared`)
+    //         return
+    //       }
 
-          // for debugging and testing purpose
-          if (
-            this.stateManager.testFailChance(
-              this.stateManager.ignoreRecieptChance,
-              'spread_appliedReceipt2',
-              utils.stringifyReduce(txId),
-              '',
-              logFlags.verbose
-            ) === true
-          ) {
-            return
-          }
+    //       // for debugging and testing purpose
+    //       if (
+    //         this.stateManager.testFailChance(
+    //           this.stateManager.ignoreRecieptChance,
+    //           'spread_appliedReceipt2',
+    //           utils.stringifyReduce(txId),
+    //           '',
+    //           logFlags.verbose
+    //         ) === true
+    //       ) {
+    //         return
+    //       }
 
-          // todo: STATESHARDING4 ENDPOINTS check payload format
-          // todo: STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
+    //       // todo: STATESHARDING4 ENDPOINTS check payload format
+    //       // todo: STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
 
-          const receiptNotNull = receivedAppliedReceipt2 != null
+    //       const receiptNotNull = receivedAppliedReceipt2 != null
 
-          // repair only if data is not attached to the receipt
-          if (Context.config.stateManager.attachDataToReceipt === false && (queueEntry.state === 'expired' || queueEntry.state === 'almostExpired')) {
-            //have we tried to repair this yet?
-            const startRepair = queueEntry.repairStarted === false
-            /* prettier-ignore */
-            if (logFlags.debug || this.stateManager.consensusLog) this.mainLogger.debug(`spread_appliedReceipt2. tx expired. start repair:${startRepair}. update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`);
-            if (queueEntry.repairStarted === false) {
-              nestedCountersInstance.countEvent('repair1', 'got receipt for expiredTX start repair')
-              queueEntry.appliedReceiptForRepair2 = receivedAppliedReceipt2
-              //todo any limits to how many repairs at once to allow?
-              this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
-            }
-            //x - dont forward gossip, it is probably too late?
-            //do forward gossip so we dont miss on sharing a receipt!
-            //return
-          }
+    //       // repair only if data is not attached to the receipt
+    //       if (Context.config.stateManager.attachDataToReceipt === false && (queueEntry.state === 'expired' || queueEntry.state === 'almostExpired')) {
+    //         //have we tried to repair this yet?
+    //         const startRepair = queueEntry.repairStarted === false
+    //         /* prettier-ignore */
+    //         if (logFlags.debug || this.stateManager.consensusLog) this.mainLogger.debug(`spread_appliedReceipt2. tx expired. start repair:${startRepair}. update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`);
+    //         if (queueEntry.repairStarted === false) {
+    //           nestedCountersInstance.countEvent('repair1', 'got receipt for expiredTX start repair')
+    //           queueEntry.appliedReceiptForRepair2 = receivedAppliedReceipt2
+    //           //todo any limits to how many repairs at once to allow?
+    //           this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
+    //         }
+    //         //x - dont forward gossip, it is probably too late?
+    //         //do forward gossip so we dont miss on sharing a receipt!
+    //         //return
+    //       }
 
-          // decide whether we should store and forward the receipt
-          let shouldStore = false
-          let shouldForward = false
-          if (Context.config.stateManager.stuckTxQueueFix) {
-            // queueEntry.gossipedReceipt will decide the actual forwarding
-            shouldForward = true
-          }
-          if (this.config.stateManager.useNewPOQ === false) {
-            shouldStore = queueEntry.gossipedReceipt === false
-          } else {
-            const localAppliedReceipt2 = queueEntry.appliedReceipt2
-            if (localAppliedReceipt2) {
-              const localReceiptConfirmNode = localAppliedReceipt2.confirmOrChallenge.nodeId
-              const receivedReceiptConfirmNode = receivedAppliedReceipt2.confirmOrChallenge.nodeId
-              if (localReceiptConfirmNode === receivedReceiptConfirmNode) {
-                if (Context.config.stateManager.stuckTxQueueFix) {
-                  // we should not care about the rank for receipt2+data gossips
-                  shouldForward = true
-                } else {
-                  shouldForward = false
-                }
-                if (logFlags.debug)
-                  this.mainLogger.debug(
-                    `spread_appliedReceipt2 ${queueEntry.logID} we have the same receipt. We do not need to store but we will forward`
-                  )
-              } else {
-                if (logFlags.debug)
-                  this.mainLogger.debug(
-                    `spread_appliedReceipt2 ${queueEntry.logID} we have different receipt ${
-                      queueEntry.logID
-                    }. localReceipt: ${utils.stringifyReduce(
-                      localAppliedReceipt2
-                    )}, receivedReceipt: ${utils.stringifyReduce(receivedAppliedReceipt2)}`
-                  )
-                const localReceiptRank = this.stateManager.transactionQueue.computeNodeRank(
-                  localReceiptConfirmNode,
-                  queueEntry.acceptedTx.txId,
-                  queueEntry.acceptedTx.timestamp
-                )
-                const receivedReceiptRank = this.stateManager.transactionQueue.computeNodeRank(
-                  receivedReceiptConfirmNode,
-                  queueEntry.acceptedTx.txId,
-                  queueEntry.acceptedTx.timestamp
-                )
-                if (receivedReceiptRank < localReceiptRank) {
-                  shouldStore = true
-                  shouldForward = true
-                  this.mainLogger.debug(
-                    `spread_appliedReceipt2 ${queueEntry.logID} received receipt is better. we will store and forward`
-                  )
-                }
-              }
-            } else {
-              shouldStore = true
-              shouldForward = true
-              if (logFlags.debug)
-                this.mainLogger.debug(
-                  `spread_appliedReceipt2 ${queueEntry.logID} we do not have a local or received receipt generated. will store and forward`
-                )
-            }
-          }
-          // if we are tx group node and haven't got data yet, we should store and forward the receipt
-          if (queueEntry.isInExecutionHome === false) {
-            if (queueEntry.accountDataSet === false || Object.keys(queueEntry.collectedFinalData).length === 0) {
-              shouldStore = true
-              shouldForward = true
-              if (logFlags.debug)
-                this.mainLogger.debug(
-                  `spread_appliedReceipt2 ${queueEntry.logID} we are tx group node and do not have receipt2 yet. will store and forward`
-                )
-            }
-          }
-          this.mainLogger.debug(`spread_appliedReceipt2 ${queueEntry.logID} shouldStore:${shouldStore}, shouldForward:${shouldForward} isInExecutionHome:${queueEntry.isInExecutionHome}, accountDataSet:${queueEntry.accountDataSet}, collectedFinalData:${Object.keys(queueEntry.collectedFinalData).length}`)
+    //       // decide whether we should store and forward the receipt
+    //       let shouldStore = false
+    //       let shouldForward = false
+    //       if (Context.config.stateManager.stuckTxQueueFix) {
+    //         // queueEntry.gossipedReceipt will decide the actual forwarding
+    //         shouldForward = true
+    //       }
+    //       if (this.config.stateManager.useNewPOQ === false) {
+    //         shouldStore = queueEntry.gossipedReceipt === false
+    //       } else {
+    //         const localAppliedReceipt2 = queueEntry.appliedReceipt2
+    //         if (localAppliedReceipt2) {
+    //           const localReceiptConfirmNode = localAppliedReceipt2.confirmOrChallenge.nodeId
+    //           const receivedReceiptConfirmNode = receivedAppliedReceipt2.confirmOrChallenge.nodeId
+    //           if (localReceiptConfirmNode === receivedReceiptConfirmNode) {
+    //             if (Context.config.stateManager.stuckTxQueueFix) {
+    //               // we should not care about the rank for receipt2+data gossips
+    //               shouldForward = true
+    //             } else {
+    //               shouldForward = false
+    //             }
+    //             if (logFlags.debug)
+    //               this.mainLogger.debug(
+    //                 `spread_appliedReceipt2 ${queueEntry.logID} we have the same receipt. We do not need to store but we will forward`
+    //               )
+    //           } else {
+    //             if (logFlags.debug)
+    //               this.mainLogger.debug(
+    //                 `spread_appliedReceipt2 ${queueEntry.logID} we have different receipt ${
+    //                   queueEntry.logID
+    //                 }. localReceipt: ${utils.stringifyReduce(
+    //                   localAppliedReceipt2
+    //                 )}, receivedReceipt: ${utils.stringifyReduce(receivedAppliedReceipt2)}`
+    //               )
+    //             const localReceiptRank = this.stateManager.transactionQueue.computeNodeRank(
+    //               localReceiptConfirmNode,
+    //               queueEntry.acceptedTx.txId,
+    //               queueEntry.acceptedTx.timestamp
+    //             )
+    //             const receivedReceiptRank = this.stateManager.transactionQueue.computeNodeRank(
+    //               receivedReceiptConfirmNode,
+    //               queueEntry.acceptedTx.txId,
+    //               queueEntry.acceptedTx.timestamp
+    //             )
+    //             if (receivedReceiptRank < localReceiptRank) {
+    //               shouldStore = true
+    //               shouldForward = true
+    //               this.mainLogger.debug(
+    //                 `spread_appliedReceipt2 ${queueEntry.logID} received receipt is better. we will store and forward`
+    //               )
+    //             }
+    //           }
+    //         } else {
+    //           shouldStore = true
+    //           shouldForward = true
+    //           if (logFlags.debug)
+    //             this.mainLogger.debug(
+    //               `spread_appliedReceipt2 ${queueEntry.logID} we do not have a local or received receipt generated. will store and forward`
+    //             )
+    //         }
+    //       }
+    //       // if we are tx group node and haven't got data yet, we should store and forward the receipt
+    //       if (queueEntry.isInExecutionHome === false) {
+    //         if (queueEntry.accountDataSet === false || Object.keys(queueEntry.collectedFinalData).length === 0) {
+    //           shouldStore = true
+    //           shouldForward = true
+    //           if (logFlags.debug)
+    //             this.mainLogger.debug(
+    //               `spread_appliedReceipt2 ${queueEntry.logID} we are tx group node and do not have receipt2 yet. will store and forward`
+    //             )
+    //         }
+    //       }
+    //       this.mainLogger.debug(`spread_appliedReceipt2 ${queueEntry.logID} shouldStore:${shouldStore}, shouldForward:${shouldForward} isInExecutionHome:${queueEntry.isInExecutionHome}, accountDataSet:${queueEntry.accountDataSet}, collectedFinalData:${Object.keys(queueEntry.collectedFinalData).length}`)
 
-          // process, store and forward the receipt
-          if (shouldStore === true && queueEntry.gossipedReceipt === false) {
-            /* prettier-ignore */
-            if (logFlags.debug || this.stateManager.consensusLog)
-              this.mainLogger.debug(
-                `spread_appliedReceipt2 update ${queueEntry.logID} receiptNotNull:${receiptNotNull}, appliedReceipt2: ${utils.stringifyReduce(receivedAppliedReceipt2)}`
-              )
+    //       // process, store and forward the receipt
+    //       if (shouldStore === true && queueEntry.gossipedReceipt === false) {
+    //         /* prettier-ignore */
+    //         if (logFlags.debug || this.stateManager.consensusLog)
+    //           this.mainLogger.debug(
+    //             `spread_appliedReceipt2 update ${queueEntry.logID} receiptNotNull:${receiptNotNull}, appliedReceipt2: ${utils.stringifyReduce(receivedAppliedReceipt2)}`
+    //           )
 
-            if (queueEntry.archived === false) {
-              queueEntry.recievedAppliedReceipt2 = receivedAppliedReceipt2
-              queueEntry.appliedReceipt2 = receivedAppliedReceipt2 // is this necessary?
-            } else {
-              this.mainLogger.error(`spread_appliedReceipt2 queueEntry.archived === true`)
-            }
+    //         if (queueEntry.archived === false) {
+    //           queueEntry.recievedAppliedReceipt2 = receivedAppliedReceipt2
+    //           queueEntry.appliedReceipt2 = receivedAppliedReceipt2 // is this necessary?
+    //         } else {
+    //           this.mainLogger.error(`spread_appliedReceipt2 queueEntry.archived === true`)
+    //         }
 
-            // commit the accounts if the receipt is valid and has data attached
-            if (Context.config.stateManager.attachDataToReceipt && receivedAppliedReceipt2.result) {
-              const wrappedStates = payload.wrappedStates as { [key: string]: Shardus.WrappedResponse}
-              if (wrappedStates == null) {
-                nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 no wrappedStates`)
-                this.mainLogger.error(`spread_appliedReceipt2 no wrappedStates for ${txId}`)
-              } else {
-                const filteredStates = {}
-                const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
-                  this.stateManager.currentCycleShardData.nodeShardData
-                for (const accountId in wrappedStates) {
-                  const isLocal = ShardFunctions.testAddressInRange(
-                    accountId,
-                    nodeShardData.storedPartitions
-                  )
-                  if (isLocal) {
-                    filteredStates[accountId] = 1
-                  }
-                }
-                const accountRecords = []
-                for (const accountId in wrappedStates) {
-                  if (filteredStates[accountId] == null) continue
-                  const wrappedState = wrappedStates[accountId] as Shardus.WrappedResponse
-                  const indexOfAccountIdInVote = receivedAppliedReceipt2.appliedVote.account_id.indexOf(accountId)
-                  if (indexOfAccountIdInVote === -1) {
-                    this.mainLogger.error(`spread_appliedReceipt2 accountId ${accountId} not found in appliedVote`)
-                    continue
-                  }
-                  const afterStateHash = receivedAppliedReceipt2.appliedVote.account_state_hash_after[indexOfAccountIdInVote]
-                  if (wrappedState.stateId !== afterStateHash) {
-                    this.mainLogger.error(`spread_appliedReceipt2 accountId ${accountId} state hash mismatch with appliedVote`)
-                    continue
-                  }
-                  queueEntry.collectedFinalData[accountId] = wrappedState // processTx() will do actual commit
-                  accountRecords.push(wrappedState)
-                  nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 add to final data`, accountRecords.length)
-                }
-                if (logFlags.debug) this.mainLogger.debug(`Use final data from appliedReceipt2 ${queueEntry.logID}`, queueEntry.collectedFinalData);
-              }
-            }
+    //         // commit the accounts if the receipt is valid and has data attached
+    //         if (Context.config.stateManager.attachDataToReceipt && receivedAppliedReceipt2.result) {
+    //           const wrappedStates = payload.wrappedStates as { [key: string]: Shardus.WrappedResponse}
+    //           if (wrappedStates == null) {
+    //             nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 no wrappedStates`)
+    //             this.mainLogger.error(`spread_appliedReceipt2 no wrappedStates for ${txId}`)
+    //           } else {
+    //             const filteredStates = {}
+    //             const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
+    //               this.stateManager.currentCycleShardData.nodeShardData
+    //             for (const accountId in wrappedStates) {
+    //               const isLocal = ShardFunctions.testAddressInRange(
+    //                 accountId,
+    //                 nodeShardData.storedPartitions
+    //               )
+    //               if (isLocal) {
+    //                 filteredStates[accountId] = 1
+    //               }
+    //             }
+    //             const accountRecords = []
+    //             for (const accountId in wrappedStates) {
+    //               if (filteredStates[accountId] == null) continue
+    //               const wrappedState = wrappedStates[accountId] as Shardus.WrappedResponse
+    //               const indexOfAccountIdInVote = receivedAppliedReceipt2.appliedVote.account_id.indexOf(accountId)
+    //               if (indexOfAccountIdInVote === -1) {
+    //                 this.mainLogger.error(`spread_appliedReceipt2 accountId ${accountId} not found in appliedVote`)
+    //                 continue
+    //               }
+    //               const afterStateHash = receivedAppliedReceipt2.appliedVote.account_state_hash_after[indexOfAccountIdInVote]
+    //               if (wrappedState.stateId !== afterStateHash) {
+    //                 this.mainLogger.error(`spread_appliedReceipt2 accountId ${accountId} state hash mismatch with appliedVote`)
+    //                 continue
+    //               }
+    //               queueEntry.collectedFinalData[accountId] = wrappedState // processTx() will do actual commit
+    //               accountRecords.push(wrappedState)
+    //               nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 add to final data`, accountRecords.length)
+    //             }
+    //             if (logFlags.debug) this.mainLogger.debug(`Use final data from appliedReceipt2 ${queueEntry.logID}`, queueEntry.collectedFinalData);
+    //           }
+    //         }
 
-            // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.receivedAppliedReceipt2
+    //         // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.receivedAppliedReceipt2
 
-            // share the receivedAppliedReceipt2.
-            const sender = null
-            const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-            if (gossipGroup.length > 1) {
-              // should consider only forwarding in some cases?
-              this.stateManager.debugNodeGroup(
-                queueEntry.acceptedTx.txId,
-                queueEntry.acceptedTx.timestamp,
-                `share appliedReceipt to neighbors`,
-                gossipGroup
-              )
-              //no await so we cant get the message out size in a reasonable way
-              this.p2p.sendGossipIn(
-                'spread_appliedReceipt2',
-                payload,
-                tracker,
-                sender,
-                gossipGroup,
-                false,
-                -1,
-                queueEntry.acceptedTx.txId
-              )
-              queueEntry.gossipedReceipt = true
-              nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 gossip forwarded')
-            }
-          } else {
-            // we get here if the receipt has already been shared
-            /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared or shouldStoreAndForward:${shouldStore}`)
-          }
-        } catch (ex) {
-          this.statemanager_fatal(
-            `spread_appliedReceipt2_ex`,
-            'spread_appliedReceipt2 endpoint failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
-          )
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt2')
-        }
-      }
-    )
+    //         // share the receivedAppliedReceipt2.
+    //         const sender = null
+    //         const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+    //         if (gossipGroup.length > 1) {
+    //           // should consider only forwarding in some cases?
+    //           this.stateManager.debugNodeGroup(
+    //             queueEntry.acceptedTx.txId,
+    //             queueEntry.acceptedTx.timestamp,
+    //             `share appliedReceipt to neighbors`,
+    //             gossipGroup
+    //           )
+    //           //no await so we cant get the message out size in a reasonable way
+    //           this.p2p.sendGossipIn(
+    //             'spread_appliedReceipt2',
+    //             payload,
+    //             tracker,
+    //             sender,
+    //             gossipGroup,
+    //             false,
+    //             -1,
+    //             queueEntry.acceptedTx.txId
+    //           )
+    //           queueEntry.gossipedReceipt = true
+    //           nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 gossip forwarded')
+    //         }
+    //       } else {
+    //         // we get here if the receipt has already been shared
+    //         /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared or shouldStoreAndForward:${shouldStore}`)
+    //       }
+    //     } catch (ex) {
+    //       this.statemanager_fatal(
+    //         `spread_appliedReceipt2_ex`,
+    //         'spread_appliedReceipt2 endpoint failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
+    //       )
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt2')
+    //     }
+    //   }
+    // )
 
     Comms.registerGossipHandler(
       'spread_confirmOrChallenge',
@@ -1887,98 +1887,99 @@ class TransactionConsenus {
    * gossip the appliedReceipt to the transaction group
    * @param queueEntry
    */
-  shareAppliedReceipt(queueEntry: QueueEntry): void {
-    /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
+  // DEPRECATED AFTER POQO
+  // shareAppliedReceipt(queueEntry: QueueEntry): void {
+  //   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
 
-    if (queueEntry.appliedReceipt2 == null) {
-      //take no action
-      /* prettier-ignore */ nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped appliedReceipt2 == null')
-      return
-    }
+  //   if (queueEntry.appliedReceipt2 == null) {
+  //     //take no action
+  //     /* prettier-ignore */ nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped appliedReceipt2 == null')
+  //     return
+  //   }
 
-    // share the appliedReceipt.
-    const sender = null
-    const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+  //   // share the appliedReceipt.
+  //   const sender = null
+  //   const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
 
-    // todo only recalc if cycle boundry?
-    // let updatedGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry, true)
+  //   // todo only recalc if cycle boundry?
+  //   // let updatedGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry, true)
 
-    if (gossipGroup.length > 1) {
-      if (queueEntry.ourNodeInTransactionGroup === false) {
-        return
-      }
+  //   if (gossipGroup.length > 1) {
+  //     if (queueEntry.ourNodeInTransactionGroup === false) {
+  //       return
+  //     }
 
-      // This code tried to optimize things by not having every node share a receipt.
+  //     // This code tried to optimize things by not having every node share a receipt.
 
-      // //look at our index in the consensus.
-      // //only have certain nodes sharde gossip the receipt.
-      // let ourIndex = queueEntry.ourTXGroupIndex
-      // let groupLength = gossipGroup.length
-      // if(this.stateManager.transactionQueue.executeInOneShard){
-      //   //we have to use different inputs if executeInOneShard is true
-      //   ourIndex = queueEntry.ourExGroupIndex
-      //   groupLength = queueEntry.executionGroup.length
-      // }
+  //     // //look at our index in the consensus.
+  //     // //only have certain nodes sharde gossip the receipt.
+  //     // let ourIndex = queueEntry.ourTXGroupIndex
+  //     // let groupLength = gossipGroup.length
+  //     // if(this.stateManager.transactionQueue.executeInOneShard){
+  //     //   //we have to use different inputs if executeInOneShard is true
+  //     //   ourIndex = queueEntry.ourExGroupIndex
+  //     //   groupLength = queueEntry.executionGroup.length
+  //     // }
 
-      // if(ourIndex > 0){
-      //   let everyN = Math.max(1,Math.floor(groupLength * 0.4))
-      //   let nonce = parseInt('0x' + queueEntry.acceptedTx.txId.substr(0,2))
-      //   let idxPlusNonce = ourIndex + nonce
-      //   let idxModEveryN = idxPlusNonce % everyN
-      //   if(idxModEveryN > 0){
-      //     nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped')
-      //     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shareAppliedReceipt-skipped', `${queueEntry.acceptedTx.txId}`, `ourIndex:${ourIndex} groupLength:${ourIndex} `)
-      //     return
-      //   }
-      // }
+  //     // if(ourIndex > 0){
+  //     //   let everyN = Math.max(1,Math.floor(groupLength * 0.4))
+  //     //   let nonce = parseInt('0x' + queueEntry.acceptedTx.txId.substr(0,2))
+  //     //   let idxPlusNonce = ourIndex + nonce
+  //     //   let idxModEveryN = idxPlusNonce % everyN
+  //     //   if(idxModEveryN > 0){
+  //     //     nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped')
+  //     //     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shareAppliedReceipt-skipped', `${queueEntry.acceptedTx.txId}`, `ourIndex:${ourIndex} groupLength:${ourIndex} `)
+  //     //     return
+  //     //   }
+  //     // }
 
-      nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-notSkipped')
-      // should consider only forwarding in some cases?
-      this.stateManager.debugNodeGroup(
-        queueEntry.acceptedTx.txId,
-        queueEntry.acceptedTx.timestamp,
-        `share appliedReceipt to neighbors`,
-        gossipGroup
-      )
-      let payload: any = queueEntry.appliedReceipt2
-      const receipt2 = this.stateManager.getReceipt2(queueEntry)
-      if (receipt2 == null) {
-        nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-receipt2 == null')
-        return
-      }
+  //     nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-notSkipped')
+  //     // should consider only forwarding in some cases?
+  //     this.stateManager.debugNodeGroup(
+  //       queueEntry.acceptedTx.txId,
+  //       queueEntry.acceptedTx.timestamp,
+  //       `share appliedReceipt to neighbors`,
+  //       gossipGroup
+  //     )
+  //     let payload: any = queueEntry.appliedReceipt2
+  //     const receipt2 = this.stateManager.getReceipt2(queueEntry)
+  //     if (receipt2 == null) {
+  //       nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-receipt2 == null')
+  //       return
+  //     }
 
-      if (Context.config.stateManager.attachDataToReceipt) {
-        // Report data to corresponding nodes
-        const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
-        const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
+  //     if (Context.config.stateManager.attachDataToReceipt) {
+  //       // Report data to corresponding nodes
+  //       const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
+  //       const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
 
-        const applyResponse = queueEntry.preApplyTXResult.applyResponse
-        let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
-        const writtenAccountsMap: WrappedResponses = {}
-        if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
-          for (const writtenAccount of applyResponse.accountWrites) {
-            writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
-            writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId]
-              ? wrappedStates[writtenAccount.accountId].stateId
-              : ''
-            writtenAccountsMap[writtenAccount.accountId].prevDataCopy = null
+  //       const applyResponse = queueEntry.preApplyTXResult.applyResponse
+  //       let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
+  //       const writtenAccountsMap: WrappedResponses = {}
+  //       if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+  //         for (const writtenAccount of applyResponse.accountWrites) {
+  //           writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+  //           writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId]
+  //             ? wrappedStates[writtenAccount.accountId].stateId
+  //             : ''
+  //           writtenAccountsMap[writtenAccount.accountId].prevDataCopy = null
 
-            datas[writtenAccount.accountId] = writtenAccount.data
-          }
-          //override wrapped states with writtenAccountsMap which should be more complete if it included
-          wrappedStates = writtenAccountsMap
-        }
-        if (receipt2.confirmOrChallenge?.message === 'challenge') {
-          wrappedStates = {}
-        }
-        payload = { receipt: queueEntry.appliedReceipt2, wrappedStates }
-      }
+  //           datas[writtenAccount.accountId] = writtenAccount.data
+  //         }
+  //         //override wrapped states with writtenAccountsMap which should be more complete if it included
+  //         wrappedStates = writtenAccountsMap
+  //       }
+  //       if (receipt2.confirmOrChallenge?.message === 'challenge') {
+  //         wrappedStates = {}
+  //       }
+  //       payload = { receipt: queueEntry.appliedReceipt2, wrappedStates }
+  //     }
 
-      //let payload = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
-      this.p2p.sendGossipIn('spread_appliedReceipt2', payload, '', sender, gossipGroup, false, -1, queueEntry.acceptedTx.txId)
-      if (logFlags.debug) this.mainLogger.debug(`shareAppliedReceipt ${queueEntry.logID} sent gossip`)
-    }
-  }
+  //     //let payload = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+  //     this.p2p.sendGossipIn('spread_appliedReceipt2', payload, '', sender, gossipGroup, false, -1, queueEntry.acceptedTx.txId)
+  //     if (logFlags.debug) this.mainLogger.debug(`shareAppliedReceipt ${queueEntry.logID} sent gossip`)
+  //   }
+  // }
 
   /**
    * hasAppliedReceiptMatchingPreApply
@@ -2735,98 +2736,91 @@ class TransactionConsenus {
     }
   }
 
-  async robustQueryBestReceipt(queueEntry: QueueEntry): Promise<AppliedReceipt2> {
-    this.profiler.profileSectionStart('robustQueryBestReceipt', true)
-    this.profiler.scopedProfileSectionStart('robustQueryBestReceipt')
-    try {
-      const queryFn = async (node: Shardus.Node): Promise<RequestReceiptForTxResp> => {
-        const ip = node.externalIp
-        const port = node.externalPort
-        // the queryFunction must return null if the given node is our own
-        if (ip === Self.ip && port === Self.port) return null
-        const message: RequestReceiptForTxReq = {
-          txid: queueEntry.acceptedTx.txId,
-          timestamp: queueEntry.acceptedTx.timestamp,
-        }
-        return await this.p2p.askBinary<RequestReceiptForTxReqSerialized, RequestReceiptForTxRespSerialized>(
-          node,
-          InternalRouteEnum.binary_request_receipt_for_tx,
-          message,
-          serializeRequestReceiptForTxReq,
-          deserializeRequestReceiptForTxResp,
-          {}
-        )
-        // return await Comms.ask(node, 'request_receipt_for_tx', message)
-      }
-      const eqFn = (item1: RequestReceiptForTxResp, item2: RequestReceiptForTxResp): boolean => {
-        const deepCompare = (obj1: any, obj2: any): boolean => {
-          // If both are null or undefined or exactly the same value
-          if (obj1 === obj2) {
-            return true
-          }
+  // DEPRECATED AFTER POQO
+  // async robustQueryBestReceipt(queueEntry: QueueEntry): Promise<AppliedReceipt2> {
+  //   this.profiler.profileSectionStart('robustQueryBestReceipt', true)
+  //   this.profiler.scopedProfileSectionStart('robustQueryBestReceipt')
+  //   try {
+  //     const queryFn = async (node: Shardus.Node): Promise<RequestReceiptForTxResp> => {
+  //       const ip = node.externalIp
+  //       const port = node.externalPort
+  //       // the queryFunction must return null if the given node is our own
+  //       if (ip === Self.ip && port === Self.port) return null
+  //       const message: RequestReceiptForTxReq = {
+  //         txid: queueEntry.acceptedTx.txId,
+  //         timestamp: queueEntry.acceptedTx.timestamp,
+  //       }
+  //       return await Comms.ask(node, 'request_receipt_for_tx', message)
+  //     }
+  //     const eqFn = (item1: RequestReceiptForTxResp, item2: RequestReceiptForTxResp): boolean => {
+  //       const deepCompare = (obj1: any, obj2: any): boolean => {
+  //         // If both are null or undefined or exactly the same value
+  //         if (obj1 === obj2) {
+  //           return true
+  //         }
 
-          // If only one is null or undefined
-          if (obj1 === null || obj2 === null || typeof obj1 !== 'object' || typeof obj2 !== 'object') {
-            return false
-          }
+  //         // If only one is null or undefined
+  //         if (obj1 === null || obj2 === null || typeof obj1 !== 'object' || typeof obj2 !== 'object') {
+  //           return false
+  //         }
 
-          // Compare arrays
-          if (Array.isArray(obj1) && Array.isArray(obj2)) {
-            if (obj1.length !== obj2.length) {
-              return false
-            }
-            for (let i = 0; i < obj1.length; i++) {
-              if (!deepCompare(obj1[i], obj2[i])) {
-                return false
-              }
-            }
-            return true
-          }
+  //         // Compare arrays
+  //         if (Array.isArray(obj1) && Array.isArray(obj2)) {
+  //           if (obj1.length !== obj2.length) {
+  //             return false
+  //           }
+  //           for (let i = 0; i < obj1.length; i++) {
+  //             if (!deepCompare(obj1[i], obj2[i])) {
+  //               return false
+  //             }
+  //           }
+  //           return true
+  //         }
 
-          // Compare objects
-          const keys1 = Object.keys(obj1)
-          const keys2 = Object.keys(obj2)
+  //         // Compare objects
+  //         const keys1 = Object.keys(obj1)
+  //         const keys2 = Object.keys(obj2)
 
-          if (keys1.length !== keys2.length) {
-            return false
-          }
+  //         if (keys1.length !== keys2.length) {
+  //           return false
+  //         }
 
-          for (const key of keys1) {
-            if (!keys2.includes(key)) {
-              return false
-            }
-            if (!deepCompare(obj1[key], obj2[key])) {
-              return false
-            }
-          }
+  //         for (const key of keys1) {
+  //           if (!keys2.includes(key)) {
+  //             return false
+  //           }
+  //           if (!deepCompare(obj1[key], obj2[key])) {
+  //             return false
+  //           }
+  //         }
 
-          return true
-        }
-        try {
-          // Deep compare item.receipt
-          return deepCompare(item1.receipt, item2.receipt)
-        } catch (err) {
-          return false
-        }
-      }
-      const redundancy = 3
-      const { topResult: response } = await robustQuery(
-        this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry),
-        queryFn,
-        eqFn,
-        redundancy,
-        true
-      )
-      if (response && response.receipt) {
-        return response.receipt
-      }
-    } catch (e) {
-      this.mainLogger.error(`robustQueryBestReceipt: ${queueEntry.logID} error: ${e.message}`)
-    } finally {
-      this.profiler.scopedProfileSectionEnd('robustQueryBestReceipt')
-      this.profiler.profileSectionEnd('robustQueryBestReceipt', true)
-    }
-  }
+  //         return true
+  //       }
+  //       try {
+  //         // Deep compare item.receipt
+  //         return deepCompare(item1.receipt, item2.receipt)
+  //       } catch (err) {
+  //         return false
+  //       }
+  //     }
+  //     const redundancy = 3
+  //     const { topResult: response } = await robustQuery(
+  //       this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry),
+  //       queryFn,
+  //       eqFn,
+  //       redundancy,
+  //       true
+  //     )
+  //     if (response && response.receipt) {
+  //       return response.receipt
+  //     }
+  //   } catch (e) {
+  //     this.mainLogger.error(`robustQueryBestReceipt: ${queueEntry.logID} error: ${e.message}`)
+  //   } finally {
+  //     this.profiler.scopedProfileSectionEnd('robustQueryBestReceipt')
+  //     this.profiler.profileSectionEnd('robustQueryBestReceipt', true)
+  //   }
+  // }
 
   async robustQueryBestVote(queueEntry: QueueEntry): Promise<AppliedVote> {
     profilerInstance.profileSectionStart('robustQueryBestVote', true)

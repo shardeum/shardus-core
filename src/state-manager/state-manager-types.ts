@@ -106,7 +106,7 @@ export type QueueEntry = {
 
   // POQo
   poqoNextSendIndex?: number
-  poqoReceipt?: AppliedReceipt2
+  poqoReceipt?: SignedReceipt
   hasSentFinalReceipt?: boolean
 
   // Consensus tracking:
@@ -888,7 +888,7 @@ export type RequestTxResp = {
 export type RequestReceiptForTxReq = { txid: string; timestamp: number }
 export type RequestReceiptForTxResp_old = { receipt: AppliedReceipt; note: string; success: boolean }
 
-export type RequestReceiptForTxResp = { receipt: AppliedReceipt2; note: string; success: boolean }
+export type RequestReceiptForTxResp = { receipt: SignedReceipt; note: string; success: boolean }
 
 export type RequestStateForTxReqPost = { txid: string; timestamp: number; key: string; hash: string }
 
@@ -1317,7 +1317,7 @@ export type CachedAppData = {
 
 export interface TimestampRemoveRequest {
   txId: string
-  receipt2: AppliedReceipt2
+  signedReceipt: SignedReceipt
   cycleCounter: number
 }
 
