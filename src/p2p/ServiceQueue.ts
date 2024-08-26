@@ -382,9 +382,6 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 }
 
 export function sendRequests(): void {
-  if (networkMode !== 'processing') {
-    return
-  }
   for (const add of addProposals) {
     if (!txAdd.some((entry) => entry.hash === add.hash)) {
       const { sign: sign1, ...unsignedAddNetworkTx } = add
