@@ -564,7 +564,7 @@ export async function processNetworkTransactions(record: P2P.CycleCreatorTypes.C
   }
   const processedSubQueueKeys = new Set<string>()
   let length = Math.min(txList.length, config.p2p.networkTransactionsToProcessPerCycle)
-  for (let i = 0; i < length; i++) {
+  for (let i = 0; i < length && currentQuarter === 3; i++) {
     try {
       // eslint-disable-next-line security/detect-object-injection
       if (!txList[i]) {
