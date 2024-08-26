@@ -5347,12 +5347,23 @@ class TransactionQueue {
     delete queueEntry.appliedReceiptForRepair
 
     // coalesce the receipt2s into applied receipt. maybe not as descriptive, but save memory.
-    queueEntry.signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
     queueEntry.recievedAppliedReceipt2 = null
     queueEntry.appliedReceiptForRepair2 = null
 
     delete queueEntry.recievedAppliedReceipt2
     delete queueEntry.appliedReceiptForRepair2
+
+    queueEntry.signedReceipt = 
+      queueEntry.signedReceipt ??
+      queueEntry.receivedSignedReceipt ??
+      queueEntry.signedReceiptForRepair ??
+      queueEntry.signedReceiptFinal
+    queueEntry.receivedSignedReceipt = null
+    queueEntry.signedReceiptForRepair = null
+    queueEntry.signedReceiptFinal = queueEntry.signedReceipt
+    
+    delete queueEntry.receivedSignedReceipt
+    delete queueEntry.signedReceiptForRepair
 
     //delete queueEntry.appliedReceiptFinal
 
