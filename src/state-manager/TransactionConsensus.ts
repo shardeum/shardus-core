@@ -1679,16 +1679,16 @@ class TransactionConsenus {
             /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-vote: no queue entry found')
             return
           }
-          if (readableReq.txGroupCycle) {
-            if (queueEntry.txGroupCycle !== readableReq.txGroupCycle) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`binary_poqo_send_vote mismatch txGroupCycle for txid: ${readableReq.txid}, sender's txGroupCycle: ${readableReq.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
-              nestedCountersInstance.countEvent(
-                'poqo',
-                'binary_poqo_send_vote: mismatch txGroupCycle for tx ' + readableReq.txid
-              )
-            }
-            delete readableReq.txGroupCycle
-          }
+          // if (readableReq.txGroupCycle) {
+          //   if (queueEntry.txGroupCycle !== readableReq.txGroupCycle) {
+          //     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`binary_poqo_send_vote mismatch txGroupCycle for txid: ${readableReq.txid}, sender's txGroupCycle: ${readableReq.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
+          //     nestedCountersInstance.countEvent(
+          //       'poqo',
+          //       'binary_poqo_send_vote: mismatch txGroupCycle for tx ' + readableReq.txid
+          //     )
+          //   }
+          //   delete readableReq.txGroupCycle
+          // }
           const collectedVoteHash = readableReq as AppliedVoteHash
 
           // Check if vote hash has a sign
@@ -1741,7 +1741,7 @@ class TransactionConsenus {
   async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {
     queueEntry.poqoNextSendIndex = 0
     const aggregatorList = queueEntry.executionGroup
-    while (!queueEntry.poqoReceipt) {
+    while (!queueEntry.signedReceipt) {
       if (queueEntry.poqoNextSendIndex >= aggregatorList.length) {
         // Maybe use modulous to wrap around
         break
@@ -1754,13 +1754,13 @@ class TransactionConsenus {
       // Send vote to the selected aggregator in the priority list
       // TODO: Add SIGN here to the payload
       // if(this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.poqoSendVoteBinary){
-        Comms.tellBinary<AppliedVoteHash>(
-          voteReceivers, 
-          InternalRouteEnum.binary_poqo_send_vote, 
-          appliedVoteHash, 
-          serializePoqoSendVoteReq,
-          {}
-        )
+      Comms.tellBinary<AppliedVoteHash>(
+        voteReceivers, 
+        InternalRouteEnum.binary_poqo_send_vote, 
+        appliedVoteHash, 
+        serializePoqoSendVoteReq,
+        {}
+      )
       // }else{
       //   Comms.tell(voteReceivers, 'poqo-send-vote', appliedVoteHash)
       // }
@@ -2219,15 +2219,22 @@ class TransactionConsenus {
           const signedReceipt: SignedReceipt = {
             proposal: queueEntry.ourProposal,
             proposalHash: queueEntry.ourVoteHash,
+            applyTimestamp: 0,
             signaturePack: []
           }
+          const voteTimestamps: number[] = []
           for (let i = 0; i < numVotes; i++) {
             // eslint-disable-next-line security/detect-object-injection
             const currentVote = queueEntry.collectedVoteHashes[i]
             if (currentVote.voteHash === winningVoteHash) {
               signedReceipt.signaturePack.push(currentVote.sign)
+              voteTimestamps.push(currentVote.voteTime)
             }
           }
+          // Median timestamp
+          voteTimestamps.sort()
+          const medianTimestamp = voteTimestamps[Math.floor(voteTimestamps.length / 2)]
+          signedReceipt.applyTimestamp = medianTimestamp
           // now send it !!!
 
           // for (let i = 0; i < queueEntry.ourVote.account_id.length; i++) {
@@ -3568,6 +3575,7 @@ class TransactionConsenus {
       appliedVoteHash = {
         txid: proposal.txid,
         voteHash,
+        voteTime: Date.now()
       }
       queueEntry.ourVoteHash = voteHash
 

@@ -5,6 +5,7 @@ import { Sign } from '../shardus/shardus-types'
 export type SpreadAppliedVoteHashReq = {
   txid: string
   voteHash: string
+  voteTime: number
   sign?: Sign
 }
 
@@ -21,6 +22,7 @@ export function serializeSpreadAppliedVoteHashReq(
   stream.writeUInt8(cSpreadAppliedVoteHashReqVersion)
   stream.writeString(obj.txid)
   stream.writeString(obj.voteHash)
+  stream.writeUInt32(obj.voteTime)
   if (obj.sign) {
     stream.writeUInt8(1)
     stream.writeString(obj.sign.owner)
@@ -37,6 +39,7 @@ export function deserializeSpreadAppliedVoteHashReq(stream: VectorBufferStream):
   }
   const txid = stream.readString()
   const voteHash = stream.readString()
+  const voteTime = stream.readUInt32()
   let sign: Sign | undefined
   if (stream.readUInt8() === 1) {
     sign = {
@@ -46,11 +49,13 @@ export function deserializeSpreadAppliedVoteHashReq(stream: VectorBufferStream):
     return {
       txid,
       voteHash,
+      voteTime,
       sign,
     }
   }
   return {
     txid,
     voteHash,
+    voteTime,
   }
 }

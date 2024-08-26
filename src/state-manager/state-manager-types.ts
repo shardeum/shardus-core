@@ -684,6 +684,7 @@ export type Proposal = {
 export type SignedReceipt = {
   proposal: Proposal
   proposalHash: string // Redundant, may go
+  applyTimestamp: number
   signaturePack: Shardus.Sign[]
 }
 
@@ -767,6 +768,7 @@ export type AppliedReceipt2 = {
 export type AppliedVoteHash = {
   txid: string
   voteHash: string
+  voteTime: number
   sign?: Shardus.Sign
 }
 
