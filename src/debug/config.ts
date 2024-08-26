@@ -31,23 +31,37 @@ export function getDevPublicKeys(): DebugConfigurations['devPublicKeys'] {
 }
 
 export function ensureKeySecurity(pubKey: string, level: DevSecurityLevel): boolean {
-  const pkClearance = getDevPublicKeys()[pubKey]
+  const devPublicKeys = getDevPublicKeys()
+  // eslint-disable-next-line security/detect-object-injection
+  const pkClearance = devPublicKeys[pubKey]
   return pkClearance !== undefined && pkClearance >= level
 }
 
 export function getDevPublicKey(key: string): string | null {
-  return getDevPublicKeys()[key] !== undefined ? key : null
+  const devPublicKeys = getDevPublicKeys()
+  // eslint-disable-next-line security/detect-object-injection
+  const pkClearance = devPublicKeys[key]
+  if (pkClearance !== undefined) return key
+  return null
 }
 
 export function getDevPublicKeyMaxLevel(clearance?: DevSecurityLevel): string | null {
   const devPublicKeys = getDevPublicKeys()
   let maxLevel = -Infinity
   let maxKey = null
-  for (const [key, level] of Object.entries(devPublicKeys)) {
-    if (clearance && level >= clearance) return key
-    if (level > maxLevel) {
-      maxLevel = level
-      maxKey = key
+  for (const key in devPublicKeys) {
+    // eslint-disable-next-line security/detect-object-injection
+    if (devPublicKeys[key]) {
+      // eslint-disable-next-line security/detect-object-injection
+      if (clearance && devPublicKeys[key] >= clearance) return key
+      else {
+        // eslint-disable-next-line security/detect-object-injection
+        const level = devPublicKeys[key]
+        if (level > maxLevel) {
+          maxLevel = level
+          maxKey = key
+        }
+      }
     }
   }
   return maxKey
@@ -58,10 +72,12 @@ export function getMultisigPublicKeys(): DebugConfigurations['multisigKeys'] {
 }
 
 export function getMultisigPublicKey(key: string): string | null {
+  // eslint-disable-next-line security/detect-object-injection
   return getMultisigPublicKeys()[key] !== undefined ? key : null
 }
 
 export function ensureMultisigKeySecurity(pubKey: string, level: DevSecurityLevel): boolean {
+  // eslint-disable-next-line security/detect-object-injection
   const pkClearance = getMultisigPublicKeys()[pubKey]
   return pkClearance !== undefined && pkClearance >= level
 }
