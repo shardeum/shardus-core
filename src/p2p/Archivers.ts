@@ -931,17 +931,6 @@ export function registerRoutes() {
   Comms.registerGossipHandler('joinarchiver', async (payload, sender, tracker) => {
     profilerInstance.scopedProfileSectionStart('joinarchiver')
     try {
-      if (
-        !checkGossipPayload(
-          payload,
-          { nodeInfo: 'o', requestType: 's', requestTimestamp: 'n', sign: 'o' },
-          'joinarchiver',
-          sender
-        )
-      ) {
-        return
-      }
-
       if (logFlags.console) console.log('Join request gossip received:', payload)
       const accepted = await addArchiverJoinRequest(payload, tracker, false)
       if (logFlags.console) {
