@@ -1711,6 +1711,16 @@ class TransactionConsenus {
   }
 
   verifyAppliedReceipt(receipt: SignedReceipt, executionGroupNodes: Set<string>): boolean {
+    if (!receipt.sign) {
+      // Missing final sign by aggregator
+      return false;
+    }
+
+    if (!this.crypto.verify(receipt as SignedObject, receipt.sign.owner)) {
+      // Final aggregator sign is invalid
+      return false;
+    }
+
     const ownerToSignMap = new Map<string, Shardus.Sign>();
     for (const sign of receipt.signaturePack) {
       if (executionGroupNodes.has(sign.owner)) {
@@ -2216,7 +2226,7 @@ class TransactionConsenus {
           }
 
           //make the new receipt.
-          const signedReceipt: SignedReceipt = {
+          const receipt: SignedReceipt = {
             proposal: queueEntry.ourProposal,
             proposalHash: queueEntry.ourVoteHash,
             applyTimestamp: 0,
@@ -2227,14 +2237,15 @@ class TransactionConsenus {
             // eslint-disable-next-line security/detect-object-injection
             const currentVote = queueEntry.collectedVoteHashes[i]
             if (currentVote.voteHash === winningVoteHash) {
-              signedReceipt.signaturePack.push(currentVote.sign)
+              receipt.signaturePack.push(currentVote.sign)
               voteTimestamps.push(currentVote.voteTime)
             }
           }
           // Median timestamp
           voteTimestamps.sort()
           const medianTimestamp = voteTimestamps[Math.floor(voteTimestamps.length / 2)]
-          signedReceipt.applyTimestamp = medianTimestamp
+          receipt.applyTimestamp = medianTimestamp
+          const signedReceipt: SignedReceipt = this.crypto.sign(receipt)
           // now send it !!!
 
           // for (let i = 0; i < queueEntry.ourVote.account_id.length; i++) {
@@ -3575,7 +3586,7 @@ class TransactionConsenus {
       appliedVoteHash = {
         txid: proposal.txid,
         voteHash,
-        voteTime: Date.now()
+        voteTime: shardusGetTime(),
       }
       queueEntry.ourVoteHash = voteHash
 
