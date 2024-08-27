@@ -212,13 +212,22 @@ export function init(): void {
   })
 
   network.registerExternalGet('debug-drop-network-txhash', isDebugModeMiddleware, (req, res) => {
-    const txHash = req.query.txHash
+    const txHash = req?.query?.txHash
+    if (txHash == null) {
+      res.send({ status: 'fail', error: 'txHash not provided' })
+      return
+    }
     const index = txList.findIndex((entry) => entry.hash === txHash)
     if (index === -1) {
       res.send({ status: 'fail', error: 'txHash not found' })
       return
     }
     txList.splice(index, 1)
+    res.send({ status: 'ok' })
+  })
+
+  network.registerExternalGet('debug-clear-network-txlist', isDebugModeMiddleware, (req, res) => {
+    txList = []
     res.send({ status: 'ok' })
   })
 
