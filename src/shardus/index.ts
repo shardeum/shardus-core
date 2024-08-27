@@ -50,7 +50,12 @@ import Statistics from '../statistics'
 import Storage from '../storage'
 import { initAjvSchemas } from '../types/ajv/Helpers'
 import * as utils from '../utils'
-import { groupResolvePromises, inRangeOfCurrentTime, isValidShardusAddress, logNode } from '../utils'
+import {
+  fastIsPicked,
+  groupResolvePromises,
+  inRangeOfCurrentTime,
+  isValidShardusAddress,
+} from '../utils'
 import { getSocketReport } from '../utils/debugUtils'
 import MemoryReporting from '../utils/memoryReporting'
 import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
@@ -79,7 +84,7 @@ import {
   serializeSignAppDataResp,
 } from '../types/SignAppDataResp'
 import { Utils } from '@shardus/types'
-import { isNodeInRotationBounds } from '../p2p/Utils'
+import { getOurNodeIndex, isNodeInRotationBounds } from '../p2p/Utils'
 import ShardFunctions from '../state-manager/shardFunctions'
 import SocketIO from 'socket.io'
 import { nodeListFromStates, queueFinishedSyncingRequest } from '../p2p/Join'
@@ -1756,6 +1761,19 @@ class Shardus extends EventEmitter {
     nestedCountersInstance.countEvent('debug', `getNumActiveNodes latestCycle.active: ${latestCycle.active}`)
 
     return latestCycle ? latestCycle.active : 0
+  }
+
+  fastIsPicked(numberToPick: number) {
+    let numActiveNodes = NodeList.activeByIdOrder.length
+
+    if (numActiveNodes < config.p2p.scaleGroupLimit) {
+      return true
+    }
+    let offset = CycleChain.newest.counter //todo something more random
+    const ourIndex = getOurNodeIndex()
+    if (ourIndex == null) return false
+
+    return fastIsPicked(ourIndex, numActiveNodes, numberToPick, offset)
   }
 
   /**
