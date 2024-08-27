@@ -286,6 +286,43 @@ export function updateRecord(
   // add all active nodes to the cycle record in the event of a shutdown
   if (record.mode === 'shutdown') {
     for (const node of Nodelist.activeByIdOrder) {
+      if (record.activated.includes(node.id)) {
+        if (
+          record.txadd.some((entry) => entry.txData.nodeId === node.id && entry.type === 'nodeInitReward')
+        ) {
+          warn(
+            `shutdown condition: active node with id ${node.id} is already in txadd (nodeInitReward); this should not happen`
+          )
+        } else {
+          const txData = {
+            startTime: record.start,
+            publicKey: node.publicKey,
+            nodeId: node.id,
+          }
+
+          const hash = crypto.hash(txData)
+          const addTx: P2P.ServiceQueueTypes.AddNetworkTx = {
+            hash,
+            type: 'nodeInitReward',
+            txData: txData,
+            cycle: currentCycle,
+            subQueueKey: node.publicKey,
+          }
+
+          sortedInsert(txListCopy, {
+            hash: addTx.hash,
+            tx: {
+              hash: addTx.hash,
+              txData: txData,
+              type: addTx.type,
+              cycle: addTx.cycle,
+              ...(addTx.subQueueKey && { subQueueKey: addTx.subQueueKey }),
+            },
+          })
+
+          record.txadd.push(addTx)
+        }
+      }
       if (record.txadd.some((entry) => entry.txData.nodeId === node.id && entry.type === 'nodeReward')) {
         warn(`shutdown condition: active node with id ${node.id} is already in txadd; this should not happen`)
         continue
@@ -313,7 +350,7 @@ export function updateRecord(
         hash,
         type: 'nodeReward',
         txData: txData,
-        cycle: currentCycle,
+        cycle: currentCycle + 1,
         subQueueKey: node.publicKey,
       }
 
@@ -509,7 +546,7 @@ async function _addNetworkTx(addTx: P2P.ServiceQueueTypes.AddNetworkTx): Promise
       )
       return false
     }
-
+    console.log('add network tx', addTx.type, addTx.txData.publicKey, addTx)
     return true
   } catch (e) {
     error(
