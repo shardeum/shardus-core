@@ -891,6 +891,13 @@ class AccountPatcher {
               continue
             }
 
+            // check the length of the radix
+            if (nodeHashes.radix.length !== this.treeSyncDepth) {
+              if (logFlags.error) this.mainLogger.error(`syncTrieHashesBinaryHandler: radix length mismatch: ${nodeHashes.radix}`)
+              nestedCountersInstance.countEvent('accountPatcher', `${route}-radix-length-mismatch`)
+              continue
+            }
+
             // todo: secure that the voter is allowed to vote.
             let hashVote = hashTrieSyncConsensus.radixHashVotes.get(nodeHashes.radix)
             if (hashVote == null) {
@@ -2582,6 +2589,12 @@ class AccountPatcher {
     const minVotes = this.calculateMinVotes()
 
     for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
+      // check the length of the radix
+      if (radix.length !== this.treeSyncDepth) {
+        if (logFlags.error) this.mainLogger.error(`syncTrieHashesBinaryHandler: radix length mismatch: ${radix}`)
+        nestedCountersInstance.countEvent('accountPatcher', `isInsync-radix-length-mismatch`)
+        continue
+      }
       const votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
       const ourTrieNode = this.shardTrie.layerMaps[this.treeSyncDepth].get(radix)
       if (logFlags.debug)
