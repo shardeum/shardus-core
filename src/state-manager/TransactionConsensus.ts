@@ -1769,19 +1769,18 @@ class TransactionConsenus {
 
       // Update applyTimestamp with every sending iteration
       appliedVoteHash.voteTime = shardusGetTime() - queueEntry.acceptedTx.timestamp
+      // Need to sign again with the new voteTime
+      const newHash = this.crypto.sign(appliedVoteHash)
+      this.tryAppendVoteHash(queueEntry, newHash)
+      
       // Send vote to the selected aggregator in the priority list
-      // The object is signed
-      // if(this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.poqoSendVoteBinary){
       Comms.tellBinary<AppliedVoteHash>(
         voteReceivers, 
         InternalRouteEnum.binary_poqo_send_vote, 
-        appliedVoteHash, 
+        newHash, 
         serializePoqoSendVoteReq,
         {}
       )
-      // }else{
-      //   Comms.tell(voteReceivers, 'poqo-send-vote', appliedVoteHash)
-      // }
       await utils.sleep(this.config.stateManager.poqoloopTime)
     }
   }
@@ -4187,8 +4186,16 @@ class TransactionConsenus {
       const currentVote = queueEntry.collectedVoteHashes[i]
 
       if (currentVote.sign.owner === voteHash.sign.owner) {
-        // already in our list so do nothing and return
-        return false
+        if (currentVote.voteTime < voteHash.voteTime) {
+          // Replace old vote with new vote
+          queueEntry.collectedVoteHashes[i] = voteHash
+          queueEntry.newVotes = true
+          queueEntry.lastVoteReceivedTimestamp = shardusGetTime()
+          return true
+        } else {
+          // already in our list so do nothing and return
+          return false
+        }
       }
     }
 
