@@ -8,7 +8,7 @@ export const cSignedReceiptVersion = 1
 export type SignedReceiptSerializable = {
   proposal: ProposalSerializable
   proposalHash: string
-  applyTimestamp: number
+  voteOffsets: number[]
   signaturePack: SignSerializable[]
 }
 
@@ -24,7 +24,11 @@ export function serializeSignedReceipt(
 
   serializeProposal(stream, obj.proposal)
   stream.writeString(obj.proposalHash)
-  stream.writeUInt32(obj.applyTimestamp)
+  stream.writeUInt16(obj.voteOffsets.length)
+  for (let i = 0; i < obj.voteOffsets.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection
+    stream.writeUInt16(obj.voteOffsets[i])
+  }
   stream.writeUInt16(obj.signaturePack.length)
   for (let i = 0; i < obj.signaturePack.length; i++) {
     // eslint-disable-next-line security/detect-object-injection
@@ -39,7 +43,11 @@ export function deserializeSignedReceipt(stream: VectorBufferStream): SignedRece
   }
   const proposal = deserializeProposal(stream)
   const proposalHash = stream.readString()
-  const applyTimestamp = stream.readUInt32()
+  const voteOffsetsLength = stream.readUInt16()
+  const voteOffsets: number[] = []
+  for (let i = 0; i < voteOffsetsLength; i++) {
+    voteOffsets.push(stream.readUInt16())
+  }
   const signaturesLength = stream.readUInt16()
   const signatures: SignSerializable[] = []
   for (let i = 0; i < signaturesLength; i++) {
@@ -48,7 +56,7 @@ export function deserializeSignedReceipt(stream: VectorBufferStream): SignedRece
   return {
     proposal,
     proposalHash,
-    applyTimestamp,
+    voteOffsets,
     signaturePack: signatures,
   }
 }

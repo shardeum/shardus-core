@@ -22,7 +22,7 @@ export function serializeSpreadAppliedVoteHashReq(
   stream.writeUInt8(cSpreadAppliedVoteHashReqVersion)
   stream.writeString(obj.txid)
   stream.writeString(obj.voteHash)
-  stream.writeUInt32(obj.voteTime)
+  stream.writeInt16(obj.voteTime)
   if (obj.sign) {
     stream.writeUInt8(1)
     stream.writeString(obj.sign.owner)
@@ -39,7 +39,7 @@ export function deserializeSpreadAppliedVoteHashReq(stream: VectorBufferStream):
   }
   const txid = stream.readString()
   const voteHash = stream.readString()
-  const voteTime = stream.readUInt32()
+  const voteTime = stream.readUInt16()
   let sign: Sign | undefined
   if (stream.readUInt8() === 1) {
     sign = {

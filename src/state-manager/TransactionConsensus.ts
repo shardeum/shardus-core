@@ -1761,8 +1761,11 @@ class TransactionConsenus {
         queueEntry.poqoNextSendIndex, queueEntry.poqoNextSendIndex + this.config.stateManager.poqobatchCount
       )
       queueEntry.poqoNextSendIndex += this.config.stateManager.poqobatchCount
+
+      // Update applyTimestamp with every sending iteration
+      appliedVoteHash.voteTime = shardusGetTime() - queueEntry.acceptedTx.timestamp
       // Send vote to the selected aggregator in the priority list
-      // TODO: Add SIGN here to the payload
+      // The object is signed
       // if(this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.poqoSendVoteBinary){
       Comms.tellBinary<AppliedVoteHash>(
         voteReceivers, 
@@ -2229,22 +2232,18 @@ class TransactionConsenus {
           const receipt: SignedReceipt = {
             proposal: queueEntry.ourProposal,
             proposalHash: queueEntry.ourVoteHash,
-            applyTimestamp: 0,
+            voteOffsets: [],
             signaturePack: []
           }
-          const voteTimestamps: number[] = []
+
           for (let i = 0; i < numVotes; i++) {
             // eslint-disable-next-line security/detect-object-injection
             const currentVote = queueEntry.collectedVoteHashes[i]
             if (currentVote.voteHash === winningVoteHash) {
               receipt.signaturePack.push(currentVote.sign)
-              voteTimestamps.push(currentVote.voteTime)
+              receipt.voteOffsets.push(currentVote.voteTime)
             }
           }
-          // Median timestamp
-          voteTimestamps.sort()
-          const medianTimestamp = voteTimestamps[Math.floor(voteTimestamps.length / 2)]
-          receipt.applyTimestamp = medianTimestamp
           const signedReceipt: SignedReceipt = this.crypto.sign(receipt)
           // now send it !!!
 
@@ -3586,7 +3585,7 @@ class TransactionConsenus {
       appliedVoteHash = {
         txid: proposal.txid,
         voteHash,
-        voteTime: shardusGetTime(),
+        voteTime: shardusGetTime() - queueEntry.acceptedTx.timestamp,
       }
       queueEntry.ourVoteHash = voteHash
 
@@ -3603,8 +3602,8 @@ class TransactionConsenus {
 
       //append our vote
       appliedVoteHash = this.crypto.sign(appliedVoteHash)
-      if (this.stateManager.transactionQueue.useNewPOQ === false)
-        this.tryAppendVoteHash(queueEntry, appliedVoteHash)
+      // if (this.stateManager.transactionQueue.useNewPOQ === false)
+      this.tryAppendVoteHash(queueEntry, appliedVoteHash)
 
       // save our vote to our queueEntry
       this.crypto.sign(ourVote)
@@ -3615,18 +3614,18 @@ class TransactionConsenus {
         queueEntry.firstVoteReceivedTimestamp = shardusGetTime()
       }
 
-      if (this.stateManager.transactionQueue.usePOQo) {
-        // Kick off POQo vote sending loop asynchronously in the background and return
-        // Can skip over the remaining part of the function because this loop will
-        // handle sending the vote to the intended receivers
-        if (logFlags.verbose) this.mainLogger.debug(`POQO: Sending vote for ${queueEntry.logID}`)
-        if (Math.random() < this.debugFailPOQo) {
-          nestedCountersInstance.countEvent('poqo', 'debug fail no vote')
-          return
-        }
-        this.poqoVoteSendLoop(queueEntry, appliedVoteHash)
+      // if (this.stateManager.transactionQueue.usePOQo) {
+      // Kick off POQo vote sending loop asynchronously in the background and return
+      // Can skip over the remaining part of the function because this loop will
+      // handle sending the vote to the intended receivers
+      if (logFlags.verbose) this.mainLogger.debug(`POQO: Sending vote for ${queueEntry.logID}`)
+      if (Math.random() < this.debugFailPOQo) {
+        nestedCountersInstance.countEvent('poqo', 'debug fail no vote')
         return
       }
+      this.poqoVoteSendLoop(queueEntry, appliedVoteHash)
+      return
+      // }
 
       // if (this.stateManager.transactionQueue.useNewPOQ) {
       //   if (isEligibleToShareVote === false) {
@@ -3674,65 +3673,65 @@ class TransactionConsenus {
       //   }
       // }
 
-      let gossipGroup = []
-      if (
-        this.stateManager.transactionQueue.executeInOneShard === true &&
-        this.stateManager.transactionQueue.useNewPOQ === false
-      ) {
-        //only share with the exection group
-        gossipGroup = queueEntry.executionGroup
-      } else {
-        //sharing with the entire transaction group actually..
-        gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-      }
+      // let gossipGroup = []
+      // if (
+      //   this.stateManager.transactionQueue.executeInOneShard === true &&
+      //   this.stateManager.transactionQueue.useNewPOQ === false
+      // ) {
+      //   //only share with the exection group
+      //   gossipGroup = queueEntry.executionGroup
+      // } else {
+      //   //sharing with the entire transaction group actually..
+      //   gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+      // }
 
-      if (gossipGroup.length >= 1) {
-        this.stateManager.debugNodeGroup(
-          queueEntry.acceptedTx.txId,
-          queueEntry.acceptedTx.timestamp,
-          `share tx vote to neighbors`,
-          gossipGroup
-        )
+      // if (gossipGroup.length >= 1) {
+      //   this.stateManager.debugNodeGroup(
+      //     queueEntry.acceptedTx.txId,
+      //     queueEntry.acceptedTx.timestamp,
+      //     `share tx vote to neighbors`,
+      //     gossipGroup
+      //   )
 
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${gossipGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)}`)
-        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${gossipGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)} `)
+      //   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${gossipGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)}`)
+      //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${gossipGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)} `)
 
-        // Filter nodes before we send tell()
-        const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
-          gossipGroup,
-          'createAndShareVote',
-          true,
-          true
-        )
-        if (filteredNodes.length === 0) {
-          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try')
-          return null
-        }
-        const filteredConsensusGroup = filteredNodes
+      //   // Filter nodes before we send tell()
+      //   const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
+      //     gossipGroup,
+      //     'createAndShareVote',
+      //     true,
+      //     true
+      //   )
+      //   if (filteredNodes.length === 0) {
+      //     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try')
+      //     return null
+      //   }
+      //   const filteredConsensusGroup = filteredNodes
 
-        if (this.stateManager.transactionQueue.useNewPOQ) {
-          // Gossip the vote to the entire consensus group
-          // Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4, queueEntry.acceptedTx.txId, `${NodeList.activeIdToPartition.get(ourVote.node_id)}`)
-        } else {
-          this.profiler.profileSectionStart('createAndShareVote-tell')
-          // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.spreadAppliedVoteHashBinary) {
-            const request = appliedVoteHash as AppliedVoteHash
-            this.p2p.tellBinary<SpreadAppliedVoteHashReq>(
-              filteredConsensusGroup,
-              InternalRouteEnum.binary_spread_appliedVoteHash,
-              request,
-              serializeSpreadAppliedVoteHashReq,
-              {}
-            )
-          // } else {
-            // this.p2p.tell(filteredConsensusGroup, 'spread_appliedVoteHash', appliedVoteHash)
-          // }
+      //   if (this.stateManager.transactionQueue.useNewPOQ) {
+      //     // Gossip the vote to the entire consensus group
+      //     // Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4, queueEntry.acceptedTx.txId, `${NodeList.activeIdToPartition.get(ourVote.node_id)}`)
+      //   } else {
+      //     this.profiler.profileSectionStart('createAndShareVote-tell')
+      //     // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.spreadAppliedVoteHashBinary) {
+      //       const request = appliedVoteHash as AppliedVoteHash
+      //       this.p2p.tellBinary<SpreadAppliedVoteHashReq>(
+      //         filteredConsensusGroup,
+      //         InternalRouteEnum.binary_spread_appliedVoteHash,
+      //         request,
+      //         serializeSpreadAppliedVoteHashReq,
+      //         {}
+      //       )
+      //     // } else {
+      //       // this.p2p.tell(filteredConsensusGroup, 'spread_appliedVoteHash', appliedVoteHash)
+      //     // }
 
-          this.profiler.profileSectionEnd('createAndShareVote-tell')
-        }
-      } else {
-        nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote fail, no consensus group')
-      }
+      //     this.profiler.profileSectionEnd('createAndShareVote-tell')
+      //   }
+      // } else {
+      //   nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote fail, no consensus group')
+      // }
     } catch (e) {
       this.mainLogger.error(`createAndShareVote: error ${e.message}`)
     } finally {
