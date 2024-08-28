@@ -1716,35 +1716,40 @@ class TransactionConsenus {
       return false;
     }
 
+    if(!executionGroupNodes.has(receipt.sign.owner)) {
+      // aggregator not in execution group
+      return false
+    }
+
     if (!this.crypto.verify(receipt as SignedObject, receipt.sign.owner)) {
       // Final aggregator sign is invalid
       return false;
     }
 
-    const ownerToSignMap = new Map<string, Shardus.Sign>();
-    for (const sign of receipt.signaturePack) {
-      if (executionGroupNodes.has(sign.owner)) {
-        ownerToSignMap.set(sign.owner, sign);
-      }
-    }
-    const totalNodes = executionGroupNodes.size;
-    const requiredMajority = Math.ceil(totalNodes * this.config.p2p.requiredVotesPercentage)
-    if (ownerToSignMap.size < requiredMajority) {
-      return false;
+    if (receipt.signaturePack.length !== receipt.voteOffsets.length) {
+      // Invalid receipt
+      return false
     }
 
-    const appliedVoteHash = {
+    let validSignatures = 0;
+    const appliedVoteHash: AppliedVoteHash = {
       txid: receipt.proposal.txid,
       voteHash: receipt.proposalHash,
+      voteTime: 0
     }
 
-    let validSignatures = 0;    
-    for (const owner of ownerToSignMap.keys()) {
-      const signedObject = { ...appliedVoteHash, sign: ownerToSignMap.get(owner) };
-      if (this.crypto.verify(signedObject, owner)) {
+    for (let i = 0; i < receipt.signaturePack.length; i++) {
+      const sign = receipt.signaturePack[i]
+      if (!executionGroupNodes.has(sign.owner)) continue
+      appliedVoteHash.voteTime = receipt.voteOffsets[i]
+      const signedObject = { ...appliedVoteHash, sign };
+      if (this.crypto.verify(signedObject, sign.owner)) {
         validSignatures++;
       }
     }
+
+    const totalNodes = executionGroupNodes.size;
+    const requiredMajority = Math.ceil(totalNodes * this.config.p2p.requiredVotesPercentage)
     return validSignatures >= requiredMajority;
   }
 
