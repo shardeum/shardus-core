@@ -3250,8 +3250,8 @@ class Shardus extends EventEmitter {
     }
   }
 
-  setGlobal(address, value, when, source) {
-    GlobalAccounts.setGlobal(address, value, when, source)
+  setGlobal(address, addressHash, value, when, source) {
+    GlobalAccounts.setGlobal(address, addressHash, value, when, source)
   }
 
   getDebugModeMiddleware() {

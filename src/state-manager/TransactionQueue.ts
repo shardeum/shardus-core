@@ -7528,7 +7528,26 @@ class TransactionQueue {
 
     const accountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
     const beforeAccountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
-    if (this.config.stateManager.includeBeforeStatesInReceipts) {
+
+    if (globalModification) {
+      if (signedReceipt.tx && signedReceipt.tx.addressHash != '' && !beforeAccountsToAdd[signedReceipt.tx.address]) {
+        console.log(queueEntry.collectedData[signedReceipt.tx.address].stateId, signedReceipt.tx.addressHash)
+        if (queueEntry.collectedData[signedReceipt.tx.address].stateId === signedReceipt.tx.addressHash) {
+          const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(signedReceipt.tx.addressHash)
+          const account = queueEntry.collectedData[signedReceipt.tx.address]
+          const accountCopy = {
+            accountId: account.accountId,
+            data: account.data,
+            hash: account.stateId,
+            timestamp: account.timestamp,
+            isGlobal,
+          } as Shardus.AccountsCopy
+          beforeAccountsToAdd[account.accountId] = accountCopy
+        } else {
+          console.log(`getArchiverReceiptFromQueueEntry: before stateId does not match addressHash for txId: ${txId} timestamp: ${timestamp} globalModification: ${globalModification}`)
+        }
+      }
+    } else if (this.config.stateManager.includeBeforeStatesInReceipts) {
       // simulate debug case
       if (configContext.mode === 'debug' && configContext.debug.beforeStateFailChance > Math.random()) {
         for (const accountId in queueEntry.collectedData) {
