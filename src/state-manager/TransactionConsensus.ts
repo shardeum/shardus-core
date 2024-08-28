@@ -1768,10 +1768,13 @@ class TransactionConsenus {
       queueEntry.poqoNextSendIndex += this.config.stateManager.poqobatchCount
 
       // Update applyTimestamp with every sending iteration
-      appliedVoteHash.voteTime = shardusGetTime() - queueEntry.acceptedTx.timestamp
+      const updatedVoteHash: AppliedVoteHash = {
+        txid: appliedVoteHash.txid,
+        voteHash: appliedVoteHash.voteHash,
+        voteTime: shardusGetTime() - queueEntry.acceptedTx.timestamp
+      }
       // Need to sign again with the new voteTime
-      const newHash = this.crypto.sign(appliedVoteHash)
-      this.tryAppendVoteHash(queueEntry, newHash)
+      const newHash = this.crypto.sign(updatedVoteHash)
       
       // Send vote to the selected aggregator in the priority list
       Comms.tellBinary<AppliedVoteHash>(
