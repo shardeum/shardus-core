@@ -100,6 +100,7 @@ import { BadRequest, ResponseError, serializeResponseError } from '../types/Resp
 import { error } from 'console'
 import { PoqoDataAndReceiptReq, serializePoqoDataAndReceiptReq } from '../types/PoqoDataAndReceiptReq'
 import { AJVSchemaEnum } from '../types/enum/AJVSchemaEnum'
+import { getGlobalTxReceipt } from '../p2p/GlobalAccounts'
 
 interface Receipt {
   tx: AcceptedTx
@@ -7506,15 +7507,27 @@ class TransactionQueue {
     if (!queueEntry.preApplyTXResult || !queueEntry.preApplyTXResult.applyResponse)
       return null as ArchiverReceipt
 
-    const accountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
-    const beforeAccountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
-    const receipt2 = this.stateManager.getSignedReceipt(queueEntry)
+    const txId = queueEntry.acceptedTx.txId
+    const timestamp = queueEntry.acceptedTx.timestamp
+    const globalModification = queueEntry.globalModification
 
-    if (receipt2 == null) {
-      nestedCountersInstance.countEvent("stateManager", "getArchiverReceiptFromQueueEntry no receipt2")
+    let signedReceipt = null as SignedReceipt | P2PTypes.GlobalAccountsTypes.GlobalTxReceipt
+    let executionShardKey: string 
+    if (globalModification) {
+      signedReceipt = getGlobalTxReceipt(queueEntry.acceptedTx.txId) as P2PTypes.GlobalAccountsTypes.GlobalTxReceipt
+      executionShardKey = signedReceipt.tx.source
+    } else {
+      signedReceipt = this.stateManager.getSignedReceipt(queueEntry) as SignedReceipt
+      executionShardKey = queueEntry.executionShardKey
+    }
+    if (!signedReceipt) {
+      nestedCountersInstance.countEvent("stateManager", "getArchiverReceiptFromQueueEntry no signedReceipt")
+      console.log(`getArchiverReceiptFromQueueEntry: signedReceipt is null for txId: ${txId} timestamp: ${timestamp} globalModification: ${globalModification}`)
       return null as ArchiverReceipt
     }
 
+    const accountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
+    const beforeAccountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
     if (this.config.stateManager.includeBeforeStatesInReceipts) {
       // simulate debug case
       if (configContext.mode === 'debug' && configContext.debug.beforeStateFailChance > Math.random()) {
@@ -7539,13 +7552,13 @@ class TransactionQueue {
       // prepare before state accounts
       for (const accountId of fileredBeforeStateToSend) {
         // check if our beforeState account hash is the same as the vote in the receipt2
-        const index = receipt2.proposal.accountIDs.indexOf(accountId)
+        const index = signedReceipt.proposal.accountIDs.indexOf(accountId)
         const account = queueEntry.collectedData[accountId]
         if (account == null) {
           badBeforeStateAccounts.push(accountId)
           continue
         }
-        if (account.stateId !== receipt2.proposal.beforeStateHashes[index]) {
+        if (account.stateId !== signedReceipt.proposal.beforeStateHashes[index]) {
           badBeforeStateAccounts.push(accountId)
         }
       }
@@ -7578,10 +7591,10 @@ class TransactionQueue {
     let isAccountsMatchWithReceipt2 = true
     const accountWrites = queueEntry.preApplyTXResult?.applyResponse?.accountWrites
 
-    if (accountWrites != null && accountWrites.length === receipt2.proposal.accountIDs.length) {
+    if (accountWrites != null && accountWrites.length === signedReceipt.proposal.accountIDs.length) {
       for (const account of accountWrites) {
-        const indexInVote = receipt2.proposal.accountIDs.indexOf(account.accountId)
-        if (receipt2.proposal.afterStateHashes[indexInVote] !== account.data.stateId) {
+        const indexInVote = signedReceipt.proposal.accountIDs.indexOf(account.accountId)
+        if (signedReceipt.proposal.afterStateHashes[indexInVote] !== account.data.stateId) {
           // console.log('account mismatch', account.accountId, receipt2.appliedVote.account_state_hash_after[indexInVote], account.data.stateId)
           isAccountsMatchWithReceipt2 = false
           break
@@ -7600,12 +7613,12 @@ class TransactionQueue {
       let success = false
       let count = 0
       const maxRetry = 3
-      const nodesToAskKeys = receipt2.signaturePack?.map((signature) => signature.owner)
+      const nodesToAskKeys = signedReceipt.signaturePack?.map((signature) => signature.owner)
 
       // retry 3 times if the request fails
       while (success === false && count < maxRetry) {
         count++
-        const requestedData = await this.requestFinalData(queueEntry, receipt2.proposal.accountIDs, nodesToAskKeys, true)
+        const requestedData = await this.requestFinalData(queueEntry, signedReceipt.proposal.accountIDs, nodesToAskKeys, true)
         if (requestedData && requestedData.wrappedResponses && requestedData.appReceiptData) {
           success = true
           for (const accountId in requestedData.wrappedResponses) {
@@ -7628,12 +7641,10 @@ class TransactionQueue {
       } as Shardus.AccountsCopy
       accountsToAdd[account.accountId] = accountCopy
     }
-
-    const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
-    // const receipt = signedReceipt ? Utils.safeJsonParse(Utils.safeStringify(signedReceipt)) : ({} as SignedReceipt)
     
     // MIGHT NOT NEED THIS NOW WITH THE POQo RECEIPT REWRITE. NEED TO CONFIRM
-    // if (this.useNewPOQ === false) {
+    // if (!globalModification && this.useNewPOQ === false) {
+    //   appliedReceipt = appliedReceipt as AppliedReceipt2
     //   if (appliedReceipt.appliedVote) {
     //     delete appliedReceipt.appliedVote.node_id
     //     delete appliedReceipt.appliedVote.sign
@@ -7650,12 +7661,12 @@ class TransactionQueue {
         timestamp: queueEntry.acceptedTx.timestamp,
       },
       signedReceipt: signedReceipt ?? {} as SignedReceipt,
-      appReceiptData: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
+      appReceiptData,
       beforeStates: [...Object.values(beforeAccountsToAdd)],
       afterStates: [...Object.values(accountsToAdd)],
       cycle: queueEntry.txGroupCycle,
-      executionShardKey: queueEntry.executionShardKey || '',
-      globalModification: queueEntry.globalModification
+      executionShardKey,
+      globalModification,
     }
     return archiverReceipt
   }

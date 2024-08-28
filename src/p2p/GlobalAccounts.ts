@@ -180,21 +180,32 @@ export function setGlobal(address, value, when, source) {
   /** [TODO] [AS] Replace with Comms.tell */
   // p2p.tell(consensusGroup, 'make-receipt', signedTx)
   // if (Context.config.p2p.useBinarySerializedEndpoints && Context.config.p2p.makeReceiptBinary) {
-    const request = signedTx as MakeReceiptReq
-    Comms.tellBinary<MakeReceiptReq>(
-      consensusGroup,
-      InternalRouteEnum.binary_make_receipt,
-      request,
-      serializeMakeReceiptReq,
-      {}
-    )
+  const request = signedTx as MakeReceiptReq
+  Comms.tellBinary<MakeReceiptReq>(
+    consensusGroup,
+    InternalRouteEnum.binary_make_receipt,
+    request,
+    serializeMakeReceiptReq,
+    {}
+  )
   // } else {
-    // Comms.tell(consensusGroup, 'make-receipt', signedTx)
+  // Comms.tell(consensusGroup, 'make-receipt', signedTx)
   // }
 }
 
 export function createMakeReceiptHandle(txHash: string) {
   return `receipt-${txHash}`
+}
+
+export function getGlobalTxReceipt(
+  txHash: P2P.GlobalAccountsTypes.TxHash
+): P2P.GlobalAccountsTypes.GlobalTxReceipt | null {
+  const receipt = receipts.get(txHash)
+  if (!receipt) return null
+  return {
+    signs: receipt.signs,
+    tx: receipt.tx,
+  }
 }
 
 export function makeReceipt(
