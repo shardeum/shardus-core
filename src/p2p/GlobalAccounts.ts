@@ -103,7 +103,7 @@ export function init() {
   Comms.registerGossipHandler(setGlobalGossipRoute.name, setGlobalGossipRoute.handler)
 }
 
-export function setGlobal(address, value, when, source) {
+export function setGlobal(address, addressHash, value, when, source) {
   if (logFlags.console) console.log(`SETGLOBAL: WE ARE: ${Self.id.substring(0, 5)}`)
 
   // Only do this if you're active
@@ -113,8 +113,8 @@ export function setGlobal(address, value, when, source) {
   }
 
   // Create a tx for setting a global account
-  const tx: P2P.GlobalAccountsTypes.SetGlobalTx = { address, value, when, source }
-  const txHash = Context.crypto.hash(tx)
+  const tx: P2P.GlobalAccountsTypes.SetGlobalTx = { address, addressHash, value, when, source }
+  const txHash = Context.shardus.app.calculateTxId(tx.value as OpaqueTransaction)
 
   // Sign tx
   const signedTx: P2P.GlobalAccountsTypes.SignedSetGlobalTx = Context.crypto.sign(tx)
@@ -222,7 +222,8 @@ export function makeReceipt(
   const tx = { ...signedTx }
   delete tx.sign
 
-  const txHash = Context.crypto.hash(tx)
+  const txHash = Context.shardus.app.calculateTxId(tx.value as OpaqueTransaction)
+  console.log('makeReceipt', txHash)
 
   // Put into correct Receipt and Tracker
   let receipt: P2P.GlobalAccountsTypes.Receipt = receipts.get(txHash)
