@@ -490,8 +490,11 @@ class Shardus extends EventEmitter {
             }
           })
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
-            console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
-            Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] === socket.id) {
+              console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
+              Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
+              Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+            }
           })
         } else {
           console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
@@ -519,9 +522,12 @@ class Shardus extends EventEmitter {
             Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
           })
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
-            console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
-            Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
-            Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+
+            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] === socket.id) {
+              console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
+              Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
+              Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+            }
           })
         }
       })
