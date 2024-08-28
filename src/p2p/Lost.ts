@@ -271,7 +271,7 @@ export function init() {
             {}
           )
         } else {
-          error(`proxy handler route is not get_trie_hashes`)
+          error(`proxy handler route is not get_trie_hashes: ${payload.route}`)
           await respond(proxyRes)
           return
         }
