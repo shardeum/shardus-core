@@ -10,6 +10,7 @@ export type SignedReceiptSerializable = {
   proposalHash: string
   voteOffsets: number[]
   signaturePack: SignSerializable[]
+  sign?: SignSerializable
 }
 
 export function serializeSignedReceipt(
@@ -34,6 +35,12 @@ export function serializeSignedReceipt(
     // eslint-disable-next-line security/detect-object-injection
     serializeSign(stream, obj.signaturePack[i])
   }
+  if (obj.sign) {
+    stream.writeUInt8(1)
+    serializeSign(stream, obj.sign)
+  } else {
+    stream.writeUInt8(0)
+  }
 }
 
 export function deserializeSignedReceipt(stream: VectorBufferStream): SignedReceiptSerializable {
@@ -53,10 +60,21 @@ export function deserializeSignedReceipt(stream: VectorBufferStream): SignedRece
   for (let i = 0; i < signaturesLength; i++) {
     signatures.push(deserializeSign(stream))
   }
-  return {
-    proposal,
-    proposalHash,
-    voteOffsets,
-    signaturePack: signatures,
+  const hasSign = stream.readUInt8()
+  if (hasSign) {
+    return {
+      proposal,
+      proposalHash,
+      voteOffsets,
+      signaturePack: signatures,
+      sign: deserializeSign(stream),
+    }
+  } else {
+    return {
+      proposal,
+      proposalHash,
+      voteOffsets,
+      signaturePack: signatures,
+    }
   }
 }
