@@ -1771,7 +1771,7 @@ class TransactionConsenus {
       const updatedVoteHash: AppliedVoteHash = {
         txid: appliedVoteHash.txid,
         voteHash: appliedVoteHash.voteHash,
-        voteTime: shardusGetTime() - queueEntry.acceptedTx.timestamp
+        voteTime: Math.ceil((shardusGetTime() - queueEntry.acceptedTx.timestamp) / 1000)
       }
       // Need to sign again with the new voteTime
       const newHash = this.crypto.sign(updatedVoteHash)
@@ -3592,7 +3592,7 @@ class TransactionConsenus {
       appliedVoteHash = {
         txid: proposal.txid,
         voteHash,
-        voteTime: shardusGetTime() - queueEntry.acceptedTx.timestamp,
+        voteTime: Math.ceil((shardusGetTime() - queueEntry.acceptedTx.timestamp) / 1000),
       }
       queueEntry.ourVoteHash = voteHash
 
