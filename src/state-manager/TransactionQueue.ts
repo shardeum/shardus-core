@@ -7,7 +7,7 @@ import * as Apoptosis from '../p2p/Apoptosis'
 import * as Archivers from '../p2p/Archivers'
 import { P2PModuleContext as P2P, network as networkContext, config as configContext } from '../p2p/Context'
 import * as CycleChain from '../p2p/CycleChain'
-import { nodes, byPubKey, potentiallyRemoved } from '../p2p/NodeList'
+import { nodes, byPubKey, potentiallyRemoved, activeByIdOrder } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import * as utils from '../utils'
@@ -2155,6 +2155,7 @@ class TransactionQueue {
           txQueueEntry.txGroupCycle = cycleNumber
           cycleShardData = this.stateManager.shardValuesByCycle.get(cycleNumber)
         }
+        txQueueEntry.txDebug.cycleSinceActivated = cycleNumber - activeByIdOrder.find(node => node.id === Self.id).activeCycle
 
         if (cycleShardData == null) {
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction logID:${txQueueEntry.logID} cycleShardData == null cycle:${cycleNumber} not putting tx in queue.`)
