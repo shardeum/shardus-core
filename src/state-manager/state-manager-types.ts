@@ -14,6 +14,7 @@ export type TxDebug = {
   endTime: { [key: string]: HRTime }
   startTimestamp: { [key: string]: number }
   endTimestamp: { [key: string]: number }
+  cycleSinceActivated?: number
   correspondingDebugInfo?: {
     ourIndex: number
     ourUnwrappedIndex: number
