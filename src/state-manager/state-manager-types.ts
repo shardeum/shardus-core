@@ -1,4 +1,4 @@
-import { StateManager } from '@shardus/types'
+import { StateManager, P2P } from '@shardus/types'
 import * as Shardus from '../shardus/shardus-types'
 export { AcceptedTx, App, ApplyResponse, Cycle, Sign } from '../shardus/shardus-types'
 
@@ -702,7 +702,7 @@ export type ArchiverReceipt = {
     txId: string
     timestamp: number
   }
-  signedReceipt: SignedReceipt
+  signedReceipt: SignedReceipt | P2P.GlobalAccountsTypes.GlobalTxReceipt
   appReceiptData: any
   beforeStates?: Shardus.AccountsCopy[]
   afterStates?: Shardus.AccountsCopy[]
