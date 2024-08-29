@@ -1797,11 +1797,12 @@ class Shardus extends EventEmitter {
     signs: ShardusTypes.Sign[],
     minRequired: number
   ): { success: boolean; reason: string } {
-    let validNodeCount = 0
     // let validNodes = []
     let appData = { ...signedAppData }
     if (appData.signs) delete appData.signs
     if (appData.sign) delete appData.sign
+
+    const validSigns = new Set<string>()
     for (let i = 0; i < signs.length; i++) {
       const sign = signs[i]
       const nodePublicKey = sign.owner
@@ -1809,10 +1810,10 @@ class Shardus extends EventEmitter {
       const node = this.p2p.state.getNodeByPubKey(nodePublicKey)
       const isValid = this.crypto.verify(appData, nodePublicKey)
       if (node && isValid) {
-        validNodeCount++
+        validSigns.add(sign.sig)
       }
       // early break loop
-      if (validNodeCount >= minRequired) {
+      if (validSigns.size >= minRequired) {
         // if (validNodes.length >= minRequired) {
         return {
           success: true,
@@ -1833,7 +1834,6 @@ class Shardus extends EventEmitter {
     nodesToSign: number,
     allowedBackupNodes: number
   ): { success: boolean; reason: string } {
-    let validNodeCount = 0
     // let validNodes = []
     let appData = { ...signedAppData }
     if (appData.signs) delete appData.signs
@@ -1847,6 +1847,7 @@ class Shardus extends EventEmitter {
         closestNodesByPubKey.set(node.publicKey, node)
       }
     }
+    const validSigns = new Set<string>()
     for (let i = 0; i < signs.length; i++) {
       const sign = signs[i]
       const nodePublicKey = sign.owner
@@ -1858,10 +1859,10 @@ class Shardus extends EventEmitter {
       const node = closestNodesByPubKey.get(nodePublicKey)
       const isValid = this.crypto.verify(appData, nodePublicKey)
       if (node && isValid) {
-        validNodeCount++
+        validSigns.add(sign.sig)
       }
       // early break loop
-      if (validNodeCount >= minRequired) {
+      if (validSigns.size >= minRequired) {
         // if (validNodes.length >= minRequired) {
         return {
           success: true,
