@@ -5122,18 +5122,16 @@ class TransactionQueue {
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.debug('tellcorrernodingnodesfinaldata', queueEntry.logID, ` : filterValidNodesForInternalMessage ${filterNodesIpPort} for accounts: ${utils.stringifyReduce(message.stateList)}`)
             // convert legacy message to binary supported type
             const request = message as BroadcastFinalStateReq
-            if (logFlags.seqdiagram) {
-              for (const node of filterdCorrespondingAccNodes) {
-                /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_finalstate'}`)
-              }
-            }
-
 
           if (this.usePOQo) {
-            // && this.config.p2p.useBinarySerializedEndpoints && Context.config.p2p.poqoDataAndReceiptBinary) {
-            this.p2p.tellBinary<PoqoDataAndReceiptReq>(
+            if (logFlags.seqdiagram) {
+              for (const node of filterdCorrespondingAccNodes) {
+                /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'poqo_data_and_receipt'}`)
+              }
+            }
+            this.p2p.tellBinary<PoqoDataAndReceiptReq>(  
               filterdCorrespondingAccNodes,
-              InternalRouteEnum.binary_poqo_data_and_receipt,
+              InternalRouteEnum.binary_poqo_data_and_receipt, 
               {
                 finalState: message,
                 receipt: queueEntry.appliedReceipt2,
@@ -5142,16 +5140,13 @@ class TransactionQueue {
               serializePoqoDataAndReceiptReq,
               {}
             )
-          // } else if (this.usePOQo) {
-          //   this.p2p.tell(
-          //     filterdCorrespondingAccNodes,
-          //     'poqo-data-and-receipt',
-          //     {
-          //       finalState: message,
-          //       receipt: queueEntry.appliedReceipt2
-          //     }
-          //   )
-          } else //if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastFinalStateBinary) {
+          } else 
+            if (logFlags.seqdiagram) {
+              for (const node of filterdCorrespondingAccNodes) {
+                /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_finalstate'}`)
+              }
+            }
+
             this.p2p.tellBinary<BroadcastFinalStateReq>(
               filterdCorrespondingAccNodes,
               InternalRouteEnum.binary_broadcast_finalstate,
