@@ -921,6 +921,11 @@ export interface NonceQueueItem {
   noConsensus: boolean
 }
 
+export interface RequestFinalDataResp {
+  appReceiptData: any
+  wrappedResponses: WrappedResponses
+}
+
 export type GlobalAccountReportResp = {
   ready: boolean
   combinedHash: string
