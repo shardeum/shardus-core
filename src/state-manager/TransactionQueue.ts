@@ -5610,7 +5610,7 @@ class TransactionQueue {
 
         // eslint-disable-next-line security/detect-object-injection
         const queueEntry: QueueEntry | undefined = this._transactionQueue[currentIndex]
-        if (!queueEntry) {
+        if (queueEntry == null) {
           this.statemanager_fatal(`queueEntry is null`, `currentIndex:${currentIndex}`)
           nestedCountersInstance.countEvent('processing', 'error: null queue entry. skipping to next TX')
           continue
