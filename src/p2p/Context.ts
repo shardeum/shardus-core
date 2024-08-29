@@ -8,6 +8,7 @@ import * as ShardusTypes from '../shardus/shardus-types'
 import StateManager from '../state-manager'
 import Storage from '../storage'
 import Reporter from '../reporter'
+import { Server as SocketIOServer } from 'socket.io';
 
 export type P2PModuleContext = typeof P2P
 
@@ -18,7 +19,7 @@ export let network: NetworkClass
 export let shardus: Shardus
 export let stateManager: StateManager
 export let storage: Storage
-export let io: SocketIO.Server
+export let io: SocketIOServer
 export let config: ShardusTypes.StrictServerConfiguration | undefined
 export let defaultConfigs: ShardusTypes.StrictShardusConfiguration
 export let reporter: Reporter

@@ -20,6 +20,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
 import { Utils } from '@shardus/types'
+import { Server as SocketIOServer } from 'socket.io';
 
 /** TYPES */
 export interface IPInfo {
@@ -46,7 +47,7 @@ let lastNTPTimeObj = {}
 
 export class NetworkClass extends EventEmitter {
   app: Application
-  io: SocketIO.Server
+  io: SocketIOServer
   sn: any
   logger: Logger
   mainLogger: Log4js.Logger
@@ -885,7 +886,7 @@ export async function checkAndUpdateTimeSyncedOffset(timeServers) {
 
 export function shardusGetTime(): number {
   let time = Date.now()
-  
+
   if (config.p2p.useNTPOffsets === true) {
     time += ntpOffsetMs
   }
@@ -916,7 +917,7 @@ export function calculateFakeTimeOffset(shift: number, spread: number): number {
   spread = Math.min(Math.max(spread, minSpread), maxSpread);
 
   const begin = shift - (spread / 2)
-  const end = shift + (spread / 2) 
+  const end = shift + (spread / 2)
   fakeTimeOffsetMs = Math.round(begin + (end - begin) * Math.random())
   return fakeTimeOffsetMs
 }
