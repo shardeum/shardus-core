@@ -7517,7 +7517,7 @@ class TransactionQueue {
         txId: queueEntry.acceptedTx.txId,
         timestamp: queueEntry.acceptedTx.timestamp,
       },
-      signedReceipt: signedReceipt,
+      signedReceipt: signedReceipt ?? {} as SignedReceipt,
       appReceiptData: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
       beforeStates: [...Object.values(beforeAccountsToAdd)],
       afterStates: [...Object.values(accountsToAdd)],
