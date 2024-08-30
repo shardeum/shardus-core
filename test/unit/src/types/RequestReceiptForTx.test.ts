@@ -47,30 +47,29 @@ describe('RequestReceiptForTx Serialization', () => {
     expect(req_stream.readUInt16()).toEqual(TypeIdentifierEnum.cRequestReceiptForTxReq)
     expect(deserializeRequestReceiptForTxReq(req_stream)).toEqual(req_payload)
 
-    const appliedVote_dummy = {
-      txid: 'txid',
-      transaction_result: false,
-      account_id: ['account_id'],
-      account_state_hash_after: ['account_state_hash_after'],
-      account_state_hash_before: ['account_state_hash_before'],
-      cant_apply: false,
-      node_id: 'node_id',
-      sign: { sig: 'sign', owner: 'owner' },
-      app_data_hash: 'app_data_hash',
-    }
     const resp_payload: RequestReceiptForTxRespSerialized = {
       receipt: {
-        txid: 'txid',
-        result: true,
-        appliedVote: appliedVote_dummy,
-        confirmOrChallenge: {
-          message: 'message',
-          nodeId: 'node_id',
-          appliedVote: appliedVote_dummy,
-          sign: { sig: 'sign', owner: 'owner' },
+        proposal: {
+          txid: 'test',
+          applied: true,
+          cant_preApply: false,
+          accountIDs: ['a', 'b', 'c'],
+          beforeStateHashes: ['b1', 'b2', 'b3'],
+          afterStateHashes: ['a1', 'a2', 'a3'],
+          appReceiptDataHash: 'hash',
         },
-        signatures: [{ sig: 'sign', owner: 'owner' }],
-        app_data_hash: 'app_data_hash',
+        signaturePack: [
+          {
+            sig: 'sign',
+            owner: 'node1',
+          },
+        ],
+        voteOffsets: [5],
+        proposalHash: 'hash',
+        sign: {
+          sig: 'sign',
+          owner: 'aggregator',
+        },
       },
       note: 'note',
       success: true,
@@ -95,30 +94,29 @@ describe('RequestReceiptForTx Serialization', () => {
 
     expect(deserializeRequestReceiptForTxReq(req_stream)).toEqual(req_payload)
 
-    const appliedVote_dummy = {
-      txid: 'txid',
-      transaction_result: false,
-      account_id: ['account_id'],
-      account_state_hash_after: ['account_state_hash_after'],
-      account_state_hash_before: ['account_state_hash_before'],
-      cant_apply: false,
-      node_id: 'node_id',
-      sign: { sig: 'sign', owner: 'owner' },
-      app_data_hash: 'app_data_hash',
-    }
     const resp_payload: RequestReceiptForTxRespSerialized = {
       receipt: {
-        txid: 'txid',
-        result: true,
-        appliedVote: appliedVote_dummy,
-        confirmOrChallenge: {
-          message: 'message',
-          nodeId: 'node_id',
-          appliedVote: appliedVote_dummy,
-          sign: { sig: 'sign', owner: 'owner' },
+        proposal: {
+          txid: 'test',
+          applied: true,
+          cant_preApply: false,
+          accountIDs: ['a', 'b', 'c'],
+          beforeStateHashes: ['b1', 'b2', 'b3'],
+          afterStateHashes: ['a1', 'a2', 'a3'],
+          appReceiptDataHash: 'hash',
         },
-        signatures: [{ sig: 'sign', owner: 'owner' }],
-        app_data_hash: 'app_data_hash',
+        signaturePack: [
+          {
+            sig: 'sign',
+            owner: 'node1',
+          },
+        ],
+        voteOffsets: [5],
+        proposalHash: 'hash',
+        sign: {
+          sig: 'sign',
+          owner: 'aggregator',
+        },
       },
       note: 'note',
       success: true,
@@ -140,30 +138,28 @@ describe('RequestReceiptForTx Serialization', () => {
     expect(req_errors).toBeInstanceOf(Array)
     expect(req_errors).toHaveLength(1)
 
-    const appliedVote_dummy = {
-      txid: 'txid',
-      transaction_result: false,
-      account_id: ['account_id'],
-      account_state_hash_after: ['account_state_hash_after'],
-      account_state_hash_before: ['account_state_hash_before'],
-      cant_apply: false,
-      node_id: 'node_id',
-      sign: { sig: 'sign', owner: 'owner' },
-      app_data_hash: 'app_data_hash',
-    }
     const resp_payload = {
       receipt: {
-        txid: 'txid',
-        result: true,
-        appliedVote: appliedVote_dummy,
-        confirmOrChallenge: {
-          message: 'message',
-          nodeId: ['node_id'], // <- failure point
-          appliedVote: appliedVote_dummy,
-          sign: { sig: 'sign', owner: 'owner' },
+        proposal: {
+          txid: 'test',
+          applied: true,
+          cant_preApply: false,
+          accountIDs: ['a', 'b', 'c'],
+          beforeStateHashes: ['b1', 'b2', 'b3'],
+          afterStateHashes: ['a1', 'a2', 'a3'],
+          appReceiptDataHash: 'hash',
         },
-        signatures: [{ sig: 'sign', owner: 'owner' }],
-        app_data_hash: 'app_data_hash',
+        signaturePack: [
+          {
+            sig: 'sign',
+            owner: 'node1',
+          },
+        ],
+        proposalHash: 'hash',
+        sign: {
+          sig: 'sign',
+          owner: 'aggregator',
+        },
       },
       note: 'note',
       success: 'true', // <- another failure point, but this will not be in errors array since ajv setting set allErrors to false at default
@@ -182,30 +178,29 @@ describe('RequestReceiptForTx Serialization', () => {
     const req_errors = verifyPayload(AJVSchemaEnum.RequestReceiptForTxReq, req_payload)
     expect(req_errors).toBeNull()
 
-    const appliedVote_dummy = {
-      txid: 'txid',
-      transaction_result: false,
-      account_id: ['account_id'],
-      account_state_hash_after: ['account_state_hash_after'],
-      account_state_hash_before: ['account_state_hash_before'],
-      cant_apply: false,
-      node_id: 'node_id',
-      sign: { sig: 'sign', owner: 'owner' },
-      app_data_hash: 'app_data_hash',
-    }
-    const resp_payload = {
+    const resp_payload: RequestReceiptForTxRespSerialized = {
       receipt: {
-        txid: 'txid',
-        result: true,
-        appliedVote: appliedVote_dummy,
-        confirmOrChallenge: {
-          message: 'message',
-          nodeId: 'node_id',
-          appliedVote: appliedVote_dummy,
-          sign: { sig: 'sign', owner: 'owner' },
+        proposal: {
+          txid: 'test',
+          applied: true,
+          cant_preApply: false,
+          accountIDs: ['a', 'b', 'c'],
+          beforeStateHashes: ['b1', 'b2', 'b3'],
+          afterStateHashes: ['a1', 'a2', 'a3'],
+          appReceiptDataHash: 'hash',
         },
-        signatures: [{ sig: 'sign', owner: 'owner' }],
-        app_data_hash: 'app_data_hash',
+        signaturePack: [
+          {
+            sig: 'sign',
+            owner: 'node1',
+          },
+        ],
+        voteOffsets: [5],
+        proposalHash: 'hash',
+        sign: {
+          sig: 'sign',
+          owner: 'aggregator',
+        },
       },
       note: 'note',
       success: true,
