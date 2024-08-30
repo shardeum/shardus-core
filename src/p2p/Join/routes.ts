@@ -45,6 +45,7 @@ import { Utils } from '@shardus/types'
 import { testFailChance } from '../../utils'
 import { shardusGetTime } from '../../network'
 import { verifyPayload } from '../../types/ajv/Helpers'
+import { AJVSchemaEnum } from '../../types/enum/AJVSchemaEnum'
 
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
@@ -79,7 +80,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       const joinRequest: JoinRequest = Utils.safeJsonParse(Utils.safeStringify(req.body))
 
       // Validate the joinReq against the ajv schema
-      const errors = verifyPayload('JoinReq', joinRequest);
+      const errors = verifyPayload(AJVSchemaEnum.JoinReq, joinRequest);
       if (errors) {
         return res.status(400).json({
           success: false,

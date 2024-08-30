@@ -1,6 +1,6 @@
 import { initJoinReq } from '../../../../src/types/ajv/JoinReq'
 import { verifyPayload } from '../../../../src/types/ajv/Helpers';
-
+import { AJVSchemaEnum } from '../../../../src/types/enum/AJVSchemaEnum';
 
 describe('JoinRequest Tests', () => {
   beforeAll(() => {
@@ -42,7 +42,7 @@ describe('JoinRequest Tests', () => {
     });
 
     test('should pass validation for a valid join request', () => {
-      const errors = verifyPayload('JoinReq', validJoinRequest);
+      const errors = verifyPayload(AJVSchemaEnum.JoinReq, validJoinRequest);
       expect(errors).toBeNull(); // No errors for a valid schema
     });
 
@@ -50,7 +50,7 @@ describe('JoinRequest Tests', () => {
       // Modify validJoinRequest to invalidate it
       const invalidJoinRequest = { ...validJoinRequest, nodeInfo: { ...validJoinRequest.nodeInfo, publicKey: undefined } };
 
-      const errors = verifyPayload('JoinReq', invalidJoinRequest);
+      const errors = verifyPayload(AJVSchemaEnum.JoinReq, invalidJoinRequest);
       expect(errors).not.toBeNull();
       expect(errors.length).toBeGreaterThan(0);
     });
@@ -62,14 +62,14 @@ describe('JoinRequest Tests', () => {
         nodeInfo: { ...validJoinRequest.nodeInfo, externalPort: 70000 } // Invalid port number
       };
 
-      const errors = verifyPayload('JoinReq', invalidPortJoinRequest);
+      const errors = verifyPayload(AJVSchemaEnum.JoinReq, invalidPortJoinRequest);
       expect(errors).not.toBeNull();
       expect(errors.length).toBeGreaterThan(0);
     });
 
     test('should fail validation for an invalid external IP format', () => {
         validJoinRequest.nodeInfo.externalIp = '999.999.999.999';  // Invalid IP format
-        const errors = verifyPayload('JoinReq', validJoinRequest);
+        const errors = verifyPayload(AJVSchemaEnum.JoinReq, validJoinRequest);
         expect(errors).not.toBeNull();
         expect(errors.length).toBeGreaterThan(0);
       });
