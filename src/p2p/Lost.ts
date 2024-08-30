@@ -360,7 +360,7 @@ export function getTxs(): P2P.LostTypes.Txs {
     /* prettier-ignore */ if (logFlags.lost) nestedCountersInstance.countEvent('testingLost', `${currentCycle}: down count: ${downMsgCount}, up count: ${upMsgCount}`)
     /* prettier-ignore */ if (logFlags.lost) console.log(`getTxs: down count: ${downMsgCount}, up count: ${upMsgCount}`)
     if (upMsgCount >= config.p2p.minChecksForUp) {
-      seen[downRecord.target] = true
+      seen[upRecord.target] = true
       /* prettier-ignore */ if (logFlags.lost) nestedCountersInstance.countEvent('testingLost', `${currentCycle}: Saw at least ${config.p2p.minChecksForUp} up messages`)
       /* prettier-ignore */ if (logFlags.lost) console.log(`getTxs: Saw at least ${config.p2p.minChecksForUp} up messages: ${Utils.safeStringify(upRecord)}`)
       if (logFlags.verbose)
