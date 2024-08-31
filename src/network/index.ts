@@ -142,19 +142,6 @@ export class NetworkClass extends EventEmitter {
     })
   }
 
-  handleError(error: any, req: any, res: any, route: string) {
-    /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Error in route ${route}: ${error.message}`)
-
-    nestedCountersInstance.countEvent('endpoint-exception', `${route}`)
-
-    // Send an error response
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: isDebugMode() ? error.message : 'An unexpected error occurred',
-      route: route,
-    })
-  }
-
   // TODO: Allow for binding to a specified network interface
   _setupExternal() {
     return new Promise((resolve, reject) => {
