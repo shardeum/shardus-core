@@ -54,7 +54,16 @@ export function prepend(cycle: P2P.CycleCreatorTypes.CycleRecord) {
     cycles.unshift(cycle)
     cyclesByMarker[marker] = cycle
     oldest = cycle
-    if (!newest){
+
+    // this will happen only once in the lifetime of a node. we never set newest to null
+    if (newest == null){
+      newest = cycle
+    }
+
+    // if our cycle is newer than the newest lets update newest and current cycle marker
+    // this should only be happening before we have started digesting cycles.
+    // but this check will make the actions correct.
+    if(cycle.counter > newest.counter){
       newest = cycle
       currentCycleMarker = marker
     }
