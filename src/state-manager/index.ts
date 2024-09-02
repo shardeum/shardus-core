@@ -1915,7 +1915,7 @@ class StateManager {
             return
           }
 
-          let receipt2 = this.getReceipt2(queueEntry)
+          let receipt2 = this.getSignedReceipt(queueEntry)
           if (receipt2 == null) {
             response.note = `${route} does not have valid receipt2: ${utils.stringifyReduce(txid)}`
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(response.note)
@@ -1926,10 +1926,10 @@ class StateManager {
           // we just need to send collected state
           for (const accountId of requestedAccountIds) {
             const beforeState = queueEntry.collectedData[accountId]
-            const index = receipt2.appliedVote.account_id.indexOf(accountId)
+            const index = receipt2.proposal.accountIDs.indexOf(accountId)
             if (
               beforeState &&
-              beforeState.stateId === receipt2.appliedVote.account_state_hash_before[index]
+              beforeState.stateId === receipt2.proposal.beforeStateHashes[index]
             ) {
               response.stateList.push(queueEntry.collectedData[accountId])
             } else {
