@@ -7508,7 +7508,7 @@ class TransactionQueue {
 
     const accountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
     const beforeAccountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
-    const receipt2 = this.stateManager.getReceipt2(queueEntry)
+    const receipt2 = this.stateManager.getSignedReceipt(queueEntry)
 
     if (receipt2 == null) {
       nestedCountersInstance.countEvent("stateManager", "getArchiverReceiptFromQueueEntry no receipt2")
@@ -7539,13 +7539,13 @@ class TransactionQueue {
       // prepare before state accounts
       for (const accountId of fileredBeforeStateToSend) {
         // check if our beforeState account hash is the same as the vote in the receipt2
-        const index = receipt2.appliedVote.account_id.indexOf(accountId)
+        const index = receipt2.proposal.accountIDs.indexOf(accountId)
         const account = queueEntry.collectedData[accountId]
         if (account == null) {
           badBeforeStateAccounts.push(accountId)
           continue
         }
-        if (account.stateId !== receipt2.appliedVote.account_state_hash_before[index]) {
+        if (account.stateId !== receipt2.proposal.beforeStateHashes[index]) {
           badBeforeStateAccounts.push(accountId)
         }
       }
@@ -7578,10 +7578,10 @@ class TransactionQueue {
     let isAccountsMatchWithReceipt2 = true
     const accountWrites = queueEntry.preApplyTXResult?.applyResponse?.accountWrites
 
-    if (accountWrites != null && accountWrites.length === receipt2.appliedVote.account_id.length) {
+    if (accountWrites != null && accountWrites.length === receipt2.proposal.accountIDs.length) {
       for (const account of accountWrites) {
-        const indexInVote = receipt2.appliedVote.account_id.indexOf(account.accountId)
-        if (receipt2.appliedVote.account_state_hash_after[indexInVote] !== account.data.stateId) {
+        const indexInVote = receipt2.proposal.accountIDs.indexOf(account.accountId)
+        if (receipt2.proposal.afterStateHashes[indexInVote] !== account.data.stateId) {
           // console.log('account mismatch', account.accountId, receipt2.appliedVote.account_state_hash_after[indexInVote], account.data.stateId)
           isAccountsMatchWithReceipt2 = false
           break
@@ -7600,12 +7600,12 @@ class TransactionQueue {
       let success = false
       let count = 0
       const maxRetry = 3
-      const nodesToAskKeys = receipt2.signatures?.map((signature) => signature.owner)
+      const nodesToAskKeys = receipt2.signaturePack?.map((signature) => signature.owner)
 
       // retry 3 times if the request fails
       while (success === false && count < maxRetry) {
         count++
-        const requestedData = await this.requestFinalData(queueEntry, receipt2.appliedVote.account_id, nodesToAskKeys, true)
+        const requestedData = await this.requestFinalData(queueEntry, receipt2.proposal.accountIDs, nodesToAskKeys, true)
         if (requestedData && requestedData.wrappedResponses && requestedData.appReceiptData) {
           success = true
           for (const accountId in requestedData.wrappedResponses) {
@@ -7737,7 +7737,6 @@ class TransactionQueue {
 
       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug( `requestFinalData: txid: ${queueEntry.acceptedTx.txId} accountIds: ${utils.stringifyReduce( accountIds )}, asking node: ${nodeToAsk.id} ${nodeToAsk.externalPort} at timestamp ${shardusGetTime()}` )
 
-      let response: RequestTxAndStateResp
       // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestTxAndStateBinary) {
       const requestMessage = message as RequestTxAndStateReq
       /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(nodeToAsk.id)}: ${'request_tx_and_state'}`)
@@ -7766,15 +7765,16 @@ class TransactionQueue {
           success = false
           break
         }
-        const indexInVote = queueEntry.appliedReceipt2.appliedVote.account_id.indexOf(data.accountId)
+        const indexInVote = queueEntry.signedReceipt.proposal.accountIDs.indexOf(data.accountId)
         if (indexInVote === -1) continue
         const afterStateIdFromVote =
-          queueEntry.appliedReceipt2.appliedVote.account_state_hash_after[indexInVote]
+          queueEntry.signedReceipt.proposal.afterStateHashes[indexInVote]
         if (data.stateId !== afterStateIdFromVote) {
           nestedCountersInstance.countEvent("stateManager", "requestFinalDataMismatch")
           continue
         }
         if (queueEntry.collectedFinalData[data.accountId] == null) {
+          // todo: check the state hashes and verify
           queueEntry.collectedFinalData[data.accountId] = data
           successCount++
           /* prettier-ignore */
@@ -7783,9 +7783,9 @@ class TransactionQueue {
       }
       if (includeAppReceiptData && response.appReceiptData) {
         const receivedAppReceiptDataHash = this.crypto.hash(response.appReceiptData)
-        const receipt2 = this.stateManager.getReceipt2(queueEntry)
+        const receipt2 = this.stateManager.getSignedReceipt(queueEntry)
         if (receipt2 != null) {
-          validAppReceiptData = receivedAppReceiptDataHash === receipt2.appliedVote.app_data_hash
+          validAppReceiptData = receivedAppReceiptDataHash === receipt2.proposal.appReceiptDataHash
         }
       }
       if (successCount === accountIds.length && validAppReceiptData === true) {
@@ -7864,11 +7864,11 @@ class TransactionQueue {
         }
 
         const results: WrappedResponses = {}
-        const receipt2 = this.stateManager.getReceipt2(queueEntry)
+        const receipt2 = this.stateManager.getSignedReceipt(queueEntry)
         if (receipt2 == null) {
           return
         }
-        if (receipt2.appliedVote.account_id.length !== response.stateList.length) {
+        if (receipt2.proposal.accountIDs.length !== response.stateList.length) {
           if (logFlags.error && logFlags.debug) this.mainLogger.error(`requestInitialData data.length not matching for tx ${queueEntry.logID}`);
           return
         }
@@ -7879,8 +7879,8 @@ class TransactionQueue {
             success = false
             break
           }
-          const indexInVote = receipt2.appliedVote.account_id.indexOf(data.accountId)
-          if (data.stateId === receipt2.appliedVote.account_state_hash_before[indexInVote]) {
+          const indexInVote = receipt2.proposal.accountIDs.indexOf(data.accountId)
+          if (data.stateId === receipt2.proposal.beforeStateHashes[indexInVote]) {
             successCount++
             results[data.accountId] = data
             /* prettier-ignore */
