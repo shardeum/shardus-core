@@ -12,6 +12,7 @@ export type MakeReceiptReq = {
     sig: string
   }
   address: string
+  addressHash: string
   value: unknown
   when: number
   source: string
@@ -25,6 +26,7 @@ export function serializeMakeReceiptReq(stream: VectorBufferStream, obj: MakeRec
   stream.writeString(obj.sign.owner)
   stream.writeString(obj.sign.sig)
   stream.writeString(obj.address)
+  stream.writeString(obj.addressHash)
   stream.writeString(Utils.safeStringify(obj.value))
   stream.writeBigUInt64(BigInt(obj.when))
   stream.writeString(obj.source)
@@ -41,6 +43,7 @@ export function deserializeMakeReceiptReq(stream: VectorBufferStream): MakeRecei
       sig: stream.readString(),
     },
     address: stream.readString(),
+    addressHash: stream.readString(),
     value: Utils.safeJsonParse(stream.readString()),
     when: Number(stream.readBigUInt64()),
     source: stream.readString(),
