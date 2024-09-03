@@ -8,21 +8,39 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { Utils } from '@shardus/types'
 import { SignedObject } from '@shardus/crypto-utils'
 import * as CycleChain from '../p2p/CycleChain'
+import { contactArchiver, getStatusHistoryCopy } from '../p2p/Self'
+import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
+import { getNewestCycle } from '../p2p/Sync'
 
 const MAX_COUNTER_BUFFER_MILLISECONDS = 10000 // <- Nonce are essentially just timestamp. This number dictate how much time range we will tolerance.
 let lastCounter = Date.now() // <- when node is first load onto mem this used to be 0, but that would cause a replay attack. So now it is set to the current time with ntp offset accounted
 let multiSigLstCounter = Date.now()
 
 // This function is used to check if the request is authorized to access the debug endpoint
-function handleDebugAuth(_req, res, next, authLevel) {
+async function handleDebugAuth(_req, res, next, authLevel) {
   try {
+    let statusHist = getStatusHistoryCopy()
+    let statusNow = statusHist[statusHist.length -1].moduleStatus || undefined
+    let weAreActive = statusNow === NodeStatus.ACTIVE
+    let latestCycle = CycleChain.newest
+
+    if (!weAreActive) {
+      const activeNodes = await contactArchiver("dbgMiddleware")
+      latestCycle = await getNewestCycle(activeNodes)
+    }
+
+    if(!latestCycle) {
+      res.status(500).json({ error: "Node can't gather latest Cycle to perform signature verification"})
+    }
+
+
     //auth with a signature
     if (_req.query.sig != null && _req.query.sig_counter != null) {
-      const nodes = String(_req.query.nodeIds).split(',')
-      const ourNodeId = Context.p2p.getNodeId().slice(0, 4)
+      const nodes = String(_req.query.nodePubkeys).split(',')
+      const ourPubkey = Context.crypto.getPublicKey().slice(0, 4)
       let intentedForOurNode = false
       nodes.forEach((id) => {
-        if (ourNodeId === id) {
+        if (ourPubkey === id) {
           intentedForOurNode = true
         }
       })
@@ -36,11 +54,11 @@ function handleDebugAuth(_req, res, next, authLevel) {
       // trim sig and sig_counter from the originalUrl
       // when the debug call is signed it include the hash of baseurl and counter to prevent replay at later time and replay at different node or the same endpoint different query params
       let payload = {
-        route: stripQueryParams(_req.originalUrl, ['sig', 'sig_counter', 'nodeIds']), //<- we're gonna hash, these query artificats need to be excluded from the hash
+        route: stripQueryParams(_req.originalUrl, ['sig', 'sig_counter', 'nodePubkeys']), //<- we're gonna hash, these query artificats need to be excluded from the hash
         count: _req.query.sig_counter,
-        nodes: _req.query.nodeIds, // example 8f35,8b3a,85f1
-        networkId: CycleChain.newest.networkId,
-        cycleCounter: CycleChain.newest.counter,
+        nodes: _req.query.nodePubkeys, // example 8f35,8b3a,85f1
+        networkId: latestCycle.networkId,
+        cycleCounter: latestCycle.counter,
       }
       const hash = crypto.hash(Utils.safeStringify(payload))
       const devPublicKeys = getDevPublicKeys() // This should return list of public keys
@@ -103,9 +121,23 @@ function handleDebugAuth(_req, res, next, authLevel) {
   })
 }
 
-function handleDebugMultiSigAuth(_req, res, next, authLevel: DevSecurityLevel) {
+async function handleDebugMultiSigAuth(_req, res, next, authLevel: DevSecurityLevel) {
   nestedCountersInstance.countEvent('middleware', 'debug_multi_sig_auth')
   try {
+
+    let statusHist = getStatusHistoryCopy()
+    let statusNow = statusHist[statusHist.length -1].moduleStatus || undefined
+    let weAreActive = statusNow === NodeStatus.ACTIVE
+    let latestCycle = CycleChain.newest
+
+    if (!weAreActive) {
+      const activeNodes = await contactArchiver("dbgMiddleware")
+      latestCycle = await getNewestCycle(activeNodes)
+    }
+
+    if(!latestCycle) {
+      res.status(500).json({ error: "Node can't gather latest Cycle to perform signature verification"})
+    }
     //auth with a signature
     if (_req.query.sig != null && _req.query.sig_counter != null) {
       const devPublicKeys = getMultisigPublicKeys()
@@ -119,11 +151,11 @@ function handleDebugMultiSigAuth(_req, res, next, authLevel: DevSecurityLevel) {
         })
       }
 
-      const nodes = String(_req.query.nodeIds).split(',')
-      const ourNodeId = Context.p2p.getNodeId().slice(0, 4)
+      const nodes = String(_req.query.nodePubkeys).split(',')
+      const ourPubkey = Context.crypto.getPublicKey().slice(0, 4)
       let intentedForOurNode = false
       nodes.forEach((id) => {
-        if (ourNodeId === id) {
+        if (ourPubkey === id) {
           intentedForOurNode = true
         }
       })
@@ -156,10 +188,10 @@ function handleDebugMultiSigAuth(_req, res, next, authLevel: DevSecurityLevel) {
 
       // when the debug call is signed it include the counter to prevent replay at later time and replay at different node or the same endpoint different query params
       const payload: any = {
-        route: stripQueryParams(_req.originalUrl, ['sig', 'sig_counter', 'nodeIds']),
-        nodes: _req.query.nodeIds, // example 8f35,8b3a,85f1
+        route: stripQueryParams(_req.originalUrl, ['sig', 'sig_counter', 'nodePubkeys']),
+        nodes: _req.query.nodePubkeys, // example 8f35,8b3a,85f1
         count: _req.query.sig_counter,
-        networkId: CycleChain.newest.networkId,
+        networkId: latestCycle.networkId,
       }
 
       // Require a larger counter than before. This prevents replay attacks

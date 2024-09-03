@@ -584,6 +584,7 @@ export interface StatusHistoryEntry {
 
 const statusHistory: StatusHistoryEntry[] = []
 
+
 export function getStatusHistoryCopy(): StatusHistoryEntry[] {
   // return a copy so it cannot be mutated
   return deepCopy(statusHistory)
@@ -844,7 +845,7 @@ async function checkNodeId(nodeMatch: (node: any) => boolean, selfId: string): P
   if (logFlags.p2pNonFatal) info('Node passed id check')
 }
 
-async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
+export async function contactArchiver(dbgContex:string): Promise<P2P.P2PTypes.Node[]> {
   const maxRetries = 10
   let retry = maxRetries
   const failArchivers: string[] = []
