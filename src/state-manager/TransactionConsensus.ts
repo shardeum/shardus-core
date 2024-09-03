@@ -4036,6 +4036,23 @@ class TransactionConsenus {
    */
   tryAppendVote(queueEntry: QueueEntry, vote: AppliedVote): boolean {
     // if (this.stateManager.transactionQueue.useNewPOQ === false) {
+
+    // Check if sender is in execution group
+    if (!queueEntry.executionGroup.some((node) => node.publicKey === vote.sign.owner)) {
+      nestedCountersInstance.countEvent('tryAppendVote', 'Vote sender not in execution group')
+      return false
+    }
+
+    //  Check if the signature is valid
+    if (vote.sign == null) {
+      nestedCountersInstance.countEvent('tryAppendVote', 'Vote signature is null')
+      return false
+    }
+    if (!this.crypto.verify(vote as SignedObject, vote.sign.owner)) {
+      nestedCountersInstance.countEvent('tryAppendVote', 'Vote signature is invalid')
+      return false
+    }
+
     const numVotes = queueEntry.collectedVotes.length
 
     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `vote: ${utils.stringifyReduce(vote)}`)
@@ -4168,6 +4185,16 @@ class TransactionConsenus {
     // Check if sender is in execution group
     if (!queueEntry.executionGroup.some((node) => node.publicKey === voteHash.sign.owner)) {
       nestedCountersInstance.countEvent('poqo', 'Vote sender not in execution group')
+      return false
+    }
+
+    //  Check if the signature is valid
+    if (voteHash.sign == null) {
+      nestedCountersInstance.countEvent('poqo', 'Vote signature is null')
+      return false
+    }
+    if (!this.crypto.verify(voteHash as SignedObject, voteHash.sign.owner)) {
+      nestedCountersInstance.countEvent('poqo', 'Vote signature is invalid')
       return false
     }
 
