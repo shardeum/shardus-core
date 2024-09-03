@@ -86,19 +86,19 @@ class Debug {
     this.network.registerExternalGet('debug-logfile', isDebugModeMiddlewareMedium, (req, res) => {
       const requestedFile = req.query.file
       if (typeof requestedFile !== 'string' || !requestedFile) {
-        return res.send({ success: false, error: 'Invalid file parameter' })
+        return res.json({ success: false, error: 'Invalid file parameter' })
       }
 
       const normalizedFile = path.normalize(requestedFile).replace(/^(\.\.[/\\])+/, '')
 
       const logsAbsolutePath = Object.keys(this.files).find((key) => this.files[key] === './logs')
       if (!logsAbsolutePath) {
-        return res.send({ success: false, error: 'Logs directory not found' })
+        return res.json({ success: false, error: 'Logs directory not found' })
       }
 
       const filePath = path.join(logsAbsolutePath, normalizedFile)
       if (!filePath.startsWith(logsAbsolutePath)) {
-        return res.send({ success: false, error: 'File not found' })
+        return res.json({ success: false, error: 'File not found' })
       }
 
       res.set('Content-Disposition', `attachment; filename="${path.basename(normalizedFile)}"`)
@@ -106,7 +106,7 @@ class Debug {
 
       const fileStream = fs.createReadStream(filePath)
       fileStream.on('error', (error) => {
-        return res.send({ success: false, error: 'Error reading the file' })
+        return res.json({ success: false, error: 'Error reading the file' })
       })
       fileStream.pipe(res)
     })
@@ -116,9 +116,9 @@ class Debug {
           req.query.delay && typeof req.query.delay === 'string' ? parseInt(req.query.delay) : 120 * 1000
         this.network.setDebugNetworkDelay(delay)
       } catch (e) {
-        return res.send({ success: false, error: e.message })
+        return res.json({ success: false, error: e.message })
       }
-      return res.send({ success: true })
+      return res.json({ success: true })
     })
     this.network.registerExternalGet('debug-forcedExpiration', isDebugModeMiddleware, (req, res) => {
       try {
@@ -129,9 +129,9 @@ class Debug {
         Context.config.debug.forcedExpiration = forcedExpiration
         nestedCountersInstance.countEvent('debug', `forcedExpiration set to ${forcedExpiration}`)
       } catch (e) {
-        return res.send({ success: false, error: e.message })
+        return res.json({ success: false, error: e.message })
       }
-      return res.send({ success: true })
+      return res.json({ success: true })
     })
   }
 }
