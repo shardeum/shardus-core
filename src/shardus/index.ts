@@ -459,7 +459,51 @@ class Shardus extends EventEmitter {
       const sk: string = this.crypto.keypair.secretKey
       this.io = (await this.network.setup(Network.ipInfo, sk)) as SocketIO.Server
       Context.setIOContext(this.io)
+      // Adding a middleware for auth
+      this.io.use((socket, next) => {
+        try {
+          // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
+          if (!Archivers.recipients || !Archivers.connectedSockets) {
+            this.mainLogger.error(
+              `❌ Seems Archiver module isn't initialized yet, dropping the Socket connection!`
+            )
+            socket.disconnect()
+            return
+          }
+
+          const archiverIP = socket.handshake.headers.host.split(':')[0]
+          const archiverCreds = JSON.parse(socket.handshake.query.data)
+          const isValidSig = this.crypto.verify(archiverCreds, archiverCreds.publicKey)
+          if (!isValidSig) {
+            this.mainLogger.error(`❌ Invalid Signature from Archiver @ ${archiverIP}`)
+            socket.disconnect()
+            return
+          }
+          const recipient = Archivers.recipients.get(archiverCreds.publicKey)
+          if (!recipient) {
+            this.mainLogger.error(`❌ Remote Archiver @ ${archiverIP} is NOT a recipient!`)
+            socket.disconnect()
+            return
+          }
+          if (archiverIP !== recipient.nodeInfo.ip) {
+            this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
+            this.mainLogger.error('Recipient: ', recipient.nodeInfo)
+            this.mainLogger.error('Remote Archiver: ', socket.handshake.headers.host)
+            socket.disconnect()
+            return
+          }
+
+          socket.handshake.query.data = archiverCreds
+          next()
+        } catch (error) {
+          this.mainLogger.error('❌ Error in Archiver Socket-Connection Auth!')
+          this.mainLogger.error(error)
+          socket.disconnect()
+          return
+        }
+      })
       this.io.on('connection', (socket: any) => {
+        const { publicKey: archiverPublicKey } = socket.handshake.query.data
         if (!Self || !Self.isActive) {
           if (!Self.allowConnectionToFirstNode) {
             socket.disconnect()
@@ -467,64 +511,38 @@ class Shardus extends EventEmitter {
           }
         }
         if (this.config.features.archiverDataSubscriptionsUpdate) {
-          console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
-          socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
-            console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
-            // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
-            if (!Archivers.recipients || !Archivers.connectedSockets) {
-              socket.disconnect()
-              console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
-              return
-            }
-            if (Archivers.recipients.get(ARCHIVER_PUBLIC_KEY)) {
-              if (Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY]) {
-                Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
-              }
-              Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
-            } else {
-              socket.disconnect()
-              console.log(
-                'Archiver is not found in the recipients list and kill the socket connection',
-                ARCHIVER_PUBLIC_KEY
-              )
-            }
-          })
+          console.log(`✅ Archive server has subscribed to this node with Socket-ID ${socket.id}!`)
+          console.log('Archiver has registered its public key', archiverPublicKey)
+          if (Archivers.connectedSockets[archiverPublicKey]) {
+            Archivers.removeArchiverConnection(archiverPublicKey)
+          }
+          Archivers.addArchiverConnection(archiverPublicKey, socket.id)
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
             if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] === socket.id) {
-              console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
+            console.log(`Archive server with public key ${ARCHIVER_PUBLIC_KEY} has requested to Un-subscribe`)
               Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
               Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
             }
           })
         } else {
           console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
-          socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
-            console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
-            // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
-            if (!Archivers.recipients || !Archivers.connectedSockets) {
-              socket.disconnect()
-              console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
-              return
+          console.log('Archiver has registered its public key', archiverPublicKey)
+          for (const [key, value] of Object.entries(Archivers.connectedSockets)) {
+            if (key === archiverPublicKey) {
+              Archivers.removeArchiverConnection(archiverPublicKey)
             }
-            for (const [key, value] of Object.entries(Archivers.connectedSockets)) {
-              if (key === ARCHIVER_PUBLIC_KEY) {
-                Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
-              }
-            }
+          }
 
-            if (
-              Object.keys(Archivers.connectedSockets).length >= config.p2p.maxArchiversSubscriptionPerNode
-            ) {
-              /* prettier-ignore */ console.log( `There are already ${config.p2p.maxArchiversSubscriptionPerNode} archivers connected for data transfer!` )
-              socket.disconnect()
-              return
-            }
-            Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
-          })
+          if (Object.keys(Archivers.connectedSockets).length >= config.p2p.maxArchiversSubscriptionPerNode) {
+            /* prettier-ignore */ console.log( `There are already ${config.p2p.maxArchiversSubscriptionPerNode} archivers connected for data transfer!` )
+            socket.disconnect()
+            return
+          }
+          Archivers.addArchiverConnection(archiverPublicKey, socket.id)
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
 
             if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] === socket.id) {
-              console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
+            console.log(`Archive server with public key ${ARCHIVER_PUBLIC_KEY} has requested to Un-subscribe`)
               Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
               Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
             }
