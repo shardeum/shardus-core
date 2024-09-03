@@ -104,4 +104,5 @@ function addSchemaDependencies(): void {
 // Function to register the schema
 function addSchemas(): void {
   addSchema(AJVSchemaEnum.CompareCertReq, schemaCompareCert)
+  addSchema(AJVSchemaEnum.CompareCertResp, schemaCompareCert)
 }
