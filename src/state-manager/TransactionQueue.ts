@@ -772,88 +772,89 @@ class TransactionQueue {
       }
     )
 
-    this.p2p.registerGossipHandler(
-      'gossip-final-state',
-      async (
-        payload: { txid: string; stateList: Shardus.WrappedResponse[], txGroupCycle?: number },
-        sender: Node,
-        tracker: string,
-        msgSize: number
-      ) => {
-        profilerInstance.scopedProfileSectionStart('gossip-final-state', false, msgSize)
-        const respondSize = cUninitializedSize
-        try {
-          // make sure we have it
-          const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          //It is okay to ignore this transaction if the txId is not found in the queue.
-          if (queueEntry == null) {
-            //In the past we would enqueue the TX, expecially if syncing but that has been removed.
-            //The normal mechanism of sharing TXs is good enough.
-            nestedCountersInstance.countEvent('processing', 'gossip-final-state_noQueueEntry')
-            return
-          }
-          if (payload.txGroupCycle) {
-            if (queueEntry.txGroupCycle !== payload.txGroupCycle) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`gossip-final-state mismatch txGroupCycle for txid: ${payload.txid}, sender's txGroupCycle: ${payload.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
-              nestedCountersInstance.countEvent(
-                'processing',
-                'gossip-final-state: mismatch txGroupCycle for txid ' + payload.txid
-              )
-            }
-            delete payload.txGroupCycle
-          }
-          if (logFlags.debug)
-            this.mainLogger.debug(`gossip-final-state ${queueEntry.logID}, ${Utils.safeStringify(payload.stateList)}`)
-          // add the data in
-          let saveSomething = false
-          for (const data of payload.stateList) {
-            //let wrappedResponse = data as Shardus.WrappedResponse
-            //this.queueEntryAddData(queueEntry, data)
-            if (data == null) {
-              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_finalstate data == null`)
-              continue
-            }
-            if (queueEntry.collectedFinalData[data.accountId] == null) {
-              queueEntry.collectedFinalData[data.accountId] = data
-              saveSomething = true
-              /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('broadcast_finalstate', `${queueEntry.logID}`, `broadcast_finalstate addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
-            }
-
-            // if (queueEntry.state === 'syncing') {
-            //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
-            // }
-          }
-          if (saveSomething) {
-            const nodesToSendTo: Set<Node> = new Set()
-            for (const data of payload.stateList) {
-              if (data == null) {
-                continue
-              }
-              const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
-              for (const node of storageNodes) {
-                nodesToSendTo.add(node)
-              }
-            }
-            if (nodesToSendTo.size > 0) {
-              payload.txGroupCycle = queueEntry.txGroupCycle
-              Comms.sendGossip(
-                'gossip-final-state',
-                payload,
-                undefined,
-                undefined,
-                Array.from(nodesToSendTo),
-                false,
-                4,
-                queueEntry.acceptedTx.txId
-              )
-              nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
-            }
-          }
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('gossip-final-state', respondSize)
-        }
-      }
-    )
+    // THIS HANDLER IS NOT USED ANYMORE
+    // this.p2p.registerGossipHandler(
+    //   'gossip-final-state',
+    //   async (
+    //     payload: { txid: string; stateList: Shardus.WrappedResponse[], txGroupCycle?: number },
+    //     sender: Node,
+    //     tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     profilerInstance.scopedProfileSectionStart('gossip-final-state', false, msgSize)
+    //     const respondSize = cUninitializedSize
+    //     try {
+    //       // make sure we have it
+    //       const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       //It is okay to ignore this transaction if the txId is not found in the queue.
+    //       if (queueEntry == null) {
+    //         //In the past we would enqueue the TX, expecially if syncing but that has been removed.
+    //         //The normal mechanism of sharing TXs is good enough.
+    //         nestedCountersInstance.countEvent('processing', 'gossip-final-state_noQueueEntry')
+    //         return
+    //       }
+    //       if (payload.txGroupCycle) {
+    //         if (queueEntry.txGroupCycle !== payload.txGroupCycle) {
+    //           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`gossip-final-state mismatch txGroupCycle for txid: ${payload.txid}, sender's txGroupCycle: ${payload.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
+    //           nestedCountersInstance.countEvent(
+    //             'processing',
+    //             'gossip-final-state: mismatch txGroupCycle for txid ' + payload.txid
+    //           )
+    //         }
+    //         delete payload.txGroupCycle
+    //       }
+    //       if (logFlags.debug)
+    //         this.mainLogger.debug(`gossip-final-state ${queueEntry.logID}, ${Utils.safeStringify(payload.stateList)}`)
+    //       // add the data in
+    //       let saveSomething = false
+    //       for (const data of payload.stateList) {
+    //         //let wrappedResponse = data as Shardus.WrappedResponse
+    //         //this.queueEntryAddData(queueEntry, data)
+    //         if (data == null) {
+    //           /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_finalstate data == null`)
+    //           continue
+    //         }
+    //         if (queueEntry.collectedFinalData[data.accountId] == null) {
+    //           queueEntry.collectedFinalData[data.accountId] = data
+    //           saveSomething = true
+    //           /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('broadcast_finalstate', `${queueEntry.logID}`, `broadcast_finalstate addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
+    //         }
+    //
+    //         // if (queueEntry.state === 'syncing') {
+    //         //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+    //         // }
+    //       }
+    //       if (saveSomething) {
+    //         const nodesToSendTo: Set<Node> = new Set()
+    //         for (const data of payload.stateList) {
+    //           if (data == null) {
+    //             continue
+    //           }
+    //           const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
+    //           for (const node of storageNodes) {
+    //             nodesToSendTo.add(node)
+    //           }
+    //         }
+    //         if (nodesToSendTo.size > 0) {
+    //           payload.txGroupCycle = queueEntry.txGroupCycle
+    //           Comms.sendGossip(
+    //             'gossip-final-state',
+    //             payload,
+    //             undefined,
+    //             undefined,
+    //             Array.from(nodesToSendTo),
+    //             false,
+    //             4,
+    //             queueEntry.acceptedTx.txId
+    //           )
+    //           nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
+    //         }
+    //       }
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('gossip-final-state', respondSize)
+    //     }
+    //   }
+    // )
 
     /**
      * request_state_for_tx
