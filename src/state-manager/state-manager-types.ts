@@ -1165,7 +1165,7 @@ export type HashTrieSyncConsensus = {
         string,
         {
           count: number
-          voters: Shardus.Node[]
+          voters: Set<Shardus.Node>
         }
       >
       bestHash: string

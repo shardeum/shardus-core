@@ -903,15 +903,15 @@ class AccountPatcher {
             if (hashVote == null) {
               hashVote = { allVotes: new Map(), bestHash: nodeHashes.hash, bestVotes: 1 }
               hashTrieSyncConsensus.radixHashVotes.set(nodeHashes.radix, hashVote)
-              hashVote.allVotes.set(nodeHashes.hash, { count: 1, voters: [node] })
+              hashVote.allVotes.set(nodeHashes.hash, { count: 1, voters: new Set([node]) })
             } else {
               const voteEntry = hashVote.allVotes.get(nodeHashes.hash)
               if (voteEntry == null) {
-                hashVote.allVotes.set(nodeHashes.hash, { count: 1, voters: [node] })
+                hashVote.allVotes.set(nodeHashes.hash, { count: 1, voters: new Set([node]) })
               } else {
-                const voteCount = voteEntry.count + 1
+                voteEntry.voters.add(node)
+                const voteCount = voteEntry.voters.size
                 voteEntry.count = voteCount
-                voteEntry.voters.push(node)
                 if (voteCount > hashVote.bestVotes) {
                   hashVote.bestVotes = voteCount
                   hashVote.bestHash = nodeHashes.hash
@@ -1452,7 +1452,7 @@ class AccountPatcher {
                 kvp.push({
                   id: key,
                   count: value.count,
-                  nodeIDs: value.voters.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
+                  nodeIDs: [...value.voters].map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
                 })
               }
               const simpleMap = {
@@ -2260,7 +2260,7 @@ class AccountPatcher {
       if (coverage == null) {
         const votes = hashTrieSyncConsensus.radixHashVotes.get(radixHash)
         const bestVote = votes.allVotes.get(votes.bestHash)
-        const potentialNodes = bestVote.voters
+        const potentialNodes = [...bestVote.voters]
         //shuffle array of potential helpers
         utils.shuffleArray(potentialNodes) //leaving non random to catch issues in testing.
         const node = potentialNodes[0]
@@ -2667,7 +2667,7 @@ class AccountPatcher {
             kvp.push({
               id: key,
               count: value.count,
-              nodeIDs: value.voters.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
+              nodeIDs: [...value.voters].map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
             })
           }
           const simpleMap = {
@@ -2810,7 +2810,7 @@ class AccountPatcher {
             kvp.push({
               id: key,
               count: value.count,
-              nodeIDs: value.voters.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
+              nodeIDs: [...value.voters].map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
             })
           }
           const simpleMap = {
@@ -2882,7 +2882,7 @@ class AccountPatcher {
           kvp.push({
             id: key,
             count: value.count,
-            nodeIDs: value.voters.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
+            nodeIDs: [...value.voters].map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
           })
         }
         const simpleMap = {
