@@ -80,21 +80,15 @@ const schemaCompareCert = {
         'start',
         'duration',
         'networkConfigHash',
-        'joined',
-        'returned',
-        'lost',
-        'refuted',
-        'appRemoved',
-        'apoptosized',
         'nodeListHash',
         'archiverListHash',
         'standbyNodeListHash',
-        'random',
       ],
       additionalProperties: true,
     },
   },
-  required: ['certs', 'record'],
+  required: ['certs'],
+  additionalProperties: true,
 }
 
 export function initCompareCertReq(): void {
