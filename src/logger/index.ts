@@ -486,36 +486,36 @@ class Logger {
           if (err) {
             // Handle error (e.g., file not found)
             console.error('Error reading file:', err)
-            res.status(500).send('Error reading file')
+            res.status(500).json({ error: 'Error reading file' })
             return
           }
 
           // Return data from filePath1 only
           res.setHeader('Content-Type', 'text/plain')
-          res.send(data)
+          res.json({ response: true, data: data })
         })
       }
     )
     Context.network.registerExternalGet('debug-clearlog', isDebugModeMiddlewareMedium, async (req, res) => {
       const requestedFileName = req?.query?.file
-      let filesToClear = []      
+      let filesToClear = []
       try {
         if (!requestedFileName) {
-          res.status(400).send('No log file specified')
+          res.status(400).json({ error: 'No log file specified' })
           return
         }
 
         // Retrieve valid filenames from the logger configuration
-      const validFileNames: string[] = []
-      for (const appender of Object.values(this.log4Conf.appenders)) {
-        if (appender.type === 'file') {
-          validFileNames.push(path.basename(appender.filename))
+        const validFileNames: string[] = []
+        for (const appender of Object.values(this.log4Conf.appenders)) {
+          if (appender.type === 'file') {
+            validFileNames.push(path.basename(appender.filename))
+          }
         }
-      }
-      // explicitly add out.log since that is handled in saveConsoleOutput.ts
-      if (this.config.saveConsoleOutput) { 
-        validFileNames.push('out.log')
-      }
+        // explicitly add out.log since that is handled in saveConsoleOutput.ts
+        if (this.config.saveConsoleOutput) {
+          validFileNames.push('out.log')
+        }
 
         // If 'all' is requested, set to clear all files, otherwise sanitize the input file name.
 
@@ -524,15 +524,14 @@ class Logger {
         } else {
           const sanitizedFileName = path.basename(requestedFileName)
           if (!validFileNames.includes(sanitizedFileName)) {
-            res.status(400).send('Invalid log file specified')
+            res.status(400).json('Invalid log file specified')
             return
           }
           filesToClear.push(sanitizedFileName)
         }
-
       } catch (error) {
         console.error('Error clearing log files 1:', error)
-        res.status(500).send(`Failed to clearing log files with input 1 ${requestedFileName}`)
+        res.status(500).json({ error: `Failed to clearing log files with input 1 ${requestedFileName}` })
       }
 
       try {
@@ -553,10 +552,10 @@ class Logger {
         const deletePromises = filesToDelete.map((file) => fs.promises.unlink(path.join(this.logDir, file)))
         await Promise.all(deletePromises)
 
-        res.status(200).send({ success: true })
+        res.status(200).json({ success: true })
       } catch (error) {
         console.error('Error clearing log files 2:', error)
-        res.status(500).send(`Failed to clearing log files with input 2 ${requestedFileName}`)
+        res.status(500).json({ error: `Failed to clearing log files with input 2 ${requestedFileName}` })
       }
     })
   }

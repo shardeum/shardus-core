@@ -2161,7 +2161,7 @@ class Shardus extends EventEmitter {
       if (req.query.set) {
         this.debugForeverLoopsEnabled = req.query.set === 'true'
       }
-      res.send(`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`)
+      res.json({ debugForeverLoopsEnabled: this.debugForeverLoopsEnabled })
     })
   }
 
@@ -2774,20 +2774,20 @@ class Shardus extends EventEmitter {
   _registerRoutes() {
     // DEBUG routes
     this.network.registerExternalPost('exit', isDebugModeMiddlewareHigh, async (_req, res) => {
-      res.send({ success: true })
+      res.json({ success: true })
       await this.shutdown()
     })
     // TODO elevate security beyond high when we get multi sig.  or is that too slow when needed?
     this.network.registerExternalPost('exit-apop', isDebugModeMiddlewareHigh, async (_req, res) => {
       apoptosizeSelf('Apoptosis called at exit-apop route')
-      res.send({ success: true })
+      res.json({ success: true })
     })
 
     this.network.registerExternalGet('config', isDebugModeMiddlewareLow, async (_req, res) => {
-      res.send({ config: this.config })
+      res.json({ config: this.config })
     })
     this.network.registerExternalGet('netconfig', async (_req, res) => {
-      res.send({ config: netConfig })
+      res.json({ config: netConfig })
     })
 
     this.network.registerExternalGet('nodeInfo', async (req, res) => {
@@ -2808,7 +2808,7 @@ class Shardus extends EventEmitter {
           lostArchiversMap: lostArchiversMap,
         }
       }
-      res.send(result)
+      res.json(result)
     })
 
     this.network.registerExternalGet('joinInfo', isDebugModeMiddlewareMedium, async (_req, res) => {
@@ -2829,7 +2829,7 @@ class Shardus extends EventEmitter {
         getLastHashedStandbyList: JoinV2.getLastHashedStandbyList(),
         getSortedStandbyNodeList: JoinV2.getSortedStandbyJoinRequests(),
       }
-      res.send(deepReplace(result, undefined, '__undefined__'))
+      res.json(deepReplace(result, undefined, '__undefined__'))
     })
 
     this.network.registerExternalGet('standby-list-debug', isDebugModeMiddlewareLow, async (_req, res) => {
@@ -2839,37 +2839,44 @@ class Shardus extends EventEmitter {
         ip: node.nodeInfo.externalIp,
         port: node.nodeInfo.externalPort,
       }))
-      res.send(result)
+      res.json(result)
     })
 
     this.network.registerExternalGet('status-history', isDebugModeMiddlewareLow, async (_req, res) => {
       let result = Self.getStatusHistoryCopy()
-      res.send(deepReplace(result, undefined, '__undefined__'))
+      res.json(deepReplace(result, undefined, '__undefined__'))
     })
 
     this.network.registerExternalGet('socketReport', isDebugModeMiddlewareLow, async (_req, res) => {
-      res.send(await getSocketReport())
+      res.json(await getSocketReport())
     })
     this.network.registerExternalGet('forceCycleSync', isDebugModeMiddleware, async (req, res) => {
       let enable = req.query.enable === 'true' || false
       config.p2p.hackForceCycleSyncComplete = enable
-      res.send(await getSocketReport())
+      res.json(await getSocketReport())
     })
 
-    this.network.registerExternalGet('calculate-fake-time-offset', isDebugModeMiddlewareHigh, async (req, res) => {
-      const shift = req.query.shift ? parseInt(req.query.shift as string) : 0
-      const spread = req.query.spread ? parseInt(req.query.spread as string) : 0
-      const offset = calculateFakeTimeOffset(shift, spread)
-      /* prettier-ignore */ this.mainLogger.debug({ message: "Calculated fakeTimeOffset", data: { shift, spread, offset } });
-      res.send({ success: true })
-    })
+    this.network.registerExternalGet(
+      'calculate-fake-time-offset',
+      isDebugModeMiddlewareHigh,
+      async (req, res) => {
+        const shift = req.query.shift ? parseInt(req.query.shift as string) : 0
+        const spread = req.query.spread ? parseInt(req.query.spread as string) : 0
+        const offset = calculateFakeTimeOffset(shift, spread)
+        /* prettier-ignore */ this.mainLogger.debug({ message: "Calculated fakeTimeOffset", data: { shift, spread, offset } });
+        res.json({ success: true })
+      }
+    )
 
-    this.network.registerExternalGet('clear-fake-time-offset', isDebugModeMiddlewareHigh, async (_req, res) => {
-      const offset = clearFakeTimeOffset()
-      /* prettier-ignore */ this.mainLogger.debug({ message: "Cleared fakeTimeOffset", data: { offset } });
-      res.send({ success: true })
-    })
-
+    this.network.registerExternalGet(
+      'clear-fake-time-offset',
+      isDebugModeMiddlewareHigh,
+      async (_req, res) => {
+        const offset = clearFakeTimeOffset()
+        /* prettier-ignore */ this.mainLogger.debug({ message: "Cleared fakeTimeOffset", data: { offset } });
+        res.json({ success: true })
+      }
+    )
 
     // this.p2p.registerInternal(
     //   'sign-app-data',
@@ -2936,7 +2943,7 @@ class Shardus extends EventEmitter {
         this.mainLogger.debug(`testGlobalAccountTX: req:${utils.stringifyReduce(req.body)}`)
         const tx = req.body.tx
         this.put(tx, false, true)
-        res.send({ success: true })
+        res.json({ success: true })
       } catch (ex) {
         this.mainLogger.debug('testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.shardus_fatal(
@@ -2951,7 +2958,7 @@ class Shardus extends EventEmitter {
         this.mainLogger.debug(`testGlobalAccountTXSet: req:${utils.stringifyReduce(req.body)}`)
         const tx = req.body.tx
         this.put(tx, true, true)
-        res.send({ success: true })
+        res.json({ success: true })
       } catch (ex) {
         this.mainLogger.debug('testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.shardus_fatal(

@@ -717,7 +717,7 @@ function registerSnapshotRoutes() {
         res.json([])
         return
       }
-      if (Self.isActive) return res.send({ answer: P2P.SnapshotTypes.offerResponse.notNeeded })
+      if (Self.isActive) return res.json({ answer: P2P.SnapshotTypes.offerResponse.notNeeded })
       const offerRequest = req.body
       let answer = P2P.SnapshotTypes.offerResponse.notNeeded
       const neededPartitonIds = []
@@ -735,7 +735,7 @@ function registerSnapshotRoutes() {
         }
         if (neededPartitonIds.length > 0) answer = P2P.SnapshotTypes.offerResponse.needed
       }
-      res.send({ answer })
+      res.json({ answer })
       if (answer === P2P.SnapshotTypes.offerResponse.needed && missingPartitions.length > 0) {
         const downloadedSnapshotData = await SnapshotFunctions.downloadDataFromNode(offerRequest.downloadUrl)
         if (downloadedSnapshotData) processDownloadedMissingData(downloadedSnapshotData)
@@ -753,7 +753,7 @@ function registerSnapshotRoutes() {
         return
       }
       if (Self.isActive) {
-        return res.send({ answer: P2P.SnapshotTypes.offerResponse.notNeeded })
+        return res.json({ answer: P2P.SnapshotTypes.offerResponse.notNeeded })
       }
       const offerRequest = req.body
       const neededPartitonIds = []
@@ -761,7 +761,7 @@ function registerSnapshotRoutes() {
       if (!safetySyncing || !safetyModeVals.networkStateHash) {
         if (!safetySyncing) log('We are not doing data exchange yet. Try agian later')
         if (!safetyModeVals.networkStateHash) log('We have empty network state hash. Try agian later')
-        return res.send({
+        return res.json({
           answer: P2P.SnapshotTypes.offerResponse.tryLater,
           waitTime: Context.config.p2p.cycleDuration * 1000 * 0.5,
         })
@@ -779,14 +779,14 @@ function registerSnapshotRoutes() {
           }
         }
         if (neededPartitonIds.length > 0) {
-          return res.send({
+          return res.json({
             answer: P2P.SnapshotTypes.offerResponse.needed,
             partitions: neededPartitonIds,
             hashes: neededHashes,
           })
         }
       }
-      return res.send({ answer: P2P.SnapshotTypes.offerResponse.notNeeded })
+      return res.json({ answer: P2P.SnapshotTypes.offerResponse.notNeeded })
     },
   }
 

@@ -59,14 +59,14 @@ export function init() {
         standby: getStandbyNodesInfoMap().size,
         desired: getDesiredCount(),
       }
-      return res.send(networkStats)
+      return res.json(networkStats)
     } catch (e) {
       console.log(`Error getting load: ${e.message}`)
     }
   })
   network.registerExternalGet('age-index', isDebugModeMiddlewareLow, (req, res) => {
     try {
-      return res.send(getAgeIndex())
+      return res.json(getAgeIndex())
     } catch (e) {
       console.log(`Error getting age index: ${e.message}`)
     }

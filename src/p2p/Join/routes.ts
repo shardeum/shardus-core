@@ -53,7 +53,7 @@ const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'cyclemarker',
   handler: (_req, res) => {
     const marker = CycleChain.newest ? CycleChain.newest.previous : '0'.repeat(64)
-    res.send(marker)
+    res.json({ marker })
   },
 }
 
@@ -243,7 +243,7 @@ const unjoinRoute: P2P.P2PTypes.Route<Handler> = {
     const unjoinRequest = req.body
     const processResult = processNewUnjoinRequest(unjoinRequest)
     if (processResult.isErr()) {
-      return res.status(500).send(processResult.error)
+      return res.status(500).json({ error: processResult.error })
     }
 
     // we need to remove the unjoin request this cycle since we are waiting until next cycle to gossip it to the network
@@ -253,7 +253,7 @@ const unjoinRoute: P2P.P2PTypes.Route<Handler> = {
 
     queueUnjoinRequest(unjoinRequest)
 
-    return res.status(200).send()
+    return res.status(200).json()
   },
 }
 
@@ -283,13 +283,13 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
       warn(
         'invalid config.debug.ignoreStandbyRefreshChance value: ' + config.debug.ignoreStandbyRefreshChance
       )
-      res.status(500).send('invalid config.debug.ignoreStandbyRefreshChance value')
+      res.status(500).json({ error: 'invalid config.debug.ignoreStandbyRefreshChance value' })
       // check if we should ignore this request for testing purposes
     } else if (config.debug.ignoreStandbyRefreshChance > 0) {
       // if we should ignore this request, sleep for 1.1 seconds since timeout is 1 second
       if (testFailChance(config.debug.ignoreStandbyRefreshChance, 'standby-refresh', '', '', false)) {
         await utils.sleep(3000)
-        res.status(500).send('simulated timeout')
+        res.status(500).json({ error: 'simulated timeout' })
       }
     }
 
@@ -298,16 +298,16 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
     let err = utils.validateTypes(req, { body: 'o' })
     if (err) {
       warn('/standby-refresh bad req ' + err)
-      res.status(400).send()
+      res.status(400).json()
     }
     err = typeof standbyRefreshPubKey === 'string' ? '' : 'standbyRefreshPubKey is not a string'
     if (err) {
       warn('/standby-refresh bad standby refresh public key ' + err)
-      res.status(400).send()
+      res.status(400).json()
     }
 
     queueStandbyRefreshRequest(standbyRefreshPubKey)
-    return res.status(200).send()
+    return res.status(200).json()
   },
 }
 
@@ -330,7 +330,7 @@ const joinedV2Route: P2P.P2PTypes.Route<Handler> = {
     }
     const publicKey = req.params.publicKey
     const id = NodeList.byPubKey.get(publicKey)?.id || null
-    res.send({ id, isOnStandbyList: isOnStandbyList(publicKey) })
+    res.json({ id, isOnStandbyList: isOnStandbyList(publicKey) })
   },
 }
 
@@ -353,7 +353,7 @@ const joinedRoute: P2P.P2PTypes.Route<Handler> = {
     }
     const publicKey = req.params.publicKey
     const node = NodeList.byPubKey.get(publicKey)
-    res.send({ node })
+    res.json({ node })
   },
 }
 

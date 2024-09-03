@@ -40,7 +40,7 @@ class NestedCounters {
       if (req.headers.accept === 'application/json') {
         // Send JSON response
         res.setHeader('Content-Type', 'application/json')
-        res.send({
+        res.json({
           timestamp: shardusGetTime(),
           report: arrayReport,
         })

@@ -105,7 +105,7 @@ const killExternalRoute: RouteHandlerWithAuthHandler<Handler> = {
   name: 'kill',
   authHandler: isDebugModeMiddlewareHigh,
   handler: (_req, res) => {
-    res.send({ status: 'left the network without telling any peers' })
+    res.json({ status: 'left the network without telling any peers' })
     killSelf(
       'Apoptosis being called killExternalRoute()->killSelf()->emitter.emit(`apoptosized`) at src/p2p/Lost.ts'
     )
@@ -117,7 +117,7 @@ const killOtherExternalRoute: RouteHandlerWithAuthHandler<Handler> = {
   name: 'killother',
   authHandler: isDebugModeMiddlewareHigh,
   handler: (_req, res) => {
-    res.send({ status: 'killing another node' })
+    res.json({ status: 'killing another node' })
     killOther()
   },
 }
@@ -129,7 +129,7 @@ const isDownCheckRoute: P2P.P2PTypes.Route<Handler> = {
     const nodeId = _req.query.nodeId
     const node = nodes.get(nodeId.toString())
     const result = await isDownCheck(node)
-    res.send({ status: result })
+    res.json({ status: result })
   },
 }
 
