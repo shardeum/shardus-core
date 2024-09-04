@@ -2130,6 +2130,12 @@ class StateManager {
             return
           }
           const req = deserializeGetAccountQueueCountReq(requestStream)
+          // Limit the number of accounts to prevent abuse
+          const MAX_ACCOUNTS = this.config.stateManager.accountBucketSize // default 200
+          if (req.accountIds.length > MAX_ACCOUNTS) {
+            nestedCountersInstance.countEvent('internal', `${route}-too_many_accounts`)
+            return respond(BadRequest(`${route} too many accounts requested`), serializeResponseError)
+          }
           const result: GetAccountQueueCountResp = {
             counts: [],
             committingAppData: [],
