@@ -142,6 +142,26 @@ export class NetworkClass extends EventEmitter {
     })
   }
 
+  // Automatically wrap routes to handle errors
+  wrapRoutes() {
+    const app = this.app;
+    ['get', 'post', 'put', 'delete', 'patch', 'options'].forEach((method) => {
+      const original = app[method];
+      app[method] = (path, ...handlers) => {
+        const wrappedHandlers = handlers.map((handler) => {
+          return async (req, res, next) => {
+            try {
+              await handler(req, res, next);
+            } catch (err) {
+              next(err);
+            }
+          };
+        });
+        return original.call(app, path, ...wrappedHandlers);
+      };
+    });
+  }
+
   // TODO: Allow for binding to a specified network interface
   _setupExternal() {
     return new Promise((resolve, reject) => {
