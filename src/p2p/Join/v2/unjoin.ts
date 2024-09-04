@@ -73,13 +73,11 @@ export function validateUnjoinRequest(unjoinRequest: SignedUnjoinRequest): Resul
     return err(new Error(`unjoin request from ${unjoinRequest.publicKey} already exists`))
   }
 
-   // cycle number check
-   const cycleNumber = CycleChain.getNewest().counter
-   if (cycleNumber !== unjoinRequest.cycleNumber) {
-     return err(
-      new Error(`cycle number in SignedUnjoinRequest request does not match current cycle number`)
-    )
-   }
+  // cycle number check
+  const cycleNumber = CycleChain.getNewest().counter
+  if (Math.abs(cycleNumber - unjoinRequest.cycleNumber) > 1) {
+    return err( new Error(`cycle number in SignedUnjoinRequest request is not close enough to the current cycle`) )
+  }
 
   const wasSelectedLastCycle = CycleChain.newest.joinedConsensors.find(
     (node) => node.publicKey === unjoinRequest.publicKey
