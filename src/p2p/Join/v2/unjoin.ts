@@ -19,6 +19,7 @@ const newUnjoinRequests: Set<SignedUnjoinRequest> = new Set()
 export async function submitUnjoin(): Promise<Result<void, Error>> {
   const unjoinRequest = crypto.sign({
     publicKey: crypto.keypair.publicKey,
+    cycleNumber: CycleChain.getNewest().counter,
   })
 
   const foundInStandbyNodes = getStandbyNodesInfoMap().has(unjoinRequest.publicKey)
@@ -71,6 +72,14 @@ export function validateUnjoinRequest(unjoinRequest: SignedUnjoinRequest): Resul
   if (newUnjoinRequestsArray.some((req) => req.publicKey === unjoinRequest.publicKey)) {
     return err(new Error(`unjoin request from ${unjoinRequest.publicKey} already exists`))
   }
+
+   // cycle number check
+   const cycleNumber = CycleChain.getNewest().counter
+   if (cycleNumber !== unjoinRequest.cycleNumber) {
+     return err(
+      new Error(`cycle number in SignedUnjoinRequest request does not match current cycle number`)
+    )
+   }
 
   const wasSelectedLastCycle = CycleChain.newest.joinedConsensors.find(
     (node) => node.publicKey === unjoinRequest.publicKey
