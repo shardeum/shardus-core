@@ -656,7 +656,12 @@ export function registerInternalBinary(route: string, handler: InternalBinaryHan
       /* prettier-ignore */ if (logFlags.p2pNonFatal) warn('registerInternalBinary: internal routes can only be used by nodes in the network...')
       return
     }
-
+    if (
+      NodeList.nodes.get(header.sender_id).publicKey !== sign.owner
+    ) {
+      warn('registerInternalBinary: Public key is not the same with sign owner')
+      return
+    }
     // Checks to see if we can extract the actual payload from the wrapped message
     const requestPayload = _extractPayloadBinary(wrappedPayload)
     if (!requestPayload) {
