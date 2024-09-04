@@ -506,6 +506,16 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
     return
   }
 
+  // then, verify the signature of the join request. this has to be done
+  // before selectionNum is calculated because we will mutate the original
+  // join request.
+  const signatureError = verifyJoinRequestSignature(joinRequest)
+  if (signatureError) {
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-gossip-reject: signature error`)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-gossip-reject: signature error ${joinRequest.nodeInfo.publicKey}:`)
+    return
+  }
+
   // then, calculate the selection number for this join request
   const selectionNumResult = computeSelectionNum(joinRequest)
   if (selectionNumResult.isErr()) {
