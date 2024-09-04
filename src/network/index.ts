@@ -99,6 +99,7 @@ export class NetworkClass extends EventEmitter {
     this.useLruCacheForSocketMgmt = config.p2p.useLruCacheForSocketMgmt
     this.lruCacheSizeForSocketMgmt = config.p2p.lruCacheSizeForSocketMgmt
     this.shardusCryptoHashKey = config.crypto.hashKey
+    this.wrapRoutes();
   }
 
   setDebugNetworkDelay(delay: number) {
