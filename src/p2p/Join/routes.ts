@@ -506,6 +506,10 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
     return
   }
 
+  // set selectionNum to undefined so that we can verify the signature
+  // it'll be added back soon anyways
+  joinRequest.selectionNum = undefined
+
   // then, verify the signature of the join request. this has to be done
   // before selectionNum is calculated because we will mutate the original
   // join request.
