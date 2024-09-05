@@ -901,7 +901,7 @@ export function registerRoutes() {
     if (!accepted.success) {
       warn('Archiver join request not accepted.')
       return res.json(
-        Utils.safeStringify({ success: false, error: `Archiver join request rejected! ${accepted.reason}` })
+        { success: false, error: `Archiver join request rejected! ${accepted.reason}` }
       )
     }
     if (logFlags.p2pNonFatal) info('Archiver join request accepted!')
@@ -922,7 +922,7 @@ export function registerRoutes() {
     if (!accepted.success) {
       warn('Archiver leave request not accepted.')
       return res.json(
-        Utils.safeStringify({ success: false, error: `Archiver leave request rejected! ${accepted.reason}` })
+        { success: false, error: `Archiver leave request rejected! ${accepted.reason}` }
       )
     }
     if (logFlags.p2pNonFatal) info('Archiver leave request accepted!')

@@ -524,7 +524,7 @@ class Logger {
         } else {
           const sanitizedFileName = path.basename(requestedFileName)
           if (!validFileNames.includes(sanitizedFileName)) {
-            res.status(400).json('Invalid log file specified')
+            res.status(400).json({ error: 'Invalid log file specified' })
             return
           }
           filesToClear.push(sanitizedFileName)

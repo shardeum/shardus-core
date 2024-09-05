@@ -310,25 +310,21 @@ const reportFakeLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
     if (archiver) {
       funcs.reportLostArchiver(archiver.publicKey, 'fake lost archiver report')
       res.json(
-        Utils.safeStringify(
-          crypto.sign({
-            status: 'accepted',
-            pick,
-            archiver,
-            message: 'will report fake lost archiver',
-          })
-        )
+        crypto.sign({
+          status: 'accepted',
+          pick,
+          archiver,
+          message: 'will report fake lost archiver',
+        })
       )
     } else {
       res.json(
-        Utils.safeStringify(
-          crypto.sign({
-            status: 'failed',
-            pick,
-            archiver,
-            message: 'archiver not found',
-          })
-        )
+        crypto.sign({
+          status: 'failed',
+          pick,
+          archiver,
+          message: 'archiver not found',
+        })
       )
     }
   },
