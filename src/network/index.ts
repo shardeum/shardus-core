@@ -20,6 +20,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
 import { Utils } from '@shardus/types'
+import { createServer } from 'node:http'
 import { Server as SocketIOServer } from 'socket.io';
 
 /** TYPES */
@@ -155,10 +156,29 @@ export class NetworkClass extends EventEmitter {
         next()
       }
 
-      this.app.use(bodyParser.json({ limit: '50mb', reviver: Utils.typeReviver}))
-      this.app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }))
-      this.app.use(cors())
-      this.app.use(this.customSendJsonMiddleware)
+      // Apply bodyParser to all routes except Socket.IO polling
+      this.app.use((req, res, next) => {
+        if (!req.url.startsWith('/socket.io/')) {
+          bodyParser.json({ limit: '50mb' })(req, res, next);
+        } else {
+          next();
+        }
+      });
+
+      this.app.use((req, res, next) => {
+        if (!req.url.startsWith('/socket.io/')) {
+          bodyParser.urlencoded({ limit: '50mb', extended: true })(req, res, next);
+        } else {
+          next();
+        }
+      });
+      this.app.use(cors({
+        origin: '*',
+        methods: ['GET', 'POST'],
+        allowedHeaders: ['Content-Type'],
+        credentials: true,
+      }));
+      // this.app.use(this.customSendJsonMiddleware)
       this.app.use(storeRequests)
       this._applyExternal()
       this.app.use((err, req, res, next) => {
@@ -169,14 +189,32 @@ export class NetworkClass extends EventEmitter {
         })
       })
 
-      this.extServer = this.app.listen(this.ipInfo.externalPort, () => {
+      this.app.use((req, res, next) => {
+        // Check if the request is related to WebSocket (Socket.IO) by matching the path
+        if (req.url.startsWith('/socket.io/')) {
+          console.log(` red - WebSocket Request to ${req.url}:`, req.method);
+
+          res.on('finish', () => {
+            console.log(` red - WebSocket Response status for ${req.url}: ${res.statusCode}`);
+          });
+        }
+        next();  // Always move to the next middleware
+      });
+
+      this.extServer = createServer(this.app)
+      this.io = new SocketIOServer(this.extServer, {
+        transports: ['websocket'],
+        maxHttpBufferSize: 1e9,
+        pingTimeout: 60000,
+        pingInterval: 25000,
+      } as any)
+      this.extServer.listen(this.ipInfo.externalPort, () => {
         const msg = `External server running on port ${this.ipInfo.externalPort}...`
         console.log(msg)
         this.mainLogger.info('Network: ' + msg)
       })
       this.extServer.setTimeout(config.network.timeout * 1000)
 
-      this.io = require('socket.io')(this.extServer)
       resolve(this.io)
     })
   }

@@ -459,9 +459,43 @@ class Shardus extends EventEmitter {
       const sk: string = this.crypto.keypair.secretKey
       this.io = (await this.network.setup(Network.ipInfo, sk)) as SocketIOServer
       Context.setIOContext(this.io)
-      this.io.on('connection', (socket: any) => {
+      this.io.on('error', (error) => {
+        console.error(' red - Server error:', error);
+      });
+
+      this.io.on('error', (error) => {
+        console.error(' red - HTTP server error:', error);
+      });
+      this.io.on('connection', (socket) => {
+        console.log(' red - socket connection', socket)
+        // Log when the client disconnects
+        socket.on('disconnect', (reason) => {
+          console.log(' red - Client disconnected:', socket.id, 'Reason:', reason);
+        });
+
+        socket.onAny((event, ...args) => {
+          console.log(` red - WebSocket event received: ${event}, data:`, args);
+        });
+
+        // Log any outgoing messages
+        const originalEmit = socket.emit;
+        socket.emit = function (event, ...args) {
+          console.log(` red - WebSocket event sent: ${event}, data:`, args);
+          return originalEmit.apply(socket, [event, ...args]);
+        };
+
+        // Log WebSocket upgrade
+        socket.on('upgrade', () => {
+          console.log(' red - Client upgraded to WebSocket:', socket.id);
+        });
+
+        // Capture any errors on the socket
+        socket.on('error', (error) => {
+          console.error(' red - Socket error on client:', socket.id, 'Error:', error);
+        });
         if (!Self || !Self.isActive) {
           if (!Self.allowConnectionToFirstNode) {
+            console.log(' red - disconnect first node ')
             socket.disconnect()
             console.log(`This node is not active yet and kill the socket connection!`)
           }
@@ -469,9 +503,11 @@ class Shardus extends EventEmitter {
         if (this.config.features.archiverDataSubscriptionsUpdate) {
           console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
           socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
+            console.log(' red - Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
             console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
             // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
             if (!Archivers.recipients || !Archivers.connectedSockets) {
+              console.log(' red - no archiver recepient ')
               socket.disconnect()
               console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
               return
@@ -482,6 +518,7 @@ class Shardus extends EventEmitter {
               }
               Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
             } else {
+              console.log(' red - Archiver is not found in the recipients list and kill the socket connection', ARCHIVER_PUBLIC_KEY)
               socket.disconnect()
               console.log(
                 'Archiver is not found in the recipients list and kill the socket connection',
@@ -490,6 +527,7 @@ class Shardus extends EventEmitter {
             }
           })
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
+            console.log(' red - Archive server has with public key', ARCHIVER_PUBLIC_KEY, 'request to unsubscribe')
             if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] === socket.id) {
               console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
               Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
@@ -499,9 +537,11 @@ class Shardus extends EventEmitter {
         } else {
           console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
           socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
+            console.log(' red - Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
             console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
             // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
             if (!Archivers.recipients || !Archivers.connectedSockets) {
+              console.log( ' red - no archiver recepient ')
               socket.disconnect()
               console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
               return
@@ -516,13 +556,14 @@ class Shardus extends EventEmitter {
               Object.keys(Archivers.connectedSockets).length >= config.p2p.maxArchiversSubscriptionPerNode
             ) {
               /* prettier-ignore */ console.log( `There are already ${config.p2p.maxArchiversSubscriptionPerNode} archivers connected for data transfer!` )
+              console.log(' red - max archivers subscription per node ')
               socket.disconnect()
               return
             }
             Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
           })
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
-
+            console.log(' red - Archive server has with public key', ARCHIVER_PUBLIC_KEY, 'request to unsubscribe')
             if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] === socket.id) {
               console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
               Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
@@ -532,6 +573,7 @@ class Shardus extends EventEmitter {
         }
       })
     } catch (e) {
+      console.log(' red - somthing wrongl', e)
       this.mainLogger.error('Socket connection break', e)
     }
     this.network.on('timeout', (node, requestId: string, context: string, route: string) => {
