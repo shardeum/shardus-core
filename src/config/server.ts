@@ -355,7 +355,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     reduceTimeFromTxTimestamp: 60000,
     fallbackToCurrentCycleFortxGroup: false,
     maxCyclesShardDataToKeep: 20,
-    avoidOurIndexInFactTell: true
+    avoidOurIndexInFactTell: false, //initial testing shows this may cause issues so leaving it off for now
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Release,
