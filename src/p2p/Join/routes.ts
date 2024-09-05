@@ -11,16 +11,11 @@ import { P2P } from '@shardus/types'
 import {
   addJoinRequest,
   computeSelectionNum,
-  getAllowBogon,
-  setAllowBogon,
-  validateJoinRequest,
   verifyJoinRequestSignature,
-  warn,
   queueStandbyRefreshRequest,
   queueJoinRequest,
   queueUnjoinRequest,
-  verifyJoinRequestTypes,
-  nodeListFromStates
+  nodeListFromStates,
 } from '.'
 import { config } from '../Context'
 import { isBogonIP } from '../../utils/functions/checkIP'
@@ -43,7 +38,9 @@ import { addSyncStarted } from './v2/syncStarted'
 import { addStandbyRefresh } from './v2/standbyRefresh'
 import { Utils } from '@shardus/types'
 import { testFailChance } from '../../utils'
-import { shardusGetTime } from '../../network'
+import { validateJoinRequest } from './validate'
+import { warn } from './logging'
+import { getAllowBogon, setAllowBogon } from './state'
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
@@ -444,14 +441,14 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
  * Part of Join Protocol v2. Gossips all valid join requests.
  */
 const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
-{
-  joinRequest: P2P.JoinTypes.JoinRequest,
-  sign: P2P.P2PTypes.Signature
-},
+  {
+    joinRequest: P2P.JoinTypes.JoinRequest
+    sign: P2P.P2PTypes.Signature
+  },
   P2P.NodeListTypes.Node['id']
 > = (
   payload: {
-    joinRequest: P2P.JoinTypes.JoinRequest,
+    joinRequest: P2P.JoinTypes.JoinRequest
     sign: P2P.P2PTypes.Signature
   },
   sender: P2P.NodeListTypes.Node['id'],
@@ -541,10 +538,17 @@ const gossipUnjoinRequests: P2P.P2PTypes.GossipHandler<SignedUnjoinRequest, P2P.
   sender: P2P.NodeListTypes.Node['id'],
   tracker: string
 ) => {
-  if(!checkGossipPayload(payload, {
-    publicKey: 's',
-    sign: 'o',
-  }, 'gossip-unjoin', sender)) {
+  if (
+    !checkGossipPayload(
+      payload,
+      {
+        publicKey: 's',
+        sign: 'o',
+      },
+      'gossip-unjoin',
+      sender
+    )
+  ) {
     return
   }
 
@@ -724,7 +728,15 @@ const gossipStandbyRefresh: P2P.P2PTypes.GossipHandler<
 }
 
 export const routes = {
-  external: [cycleMarkerRoute, joinRoute, joinedRoute, joinedV2Route, acceptedRoute, unjoinRoute, standbyRefreshRoute],
+  external: [
+    cycleMarkerRoute,
+    joinRoute,
+    joinedRoute,
+    joinedV2Route,
+    acceptedRoute,
+    unjoinRoute,
+    standbyRefreshRoute,
+  ],
   gossip: {
     'gossip-join': gossipJoinRoute,
     'gossip-valid-join-requests': gossipValidJoinRequests,
