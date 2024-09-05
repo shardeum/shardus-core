@@ -1298,34 +1298,34 @@ class TransactionConsenus {
             //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
             // }
           }
-          const nodesToSendTo: Set<Shardus.Node> = new Set()
+          // const nodesToSendTo: Set<Shardus.Node> = new Set()
 
-          for (const data of readableReq.finalState.stateList) {
-            if (data == null) {
-              continue
-            }
-            if (savedAccountIds.has(data.accountId) === false) {
-              continue
-            }
-            const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
-            for (const node of storageNodes) {
-              nodesToSendTo.add(node)
-            }
-          }
-          if (nodesToSendTo.size > 0) {
-            const finalDataToGossip = { ...readableReq.finalState, txGroupCycle: queueEntry.txGroupCycle }
-            Comms.sendGossip(
-              'gossip-final-state',
-              finalDataToGossip,
-              null,
-              null,
-              Array.from(nodesToSendTo),
-              false,
-              4,
-              queueEntry.acceptedTx.txId
-            )
-            nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
-          }
+          // for (const data of readableReq.finalState.stateList) {
+          //   if (data == null) {
+          //     continue
+          //   }
+          //   if (savedAccountIds.has(data.accountId) === false) {
+          //     continue
+          //   }
+          //   const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
+          //   for (const node of storageNodes) {
+          //     nodesToSendTo.add(node)
+          //   }
+          // }
+          // if (nodesToSendTo.size > 0) {
+          //   const finalDataToGossip = { ...readableReq.finalState, txGroupCycle: queueEntry.txGroupCycle }
+          //   Comms.sendGossip(
+          //     'gossip-final-state',
+          //     finalDataToGossip,
+          //     null,
+          //     null,
+          //     Array.from(nodesToSendTo),
+          //     false,
+          //     4,
+          //     queueEntry.acceptedTx.txId
+          //   )
+          //   nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
+          // }
         } catch (e) {
           console.error(`Error processing poqoDataAndReceipt Binary handler: ${e}`)
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
