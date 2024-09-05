@@ -146,6 +146,7 @@ export function getCycleNumberFromTimestamp(
         /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber failed to redeem')
       }
     } else {
+      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `current cycle`)
       return currentCycleShardData.cycleNumber
     }
   }
@@ -158,9 +159,19 @@ export function getCycleNumberFromTimestamp(
   //is it in the future
   if (offsetTimestamp >= currentCycleShardData.timestampEndCycle) {
     let cycle: P2P.CycleCreatorTypes.CycleRecord = getNewest()
-
     let timePastCurrentCycle = offsetTimestamp - currentCycleShardData.timestampEndCycle
-    let cyclesAhead = Math.ceil(timePastCurrentCycle / (cycle.duration * 1000))
+    // floor + 1 needed to fit where the lower boundary is closed and the upper is open
+    const cyclesAheadNotAdjusted = timePastCurrentCycle / (cycle.duration * 1000)
+    let cyclesAhead = Math.floor(cyclesAheadNotAdjusted) // +1  //save +1 for after some extra logging
+
+    //If we land on an exact boundary this would have been broken under past logic
+    if(cyclesAhead === cyclesAheadNotAdjusted){
+      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `exact future boundary`)
+    }
+
+    // +1 because we are using a floor to work with a lower closed boundary and upper open boundary
+    cyclesAhead += 1 //this makes sense because to get in this exact code the cycle must be in the future by at leaset one
+
     nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `+${cyclesAhead}`)
 
     return currentCycleShardData.cycleNumber + cyclesAhead
@@ -170,12 +181,12 @@ export function getCycleNumberFromTimestamp(
     // let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
     const cycle = getStoredCycleByTimestamp(offsetTimestamp)
     if (cycle != null) {
-      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup')
       if (cycle.counter == null) {
         /* prettier-ignore */ stateManager.statemanager_fatal('getCycleNumberFromTimestamp  unexpected cycle.cycleNumber == null', 'getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null')
         /* prettier-ignore */ nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null  ${timestamp}`)
       }
-
+      const cyclesBehind = currentCycleShardData.cycleNumber - cycle.counter
+      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `-${cyclesBehind}`)
       return cycle.counter
     } else {
       //nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle')
