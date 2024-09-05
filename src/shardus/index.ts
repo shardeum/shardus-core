@@ -459,9 +459,18 @@ class Shardus extends EventEmitter {
       const sk: string = this.crypto.keypair.secretKey
       this.io = (await this.network.setup(Network.ipInfo, sk)) as SocketIO.Server
       Context.setIOContext(this.io)
-      // Adding a middleware for auth
+      /**
+       * io.use middleware to authenticate the archiver socket connections
+       * was added under BLUE-257
+      */
       this.io.use((socket, next) => {
         try {
+          if (!Self || !Self.isActive) {
+            if (!Self.allowConnectionToFirstNode) {
+              socket.disconnect()
+              this.mainLogger.error(`❌ This node is not active yet and kill the socket connection!`)
+            }
+          }
           // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
           if (!Archivers.recipients || !Archivers.connectedSockets) {
             this.mainLogger.error(
@@ -504,14 +513,24 @@ class Shardus extends EventEmitter {
       })
       this.io.on('connection', (socket: any) => {
         const { publicKey: archiverPublicKey } = socket.handshake.query.data
-        if (!Self || !Self.isActive) {
+        /**
+         * The following check has been moved to the top of io.use middleware
+         * if (!Self || !Self.isActive) {
           if (!Self.allowConnectionToFirstNode) {
             socket.disconnect()
             console.log(`This node is not active yet and kill the socket connection!`)
           }
-        }
+        } */
         if (this.config.features.archiverDataSubscriptionsUpdate) {
           console.log(`✅ Archive server has subscribed to this node with Socket-ID ${socket.id}!`)
+          /**
+           * The following code-block has also been shifted to the io.use middleware
+           // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
+           // if (!Archivers.recipients || !Archivers.connectedSockets) {
+            socket.disconnect()
+            console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
+            return
+          } */
           console.log('Archiver has registered its public key', archiverPublicKey)
           if (Archivers.connectedSockets[archiverPublicKey]) {
             Archivers.removeArchiverConnection(archiverPublicKey)
