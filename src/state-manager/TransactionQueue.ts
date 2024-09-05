@@ -4515,6 +4515,51 @@ class TransactionQueue {
           //correspondingIndices = extraCorrespondingIndices
         }
       }
+      // check if we should avoid our index in the corresponding nodes
+      if (Context.config.stateManager.avoidOurIndexInFactTell && correspondingIndices.includes(ourIndexInTxGroup)) {
+        if (logFlags.debug) this.mainLogger.debug(`factTellCorrespondingNodes: avoiding our index in tx group`, ourIndexInTxGroup, correspondingIndices)
+        queueEntry.correspondingGlobalOffset += 1
+        nestedCountersInstance.countEvent('stateManager', 'factTellCorrespondingNodes: avoiding our index in tx group')
+        correspondingIndices = getCorrespondingNodes(
+          ourIndexInTxGroup,
+          targetIndices.startIndex,
+          targetIndices.endIndex,
+          queueEntry.correspondingGlobalOffset,
+          targetGroupSize,
+          senderGroupSize,
+          queueEntry.transactionGroup.length
+        )
+        let oldCorrespondingIndices:number[] = undefined
+        if(this.config.stateManager.correspondingTellUseUnwrapped){
+          // can just find if any home nodes for the accounts we cover would say that our node is wrapped
+          // precalc shouldUnwrapSender   check if any account we own shows that we are on the left side of a wrapped range
+          // can use partitions to check this
+          if (unwrappedIndex != null) {
+            const extraCorrespondingIndices = getCorrespondingNodes(
+              unwrappedIndex,
+              targetIndices.startIndex,
+              targetIndices.endIndex,
+              queueEntry.correspondingGlobalOffset,
+              targetGroupSize,
+              senderGroupSize,
+              queueEntry.transactionGroup.length,
+              queueEntry.logID
+            )
+            if (Context.config.stateManager.concatCorrespondingTellUseUnwrapped) {
+              //add them
+              correspondingIndices = correspondingIndices.concat(extraCorrespondingIndices)
+            } else {
+              // replace them
+              oldCorrespondingIndices = correspondingIndices
+              correspondingIndices = extraCorrespondingIndices
+            }
+            //replace them
+            // possible optimization where we pick one or the other path based on our account index
+            //correspondingIndices = extraCorrespondingIndices
+          }
+        }
+        if (logFlags.debug) this.mainLogger.debug(`factTellCorrespondingNodes: new corresponding indices after avoiding our index in tx group`, ourIndexInTxGroup, correspondingIndices)
+      }
 
       const validCorrespondingIndices = []
       for (const targetIndex of correspondingIndices) {

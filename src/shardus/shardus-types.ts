@@ -1318,6 +1318,8 @@ export interface ServerConfiguration {
     fallbackToCurrentCycleFortxGroup: boolean
     // max number of recent cycle shard data to keep
     maxCyclesShardDataToKeep: number
+    // make sure we send data to non-self nodes
+    avoidOurIndexInFactTell: boolean
   }
   /** Options for sharding calculations */
   sharding?: {
