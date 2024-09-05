@@ -975,6 +975,7 @@ export interface ServerConfiguration {
     timestampCacheFix: boolean
     // /** The number of network transactions to try to process per cycle from txAdd in cycle record */
     networkTransactionsToProcessPerCycle: number
+    useAjvCycleRecordValidation: boolean
   }
   /** Server IP configuration */
   ip?: {
