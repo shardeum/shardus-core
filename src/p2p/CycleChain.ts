@@ -93,9 +93,13 @@ export function getStoredCycleByTimestamp(timestamp) {
   // search from end, to improve normal case perf
   for (let i = cycles.length - 1; i >= 0; i--) {
     let cycle = cycles[i]
-    if (cycle.start <= secondsTs && cycle.start + cycle.duration > secondsTs) {
+    if (cycle.start < secondsTs && cycle.start + cycle.duration >= secondsTs) {
       return cycle
     }
+  }
+  if(cycles.length > 0 && timestamp === cycles[0].start){
+    nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `getStoredCycleByTimestamp edge case 0`)
+    return cycles[0]
   }
   return null
 }
@@ -127,8 +131,8 @@ export function getCycleNumberFromTimestamp(
 
   //currentCycleShardData
   if (
-    currentCycleShardData.timestamp <= offsetTimestamp &&
-    offsetTimestamp < currentCycleShardData.timestampEndCycle
+    currentCycleShardData.timestamp < offsetTimestamp &&
+    offsetTimestamp <= currentCycleShardData.timestampEndCycle
   ) {
     if (currentCycleShardData.cycleNumber == null) {
       /* prettier-ignore */ stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed. cycleNumber == null', 'currentCycleShardData.cycleNumber == null')
@@ -147,6 +151,9 @@ export function getCycleNumberFromTimestamp(
       }
     } else {
       nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `current cycle`)
+      if(currentCycleShardData.timestamp === offsetTimestamp){
+        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `exact curent upper boundary`)
+      }
       return currentCycleShardData.cycleNumber
     }
   }
@@ -157,20 +164,16 @@ export function getCycleNumberFromTimestamp(
   }
 
   //is it in the future
-  if (offsetTimestamp >= currentCycleShardData.timestampEndCycle) {
+  if (offsetTimestamp > currentCycleShardData.timestampEndCycle) {
     let cycle: P2P.CycleCreatorTypes.CycleRecord = getNewest()
     let timePastCurrentCycle = offsetTimestamp - currentCycleShardData.timestampEndCycle
-    // floor + 1 needed to fit where the lower boundary is closed and the upper is open
+    
     const cyclesAheadNotAdjusted = timePastCurrentCycle / (cycle.duration * 1000)
-    let cyclesAhead = Math.floor(cyclesAheadNotAdjusted) // +1  //save +1 for after some extra logging
-
+    let cyclesAhead = Math.ceil(cyclesAheadNotAdjusted) 
     //If we land on an exact boundary this would have been broken under past logic
     if(cyclesAhead === cyclesAheadNotAdjusted){
       nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `exact future boundary`)
     }
-
-    // +1 because we are using a floor to work with a lower closed boundary and upper open boundary
-    cyclesAhead += 1 //this makes sense because to get in this exact code the cycle must be in the future by at leaset one
 
     nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `+${cyclesAhead}`)
 
