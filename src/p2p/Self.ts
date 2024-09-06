@@ -996,6 +996,10 @@ async function getActiveNodesFromArchiver(
   archiver: ActiveNode
 ): Promise<P2P.P2PTypes.SignedObject<SeedNodesList>> {
   const nodeInfo = getPublicNodeInfo()
+  const joinRequest = {
+    nodeInfo: nodeInfo,
+    appJoinData: Context.shardus.app.getNodeInfoAppData(),
+  }
   const seedListResult: Result<
     P2P.P2PTypes.SignedObject<SeedNodesList>,
     Error
@@ -1003,7 +1007,7 @@ async function getActiveNodesFromArchiver(
     archiver,
     'nodelist',
     Context.crypto.sign({
-      nodeInfo,
+      joinRequest,
     }),
     10000
   )
