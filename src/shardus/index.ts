@@ -83,7 +83,7 @@ import {
 import { Utils } from '@shardus/types'
 import { isNodeInRotationBounds } from '../p2p/Utils'
 import ShardFunctions from '../state-manager/shardFunctions'
-import SocketIO from 'socket.io'
+import SocketIO, { Socket } from 'socket.io'
 import { nodeListFromStates, queueFinishedSyncingRequest } from '../p2p/Join'
 import * as NodeList from '../p2p/NodeList'
 import { P2P } from '@shardus/types'
@@ -459,7 +459,7 @@ class Shardus extends EventEmitter {
       const sk: string = this.crypto.keypair.secretKey
       this.io = (await this.network.setup(Network.ipInfo, sk)) as SocketIO.Server
       Context.setIOContext(this.io)
-      this.io.on('connection', (socket: any) => {
+      this.io.on('connection', (socket: Socket) => {
         if (!Self || !Self.isActive) {
           if (!Self.allowConnectionToFirstNode) {
             socket.disconnect()
@@ -469,6 +469,22 @@ class Shardus extends EventEmitter {
         if (this.config.features.archiverDataSubscriptionsUpdate) {
           console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
           socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
+            const archiver = Archivers.archivers.get(ARCHIVER_PUBLIC_KEY)
+
+            if(!archiver) {
+              console.log('We do not know regonize this archiver, disconnecting', ARCHIVER_PUBLIC_KEY)
+              socket.disconnect()
+              return
+            }
+
+            const ipMatches = archiver.ip === socket.handshake.address
+
+            if (!ipMatches) {
+              console.log(`Archiver IP address does not match the one in the archiver list, disconnecting`, ARCHIVER_PUBLIC_KEY)
+              socket.disconnect()
+              return
+            }
+
             console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
             // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
             if (!Archivers.recipients || !Archivers.connectedSockets) {
