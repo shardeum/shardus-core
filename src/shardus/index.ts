@@ -505,19 +505,33 @@ class Shardus extends EventEmitter {
           })
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
 
-
-            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] !== socket.id) return 
+            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] !== socket.id) {
+              // somebody's pretending to be archiver x
+              // this should not happen. Let the socket go.
+              socket.disconnect()
+              return
+            }
 
             const archiver = Archivers.archivers.get(ARCHIVER_PUBLIC_KEY)
 
-            if(!archiver) return
+            if(!archiver) {
+              // somebody's trying to remove archiver that's not even in the list
+              // this should not happen. Let the socket go.
+              socket.disconnect();
+              return
+            }
 
-            if (archiver.ip !== socket.handshake.address) return
+            if (archiver.ip !== socket.handshake.address) {
+              // sombody pretending kick it out
+              socket.disconnect()
+              return
+            }
 
             console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
             Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
             Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
-
+            // explicitly disconnect
+            socket.disconnect()
           })
         } else {
           console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
@@ -559,17 +573,33 @@ class Shardus extends EventEmitter {
           })
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
 
-            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] !== socket.id) return 
+            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] !== socket.id) {
+              // somebody's pretending to be archiver x
+              // this should not happen. Let the socket go.
+              socket.disconnect()
+              return
+            }
 
             const archiver = Archivers.archivers.get(ARCHIVER_PUBLIC_KEY)
 
-            if(!archiver) return
+            if(!archiver) {
+              // somebody's trying to remove archiver that's not even in the list
+              // this should not happen. Let the socket go.
+              socket.disconnect();
+              return
+            }
 
-            if (archiver.ip !== socket.handshake.address) return
+            if (archiver.ip !== socket.handshake.address) {
+              // sombody pretending kick it out
+              socket.disconnect()
+              return
+            }
 
             console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
             Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
             Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+            // explicitly disconnect
+            socket.disconnect()
           })
         }
       })
