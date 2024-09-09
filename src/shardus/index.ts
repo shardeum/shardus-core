@@ -726,6 +726,8 @@ class Shardus extends EventEmitter {
       await this.stateManager.startCatchUpQueue()
       console.log('restore - startCatchUpQueue')
       nestedCountersInstance.countEvent('restore', `restore event: finished startCatchUpQueue. ${shardusGetTime()}`)
+      await this.app.sync()
+      console.log('syncAppData - sync')
 
       queueFinishedSyncingRequest()
       console.log('syncAppData - queueFinishedSyncingRequest')
