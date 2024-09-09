@@ -477,7 +477,7 @@ class Shardus extends EventEmitter {
               return
             }
 
-            if (archiver.ip === socket.handshake.address) {
+            if (archiver.ip !== socket.handshake.address) {
               console.log(`Archiver IP address does not match the one in the archiver list, disconnecting`, ARCHIVER_PUBLIC_KEY)
               socket.disconnect()
               return
@@ -512,7 +512,7 @@ class Shardus extends EventEmitter {
 
             if(!archiver) return
 
-            if (archiver.ip === socket.handshake.address) return
+            if (archiver.ip !== socket.handshake.address) return
 
             console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
             Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
@@ -531,7 +531,7 @@ class Shardus extends EventEmitter {
               return
             }
 
-            if (archiver.ip === socket.handshake.address) {
+            if (archiver.ip !== socket.handshake.address) {
               console.log(`Archiver IP address does not match the one in the archiver list, disconnecting`, ARCHIVER_PUBLIC_KEY)
               socket.disconnect()
               return
@@ -565,7 +565,7 @@ class Shardus extends EventEmitter {
 
             if(!archiver) return
 
-            if (archiver.ip === socket.handshake.address) return
+            if (archiver.ip !== socket.handshake.address) return
 
             console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
             Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
