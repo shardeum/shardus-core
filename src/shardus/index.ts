@@ -477,9 +477,7 @@ class Shardus extends EventEmitter {
               return
             }
 
-            const ipMatches = archiver.ip === socket.handshake.address
-
-            if (!ipMatches) {
+            if (archiver.ip === socket.handshake.address) {
               console.log(`Archiver IP address does not match the one in the archiver list, disconnecting`, ARCHIVER_PUBLIC_KEY)
               socket.disconnect()
               return
@@ -506,16 +504,38 @@ class Shardus extends EventEmitter {
             }
           })
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
-            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] === socket.id) {
-              console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
-              Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
-              Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
-            }
+
+
+            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] !== socket.id) return 
+
+            const archiver = Archivers.archivers.get(ARCHIVER_PUBLIC_KEY)
+
+            if(!archiver) return
+
+            if (archiver.ip === socket.handshake.address) return
+
+            console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
+            Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
+            Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+
           })
         } else {
           console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
           socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
             console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
+            const archiver = Archivers.archivers.get(ARCHIVER_PUBLIC_KEY)
+
+            if(!archiver) {
+              console.log('We do not know regonize this archiver, disconnecting', ARCHIVER_PUBLIC_KEY)
+              socket.disconnect()
+              return
+            }
+
+            if (archiver.ip === socket.handshake.address) {
+              console.log(`Archiver IP address does not match the one in the archiver list, disconnecting`, ARCHIVER_PUBLIC_KEY)
+              socket.disconnect()
+              return
+            }
             // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
             if (!Archivers.recipients || !Archivers.connectedSockets) {
               socket.disconnect()
@@ -539,11 +559,17 @@ class Shardus extends EventEmitter {
           })
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
 
-            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] === socket.id) {
-              console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
-              Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
-              Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
-            }
+            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] !== socket.id) return 
+
+            const archiver = Archivers.archivers.get(ARCHIVER_PUBLIC_KEY)
+
+            if(!archiver) return
+
+            if (archiver.ip === socket.handshake.address) return
+
+            console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
+            Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
+            Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
           })
         }
       })
