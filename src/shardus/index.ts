@@ -627,6 +627,11 @@ class Shardus extends EventEmitter {
 
     this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.seqLogger)
 
+    Context.setShardusContext(this)
+
+    // Init new P2P
+    Self.init()
+
     if (this.app) {
       this._createAndLinkStateManager()
       this._attemptCreateAppliedListener()
@@ -909,11 +914,6 @@ class Shardus extends EventEmitter {
         this.mainLogger.error(`Error: while processing try-network-transaction event stack: ${e.stack}`)
       }
     })
-
-    Context.setShardusContext(this)
-
-    // Init new P2P
-    Self.init()
 
     // Start P2P
     await Self.startupV2()
