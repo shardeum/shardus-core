@@ -2,7 +2,7 @@
   "name": "@shardus/core",
   "version": "2.13.3-6",
   "engines": {
-    "node": "18.16.1"
+    "node": "18.19.1"
   },
   "description": "The Shardus Global Server",
   "main": "./dist/index.js",
@@ -79,7 +79,7 @@
     "@types/express": "4.17.3",
     "@types/got": "9.6.9",
     "@types/jest": "27.0.1",
-    "@types/node": "18.16.1",
+    "@types/node": "18.19.1",
     "@types/socket.io": "2.1.11",
     "@types/sqlite3": "3.1.8",
     "@types/tar-fs": "1.16.2",
