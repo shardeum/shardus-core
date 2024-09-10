@@ -131,7 +131,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       if (!externalPortReachable || !internalPortReachable) {
         /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-reject: !externalPortReachable || !internalPortReachable` )
         /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: !externalPortReachable || !internalPortReachable ${joinRequest.nodeInfo.publicKey} ${Utils.safeStringify({ host: externalIp, port: externalPort })}`)
-        return res.send({
+        return res.json({
           success: false,
           fatal: true,
           //the following message string is used by submitJoinV2.  if you change the string please update submitJoinV2
@@ -200,30 +200,30 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
 
         /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join success` )
         // respond with the number of standby nodes for the user's information
-        return res.status(200).send({ success: true, numStandbyNodes: getStandbyNodesInfoMap().size })
+        return res.status(200).json({ success: true, numStandbyNodes: getStandbyNodesInfoMap().size })
       } else {
-          //  Validate of joinReq is done in addJoinRequest
-          const joinRequestResponse = addJoinRequest(joinRequest)
+        //  Validate of joinReq is done in addJoinRequest
+        const joinRequestResponse = addJoinRequest(joinRequest)
 
-          // if the join request was valid and accepted, gossip that this join request
-          // was accepted to other nodes
-          if (joinRequestResponse.success) {
-            // only gossip join requests if we are still using the old join protocol
-            Comms.sendGossip(
-              'gossip-join',
-              joinRequest,
-              '',
-              null,
-              nodeListFromStates([
-                P2P.P2PTypes.NodeStatus.ACTIVE,
-                P2P.P2PTypes.NodeStatus.READY,
-                P2P.P2PTypes.NodeStatus.SYNCING,
-              ]),
-              true
-            )
-            nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
-          }
-          return res.send(joinRequestResponse)
+        // if the join request was valid and accepted, gossip that this join request
+        // was accepted to other nodes
+        if (joinRequestResponse.success) {
+          // only gossip join requests if we are still using the old join protocol
+          Comms.sendGossip(
+            'gossip-join',
+            joinRequest,
+            '',
+            null,
+            nodeListFromStates([
+              P2P.P2PTypes.NodeStatus.ACTIVE,
+              P2P.P2PTypes.NodeStatus.READY,
+              P2P.P2PTypes.NodeStatus.SYNCING,
+            ]),
+            true
+          )
+          nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
+        }
+        return res.json(joinRequestResponse)
       }
     } catch (error) {
       console.error('Error handling join request:', error);
