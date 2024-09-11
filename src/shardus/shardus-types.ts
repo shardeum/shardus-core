@@ -369,6 +369,13 @@ export interface App {
   canStayOnStandby: (joinInfo: JoinRequest) => { canStay: boolean; reason: string }
   binarySerializeObject: (identifier: AppObjEnum, obj: any) => Buffer
   binaryDeserializeObject: (identifier: AppObjEnum, buffer: Buffer) => any
+  verifyMultiSigs: (
+    rawPayload: object,
+    sigs: Sign[],
+    allowedPubkeys: { [pubkey: string]: DevSecurityLevel },
+    minSigRequired: number,
+    requiredSecurityLevel: DevSecurityLevel
+  ) => boolean
 }
 
 export interface TransactionKeys {
@@ -1058,8 +1065,14 @@ export interface ServerConfiguration {
     devPublicKeys?: {
       [pubKey: string]: DevSecurityLevel
     }
-    /** minimum approvals need for multisig operations*/
-    minApprovalsMultiAuth: number
+    /** keys that are used for multisig operations */
+    multisigKeys?: {
+      [pubKey: string]: DevSecurityLevel
+    }
+    /** minimum approvals needed for debug endpoint access using multisig */
+    minMultiSigRequiredForEndpoints: number
+    /** minimum approvals needed for global txs using multisig */
+    minMultiSigRequiredForGlobalTxs: number
     /** dump extra data for robust query even if in error/fatal logggin only mode */
     robustQueryDebug: boolean
     /** pretty sure we don't want this ever but making a config so we can AB test as needed */
@@ -1318,6 +1331,8 @@ export interface ServerConfiguration {
     fallbackToCurrentCycleFortxGroup: boolean
     // max number of recent cycle shard data to keep
     maxCyclesShardDataToKeep: number
+    // make sure we send data to non-self nodes
+    avoidOurIndexInFactTell: boolean
   }
   /** Options for sharding calculations */
   sharding?: {

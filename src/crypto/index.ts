@@ -213,6 +213,9 @@ class Crypto {
   }
 
   hash(obj: HashableObject): string {
+    if (typeof obj === 'string') {
+      return crypto.hash(obj)
+    }
     if (!obj.sign) {
       return crypto.hashObj(obj)
     }

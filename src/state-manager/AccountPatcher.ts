@@ -35,7 +35,8 @@ import {
   ShardedHashTrie,
   TrieAccount,
   IsInsyncResult,
-  CycleShardData, AppliedReceipt2
+  CycleShardData,
+  SignedReceipt
 } from "./state-manager-types";
 import {
   isDebugModeMiddleware,
@@ -127,7 +128,7 @@ interface TooOldAccountRecord {
 interface TooOldAccountUpdateRequest {
   accountID: string
   txId: string
-  appliedReceipt2: AppliedReceipt2
+  signedReceipt: SignedReceipt
   updatedAccountData: Shardus.WrappedData
 }
 
@@ -504,7 +505,7 @@ class AccountPatcher {
           const payload = deserializeRepairOOSAccountsReq(requestStream)
           // verifyPayload(AJVSchemaEnum.RepairOOSAccountsReq', payload)
           for (const repairInstruction of payload?.repairInstructions) {
-            const { accountID, txId, hash, accountData, targetNodeId, receipt2 } = repairInstruction
+            const { accountID, txId, hash, accountData, targetNodeId, signedReceipt } = repairInstruction
 
             // check if we are the target node
             if (targetNodeId !== Self.id) {
@@ -556,122 +557,128 @@ class AccountPatcher {
               continue
             }
 
-            // check the vote and confirmation status of the tx
-            const bestMessage = receipt2.confirmOrChallenge
-            const receivedBestVote = receipt2.appliedVote
+            const proposal = signedReceipt.proposal
 
-            if (receivedBestVote != null) {
+            // if (receivedBestVote != null) {
               // Check if vote is from eligible list of voters for this TX
-              if (
-                this.stateManager.transactionQueue.useNewPOQ &&
-                !archivedQueueEntry.eligibleNodeIdsToVote.has(receivedBestVote.node_id)
-              ) {
-                nestedCountersInstance.countEvent(
-                  'accountPatcher',
-                  `binary/repair_oos_accounts: vote from ineligible node for txId: ${txId}`
-                )
-                continue
-              }
+            // if (
+            //   this.stateManager.transactionQueue.useNewPOQ &&
+            //   !archivedQueueEntry.eligibleNodeIdsToVote.has(receivedBestVote.node_id)
+            // ) {
+            //   nestedCountersInstance.countEvent(
+            //     'accountPatcher',
+            //     `binary/repair_oos_accounts: vote from ineligible node for txId: ${txId}`
+            //   )
+            //   continue
+            // }
 
-              // Check signature of the vote
-              if (
-                !this.crypto.verify(
-                  receivedBestVote as SignedObject,
-                  archivedQueueEntry.executionGroupMap.get(receivedBestVote.node_id).publicKey
-                )
-              ) {
-                nestedCountersInstance.countEvent(
-                  'accountPatcher',
-                  `binary/repair_oos_accounts: vote signature invalid for txId: ${txId}`
-                )
-                continue
-              }
+            // Check signature of the vote
+            // if (
+            //   !this.crypto.verify(
+            //     receivedBestVote as SignedObject,
+            //     archivedQueueEntry.executionGroupMap.get(receivedBestVote.node_id).publicKey
+            //   )
+            // ) {
+            //   nestedCountersInstance.countEvent(
+            //     'accountPatcher',
+            //     `binary/repair_oos_accounts: vote signature invalid for txId: ${txId}`
+            //   )
+            //   continue
+            // }
 
-              // Check transaction result from vote
-              if (!receivedBestVote.transaction_result) {
-                nestedCountersInstance.countEvent(
-                  'accountPatcher',
-                  `binary/repair_oos_accounts: vote result not true for txId ${txId}`
-                )
-                continue
-              }
+            // Verify signed receipt
+            const executionGroupNodes = new Set(archivedQueueEntry.executionGroup.map((node) => node.publicKey))
+            const receiptVerification = this.stateManager.transactionConsensus.verifyAppliedReceipt(signedReceipt, executionGroupNodes)
+            if (receiptVerification !== true) {
+              nestedCountersInstance.countEvent('accountPatcher', `repair_oos_accounts: receipt verification failed for txId: ${txId}`)
+              continue
+            }
 
-              // Check account hash. Calculate account hash of account given in instruction
-              // and compare it with the account hash in the vote.
-              const calculatedAccountHash = this.app.calculateAccountHash(accountData.data)
-              let accountHashMatch = false
-              for (let i = 0; i < receivedBestVote.account_id.length; i++) {
-                if (receivedBestVote.account_id[i] === accountID) {
-                  if (receivedBestVote.account_state_hash_after[i] !== calculatedAccountHash) {
-                    nestedCountersInstance.countEvent(
-                      'accountPatcher',
-                      `binary/repair_oos_accounts: account hash mismatch for txId: ${txId}`
-                    )
-                    accountHashMatch = false
-                  } else {
-                    accountHashMatch = true
-                  }
-                  break
-                }
-              }
-              if (accountHashMatch === false) {
-                nestedCountersInstance.countEvent(
-                  'accountPatcher',
-                  `binary/repair_oos_accounts: vote account hash mismatch for txId: ${txId}`
-                )
-                continue
-              }
-            } else {
-              // Skip this account apply as we were not able to get the best vote for this tx
+            // Check transaction result from vote
+            if (!proposal.applied) {
               nestedCountersInstance.countEvent(
                 'accountPatcher',
-                `binary/repair_oos_accounts: no vote for txId: ${txId}`
+                `binary/repair_oos_accounts: proposal result not true for txId ${txId}`
               )
               continue
             }
 
-            if (this.stateManager.transactionQueue.useNewPOQ) {
-              if (bestMessage != null) {
-                // Skip if challenge receipt
-                if (bestMessage.message === 'challenge') {
+            // Check account hash. Calculate account hash of account given in instruction
+            // and compare it with the account hash in the vote.
+            const calculatedAccountHash = this.app.calculateAccountHash(accountData.data)
+            let accountHashMatch = false
+            for (let i = 0; i < proposal.accountIDs.length; i++) {
+              if (proposal.accountIDs[i] === accountID) {
+                if (proposal.afterStateHashes[i] !== calculatedAccountHash) {
                   nestedCountersInstance.countEvent(
                     'accountPatcher',
-                    `binary/repair_oos_accounts: challenge for txId: ${txId}`
+                    `binary/repair_oos_accounts: account hash mismatch for txId: ${txId}`
                   )
-                  continue
+                  accountHashMatch = false
+                } else {
+                  accountHashMatch = true
                 }
-
-                // Check if mesasge is from eligible list of responders for this TX
-                if (!archivedQueueEntry.eligibleNodeIdsToConfirm.has(bestMessage.nodeId)) {
-                  nestedCountersInstance.countEvent(
-                    'accountPatcher',
-                    `binary/repair_oos_accounts: confirmation from ineligible node for txId: ${txId}`
-                  )
-                  continue
-                }
-
-                // Check signature of the message
-                if (
-                  !this.crypto.verify(
-                    bestMessage as SignedObject,
-                    archivedQueueEntry.executionGroupMap.get(bestMessage.nodeId).publicKey
-                  )
-                ) {
-                  nestedCountersInstance.countEvent(
-                    'accountPatcher',
-                    `binary/repair_oos_accounts: confirmation signature invalid for txId: ${txId}`
-                  )
-                  continue
-                }
-              } else {
-                // Skip this account apply as we were not able to get the best confirmation for this tx
-                nestedCountersInstance.countEvent(
-                  'accountPatcher',
-                  `binary/repair_oos_accounts: no confirmation for txId: ${txId}`
-                )
-                continue
+                break
               }
             }
+            if (accountHashMatch === false) {
+              nestedCountersInstance.countEvent(
+                'accountPatcher',
+                `binary/repair_oos_accounts: vote account hash mismatch for txId: ${txId}`
+              )
+              continue
+            }
+            // } else {
+            //   // Skip this account apply as we were not able to get the best vote for this tx
+            //   nestedCountersInstance.countEvent(
+            //     'accountPatcher',
+            //     `binary/repair_oos_accounts: no vote for txId: ${txId}`
+            //   )
+            //   continue
+            // }
+
+            // if (this.stateManager.transactionQueue.useNewPOQ) {
+            //   if (bestMessage != null) {
+            //     // Skip if challenge receipt
+            //     if (bestMessage.message === 'challenge') {
+            //       nestedCountersInstance.countEvent(
+            //         'accountPatcher',
+            //         `binary/repair_oos_accounts: challenge for txId: ${txId}`
+            //       )
+            //       continue
+            //     }
+
+            //     // Check if mesasge is from eligible list of responders for this TX
+            //     if (!archivedQueueEntry.eligibleNodeIdsToConfirm.has(bestMessage.nodeId)) {
+            //       nestedCountersInstance.countEvent(
+            //         'accountPatcher',
+            //         `binary/repair_oos_accounts: confirmation from ineligible node for txId: ${txId}`
+            //       )
+            //       continue
+            //     }
+
+            //     // Check signature of the message
+            //     if (
+            //       !this.crypto.verify(
+            //         bestMessage as SignedObject,
+            //         archivedQueueEntry.executionGroupMap.get(bestMessage.nodeId).publicKey
+            //       )
+            //     ) {
+            //       nestedCountersInstance.countEvent(
+            //         'accountPatcher',
+            //         `binary/repair_oos_accounts: confirmation signature invalid for txId: ${txId}`
+            //       )
+            //       continue
+            //     }
+            //   } else {
+            //     // Skip this account apply as we were not able to get the best confirmation for this tx
+            //     nestedCountersInstance.countEvent(
+            //       'accountPatcher',
+            //       `binary/repair_oos_accounts: no confirmation for txId: ${txId}`
+            //     )
+            //     continue
+            //   }
+            // }
 
             // update the account data (and cache?)
             const updatedAccounts: string[] = []
@@ -884,20 +891,27 @@ class AccountPatcher {
               continue
             }
 
+            // check the length of the radix
+            if (nodeHashes.radix.length !== this.treeSyncDepth) {
+              if (logFlags.error) this.mainLogger.error(`syncTrieHashesBinaryHandler: radix length mismatch: ${nodeHashes.radix}`)
+              nestedCountersInstance.countEvent('accountPatcher', `${route}-radix-length-mismatch`)
+              continue
+            }
+
             // todo: secure that the voter is allowed to vote.
             let hashVote = hashTrieSyncConsensus.radixHashVotes.get(nodeHashes.radix)
             if (hashVote == null) {
               hashVote = { allVotes: new Map(), bestHash: nodeHashes.hash, bestVotes: 1 }
               hashTrieSyncConsensus.radixHashVotes.set(nodeHashes.radix, hashVote)
-              hashVote.allVotes.set(nodeHashes.hash, { count: 1, voters: [node] })
+              hashVote.allVotes.set(nodeHashes.hash, { count: 1, voters: new Set([node]) })
             } else {
               const voteEntry = hashVote.allVotes.get(nodeHashes.hash)
               if (voteEntry == null) {
-                hashVote.allVotes.set(nodeHashes.hash, { count: 1, voters: [node] })
+                hashVote.allVotes.set(nodeHashes.hash, { count: 1, voters: new Set([node]) })
               } else {
-                const voteCount = voteEntry.count + 1
+                voteEntry.voters.add(node)
+                const voteCount = voteEntry.voters.size
                 voteEntry.count = voteCount
-                voteEntry.voters.push(node)
                 if (voteCount > hashVote.bestVotes) {
                   hashVote.bestVotes = voteCount
                   hashVote.bestHash = nodeHashes.hash
@@ -1422,7 +1436,7 @@ class AccountPatcher {
           const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
           if (!hashTrieSyncConsensus) {
-            return res.send({ error: `Unable to find hashTrieSyncConsensus for last cycle ${lastCycle}` })
+            return res.json({ error: `Unable to find hashTrieSyncConsensus for last cycle ${lastCycle}` })
           }
 
           for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
@@ -1438,7 +1452,7 @@ class AccountPatcher {
                 kvp.push({
                   id: key,
                   count: value.count,
-                  nodeIDs: value.voters.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
+                  nodeIDs: [...value.voters].map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
                 })
               }
               const simpleMap = {
@@ -1452,7 +1466,7 @@ class AccountPatcher {
               if (!isRadixInSync) outOfSyncRadix[radix] = simpleMap // eslint-disable-line security/detect-object-injection
             }
           }
-          return res.send({
+          return res.json({
             cycle,
             notEnoughVotesRadix,
             outOfSyncRadix,
@@ -2246,7 +2260,7 @@ class AccountPatcher {
       if (coverage == null) {
         const votes = hashTrieSyncConsensus.radixHashVotes.get(radixHash)
         const bestVote = votes.allVotes.get(votes.bestHash)
-        const potentialNodes = bestVote.voters
+        const potentialNodes = [...bestVote.voters]
         //shuffle array of potential helpers
         utils.shuffleArray(potentialNodes) //leaving non random to catch issues in testing.
         const node = potentialNodes[0]
@@ -2575,6 +2589,12 @@ class AccountPatcher {
     const minVotes = this.calculateMinVotes()
 
     for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
+      // check the length of the radix
+      if (radix.length !== this.treeSyncDepth) {
+        if (logFlags.error) this.mainLogger.error(`syncTrieHashesBinaryHandler: radix length mismatch: ${radix}`)
+        nestedCountersInstance.countEvent('accountPatcher', `isInsync-radix-length-mismatch`)
+        continue
+      }
       const votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
       const ourTrieNode = this.shardTrie.layerMaps[this.treeSyncDepth].get(radix)
       if (logFlags.debug)
@@ -2647,7 +2667,7 @@ class AccountPatcher {
             kvp.push({
               id: key,
               count: value.count,
-              nodeIDs: value.voters.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
+              nodeIDs: [...value.voters].map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
             })
           }
           const simpleMap = {
@@ -2790,7 +2810,7 @@ class AccountPatcher {
             kvp.push({
               id: key,
               count: value.count,
-              nodeIDs: value.voters.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
+              nodeIDs: [...value.voters].map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
             })
           }
           const simpleMap = {
@@ -2862,7 +2882,7 @@ class AccountPatcher {
           kvp.push({
             id: key,
             count: value.count,
-            nodeIDs: value.voters.map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
+            nodeIDs: [...value.voters].map((node) => utils.makeShortHash(node.id) + ':' + node.externalPort),
           })
         }
         const simpleMap = {
@@ -3486,7 +3506,7 @@ class AccountPatcher {
           txId: archivedQueueEntry.acceptedTx.txId,
           accountData,
           targetNodeId: accountToFix.targetNodeId,
-          receipt2: archivedQueueEntry.appliedReceipt2
+          signedReceipt: archivedQueueEntry.signedReceipt
         }
         if (repairInstructionMap.has(repairInstruction.targetNodeId)) {
           repairInstructionMap.get(repairInstruction.targetNodeId).push(repairInstruction)
@@ -3803,7 +3823,7 @@ class AccountPatcher {
           const accountDataRequest: TooOldAccountUpdateRequest = {
             accountID: accountId,
             txId: archivedQueueEntry.acceptedTx.txId,
-            appliedReceipt2: this.stateManager.getReceipt2(archivedQueueEntry),
+            signedReceipt: this.stateManager.getSignedReceipt(archivedQueueEntry),
             updatedAccountData: updatedAccountData
           }
           const message: RepairOOSAccountsReq = {
@@ -3813,7 +3833,7 @@ class AccountPatcher {
               txId: archivedQueueEntry.acceptedTx.txId,
               accountData: updatedAccountData,
               targetNodeId: tooOldRecord.node.id,
-              receipt2: this.stateManager.getReceipt2(archivedQueueEntry)
+              signedReceipt: this.stateManager.getSignedReceipt(archivedQueueEntry)
             }]
           }
           nestedCountersInstance.countEvent('accountPatcher', 'sending too_old_account repair request')
@@ -4524,7 +4544,7 @@ export type AccountRepairInstruction = {
   txId: string
   accountData: Shardus.WrappedData
   targetNodeId: string
-  receipt2: AppliedReceipt2
+  signedReceipt: SignedReceipt
 }
 
 export default AccountPatcher

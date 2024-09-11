@@ -274,7 +274,7 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
       logging.warn(
         `refuteLostArchiverRoute: invalid archiver up message error: ${error}, payload: ${inspect(req.body)}`
       )
-      res.send({ status: 'failure', message: error })
+      res.json({ status: 'failure', message: error })
       return
     }
     const refuteMsg = req.body as SignedObject<ArchiverRefutesLostMsg>
@@ -287,7 +287,7 @@ const refuteLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
     }
     if (record.status !== 'up') record.status = 'up'
     if (!record.archiverRefuteMsg) record.archiverRefuteMsg = refuteMsg
-    res.send({ status: 'success' })
+    res.json({ status: 'success' })
   },
 }
 
@@ -309,26 +309,22 @@ const reportFakeLostArchiverRoute: P2P.P2PTypes.Route<Handler> = {
     const archiver = publicKey ? getArchiverWithPublicKey(publicKey) : getRandomAvailableArchiver()
     if (archiver) {
       funcs.reportLostArchiver(archiver.publicKey, 'fake lost archiver report')
-      res.send(
-        Utils.safeStringify(
-          crypto.sign({
-            status: 'accepted',
-            pick,
-            archiver,
-            message: 'will report fake lost archiver',
-          })
-        )
+      res.json(
+        crypto.sign({
+          status: 'accepted',
+          pick,
+          archiver,
+          message: 'will report fake lost archiver',
+        })
       )
     } else {
-      res.send(
-        Utils.safeStringify(
-          crypto.sign({
-            status: 'failed',
-            pick,
-            archiver,
-            message: 'archiver not found',
-          })
-        )
+      res.json(
+        crypto.sign({
+          status: 'failed',
+          pick,
+          archiver,
+          message: 'archiver not found',
+        })
       )
     }
   },

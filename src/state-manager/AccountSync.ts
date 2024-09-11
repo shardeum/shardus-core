@@ -430,6 +430,14 @@ class AccountSync {
             return respond(BadRequest(`${route} invalid request`), serializeResponseError)
           }
           const readableReq = deserializeGetAccountDataByListReq(requestStream)
+
+          // Limit the number of accounts to prevent abuse
+          const MAX_ACCOUNTS = this.config.stateManager.accountBucketSize // default 200
+          if (readableReq.accountIds.length > MAX_ACCOUNTS) {
+            nestedCountersInstance.countEvent('internal', `${route}-too_many_accounts`)
+            return respond(BadRequest(`${route} too many accounts requested`), serializeResponseError)
+          }
+
           if (utils.isValidShardusAddress(readableReq.accountIds) === false) {
             nestedCountersInstance.countEvent('internal', `${route}-invalid_account_ids`)
             return respond(BadRequest(`${route} invalid account_ids`), serializeResponseError)
@@ -972,20 +980,20 @@ class AccountSync {
         //   this.stateManager.config.p2p.useBinarySerializedEndpoints &&
         //   this.stateManager.config.p2p.getGloablAccountReportBinary
         // ) {
-          const request = {} as GlobalAccountReportReqSerializable
-          result = await this.p2p.askBinary<
-            GlobalAccountReportReqSerializable,
-            GlobalAccountReportRespSerializable
-          >(
-            node,
-            InternalRouteEnum.binary_get_globalaccountreport,
-            request,
-            serializeGlobalAccountReportReq,
-            deserializeGlobalAccountReportResp,
-            {}
-          )
+        const request = {} as GlobalAccountReportReqSerializable
+        result = await this.p2p.askBinary<
+          GlobalAccountReportReqSerializable,
+          GlobalAccountReportRespSerializable
+        >(
+          node,
+          InternalRouteEnum.binary_get_globalaccountreport,
+          request,
+          serializeGlobalAccountReportReq,
+          deserializeGlobalAccountReportResp,
+          {}
+        )
         // } else {
-          // result = await this.p2p.ask(node, 'get_globalaccountreport', {})
+        // result = await this.p2p.ask(node, 'get_globalaccountreport', {})
         // }
         return checkResultFn(result, node.id)
       } catch (error) {
@@ -1014,7 +1022,7 @@ class AccountSync {
           return r
         } catch (error) {
           console.error('getGlobalAccountReportFromArchiver error', error)
-          null
+          return null
         }
       }
 
@@ -1037,21 +1045,21 @@ class AccountSync {
         return result
       }
       result = result as Partial<GlobalAccountReportResp> & { msg: string }
-      if (result === null) {
+      if (result == null) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('sync', `DATASYNC: getRobustGlobalReport_${tag} result === null`)
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null ${resultFromArchiver ? 'archiver:': 'node:'}${utils.stringifyReduce(nodeId)} `)
         result = { ready: false, msg: `result === null: ${Math.random()}` }
         return result
       }
 
-      if (result != null && result.ready === false) {
+      if (result.ready === false) {
         /* prettier-ignore */ nestedCountersInstance.countEvent( 'sync', `DATASYNC: getRobustGlobalReport_${tag} result.ready = false` )
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error( `ASK FAIL getRobustGlobalReport result.ready === false, result: ${utils.stringifyReduce(result)}` )
         result = { ready: false, msg: `not ready: ${Math.random()}` }
         return result
       }
 
-      if (result != null && result.accounts == null) {
+      if (result.accounts == null) {
         /* prettier-ignore */ nestedCountersInstance.countEvent( 'sync', `DATASYNC: getRobustGlobalReport_${tag} result != null, result.stateHash == null. result: ${utils.stringifyReduce( result )}` )
         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error( `ASK FAIL getRobustGlobalReport result.stateHash == null, result: ${utils.stringifyReduce( result )}` )
         result = { ready: false, msg: `invalid data format: ${Math.random()}` }

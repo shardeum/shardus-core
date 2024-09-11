@@ -404,13 +404,14 @@ class CachedAppDataManager {
     const targetGroupSize = targetGroup.length
     const {startIndex: targetStartIndex, endIndex: targetEndIndex} = 
       this.stateManager.transactionQueue.getStartAndEndIndexOfTargetGroup(targetGroup.map(node => node.id), allNodes)
+    const globalOffset = parseInt(txId.slice(-4), 16)
 
 
     const correspondingIndices = getCorrespondingNodes(
       senderIndexInTxGroup,
       targetStartIndex,
       targetEndIndex,
-      queueEntry.correspondingGlobalOffset,
+      globalOffset,
       targetGroupSize,
       senderGroupSize,
       allNodes.length

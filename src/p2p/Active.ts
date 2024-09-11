@@ -95,7 +95,7 @@ export function init() {
 
   network.registerExternalGet('debug-neverGoActive', isDebugModeMiddleware, (req, res) => {
     neverGoActive = !neverGoActive
-    res.send({ status: 'ok', neverGoActive: neverGoActive })
+    res.json({ status: 'ok', neverGoActive: neverGoActive })
   })
 }
 
@@ -114,6 +114,8 @@ export function validateRecordTypes(rec: P2P.ActiveTypes.Record): string {
     active: 'n',
     activated: 'a',
     activatedPublicKeys: 'a',
+    standby: 'n',
+    maxSyncTime: 'n',
   })
   if (err) return err
   for (const item of rec.activated) {

@@ -74,7 +74,7 @@ const stopExternalRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'stop',
   handler: (_req, res) => {
     if (isDebugMode()) {
-      res.send({ status: 'goodbye cruel world' })
+      res.json({ status: 'goodbye cruel world' })
       apoptosizeSelf('Apoptosis called at stopExternalRoute => src/p2p/Apoptosis.ts')
     }
   },
@@ -405,6 +405,7 @@ function validateProposal(payload: unknown): boolean {
   if (!(payload as P2P.P2PTypes.LooseObject).id) return false
   if (!(payload as P2P.P2PTypes.LooseObject).when) return false
   if (!(payload as P2P.ApoptosisTypes.SignedApoptosisProposal).sign) return false
+  if (!isValidWhen((payload as P2P.ApoptosisTypes.SignedApoptosisProposal).when)) return false
   const proposal = payload as P2P.ApoptosisTypes.SignedApoptosisProposal
   const id = proposal.id
 
@@ -418,6 +419,16 @@ function validateProposal(payload: unknown): boolean {
   if (!valid) return false
 
   return true
+}
+
+function isValidWhen(when: unknown): boolean {
+  if (typeof when !== 'number' || !Number.isInteger(when)) {
+    return false
+  }
+
+  const minAcceptableCycle = currentCycle - 1
+  const maxAcceptableCycle = currentCycle + 1
+  return when >= minAcceptableCycle && when <= maxAcceptableCycle
 }
 
 export function isApopMarkedNode(id: string): boolean {

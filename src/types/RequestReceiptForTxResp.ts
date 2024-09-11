@@ -1,12 +1,12 @@
-import { Utils } from '@shardus/types'
-import { AppliedReceipt2 } from '../state-manager/state-manager-types'
+import { SignedReceipt } from '../state-manager/state-manager-types'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { verifyPayload } from './ajv/Helpers'
+import { deserializeSignedReceipt, serializeSignedReceipt } from './SignedReceipt'
 
 export type RequestReceiptForTxRespSerialized = {
-  receipt: AppliedReceipt2 | null
+  receipt: SignedReceipt | null
   note: string
   success: boolean
 }
@@ -27,7 +27,7 @@ export function serializeRequestReceiptForTxResp(
     stream.writeUInt8(0)
   } else {
     stream.writeUInt8(1)
-    stream.writeString(Utils.safeStringify(inp.receipt))
+    serializeSignedReceipt(stream, inp.receipt)
   }
   stream.writeString(inp.note)
   stream.writeUInt8(inp.success ? 1 : 0)
@@ -45,8 +45,7 @@ export function deserializeRequestReceiptForTxResp(
     const success = stream.readUInt8() === 1
     return { receipt: null, note, success }
   }
-  const receipt_str = stream.readString()
-  const receipt = Utils.safeJsonParse(receipt_str) as AppliedReceipt2
+  const receipt = deserializeSignedReceipt(stream)
   const note = stream.readString()
   const success = stream.readUInt8() === 1
   const errors = verifyPayload(AJVSchemaEnum.RequestReceiptForTxResp, { receipt, note, success })

@@ -80,40 +80,15 @@ const schemaCompareCert = {
         'start',
         'duration',
         'networkConfigHash',
-        'mode',
-        'safetyMode',
-        'safetyNum',
-        'networkStateHash',
-        'refreshedArchivers',
-        'refreshedConsensors',
-        'joinedArchivers',
-        'leavingArchivers',
-        'archiversAtShutdown',
-        'syncing',
-        'joinedConsensors',
-        'active',
-        'standby',
-        'activated',
-        'activatedPublicKeys',
-        'maxSyncTime',
-        'apoptosized',
-        'lost',
-        'lostSyncing',
-        'refuted',
-        'appRemoved',
-        'expired',
-        'removed',
         'nodeListHash',
         'archiverListHash',
         'standbyNodeListHash',
-        'random',
-        'joined',
-        'returned',
       ],
       additionalProperties: true,
     },
   },
-  required: ['certs', 'record'],
+  required: ['certs'],
+  additionalProperties: true,
 }
 
 export function initCompareCertReq(): void {
@@ -129,4 +104,5 @@ function addSchemaDependencies(): void {
 // Function to register the schema
 function addSchemas(): void {
   addSchema(AJVSchemaEnum.CompareCertReq, schemaCompareCert)
+  addSchema(AJVSchemaEnum.CompareCertResp, schemaCompareCert)
 }

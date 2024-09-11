@@ -23,11 +23,11 @@ export function isServiceMode(): boolean {
 }
 
 export function getHashedDevKey(): string {
-  return config?.debug?.hashedDevAuth || '';
+  return config?.debug?.hashedDevAuth || ''
 }
 
 export function getDevPublicKeys(): DebugConfigurations['devPublicKeys'] {
-  return config?.debug?.devPublicKeys || {};
+  return config?.debug?.devPublicKeys || {}
 }
 
 export function ensureKeySecurity(pubKey: string, level: DevSecurityLevel): boolean {
@@ -65,4 +65,19 @@ export function getDevPublicKeyMaxLevel(clearance?: DevSecurityLevel): string | 
     }
   }
   return maxKey
+}
+
+export function getMultisigPublicKeys(): DebugConfigurations['multisigKeys'] {
+  return config?.debug?.multisigKeys || {}
+}
+
+export function getMultisigPublicKey(key: string): string | null {
+  // eslint-disable-next-line security/detect-object-injection
+  return getMultisigPublicKeys()[key] !== undefined ? key : null
+}
+
+export function ensureMultisigKeySecurity(pubKey: string, level: DevSecurityLevel): boolean {
+  // eslint-disable-next-line security/detect-object-injection
+  const pkClearance = getMultisigPublicKeys()[pubKey]
+  return pkClearance !== undefined && pkClearance >= level
 }

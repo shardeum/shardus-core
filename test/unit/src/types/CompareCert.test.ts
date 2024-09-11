@@ -7,6 +7,8 @@ import {
 import { initCompareCertReq } from '../../../../src/types/ajv/CompareCert'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import { Utils } from '@shardus/types'
+import { verifyPayload } from '../../../../src/types/ajv/Helpers'
+import { AJVSchemaEnum } from '../../../../src/types/enum/AJVSchemaEnum'
 
 /*
 Note: Since both CompareCertReq and CompareCertResp have similar types, 
@@ -134,5 +136,14 @@ describe('CompareCert Serialization and Deserialization', () => {
     stream.position = 0
     const deserializedObj = deserializeCompareCertReq(stream)
     expect(deserializedObj).toEqual(validPayload)
+  })
+
+  test('AJV allows additional properties in record', () => {
+    const payload = {
+      ...validPayload,
+      record: { ...validPayload.record, additionalProperty: 'additional' },
+    }
+    const errors = verifyPayload(AJVSchemaEnum.CompareCertReq, payload)
+    expect(errors).toBeNull()
   })
 })

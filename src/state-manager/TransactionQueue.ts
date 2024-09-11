@@ -29,14 +29,11 @@ import * as NodeList from '../p2p/NodeList'
 import {
   AcceptedTx,
   AccountFilter,
-  AppliedReceipt,
-  AppliedReceipt2,
   CommitConsensedTransactionResult,
   PreApplyAcceptedTransactionResult,
   ProcessQueueStats,
   QueueCountsResult,
   QueueEntry,
-  RequestReceiptForTxResp,
   RequestReceiptForTxResp_old,
   RequestStateForTxReq,
   RequestStateForTxResp,
@@ -48,7 +45,8 @@ import {
   WrappedResponses,
   ArchiverReceipt,
   NonceQueueItem,
-  AppliedVote
+  SignedReceipt,
+  Proposal
 } from './state-manager-types'
 import { isInternalTxAllowed, networkMode } from '../p2p/Modes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
@@ -343,50 +341,50 @@ class TransactionQueue {
     //   }
     // )
 
-    this.p2p.registerInternal(
-      'broadcast_state_complete_data',
-      async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
-        profilerInstance.scopedProfileSectionStart('broadcast_state_complete_data')
-        try {
-          const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            nestedCountersInstance.countEvent('processing', 'broadcast_state_complete_data_noQueueEntry')
-            return
-          }
-          if (queueEntry.gossipedCompleteData === true) {
-            return
-          }
-          for (const data of payload.stateList) {
-            if (configContext.stateManager.collectedDataFix && configContext.stateManager.rejectSharedDataIfCovered) {
-              const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(data.accountId)
-              const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
-              if (coveredByUs) {
-                nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
-                /* prettier-ignore */ if (logFlags.verbose) console.log(`broadcast_state: coveredByUs: ${data.accountId} no need to accept this data`)
-                continue
-              } else {
-                this.queueEntryAddData(queueEntry, data)
-              }
-            } else {
-              this.queueEntryAddData(queueEntry, data)
-            }
-          }
-          Comms.sendGossip(
-            'broadcast_state_complete_data',
-            payload,
-            undefined,
-            undefined,
-            queueEntry.executionGroup,
-            false,
-            6,
-            queueEntry.acceptedTx.txId
-          )
-          queueEntry.gossipedCompleteData = true
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('broadcast_state_complete_data')
-        }
-      }
-    )
+    // this.p2p.registerInternal(
+    //   'broadcast_state_complete_data',
+    //   async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }) => {
+    //     profilerInstance.scopedProfileSectionStart('broadcast_state_complete_data')
+    //     try {
+    //       const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         nestedCountersInstance.countEvent('processing', 'broadcast_state_complete_data_noQueueEntry')
+    //         return
+    //       }
+    //       if (queueEntry.gossipedCompleteData === true) {
+    //         return
+    //       }
+    //       for (const data of payload.stateList) {
+    //         if (configContext.stateManager.collectedDataFix && configContext.stateManager.rejectSharedDataIfCovered) {
+    //           const consensusNodes = this.stateManager.transactionQueue.getConsenusGroupForAccount(data.accountId)
+    //           const coveredByUs = consensusNodes.map((node) => node.id).includes(Self.id)
+    //           if (coveredByUs) {
+    //             nestedCountersInstance.countEvent('processing', 'broadcast_state_coveredByUs')
+    //             /* prettier-ignore */ if (logFlags.verbose) console.log(`broadcast_state: coveredByUs: ${data.accountId} no need to accept this data`)
+    //             continue
+    //           } else {
+    //             this.queueEntryAddData(queueEntry, data)
+    //           }
+    //         } else {
+    //           this.queueEntryAddData(queueEntry, data)
+    //         }
+    //       }
+    //       Comms.sendGossip(
+    //         'broadcast_state_complete_data',
+    //         payload,
+    //         undefined,
+    //         undefined,
+    //         queueEntry.executionGroup,
+    //         false,
+    //         6,
+    //         queueEntry.acceptedTx.txId
+    //       )
+    //       queueEntry.gossipedCompleteData = true
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('broadcast_state_complete_data')
+    //     }
+    //   }
+    // )
 
     const broadcastStateRoute: P2PTypes.P2PTypes.Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_broadcast_state,
@@ -774,88 +772,89 @@ class TransactionQueue {
       }
     )
 
-    this.p2p.registerGossipHandler(
-      'gossip-final-state',
-      async (
-        payload: { txid: string; stateList: Shardus.WrappedResponse[], txGroupCycle?: number },
-        sender: Node,
-        tracker: string,
-        msgSize: number
-      ) => {
-        profilerInstance.scopedProfileSectionStart('gossip-final-state', false, msgSize)
-        const respondSize = cUninitializedSize
-        try {
-          // make sure we have it
-          const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          //It is okay to ignore this transaction if the txId is not found in the queue.
-          if (queueEntry == null) {
-            //In the past we would enqueue the TX, expecially if syncing but that has been removed.
-            //The normal mechanism of sharing TXs is good enough.
-            nestedCountersInstance.countEvent('processing', 'gossip-final-state_noQueueEntry')
-            return
-          }
-          if (payload.txGroupCycle) {
-            if (queueEntry.txGroupCycle !== payload.txGroupCycle) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`gossip-final-state mismatch txGroupCycle for txid: ${payload.txid}, sender's txGroupCycle: ${payload.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
-              nestedCountersInstance.countEvent(
-                'processing',
-                'gossip-final-state: mismatch txGroupCycle for txid ' + payload.txid
-              )
-            }
-            delete payload.txGroupCycle
-          }
-          if (logFlags.debug)
-            this.mainLogger.debug(`gossip-final-state ${queueEntry.logID}, ${Utils.safeStringify(payload.stateList)}`)
-          // add the data in
-          let saveSomething = false
-          for (const data of payload.stateList) {
-            //let wrappedResponse = data as Shardus.WrappedResponse
-            //this.queueEntryAddData(queueEntry, data)
-            if (data == null) {
-              /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_finalstate data == null`)
-              continue
-            }
-            if (queueEntry.collectedFinalData[data.accountId] == null) {
-              queueEntry.collectedFinalData[data.accountId] = data
-              saveSomething = true
-              /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('broadcast_finalstate', `${queueEntry.logID}`, `broadcast_finalstate addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
-            }
-
-            // if (queueEntry.state === 'syncing') {
-            //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
-            // }
-          }
-          if (saveSomething) {
-            const nodesToSendTo: Set<Node> = new Set()
-            for (const data of payload.stateList) {
-              if (data == null) {
-                continue
-              }
-              const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
-              for (const node of storageNodes) {
-                nodesToSendTo.add(node)
-              }
-            }
-            if (nodesToSendTo.size > 0) {
-              payload.txGroupCycle = queueEntry.txGroupCycle
-              Comms.sendGossip(
-                'gossip-final-state',
-                payload,
-                undefined,
-                undefined,
-                Array.from(nodesToSendTo),
-                false,
-                4,
-                queueEntry.acceptedTx.txId
-              )
-              nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
-            }
-          }
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('gossip-final-state', respondSize)
-        }
-      }
-    )
+    // THIS HANDLER IS NOT USED ANYMORE
+    // this.p2p.registerGossipHandler(
+    //   'gossip-final-state',
+    //   async (
+    //     payload: { txid: string; stateList: Shardus.WrappedResponse[], txGroupCycle?: number },
+    //     sender: Node,
+    //     tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     profilerInstance.scopedProfileSectionStart('gossip-final-state', false, msgSize)
+    //     const respondSize = cUninitializedSize
+    //     try {
+    //       // make sure we have it
+    //       const queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       //It is okay to ignore this transaction if the txId is not found in the queue.
+    //       if (queueEntry == null) {
+    //         //In the past we would enqueue the TX, expecially if syncing but that has been removed.
+    //         //The normal mechanism of sharing TXs is good enough.
+    //         nestedCountersInstance.countEvent('processing', 'gossip-final-state_noQueueEntry')
+    //         return
+    //       }
+    //       if (payload.txGroupCycle) {
+    //         if (queueEntry.txGroupCycle !== payload.txGroupCycle) {
+    //           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`gossip-final-state mismatch txGroupCycle for txid: ${payload.txid}, sender's txGroupCycle: ${payload.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
+    //           nestedCountersInstance.countEvent(
+    //             'processing',
+    //             'gossip-final-state: mismatch txGroupCycle for txid ' + payload.txid
+    //           )
+    //         }
+    //         delete payload.txGroupCycle
+    //       }
+    //       if (logFlags.debug)
+    //         this.mainLogger.debug(`gossip-final-state ${queueEntry.logID}, ${Utils.safeStringify(payload.stateList)}`)
+    //       // add the data in
+    //       let saveSomething = false
+    //       for (const data of payload.stateList) {
+    //         //let wrappedResponse = data as Shardus.WrappedResponse
+    //         //this.queueEntryAddData(queueEntry, data)
+    //         if (data == null) {
+    //           /* prettier-ignore */ if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_finalstate data == null`)
+    //           continue
+    //         }
+    //         if (queueEntry.collectedFinalData[data.accountId] == null) {
+    //           queueEntry.collectedFinalData[data.accountId] = data
+    //           saveSomething = true
+    //           /* prettier-ignore */ if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('broadcast_finalstate', `${queueEntry.logID}`, `broadcast_finalstate addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
+    //         }
+    //
+    //         // if (queueEntry.state === 'syncing') {
+    //         //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+    //         // }
+    //       }
+    //       if (saveSomething) {
+    //         const nodesToSendTo: Set<Node> = new Set()
+    //         for (const data of payload.stateList) {
+    //           if (data == null) {
+    //             continue
+    //           }
+    //           const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
+    //           for (const node of storageNodes) {
+    //             nodesToSendTo.add(node)
+    //           }
+    //         }
+    //         if (nodesToSendTo.size > 0) {
+    //           payload.txGroupCycle = queueEntry.txGroupCycle
+    //           Comms.sendGossip(
+    //             'gossip-final-state',
+    //             payload,
+    //             undefined,
+    //             undefined,
+    //             Array.from(nodesToSendTo),
+    //             false,
+    //             4,
+    //             queueEntry.acceptedTx.txId
+    //           )
+    //           nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
+    //         }
+    //       }
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('gossip-final-state', respondSize)
+    //     }
+    //   }
+    // )
 
     /**
      * request_state_for_tx
@@ -969,7 +968,7 @@ class TransactionQueue {
     this.p2p.registerInternalBinary(requestStateForTxRoute.name, requestStateForTxRoute.handler)
 
     networkContext.registerExternalPost('get-tx-receipt', async (req, res) => {
-      let result: { success: boolean; receipt?: ArchiverReceipt | AppliedReceipt2; reason?: string }
+      let result: { success: boolean; receipt?: ArchiverReceipt | SignedReceipt; reason?: string }
       try {
         let error = utils.validateTypes(req.body, {
           txId: 's',
@@ -977,12 +976,12 @@ class TransactionQueue {
           full_receipt: 'b',
           sign: 'o',
         })
-        if (error) return res.send((result = { success: false, reason: error }))
+        if (error) return res.json((result = { success: false, reason: error }))
         error = utils.validateTypes(req.body.sign, {
           owner: 's',
           sig: 's',
         })
-        if (error) return res.send((result = { success: false, reason: error }))
+        if (error) return res.json((result = { success: false, reason: error }))
 
         const { txId, timestamp, full_receipt, sign } = req.body
         const isReqFromArchiver = Archivers.archivers.has(sign.owner)
@@ -1012,16 +1011,16 @@ class TransactionQueue {
               if (fullReceipt === null) return res.status(400).json({ success: false, reason: 'Receipt Not Found.' })
               result = Utils.safeJsonParse(Utils.safeStringify({ success: true, receipt: fullReceipt }))
             } else {
-              result = { success: true, receipt: this.stateManager.getReceipt2(queueEntry) }
+              result = { success: true, receipt: this.stateManager.getSignedReceipt(queueEntry) }
             }
           } else {
             result = { success: false, reason: 'Invalid Signature.' }
           }
         }
-        res.send(result)
+        res.json(result)
       } catch (e) {
         console.log('Error caught in /get-tx-receipt: ', e)
-        res.send((result = { success: false, reason: e }))
+        res.json((result = { success: false, reason: e }))
       }
     })
   }
@@ -2616,27 +2615,28 @@ class TransactionQueue {
       for (const queueEntry of this.archivedQueueEntriesByID.values()) {
         if (queueEntry.uniqueKeys.includes(accountId)) {
           foundQueueEntry = true
-          const receipt2: AppliedReceipt2 = this.stateManager.getReceipt2(queueEntry)
-          let bestReceivedVote
-          if (receipt2 !=  null) {
-            bestReceivedVote = receipt2.appliedVote
-            if (receipt2.appliedVote) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get vote from' +
-              ' receipt2')
+          const signedReceipt: SignedReceipt = this.stateManager.getSignedReceipt(queueEntry)
+          let proposal: Proposal | null = null
+          if (signedReceipt !=  null) {
+            proposal = signedReceipt.proposal
+            if (signedReceipt.proposal) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get proposal from signedReceipt')
           }
-          if (bestReceivedVote == null) {
-            bestReceivedVote = queueEntry.receivedBestVote
-            if (queueEntry.receivedBestVote) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get vote' +
+          if (proposal == null) {
+            proposal = queueEntry.ourProposal
+            if (queueEntry.receivedBestVote) nestedCountersInstance.countEvent('getArchivedQueueEntryByAccountIdAndHash', 'get proposal' +
               ' from' +
-              ' receipt2')
+              ' queueEntry.ourProposal')
           }
-          if (bestReceivedVote == null) {
+          if (proposal == null) {
             continue
           }
           foundVote = true
           // this node might not have a vote for this tx
-          for (let i = 0; i < bestReceivedVote.account_id.length; i++) {
-            if (bestReceivedVote.account_id[i] === accountId) {
-              if (bestReceivedVote.account_state_hash_after[i] === hash) {
+          for (let i = 0; i < proposal.accountIDs.length; i++) {
+            // eslint-disable-next-line security/detect-object-injection
+            if (proposal.accountIDs[i] === accountId) {
+              // eslint-disable-next-line security/detect-possible-timing-attacks, security/detect-object-injection
+              if (proposal.afterStateHashes[i] === hash) {
                 foundVoteMatchingHash = true
                 return queueEntry
               }
@@ -2824,7 +2824,7 @@ class TransactionQueue {
     const payload = {txid: queueEntry.acceptedTx.txId, stateList}
     if (stateList.length > 0) {
       Comms.sendGossip(
-        'broadcast_state_complete_data',
+        'broadcast_state_complete_data', // deprecated
         payload,
         '',
         Self.id,
@@ -3257,7 +3257,7 @@ class TransactionQueue {
 
         if (result.success === true && result.receipt != null) {
           //TODO implement this!!!
-          queueEntry.recievedAppliedReceipt2 = result.receipt
+          queueEntry.receivedSignedReceipt = result.receipt
           keepTrying = false
           gotReceipt = true
 
@@ -4515,6 +4515,51 @@ class TransactionQueue {
           //correspondingIndices = extraCorrespondingIndices
         }
       }
+      // check if we should avoid our index in the corresponding nodes
+      if (Context.config.stateManager.avoidOurIndexInFactTell && correspondingIndices.includes(ourIndexInTxGroup)) {
+        if (logFlags.debug) this.mainLogger.debug(`factTellCorrespondingNodes: avoiding our index in tx group`, ourIndexInTxGroup, correspondingIndices)
+        queueEntry.correspondingGlobalOffset += 1
+        nestedCountersInstance.countEvent('stateManager', 'factTellCorrespondingNodes: avoiding our index in tx group')
+        correspondingIndices = getCorrespondingNodes(
+          ourIndexInTxGroup,
+          targetIndices.startIndex,
+          targetIndices.endIndex,
+          queueEntry.correspondingGlobalOffset,
+          targetGroupSize,
+          senderGroupSize,
+          queueEntry.transactionGroup.length
+        )
+        let oldCorrespondingIndices:number[] = undefined
+        if(this.config.stateManager.correspondingTellUseUnwrapped){
+          // can just find if any home nodes for the accounts we cover would say that our node is wrapped
+          // precalc shouldUnwrapSender   check if any account we own shows that we are on the left side of a wrapped range
+          // can use partitions to check this
+          if (unwrappedIndex != null) {
+            const extraCorrespondingIndices = getCorrespondingNodes(
+              unwrappedIndex,
+              targetIndices.startIndex,
+              targetIndices.endIndex,
+              queueEntry.correspondingGlobalOffset,
+              targetGroupSize,
+              senderGroupSize,
+              queueEntry.transactionGroup.length,
+              queueEntry.logID
+            )
+            if (Context.config.stateManager.concatCorrespondingTellUseUnwrapped) {
+              //add them
+              correspondingIndices = correspondingIndices.concat(extraCorrespondingIndices)
+            } else {
+              // replace them
+              oldCorrespondingIndices = correspondingIndices
+              correspondingIndices = extraCorrespondingIndices
+            }
+            //replace them
+            // possible optimization where we pick one or the other path based on our account index
+            //correspondingIndices = extraCorrespondingIndices
+          }
+        }
+        if (logFlags.debug) this.mainLogger.debug(`factTellCorrespondingNodes: new corresponding indices after avoiding our index in tx group`, ourIndexInTxGroup, correspondingIndices)
+      }
 
       const validCorrespondingIndices = []
       for (const targetIndex of correspondingIndices) {
@@ -5136,7 +5181,7 @@ class TransactionQueue {
               InternalRouteEnum.binary_poqo_data_and_receipt,
               {
                 finalState: message,
-                receipt: queueEntry.appliedReceipt2,
+                receipt: queueEntry.signedReceipt,
                 txGroupCycle: queueEntry.txGroupCycle
               },
               serializePoqoDataAndReceiptReq,
@@ -5349,12 +5394,23 @@ class TransactionQueue {
     delete queueEntry.appliedReceiptForRepair
 
     // coalesce the receipt2s into applied receipt. maybe not as descriptive, but save memory.
-    this.stateManager.getReceipt2(queueEntry)
     queueEntry.recievedAppliedReceipt2 = null
     queueEntry.appliedReceiptForRepair2 = null
 
     delete queueEntry.recievedAppliedReceipt2
     delete queueEntry.appliedReceiptForRepair2
+
+    queueEntry.signedReceipt = 
+      queueEntry.signedReceipt ??
+      queueEntry.receivedSignedReceipt ??
+      queueEntry.signedReceiptForRepair ??
+      queueEntry.signedReceiptFinal
+    queueEntry.receivedSignedReceipt = null
+    queueEntry.signedReceiptForRepair = null
+    queueEntry.signedReceiptFinal = queueEntry.signedReceipt
+    
+    delete queueEntry.receivedSignedReceipt
+    delete queueEntry.signedReceiptForRepair
 
     //delete queueEntry.appliedReceiptFinal
 
@@ -5610,7 +5666,12 @@ class TransactionQueue {
         this.clearDebugAwaitStrings()
 
         // eslint-disable-next-line security/detect-object-injection
-        const queueEntry: QueueEntry = this._transactionQueue[currentIndex]
+        const queueEntry: QueueEntry | undefined = this._transactionQueue[currentIndex]
+        if (queueEntry == null) {
+          this.statemanager_fatal(`queueEntry is null`, `currentIndex:${currentIndex}`)
+          nestedCountersInstance.countEvent('processing', 'error: null queue entry. skipping to next TX')
+          continue
+        }
         if (logFlags.seqdiagram)  this.mainLogger.info(`0x10052024 ${ipInfo.externalIp} ${shardusGetTime()} 0x0001 currentIndex:${currentIndex} txId:${queueEntry.acceptedTx.txId} state:${queueEntry.state}`)
         const txTime = queueEntry.txKeys.timestamp
         const txAge = currentTime - txTime
@@ -5628,14 +5689,10 @@ class TransactionQueue {
         }
 
         this.stateManager.debugTXHistory[queueEntry.logID] = queueEntry.state
-        let hasApplyReceipt = queueEntry.appliedReceipt != null
-        let hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt != null
-        let hasReceivedApplyReceiptForRepair = queueEntry.appliedReceiptForRepair != null
+        const hasApplyReceipt = queueEntry.signedReceipt != null
+        const hasReceivedApplyReceipt = queueEntry.receivedSignedReceipt != null
+        const hasReceivedApplyReceiptForRepair = queueEntry.signedReceiptForRepair != null
         const shortID = queueEntry.logID //`${utils.makeShortHash(queueEntry.acceptedTx.id)}`
-
-        hasApplyReceipt = queueEntry.appliedReceipt2 != null
-        hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt2 != null
-        hasReceivedApplyReceiptForRepair = queueEntry.appliedReceiptForRepair2 != null
 
         // on the off chance we are here with a pass of fail state remove this from the queue.
         // log fatal because we do not want to get to this situation.
@@ -5671,7 +5728,7 @@ class TransactionQueue {
                 `txExpired txAge > timeM3*2 && queueEntry.didSync == false. ` +
                   `txid: ${shortID} state: ${
                     queueEntry.state
-                  } applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${
+                  } applyReceipt:${hasApplyReceipt} receivedSignedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${
                     queueEntry.receiptEverRequested
                   } age:${txAge} ${utils.stringifyReduce(queueEntry.uniqueWritableKeys)}`
               )
@@ -5679,18 +5736,18 @@ class TransactionQueue {
                 this.statemanager_fatal(
                   `txExpired1 > M3 * 2 -!receiptEverRequested`,
                   `txExpired txAge > timeM3*2 && queueEntry.didSync == false. !receiptEverRequested ` +
-                    `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge}`
+                    `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} receivedSignedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge}`
                 )
               }
               if (queueEntry.globalModification) {
                 this.statemanager_fatal(
                   `txExpired1 > M3 * 2 -GlobalModification!!`,
                   `txExpired txAge > timeM3*2 && queueEntry.didSync == false. !receiptEverRequested ` +
-                    `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge}`
+                    `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} receivedSignedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge}`
                 )
               }
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-              /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+              /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.receivedSignedReceipt: ${utils.stringifyReduce(queueEntry.receivedSignedReceipt)}`)
 
               /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> M3 * 2. NormalTX Timed out. didSync == false. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
 
@@ -5727,10 +5784,10 @@ class TransactionQueue {
                 this.statemanager_fatal(
                   `txExpired3 > M3. receiptRequestFail after Timed Out`,
                   `txExpired txAge > timeM3 && queueEntry.requestingReceiptFailed ` +
-                    `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
+                    `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} receivedSignedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
                 )
                 /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
-                /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+                /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.receivedSignedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.receivedSignedReceipt)}`)
 
                 /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> M3. receiptRequestFail after Timed Out. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
 
@@ -5749,10 +5806,10 @@ class TransactionQueue {
                 this.statemanager_fatal(
                   `txExpired3 > M3. repairFailed after Timed Out`,
                   `txExpired txAge > timeM3 && queueEntry.repairFailed ` +
-                    `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
+                    `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} receivedSignedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
                 )
                 /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 repairFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
-                /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 repairFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+                /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.receivedSignedReceipt 3 repairFailed: ${utils.stringifyReduce(queueEntry.receivedSignedReceipt)}`)
 
                 /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `> M3. repairFailed after Timed Out. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
 
@@ -5774,9 +5831,9 @@ class TransactionQueue {
                 ) {
                   if (queueEntry.state == 'awaiting data') {
                     // no receipt yet, and state not committing
-                    if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null) {
+                    if (queueEntry.receivedSignedReceipt == null && queueEntry.signedReceipt == null) {
                       /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`Wait for reciept only: txAge > timeM2_5 txid:${shortID} `)
-                      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt3', `${shortID}`, `processAcceptedTxQueue ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+                      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt3', `${shortID}`, `processAcceptedTxQueue ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} receivedSignedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
 
                       /* prettier-ignore */ nestedCountersInstance.countEvent('txMissingReceipt', `Wait for reciept only: txAge > timeM2.5. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
                       queueEntry.waitForReceiptOnly = true
@@ -5808,7 +5865,7 @@ class TransactionQueue {
                     this.stateManager.hasReceipt(queueEntry) === false &&
                     queueEntry.requestingReceipt === false
                   ) {
-                    /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`txAge > timeM3 => ask for receipt now ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+                    /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`txAge > timeM3 => ask for receipt now ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} receivedSignedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
                     /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt1', `txAge > timeM3 ${shortID}`, `syncNeedsReceipt ${shortID}`)
 
                     const seen = this.processQueue_accountSeen(seenAccounts, queueEntry)
@@ -5838,10 +5895,10 @@ class TransactionQueue {
               this.statemanager_fatal(
                 `txExpired4`,
                 `Still on inital syncing.  txExpired txAge > timeM3 * 50. ` +
-                  `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
+                  `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} receivedSignedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
               )
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 4  ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-              /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 4: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+              /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.receivedSignedReceipt 4: ${utils.stringifyReduce(queueEntry.receivedSignedReceipt)}`)
 
               /* prettier-ignore */ nestedCountersInstance.countEvent('txExpired', `txExpired txAge > timeM3 * 50. still syncing. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
 
@@ -5994,7 +6051,7 @@ class TransactionQueue {
               this.statemanager_fatal(
                 `txExpired3 > M2. fail ${reason}`,
                 `txExpired txAge > timeM2 fail ${reason} ` +
-                  `txid: ${shortID} state: ${queueEntry.state} hasAll:${queueEntry.hasAll} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
+                  `txid: ${shortID} state: ${queueEntry.state} hasAll:${queueEntry.hasAll} applyReceipt:${hasApplyReceipt} receivedSignedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
               )
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired >m2 fail ${reason}  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
               //if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
@@ -6015,8 +6072,8 @@ class TransactionQueue {
           const isAwaitingFinalData = queueEntry.state === 'await final data'
           const isInExecutionHome = queueEntry.isInExecutionHome
           //note this wont work with old receipts but we can depricate old receipts soon
-          const receipt2 = this.stateManager.getReceipt2(queueEntry)
-          const hasReceipt = receipt2 != null
+          const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
+          const hasReceipt = signedReceipt != null
           const hasCastVote = queueEntry.ourVote != null
 
           let extraTime = 0
@@ -6072,7 +6129,7 @@ class TransactionQueue {
               this.statemanager_fatal(
                 `setTxAlmostExpired > M3. general case`,
                 `setTxAlmostExpired txAge > timeM3 general case ` +
-                `txid: ${shortID} state: ${queueEntry.state} hasAll:${queueEntry.hasAll} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}  hasReceipt:${hasReceipt} matchingReceipt:${matchingReceipt} isInExecutionHome:${isInExecutionHome} hasVote: ${queueEntry.receivedBestVote != null}`
+                `txid: ${shortID} state: ${queueEntry.state} hasAll:${queueEntry.hasAll} applyReceipt:${hasApplyReceipt} receivedSignedReceipt:${hasReceivedApplyReceipt} age:${txAge}  hasReceipt:${hasReceipt} matchingReceipt:${matchingReceipt} isInExecutionHome:${isInExecutionHome} hasVote: ${queueEntry.receivedBestVote != null}`
               )
               /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `setTxAlmostExpired ${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
               //if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
@@ -6331,8 +6388,8 @@ class TransactionQueue {
               //TODO check for receipt and move to repair state / await final data
 
               if(this.config.stateManager.awaitingDataCanBailOnReceipt){
-                const receipt = this.stateManager.getReceipt2(queueEntry)
-                if(receipt != null){
+                const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
+                if(signedReceipt != null){
                   //we saw a receipt so we can move to await final data
                   nestedCountersInstance.countEvent('processing', 'awaitingDataCanBailOnReceipt: activated.  tx state changed from awaiting data to await final data')
                   this.updateTxState(queueEntry, 'await final data', 'receipt while waiting for initial data')
@@ -6537,13 +6594,13 @@ class TransactionQueue {
               let didNotMatchReceipt = false
 
               let finishedConsensing = false
-              let result: AppliedReceipt
+              let result: SignedReceipt
 
-              if (this.usePOQo) {
+              // if (this.usePOQo) {
                 // Try to produce receipt
                 // If receipt made, tellx128 it to execution group
                 // that endpoint should then factTellCorrespondingNodesFinalData
-                const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+                const receipt2 = queueEntry.receivedSignedReceipt ?? queueEntry.signedReceipt
                 if (receipt2 != null) {
                   if (logFlags.debug)
                     this.mainLogger.debug(
@@ -6551,84 +6608,78 @@ class TransactionQueue {
                     )
                   nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
                   //we have a receipt2, so we can make a receipt
-                  result = {
-                    result: receipt2.result,
-                    appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
-                    confirmOrChallenge: [receipt2.confirmOrChallenge],
-                    txid: receipt2.txid,
-                    app_data_hash: receipt2.app_data_hash,
-                  }
+                  result = queueEntry.signedReceipt
                 } else {
                   result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
                 }
-              }
-              else if (this.useNewPOQ) {
-                this.stateManager.transactionConsensus.confirmOrChallenge(queueEntry)
+              // }
+              // else if (this.useNewPOQ) {
+              //   this.stateManager.transactionConsensus.confirmOrChallenge(queueEntry)
 
-                if (queueEntry.pendingConfirmOrChallenge.size > 0 && queueEntry.robustQueryVoteCompleted === true && queueEntry.acceptVoteMessage === false) {
-                  this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} pendingConfirmOrChallenge.size = ${queueEntry.pendingConfirmOrChallenge.size}`)
-                  for (const [nodeId, confirmOrChallenge] of queueEntry.pendingConfirmOrChallenge) {
-                    const appendSuccessful = this.stateManager.transactionConsensus.tryAppendMessage(queueEntry, confirmOrChallenge)
-                    if (appendSuccessful) {
-                      // we need forward the message to other nodes if append is successful
-                      const payload  = confirmOrChallenge
-                      const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-                      Comms.sendGossip('spread_confirmOrChallenge', payload, '', null, gossipGroup, false, 10, queueEntry.acceptedTx.txId)
-                      queueEntry.gossipedConfirmOrChallenge = true
-                    }
-                  }
-                  queueEntry.pendingConfirmOrChallenge = new Map()
-                  this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} reset pendingConfirmOrChallenge.size = ${queueEntry.pendingConfirmOrChallenge.size}`)
-                }
+              //   if (queueEntry.pendingConfirmOrChallenge.size > 0 && queueEntry.robustQueryVoteCompleted === true && queueEntry.acceptVoteMessage === false) {
+              //     this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} pendingConfirmOrChallenge.size = ${queueEntry.pendingConfirmOrChallenge.size}`)
+              //     for (const [nodeId, confirmOrChallenge] of queueEntry.pendingConfirmOrChallenge) {
+              //       const appendSuccessful = this.stateManager.transactionConsensus.tryAppendMessage(queueEntry, confirmOrChallenge)
+              //       if (appendSuccessful) {
+              //         // we need forward the message to other nodes if append is successful
+              //         const payload  = confirmOrChallenge
+              //         const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+              //         Comms.sendGossip('spread_confirmOrChallenge', payload, '', null, gossipGroup, false, 10, queueEntry.acceptedTx.txId)
+              //         queueEntry.gossipedConfirmOrChallenge = true
+              //       }
+              //     }
+              //     queueEntry.pendingConfirmOrChallenge = new Map()
+              //     this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} reset pendingConfirmOrChallenge.size = ${queueEntry.pendingConfirmOrChallenge.size}`)
+              //   }
 
-                // try to produce a receipt
-                /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
+              //   // try to produce a receipt
+              //   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
 
-                const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
-                if (receipt2 != null) {
-                  nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
-                  //we have a receipt2, so we can make a receipt
-                  result = {
-                    result: receipt2.result,
-                    appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
-                    confirmOrChallenge: [receipt2.confirmOrChallenge],
-                    txid: receipt2.txid,
-                    app_data_hash: receipt2.app_data_hash,
-                  }
-                } else {
-                  result = queueEntry.appliedReceipt
-                }
+              //   const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+              //   if (receipt2 != null) {
+              //     nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
+              //     //we have a receipt2, so we can make a receipt
+              //     result = {
+              //       result: receipt2.result,
+              //       appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
+              //       confirmOrChallenge: [receipt2.confirmOrChallenge],
+              //       txid: receipt2.txid,
+              //       app_data_hash: receipt2.app_data_hash,
+              //     }
+              //   } else {
+              //     result = queueEntry.appliedReceipt
+              //   }
 
-                if (result == null) {
-                  this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
-                }
-              } else {
-                const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
-                if (receipt2 != null) {
-                  if (logFlags.debug)
-                    this.mainLogger.debug(
-                      `processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`
-                    )
-                  nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
-                  //we have a receipt2, so we can make a receipt
-                  result = {
-                    result: receipt2.result,
-                    appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
-                    confirmOrChallenge: [receipt2.confirmOrChallenge],
-                    txid: receipt2.txid,
-                    app_data_hash: receipt2.app_data_hash,
-                  }
-                } else {
-                  result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
-                }
-              }
+              //   if (result == null) {
+              //     this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
+              //   }
+              // } else {
+              //   const receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+              //   if (receipt2 != null) {
+              //     if (logFlags.debug)
+              //       this.mainLogger.debug(
+              //         `processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`
+              //       )
+              //     nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt receipt2 != null')
+              //     //we have a receipt2, so we can make a receipt
+              //     result = {
+              //       result: receipt2.result,
+              //       appliedVotes: [receipt2.appliedVote], // everything is the same but the applied vote is an array
+              //       confirmOrChallenge: [receipt2.confirmOrChallenge],
+              //       txid: receipt2.txid,
+              //       app_data_hash: receipt2.app_data_hash,
+              //     }
+              //   } else {
+              //     result = await this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
+              //   }
+              // }
 
               /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt result : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
 
               //todo this is false.. and prevents some important stuff.
               //need to look at appliedReceipt2
-              if (this.stateManager.getReceipt2(queueEntry) != null) {
-                const receipt2 = this.stateManager.getReceipt2(queueEntry)
+              if (this.stateManager.getSignedReceipt(queueEntry) != null) {
+                const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
                 //TODO share receipt with corresponding index
 
                 if (logFlags.debug || this.stateManager.consensusLog) {
@@ -6648,51 +6699,51 @@ class TransactionQueue {
                 }
 
                 // we should send the receipt if we are in the top 5 nodes
-                const isConfirmedReceipt = receipt2.confirmOrChallenge?.message === 'confirm'
-                const isChallengedReceipt = receipt2.confirmOrChallenge?.message === 'challenge'
-                let shouldSendReceipt = false
-                if (queueEntry.isInExecutionHome) {
-                  if (this.usePOQo) {
-                    // Already handled above
-                    shouldSendReceipt = false
-                  }
-                  else if (this.useNewPOQ) {
-                    let numberOfSharingNodes = configContext.stateManager.nodesToGossipAppliedReceipt
-                    if (numberOfSharingNodes > queueEntry.executionGroup.length) numberOfSharingNodes = queueEntry.executionGroup.length
-                    const highestRankedNodeIds = queueEntry.executionGroup.slice(0, numberOfSharingNodes).map(n => n.id)
-                    if (highestRankedNodeIds.includes(Self.id)) {
-                      if (isChallengedReceipt) shouldSendReceipt = true
-                      else if (isConfirmedReceipt && isReceiptMatchPreApply) shouldSendReceipt = true
-                    }
-                  } else {
-                    shouldSendReceipt = true
-                  }
+                // const isConfirmedReceipt = receipt2.confirmOrChallenge?.message === 'confirm'
+                // const isChallengedReceipt = receipt2.confirmOrChallenge?.message === 'challenge'
+                // let shouldSendReceipt = false
+                // if (queueEntry.isInExecutionHome) {
+                //   if (this.usePOQo) {
+                //     // Already handled above
+                //     shouldSendReceipt = false
+                //   }
+                //   else if (this.useNewPOQ) {
+                //     let numberOfSharingNodes = configContext.stateManager.nodesToGossipAppliedReceipt
+                //     if (numberOfSharingNodes > queueEntry.executionGroup.length) numberOfSharingNodes = queueEntry.executionGroup.length
+                //     const highestRankedNodeIds = queueEntry.executionGroup.slice(0, numberOfSharingNodes).map(n => n.id)
+                //     if (highestRankedNodeIds.includes(Self.id)) {
+                //       if (isChallengedReceipt) shouldSendReceipt = true
+                //       else if (isConfirmedReceipt && isReceiptMatchPreApply) shouldSendReceipt = true
+                //     }
+                //   } else {
+                //     shouldSendReceipt = true
+                //   }
 
-                  if (shouldSendReceipt) {
-                    // Broadcast the receipt, only if we made one (try produce can early out if we received one)
-                    const awaitStart = shardusGetTime()
-                    /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()' )
-                    this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
-                    /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()', DebugComplete.Completed )
+                //   if (shouldSendReceipt) {
+                //     // Broadcast the receipt, only if we made one (try produce can early out if we received one)
+                //     const awaitStart = shardusGetTime()
+                //     /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()' )
+                //     this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
+                //     /* prettier-ignore */ this.setDebugLastAwaitedCall( 'this.stateManager.transactionConsensus.shareAppliedReceipt()', DebugComplete.Completed )
 
-                    this.updateSimpleStatsObject(
-                      processStats.awaitStats,
-                      'shareAppliedReceipt',
-                      shardusGetTime() - awaitStart
-                    )
-                  }
-                }
+                //     this.updateSimpleStatsObject(
+                //       processStats.awaitStats,
+                //       'shareAppliedReceipt',
+                //       shardusGetTime() - awaitStart
+                //     )
+                //   }
+                // }
 
                 // remove from the queue if receipt2 is a challenged receipt
-                if (isChallengedReceipt && this.useNewPOQ) {
-                  const txId = queueEntry.acceptedTx.txId
-                  const logID = queueEntry.logID
-                  this.updateTxState(queueEntry, 'fail')
-                  this.removeFromQueue(queueEntry, currentIndex, true) // we don't want to archive this
-                  nestedCountersInstance.countEvent('consensus', 'isChallengedReceipt: true removing from queue')
-                  this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isChallengedReceipt : ${logID}. remove from queue`)
-                  continue
-                }
+                // if (isChallengedReceipt && this.useNewPOQ) {
+                //   const txId = queueEntry.acceptedTx.txId
+                //   const logID = queueEntry.logID
+                //   this.updateTxState(queueEntry, 'fail')
+                //   this.removeFromQueue(queueEntry, currentIndex, true) // we don't want to archive this
+                //   nestedCountersInstance.countEvent('consensus', 'isChallengedReceipt: true removing from queue')
+                //   this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt isChallengedReceipt : ${logID}. remove from queue`)
+                //   continue
+                // }
 
                 // not a challenge receipt but check the tx result
                 if (isReceiptMatchPreApply && queueEntry.isInExecutionHome) {
@@ -6702,9 +6753,8 @@ class TransactionQueue {
                   //todo check cant_apply flag to make sure a vote can form with it!
                   //also check if failed votes will work...?
                   if (
-                    this.stateManager.getReceiptVote(queueEntry).cant_apply === false &&
-                    this.stateManager.getReceiptResult(queueEntry) === true &&
-                    this.stateManager.getReceiptConfirmation(queueEntry) === true
+                    this.stateManager.getReceiptProposal(queueEntry).cant_preApply === false &&
+                    this.stateManager.getReceiptResult(queueEntry) === true
                   ) {
                     this.updateTxState(queueEntry, 'commiting')
                     queueEntry.hasValidFinalData = true
@@ -6759,7 +6809,7 @@ class TransactionQueue {
                     this.statemanager_fatal(
                       `consensing: on a failed receipt`,
                       `consensing: got a failed receipt for ` +
-                        `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
+                        `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} receivedSignedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
                     )
                     if (logFlags.debug || this.stateManager.consensusLog) {
                       /* prettier-ignore */ this.mainLogger.debug(`processAcceptedTxQueue2 tryProduceReceipt failed result: false : ${queueEntry.logID} ${utils.stringifyReduce(result)}`)
@@ -6771,10 +6821,10 @@ class TransactionQueue {
                     continue
                   }
                   didNotMatchReceipt = true
-                  queueEntry.appliedReceiptForRepair = result
+                  queueEntry.signedReceiptForRepair = result
 
-                  queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
-                  if (queueEntry.isInExecutionHome === false && queueEntry.appliedReceipt2 != null) {
+                  // queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
+                  if (queueEntry.isInExecutionHome === false && queueEntry.signedReceipt != null) {
                     if (this.stateManager.consensusLog)
                       this.mainLogger.debug(
                         `processTransactions ${queueEntry.logID} we are not execution home, but we have a receipt2, go to await final data`
@@ -6785,18 +6835,18 @@ class TransactionQueue {
               }
               if (finishedConsensing === false) {
                 // if we got a reciept while waiting see if we should use it (if our own vote matches)
-                if (hasReceivedApplyReceipt && queueEntry.recievedAppliedReceipt != null) {
+                if (hasReceivedApplyReceipt && queueEntry.receivedSignedReceipt != null) {
                   if (
                     this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(
                       queueEntry,
-                      queueEntry.recievedAppliedReceipt
+                      queueEntry.receivedSignedReceipt
                     )
                   ) {
                     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
 
                     //todo check cant_apply flag to make sure a vote can form with it!
                     if (
-                      this.stateManager.getReceiptVote(queueEntry).cant_apply === false &&
+                      this.stateManager.getReceiptProposal(queueEntry).cant_preApply === false &&
                       this.stateManager.getReceiptResult(queueEntry) === true
                     ) {
                       this.updateTxState(queueEntry, 'commiting')
@@ -6815,9 +6865,10 @@ class TransactionQueue {
                   } else {
                     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                     didNotMatchReceipt = true
-                    queueEntry.appliedReceiptForRepair = queueEntry.recievedAppliedReceipt
+                    queueEntry.signedReceiptForRepair = queueEntry.receivedSignedReceipt
 
-                    queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
+                    // queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
+                    queueEntry.signedReceiptForRepair = this.stateManager.getSignedReceipt(queueEntry)
                   }
                 } else {
                   //just keep waiting for a reciept
@@ -6840,9 +6891,9 @@ class TransactionQueue {
                     continue
                   }
 
-                  /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_didNotMatchReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
+                  /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_didNotMatchReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.signedReceiptForRepair.proposal.applied} `)
                   queueEntry.repairFinished = false
-                  if (queueEntry.appliedReceiptForRepair.result === true) {
+                  if (queueEntry.signedReceiptForRepair.proposal.applied === true) {
                     // need to start repair process and wait
                     //await note: it is best to not await this.  it should be an async operation.
                     if (configContext.stateManager.noRepairIfDataAttached && configContext.stateManager.attachDataToReceipt) {
@@ -6860,7 +6911,7 @@ class TransactionQueue {
                     this.statemanager_fatal(
                       `consensing: repairToMatchReceipt failed`,
                       `consensing: repairToMatchReceipt failed ` +
-                        `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
+                        `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} receivedSignedReceipt:${hasReceivedApplyReceipt} age:${txAge}`
                     )
                     this.removeFromQueue(queueEntry, currentIndex)
                     this.updateTxState(queueEntry, 'fail')
@@ -6879,8 +6930,8 @@ class TransactionQueue {
 
             // Special state that we are put in if we are waiting for a repair to receipt operation to conclude
             if (queueEntry.repairFinished === true) {
-              /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} txAge:${txAge} `)
-              if (queueEntry.appliedReceiptForRepair.result === true) {
+              /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.signedReceiptForRepair.proposal.applied} txAge:${txAge} `)
+              if (queueEntry.signedReceiptForRepair.proposal.applied === true) {
                 this.updateTxState(queueEntry, 'pass')
               } else {
                 // technically should never get here, because we dont need to repair to a receipt when the network did not apply the TX
@@ -6927,9 +6978,8 @@ class TransactionQueue {
 
               //collectedFinalData
               //PURPL-74 todo: get the vote from queueEntry.receivedBestVote or receivedBestConfirmation instead of receipt2
-              const receipt2 = this.stateManager.getReceipt2(queueEntry)
+              const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
               const timeSinceAwaitFinalStart = queueEntry.txDebug.startTimestamp['await final data'] > 0 ? shardusGetTime() - queueEntry.txDebug.startTimestamp['await final data'] : 0
-              let vote: AppliedVote
 
               // if(configContext.stateManager.removeStuckChallengedTXs && this.useNewPOQ) {
               //   // first check if this is a challenge receipt
@@ -6956,26 +7006,10 @@ class TransactionQueue {
               //   }
               // }
 
-              // see if we can find a good vote to use
-              if (receipt2) {
-                vote = receipt2.appliedVote
-              } else if (queueEntry.receivedBestConfirmation?.appliedVote) {
-                // I think this is POQ-LS and will go away
-                vote = queueEntry.receivedBestConfirmation.appliedVote
-              } else if (queueEntry.receivedBestVote) {
-                // I think this is POQ-LS and will go away
-                vote = queueEntry.receivedBestVote
-              } else if (queueEntry.ourVote && configContext.stateManager.stuckTxQueueFix) {
-                // allow node to request missing data if it has an own vote
-                // 20240709 this does not seem right.  We should not use our own vote to request missing data
-                // going to add counters to confirm
-                nestedCountersInstance.countEvent('stateManager', 'shrd_awaitFinalData used ourVote')
-                vote = queueEntry.ourVote
-              }
               const accountsNotStored = new Set()
               //if we got a vote above then build a list of accounts that we store but are missing in our
               //collectedFinalData
-              if (vote) {
+              if (signedReceipt) {
                 let failed = false
                 let incomplete = false
                 let skipped = 0
@@ -6984,9 +7018,9 @@ class TransactionQueue {
                   this.stateManager.currentCycleShardData.nodeShardData
 
                 /* eslint-disable security/detect-object-injection */
-                for (let i = 0; i < vote.account_id.length; i++) {
-                  const accountID = vote.account_id[i]
-                  const accountHash = vote.account_state_hash_after[i]
+                for (let i = 0; i < signedReceipt.proposal.accountIDs.length; i++) {
+                  const accountID = signedReceipt.proposal.accountIDs[i]
+                  const accountHash = signedReceipt.proposal.afterStateHashes[i]
 
                   //only check for stored keys.
                   if ( ShardFunctions.testAddressInRange(accountID, nodeShardData.storedPartitions) === false ) {
@@ -7062,8 +7096,8 @@ class TransactionQueue {
                   const rawAccounts = []
                   const accountRecords: Shardus.WrappedData[] = []
                   /* eslint-disable security/detect-object-injection */
-                  for (let i = 0; i < vote.account_id.length; i++) {
-                    const accountID = vote.account_id[i]
+                  for (let i = 0; i < signedReceipt.proposal.accountIDs.length; i++) {
+                    const accountID = signedReceipt.proposal.accountIDs[i]
                     //skip accounts we don't store
                     if (accountsNotStored.has(accountID)) {
                       continue
@@ -7108,14 +7142,13 @@ class TransactionQueue {
                   }
 
                   if (
-                    queueEntry.recievedAppliedReceipt?.result === true ||
-                    queueEntry.recievedAppliedReceipt2?.result === true ||
-                    queueEntry.appliedReceipt2?.result === true
+                    queueEntry.receivedSignedReceipt?.proposal?.applied === true ||
+                    queueEntry.signedReceipt?.proposal?.applied === true
                   ) {
                     this.updateTxState(queueEntry, 'pass')
                   } else {
                     /* prettier-ignore */
-                    if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_fail : ${queueEntry.logID} no receivedAppliedRecipt or recievedAppliedReceipt2. appliedReceipt2: ${utils.stringifyReduce(queueEntry.appliedReceipt2)}`);
+                    if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_fail : ${queueEntry.logID} no receivedSignedReceipt. signedReceipt: ${utils.stringifyReduce(queueEntry.signedReceipt)}`);
                     this.updateTxState(queueEntry, 'fail')
                   }
                   this.removeFromQueue(queueEntry, currentIndex)
@@ -7199,15 +7232,15 @@ class TransactionQueue {
                   if (queueEntry.preApplyTXResult.passed === false) {
                     canCommitTX = false
                   }
-                } else if (queueEntry.appliedReceipt2 != null) {
+                } else if (queueEntry.signedReceipt != null) {
                   // the final state of the queue entry will be pass or fail based on the receipt
-                  if (queueEntry.appliedReceipt2.result === false) {
+                  if (queueEntry.signedReceipt.proposal.applied === false) {
                     canCommitTX = false
                     hasReceiptFail = true
                   }
-                } else if (queueEntry.recievedAppliedReceipt2 != null) {
+                } else if (queueEntry.receivedSignedReceipt != null) {
                   // the final state of the queue entry will be pass or fail based on the receipt
-                  if (queueEntry.recievedAppliedReceipt2.result === false) {
+                  if (queueEntry.receivedSignedReceipt.proposal.applied === false) {
                     canCommitTX = false
                     if(configContext.stateManager.receiptRemoveFix){
                       hasReceiptFail = true
@@ -7295,17 +7328,17 @@ class TransactionQueue {
                     this.updateTxState(queueEntry, 'fail')
                   }
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : noConsensus:${queueEntry.state} ${queueEntry.logID} `)
-                } else if (queueEntry.appliedReceipt2 != null) {
+                } else if (queueEntry.signedReceipt != null) {
                   // the final state of the queue entry will be pass or fail based on the receipt
-                  if (queueEntry.appliedReceipt2.result === true) {
+                  if (queueEntry.signedReceipt.proposal.applied === true) {
                     this.updateTxState(queueEntry, 'pass')
                   } else {
                     this.updateTxState(queueEntry, 'fail')
                   }
                   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : Recpt:${queueEntry.state} ${queueEntry.logID} `)
-                } else if (queueEntry.recievedAppliedReceipt2 != null) {
+                } else if (queueEntry.receivedSignedReceipt != null) {
                   // the final state of the queue entry will be pass or fail based on the receipt
-                  if (queueEntry.recievedAppliedReceipt2.result === true) {
+                  if (queueEntry.receivedSignedReceipt.proposal.applied === true) {
                     this.updateTxState(queueEntry, 'pass')
                   } else {
                     this.updateTxState(queueEntry, 'fail')
@@ -7445,12 +7478,12 @@ class TransactionQueue {
 
     //This is really important.  If we are going to expire a TX, then look to see if we already have a receipt for it.
     //If so, then just go into async receipt repair mode for the TX AFTER it has been expired and removed from the queue
-    if (queueEntry.appliedReceiptFinal2 != null) {
+    if (queueEntry.signedReceiptFinal != null) {
       const startRepair = queueEntry.repairStarted === false
       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`setTXExpired. ${queueEntry.logID} start repair:${startRepair}. update `)
       if (startRepair) {
         nestedCountersInstance.countEvent('repair1', 'setTXExpired: start repair')
-        queueEntry.appliedReceiptForRepair2 = queueEntry.appliedReceiptFinal2
+        queueEntry.signedReceiptForRepair = queueEntry.signedReceiptFinal
         //todo any limits to how many repairs at once to allow?
         this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
       }
@@ -7511,17 +7544,19 @@ class TransactionQueue {
       }
     }
 
-    const receipt2 = this.stateManager.getReceipt2(queueEntry)
-    const appliedReceipt = receipt2 ? Utils.safeJsonParse(Utils.safeStringify(receipt2)) : ({} as AppliedReceipt2)
-    if (this.useNewPOQ === false) {
-      if (appliedReceipt.appliedVote) {
-        delete appliedReceipt.appliedVote.node_id
-        delete appliedReceipt.appliedVote.sign
-        delete appliedReceipt.confirmOrChallenge
-        // Update the app_data_hash with the app_data_hash from the appliedVote
-        appliedReceipt.app_data_hash = appliedReceipt.appliedVote.app_data_hash
-      }
-    }
+    const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
+    // const receipt = signedReceipt ? Utils.safeJsonParse(Utils.safeStringify(signedReceipt)) : ({} as SignedReceipt)
+    
+    // MIGHT NOT NEED THIS NOW WITH THE POQo RECEIPT REWRITE. NEED TO CONFIRM
+    // if (this.useNewPOQ === false) {
+    //   if (appliedReceipt.appliedVote) {
+    //     delete appliedReceipt.appliedVote.node_id
+    //     delete appliedReceipt.appliedVote.sign
+    //     delete appliedReceipt.confirmOrChallenge
+    //     // Update the app_data_hash with the app_data_hash from the appliedVote
+    //     appliedReceipt.app_data_hash = appliedReceipt.appliedVote.app_data_hash
+    //   }
+    // }
 
     const archiverReceipt: ArchiverReceipt = {
       tx: {
@@ -7529,13 +7564,13 @@ class TransactionQueue {
         txId: queueEntry.acceptedTx.txId,
         timestamp: queueEntry.acceptedTx.timestamp,
       },
-      cycle: queueEntry.txGroupCycle, // Updated to use txGroupCycle instead of cycleToRecordOn because when the receipt is arrived at the archiver, the cycleToRecordOn cycle might not exist yet.
-      beforeStateAccounts: [...Object.values(beforeAccountsToAdd)],
-      accounts: [...Object.values(accountsToAdd)],
+      signedReceipt: signedReceipt ?? {} as SignedReceipt,
       appReceiptData: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
-      appliedReceipt,
+      beforeStates: [...Object.values(beforeAccountsToAdd)],
+      afterStates: [...Object.values(accountsToAdd)],
+      cycle: queueEntry.txGroupCycle,
       executionShardKey: queueEntry.executionShardKey || '',
-      globalModification: queueEntry.globalModification,
+      globalModification: queueEntry.globalModification
     }
     return archiverReceipt
   }
@@ -7616,18 +7651,17 @@ class TransactionQueue {
 
       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug( `requestFinalData: txid: ${queueEntry.acceptedTx.txId} accountIds: ${utils.stringifyReduce( accountIds )}, asking node: ${nodeToAsk.id} ${nodeToAsk.externalPort} at timestamp ${shardusGetTime()}` )
 
-      let response
       // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestTxAndStateBinary) {
-        const requestMessage = message as RequestTxAndStateReq
-        /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(nodeToAsk.id)}: ${'request_tx_and_state'}`)
-        response = await Comms.askBinary<RequestTxAndStateReq, RequestTxAndStateResp>(
-          nodeToAsk,
-          InternalRouteEnum.binary_request_tx_and_state,
-          requestMessage,
-          serializeRequestTxAndStateReq,
-          deserializeRequestTxAndStateResp,
-          {}
-        )
+      const requestMessage = message as RequestTxAndStateReq
+      /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(nodeToAsk.id)}: ${'request_tx_and_state'}`)
+      const response = await Comms.askBinary<RequestTxAndStateReq, RequestTxAndStateResp>(
+        nodeToAsk,
+        InternalRouteEnum.binary_request_tx_and_state,
+        requestMessage,
+        serializeRequestTxAndStateReq,
+        deserializeRequestTxAndStateResp,
+        {}
+      )
       // } else response = await Comms.ask(nodeToAsk, 'request_tx_and_state', message)
 
       if (response && response.stateList && response.stateList.length > 0) {
@@ -8513,7 +8547,7 @@ getDebugStuckTxs(opts): unknown {
       executionDebug: queueEntry.executionDebug,
       waitForReceiptOnly: queueEntry.waitForReceiptOnly,
       ourVote: queueEntry.ourVote || null,
-      receipt2: this.stateManager.getReceipt2(queueEntry) || null,
+      signedReceipt: this.stateManager.getSignedReceipt(queueEntry) || null,
       // uniqueChallenges: queueEntry.uniqueChallengesCount,
       collectedVoteCount: queueEntry.collectedVoteHashes.length,
       simpleDebugStr: this.app.getSimpleTxDebugValue ? this.app.getSimpleTxDebugValue(queueEntry.acceptedTx?.data) : "",
@@ -8531,10 +8565,11 @@ getDebugStuckTxs(opts): unknown {
   }
   updateTxState(queueEntry: QueueEntry, nextState: string, context = ''): void {
     if (logFlags.seqdiagram)
-      if (context == '')
+      if (context == '') {
         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: ${queueEntry.state}-${nextState}`)
-      else 
+      } else {
         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455104 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: ${queueEntry.state}-${nextState}:${context}`)
+      }
     const currentState = queueEntry.state
     this.txDebugMarkEndTime(queueEntry, currentState)
     queueEntry.state = nextState

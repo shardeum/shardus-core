@@ -55,20 +55,52 @@ export const schemaConfirmOrChallengeMessage = {
   required: ['message', 'nodeId', 'appliedVote'],
 }
 
-export const schemaAppliedReceipt2 = {
+export const schemaProposal = {
   type: 'object',
   properties: {
+    applied: { type: 'boolean' },
+    cant_preApply: { type: 'boolean' },
+    accountIDs: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+    beforeStateHashes: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+    afterStateHashes: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+    appReceiptDataHash: { type: 'string' },
     txid: { type: 'string' },
-    result: { type: 'boolean' },
-    appliedVote: schemaAppliedVote,
-    confirmOrChallenge: schemaConfirmOrChallengeMessage,
-    signatures: {
+  },
+  required: [
+    'applied',
+    'cant_preApply',
+    'accountIDs',
+    'beforeStateHashes',
+    'afterStateHashes',
+    'appReceiptDataHash',
+  ],
+}
+
+export const schemaSignedReceipt = {
+  type: 'object',
+  properties: {
+    proposal: schemaProposal,
+    proposalHash: { type: 'string' },
+    signaturePack: {
       type: 'array',
       items: schemaSign,
     },
-    app_data_hash: { type: 'string' },
+    voteOffsets: {
+      type: 'array',
+      items: { type: 'number' },
+    },
+    sign: schemaSign,
   },
-  required: ['txid', 'result', 'appliedVote', 'signatures', 'app_data_hash'],
+  required: ['proposal', 'proposalHash', 'signaturePack', 'voteOffsets'],
 }
 
 export const schemaAccountRepairInstruction = {
@@ -79,9 +111,9 @@ export const schemaAccountRepairInstruction = {
     txId: { type: 'string' },
     accountData: schemaWrappedData,
     targetNodeId: { type: 'string' },
-    receipt2: schemaAppliedReceipt2,
+    signedReceipt: schemaSignedReceipt,
   },
-  required: ['accountID', 'hash', 'txId', 'accountData', 'targetNodeId', 'receipt2'],
+  required: ['accountID', 'hash', 'txId', 'accountData', 'targetNodeId', 'signedReceipt'],
 }
 
 export const schemaRepairOOSAccountsReq = {

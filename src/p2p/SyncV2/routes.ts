@@ -23,7 +23,7 @@ const validatorListHashRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'validator-list-hash',
   handler: (_req, res) => {
     const nextCycleTimestamp = CycleCreator.nextQ1Start
-    res.send({ nodeListHash: NodeList.getNodeListHash(), nextCycleTimestamp })
+    res.json({ nodeListHash: NodeList.getNodeListHash(), nextCycleTimestamp })
   },
 }
 
@@ -32,7 +32,7 @@ const archiverListHashRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'archiver-list-hash',
   handler: (_req, res) => {
-    res.send({ archiverListHash: Archivers.getArchiverListHash() })
+    res.json({ archiverListHash: Archivers.getArchiverListHash() })
   },
 }
 
@@ -41,7 +41,7 @@ const standbyListHashRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'standby-list-hash',
   handler: (_req, res) => {
-    res.send({ standbyNodeListHash: JoinV2.getStandbyListHash() })
+    res.json({ standbyNodeListHash: JoinV2.getStandbyListHash() })
   },
 }
 
@@ -59,7 +59,7 @@ const newestCycleHashRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'current-cycle-hash',
   handler: (_req, res) => {
-    res.send({ currentCycleHash: CycleChain.getCurrentCycleMarker() })
+    res.json({ currentCycleHash: CycleChain.getCurrentCycleMarker() })
   },
 }
 
@@ -81,7 +81,7 @@ const validatorListRoute: P2P.P2PTypes.Route<Handler> = {
         respondSize = jsonHttpResWithSize(res, getLastHashedNodeList)
       } else {
         /* prettier-ignore */ if (logFlags.debug) console.error( `rejecting validator list request: expected '${expectedHash}' != '${NodeList.getNodeListHash()}'` )
-        res.status(404).send(`validator list with hash '${expectedHash}' not found`)
+        res.status(404).json({ error: `validator list with hash '${expectedHash}' not found` })
       }
     } finally {
       profilerInstance.scopedProfileSectionEnd('validator-list', respondSize)
@@ -100,10 +100,10 @@ const archiverListRoute: P2P.P2PTypes.Route<Handler> = {
 
     // return the archiver list if the hash from the requester matches
     if (expectedHash && expectedHash === Archivers.getArchiverListHash()) {
-      res.send(Archivers.getLastHashedArchiverList())
+      res.json(Archivers.getLastHashedArchiverList())
     } else {
       /* prettier-ignore */ if (logFlags.debug) console.error( `rejecting archiver list request: expected '${expectedHash}' != '${Archivers.getArchiverListHash()}'` )
-      res.status(404).send(`archiver list with hash '${expectedHash}' not found`)
+      res.status(404).json({ error: `archiver list with hash '${expectedHash}' not found` })
     }
     profilerInstance.scopedProfileSectionEnd('archiver-list')
   },
@@ -133,7 +133,7 @@ const standbyListRoute: P2P.P2PTypes.Route<Handler> = {
         //res.json(standbyList)
       } else {
         /* prettier-ignore */ if (logFlags.debug) console.error( `rejecting standby list request: expected '${expectedHash}' != '${JoinV2.getStandbyListHash()}'` )
-        res.status(404).send(`standby list with hash '${expectedHash}' not found`)
+        res.status(404).json({ error: `standby list with hash '${expectedHash}' not found` })
       }
     } finally {
       profilerInstance.scopedProfileSectionEnd('standby-list', respondSize)
@@ -173,9 +173,9 @@ const cycleByMarkerRoute: P2P.P2PTypes.Route<Handler> = {
     // otherwise return an error.
     const cycle = CycleChain.cyclesByMarker[req.query.marker as string]
     if (cycle) {
-      res.send(cycle)
+      res.json(cycle)
     } else {
-      res.status(404).send(`cycle with marker '${req.query.marker}' not found`)
+      res.status(404).json({ error: `cycle with marker '${req.query.marker}' not found` })
     }
     profilerInstance.scopedProfileSectionEnd('cycle-by-marker')
   },
@@ -186,7 +186,7 @@ const newestCycleRecordRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'newest-cycle-record',
   handler: (_req, res) => {
     profilerInstance.scopedProfileSectionStart('newest-cycle-record', false)
-    res.send(CycleChain.newest)
+    res.json(CycleChain.newest)
     profilerInstance.scopedProfileSectionEnd('newest-cycle-record')
   },
 }

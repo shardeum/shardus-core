@@ -56,7 +56,7 @@ class LoadDetection extends EventEmitter {
       this.dbg = true
       this.load = Number(req.query.load)
       console.log(`set load to ${this.load}`)
-      res.send(`set load to ${this.load}`)
+      res.json({ success: true, data: `set load to ${this.load}` })
     })
     /**
      * Resets load detection to normal behavior
@@ -66,14 +66,14 @@ class LoadDetection extends EventEmitter {
     Context.network.registerExternalGet('loadreset', isDebugModeMiddleware, (req, res) => {
       this.dbg = false
       console.log('reset load detection to normal behavior')
-      res.send('reset load detection to normal behavior')
+      res.json({ success: true, data: 'reset load detection to normal behavior' })
     })
     Context.network.registerExternalGet('load', (req, res) => {
       try {
         // todo: reject if request is not coming from node operator dashboard
         const load = this.getCurrentLoad()
         const nodeLoad = this.getCurrentNodeLoad()
-        return res.send({load, nodeLoad})
+        return res.json({ load, nodeLoad })
       } catch (e) {
         console.log(`Error getting load: ${e.message}`);
       }

@@ -20,7 +20,6 @@ import ShardFunctions from './shardFunctions'
 import * as NodeList from '../p2p/NodeList'
 import {
   AppliedReceipt,
-  AppliedReceipt2,
   AppliedVote,
   AppliedVoteHash,
   AppliedVoteQuery,
@@ -31,10 +30,11 @@ import {
   GetAccountData3Req,
   GetAccountData3Resp,
   QueueEntry,
-  RequestReceiptForTxReq,
-  RequestReceiptForTxResp,
   WrappedResponses,
   TimestampRemoveRequest,
+  Proposal,
+  Vote,
+  SignedReceipt,
 } from './state-manager-types'
 import { ipInfo, shardusGetTime } from '../network'
 import { robustQuery } from '../p2p/Utils'
@@ -290,12 +290,12 @@ class TransactionConsenus {
 
     Context.network.registerExternalGet('debug-produceBadVote', isDebugModeMiddleware, (req, res) => {
       this.produceBadVote = !this.produceBadVote
-      res.send({ status: 'ok', produceBadVote: this.produceBadVote })
+      res.json({ status: 'ok', produceBadVote: this.produceBadVote })
     })
 
     Context.network.registerExternalGet('debug-produceBadChallenge', isDebugModeMiddleware, (req, res) => {
       this.produceBadChallenge = !this.produceBadChallenge
-      res.send({ status: 'ok', produceBadChallenge: this.produceBadChallenge })
+      res.json({ status: 'ok', produceBadChallenge: this.produceBadChallenge })
     })
 
     // this.p2p.registerInternal(
@@ -320,23 +320,24 @@ class TransactionConsenus {
     //   }
     // )
 
-    this.p2p.registerInternal(
-      'remove_timestamp_cache',
-      async (
-        payload: TimestampRemoveRequest,
-        respond: (result: boolean) => unknown
-      ) => {
-        const { txId, receipt2, cycleCounter } = payload
-        if (this.txTimestampCache.has(cycleCounter) && this.txTimestampCache.get(cycleCounter).has(txId)) {
-
-          /* prettier-ignore */ this.mainLogger.debug(`Removed timestamp cache for txId: ${txId}, timestamp: ${Utils.safeStringify(this.txTimestampCache.get(cycleCounter).get(txId))}`)
-          // remove the timestamp from the cache
-          this.txTimestampCache.get(cycleCounter).delete(txId)
-          nestedCountersInstance.countEvent('consensus', 'remove_timestamp_cache')
-        }
-        await respond(true)
-      }
-    )
+    // this.p2p.registerInternal(
+    //   'remove_timestamp_cache',
+    //   async (
+    //     payload: TimestampRemoveRequest,
+    //     respond: (result: boolean) => unknown
+    //   ) => {
+    //     const { txId, receipt2, cycleCounter } = payload
+    //     /* eslint-disable security/detect-object-injection */
+    //     if (this.txTimestampCache[cycleCounter] && this.txTimestampCache[cycleCounter][txId]) {
+    //       // remove the timestamp from the cache
+    //       delete this.txTimestampCache[cycleCounter][txId]
+    //       this.txTimestampCache[cycleCounter][txId] = null
+    //       /* prettier-ignore */ this.mainLogger.debug(`Removed timestamp cache for txId: ${txId}, timestamp: ${Utils.safeStringify(this.txTimestampCache[cycleCounter][txId])}`)
+    //       nestedCountersInstance.countEvent('consensus', 'remove_timestamp_cache')
+    //     }
+    //     await respond(true)
+    //   }
+    // )
 
     const getTxTimestampBinary: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_get_tx_timestamp,
@@ -760,356 +761,358 @@ class TransactionConsenus {
       }
     )
 
-    this.p2p.registerGossipHandler(
-      'spread_appliedReceipt2',
-      async (
-        payload: any,
-        tracker: string,
-        msgSize: number
-      ) => {
-        nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 handler')
-        profilerInstance.scopedProfileSectionStart('spread_appliedReceipt2', false, msgSize)
-        const respondSize = cUninitializedSize
+    // DEPRECATED AFTER POQO
+    // this.p2p.registerGossipHandler(
+    //   'spread_appliedReceipt2',
+    //   async (
+    //     payload: any,
+    //     tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 handler')
+    //     profilerInstance.scopedProfileSectionStart('spread_appliedReceipt2', false, msgSize)
+    //     const respondSize = cUninitializedSize
 
-        // ignore the message for debugging purpose
-        if (
-          this.stateManager.testFailChance(
-            this.stateManager.ignoreRecieptChance,
-            'spread_appliedReceipt2',
-            utils.stringifyReduce(payload.txid),
-            '',
-            logFlags.verbose
-          ) === true
-        ) {
-          return
-        }
+    //     // ignore the message for debugging purpose
+    //     if (
+    //       this.stateManager.testFailChance(
+    //         this.stateManager.ignoreRecieptChance,
+    //         'spread_appliedReceipt2',
+    //         utils.stringifyReduce(payload.txid),
+    //         '',
+    //         logFlags.verbose
+    //       ) === true
+    //     ) {
+    //       return
+    //     }
 
-        try {
-          // extract txId
-          let txId: string
-          let receivedAppliedReceipt2: AppliedReceipt2
-          if (Context.config.stateManager.attachDataToReceipt) {
-            txId = payload.receipt?.txid
-            receivedAppliedReceipt2 = payload.receipt as AppliedReceipt2
-          } else {
-            receivedAppliedReceipt2 = payload as AppliedReceipt2
-            txId = receivedAppliedReceipt2.txid
-          }
-          if (receivedAppliedReceipt2 == null) {
-            /* prettier-ignore */ this.mainLogger.error(`spread_appliedReceipt2 ${txId} received null receipt`)
-            nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null receipt`)
-            return
-          }
+    //     try {
+    //       // extract txId
+    //       let txId: string
+    //       let receivedSignedReceipt: SignedReceipt
+    //       if (Context.config.stateManager.attachDataToReceipt) {
+    //         txId = payload.receipt?.txid
+    //         receivedSignedReceipt = payload.receipt as SignedReceipt
+    //       } else {
+    //         receivedAppliedReceipt2 = payload as AppliedReceipt2
+    //         txId = receivedAppliedReceipt2.txid
+    //       }
+    //       if (receivedAppliedReceipt2 == null) {
+    //         /* prettier-ignore */ this.mainLogger.error(`spread_appliedReceipt2 ${txId} received null receipt`)
+    //         nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null receipt`)
+    //         return
+    //       }
 
-          // we need confirmation in new POQ
-          if (this.stateManager.transactionQueue.useNewPOQ && receivedAppliedReceipt2.confirmOrChallenge == null) {
-            /* prettier-ignore */ this.mainLogger.error(`spread_appliedReceipt2 ${txId} received null receipt`)
-            nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null confirm message`)
-            return
-          }
+    //       // we need confirmation in new POQ
+    //       if (this.stateManager.transactionQueue.useNewPOQ && receivedAppliedReceipt2.confirmOrChallenge == null) {
+    //         /* prettier-ignore */ this.mainLogger.error(`spread_appliedReceipt2 ${txId} received null receipt`)
+    //         nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt received null confirm message`)
+    //         return
+    //       }
 
-          // check if we have the queue entry
-          let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId) // , payload.timestamp)
-          if (queueEntry == null) {
-            if (queueEntry == null) {
-              // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
-              queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
-                txId,
-                'spread_appliedReceipt2'
-              ) // , payload.timestamp)
-              if (queueEntry != null) {
-                // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
-                // would need to make sure we send gossip though.
-              }
-            }
-            if (queueEntry == null) {
-              /* prettier-ignore */
-              if (logFlags.error || this.stateManager.consensusLog)
-                this.mainLogger.error(
-                  `spread_appliedReceipt no queue entry for ${txId} txId:${txId}`
-                )
-              // NEW start repair process that will find the TX then apply repairs
-              // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(receivedAppliedReceipt2)
-              return
-            }
-          }
-          if (queueEntry.hasValidFinalData || queueEntry.accountDataSet) {
-            /* prettier-ignore */
-            if (logFlags.debug || this.stateManager.consensusLog)
-              this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} Already Shared`)
-            nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 skipped Already Shared`)
-            return
-          }
+    //       // check if we have the queue entry
+    //       let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         if (queueEntry == null) {
+    //           // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
+    //           queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
+    //             txId,
+    //             'spread_appliedReceipt2'
+    //           ) // , payload.timestamp)
+    //           if (queueEntry != null) {
+    //             // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
+    //             // would need to make sure we send gossip though.
+    //           }
+    //         }
+    //         if (queueEntry == null) {
+    //           /* prettier-ignore */
+    //           if (logFlags.error || this.stateManager.consensusLog)
+    //             this.mainLogger.error(
+    //               `spread_appliedReceipt no queue entry for ${txId} txId:${txId}`
+    //             )
+    //           // NEW start repair process that will find the TX then apply repairs
+    //           // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(receivedAppliedReceipt2)
+    //           return
+    //         }
+    //       }
+    //       if (queueEntry.hasValidFinalData || queueEntry.accountDataSet) {
+    //         /* prettier-ignore */
+    //         if (logFlags.debug || this.stateManager.consensusLog)
+    //           this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} Already Shared`)
+    //         nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 skipped Already Shared`)
+    //         return
+    //       }
 
-          // for debugging and testing purpose
-          if (
-            this.stateManager.testFailChance(
-              this.stateManager.ignoreRecieptChance,
-              'spread_appliedReceipt2',
-              utils.stringifyReduce(txId),
-              '',
-              logFlags.verbose
-            ) === true
-          ) {
-            return
-          }
+    //       // for debugging and testing purpose
+    //       if (
+    //         this.stateManager.testFailChance(
+    //           this.stateManager.ignoreRecieptChance,
+    //           'spread_appliedReceipt2',
+    //           utils.stringifyReduce(txId),
+    //           '',
+    //           logFlags.verbose
+    //         ) === true
+    //       ) {
+    //         return
+    //       }
 
-          // todo: STATESHARDING4 ENDPOINTS check payload format
-          // todo: STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
+    //       // todo: STATESHARDING4 ENDPOINTS check payload format
+    //       // todo: STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
 
-          const receiptNotNull = receivedAppliedReceipt2 != null
+    //       const receiptNotNull = receivedAppliedReceipt2 != null
 
-          // repair only if data is not attached to the receipt
-          if (Context.config.stateManager.attachDataToReceipt === false && (queueEntry.state === 'expired' || queueEntry.state === 'almostExpired')) {
-            //have we tried to repair this yet?
-            const startRepair = queueEntry.repairStarted === false
-            /* prettier-ignore */
-            if (logFlags.debug || this.stateManager.consensusLog) this.mainLogger.debug(`spread_appliedReceipt2. tx expired. start repair:${startRepair}. update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`);
-            if (queueEntry.repairStarted === false) {
-              nestedCountersInstance.countEvent('repair1', 'got receipt for expiredTX start repair')
-              queueEntry.appliedReceiptForRepair2 = receivedAppliedReceipt2
-              //todo any limits to how many repairs at once to allow?
-              this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
-            }
-            //x - dont forward gossip, it is probably too late?
-            //do forward gossip so we dont miss on sharing a receipt!
-            //return
-          }
+    //       // repair only if data is not attached to the receipt
+    //       if (Context.config.stateManager.attachDataToReceipt === false && (queueEntry.state === 'expired' || queueEntry.state === 'almostExpired')) {
+    //         //have we tried to repair this yet?
+    //         const startRepair = queueEntry.repairStarted === false
+    //         /* prettier-ignore */
+    //         if (logFlags.debug || this.stateManager.consensusLog) this.mainLogger.debug(`spread_appliedReceipt2. tx expired. start repair:${startRepair}. update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`);
+    //         if (queueEntry.repairStarted === false) {
+    //           nestedCountersInstance.countEvent('repair1', 'got receipt for expiredTX start repair')
+    //           queueEntry.appliedReceiptForRepair2 = receivedAppliedReceipt2
+    //           //todo any limits to how many repairs at once to allow?
+    //           this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
+    //         }
+    //         //x - dont forward gossip, it is probably too late?
+    //         //do forward gossip so we dont miss on sharing a receipt!
+    //         //return
+    //       }
 
-          // decide whether we should store and forward the receipt
-          let shouldStore = false
-          let shouldForward = false
-          if (Context.config.stateManager.stuckTxQueueFix) {
-            // queueEntry.gossipedReceipt will decide the actual forwarding
-            shouldForward = true
-          }
-          if (this.config.stateManager.useNewPOQ === false) {
-            shouldStore = queueEntry.gossipedReceipt === false
-          } else {
-            const localAppliedReceipt2 = queueEntry.appliedReceipt2
-            if (localAppliedReceipt2) {
-              const localReceiptConfirmNode = localAppliedReceipt2.confirmOrChallenge.nodeId
-              const receivedReceiptConfirmNode = receivedAppliedReceipt2.confirmOrChallenge.nodeId
-              if (localReceiptConfirmNode === receivedReceiptConfirmNode) {
-                if (Context.config.stateManager.stuckTxQueueFix) {
-                  // we should not care about the rank for receipt2+data gossips
-                  shouldForward = true
-                } else {
-                  shouldForward = false
-                }
-                if (logFlags.debug)
-                  this.mainLogger.debug(
-                    `spread_appliedReceipt2 ${queueEntry.logID} we have the same receipt. We do not need to store but we will forward`
-                  )
-              } else {
-                if (logFlags.debug)
-                  this.mainLogger.debug(
-                    `spread_appliedReceipt2 ${queueEntry.logID} we have different receipt ${
-                      queueEntry.logID
-                    }. localReceipt: ${utils.stringifyReduce(
-                      localAppliedReceipt2
-                    )}, receivedReceipt: ${utils.stringifyReduce(receivedAppliedReceipt2)}`
-                  )
-                const localReceiptRank = this.stateManager.transactionQueue.computeNodeRank(
-                  localReceiptConfirmNode,
-                  queueEntry.acceptedTx.txId,
-                  queueEntry.acceptedTx.timestamp
-                )
-                const receivedReceiptRank = this.stateManager.transactionQueue.computeNodeRank(
-                  receivedReceiptConfirmNode,
-                  queueEntry.acceptedTx.txId,
-                  queueEntry.acceptedTx.timestamp
-                )
-                if (receivedReceiptRank < localReceiptRank) {
-                  shouldStore = true
-                  shouldForward = true
-                  this.mainLogger.debug(
-                    `spread_appliedReceipt2 ${queueEntry.logID} received receipt is better. we will store and forward`
-                  )
-                }
-              }
-            } else {
-              shouldStore = true
-              shouldForward = true
-              if (logFlags.debug)
-                this.mainLogger.debug(
-                  `spread_appliedReceipt2 ${queueEntry.logID} we do not have a local or received receipt generated. will store and forward`
-                )
-            }
-          }
-          // if we are tx group node and haven't got data yet, we should store and forward the receipt
-          if (queueEntry.isInExecutionHome === false) {
-            if (queueEntry.accountDataSet === false || Object.keys(queueEntry.collectedFinalData).length === 0) {
-              shouldStore = true
-              shouldForward = true
-              if (logFlags.debug)
-                this.mainLogger.debug(
-                  `spread_appliedReceipt2 ${queueEntry.logID} we are tx group node and do not have receipt2 yet. will store and forward`
-                )
-            }
-          }
-          this.mainLogger.debug(`spread_appliedReceipt2 ${queueEntry.logID} shouldStore:${shouldStore}, shouldForward:${shouldForward} isInExecutionHome:${queueEntry.isInExecutionHome}, accountDataSet:${queueEntry.accountDataSet}, collectedFinalData:${Object.keys(queueEntry.collectedFinalData).length}`)
+    //       // decide whether we should store and forward the receipt
+    //       let shouldStore = false
+    //       let shouldForward = false
+    //       if (Context.config.stateManager.stuckTxQueueFix) {
+    //         // queueEntry.gossipedReceipt will decide the actual forwarding
+    //         shouldForward = true
+    //       }
+    //       if (this.config.stateManager.useNewPOQ === false) {
+    //         shouldStore = queueEntry.gossipedReceipt === false
+    //       } else {
+    //         const localAppliedReceipt2 = queueEntry.appliedReceipt2
+    //         if (localAppliedReceipt2) {
+    //           const localReceiptConfirmNode = localAppliedReceipt2.confirmOrChallenge.nodeId
+    //           const receivedReceiptConfirmNode = receivedAppliedReceipt2.confirmOrChallenge.nodeId
+    //           if (localReceiptConfirmNode === receivedReceiptConfirmNode) {
+    //             if (Context.config.stateManager.stuckTxQueueFix) {
+    //               // we should not care about the rank for receipt2+data gossips
+    //               shouldForward = true
+    //             } else {
+    //               shouldForward = false
+    //             }
+    //             if (logFlags.debug)
+    //               this.mainLogger.debug(
+    //                 `spread_appliedReceipt2 ${queueEntry.logID} we have the same receipt. We do not need to store but we will forward`
+    //               )
+    //           } else {
+    //             if (logFlags.debug)
+    //               this.mainLogger.debug(
+    //                 `spread_appliedReceipt2 ${queueEntry.logID} we have different receipt ${
+    //                   queueEntry.logID
+    //                 }. localReceipt: ${utils.stringifyReduce(
+    //                   localAppliedReceipt2
+    //                 )}, receivedReceipt: ${utils.stringifyReduce(receivedAppliedReceipt2)}`
+    //               )
+    //             const localReceiptRank = this.stateManager.transactionQueue.computeNodeRank(
+    //               localReceiptConfirmNode,
+    //               queueEntry.acceptedTx.txId,
+    //               queueEntry.acceptedTx.timestamp
+    //             )
+    //             const receivedReceiptRank = this.stateManager.transactionQueue.computeNodeRank(
+    //               receivedReceiptConfirmNode,
+    //               queueEntry.acceptedTx.txId,
+    //               queueEntry.acceptedTx.timestamp
+    //             )
+    //             if (receivedReceiptRank < localReceiptRank) {
+    //               shouldStore = true
+    //               shouldForward = true
+    //               this.mainLogger.debug(
+    //                 `spread_appliedReceipt2 ${queueEntry.logID} received receipt is better. we will store and forward`
+    //               )
+    //             }
+    //           }
+    //         } else {
+    //           shouldStore = true
+    //           shouldForward = true
+    //           if (logFlags.debug)
+    //             this.mainLogger.debug(
+    //               `spread_appliedReceipt2 ${queueEntry.logID} we do not have a local or received receipt generated. will store and forward`
+    //             )
+    //         }
+    //       }
+    //       // if we are tx group node and haven't got data yet, we should store and forward the receipt
+    //       if (queueEntry.isInExecutionHome === false) {
+    //         if (queueEntry.accountDataSet === false || Object.keys(queueEntry.collectedFinalData).length === 0) {
+    //           shouldStore = true
+    //           shouldForward = true
+    //           if (logFlags.debug)
+    //             this.mainLogger.debug(
+    //               `spread_appliedReceipt2 ${queueEntry.logID} we are tx group node and do not have receipt2 yet. will store and forward`
+    //             )
+    //         }
+    //       }
+    //       this.mainLogger.debug(`spread_appliedReceipt2 ${queueEntry.logID} shouldStore:${shouldStore}, shouldForward:${shouldForward} isInExecutionHome:${queueEntry.isInExecutionHome}, accountDataSet:${queueEntry.accountDataSet}, collectedFinalData:${Object.keys(queueEntry.collectedFinalData).length}`)
 
-          // process, store and forward the receipt
-          if (shouldStore === true && queueEntry.gossipedReceipt === false) {
-            /* prettier-ignore */
-            if (logFlags.debug || this.stateManager.consensusLog)
-              this.mainLogger.debug(
-                `spread_appliedReceipt2 update ${queueEntry.logID} receiptNotNull:${receiptNotNull}, appliedReceipt2: ${utils.stringifyReduce(receivedAppliedReceipt2)}`
-              )
+    //       // process, store and forward the receipt
+    //       if (shouldStore === true && queueEntry.gossipedReceipt === false) {
+    //         /* prettier-ignore */
+    //         if (logFlags.debug || this.stateManager.consensusLog)
+    //           this.mainLogger.debug(
+    //             `spread_appliedReceipt2 update ${queueEntry.logID} receiptNotNull:${receiptNotNull}, appliedReceipt2: ${utils.stringifyReduce(receivedAppliedReceipt2)}`
+    //           )
 
-            if (queueEntry.archived === false) {
-              queueEntry.recievedAppliedReceipt2 = receivedAppliedReceipt2
-              queueEntry.appliedReceipt2 = receivedAppliedReceipt2 // is this necessary?
-            } else {
-              this.mainLogger.error(`spread_appliedReceipt2 queueEntry.archived === true`)
-            }
+    //         if (queueEntry.archived === false) {
+    //           queueEntry.recievedAppliedReceipt2 = receivedAppliedReceipt2
+    //           queueEntry.appliedReceipt2 = receivedAppliedReceipt2 // is this necessary?
+    //         } else {
+    //           this.mainLogger.error(`spread_appliedReceipt2 queueEntry.archived === true`)
+    //         }
 
-            // commit the accounts if the receipt is valid and has data attached
-            if (Context.config.stateManager.attachDataToReceipt && receivedAppliedReceipt2.result) {
-              const wrappedStates = payload.wrappedStates as { [key: string]: Shardus.WrappedResponse}
-              if (wrappedStates == null) {
-                nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 no wrappedStates`)
-                this.mainLogger.error(`spread_appliedReceipt2 no wrappedStates for ${txId}`)
-              } else {
-                const filteredStates = {}
-                const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
-                  this.stateManager.currentCycleShardData.nodeShardData
-                for (const accountId in wrappedStates) {
-                  const isLocal = ShardFunctions.testAddressInRange(
-                    accountId,
-                    nodeShardData.storedPartitions
-                  )
-                  if (isLocal) {
-                    filteredStates[accountId] = 1
-                  }
-                }
-                const accountRecords = []
-                for (const accountId in wrappedStates) {
-                  if (filteredStates[accountId] == null) continue
-                  const wrappedState = wrappedStates[accountId] as Shardus.WrappedResponse
-                  const indexOfAccountIdInVote = receivedAppliedReceipt2.appliedVote.account_id.indexOf(accountId)
-                  if (indexOfAccountIdInVote === -1) {
-                    this.mainLogger.error(`spread_appliedReceipt2 accountId ${accountId} not found in appliedVote`)
-                    continue
-                  }
-                  const afterStateHash = receivedAppliedReceipt2.appliedVote.account_state_hash_after[indexOfAccountIdInVote]
-                  if (wrappedState.stateId !== afterStateHash) {
-                    this.mainLogger.error(`spread_appliedReceipt2 accountId ${accountId} state hash mismatch with appliedVote`)
-                    continue
-                  }
-                  queueEntry.collectedFinalData[accountId] = wrappedState // processTx() will do actual commit
-                  accountRecords.push(wrappedState)
-                  nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 add to final data`, accountRecords.length)
-                }
-                if (logFlags.debug) this.mainLogger.debug(`Use final data from appliedReceipt2 ${queueEntry.logID}`, queueEntry.collectedFinalData);
-              }
-            }
+    //         // commit the accounts if the receipt is valid and has data attached
+    //         if (Context.config.stateManager.attachDataToReceipt && receivedAppliedReceipt2.result) {
+    //           const wrappedStates = payload.wrappedStates as { [key: string]: Shardus.WrappedResponse}
+    //           if (wrappedStates == null) {
+    //             nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 no wrappedStates`)
+    //             this.mainLogger.error(`spread_appliedReceipt2 no wrappedStates for ${txId}`)
+    //           } else {
+    //             const filteredStates = {}
+    //             const nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData =
+    //               this.stateManager.currentCycleShardData.nodeShardData
+    //             for (const accountId in wrappedStates) {
+    //               const isLocal = ShardFunctions.testAddressInRange(
+    //                 accountId,
+    //                 nodeShardData.storedPartitions
+    //               )
+    //               if (isLocal) {
+    //                 filteredStates[accountId] = 1
+    //               }
+    //             }
+    //             const accountRecords = []
+    //             for (const accountId in wrappedStates) {
+    //               if (filteredStates[accountId] == null) continue
+    //               const wrappedState = wrappedStates[accountId] as Shardus.WrappedResponse
+    //               const indexOfAccountIdInVote = receivedAppliedReceipt2.appliedVote.account_id.indexOf(accountId)
+    //               if (indexOfAccountIdInVote === -1) {
+    //                 this.mainLogger.error(`spread_appliedReceipt2 accountId ${accountId} not found in appliedVote`)
+    //                 continue
+    //               }
+    //               const afterStateHash = receivedAppliedReceipt2.appliedVote.account_state_hash_after[indexOfAccountIdInVote]
+    //               if (wrappedState.stateId !== afterStateHash) {
+    //                 this.mainLogger.error(`spread_appliedReceipt2 accountId ${accountId} state hash mismatch with appliedVote`)
+    //                 continue
+    //               }
+    //               queueEntry.collectedFinalData[accountId] = wrappedState // processTx() will do actual commit
+    //               accountRecords.push(wrappedState)
+    //               nestedCountersInstance.countEvent(`consensus`, `spread_appliedReceipt2 add to final data`, accountRecords.length)
+    //             }
+    //             if (logFlags.debug) this.mainLogger.debug(`Use final data from appliedReceipt2 ${queueEntry.logID}`, queueEntry.collectedFinalData);
+    //           }
+    //         }
 
-            // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.receivedAppliedReceipt2
+    //         // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.receivedAppliedReceipt2
 
-            // share the receivedAppliedReceipt2.
-            const sender = null
-            const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-            if (gossipGroup.length > 1) {
-              // should consider only forwarding in some cases?
-              this.stateManager.debugNodeGroup(
-                queueEntry.acceptedTx.txId,
-                queueEntry.acceptedTx.timestamp,
-                `share appliedReceipt to neighbors`,
-                gossipGroup
-              )
-              //no await so we cant get the message out size in a reasonable way
-              this.p2p.sendGossipIn(
-                'spread_appliedReceipt2',
-                payload,
-                tracker,
-                sender,
-                gossipGroup,
-                false,
-                -1,
-                queueEntry.acceptedTx.txId
-              )
-              queueEntry.gossipedReceipt = true
-              nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 gossip forwarded')
-            }
-          } else {
-            // we get here if the receipt has already been shared
-            /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared or shouldStoreAndForward:${shouldStore}`)
-          }
-        } catch (ex) {
-          this.statemanager_fatal(
-            `spread_appliedReceipt2_ex`,
-            'spread_appliedReceipt2 endpoint failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
-          )
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt2')
-        }
-      }
-    )
+    //         // share the receivedAppliedReceipt2.
+    //         const sender = null
+    //         const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+    //         if (gossipGroup.length > 1) {
+    //           // should consider only forwarding in some cases?
+    //           this.stateManager.debugNodeGroup(
+    //             queueEntry.acceptedTx.txId,
+    //             queueEntry.acceptedTx.timestamp,
+    //             `share appliedReceipt to neighbors`,
+    //             gossipGroup
+    //           )
+    //           //no await so we cant get the message out size in a reasonable way
+    //           this.p2p.sendGossipIn(
+    //             'spread_appliedReceipt2',
+    //             payload,
+    //             tracker,
+    //             sender,
+    //             gossipGroup,
+    //             false,
+    //             -1,
+    //             queueEntry.acceptedTx.txId
+    //           )
+    //           queueEntry.gossipedReceipt = true
+    //           nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt2 gossip forwarded')
+    //         }
+    //       } else {
+    //         // we get here if the receipt has already been shared
+    //         /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared or shouldStoreAndForward:${shouldStore}`)
+    //       }
+    //     } catch (ex) {
+    //       this.statemanager_fatal(
+    //         `spread_appliedReceipt2_ex`,
+    //         'spread_appliedReceipt2 endpoint failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
+    //       )
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt2')
+    //     }
+    //   }
+    // )
 
-    Comms.registerGossipHandler(
-      'spread_confirmOrChallenge',
-      (payload: ConfirmOrChallengeMessage, msgSize: number) => {
-        nestedCountersInstance.countEvent('consensus', 'spread_confirmOrChallenge handler')
-        profilerInstance.scopedProfileSectionStart('spread_confirmOrChallenge', false, msgSize)
-        try {
-          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.appliedVote?.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            if (logFlags.error) {
-              this.mainLogger.error(
-                `spread_confirmOrChallenge no queue entry for ${payload.appliedVote?.txid} dbg:${
-                  this.stateManager.debugTXHistory[utils.stringifyReduce(payload.appliedVote?.txid)]
-                }`
-              )
-            }
-            return
-          }
-          if (queueEntry.acceptConfirmOrChallenge === false) {
-            if (logFlags.debug)
-              this.mainLogger.debug(`spread_confirmOrChallenge ${queueEntry.logID} not accepting anymore`)
-            return
-          }
+    // DEPRECATED AFTER POQO
+    // Comms.registerGossipHandler(
+    //   'spread_confirmOrChallenge',
+    //   (payload: ConfirmOrChallengeMessage, msgSize: number) => {
+    //     nestedCountersInstance.countEvent('consensus', 'spread_confirmOrChallenge handler')
+    //     profilerInstance.scopedProfileSectionStart('spread_confirmOrChallenge', false, msgSize)
+    //     try {
+    //       const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.appliedVote?.txid) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         if (logFlags.error) {
+    //           this.mainLogger.error(
+    //             `spread_confirmOrChallenge no queue entry for ${payload.appliedVote?.txid} dbg:${
+    //               this.stateManager.debugTXHistory[utils.stringifyReduce(payload.appliedVote?.txid)]
+    //             }`
+    //           )
+    //         }
+    //         return
+    //       }
+    //       if (queueEntry.acceptConfirmOrChallenge === false) {
+    //         if (logFlags.debug)
+    //           this.mainLogger.debug(`spread_confirmOrChallenge ${queueEntry.logID} not accepting anymore`)
+    //         return
+    //       }
 
-          const appendSuccessful = this.tryAppendMessage(queueEntry, payload)
+    //       const appendSuccessful = this.tryAppendMessage(queueEntry, payload)
 
-          if (logFlags.debug)
-            this.mainLogger.debug(
-              `spread_confirmOrChallenge ${queueEntry.logID} appendSuccessful:${appendSuccessful}`
-            )
+    //       if (logFlags.debug)
+    //         this.mainLogger.debug(
+    //           `spread_confirmOrChallenge ${queueEntry.logID} appendSuccessful:${appendSuccessful}`
+    //         )
 
-          if (appendSuccessful) {
-            // Gossip further
-            const sender = null
-            const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-            Comms.sendGossip('spread_confirmOrChallenge', payload, '', sender, gossipGroup, false, 10, queueEntry.acceptedTx.txId, `handler_${NodeList.activeIdToPartition.get(payload.appliedVote?.node_id)}`)
-            queueEntry.gossipedConfirmOrChallenge = true
-          }
-        } catch (e) {
-          this.mainLogger.error(`Error in spread_confirmOrChallenge handler: ${e.message}`)
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('spread_confirmOrChallenge', msgSize)
-        }
-      }
-    )
+    //       if (appendSuccessful) {
+    //         // Gossip further
+    //         const sender = null
+    //         const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+    //         Comms.sendGossip('spread_confirmOrChallenge', payload, '', sender, gossipGroup, false, 10, queueEntry.acceptedTx.txId, `handler_${NodeList.activeIdToPartition.get(payload.appliedVote?.node_id)}`)
+    //         queueEntry.gossipedConfirmOrChallenge = true
+    //       }
+    //     } catch (e) {
+    //       this.mainLogger.error(`Error in spread_confirmOrChallenge handler: ${e.message}`)
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('spread_confirmOrChallenge', msgSize)
+    //     }
+    //   }
+    // )
 
     Comms.registerGossipHandler(
       'poqo-receipt-gossip',
-      (payload: AppliedReceipt2 & { txGroupCycle: number }) => {
+      (payload: SignedReceipt & { txGroupCycle: number }) => {
         profilerInstance.scopedProfileSectionStart('poqo-receipt-gossip')
         try {
-          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid)
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.proposal.txid)
           if (queueEntry == null) {
             nestedCountersInstance.countEvent('poqo', 'error: gossip skipped: no queue entry')
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip no queue entry for ${payload.txid}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip no queue entry for ${payload.proposal.txid}`)
             return
           }
           if (payload.txGroupCycle) {
             if (queueEntry.txGroupCycle !== payload.txGroupCycle) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip mismatch txGroupCycle for txid: ${payload.txid}, sender's txGroupCycle: ${payload.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip mismatch txGroupCycle for txid: ${payload.proposal.txid}, sender's txGroupCycle: ${payload.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
               nestedCountersInstance.countEvent(
                 'poqo',
-                'poqo-receipt-gossip: mismatch txGroupCycle for txid ' + payload.txid
+                'poqo-receipt-gossip: mismatch txGroupCycle for txid ' + payload.proposal.txid
               )
             }
             delete payload.txGroupCycle
@@ -1125,14 +1128,12 @@ class TransactionConsenus {
           const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
           const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload, executionGroupNodes)
           if (!hasTwoThirdsMajority) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.txid}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${payload.proposal.txid}`)
               nestedCountersInstance.countEvent('poqo', 'poqo-receipt-gossip: Rejecting receipt because no majority')
             return
           }
 
-          queueEntry.poqoReceipt = payload
-          queueEntry.appliedReceipt2 = payload
-          queueEntry.recievedAppliedReceipt2 = payload
+          queueEntry.signedReceipt = payload
           payload.txGroupCycle = queueEntry.txGroupCycle
           Comms.sendGossip(
             'poqo-receipt-gossip',
@@ -1142,7 +1143,7 @@ class TransactionConsenus {
             queueEntry.transactionGroup,
             false,
             4,
-            payload.txid,
+            payload.proposal.txid,
             '',
             true
           )
@@ -1163,11 +1164,11 @@ class TransactionConsenus {
                 'final data timeout, making explicit request'
               )
 
-              const nodesToAskKeys = payload.signatures?.map((signature) => signature.owner)
+              const nodesToAskKeys = payload.signaturePack?.map((signature) => signature.owner)
 
               await this.stateManager.transactionQueue.requestFinalData(
                 queueEntry,
-                payload.appliedVote.account_id,
+                payload.proposal.accountIDs,
                 nodesToAskKeys
               )
 
@@ -1236,9 +1237,9 @@ class TransactionConsenus {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid: readableReq.receipt == null sender ${_sender}`)
               return
           }
-          if(readableReq.finalState.txid != readableReq.receipt.txid) {
+          if(readableReq.finalState.txid != readableReq.receipt.proposal.txid) {
             nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt: readableReq.finalState.txid != readableReq.receipt.txid')
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid: readableReq.finalState.txid != readableReq.receipt.txid sender ${_sender}  ${readableReq.finalState.txid} != ${readableReq.receipt.txid}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt invalid: readableReq.finalState.txid != readableReq.receipt.txid sender ${_sender}  ${readableReq.finalState.txid} != ${readableReq.receipt.proposal.txid}`)
               return
           }
 
@@ -1246,7 +1247,7 @@ class TransactionConsenus {
             const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
             const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq.receipt, executionGroupNodes)
             if(!hasTwoThirdsMajority) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.receipt.txid}`)
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.receipt.proposal.txid}`)
               nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt because no majority')
               return
             }
@@ -1254,9 +1255,7 @@ class TransactionConsenus {
               this.mainLogger.debug(
                 `POQo: received data & receipt for ${queueEntry.logID} starting receipt gossip`
               )
-            queueEntry.poqoReceipt = readableReq.receipt
-            queueEntry.appliedReceipt2 = readableReq.receipt
-            queueEntry.recievedAppliedReceipt2 = readableReq.receipt
+            queueEntry.signedReceipt = readableReq.receipt
             const receiptToGossip = { ...readableReq.receipt, txGroupCycle: queueEntry.txGroupCycle }
             Comms.sendGossip(
               'poqo-receipt-gossip',
@@ -1299,34 +1298,34 @@ class TransactionConsenus {
             //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
             // }
           }
-          const nodesToSendTo: Set<Shardus.Node> = new Set()
+          // const nodesToSendTo: Set<Shardus.Node> = new Set()
 
-          for (const data of readableReq.finalState.stateList) {
-            if (data == null) {
-              continue
-            }
-            if (savedAccountIds.has(data.accountId) === false) {
-              continue
-            }
-            const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
-            for (const node of storageNodes) {
-              nodesToSendTo.add(node)
-            }
-          }
-          if (nodesToSendTo.size > 0) {
-            const finalDataToGossip = { ...readableReq.finalState, txGroupCycle: queueEntry.txGroupCycle }
-            Comms.sendGossip(
-              'gossip-final-state',
-              finalDataToGossip,
-              null,
-              null,
-              Array.from(nodesToSendTo),
-              false,
-              4,
-              queueEntry.acceptedTx.txId
-            )
-            nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
-          }
+          // for (const data of readableReq.finalState.stateList) {
+          //   if (data == null) {
+          //     continue
+          //   }
+          //   if (savedAccountIds.has(data.accountId) === false) {
+          //     continue
+          //   }
+          //   const storageNodes = this.stateManager.transactionQueue.getStorageGroupForAccount(data.accountId)
+          //   for (const node of storageNodes) {
+          //     nodesToSendTo.add(node)
+          //   }
+          // }
+          // if (nodesToSendTo.size > 0) {
+          //   const finalDataToGossip = { ...readableReq.finalState, txGroupCycle: queueEntry.txGroupCycle }
+          //   Comms.sendGossip(
+          //     'gossip-final-state',
+          //     finalDataToGossip,
+          //     null,
+          //     null,
+          //     Array.from(nodesToSendTo),
+          //     false,
+          //     4,
+          //     queueEntry.acceptedTx.txId
+          //   )
+          //   nestedCountersInstance.countEvent(`processing`, `forwarded final data to storage nodes`)
+          // }
         } catch (e) {
           console.error(`Error processing poqoDataAndReceipt Binary handler: ${e}`)
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
@@ -1560,23 +1559,23 @@ class TransactionConsenus {
 
           const readableReq = deserializePoqoSendReceiptReq(requestStream)
 
-          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(readableReq.txid)
+          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(readableReq.proposal.txid)
           if (queueEntry == null) {
             /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'binary/poqo_send_receipt: no queue entry found')
             return
           }
           if (readableReq.txGroupCycle) {
             if (queueEntry.txGroupCycle !== readableReq.txGroupCycle) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`binary_poqo_send_receipt mismatch txGroupCycle for txid: ${readableReq.txid}, sender's txGroupCycle: ${readableReq.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
+              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`binary_poqo_send_receipt mismatch txGroupCycle for txid: ${readableReq.proposal.txid}, sender's txGroupCycle: ${readableReq.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
               nestedCountersInstance.countEvent(
                 'poqo',
-                'binary_poqo_send_receipt: mismatch txGroupCycle for tx ' + readableReq.txid
+                'binary_poqo_send_receipt: mismatch txGroupCycle for tx ' + readableReq.proposal.txid
               )
             }
             delete readableReq.txGroupCycle
           }
 
-          if (queueEntry.poqoReceipt) {
+          if (queueEntry.signedReceipt) {
             // We've already handled this
             return
           }
@@ -1584,7 +1583,7 @@ class TransactionConsenus {
           const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
           const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq, executionGroupNodes)
           if (!hasTwoThirdsMajority) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.txid}`)
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.proposal.txid}`)
               nestedCountersInstance.countEvent('poqo', 'poqo-send-receipt: Rejecting receipt because no majority')
             return
           }
@@ -1593,10 +1592,8 @@ class TransactionConsenus {
             this.mainLogger.debug(
               `POQo: Received receipt from aggregator for ${queueEntry.logID} starting CT2 for data & receipt`
             )
-          const receivedReceipt = readableReq as AppliedReceipt2
-          queueEntry.poqoReceipt = receivedReceipt
-          queueEntry.appliedReceipt2 = receivedReceipt
-          queueEntry.recievedAppliedReceipt2 = receivedReceipt
+          const receivedReceipt = readableReq as SignedReceipt
+          queueEntry.signedReceipt = receivedReceipt
           queueEntry.hasSentFinalReceipt = true
           const receiptToGossip = { ...readableReq, txGroupCycle: queueEntry.txGroupCycle }
           Comms.sendGossip(
@@ -1607,7 +1604,7 @@ class TransactionConsenus {
             queueEntry.transactionGroup,
             false,
             4,
-            readableReq.txid,
+            readableReq.proposal.txid,
             '',
             true
           )
@@ -1683,16 +1680,16 @@ class TransactionConsenus {
             /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', 'poqo-send-vote: no queue entry found')
             return
           }
-          if (readableReq.txGroupCycle) {
-            if (queueEntry.txGroupCycle !== readableReq.txGroupCycle) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`binary_poqo_send_vote mismatch txGroupCycle for txid: ${readableReq.txid}, sender's txGroupCycle: ${readableReq.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
-              nestedCountersInstance.countEvent(
-                'poqo',
-                'binary_poqo_send_vote: mismatch txGroupCycle for tx ' + readableReq.txid
-              )
-            }
-            delete readableReq.txGroupCycle
-          }
+          // if (readableReq.txGroupCycle) {
+          //   if (queueEntry.txGroupCycle !== readableReq.txGroupCycle) {
+          //     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`binary_poqo_send_vote mismatch txGroupCycle for txid: ${readableReq.txid}, sender's txGroupCycle: ${readableReq.txGroupCycle}, our txGroupCycle: ${queueEntry.txGroupCycle}`)
+          //     nestedCountersInstance.countEvent(
+          //       'poqo',
+          //       'binary_poqo_send_vote: mismatch txGroupCycle for tx ' + readableReq.txid
+          //     )
+          //   }
+          //   delete readableReq.txGroupCycle
+          // }
           const collectedVoteHash = readableReq as AppliedVoteHash
 
           // Check if vote hash has a sign
@@ -1714,40 +1711,53 @@ class TransactionConsenus {
     Comms.registerInternalBinary(poqoSendVoteBinaryHandler.name, poqoSendVoteBinaryHandler.handler)
   }
 
-  verifyAppliedReceipt(receipt: AppliedReceipt2, executionGroupNodes: Set<string>): boolean {
-    const ownerToSignMap = new Map<string, Shardus.Sign>();
-    for (const sign of receipt.signatures) {
-      if (executionGroupNodes.has(sign.owner)) {
-        ownerToSignMap.set(sign.owner, sign);
-      }
-    }
-    const totalNodes = executionGroupNodes.size;
-    const requiredMajority = Math.ceil(totalNodes * this.config.p2p.requiredVotesPercentage)
-    if (ownerToSignMap.size < requiredMajority) {
+  verifyAppliedReceipt(receipt: SignedReceipt, executionGroupNodes: Set<string>): boolean {
+    if (!receipt.sign) {
+      // Missing final sign by aggregator
       return false;
     }
 
-    const vote = receipt.appliedVote; 
-    const voteHash = this.calculateVoteHash(vote);
-    const appliedVoteHash = {
-      txid: vote.txid,
-      voteHash,
+    if(!executionGroupNodes.has(receipt.sign.owner)) {
+      // aggregator not in execution group
+      return false
     }
 
-    let validSignatures = 0;    
-    for (const owner of ownerToSignMap.keys()) {
-      const signedObject = { ...appliedVoteHash, sign: ownerToSignMap.get(owner) };
-      if (this.crypto.verify(signedObject, owner)) {
+    if (!this.crypto.verify(receipt as SignedObject, receipt.sign.owner)) {
+      // Final aggregator sign is invalid
+      return false;
+    }
+
+    if (receipt.signaturePack.length !== receipt.voteOffsets.length) {
+      // Invalid receipt
+      return false
+    }
+
+    let validSignatures = 0;
+    const appliedVoteHash: AppliedVoteHash = {
+      txid: receipt.proposal.txid,
+      voteHash: receipt.proposalHash,
+      voteTime: 0
+    }
+
+    for (let i = 0; i < receipt.signaturePack.length; i++) {
+      const sign = receipt.signaturePack[i]
+      if (!executionGroupNodes.has(sign.owner)) continue
+      appliedVoteHash.voteTime = receipt.voteOffsets[i]
+      const signedObject = { ...appliedVoteHash, sign };
+      if (this.crypto.verify(signedObject, sign.owner)) {
         validSignatures++;
       }
     }
+
+    const totalNodes = executionGroupNodes.size;
+    const requiredMajority = Math.ceil(totalNodes * this.config.p2p.requiredVotesPercentage)
     return validSignatures >= requiredMajority;
   }
 
   async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {
     queueEntry.poqoNextSendIndex = 0
     const aggregatorList = queueEntry.executionGroup
-    while (!queueEntry.poqoReceipt) {
+    while (!queueEntry.signedReceipt) {
       if (queueEntry.poqoNextSendIndex >= aggregatorList.length) {
         // Maybe use modulous to wrap around
         break
@@ -1757,19 +1767,24 @@ class TransactionConsenus {
         queueEntry.poqoNextSendIndex, queueEntry.poqoNextSendIndex + this.config.stateManager.poqobatchCount
       )
       queueEntry.poqoNextSendIndex += this.config.stateManager.poqobatchCount
+
+      // Update applyTimestamp with every sending iteration
+      const updatedVoteHash: AppliedVoteHash = {
+        txid: appliedVoteHash.txid,
+        voteHash: appliedVoteHash.voteHash,
+        voteTime: Math.ceil((shardusGetTime() - queueEntry.acceptedTx.timestamp) / 1000)
+      }
+      // Need to sign again with the new voteTime
+      const newHash = this.crypto.sign(updatedVoteHash)
+      
       // Send vote to the selected aggregator in the priority list
-      // TODO: Add SIGN here to the payload
-      // if(this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.poqoSendVoteBinary){
-        Comms.tellBinary<AppliedVoteHash>(
-          voteReceivers, 
-          InternalRouteEnum.binary_poqo_send_vote, 
-          appliedVoteHash, 
-          serializePoqoSendVoteReq,
-          {}
-        )
-      // }else{
-      //   Comms.tell(voteReceivers, 'poqo-send-vote', appliedVoteHash)
-      // }
+      Comms.tellBinary<AppliedVoteHash>(
+        voteReceivers, 
+        InternalRouteEnum.binary_poqo_send_vote, 
+        newHash, 
+        serializePoqoSendVoteReq,
+        {}
+      )
       await utils.sleep(this.config.stateManager.poqoloopTime)
     }
   }
@@ -1834,7 +1849,7 @@ class TransactionConsenus {
       txId,
       Context.stateManager.currentCycleShardData.parititionShardDataMap
     )
-    const cycleMarker = CycleChain.computeCycleMarker(CycleChain.newest)
+    const cycleMarker = CycleChain.getCurrentCycleMarker()
     const cycleCounter = CycleChain.newest.counter
     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug('Asking timestamp from node', homeNode.node)
 
@@ -1892,98 +1907,99 @@ class TransactionConsenus {
    * gossip the appliedReceipt to the transaction group
    * @param queueEntry
    */
-  shareAppliedReceipt(queueEntry: QueueEntry): void {
-    /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
+  // DEPRECATED AFTER POQO
+  // shareAppliedReceipt(queueEntry: QueueEntry): void {
+  //   /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
 
-    if (queueEntry.appliedReceipt2 == null) {
-      //take no action
-      /* prettier-ignore */ nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped appliedReceipt2 == null')
-      return
-    }
+  //   if (queueEntry.appliedReceipt2 == null) {
+  //     //take no action
+  //     /* prettier-ignore */ nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped appliedReceipt2 == null')
+  //     return
+  //   }
 
-    // share the appliedReceipt.
-    const sender = null
-    const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+  //   // share the appliedReceipt.
+  //   const sender = null
+  //   const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
 
-    // todo only recalc if cycle boundry?
-    // let updatedGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry, true)
+  //   // todo only recalc if cycle boundry?
+  //   // let updatedGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry, true)
 
-    if (gossipGroup.length > 1) {
-      if (queueEntry.ourNodeInTransactionGroup === false) {
-        return
-      }
+  //   if (gossipGroup.length > 1) {
+  //     if (queueEntry.ourNodeInTransactionGroup === false) {
+  //       return
+  //     }
 
-      // This code tried to optimize things by not having every node share a receipt.
+  //     // This code tried to optimize things by not having every node share a receipt.
 
-      // //look at our index in the consensus.
-      // //only have certain nodes sharde gossip the receipt.
-      // let ourIndex = queueEntry.ourTXGroupIndex
-      // let groupLength = gossipGroup.length
-      // if(this.stateManager.transactionQueue.executeInOneShard){
-      //   //we have to use different inputs if executeInOneShard is true
-      //   ourIndex = queueEntry.ourExGroupIndex
-      //   groupLength = queueEntry.executionGroup.length
-      // }
+  //     // //look at our index in the consensus.
+  //     // //only have certain nodes sharde gossip the receipt.
+  //     // let ourIndex = queueEntry.ourTXGroupIndex
+  //     // let groupLength = gossipGroup.length
+  //     // if(this.stateManager.transactionQueue.executeInOneShard){
+  //     //   //we have to use different inputs if executeInOneShard is true
+  //     //   ourIndex = queueEntry.ourExGroupIndex
+  //     //   groupLength = queueEntry.executionGroup.length
+  //     // }
 
-      // if(ourIndex > 0){
-      //   let everyN = Math.max(1,Math.floor(groupLength * 0.4))
-      //   let nonce = parseInt('0x' + queueEntry.acceptedTx.txId.substr(0,2))
-      //   let idxPlusNonce = ourIndex + nonce
-      //   let idxModEveryN = idxPlusNonce % everyN
-      //   if(idxModEveryN > 0){
-      //     nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped')
-      //     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shareAppliedReceipt-skipped', `${queueEntry.acceptedTx.txId}`, `ourIndex:${ourIndex} groupLength:${ourIndex} `)
-      //     return
-      //   }
-      // }
+  //     // if(ourIndex > 0){
+  //     //   let everyN = Math.max(1,Math.floor(groupLength * 0.4))
+  //     //   let nonce = parseInt('0x' + queueEntry.acceptedTx.txId.substr(0,2))
+  //     //   let idxPlusNonce = ourIndex + nonce
+  //     //   let idxModEveryN = idxPlusNonce % everyN
+  //     //   if(idxModEveryN > 0){
+  //     //     nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped')
+  //     //     /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shareAppliedReceipt-skipped', `${queueEntry.acceptedTx.txId}`, `ourIndex:${ourIndex} groupLength:${ourIndex} `)
+  //     //     return
+  //     //   }
+  //     // }
 
-      nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-notSkipped')
-      // should consider only forwarding in some cases?
-      this.stateManager.debugNodeGroup(
-        queueEntry.acceptedTx.txId,
-        queueEntry.acceptedTx.timestamp,
-        `share appliedReceipt to neighbors`,
-        gossipGroup
-      )
-      let payload: any = queueEntry.appliedReceipt2
-      const receipt2 = this.stateManager.getReceipt2(queueEntry)
-      if (receipt2 == null) {
-        nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-receipt2 == null')
-        return
-      }
+  //     nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-notSkipped')
+  //     // should consider only forwarding in some cases?
+  //     this.stateManager.debugNodeGroup(
+  //       queueEntry.acceptedTx.txId,
+  //       queueEntry.acceptedTx.timestamp,
+  //       `share appliedReceipt to neighbors`,
+  //       gossipGroup
+  //     )
+  //     let payload: any = queueEntry.appliedReceipt2
+  //     const receipt2 = this.stateManager.getReceipt2(queueEntry)
+  //     if (receipt2 == null) {
+  //       nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-receipt2 == null')
+  //       return
+  //     }
 
-      if (Context.config.stateManager.attachDataToReceipt) {
-        // Report data to corresponding nodes
-        const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
-        const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
+  //     if (Context.config.stateManager.attachDataToReceipt) {
+  //       // Report data to corresponding nodes
+  //       const ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
+  //       const datas: { [accountID: string]: Shardus.WrappedResponse } = {}
 
-        const applyResponse = queueEntry.preApplyTXResult.applyResponse
-        let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
-        const writtenAccountsMap: WrappedResponses = {}
-        if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
-          for (const writtenAccount of applyResponse.accountWrites) {
-            writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
-            writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId]
-              ? wrappedStates[writtenAccount.accountId].stateId
-              : ''
-            writtenAccountsMap[writtenAccount.accountId].prevDataCopy = null
+  //       const applyResponse = queueEntry.preApplyTXResult.applyResponse
+  //       let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
+  //       const writtenAccountsMap: WrappedResponses = {}
+  //       if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+  //         for (const writtenAccount of applyResponse.accountWrites) {
+  //           writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+  //           writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId]
+  //             ? wrappedStates[writtenAccount.accountId].stateId
+  //             : ''
+  //           writtenAccountsMap[writtenAccount.accountId].prevDataCopy = null
 
-            datas[writtenAccount.accountId] = writtenAccount.data
-          }
-          //override wrapped states with writtenAccountsMap which should be more complete if it included
-          wrappedStates = writtenAccountsMap
-        }
-        if (receipt2.confirmOrChallenge?.message === 'challenge') {
-          wrappedStates = {}
-        }
-        payload = { receipt: queueEntry.appliedReceipt2, wrappedStates }
-      }
+  //           datas[writtenAccount.accountId] = writtenAccount.data
+  //         }
+  //         //override wrapped states with writtenAccountsMap which should be more complete if it included
+  //         wrappedStates = writtenAccountsMap
+  //       }
+  //       if (receipt2.confirmOrChallenge?.message === 'challenge') {
+  //         wrappedStates = {}
+  //       }
+  //       payload = { receipt: queueEntry.appliedReceipt2, wrappedStates }
+  //     }
 
-      //let payload = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
-      this.p2p.sendGossipIn('spread_appliedReceipt2', payload, '', sender, gossipGroup, false, -1, queueEntry.acceptedTx.txId)
-      if (logFlags.debug) this.mainLogger.debug(`shareAppliedReceipt ${queueEntry.logID} sent gossip`)
-    }
-  }
+  //     //let payload = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+  //     this.p2p.sendGossipIn('spread_appliedReceipt2', payload, '', sender, gossipGroup, false, -1, queueEntry.acceptedTx.txId)
+  //     if (logFlags.debug) this.mainLogger.debug(`shareAppliedReceipt ${queueEntry.logID} sent gossip`)
+  //   }
+  // }
 
   /**
    * hasAppliedReceiptMatchingPreApply
@@ -1993,16 +2009,16 @@ class TransactionConsenus {
    *
    * @param queueEntry
    */
-  hasAppliedReceiptMatchingPreApply(queueEntry: QueueEntry, appliedReceipt: AppliedReceipt): boolean {
+  hasAppliedReceiptMatchingPreApply(queueEntry: QueueEntry, signedReceipt: SignedReceipt): boolean {
     if (queueEntry.preApplyTXResult == null || queueEntry.preApplyTXResult.applyResponse == null) {
       /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} preApplyTXResult == null or applyResponse == null`)
       return false
     }
     // This is much easier than the old way
     if (queueEntry.ourVote) {
-      const receipt = queueEntry.appliedReceipt2 ?? queueEntry.recievedAppliedReceipt2
+      const receipt = queueEntry.signedReceipt
       if (receipt != null && queueEntry.ourVoteHash != null) {
-        const receiptVoteHash = this.calculateVoteHash(receipt.appliedVote)
+        const receiptVoteHash = this.calculateVoteHash(receipt.proposal)
         if (receiptVoteHash === queueEntry.ourVoteHash) {
           return true
         } else {
@@ -2013,7 +2029,7 @@ class TransactionConsenus {
       return false
     }
 
-    if (appliedReceipt == null) {
+    if (signedReceipt == null) {
       return false
     }
 
@@ -2022,23 +2038,23 @@ class TransactionConsenus {
       return false
     }
 
-    if (appliedReceipt != null) {
-      if (appliedReceipt.result !== queueEntry.ourVote.transaction_result) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ${appliedReceipt.result}, ${queueEntry.ourVote.transaction_result} appliedReceipt.result !== queueEntry.ourVote.transaction_result`)
+    if (signedReceipt != null) {
+      if (signedReceipt.proposal.applied !== queueEntry.ourProposal.applied) {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ${signedReceipt.proposal.applied}, ${queueEntry.ourProposal.applied} signedReceipt.result !== queueEntry.ourProposal.applied`)
         return false
       }
-      if (appliedReceipt.txid !== queueEntry.ourVote.txid) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.txid !== queueEntry.ourVote.txid`)
+      if (signedReceipt.proposal.txid !== queueEntry.ourProposal.txid) {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} signedReceipt.txid !== queueEntry.ourProposal.txid`)
         return false
       }
-      if (appliedReceipt.appliedVotes.length === 0) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes.length == 0`)
+      if (signedReceipt.signaturePack.length === 0) {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} signedReceipt.signaturePack.length == 0`)
         return false
       }
 
-      if (appliedReceipt.appliedVotes[0].cant_apply === true) {
+      if (signedReceipt.proposal.cant_preApply === true) {
         // TODO STATESHARDING4 NEGATIVECASE    need to figure out what to do here
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes[0].cant_apply === true`)
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} signedReceipt.proposal.cant_preApply === true`)
         //If the network votes for cant_apply then we wouldn't need to patch.  We return true here
         //but outside logic will have to know to check cant_apply flag and make sure to not commit data
         return true
@@ -2046,8 +2062,8 @@ class TransactionConsenus {
 
       //we return true for a false receipt because there is no need to repair our data to match the receipt
       //it is already checked above if we matched the result
-      if (appliedReceipt.result === false) {
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} result===false Good Match`)
+      if (signedReceipt.proposal.applied === false) {
+        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} applied===false Good Match`)
         return true
       }
 
@@ -2055,7 +2071,7 @@ class TransactionConsenus {
       let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
 
       let wrappedStateKeys = Object.keys(queueEntry.collectedData)
-      const vote = appliedReceipt.appliedVotes[0] //all votes are equivalent, so grab the first
+      // const vote = appliedReceipt.appliedVotes[0] //all votes are equivalent, so grab the first
 
       // Iff we have accountWrites, then overwrite the keys and wrapped data
       const appOrderedKeys = []
@@ -2087,10 +2103,10 @@ class TransactionConsenus {
       //   /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply collectedFinalData tx:${queueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
       // }
 
-      for (let j = 0; j < vote.account_id.length; j++) {
+      for (let j = 0; j < signedReceipt.proposal.accountIDs.length; j++) {
         /* eslint-disable security/detect-object-injection */
-        const id = vote.account_id[j]
-        const hash = vote.account_state_hash_after[j]
+        const id = signedReceipt.proposal.accountIDs[j]
+        const hash = signedReceipt.proposal.afterStateHashes[j]
         let found = false
         for (const key of wrappedStateKeys) {
           const wrappedState = wrappedStates[key]
@@ -2127,7 +2143,7 @@ class TransactionConsenus {
    *
    * @param queueEntry
    */
-  async tryProduceReceipt(queueEntry: QueueEntry): Promise<AppliedReceipt> {
+  async tryProduceReceipt(queueEntry: QueueEntry): Promise<SignedReceipt> {
     this.profiler.profileSectionStart('tryProduceReceipt')
     if (logFlags.profiling_verbose) this.profiler.scopedProfileSectionStart('tryProduceReceipt')
     try {
@@ -2143,10 +2159,10 @@ class TransactionConsenus {
       //   return null
       // }
 
-      if (queueEntry.appliedReceipt != null) {
+      if (queueEntry.signedReceipt != null) {
         nestedCountersInstance.countEvent(`consensus`, 'tryProduceReceipt appliedReceipt != null')
         if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt ${queueEntry.logID} appliedReceipt != null`)
-        return queueEntry.appliedReceipt
+        return queueEntry.signedReceipt
       }
 
       if (queueEntry.queryingRobustConfirmOrChallenge === true) {
@@ -2172,7 +2188,7 @@ class TransactionConsenus {
         votingGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
       }
 
-      if (this.stateManager.transactionQueue.usePOQo === true) {
+      // if (this.stateManager.transactionQueue.usePOQo === true) {
         if (Math.random() < this.debugFailPOQo) {
           nestedCountersInstance.countEvent('poqo', 'debug fail no receipt produced')
           return null
@@ -2221,25 +2237,22 @@ class TransactionConsenus {
           }
 
           //make the new receipt.
-          const appliedReceipt2: AppliedReceipt2 = {
-            txid: queueEntry.acceptedTx.txId,
-            result: undefined,
-            appliedVote: undefined,
-            signatures: [],
-            app_data_hash: '',
-            // transaction_result: false //this was missing before..
+          const receipt: SignedReceipt = {
+            proposal: queueEntry.ourProposal,
+            proposalHash: queueEntry.ourVoteHash,
+            voteOffsets: [],
+            signaturePack: []
           }
+
           for (let i = 0; i < numVotes; i++) {
             // eslint-disable-next-line security/detect-object-injection
             const currentVote = queueEntry.collectedVoteHashes[i]
             if (currentVote.voteHash === winningVoteHash) {
-              appliedReceipt2.signatures.push(currentVote.sign)
+              receipt.signaturePack.push(currentVote.sign)
+              receipt.voteOffsets.push(currentVote.voteTime)
             }
           }
-
-          appliedReceipt2.result = queueEntry.ourVote.transaction_result
-          appliedReceipt2.appliedVote = queueEntry.ourVote
-          appliedReceipt2.app_data_hash = queueEntry.ourVote.app_data_hash
+          const signedReceipt: SignedReceipt = this.crypto.sign(receipt)
           // now send it !!!
 
           // for (let i = 0; i < queueEntry.ourVote.account_id.length; i++) {
@@ -2251,20 +2264,20 @@ class TransactionConsenus {
           //   /* eslint-enable security/detect-object-injection */
           // }
 
-          queueEntry.appliedReceipt2 = appliedReceipt2
-          queueEntry.poqoReceipt = appliedReceipt2
+          queueEntry.signedReceipt = signedReceipt
+          
 
           //this is a temporary hack to reduce the ammount of refactor needed.
-          const appliedReceipt: AppliedReceipt = {
-            txid: queueEntry.acceptedTx.txId,
-            result: queueEntry.ourVote.transaction_result,
-            appliedVotes: [queueEntry.ourVote],
-            confirmOrChallenge: [], // TODO: Do we remove this for POQo??
-            app_data_hash: appliedReceipt2.app_data_hash,
-          }
-          queueEntry.appliedReceipt = appliedReceipt
+          // const appliedReceipt: AppliedReceipt = {
+          //   txid: queueEntry.acceptedTx.txId,
+          //   result: queueEntry.ourVote.transaction_result,
+          //   appliedVotes: [queueEntry.ourVote],
+          //   confirmOrChallenge: [], // TODO: Do we remove this for POQo??
+          //   app_data_hash: appliedReceipt2.app_data_hash,
+          // }
+          // queueEntry.appliedReceipt = appliedReceipt
 
-          const payload = { ...appliedReceipt2, txGroupCycle: queueEntry.txGroupCycle }
+          const payload = { ...signedReceipt, txGroupCycle: queueEntry.txGroupCycle }
           // tellx128 the receipt to the entire execution group
           // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.poqoSendReceiptBinary) {
            
@@ -2292,7 +2305,7 @@ class TransactionConsenus {
             // note: appliedReceipt2.result comes from queueEntry.ourVote.transaction_result which comes from PreApplyAcceptedTransactionResult.passed
             // it will be false if the apply funciton throws an error to signal that it was not possible apply
 
-            if(appliedReceipt2.result === true){
+            if(signedReceipt.proposal.applied === true){
               // if we have a receipt with a positive result we should not have a null preApplyTXResult
               /* prettier-ignore */ nestedCountersInstance.countEvent('poqo', `error: unexpected preApplyTXResult == null while result === true.  preApplyTXResult:${queueEntry.preApplyTXResult != null} applyResponse:${queueEntry.preApplyTXResult?.applyResponse != null}`)
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`error: unexpected preApplyTXResult == null while result === true ${queueEntry.logID}   preApplyTXResult:${queueEntry.preApplyTXResult != null}  applyResponse:${queueEntry.preApplyTXResult?.applyResponse != null}`)
@@ -2314,429 +2327,429 @@ class TransactionConsenus {
             '',
             true
           )
-          return appliedReceipt
+          return signedReceipt
         }
-      } else if (this.stateManager.transactionQueue.useNewPOQ === false) {
-        const requiredVotes = Math.round(votingGroup.length * this.config.p2p.requiredVotesPercentage) //hacky for now.  debug code:
+      // } else if (this.stateManager.transactionQueue.useNewPOQ === false) {
+      //   const requiredVotes = Math.round(votingGroup.length * this.config.p2p.requiredVotesPercentage) //hacky for now.  debug code:
 
-        if (queueEntry.debug.loggedStats1 == null) {
-          queueEntry.debug.loggedStats1 = true
-          nestedCountersInstance.countEvent('transactionStats', ` votingGroup:${votingGroup.length}`)
-        }
+      //   if (queueEntry.debug.loggedStats1 == null) {
+      //     queueEntry.debug.loggedStats1 = true
+      //     nestedCountersInstance.countEvent('transactionStats', ` votingGroup:${votingGroup.length}`)
+      //   }
 
-        const numVotes = queueEntry.collectedVoteHashes.length
+      //   const numVotes = queueEntry.collectedVoteHashes.length
 
-        if (numVotes < requiredVotes) {
-          // we need more votes
-          return null
-        }
+      //   if (numVotes < requiredVotes) {
+      //     // we need more votes
+      //     return null
+      //   }
 
-        // be smart an only recalculate votes when we see a new vote show up.
-        if (queueEntry.newVotes === false) {
-          return null
-        }
-        queueEntry.newVotes = false
-        let mostVotes = 0
-        let winningVoteHash: string
-        const hashCounts: Map<string, number> = new Map()
+      //   // be smart an only recalculate votes when we see a new vote show up.
+      //   if (queueEntry.newVotes === false) {
+      //     return null
+      //   }
+      //   queueEntry.newVotes = false
+      //   let mostVotes = 0
+      //   let winningVoteHash: string
+      //   const hashCounts: Map<string, number> = new Map()
 
-        for (let i = 0; i < numVotes; i++) {
-          // eslint-disable-next-line security/detect-object-injection
-          const currentVote = queueEntry.collectedVoteHashes[i]
-          const voteCount = hashCounts.get(currentVote.voteHash)
-          let updatedVoteCount: number
-          if (voteCount === undefined) {
-            updatedVoteCount = 1
-          } else {
-            updatedVoteCount = voteCount + 1
-          }
-          hashCounts.set(currentVote.voteHash, updatedVoteCount)
-          if (updatedVoteCount > mostVotes) {
-            mostVotes = updatedVoteCount
-            winningVoteHash = currentVote.voteHash
-          }
-        }
+      //   for (let i = 0; i < numVotes; i++) {
+      //     // eslint-disable-next-line security/detect-object-injection
+      //     const currentVote = queueEntry.collectedVoteHashes[i]
+      //     const voteCount = hashCounts.get(currentVote.voteHash)
+      //     let updatedVoteCount: number
+      //     if (voteCount === undefined) {
+      //       updatedVoteCount = 1
+      //     } else {
+      //       updatedVoteCount = voteCount + 1
+      //     }
+      //     hashCounts.set(currentVote.voteHash, updatedVoteCount)
+      //     if (updatedVoteCount > mostVotes) {
+      //       mostVotes = updatedVoteCount
+      //       winningVoteHash = currentVote.voteHash
+      //     }
+      //   }
 
-        if (mostVotes < requiredVotes) {
-          return null
-        }
+      //   if (mostVotes < requiredVotes) {
+      //     return null
+      //   }
 
-        if (winningVoteHash != undefined) {
-          //make the new receipt.
-          const appliedReceipt2: AppliedReceipt2 = {
-            txid: queueEntry.acceptedTx.txId,
-            result: undefined,
-            appliedVote: undefined,
-            confirmOrChallenge: null,
-            signatures: [],
-            app_data_hash: '',
-            // transaction_result: false //this was missing before..
-          }
-          for (let i = 0; i < numVotes; i++) {
-            // eslint-disable-next-line security/detect-object-injection
-            const currentVote = queueEntry.collectedVoteHashes[i]
-            if (currentVote.voteHash === winningVoteHash) {
-              appliedReceipt2.signatures.push(currentVote.sign)
-            }
-          }
-          //result and appliedVote must be set using a winning vote..
-          //we may not have this yet
+      //   if (winningVoteHash != undefined) {
+      //     //make the new receipt.
+      //     const appliedReceipt2: AppliedReceipt2 = {
+      //       txid: queueEntry.acceptedTx.txId,
+      //       result: undefined,
+      //       appliedVote: undefined,
+      //       confirmOrChallenge: null,
+      //       signatures: [],
+      //       app_data_hash: '',
+      //       // transaction_result: false //this was missing before..
+      //     }
+      //     for (let i = 0; i < numVotes; i++) {
+      //       // eslint-disable-next-line security/detect-object-injection
+      //       const currentVote = queueEntry.collectedVoteHashes[i]
+      //       if (currentVote.voteHash === winningVoteHash) {
+      //         appliedReceipt2.signatures.push(currentVote.sign)
+      //       }
+      //     }
+      //     //result and appliedVote must be set using a winning vote..
+      //     //we may not have this yet
 
-          if (queueEntry.ourVote != null && queueEntry.ourVoteHash === winningVoteHash) {
-            appliedReceipt2.result = queueEntry.ourVote.transaction_result
-            appliedReceipt2.appliedVote = queueEntry.ourVote
-            // now send it !!!
+      //     if (queueEntry.ourVote != null && queueEntry.ourVoteHash === winningVoteHash) {
+      //       appliedReceipt2.result = queueEntry.ourVote.transaction_result
+      //       appliedReceipt2.appliedVote = queueEntry.ourVote
+      //       // now send it !!!
 
-            queueEntry.appliedReceipt2 = appliedReceipt2
+      //       queueEntry.appliedReceipt2 = appliedReceipt2
 
-            for (let i = 0; i < queueEntry.ourVote.account_id.length; i++) {
-              /* eslint-disable security/detect-object-injection */
-              if (queueEntry.ourVote.account_id[i] === 'app_data_hash') {
-                appliedReceipt2.app_data_hash = queueEntry.ourVote.account_state_hash_after[i]
-                break
-              }
-              /* eslint-enable security/detect-object-injection */
-            }
+      //       for (let i = 0; i < queueEntry.ourVote.account_id.length; i++) {
+      //         /* eslint-disable security/detect-object-injection */
+      //         if (queueEntry.ourVote.account_id[i] === 'app_data_hash') {
+      //           appliedReceipt2.app_data_hash = queueEntry.ourVote.account_state_hash_after[i]
+      //           break
+      //         }
+      //         /* eslint-enable security/detect-object-injection */
+      //       }
 
-            //this is a temporary hack to reduce the ammount of refactor needed.
-            const appliedReceipt: AppliedReceipt = {
-              txid: queueEntry.acceptedTx.txId,
-              result: queueEntry.ourVote.transaction_result,
-              appliedVotes: [queueEntry.ourVote],
-              confirmOrChallenge: [],
-              app_data_hash: appliedReceipt2.app_data_hash,
-            }
-            queueEntry.appliedReceipt = appliedReceipt
+      //       //this is a temporary hack to reduce the ammount of refactor needed.
+      //       const appliedReceipt: AppliedReceipt = {
+      //         txid: queueEntry.acceptedTx.txId,
+      //         result: queueEntry.ourVote.transaction_result,
+      //         appliedVotes: [queueEntry.ourVote],
+      //         confirmOrChallenge: [],
+      //         app_data_hash: appliedReceipt2.app_data_hash,
+      //       }
+      //       queueEntry.appliedReceipt = appliedReceipt
 
-            return appliedReceipt
-          }
-        }
-      } else {
-        if (queueEntry.completedConfirmedOrChallenge === false && queueEntry.isInExecutionHome) {
-          if (this.stateManager.consensusLog || logFlags.debug)
-            this.mainLogger.info(
-              `tryProduceReceipt ${queueEntry.logID} completedConfirmedOrChallenge === false and isInExecutionHome`
-            )
-          nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt still in confirm/challenge stage')
-          return
-        }
-        const now = shardusGetTime()
-        const timeSinceLastConfirmOrChallenge =
-          queueEntry.lastConfirmOrChallengeTimestamp > 0
-            ? now - queueEntry.lastConfirmOrChallengeTimestamp
-            : 0
-        const timeSinceFirstMessage =
-          queueEntry.firstConfirmOrChallengeTimestamp > 0
-            ? now - queueEntry.firstConfirmOrChallengeTimestamp
-            : 0
-        const hasWaitedLongEnough =
-          timeSinceLastConfirmOrChallenge >= this.config.stateManager.waitTimeBeforeReceipt
-        const hasWaitLimitReached =
-          timeSinceFirstMessage >= this.config.stateManager.waitLimitAfterFirstMessage
-        if (logFlags.debug)
-          this.mainLogger.debug(
-            `tryProduceReceipt: ${queueEntry.logID} hasWaitedLongEnough: ${hasWaitedLongEnough}, hasWaitLimitReached: ${hasWaitLimitReached}, timeSinceLastConfirmOrChallenge: ${timeSinceLastConfirmOrChallenge} ms, timeSinceFirstMessage: ${timeSinceFirstMessage} ms`
-          )
-        // check if last vote confirm/challenge received is waitTimeBeforeReceipt ago
-        if (timeSinceLastConfirmOrChallenge >= this.config.stateManager.waitTimeBeforeReceipt) {
-          // stop accepting the vote messages, confirm or challenge for this tx
-          queueEntry.acceptConfirmOrChallenge = false
-          nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt hasWaitedLongEnough: true')
-          if (logFlags.debug)
-            this.mainLogger.debug(
-              `tryProduceReceipt: ${queueEntry.logID} stopped accepting confirm/challenge messages`
-            )
+      //       return appliedReceipt
+      //     }
+      //   }
+      // } else {
+      //   if (queueEntry.completedConfirmedOrChallenge === false && queueEntry.isInExecutionHome) {
+      //     if (this.stateManager.consensusLog || logFlags.debug)
+      //       this.mainLogger.info(
+      //         `tryProduceReceipt ${queueEntry.logID} completedConfirmedOrChallenge === false and isInExecutionHome`
+      //       )
+      //     nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt still in confirm/challenge stage')
+      //     return
+      //   }
+      //   const now = shardusGetTime()
+      //   const timeSinceLastConfirmOrChallenge =
+      //     queueEntry.lastConfirmOrChallengeTimestamp > 0
+      //       ? now - queueEntry.lastConfirmOrChallengeTimestamp
+      //       : 0
+      //   const timeSinceFirstMessage =
+      //     queueEntry.firstConfirmOrChallengeTimestamp > 0
+      //       ? now - queueEntry.firstConfirmOrChallengeTimestamp
+      //       : 0
+      //   const hasWaitedLongEnough =
+      //     timeSinceLastConfirmOrChallenge >= this.config.stateManager.waitTimeBeforeReceipt
+      //   const hasWaitLimitReached =
+      //     timeSinceFirstMessage >= this.config.stateManager.waitLimitAfterFirstMessage
+      //   if (logFlags.debug)
+      //     this.mainLogger.debug(
+      //       `tryProduceReceipt: ${queueEntry.logID} hasWaitedLongEnough: ${hasWaitedLongEnough}, hasWaitLimitReached: ${hasWaitLimitReached}, timeSinceLastConfirmOrChallenge: ${timeSinceLastConfirmOrChallenge} ms, timeSinceFirstMessage: ${timeSinceFirstMessage} ms`
+      //     )
+      //   // check if last vote confirm/challenge received is waitTimeBeforeReceipt ago
+      //   if (timeSinceLastConfirmOrChallenge >= this.config.stateManager.waitTimeBeforeReceipt) {
+      //     // stop accepting the vote messages, confirm or challenge for this tx
+      //     queueEntry.acceptConfirmOrChallenge = false
+      //     nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt hasWaitedLongEnough: true')
+      //     if (logFlags.debug)
+      //       this.mainLogger.debug(
+      //         `tryProduceReceipt: ${queueEntry.logID} stopped accepting confirm/challenge messages`
+      //       )
 
-          if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} ready to decide final receipt. bestReceivedChallenge: ${utils.stringifyReduce(queueEntry.receivedBestChallenge)}, bestReceivedConfirmation: ${utils.stringifyReduce(queueEntry.receivedBestConfirmation)}, receivedBestConfirmedNode: ${utils.stringifyReduce(queueEntry.receivedBestConfirmedNode)}`) // prettier-ignore
-          if (this.stateManager.consensusLog) {
-            this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} ready to decide final receipt.`)
-            this.mainLogger.debug(
-              `tryProduceReceipt: ${queueEntry.logID} uniqueChallengesCount: ${queueEntry.uniqueChallengesCount}`
-            )
-          }
+      //     if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} ready to decide final receipt. bestReceivedChallenge: ${utils.stringifyReduce(queueEntry.receivedBestChallenge)}, bestReceivedConfirmation: ${utils.stringifyReduce(queueEntry.receivedBestConfirmation)}, receivedBestConfirmedNode: ${utils.stringifyReduce(queueEntry.receivedBestConfirmedNode)}`) // prettier-ignore
+      //     if (this.stateManager.consensusLog) {
+      //       this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} ready to decide final receipt.`)
+      //       this.mainLogger.debug(
+      //         `tryProduceReceipt: ${queueEntry.logID} uniqueChallengesCount: ${queueEntry.uniqueChallengesCount}`
+      //       )
+      //     }
 
-          // we have received challenge message, produce failed receipt
-          if (
-            queueEntry.receivedBestChallenge &&
-            queueEntry.receivedBestChallenger &&
-            queueEntry.uniqueChallengesCount >= this.config.stateManager.minRequiredChallenges
-          ) {
-            nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt producing fail receipt from unique challenges')
-            const appliedReceipt: AppliedReceipt = {
-              txid: queueEntry.receivedBestChallenge.appliedVote.txid,
-              result: false,
-              appliedVotes: [queueEntry.receivedBestChallenge.appliedVote],
-              confirmOrChallenge: [queueEntry.receivedBestChallenge],
-              app_data_hash: queueEntry.receivedBestChallenge.appliedVote.app_data_hash,
-            }
-            const appliedReceipt2: AppliedReceipt2 = {
-              txid: queueEntry.receivedBestChallenge.appliedVote.txid,
-              result: false,
-              appliedVote: queueEntry.receivedBestChallenge.appliedVote,
-              confirmOrChallenge: queueEntry.receivedBestChallenge,
-              app_data_hash: queueEntry.receivedBestChallenge.appliedVote.app_data_hash,
-              signatures: [queueEntry.receivedBestChallenge.appliedVote.sign],
-            }
-            if (logFlags.debug)
-              this.mainLogger.debug(
-                `tryProduceReceipt: ${
-                  queueEntry.logID
-                } producing a fail receipt based on received challenge message. appliedReceipt: ${utils.stringifyReduce(
-                  appliedReceipt2
-                )}`
-              )
+      //     // we have received challenge message, produce failed receipt
+      //     if (
+      //       queueEntry.receivedBestChallenge &&
+      //       queueEntry.receivedBestChallenger &&
+      //       queueEntry.uniqueChallengesCount >= this.config.stateManager.minRequiredChallenges
+      //     ) {
+      //       nestedCountersInstance.countEvent('consensus', 'tryProduceReceipt producing fail receipt from unique challenges')
+      //       const appliedReceipt: AppliedReceipt = {
+      //         txid: queueEntry.receivedBestChallenge.appliedVote.txid,
+      //         result: false,
+      //         appliedVotes: [queueEntry.receivedBestChallenge.appliedVote],
+      //         confirmOrChallenge: [queueEntry.receivedBestChallenge],
+      //         app_data_hash: queueEntry.receivedBestChallenge.appliedVote.app_data_hash,
+      //       }
+      //       const appliedReceipt2: AppliedReceipt2 = {
+      //         txid: queueEntry.receivedBestChallenge.appliedVote.txid,
+      //         result: false,
+      //         appliedVote: queueEntry.receivedBestChallenge.appliedVote,
+      //         confirmOrChallenge: queueEntry.receivedBestChallenge,
+      //         app_data_hash: queueEntry.receivedBestChallenge.appliedVote.app_data_hash,
+      //         signatures: [queueEntry.receivedBestChallenge.appliedVote.sign],
+      //       }
+      //       if (logFlags.debug)
+      //         this.mainLogger.debug(
+      //           `tryProduceReceipt: ${
+      //             queueEntry.logID
+      //           } producing a fail receipt based on received challenge message. appliedReceipt: ${utils.stringifyReduce(
+      //             appliedReceipt2
+      //           )}`
+      //         )
 
-            // todo: we still need to check if we have a better challenge receipt from robust query ??
-            const robustQueryResult = await this.robustQueryConfirmOrChallenge(queueEntry)
-            const robustConfirmOrChallenge = robustQueryResult?.result
-            const robustUniqueCount = robustQueryResult?.uniqueCount
-            if (this.stateManager.consensusLog) {
-              this.mainLogger.debug(
-                `tryProduceReceipt: ${queueEntry.logID} robustChallenge: ${utils.stringifyReduce(
-                  robustConfirmOrChallenge
-                )}, robustUniqueCount: ${robustUniqueCount}`
-              )
-            }
-            if (robustConfirmOrChallenge == null) {
-              nestedCountersInstance.countEvent(
-                'consensus',
-                'tryProduceReceipt robust query for challenge failed'
-              )
-              if (logFlags.debug)
-                this.mainLogger.debug(
-                  `tryProduceReceipt: ${queueEntry.logID} failed to query robust challenge`
-                )
-              return
-            }
-            queueEntry.robustQueryConfirmOrChallengeCompleted = true
+      //       // todo: we still need to check if we have a better challenge receipt from robust query ??
+      //       const robustQueryResult = await this.robustQueryConfirmOrChallenge(queueEntry)
+      //       const robustConfirmOrChallenge = robustQueryResult?.result
+      //       const robustUniqueCount = robustQueryResult?.uniqueCount
+      //       if (this.stateManager.consensusLog) {
+      //         this.mainLogger.debug(
+      //           `tryProduceReceipt: ${queueEntry.logID} robustChallenge: ${utils.stringifyReduce(
+      //             robustConfirmOrChallenge
+      //           )}, robustUniqueCount: ${robustUniqueCount}`
+      //         )
+      //       }
+      //       if (robustConfirmOrChallenge == null) {
+      //         nestedCountersInstance.countEvent(
+      //           'consensus',
+      //           'tryProduceReceipt robust query for challenge failed'
+      //         )
+      //         if (logFlags.debug)
+      //           this.mainLogger.debug(
+      //             `tryProduceReceipt: ${queueEntry.logID} failed to query robust challenge`
+      //           )
+      //         return
+      //       }
+      //       queueEntry.robustQueryConfirmOrChallengeCompleted = true
 
-            // Received a confrim receipt. We have a challenge receipt which is better.
-            if (robustConfirmOrChallenge && robustConfirmOrChallenge.message === 'confirm') {
-              if (logFlags.debug)
-                this.mainLogger.debug(
-                  `tryProduceReceipt: ${queueEntry.logID} received a confirm message. We have enough challenge messages which is better`
-                )
-              // just use our challenge receipt and return
-              queueEntry.appliedReceipt = appliedReceipt
-              queueEntry.appliedReceipt2 = appliedReceipt2
-              return appliedReceipt
-            }
+      //       // Received a confrim receipt. We have a challenge receipt which is better.
+      //       if (robustConfirmOrChallenge && robustConfirmOrChallenge.message === 'confirm') {
+      //         if (logFlags.debug)
+      //           this.mainLogger.debug(
+      //             `tryProduceReceipt: ${queueEntry.logID} received a confirm message. We have enough challenge messages which is better`
+      //           )
+      //         // just use our challenge receipt and return
+      //         queueEntry.appliedReceipt = appliedReceipt
+      //         queueEntry.appliedReceipt2 = appliedReceipt2
+      //         return appliedReceipt
+      //       }
 
-            // Received another challenge receipt. Compare ranks. Lower is better
-            let bestNodeFromRobustQuery: Shardus.NodeWithRank
-            if (queueEntry.executionGroupMap.has(robustConfirmOrChallenge.nodeId)) {
-              bestNodeFromRobustQuery = queueEntry.executionGroupMap.get(
-                robustConfirmOrChallenge.nodeId
-              ) as Shardus.NodeWithRank
-            }
-            const isRobustQueryNodeBetter = bestNodeFromRobustQuery.rank < queueEntry.receivedBestChallenger.rank
-            if (
-              isRobustQueryNodeBetter &&
-              robustUniqueCount >= this.config.stateManager.minRequiredChallenges
-            ) {
-              nestedCountersInstance.countEvent(
-                'consensus',
-                'tryProduceReceipt challenge from network is better than our challenge'
-              )
-              if (logFlags.debug)
-                this.mainLogger.debug(
-                  `tryProduceReceipt: ${
-                    queueEntry.logID
-                  } challenge from robust query is better than our challenge. robustQueryConfirmOrChallenge: ${Utils.safeStringify(
-                    robustConfirmOrChallenge
-                  )}`
-                )
-              const robustReceipt: AppliedReceipt = {
-                txid: robustConfirmOrChallenge.appliedVote.txid,
-                result: false,
-                appliedVotes: [robustConfirmOrChallenge.appliedVote],
-                confirmOrChallenge: [robustConfirmOrChallenge],
-                app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
-              }
-              const robustReceipt2: AppliedReceipt2 = {
-                txid: robustConfirmOrChallenge.appliedVote.txid,
-                result: false,
-                appliedVote: robustConfirmOrChallenge.appliedVote,
-                confirmOrChallenge: robustConfirmOrChallenge,
-                app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
-                signatures: [robustConfirmOrChallenge.appliedVote.sign],
-              }
-              queueEntry.appliedReceipt = robustReceipt
-              queueEntry.appliedReceipt2 = robustReceipt2
-              return robustReceipt
-            } else {
-              nestedCountersInstance.countEvent(
-                'consensus',
-                'tryProduceReceipt robustQueryConfirmOrChallenge is NOT better'
-              )
-              /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} challenge from robust query is not better than our challenge. use our challenge: ${utils.stringifyReduce(appliedReceipt2)}`)
-              queueEntry.appliedReceipt = appliedReceipt
-              queueEntry.appliedReceipt2 = appliedReceipt2
-              return appliedReceipt
-            }
-          }
+      //       // Received another challenge receipt. Compare ranks. Lower is better
+      //       let bestNodeFromRobustQuery: Shardus.NodeWithRank
+      //       if (queueEntry.executionGroupMap.has(robustConfirmOrChallenge.nodeId)) {
+      //         bestNodeFromRobustQuery = queueEntry.executionGroupMap.get(
+      //           robustConfirmOrChallenge.nodeId
+      //         ) as Shardus.NodeWithRank
+      //       }
+      //       const isRobustQueryNodeBetter = bestNodeFromRobustQuery.rank < queueEntry.receivedBestChallenger.rank
+      //       if (
+      //         isRobustQueryNodeBetter &&
+      //         robustUniqueCount >= this.config.stateManager.minRequiredChallenges
+      //       ) {
+      //         nestedCountersInstance.countEvent(
+      //           'consensus',
+      //           'tryProduceReceipt challenge from network is better than our challenge'
+      //         )
+      //         if (logFlags.debug)
+      //           this.mainLogger.debug(
+      //             `tryProduceReceipt: ${
+      //               queueEntry.logID
+      //             } challenge from robust query is better than our challenge. robustQueryConfirmOrChallenge: ${Utils.safeStringify(
+      //               robustConfirmOrChallenge
+      //             )}`
+      //           )
+      //         const robustReceipt: AppliedReceipt = {
+      //           txid: robustConfirmOrChallenge.appliedVote.txid,
+      //           result: false,
+      //           appliedVotes: [robustConfirmOrChallenge.appliedVote],
+      //           confirmOrChallenge: [robustConfirmOrChallenge],
+      //           app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
+      //         }
+      //         const robustReceipt2: AppliedReceipt2 = {
+      //           txid: robustConfirmOrChallenge.appliedVote.txid,
+      //           result: false,
+      //           appliedVote: robustConfirmOrChallenge.appliedVote,
+      //           confirmOrChallenge: robustConfirmOrChallenge,
+      //           app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
+      //           signatures: [robustConfirmOrChallenge.appliedVote.sign],
+      //         }
+      //         queueEntry.appliedReceipt = robustReceipt
+      //         queueEntry.appliedReceipt2 = robustReceipt2
+      //         return robustReceipt
+      //       } else {
+      //         nestedCountersInstance.countEvent(
+      //           'consensus',
+      //           'tryProduceReceipt robustQueryConfirmOrChallenge is NOT better'
+      //         )
+      //         /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt: ${queueEntry.logID} challenge from robust query is not better than our challenge. use our challenge: ${utils.stringifyReduce(appliedReceipt2)}`)
+      //         queueEntry.appliedReceipt = appliedReceipt
+      //         queueEntry.appliedReceipt2 = appliedReceipt2
+      //         return appliedReceipt
+      //       }
+      //     }
 
-          // create receipt
-          // The receipt for the transactions is the lowest ranked challenge message or if there is no challenge the lowest ranked confirm message
-          // loop through "confirm" messages and "challenge" messages to decide the final receipt
-          if (queueEntry.receivedBestConfirmation && queueEntry.receivedBestConfirmedNode) {
-            const winningVote = queueEntry.receivedBestConfirmation.appliedVote
-            const appliedReceipt: AppliedReceipt = {
-              txid: winningVote.txid,
-              result: winningVote.transaction_result,
-              appliedVotes: [winningVote],
-              confirmOrChallenge: [queueEntry.receivedBestConfirmation],
-              app_data_hash: winningVote.app_data_hash,
-            }
-            const appliedReceipt2: AppliedReceipt2 = {
-              txid: winningVote.txid,
-              result: winningVote.transaction_result,
-              appliedVote: winningVote,
-              confirmOrChallenge: queueEntry.receivedBestConfirmation,
-              app_data_hash: winningVote.app_data_hash,
-              signatures: [winningVote.sign],
-            }
-            if (logFlags.debug || this.stateManager.consensusLog)
-              this.mainLogger.debug(
-                `tryProduceReceipt: ${queueEntry.logID} producing a confirm receipt based on received confirmation message.`
-              )
-            for (let i = 0; i < winningVote.account_id.length; i++) {
-              /* eslint-disable security/detect-object-injection */
-              if (winningVote.account_id[i] === 'app_data_hash') {
-                appliedReceipt.app_data_hash = winningVote.account_state_hash_after[i]
-                appliedReceipt2.app_data_hash = winningVote.account_state_hash_after[i]
-                break
-              }
-              /* eslint-enable security/detect-object-injection */
-            }
-            // do a robust query to confirm that we have the best receipt
-            // (lower the rank of confirm message, the better the receipt is)
-            const robustQueryResult = await this.robustQueryConfirmOrChallenge(queueEntry)
-            const robustConfirmOrChallenge = robustQueryResult?.result
+      //     // create receipt
+      //     // The receipt for the transactions is the lowest ranked challenge message or if there is no challenge the lowest ranked confirm message
+      //     // loop through "confirm" messages and "challenge" messages to decide the final receipt
+      //     if (queueEntry.receivedBestConfirmation && queueEntry.receivedBestConfirmedNode) {
+      //       const winningVote = queueEntry.receivedBestConfirmation.appliedVote
+      //       const appliedReceipt: AppliedReceipt = {
+      //         txid: winningVote.txid,
+      //         result: winningVote.transaction_result,
+      //         appliedVotes: [winningVote],
+      //         confirmOrChallenge: [queueEntry.receivedBestConfirmation],
+      //         app_data_hash: winningVote.app_data_hash,
+      //       }
+      //       const appliedReceipt2: AppliedReceipt2 = {
+      //         txid: winningVote.txid,
+      //         result: winningVote.transaction_result,
+      //         appliedVote: winningVote,
+      //         confirmOrChallenge: queueEntry.receivedBestConfirmation,
+      //         app_data_hash: winningVote.app_data_hash,
+      //         signatures: [winningVote.sign],
+      //       }
+      //       if (logFlags.debug || this.stateManager.consensusLog)
+      //         this.mainLogger.debug(
+      //           `tryProduceReceipt: ${queueEntry.logID} producing a confirm receipt based on received confirmation message.`
+      //         )
+      //       for (let i = 0; i < winningVote.account_id.length; i++) {
+      //         /* eslint-disable security/detect-object-injection */
+      //         if (winningVote.account_id[i] === 'app_data_hash') {
+      //           appliedReceipt.app_data_hash = winningVote.account_state_hash_after[i]
+      //           appliedReceipt2.app_data_hash = winningVote.account_state_hash_after[i]
+      //           break
+      //         }
+      //         /* eslint-enable security/detect-object-injection */
+      //       }
+      //       // do a robust query to confirm that we have the best receipt
+      //       // (lower the rank of confirm message, the better the receipt is)
+      //       const robustQueryResult = await this.robustQueryConfirmOrChallenge(queueEntry)
+      //       const robustConfirmOrChallenge = robustQueryResult?.result
 
-            if (this.stateManager.consensusLog) {
-              this.mainLogger.debug(
-                `tryProduceReceipt: ${
-                  queueEntry.logID
-                } got result robustConfirmOrChallenge: ${utils.stringifyReduce(robustConfirmOrChallenge)}`
-              )
-            }
+      //       if (this.stateManager.consensusLog) {
+      //         this.mainLogger.debug(
+      //           `tryProduceReceipt: ${
+      //             queueEntry.logID
+      //           } got result robustConfirmOrChallenge: ${utils.stringifyReduce(robustConfirmOrChallenge)}`
+      //         )
+      //       }
 
-            if (robustConfirmOrChallenge == null || robustConfirmOrChallenge.message == null) {
-              nestedCountersInstance.countEvent(
-                'consensus',
-                'tryProduceReceipt robustQueryConfirmOrChallenge confirm failed'
-              )
-              if (logFlags.debug || this.stateManager.consensusLog)
-                this.mainLogger.debug(
-                  `tryProduceReceipt: ${queueEntry.logID} failed to query best challenge/message from robust query`
-                )
-              return // this will prevent OOS
-            }
-            queueEntry.robustQueryConfirmOrChallengeCompleted = true
+      //       if (robustConfirmOrChallenge == null || robustConfirmOrChallenge.message == null) {
+      //         nestedCountersInstance.countEvent(
+      //           'consensus',
+      //           'tryProduceReceipt robustQueryConfirmOrChallenge confirm failed'
+      //         )
+      //         if (logFlags.debug || this.stateManager.consensusLog)
+      //           this.mainLogger.debug(
+      //             `tryProduceReceipt: ${queueEntry.logID} failed to query best challenge/message from robust query`
+      //           )
+      //         return // this will prevent OOS
+      //       }
+      //       queueEntry.robustQueryConfirmOrChallengeCompleted = true
 
-            // Received challenge receipt, we have confirm receipt which is not as strong as challenge receipt
-            if (robustConfirmOrChallenge.message === 'challenge') {
-              nestedCountersInstance.countEvent(
-                'consensus',
-                'tryProduceReceipt robustQueryConfirmOrChallenge is challenge, we have confirmation'
-              )
-              const robustReceipt: AppliedReceipt = {
-                txid: robustConfirmOrChallenge.appliedVote.txid,
-                result: false,
-                appliedVotes: [robustConfirmOrChallenge.appliedVote],
-                confirmOrChallenge: [robustConfirmOrChallenge],
-                app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
-              }
-              const robustReceipt2: AppliedReceipt2 = {
-                txid: robustConfirmOrChallenge.appliedVote.txid,
-                result: false,
-                appliedVote: robustConfirmOrChallenge.appliedVote,
-                confirmOrChallenge: robustConfirmOrChallenge,
-                app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
-                signatures: [robustConfirmOrChallenge.appliedVote.sign],
-              }
-              queueEntry.appliedReceipt = robustReceipt
-              queueEntry.appliedReceipt2 = robustReceipt2
-              return robustReceipt
-            }
-            // mark that we have a robust confirmation, should not expire the tx
-            queueEntry.hasRobustConfirmation = true
+      //       // Received challenge receipt, we have confirm receipt which is not as strong as challenge receipt
+      //       if (robustConfirmOrChallenge.message === 'challenge') {
+      //         nestedCountersInstance.countEvent(
+      //           'consensus',
+      //           'tryProduceReceipt robustQueryConfirmOrChallenge is challenge, we have confirmation'
+      //         )
+      //         const robustReceipt: AppliedReceipt = {
+      //           txid: robustConfirmOrChallenge.appliedVote.txid,
+      //           result: false,
+      //           appliedVotes: [robustConfirmOrChallenge.appliedVote],
+      //           confirmOrChallenge: [robustConfirmOrChallenge],
+      //           app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
+      //         }
+      //         const robustReceipt2: AppliedReceipt2 = {
+      //           txid: robustConfirmOrChallenge.appliedVote.txid,
+      //           result: false,
+      //           appliedVote: robustConfirmOrChallenge.appliedVote,
+      //           confirmOrChallenge: robustConfirmOrChallenge,
+      //           app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
+      //           signatures: [robustConfirmOrChallenge.appliedVote.sign],
+      //         }
+      //         queueEntry.appliedReceipt = robustReceipt
+      //         queueEntry.appliedReceipt2 = robustReceipt2
+      //         return robustReceipt
+      //       }
+      //       // mark that we have a robust confirmation, should not expire the tx
+      //       queueEntry.hasRobustConfirmation = true
 
-            // Received another confirm receipt. Compare ranks
-            let bestNodeFromRobustQuery: Shardus.NodeWithRank
-            if (queueEntry.executionGroupMap.has(robustConfirmOrChallenge.nodeId)) {
-              bestNodeFromRobustQuery = queueEntry.executionGroupMap.get(
-                robustConfirmOrChallenge.nodeId
-              ) as Shardus.NodeWithRank
-            }
+      //       // Received another confirm receipt. Compare ranks
+      //       let bestNodeFromRobustQuery: Shardus.NodeWithRank
+      //       if (queueEntry.executionGroupMap.has(robustConfirmOrChallenge.nodeId)) {
+      //         bestNodeFromRobustQuery = queueEntry.executionGroupMap.get(
+      //           robustConfirmOrChallenge.nodeId
+      //         ) as Shardus.NodeWithRank
+      //       }
 
-            const isRobustQueryNodeBetter =
-              bestNodeFromRobustQuery.rank < queueEntry.receivedBestConfirmedNode.rank
-            if (isRobustQueryNodeBetter) {
-              nestedCountersInstance.countEvent(
-                'consensus',
-                'tryProduceReceipt robustQueryConfirmOrChallenge is better'
-              )
-              if (this.stateManager.consensusLog) {
-                this.mainLogger.debug(
-                  `tryProducedReceipt: ${
-                    queueEntry.logID
-                  } robust confirmation result is better. ${utils.stringifyReduce(robustConfirmOrChallenge)}`
-                )
-              }
-              if (logFlags.debug)
-                this.mainLogger.debug(
-                  `tryProduceReceipt: ${
-                    queueEntry.logID
-                  } confirmation from robust query is better than our confirm. bestNodeFromRobust?Query: ${Utils.safeStringify(
-                    bestNodeFromRobustQuery
-                  )}, queueEntry.receivedBestVoter: ${Utils.safeStringify(
-                    queueEntry.receivedBestVoter
-                  )}, robustQueryConfirmOrChallenge: ${Utils.safeStringify(robustConfirmOrChallenge)}`
-                )
-              const robustReceipt: AppliedReceipt = {
-                txid: robustConfirmOrChallenge.appliedVote.txid,
-                result: robustConfirmOrChallenge.appliedVote.transaction_result,
-                appliedVotes: [robustConfirmOrChallenge.appliedVote],
-                confirmOrChallenge: [robustConfirmOrChallenge],
-                app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
-              }
-              const robustReceipt2: AppliedReceipt2 = {
-                txid: robustConfirmOrChallenge.appliedVote.txid,
-                result: robustConfirmOrChallenge.appliedVote.transaction_result,
-                appliedVote: robustConfirmOrChallenge.appliedVote,
-                confirmOrChallenge: robustConfirmOrChallenge,
-                app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
-                signatures: [robustConfirmOrChallenge.appliedVote.sign],
-              }
-              queueEntry.appliedReceipt = robustReceipt
-              queueEntry.appliedReceipt2 = robustReceipt2
-              return robustReceipt
-            } else {
-              if (this.stateManager.consensusLog) {
-                this.mainLogger.debug(
-                  `tryProducedReceipt: ${queueEntry.logID} robust confirmation result is NOT better. Using our best received confirmation`
-                )
-              }
-              queueEntry.appliedReceipt = appliedReceipt
-              queueEntry.appliedReceipt2 = appliedReceipt2
-              return queueEntry.appliedReceipt
-            }
-          } else {
-            nestedCountersInstance.countEvent(
-              'consensus',
-              'tryProduceReceipt waitedEnough: true. no confirm or challenge received'
-            )
-            return null
-          }
-        } else {
-          if (logFlags.debug)
-            this.mainLogger.debug(
-              `tryProduceReceipt: ${queueEntry.logID} not producing receipt yet because timeSinceLastConfirmOrChallenge is ${timeSinceLastConfirmOrChallenge} ms`
-            )
-        }
-      }
+      //       const isRobustQueryNodeBetter =
+      //         bestNodeFromRobustQuery.rank < queueEntry.receivedBestConfirmedNode.rank
+      //       if (isRobustQueryNodeBetter) {
+      //         nestedCountersInstance.countEvent(
+      //           'consensus',
+      //           'tryProduceReceipt robustQueryConfirmOrChallenge is better'
+      //         )
+      //         if (this.stateManager.consensusLog) {
+      //           this.mainLogger.debug(
+      //             `tryProducedReceipt: ${
+      //               queueEntry.logID
+      //             } robust confirmation result is better. ${utils.stringifyReduce(robustConfirmOrChallenge)}`
+      //           )
+      //         }
+      //         if (logFlags.debug)
+      //           this.mainLogger.debug(
+      //             `tryProduceReceipt: ${
+      //               queueEntry.logID
+      //             } confirmation from robust query is better than our confirm. bestNodeFromRobust?Query: ${Utils.safeStringify(
+      //               bestNodeFromRobustQuery
+      //             )}, queueEntry.receivedBestVoter: ${Utils.safeStringify(
+      //               queueEntry.receivedBestVoter
+      //             )}, robustQueryConfirmOrChallenge: ${Utils.safeStringify(robustConfirmOrChallenge)}`
+      //           )
+      //         const robustReceipt: AppliedReceipt = {
+      //           txid: robustConfirmOrChallenge.appliedVote.txid,
+      //           result: robustConfirmOrChallenge.appliedVote.transaction_result,
+      //           appliedVotes: [robustConfirmOrChallenge.appliedVote],
+      //           confirmOrChallenge: [robustConfirmOrChallenge],
+      //           app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
+      //         }
+      //         const robustReceipt2: AppliedReceipt2 = {
+      //           txid: robustConfirmOrChallenge.appliedVote.txid,
+      //           result: robustConfirmOrChallenge.appliedVote.transaction_result,
+      //           appliedVote: robustConfirmOrChallenge.appliedVote,
+      //           confirmOrChallenge: robustConfirmOrChallenge,
+      //           app_data_hash: robustConfirmOrChallenge.appliedVote.app_data_hash,
+      //           signatures: [robustConfirmOrChallenge.appliedVote.sign],
+      //         }
+      //         queueEntry.appliedReceipt = robustReceipt
+      //         queueEntry.appliedReceipt2 = robustReceipt2
+      //         return robustReceipt
+      //       } else {
+      //         if (this.stateManager.consensusLog) {
+      //           this.mainLogger.debug(
+      //             `tryProducedReceipt: ${queueEntry.logID} robust confirmation result is NOT better. Using our best received confirmation`
+      //           )
+      //         }
+      //         queueEntry.appliedReceipt = appliedReceipt
+      //         queueEntry.appliedReceipt2 = appliedReceipt2
+      //         return queueEntry.appliedReceipt
+      //       }
+      //     } else {
+      //       nestedCountersInstance.countEvent(
+      //         'consensus',
+      //         'tryProduceReceipt waitedEnough: true. no confirm or challenge received'
+      //       )
+      //       return null
+      //     }
+      //   } else {
+      //     if (logFlags.debug)
+      //       this.mainLogger.debug(
+      //         `tryProduceReceipt: ${queueEntry.logID} not producing receipt yet because timeSinceLastConfirmOrChallenge is ${timeSinceLastConfirmOrChallenge} ms`
+      //       )
+      //   }
+      // }
       return null
     } catch (e) {
       //if (logFlags.error) this.mainLogger.error(`tryProduceReceipt: error ${queueEntry.logID} error: ${e.message}`)
@@ -2747,98 +2760,91 @@ class TransactionConsenus {
     }
   }
 
-  async robustQueryBestReceipt(queueEntry: QueueEntry): Promise<AppliedReceipt2> {
-    this.profiler.profileSectionStart('robustQueryBestReceipt', true)
-    this.profiler.scopedProfileSectionStart('robustQueryBestReceipt')
-    try {
-      const queryFn = async (node: Shardus.Node): Promise<RequestReceiptForTxResp> => {
-        const ip = node.externalIp
-        const port = node.externalPort
-        // the queryFunction must return null if the given node is our own
-        if (ip === Self.ip && port === Self.port) return null
-        const message: RequestReceiptForTxReq = {
-          txid: queueEntry.acceptedTx.txId,
-          timestamp: queueEntry.acceptedTx.timestamp,
-        }
-        return await this.p2p.askBinary<RequestReceiptForTxReqSerialized, RequestReceiptForTxRespSerialized>(
-          node,
-          InternalRouteEnum.binary_request_receipt_for_tx,
-          message,
-          serializeRequestReceiptForTxReq,
-          deserializeRequestReceiptForTxResp,
-          {}
-        )
-        // return await Comms.ask(node, 'request_receipt_for_tx', message)
-      }
-      const eqFn = (item1: RequestReceiptForTxResp, item2: RequestReceiptForTxResp): boolean => {
-        const deepCompare = (obj1: any, obj2: any): boolean => {
-          // If both are null or undefined or exactly the same value
-          if (obj1 === obj2) {
-            return true
-          }
+  // DEPRECATED AFTER POQO
+  // async robustQueryBestReceipt(queueEntry: QueueEntry): Promise<AppliedReceipt2> {
+  //   this.profiler.profileSectionStart('robustQueryBestReceipt', true)
+  //   this.profiler.scopedProfileSectionStart('robustQueryBestReceipt')
+  //   try {
+  //     const queryFn = async (node: Shardus.Node): Promise<RequestReceiptForTxResp> => {
+  //       const ip = node.externalIp
+  //       const port = node.externalPort
+  //       // the queryFunction must return null if the given node is our own
+  //       if (ip === Self.ip && port === Self.port) return null
+  //       const message: RequestReceiptForTxReq = {
+  //         txid: queueEntry.acceptedTx.txId,
+  //         timestamp: queueEntry.acceptedTx.timestamp,
+  //       }
+  //       return await Comms.ask(node, 'request_receipt_for_tx', message)
+  //     }
+  //     const eqFn = (item1: RequestReceiptForTxResp, item2: RequestReceiptForTxResp): boolean => {
+  //       const deepCompare = (obj1: any, obj2: any): boolean => {
+  //         // If both are null or undefined or exactly the same value
+  //         if (obj1 === obj2) {
+  //           return true
+  //         }
 
-          // If only one is null or undefined
-          if (obj1 === null || obj2 === null || typeof obj1 !== 'object' || typeof obj2 !== 'object') {
-            return false
-          }
+  //         // If only one is null or undefined
+  //         if (obj1 === null || obj2 === null || typeof obj1 !== 'object' || typeof obj2 !== 'object') {
+  //           return false
+  //         }
 
-          // Compare arrays
-          if (Array.isArray(obj1) && Array.isArray(obj2)) {
-            if (obj1.length !== obj2.length) {
-              return false
-            }
-            for (let i = 0; i < obj1.length; i++) {
-              if (!deepCompare(obj1[i], obj2[i])) {
-                return false
-              }
-            }
-            return true
-          }
+  //         // Compare arrays
+  //         if (Array.isArray(obj1) && Array.isArray(obj2)) {
+  //           if (obj1.length !== obj2.length) {
+  //             return false
+  //           }
+  //           for (let i = 0; i < obj1.length; i++) {
+  //             if (!deepCompare(obj1[i], obj2[i])) {
+  //               return false
+  //             }
+  //           }
+  //           return true
+  //         }
 
-          // Compare objects
-          const keys1 = Object.keys(obj1)
-          const keys2 = Object.keys(obj2)
+  //         // Compare objects
+  //         const keys1 = Object.keys(obj1)
+  //         const keys2 = Object.keys(obj2)
 
-          if (keys1.length !== keys2.length) {
-            return false
-          }
+  //         if (keys1.length !== keys2.length) {
+  //           return false
+  //         }
 
-          for (const key of keys1) {
-            if (!keys2.includes(key)) {
-              return false
-            }
-            if (!deepCompare(obj1[key], obj2[key])) {
-              return false
-            }
-          }
+  //         for (const key of keys1) {
+  //           if (!keys2.includes(key)) {
+  //             return false
+  //           }
+  //           if (!deepCompare(obj1[key], obj2[key])) {
+  //             return false
+  //           }
+  //         }
 
-          return true
-        }
-        try {
-          // Deep compare item.receipt
-          return deepCompare(item1.receipt, item2.receipt)
-        } catch (err) {
-          return false
-        }
-      }
-      const redundancy = 3
-      const { topResult: response } = await robustQuery(
-        this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry),
-        queryFn,
-        eqFn,
-        redundancy,
-        true
-      )
-      if (response && response.receipt) {
-        return response.receipt
-      }
-    } catch (e) {
-      this.mainLogger.error(`robustQueryBestReceipt: ${queueEntry.logID} error: ${e.message}`)
-    } finally {
-      this.profiler.scopedProfileSectionEnd('robustQueryBestReceipt')
-      this.profiler.profileSectionEnd('robustQueryBestReceipt', true)
-    }
-  }
+  //         return true
+  //       }
+  //       try {
+  //         // Deep compare item.receipt
+  //         return deepCompare(item1.receipt, item2.receipt)
+  //       } catch (err) {
+  //         return false
+  //       }
+  //     }
+  //     const redundancy = 3
+  //     const { topResult: response } = await robustQuery(
+  //       this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry),
+  //       queryFn,
+  //       eqFn,
+  //       redundancy,
+  //       true
+  //     )
+  //     if (response && response.receipt) {
+  //       return response.receipt
+  //     }
+  //   } catch (e) {
+  //     this.mainLogger.error(`robustQueryBestReceipt: ${queueEntry.logID} error: ${e.message}`)
+  //   } finally {
+  //     this.profiler.scopedProfileSectionEnd('robustQueryBestReceipt')
+  //     this.profiler.profileSectionEnd('robustQueryBestReceipt', true)
+  //   }
+  // }
 
   async robustQueryBestVote(queueEntry: QueueEntry): Promise<AppliedVote> {
     profilerInstance.profileSectionStart('robustQueryBestVote', true)
@@ -3107,300 +3113,301 @@ class TransactionConsenus {
     }
   }
 
-  async confirmOrChallenge(queueEntry: QueueEntry): Promise<void> {
-    try {
-      if (queueEntry.ourVote == null && queueEntry.isInExecutionHome) {
-        nestedCountersInstance.countEvent('confirmOrChallenge', 'ourVote == null and isInExecutionHome')
-        return
-      }
-      if (queueEntry.completedConfirmedOrChallenge) {
-        nestedCountersInstance.countEvent('confirmOrChallenge', 'already completedConfirmedOrChallenge')
-        return
-      }
-      if (queueEntry.queryingRobustVote) {
-        nestedCountersInstance.countEvent('confirmOrChallenge', 'in the middle of querying robust vote')
-        return
-      }
-      if (queueEntry.queryingRobustAccountData) {
-        nestedCountersInstance.countEvent(
-          'confirmOrChallenge',
-          'in the middle of querying robust account data'
-        )
-        return
-      }
-      if (logFlags.debug)
-        this.mainLogger.debug(
-          `confirmOrChallenge: ${queueEntry.logID}  receivedBestVote: ${Utils.safeStringify(
-            queueEntry.receivedBestVote
-          )}} `
-        )
+  // async confirmOrChallenge(queueEntry: QueueEntry): Promise<void> {
+  //   try {
+  //     if (queueEntry.ourVote == null && queueEntry.isInExecutionHome) {
+  //       nestedCountersInstance.countEvent('confirmOrChallenge', 'ourVote == null and isInExecutionHome')
+  //       return
+  //     }
+  //     if (queueEntry.completedConfirmedOrChallenge) {
+  //       nestedCountersInstance.countEvent('confirmOrChallenge', 'already completedConfirmedOrChallenge')
+  //       return
+  //     }
+  //     if (queueEntry.queryingRobustVote) {
+  //       nestedCountersInstance.countEvent('confirmOrChallenge', 'in the middle of querying robust vote')
+  //       return
+  //     }
+  //     if (queueEntry.queryingRobustAccountData) {
+  //       nestedCountersInstance.countEvent(
+  //         'confirmOrChallenge',
+  //         'in the middle of querying robust account data'
+  //       )
+  //       return
+  //     }
+  //     if (logFlags.debug)
+  //       this.mainLogger.debug(
+  //         `confirmOrChallenge: ${queueEntry.logID}  receivedBestVote: ${Utils.safeStringify(
+  //           queueEntry.receivedBestVote
+  //         )}} `
+  //       )
 
-      this.profiler.profileSectionStart('confirmOrChallenge')
-      if (logFlags.profiling_verbose) this.profiler.scopedProfileSectionStart('confirmOrChallenge')
+  //     this.profiler.profileSectionStart('confirmOrChallenge')
+  //     if (logFlags.profiling_verbose) this.profiler.scopedProfileSectionStart('confirmOrChallenge')
 
-      const now = shardusGetTime()
-      //  if we are in lowest 10% of execution group and agrees with the highest ranked vote, send out a confirm msg
-      const timeSinceLastVoteMessage =
-        queueEntry.lastVoteReceivedTimestamp > 0 ? now - queueEntry.lastVoteReceivedTimestamp : 0
-      const timeSinceFirstVote =
-        queueEntry.firstVoteReceivedTimestamp > 0 ? now - queueEntry.firstVoteReceivedTimestamp : 0
-      // check if last confirm/challenge received is 1s ago
-      const hasWaitedLongEnough = timeSinceLastVoteMessage >= this.config.stateManager.waitTimeBeforeConfirm
-      const hasWaitLimitReached = timeSinceFirstVote >= this.config.stateManager.waitLimitAfterFirstVote
-      if (logFlags.verbose && this.stateManager.consensusLog)
-        this.mainLogger.debug(
-          `confirmOrChallenge: ${queueEntry.logID} hasWaitedLongEnough: ${hasWaitedLongEnough}, hasWaitLimitReached: ${hasWaitLimitReached}, timeSinceLastVoteMessage: ${timeSinceLastVoteMessage} ms, timeSinceFirstVote: ${timeSinceFirstVote} ms`
-        )
-      if (hasWaitedLongEnough || hasWaitLimitReached) {
-        nestedCountersInstance.countEvent('confirmOrChallenge', 'hasWaitedLongEnough or hasWaitLimitReached')
-        // stop accepting the vote messages for this tx
-        queueEntry.acceptVoteMessage = false
-        const eligibleToConfirm = queueEntry.eligibleNodeIdsToConfirm.has(Self.id)
-        const eligibleToChallenge = true
-        if (this.stateManager.consensusLog || logFlags.debug) {
-          this.mainLogger.info(
-            `confirmOrChallenge: ${queueEntry.logID} hasWaitedLongEnough: true. Now we will try to confirm or challenge. eligibleToConfirm: ${eligibleToConfirm}, eligibleToChallenge: ${eligibleToChallenge}`
-          )
-        }
+  //     const now = shardusGetTime()
+  //     //  if we are in lowest 10% of execution group and agrees with the highest ranked vote, send out a confirm msg
+  //     const timeSinceLastVoteMessage =
+  //       queueEntry.lastVoteReceivedTimestamp > 0 ? now - queueEntry.lastVoteReceivedTimestamp : 0
+  //     const timeSinceFirstVote =
+  //       queueEntry.firstVoteReceivedTimestamp > 0 ? now - queueEntry.firstVoteReceivedTimestamp : 0
+  //     // check if last confirm/challenge received is 1s ago
+  //     const hasWaitedLongEnough = timeSinceLastVoteMessage >= this.config.stateManager.waitTimeBeforeConfirm
+  //     const hasWaitLimitReached = timeSinceFirstVote >= this.config.stateManager.waitLimitAfterFirstVote
+  //     if (logFlags.verbose && this.stateManager.consensusLog)
+  //       this.mainLogger.debug(
+  //         `confirmOrChallenge: ${queueEntry.logID} hasWaitedLongEnough: ${hasWaitedLongEnough}, hasWaitLimitReached: ${hasWaitLimitReached}, timeSinceLastVoteMessage: ${timeSinceLastVoteMessage} ms, timeSinceFirstVote: ${timeSinceFirstVote} ms`
+  //       )
+  //     if (hasWaitedLongEnough || hasWaitLimitReached) {
+  //       nestedCountersInstance.countEvent('confirmOrChallenge', 'hasWaitedLongEnough or hasWaitLimitReached')
+  //       // stop accepting the vote messages for this tx
+  //       queueEntry.acceptVoteMessage = false
+  //       const eligibleToConfirm = queueEntry.eligibleNodeIdsToConfirm.has(Self.id)
+  //       const eligibleToChallenge = true
+  //       if (this.stateManager.consensusLog || logFlags.debug) {
+  //         this.mainLogger.info(
+  //           `confirmOrChallenge: ${queueEntry.logID} hasWaitedLongEnough: true. Now we will try to confirm or challenge. eligibleToConfirm: ${eligibleToConfirm}, eligibleToChallenge: ${eligibleToChallenge}`
+  //         )
+  //       }
 
-        // confirm that current vote is the winning highest ranked vote using robustQuery
-        const voteFromRobustQuery = await this.robustQueryBestVote(queueEntry)
-        if (voteFromRobustQuery == null) {
-          // we cannot confirm the best vote from network
-          this.mainLogger.error(`confirmOrChallenge: ${queueEntry.logID} We cannot get voteFromRobustQuery`)
-          nestedCountersInstance.countEvent('confirmOrChallenge', 'cannot get robust vote from network')
-          return
-        }
-        /* prettier ignore */if (this.mainLogger.debug || this.stateManager.consensusLog) this.mainLogger.debug(`confirmOrChallenge: ${queueEntry.logID} voteFromRobustQuery: ${utils.stringifyReduce(voteFromRobustQuery)}`)
-        let bestVoterFromRobustQuery: Shardus.NodeWithRank
-        for (let i = 0; i < queueEntry.executionGroup.length; i++) {
-          const node = queueEntry.executionGroup[i]
-          if (node.id === voteFromRobustQuery.node_id) {
-            bestVoterFromRobustQuery = node as Shardus.NodeWithRank
-            break
-          }
-        }
-        if (bestVoterFromRobustQuery == null) {
-          // we cannot confirm the best voter from network
-          this.mainLogger.error(
-            `confirmOrChallenge: ${queueEntry.logID} We cannot get bestVoter from robustQuery for tx ${queueEntry.logID}`
-          )
-          nestedCountersInstance.countEvent('confirmOrChallenge', 'cannot get robust voter from network')
-          return
-        }
-        queueEntry.robustQueryVoteCompleted = true
+  //       // confirm that current vote is the winning highest ranked vote using robustQuery
+  //       const voteFromRobustQuery = await this.robustQueryBestVote(queueEntry)
+  //       if (voteFromRobustQuery == null) {
+  //         // we cannot confirm the best vote from network
+  //         this.mainLogger.error(`confirmOrChallenge: ${queueEntry.logID} We cannot get voteFromRobustQuery`)
+  //         nestedCountersInstance.countEvent('confirmOrChallenge', 'cannot get robust vote from network')
+  //         return
+  //       }
+  //       /* prettier ignore */if (this.mainLogger.debug || this.stateManager.consensusLog) this.mainLogger.debug(`confirmOrChallenge: ${queueEntry.logID} voteFromRobustQuery: ${utils.stringifyReduce(voteFromRobustQuery)}`)
+  //       let bestVoterFromRobustQuery: Shardus.NodeWithRank
+  //       for (let i = 0; i < queueEntry.executionGroup.length; i++) {
+  //         const node = queueEntry.executionGroup[i]
+  //         if (node.id === voteFromRobustQuery.node_id) {
+  //           bestVoterFromRobustQuery = node as Shardus.NodeWithRank
+  //           break
+  //         }
+  //       }
+  //       if (bestVoterFromRobustQuery == null) {
+  //         // we cannot confirm the best voter from network
+  //         this.mainLogger.error(
+  //           `confirmOrChallenge: ${queueEntry.logID} We cannot get bestVoter from robustQuery for tx ${queueEntry.logID}`
+  //         )
+  //         nestedCountersInstance.countEvent('confirmOrChallenge', 'cannot get robust voter from network')
+  //         return
+  //       }
+  //       queueEntry.robustQueryVoteCompleted = true
 
-        // if vote from robust is better than our received vote, use it as final vote
-        const isRobustQueryVoteBetter = bestVoterFromRobustQuery.rank > queueEntry.receivedBestVoter.rank
-        let finalVote = queueEntry.receivedBestVote
-        let finalVoteHash = queueEntry.receivedBestVoteHash
-        if (isRobustQueryVoteBetter) {
-          nestedCountersInstance.countEvent('confirmOrChallenge', 'robust query vote is better')
-          finalVote = voteFromRobustQuery
-          finalVoteHash = this.calculateVoteHash(voteFromRobustQuery)
-          queueEntry.receivedBestVote = voteFromRobustQuery
-          queueEntry.receivedBestVoter = bestVoterFromRobustQuery
-          queueEntry.receivedBestVoteHash = finalVoteHash
-          if (this.stateManager.consensusLog) {
-            this.mainLogger.info(`confirmOrChallenge: ${queueEntry.logID} robust query vote is better`)
-          }
-        } else {
-          if (this.stateManager.consensusLog) {
-            this.mainLogger.info(
-              `confirmOrChallenge: ${
-                queueEntry.logID
-              } robust query vote is NOT better. ${utils.stringifyReduce(queueEntry.receivedBestVote)}`
-            )
-          }
-        }
-        const shouldChallenge = queueEntry.ourVoteHash != null && queueEntry.ourVoteHash !== finalVoteHash
+  //       // if vote from robust is better than our received vote, use it as final vote
+  //       const isRobustQueryVoteBetter = bestVoterFromRobustQuery.rank > queueEntry.receivedBestVoter.rank
+  //       let finalVote = queueEntry.receivedBestVote
+  //       let finalVoteHash = queueEntry.receivedBestVoteHash
+  //       if (isRobustQueryVoteBetter) {
+  //         nestedCountersInstance.countEvent('confirmOrChallenge', 'robust query vote is better')
+  //         finalVote = voteFromRobustQuery
+  //         finalVoteHash = this.calculateVoteHash(voteFromRobustQuery)
+  //         queueEntry.receivedBestVote = voteFromRobustQuery
+  //         queueEntry.receivedBestVoter = bestVoterFromRobustQuery
+  //         queueEntry.receivedBestVoteHash = finalVoteHash
+  //         if (this.stateManager.consensusLog) {
+  //           this.mainLogger.info(`confirmOrChallenge: ${queueEntry.logID} robust query vote is better`)
+  //         }
+  //       } else {
+  //         if (this.stateManager.consensusLog) {
+  //           this.mainLogger.info(
+  //             `confirmOrChallenge: ${
+  //               queueEntry.logID
+  //             } robust query vote is NOT better. ${utils.stringifyReduce(queueEntry.receivedBestVote)}`
+  //           )
+  //         }
+  //       }
+  //       const shouldChallenge = queueEntry.ourVoteHash != null && queueEntry.ourVoteHash !== finalVoteHash
 
-        if (this.stateManager.consensusLog)
-          this.mainLogger.debug(
-            `confirmOrChallenge: ${queueEntry.logID} isInExecutionSet: ${queueEntry.isInExecutionHome}, eligibleToConfirm: ${eligibleToConfirm}, shouldChallenge: ${shouldChallenge}`
-          )
-        if (this.produceBadChallenge || shouldChallenge) {
-          if (!shouldChallenge && logFlags.debug) {
-            this.mainLogger.debug(
-              `confirmOrChallenge: ${queueEntry.logID} I'm a bad node producing a bad challenge`
-            )
-          }
-          this.challengeVoteAndShare(queueEntry)
-          return
-        }
+  //       if (this.stateManager.consensusLog)
+  //         this.mainLogger.debug(
+  //           `confirmOrChallenge: ${queueEntry.logID} isInExecutionSet: ${queueEntry.isInExecutionHome}, eligibleToConfirm: ${eligibleToConfirm}, shouldChallenge: ${shouldChallenge}`
+  //         )
+  //       if (this.produceBadChallenge || shouldChallenge) {
+  //         if (!shouldChallenge && logFlags.debug) {
+  //           this.mainLogger.debug(
+  //             `confirmOrChallenge: ${queueEntry.logID} I'm a bad node producing a bad challenge`
+  //           )
+  //         }
+  //         this.challengeVoteAndShare(queueEntry)
+  //         return
+  //       }
 
-        if (eligibleToConfirm && queueEntry.ourVoteHash === finalVoteHash) {
-          // queueEntry.eligibleNodesToConfirm is sorted highest to lowest rank
-          const confirmNodeIds = Array.from(queueEntry.eligibleNodeIdsToConfirm).reverse()
-          const ourRankIndex = confirmNodeIds.indexOf(Self.id)
-          // let delayBeforeConfirm = ourRankIndex * 50 // 50ms
-          //
-          // if (delayBeforeConfirm > 500) delayBeforeConfirm = 500 // we don't want to wait too long
-          //
-          // if (delayBeforeConfirm > 0) {
-          //   await utils.sleep(delayBeforeConfirm)
-          //
-          //   // Compare our rank with received rank before sharing our confirmation
-          //   if (
-          //     queueEntry.receivedBestConfirmedNode &&
-          //     queueEntry.receivedBestConfirmedNode.rank < queueEntry.ourNodeRank
-          //   ) {
-          //     nestedCountersInstance.countEvent(
-          //       'confirmOrChallenge',
-          //       `isReceivedBetterConfirmation after ${delayBeforeConfirm}ms delay: true`
-          //     )
-          //     if (logFlags.debug)
-          //       this.mainLogger.debug(
-          //         `confirmOrChallenge: ${
-          //           queueEntry.logID
-          //         } received better confirmation before we share ours, receivedBestConfirmation: ${utils.stringifyReduce(
-          //           queueEntry.receivedBestConfirmation
-          //         )}`
-          //       )
-          //     queueEntry.completedConfirmedOrChallenge = true
-          //     return
-          //   }
-          //   nestedCountersInstance.countEvent(
-          //     'confirmOrChallenge',
-          //     `isReceivedBetterConfirmation after ${delayBeforeConfirm}ms delay: false`
-          //   )
-          // }
-          this.confirmVoteAndShare(queueEntry)
-        } else if (eligibleToConfirm === false) {
-          // we are not eligible to confirm
-          if (this.stateManager.consensusLog)
-            this.mainLogger.debug(
-              `confirmOrChallenge: ${queueEntry.logID} not eligible to confirm. set completedConfirmedOrChallenge to true`
-            )
-          queueEntry.completedConfirmedOrChallenge = true
-        }
-      } else {
-        nestedCountersInstance.countEvent('confirmOrChallenge', 'still early for confirm or challenge')
-        if (logFlags.debug)
-          this.mainLogger.debug(
-            `confirmOrChallenge: ${queueEntry.logID} not sending confirm or challenge yet because timeSinceLastVoteMessage is ${timeSinceLastVoteMessage} ms`
-          )
-      }
-    } catch (e) {
-      this.mainLogger.error(`confirmOrChallenge: ${queueEntry.logID} error: ${e.message}, ${e.stack}`)
-    } finally {
-      if (logFlags.profiling_verbose) this.profiler.scopedProfileSectionEnd('confirmOrChallenge')
-      this.profiler.profileSectionEnd('confirmOrChallenge')
-    }
-  }
+  //       if (eligibleToConfirm && queueEntry.ourVoteHash === finalVoteHash) {
+  //         // queueEntry.eligibleNodesToConfirm is sorted highest to lowest rank
+  //         const confirmNodeIds = Array.from(queueEntry.eligibleNodeIdsToConfirm).reverse()
+  //         const ourRankIndex = confirmNodeIds.indexOf(Self.id)
+  //         // let delayBeforeConfirm = ourRankIndex * 50 // 50ms
+  //         //
+  //         // if (delayBeforeConfirm > 500) delayBeforeConfirm = 500 // we don't want to wait too long
+  //         //
+  //         // if (delayBeforeConfirm > 0) {
+  //         //   await utils.sleep(delayBeforeConfirm)
+  //         //
+  //         //   // Compare our rank with received rank before sharing our confirmation
+  //         //   if (
+  //         //     queueEntry.receivedBestConfirmedNode &&
+  //         //     queueEntry.receivedBestConfirmedNode.rank < queueEntry.ourNodeRank
+  //         //   ) {
+  //         //     nestedCountersInstance.countEvent(
+  //         //       'confirmOrChallenge',
+  //         //       `isReceivedBetterConfirmation after ${delayBeforeConfirm}ms delay: true`
+  //         //     )
+  //         //     if (logFlags.debug)
+  //         //       this.mainLogger.debug(
+  //         //         `confirmOrChallenge: ${
+  //         //           queueEntry.logID
+  //         //         } received better confirmation before we share ours, receivedBestConfirmation: ${utils.stringifyReduce(
+  //         //           queueEntry.receivedBestConfirmation
+  //         //         )}`
+  //         //       )
+  //         //     queueEntry.completedConfirmedOrChallenge = true
+  //         //     return
+  //         //   }
+  //         //   nestedCountersInstance.countEvent(
+  //         //     'confirmOrChallenge',
+  //         //     `isReceivedBetterConfirmation after ${delayBeforeConfirm}ms delay: false`
+  //         //   )
+  //         // }
+  //         this.confirmVoteAndShare(queueEntry)
+  //       } else if (eligibleToConfirm === false) {
+  //         // we are not eligible to confirm
+  //         if (this.stateManager.consensusLog)
+  //           this.mainLogger.debug(
+  //             `confirmOrChallenge: ${queueEntry.logID} not eligible to confirm. set completedConfirmedOrChallenge to true`
+  //           )
+  //         queueEntry.completedConfirmedOrChallenge = true
+  //       }
+  //     } else {
+  //       nestedCountersInstance.countEvent('confirmOrChallenge', 'still early for confirm or challenge')
+  //       if (logFlags.debug)
+  //         this.mainLogger.debug(
+  //           `confirmOrChallenge: ${queueEntry.logID} not sending confirm or challenge yet because timeSinceLastVoteMessage is ${timeSinceLastVoteMessage} ms`
+  //         )
+  //     }
+  //   } catch (e) {
+  //     this.mainLogger.error(`confirmOrChallenge: ${queueEntry.logID} error: ${e.message}, ${e.stack}`)
+  //   } finally {
+  //     if (logFlags.profiling_verbose) this.profiler.scopedProfileSectionEnd('confirmOrChallenge')
+  //     this.profiler.profileSectionEnd('confirmOrChallenge')
+  //   }
+  // }
 
   sortByAccountId(first: Shardus.WrappedResponse, second: Shardus.WrappedResponse): Ordering {
     return utils.sortAscProp(first, second, 'accountId')
   }
 
-  async confirmVoteAndShare(queueEntry: QueueEntry): Promise<void> {
-    this.profiler.profileSectionStart('confirmVoteAndShare')
-    try {
-      /* prettier-ignore */
-      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote("shrd_confirmOrChallengeVote", `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `);
+  // DEPRECATED AFTER POQO
+  // async confirmVoteAndShare(queueEntry: QueueEntry): Promise<void> {
+  //   this.profiler.profileSectionStart('confirmVoteAndShare')
+  //   try {
+  //     /* prettier-ignore */
+  //     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote("shrd_confirmOrChallengeVote", `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `);
 
-      // podA: POQ3 create confirm message and share to tx group
-      const confirmMessage: ConfirmOrChallengeMessage = {
-        message: 'confirm',
-        nodeId: Self.id,
-        appliedVote: queueEntry.receivedBestVote,
-      }
-      const signedConfirmMessage = this.crypto.sign(confirmMessage)
-      if (this.stateManager.consensusLog) this.mainLogger.debug(`confirmVoteAndShare: ${queueEntry.logID}`)
+  //     // podA: POQ3 create confirm message and share to tx group
+  //     const confirmMessage: ConfirmOrChallengeMessage = {
+  //       message: 'confirm',
+  //       nodeId: Self.id,
+  //       appliedVote: queueEntry.receivedBestVote,
+  //     }
+  //     const signedConfirmMessage = this.crypto.sign(confirmMessage)
+  //     if (this.stateManager.consensusLog) this.mainLogger.debug(`confirmVoteAndShare: ${queueEntry.logID}`)
 
-      //Share message to tx group
-      const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-      Comms.sendGossip('spread_confirmOrChallenge', signedConfirmMessage, '', Self.id, gossipGroup, true, 10, queueEntry.acceptedTx.txId, `confirmVote_${NodeList.activeIdToPartition.get(signedConfirmMessage.appliedVote?.node_id)}`)
-      this.tryAppendMessage(queueEntry, signedConfirmMessage)
-      queueEntry.gossipedConfirmOrChallenge = true
-      queueEntry.completedConfirmedOrChallenge = true
-      if (this.stateManager.consensusLog)
-        this.mainLogger.debug(`completedConfirmOrChallenge: ${queueEntry.logID}`)
-    } catch (e) {
-      this.mainLogger.error(`confirmVoteAndShare: ${queueEntry.logID} error: ${e.message}`)
-    } finally {
-      this.profiler.profileSectionEnd('confirmVoteAndShare')
-    }
-  }
+  //     //Share message to tx group
+  //     const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+  //     Comms.sendGossip('spread_confirmOrChallenge', signedConfirmMessage, '', Self.id, gossipGroup, true, 10, queueEntry.acceptedTx.txId, `confirmVote_${NodeList.activeIdToPartition.get(signedConfirmMessage.appliedVote?.node_id)}`)
+  //     this.tryAppendMessage(queueEntry, signedConfirmMessage)
+  //     queueEntry.gossipedConfirmOrChallenge = true
+  //     queueEntry.completedConfirmedOrChallenge = true
+  //     if (this.stateManager.consensusLog)
+  //       this.mainLogger.debug(`completedConfirmOrChallenge: ${queueEntry.logID}`)
+  //   } catch (e) {
+  //     this.mainLogger.error(`confirmVoteAndShare: ${queueEntry.logID} error: ${e.message}`)
+  //   } finally {
+  //     this.profiler.profileSectionEnd('confirmVoteAndShare')
+  //   }
+  // }
 
-  async challengeVoteAndShare(queueEntry: QueueEntry): Promise<void> {
-    this.profiler.profileSectionStart('challengeVoteAndShare')
-    try {
-      /* prettier-ignore */
-      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote("shrd_confirmOrChallengeVote", `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `);
+  // async challengeVoteAndShare(queueEntry: QueueEntry): Promise<void> {
+  //   this.profiler.profileSectionStart('challengeVoteAndShare')
+  //   try {
+  //     /* prettier-ignore */
+  //     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote("shrd_confirmOrChallengeVote", `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `);
 
-      // Should check account integrity only when before states are different from best vote
-      let doStatesMatch = true
-      const voteBeforeStates = queueEntry.receivedBestVote.account_state_hash_before
-      const ourCollectedData = Object.values(queueEntry.collectedData)
-      if (voteBeforeStates.length !== ourCollectedData.length) {
-        doStatesMatch = false
-      }
-      for (let i = 0; i < voteBeforeStates.length; i++) {
-        if (ourCollectedData[i] == null) {
-          doStatesMatch = false
-          nestedCountersInstance.countEvent(
-            'confirmOrChallenge',
-            'tryChallengeVoteAndShare canceled because ourCollectedData is null'
-          )
-          break
-        }
-        if (voteBeforeStates[i] !== ourCollectedData[i].stateId) {
-          doStatesMatch = false
-          nestedCountersInstance.countEvent(
-            'confirmOrChallenge',
-            'tryChallengeVoteAndShare states do not match'
-          )
-          break
-        }
-      }
-      if (this.produceBadChallenge) doStatesMatch = false
-      let isAccountIntegrityOk = false
+  //     // Should check account integrity only when before states are different from best vote
+  //     let doStatesMatch = true
+  //     const voteBeforeStates = queueEntry.receivedBestVote.account_state_hash_before
+  //     const ourCollectedData = Object.values(queueEntry.collectedData)
+  //     if (voteBeforeStates.length !== ourCollectedData.length) {
+  //       doStatesMatch = false
+  //     }
+  //     for (let i = 0; i < voteBeforeStates.length; i++) {
+  //       if (ourCollectedData[i] == null) {
+  //         doStatesMatch = false
+  //         nestedCountersInstance.countEvent(
+  //           'confirmOrChallenge',
+  //           'tryChallengeVoteAndShare canceled because ourCollectedData is null'
+  //         )
+  //         break
+  //       }
+  //       if (voteBeforeStates[i] !== ourCollectedData[i].stateId) {
+  //         doStatesMatch = false
+  //         nestedCountersInstance.countEvent(
+  //           'confirmOrChallenge',
+  //           'tryChallengeVoteAndShare states do not match'
+  //         )
+  //         break
+  //       }
+  //     }
+  //     if (this.produceBadChallenge) doStatesMatch = false
+  //     let isAccountIntegrityOk = false
 
-      if (doStatesMatch) {
-        isAccountIntegrityOk = true
-      } else if (doStatesMatch === false && this.config.stateManager.integrityCheckBeforeChallenge === true) {
-        isAccountIntegrityOk = await this.checkAccountIntegrity(queueEntry)
-      } else {
-        isAccountIntegrityOk = true
-      }
+  //     if (doStatesMatch) {
+  //       isAccountIntegrityOk = true
+  //     } else if (doStatesMatch === false && this.config.stateManager.integrityCheckBeforeChallenge === true) {
+  //       isAccountIntegrityOk = await this.checkAccountIntegrity(queueEntry)
+  //     } else {
+  //       isAccountIntegrityOk = true
+  //     }
 
-      if (!isAccountIntegrityOk) {
-        nestedCountersInstance.countEvent(
-          'confirmOrChallenge',
-          'tryChallengeVoteAndShare account integrity not ok.'
-        )
-        if (logFlags.verbose)
-          this.mainLogger.debug(`challengeVoteAndShare: ${queueEntry.logID} account integrity is not ok`)
-        // we should not challenge or confirm if account integrity is not ok
-        queueEntry.completedConfirmedOrChallenge = true
-        return
-      }
+  //     if (!isAccountIntegrityOk) {
+  //       nestedCountersInstance.countEvent(
+  //         'confirmOrChallenge',
+  //         'tryChallengeVoteAndShare account integrity not ok.'
+  //       )
+  //       if (logFlags.verbose)
+  //         this.mainLogger.debug(`challengeVoteAndShare: ${queueEntry.logID} account integrity is not ok`)
+  //       // we should not challenge or confirm if account integrity is not ok
+  //       queueEntry.completedConfirmedOrChallenge = true
+  //       return
+  //     }
 
-      //podA: POQ4 create challenge message and share to tx group
-      const challengeMessage: ConfirmOrChallengeMessage = {
-        message: 'challenge',
-        nodeId: queueEntry.ourVote.node_id,
-        appliedVote: queueEntry.receivedBestVote,
-      }
-      const signedChallengeMessage = this.crypto.sign(challengeMessage)
-      if (logFlags.debug)
-        this.mainLogger.debug(
-          `challengeVoteAndShare: ${queueEntry.logID}  ${Utils.safeStringify(signedChallengeMessage)}}`
-        )
+  //     //podA: POQ4 create challenge message and share to tx group
+  //     const challengeMessage: ConfirmOrChallengeMessage = {
+  //       message: 'challenge',
+  //       nodeId: queueEntry.ourVote.node_id,
+  //       appliedVote: queueEntry.receivedBestVote,
+  //     }
+  //     const signedChallengeMessage = this.crypto.sign(challengeMessage)
+  //     if (logFlags.debug)
+  //       this.mainLogger.debug(
+  //         `challengeVoteAndShare: ${queueEntry.logID}  ${Utils.safeStringify(signedChallengeMessage)}}`
+  //       )
 
-      //Share message to tx group
-      const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-      Comms.sendGossip('spread_confirmOrChallenge', signedChallengeMessage, '', null, gossipGroup, true, 10, queueEntry.acceptedTx.txId, `challengeVote_${NodeList.activeIdToPartition.get(signedChallengeMessage.appliedVote?.node_id)}`)
-      this.tryAppendMessage(queueEntry, signedChallengeMessage)
-      queueEntry.gossipedConfirmOrChallenge = true
-      queueEntry.completedConfirmedOrChallenge = true
-    } catch (e) {
-      this.mainLogger.error(`challengeVoteAndShare: ${queueEntry.logID} error: ${e.message}`)
-    } finally {
-      this.profiler.profileSectionEnd('challengeVoteAndShare')
-    }
-  }
+  //     //Share message to tx group
+  //     const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+  //     Comms.sendGossip('spread_confirmOrChallenge', signedChallengeMessage, '', null, gossipGroup, true, 10, queueEntry.acceptedTx.txId, `challengeVote_${NodeList.activeIdToPartition.get(signedChallengeMessage.appliedVote?.node_id)}`)
+  //     this.tryAppendMessage(queueEntry, signedChallengeMessage)
+  //     queueEntry.gossipedConfirmOrChallenge = true
+  //     queueEntry.completedConfirmedOrChallenge = true
+  //   } catch (e) {
+  //     this.mainLogger.error(`challengeVoteAndShare: ${queueEntry.logID} error: ${e.message}`)
+  //   } finally {
+  //     this.profiler.profileSectionEnd('challengeVoteAndShare')
+  //   }
+  // }
 
   async checkAccountIntegrity(queueEntry: QueueEntry): Promise<boolean> {
     this.profiler.scopedProfileSectionStart('checkAccountIntegrity')
@@ -3501,31 +3508,24 @@ class TransactionConsenus {
     try {
       const ourNodeId = Self.id
       const isEligibleToShareVote = queueEntry.eligibleNodeIdsToVote.has(ourNodeId)
-      let isReceivedBetterVote = false
 
       // create our vote (for later use) even if we have received a better vote
-      let ourVote: AppliedVote = {
+      const proposal: Proposal = {
         txid: queueEntry.acceptedTx.txId,
-        transaction_result: queueEntry.preApplyTXResult.passed,
-        account_id: [],
-        account_state_hash_after: [],
-        account_state_hash_before: [],
-        node_id: ourNodeId,
-        cant_apply: queueEntry.preApplyTXResult.applied === false,
-        app_data_hash: '',
+        applied: queueEntry.preApplyTXResult.passed,
+        accountIDs: [],
+        afterStateHashes: [],
+        beforeStateHashes: [],
+        cant_preApply: queueEntry.preApplyTXResult.applied === false,
+        appReceiptDataHash: '',
       }
 
-      // BAD NODE SIMULATION
-      if (this.produceBadVote) {
-        ourVote.transaction_result = !ourVote.transaction_result
-      }
-
-      ourVote.app_data_hash = queueEntry?.preApplyTXResult?.applyResponse?.appReceiptDataHash || ''
+      proposal.appReceiptDataHash = queueEntry?.preApplyTXResult?.applyResponse?.appReceiptDataHash || ''
 
       if (queueEntry.debugFail_voteFlip === true) {
         /* prettier-ignore */ if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)
 
-        ourVote.transaction_result = !ourVote.transaction_result
+          proposal.applied = !proposal.applied
       }
 
       let wrappedStates = this.stateManager.useAccountWritesOnly ? {} : queueEntry.collectedData
@@ -3575,163 +3575,171 @@ class TransactionConsenus {
           wrappedState.stateId = updatedHash
 
           // populate accountIds
-          ourVote.account_id.push(wrappedState.accountId)
+          proposal.accountIDs.push(wrappedState.accountId)
           // popoulate after state hashes
-          ourVote.account_state_hash_after.push(wrappedState.stateId) // account hash for nonce 100
+          proposal.afterStateHashes.push(wrappedState.stateId) // account hash for nonce 100
           const wrappedResponse = queueEntry.collectedData[wrappedState.accountId]
           // populate before state hashes
-          if (wrappedResponse != null) ourVote.account_state_hash_before.push(wrappedResponse.stateId)
+          if (wrappedResponse != null) proposal.beforeStateHashes.push(wrappedResponse.stateId)
         }
       }
 
       let appliedVoteHash: AppliedVoteHash
       //let temp = ourVote.node_id
       // ourVote.node_id = '' //exclue this from hash
-      ourVote = this.crypto.sign(ourVote)
-      const voteHash = this.calculateVoteHash(ourVote)
+      // proposal = this.crypto.sign(proposal)
+      const voteHash = this.calculateVoteHash(proposal)
       //ourVote.node_id = temp
       appliedVoteHash = {
-        txid: ourVote.txid,
+        txid: proposal.txid,
         voteHash,
+        voteTime: Math.ceil((shardusGetTime() - queueEntry.acceptedTx.timestamp) / 1000),
       }
       queueEntry.ourVoteHash = voteHash
+
+      const ourVote: Vote = {
+        proposalHash: voteHash,
+      }
 
       if (logFlags.debug || this.stateManager.consensusLog)
         this.mainLogger.debug(
           `createAndShareVote ${queueEntry.logID} created ourVote: ${utils.stringifyReduce(
             ourVote
-          )},ourVoteHash: ${voteHash}, isEligibleToShareVote: ${isEligibleToShareVote}, isReceivedBetterVote: ${isReceivedBetterVote}`
+          )},ourVoteHash: ${voteHash}, isEligibleToShareVote: ${isEligibleToShareVote}`
         )
 
       //append our vote
       appliedVoteHash = this.crypto.sign(appliedVoteHash)
-      if (this.stateManager.transactionQueue.useNewPOQ === false)
-        this.tryAppendVoteHash(queueEntry, appliedVoteHash)
+      // if (this.stateManager.transactionQueue.useNewPOQ === false)
+      this.tryAppendVoteHash(queueEntry, appliedVoteHash)
 
       // save our vote to our queueEntry
+      this.crypto.sign(ourVote)
+      this.crypto.sign(proposal)
       queueEntry.ourVote = ourVote
+      queueEntry.ourProposal = proposal
       if (queueEntry.firstVoteReceivedTimestamp === 0) {
         queueEntry.firstVoteReceivedTimestamp = shardusGetTime()
       }
 
-      if (this.stateManager.transactionQueue.usePOQo) {
-        // Kick off POQo vote sending loop asynchronously in the background and return
-        // Can skip over the remaining part of the function because this loop will
-        // handle sending the vote to the intended receivers
-        if (logFlags.verbose) this.mainLogger.debug(`POQO: Sending vote for ${queueEntry.logID}`)
-        if (Math.random() < this.debugFailPOQo) {
-          nestedCountersInstance.countEvent('poqo', 'debug fail no vote')
-          return
-        }
-        this.poqoVoteSendLoop(queueEntry, appliedVoteHash)
+      // if (this.stateManager.transactionQueue.usePOQo) {
+      // Kick off POQo vote sending loop asynchronously in the background and return
+      // Can skip over the remaining part of the function because this loop will
+      // handle sending the vote to the intended receivers
+      if (logFlags.verbose) this.mainLogger.debug(`POQO: Sending vote for ${queueEntry.logID}`)
+      if (Math.random() < this.debugFailPOQo) {
+        nestedCountersInstance.countEvent('poqo', 'debug fail no vote')
         return
       }
+      this.poqoVoteSendLoop(queueEntry, appliedVoteHash)
+      return
+      // }
 
-      if (this.stateManager.transactionQueue.useNewPOQ) {
-        if (isEligibleToShareVote === false) {
-          nestedCountersInstance.countEvent(
-            'transactionConsensus',
-            'createAndShareVote isEligibleToShareVote:' + ' false'
-          )
-          return
-        }
-        const ourRankIndex = Array.from(queueEntry.eligibleNodeIdsToVote).indexOf(ourNodeId)
-        let delayBeforeVote = ourRankIndex * 10 // 10ms x rank index
+      // if (this.stateManager.transactionQueue.useNewPOQ) {
+      //   if (isEligibleToShareVote === false) {
+      //     nestedCountersInstance.countEvent(
+      //       'transactionConsensus',
+      //       'createAndShareVote isEligibleToShareVote:' + ' false'
+      //     )
+      //     return
+      //   }
+      //   const ourRankIndex = Array.from(queueEntry.eligibleNodeIdsToVote).indexOf(ourNodeId)
+      //   let delayBeforeVote = ourRankIndex * 10 // 10ms x rank index
 
-        if (delayBeforeVote > 500) {
-          delayBeforeVote = 500
-        }
+      //   if (delayBeforeVote > 500) {
+      //     delayBeforeVote = 500
+      //   }
 
-        nestedCountersInstance.countEvent(
-          'transactionConsensus',
-          `createAndShareVote delayBeforeSharingVote: ${delayBeforeVote} ms`
-        )
+      //   nestedCountersInstance.countEvent(
+      //     'transactionConsensus',
+      //     `createAndShareVote delayBeforeSharingVote: ${delayBeforeVote} ms`
+      //   )
 
-        if (delayBeforeVote > 0) {
-          await utils.sleep(delayBeforeVote)
+      //   if (delayBeforeVote > 0) {
+      //     await utils.sleep(delayBeforeVote)
 
-          // Compare our rank with received rank
-          if (queueEntry.receivedBestVoter && queueEntry.receivedBestVoter.rank > queueEntry.ourNodeRank) {
-            isReceivedBetterVote = true
-          }
+      //     // Compare our rank with received rank
+      //     if (queueEntry.receivedBestVoter && queueEntry.receivedBestVoter.rank > queueEntry.ourNodeRank) {
+      //       isReceivedBetterVote = true
+      //     }
 
-          if (isReceivedBetterVote) {
-            if (this.stateManager.consensusLog)
-              this.mainLogger.debug(`createAndShareVote received better vote`)
-            nestedCountersInstance.countEvent(
-              'transactionConsensus',
-              'createAndShareVote isReceivedBetterVote: true'
-            )
-            return
-          }
-        }
+      //     if (isReceivedBetterVote) {
+      //       if (this.stateManager.consensusLog)
+      //         this.mainLogger.debug(`createAndShareVote received better vote`)
+      //       nestedCountersInstance.countEvent(
+      //         'transactionConsensus',
+      //         'createAndShareVote isReceivedBetterVote: true'
+      //       )
+      //       return
+      //     }
+      //   }
 
-        // tryAppend before sharing
-        const appendWorked = this.tryAppendVote(queueEntry, ourVote)
-        if (appendWorked === false) {
-          nestedCountersInstance.countEvent('transactionConsensus', 'createAndShareVote appendFailed')
-        }
-      }
+      //   // tryAppend before sharing
+      //   const appendWorked = this.tryAppendVote(queueEntry, ourVote)
+      //   if (appendWorked === false) {
+      //     nestedCountersInstance.countEvent('transactionConsensus', 'createAndShareVote appendFailed')
+      //   }
+      // }
 
-      let gossipGroup = []
-      if (
-        this.stateManager.transactionQueue.executeInOneShard === true &&
-        this.stateManager.transactionQueue.useNewPOQ === false
-      ) {
-        //only share with the exection group
-        gossipGroup = queueEntry.executionGroup
-      } else {
-        //sharing with the entire transaction group actually..
-        gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-      }
+      // let gossipGroup = []
+      // if (
+      //   this.stateManager.transactionQueue.executeInOneShard === true &&
+      //   this.stateManager.transactionQueue.useNewPOQ === false
+      // ) {
+      //   //only share with the exection group
+      //   gossipGroup = queueEntry.executionGroup
+      // } else {
+      //   //sharing with the entire transaction group actually..
+      //   gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+      // }
 
-      if (gossipGroup.length >= 1) {
-        this.stateManager.debugNodeGroup(
-          queueEntry.acceptedTx.txId,
-          queueEntry.acceptedTx.timestamp,
-          `share tx vote to neighbors`,
-          gossipGroup
-        )
+      // if (gossipGroup.length >= 1) {
+      //   this.stateManager.debugNodeGroup(
+      //     queueEntry.acceptedTx.txId,
+      //     queueEntry.acceptedTx.timestamp,
+      //     `share tx vote to neighbors`,
+      //     gossipGroup
+      //   )
 
-        /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${gossipGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)}`)
-        /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${gossipGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)} `)
+      //   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${gossipGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)}`)
+      //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${gossipGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)} `)
 
-        // Filter nodes before we send tell()
-        const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
-          gossipGroup,
-          'createAndShareVote',
-          true,
-          true
-        )
-        if (filteredNodes.length === 0) {
-          /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try')
-          return null
-        }
-        const filteredConsensusGroup = filteredNodes
+      //   // Filter nodes before we send tell()
+      //   const filteredNodes = this.stateManager.filterValidNodesForInternalMessage(
+      //     gossipGroup,
+      //     'createAndShareVote',
+      //     true,
+      //     true
+      //   )
+      //   if (filteredNodes.length === 0) {
+      //     /* prettier-ignore */ if (logFlags.error) this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try')
+      //     return null
+      //   }
+      //   const filteredConsensusGroup = filteredNodes
 
-        if (this.stateManager.transactionQueue.useNewPOQ) {
-          // Gossip the vote to the entire consensus group
-          Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4, queueEntry.acceptedTx.txId, `${NodeList.activeIdToPartition.get(ourVote.node_id)}`)
-        } else {
-          this.profiler.profileSectionStart('createAndShareVote-tell')
-          // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.spreadAppliedVoteHashBinary) {
-            const request = appliedVoteHash as AppliedVoteHash
-            this.p2p.tellBinary<SpreadAppliedVoteHashReq>(
-              filteredConsensusGroup,
-              InternalRouteEnum.binary_spread_appliedVoteHash,
-              request,
-              serializeSpreadAppliedVoteHashReq,
-              {}
-            )
-          // } else {
-            // this.p2p.tell(filteredConsensusGroup, 'spread_appliedVoteHash', appliedVoteHash)
-          // }
+      //   if (this.stateManager.transactionQueue.useNewPOQ) {
+      //     // Gossip the vote to the entire consensus group
+      //     // Comms.sendGossip('gossip-applied-vote', ourVote, '', null, filteredConsensusGroup, true, 4, queueEntry.acceptedTx.txId, `${NodeList.activeIdToPartition.get(ourVote.node_id)}`)
+      //   } else {
+      //     this.profiler.profileSectionStart('createAndShareVote-tell')
+      //     // if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.spreadAppliedVoteHashBinary) {
+      //       const request = appliedVoteHash as AppliedVoteHash
+      //       this.p2p.tellBinary<SpreadAppliedVoteHashReq>(
+      //         filteredConsensusGroup,
+      //         InternalRouteEnum.binary_spread_appliedVoteHash,
+      //         request,
+      //         serializeSpreadAppliedVoteHashReq,
+      //         {}
+      //       )
+      //     // } else {
+      //       // this.p2p.tell(filteredConsensusGroup, 'spread_appliedVoteHash', appliedVoteHash)
+      //     // }
 
-          this.profiler.profileSectionEnd('createAndShareVote-tell')
-        }
-      } else {
-        nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote fail, no consensus group')
-      }
+      //     this.profiler.profileSectionEnd('createAndShareVote-tell')
+      //   }
+      // } else {
+      //   nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote fail, no consensus group')
+      // }
     } catch (e) {
       this.mainLogger.error(`createAndShareVote: error ${e.message}`)
     } finally {
@@ -3739,19 +3747,35 @@ class TransactionConsenus {
     }
   }
 
-  calculateVoteHash(vote: AppliedVote, removeSign = true): string {
-    if (this.stateManager.transactionQueue.usePOQo) {
+  calculateVoteHash(vote: AppliedVote | Proposal, removeSign = true): string {
+    if (this.stateManager.transactionQueue.usePOQo && (vote as Proposal).applied !== undefined) {
+      const proposal = vote as Proposal
+      const applyStatus = {
+        applied: proposal.applied,
+        cantApply: proposal.cant_preApply,
+      }
+      const accountsHash = this.crypto.hash(
+        this.crypto.hash(proposal.accountIDs) +
+        this.crypto.hash(proposal.beforeStateHashes) + 
+        this.crypto.hash(proposal.afterStateHashes)
+      )
+      const proposalHash = this.crypto.hash(
+        this.crypto.hash(applyStatus) + accountsHash + proposal.appReceiptDataHash
+      )
+      return proposalHash
+    } else if (this.stateManager.transactionQueue.usePOQo) {
+      const appliedVote = vote as AppliedVote
       const appliedHash = {
-        applied: vote.transaction_result,
-        cantApply: vote.cant_apply
+        applied: appliedVote.transaction_result,
+        cantApply: appliedVote.cant_apply
       }
       const stateHash = {
-        account_id: vote.account_id,
-        account_state_hash_after: vote.account_state_hash_after,
-        account_state_hash_before: vote.account_state_hash_before,
+        account_id: appliedVote.account_id,
+        account_state_hash_after: appliedVote.account_state_hash_after,
+        account_state_hash_before: appliedVote.account_state_hash_before,
       }
       const appDataHash = {
-        app_data_hash: vote.app_data_hash,
+        app_data_hash: appliedVote.app_data_hash,
       }
       const voteToHash = {
         appliedHash: this.crypto.hash(appliedHash),
@@ -3760,18 +3784,19 @@ class TransactionConsenus {
       }
       return this.crypto.hash(voteToHash)
     } else if (this.stateManager.transactionQueue.useNewPOQ) {
+      const appliedVote = vote as AppliedVote
       const voteToHash = {
-        txId: vote.txid,
-        transaction_result: vote.transaction_result,
-        account_id: vote.account_id,
-        account_state_hash_after: vote.account_state_hash_after,
-        account_state_hash_before: vote.account_state_hash_before,
-        cant_apply: vote.cant_apply,
-        app_data_hash: vote.app_data_hash,
+        txId: appliedVote.txid,
+        transaction_result: appliedVote.transaction_result,
+        account_id: appliedVote.account_id,
+        account_state_hash_after: appliedVote.account_state_hash_after,
+        account_state_hash_before: appliedVote.account_state_hash_before,
+        cant_apply: appliedVote.cant_apply,
       }
       return this.crypto.hash(voteToHash)
     } else {
-      const voteToHash = Object.assign({}, vote)
+      const appliedVote = vote as AppliedVote
+      const voteToHash = Object.assign({}, appliedVote)
       if (voteToHash.node_id != null) voteToHash.node_id = ''
       if (voteToHash.sign != null) delete voteToHash.sign
       return this.crypto.hash(voteToHash)
@@ -3783,223 +3808,224 @@ class TransactionConsenus {
     }
   }
 
-  /**
-   * tryAppendMessage
-   * if we have not seen this message yet search our list of votes and append it in
-   * the correct spot sorted by signer's id
-   * @param queueEntry
-   * @param confirmOrChallenge
-   */
-  tryAppendMessage(queueEntry: QueueEntry, confirmOrChallenge: ConfirmOrChallengeMessage): boolean {
-    if (queueEntry.acceptVoteMessage === true) { /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID} we are still accepting vote messages. Not ready`)
-      this.addPendingConfirmOrChallenge(queueEntry, confirmOrChallenge)
-      return false
-    }
-    if (queueEntry.robustQueryVoteCompleted === false) {
-      /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID} robustQueryVoteCompleted: ${queueEntry.robustQueryVoteCompleted}. Not ready`)
-      this.addPendingConfirmOrChallenge(queueEntry, confirmOrChallenge)
-      return false
-    }
-    if (queueEntry.acceptConfirmOrChallenge === false || queueEntry.appliedReceipt2 != null) {
-      this.mainLogger.debug(
-        `tryAppendMessage: ${
-          queueEntry.logID
-        } not accepting confirm or challenge. acceptConfirmOrChallenge: ${
-          queueEntry.acceptConfirmOrChallenge
-        }, appliedReceipt2: ${queueEntry.appliedReceipt2 == null}`
-      )
-      return false
-    }
+  // DEPRECATED AFTER POQO
+  // /**
+  //  * tryAppendMessage
+  //  * if we have not seen this message yet search our list of votes and append it in
+  //  * the correct spot sorted by signer's id
+  //  * @param queueEntry
+  //  * @param confirmOrChallenge
+  //  */
+  // tryAppendMessage(queueEntry: QueueEntry, confirmOrChallenge: ConfirmOrChallengeMessage): boolean {
+  //   if (queueEntry.acceptVoteMessage === true) { /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID} we are still accepting vote messages. Not ready`)
+  //     this.addPendingConfirmOrChallenge(queueEntry, confirmOrChallenge)
+  //     return false
+  //   }
+  //   if (queueEntry.robustQueryVoteCompleted === false) {
+  //     /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID} robustQueryVoteCompleted: ${queueEntry.robustQueryVoteCompleted}. Not ready`)
+  //     this.addPendingConfirmOrChallenge(queueEntry, confirmOrChallenge)
+  //     return false
+  //   }
+  //   if (queueEntry.acceptConfirmOrChallenge === false || queueEntry.appliedReceipt2 != null) {
+  //     this.mainLogger.debug(
+  //       `tryAppendMessage: ${
+  //         queueEntry.logID
+  //       } not accepting confirm or challenge. acceptConfirmOrChallenge: ${
+  //         queueEntry.acceptConfirmOrChallenge
+  //       }, appliedReceipt2: ${queueEntry.appliedReceipt2 == null}`
+  //     )
+  //     return false
+  //   }
 
-    /* prettier-ignore */
-    if (logFlags.playback) this.logger.playbackLogNote("tryAppendMessage", `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`);
-    /* prettier-ignore */
-    if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID}   ${Utils.safeStringify(confirmOrChallenge)} `);
-    // check if the node is in the execution group
-    const isMessageFromExecutionNode = queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)
+  //   /* prettier-ignore */
+  //   if (logFlags.playback) this.logger.playbackLogNote("tryAppendMessage", `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`);
+  //   /* prettier-ignore */
+  //   if (logFlags.debug) this.mainLogger.debug(`tryAppendMessage: ${queueEntry.logID}   ${Utils.safeStringify(confirmOrChallenge)} `);
+  //   // check if the node is in the execution group
+  //   const isMessageFromExecutionNode = queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)
 
-    if (!isMessageFromExecutionNode) {
-      this.mainLogger.error(`tryAppendMessage: ${queueEntry.logID} Message is not from an execution node.`)
-      return false
-    }
+  //   if (!isMessageFromExecutionNode) {
+  //     this.mainLogger.error(`tryAppendMessage: ${queueEntry.logID} Message is not from an execution node.`)
+  //     return false
+  //   }
 
-    if (confirmOrChallenge.message === 'confirm') {
-      const foundNode =
-        queueEntry.eligibleNodeIdsToConfirm.has(confirmOrChallenge.nodeId) &&
-        this.crypto.verify(
-          confirmOrChallenge as SignedObject,
-          queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId).publicKey
-        )
+  //   if (confirmOrChallenge.message === 'confirm') {
+  //     const foundNode =
+  //       queueEntry.eligibleNodeIdsToConfirm.has(confirmOrChallenge.nodeId) &&
+  //       this.crypto.verify(
+  //         confirmOrChallenge as SignedObject,
+  //         queueEntry.executionGroupMap.get(confirmOrChallenge.nodeId).publicKey
+  //       )
 
-      if (!foundNode) {
-        this.mainLogger.error(
-          `tryAppendMessage: ${queueEntry.logID} Message signature does not match with any eligible nodes that can confirm.`
-        )
-        return false
-      }
-    }
+  //     if (!foundNode) {
+  //       this.mainLogger.error(
+  //         `tryAppendMessage: ${queueEntry.logID} Message signature does not match with any eligible nodes that can confirm.`
+  //       )
+  //       return false
+  //     }
+  //   }
 
-    // todo: podA check if the message is valid
-    const isMessageValid = true
-    if (!isMessageValid) return false
+  //   // todo: podA check if the message is valid
+  //   const isMessageValid = true
+  //   if (!isMessageValid) return false
 
-    // Check if the previous phase is finalized and we have received best vote
-    if (queueEntry.receivedBestVote == null) {
-      this.mainLogger.error(
-        `tryAppendMessage: ${queueEntry.logID} confirm/challenge is too early. Not finalized best vote yet`
-      )
-      this.addPendingConfirmOrChallenge(queueEntry, confirmOrChallenge)
-      return false
-    }
+  //   // Check if the previous phase is finalized and we have received best vote
+  //   if (queueEntry.receivedBestVote == null) {
+  //     this.mainLogger.error(
+  //       `tryAppendMessage: ${queueEntry.logID} confirm/challenge is too early. Not finalized best vote yet`
+  //     )
+  //     this.addPendingConfirmOrChallenge(queueEntry, confirmOrChallenge)
+  //     return false
+  //   }
 
-    // verify that the vote part of the message is for the same vote that was finalized in the previous phase
-    if (this.calculateVoteHash(confirmOrChallenge.appliedVote) !== queueEntry.receivedBestVoteHash) {
-      this.mainLogger.error(
-        `tryAppendMessage: ${
-          queueEntry.logID
-        } confirmOrChallenge is not for the same vote that was finalized in the previous phase, queueEntry.receivedBestVote: ${Utils.safeStringify(
-          queueEntry.receivedBestVote
-        )}`
-      )
-      nestedCountersInstance.countEvent('confirmOrChallenge', 'not same vote as finalized vote')
-      return false
-    }
+  //   // verify that the vote part of the message is for the same vote that was finalized in the previous phase
+  //   if (this.calculateVoteHash(confirmOrChallenge.appliedVote) !== queueEntry.receivedBestVoteHash) {
+  //     this.mainLogger.error(
+  //       `tryAppendMessage: ${
+  //         queueEntry.logID
+  //       } confirmOrChallenge is not for the same vote that was finalized in the previous phase, queueEntry.receivedBestVote: ${Utils.safeStringify(
+  //         queueEntry.receivedBestVote
+  //       )}`
+  //     )
+  //     nestedCountersInstance.countEvent('confirmOrChallenge', 'not same vote as finalized vote')
+  //     return false
+  //   }
 
-    // record the timestamps
-    const now = shardusGetTime()
-    queueEntry.lastConfirmOrChallengeTimestamp = now
-    if (queueEntry.firstConfirmOrChallengeTimestamp === 0) {
-      queueEntry.firstConfirmOrChallengeTimestamp = now
+  //   // record the timestamps
+  //   const now = shardusGetTime()
+  //   queueEntry.lastConfirmOrChallengeTimestamp = now
+  //   if (queueEntry.firstConfirmOrChallengeTimestamp === 0) {
+  //     queueEntry.firstConfirmOrChallengeTimestamp = now
 
-      if (this.stateManager.consensusLog) {
-        this.mainLogger.info(`tryAppendMessage: ${queueEntry.logID} first confirm or challenge`)
-      }
-    }
+  //     if (this.stateManager.consensusLog) {
+  //       this.mainLogger.info(`tryAppendMessage: ${queueEntry.logID} first confirm or challenge`)
+  //     }
+  //   }
 
-    if (confirmOrChallenge.message === 'confirm') {
-      let isBetterThanCurrentConfirmation
-      let receivedConfirmedNode: Shardus.NodeWithRank
+  //   if (confirmOrChallenge.message === 'confirm') {
+  //     let isBetterThanCurrentConfirmation
+  //     let receivedConfirmedNode: Shardus.NodeWithRank
 
-      queueEntry.topConfirmations.add(confirmOrChallenge.nodeId)
-      if (this.stateManager.consensusLog) this.mainLogger.info(
-          `tryAppendMessage: ${queueEntry.logID} current topConfirmations: ${queueEntry.topConfirmations.size}`
-        )
+  //     queueEntry.topConfirmations.add(confirmOrChallenge.nodeId)
+  //     if (this.stateManager.consensusLog) this.mainLogger.info(
+  //         `tryAppendMessage: ${queueEntry.logID} current topConfirmations: ${queueEntry.topConfirmations.size}`
+  //       )
 
-      if (!queueEntry.receivedBestConfirmation) isBetterThanCurrentConfirmation = true
-      else if (queueEntry.receivedBestConfirmation.nodeId === confirmOrChallenge.nodeId)
-        isBetterThanCurrentConfirmation = false
-      else {
-        // Compare ranks
-        if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
-          receivedConfirmedNode = queueEntry.executionGroupMap.get(
-            confirmOrChallenge.nodeId
-          ) as Shardus.NodeWithRank
-        }
+  //     if (!queueEntry.receivedBestConfirmation) isBetterThanCurrentConfirmation = true
+  //     else if (queueEntry.receivedBestConfirmation.nodeId === confirmOrChallenge.nodeId)
+  //       isBetterThanCurrentConfirmation = false
+  //     else {
+  //       // Compare ranks
+  //       if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
+  //         receivedConfirmedNode = queueEntry.executionGroupMap.get(
+  //           confirmOrChallenge.nodeId
+  //         ) as Shardus.NodeWithRank
+  //       }
 
-        isBetterThanCurrentConfirmation =
-          receivedConfirmedNode.rank < queueEntry.receivedBestConfirmedNode.rank
-      }
+  //       isBetterThanCurrentConfirmation =
+  //         receivedConfirmedNode.rank < queueEntry.receivedBestConfirmedNode.rank
+  //     }
 
-      if (!isBetterThanCurrentConfirmation) {
-        if (logFlags.debug)
-          this.mainLogger.debug(
-            `tryAppendMessage: ${queueEntry.logID} confirmation is not better than current confirmation`
-          )
-        return false
-      }
+  //     if (!isBetterThanCurrentConfirmation) {
+  //       if (logFlags.debug)
+  //         this.mainLogger.debug(
+  //           `tryAppendMessage: ${queueEntry.logID} confirmation is not better than current confirmation`
+  //         )
+  //       return false
+  //     }
 
-      if (this.stateManager.consensusLog)
-        this.mainLogger.debug(
-          `tryAppendMessage: ${queueEntry.logID} better confirmation received and switching to it`
-        )
+  //     if (this.stateManager.consensusLog)
+  //       this.mainLogger.debug(
+  //         `tryAppendMessage: ${queueEntry.logID} better confirmation received and switching to it`
+  //       )
 
-      queueEntry.receivedBestConfirmation = confirmOrChallenge
+  //     queueEntry.receivedBestConfirmation = confirmOrChallenge
 
-      if (receivedConfirmedNode) {
-        queueEntry.receivedBestConfirmedNode = receivedConfirmedNode
-      } else {
-        if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
-          queueEntry.receivedBestConfirmedNode = queueEntry.executionGroupMap.get(
-            confirmOrChallenge.nodeId
-          ) as Shardus.NodeWithRank
-        }
-      }
+  //     if (receivedConfirmedNode) {
+  //       queueEntry.receivedBestConfirmedNode = receivedConfirmedNode
+  //     } else {
+  //       if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
+  //         queueEntry.receivedBestConfirmedNode = queueEntry.executionGroupMap.get(
+  //           confirmOrChallenge.nodeId
+  //         ) as Shardus.NodeWithRank
+  //       }
+  //     }
 
-      if (logFlags.debug)
-        this.mainLogger.debug(
-          `tryAppendMessage: ${
-            queueEntry.logID
-          } confirmation received and processed. queueEntry.receivedBestConfirmation: ${Utils.safeStringify(
-            queueEntry.receivedBestConfirmation
-          )}, receivedBestConfirmedNode: ${queueEntry.receivedBestConfirmedNode}`
-        )
-      return true
-    } else if (confirmOrChallenge.message === 'challenge') {
-      let isBetterThanCurrentChallenge = false
-      let receivedChallenger: Shardus.NodeWithRank
+  //     if (logFlags.debug)
+  //       this.mainLogger.debug(
+  //         `tryAppendMessage: ${
+  //           queueEntry.logID
+  //         } confirmation received and processed. queueEntry.receivedBestConfirmation: ${Utils.safeStringify(
+  //           queueEntry.receivedBestConfirmation
+  //         )}, receivedBestConfirmedNode: ${queueEntry.receivedBestConfirmedNode}`
+  //       )
+  //     return true
+  //   } else if (confirmOrChallenge.message === 'challenge') {
+  //     let isBetterThanCurrentChallenge = false
+  //     let receivedChallenger: Shardus.NodeWithRank
 
-      // add the challenge to the queueEntry if it is from a unique node
-      if (queueEntry.uniqueChallenges[confirmOrChallenge.sign.owner] == null) {
-        queueEntry.uniqueChallenges[confirmOrChallenge.sign.owner] = confirmOrChallenge
-        queueEntry.uniqueChallengesCount++
-        if (this.stateManager.consensusLog)
-          this.mainLogger.debug(
-            `tryAppendMessage: ${queueEntry.logID} unique challenge added. ${Utils.safeStringify(
-              queueEntry.uniqueChallenges
-            )}`
-          )
-      }
+  //     // add the challenge to the queueEntry if it is from a unique node
+  //     if (queueEntry.uniqueChallenges[confirmOrChallenge.sign.owner] == null) {
+  //       queueEntry.uniqueChallenges[confirmOrChallenge.sign.owner] = confirmOrChallenge
+  //       queueEntry.uniqueChallengesCount++
+  //       if (this.stateManager.consensusLog)
+  //         this.mainLogger.debug(
+  //           `tryAppendMessage: ${queueEntry.logID} unique challenge added. ${Utils.safeStringify(
+  //             queueEntry.uniqueChallenges
+  //           )}`
+  //         )
+  //     }
 
-      this.mainLogger.debug(
-        `tryAppendMessage: ${
-          queueEntry.logID
-        } challenge received and processing. queueEntry.receivedBestChallenge: ${Utils.safeStringify(
-          queueEntry.receivedBestChallenge
-        )}`
-      )
-      if (!queueEntry.receivedBestChallenge) isBetterThanCurrentChallenge = true
-      else if (queueEntry.receivedBestChallenge.nodeId === confirmOrChallenge.nodeId)
-        isBetterThanCurrentChallenge = false
-      else {
-        // Compare ranks
-        if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
-          receivedChallenger = queueEntry.executionGroupMap.get(
-            confirmOrChallenge.nodeId
-          ) as Shardus.NodeWithRank
-        }
-        isBetterThanCurrentChallenge = receivedChallenger.rank < queueEntry.receivedBestChallenger.rank
-      }
+  //     this.mainLogger.debug(
+  //       `tryAppendMessage: ${
+  //         queueEntry.logID
+  //       } challenge received and processing. queueEntry.receivedBestChallenge: ${Utils.safeStringify(
+  //         queueEntry.receivedBestChallenge
+  //       )}`
+  //     )
+  //     if (!queueEntry.receivedBestChallenge) isBetterThanCurrentChallenge = true
+  //     else if (queueEntry.receivedBestChallenge.nodeId === confirmOrChallenge.nodeId)
+  //       isBetterThanCurrentChallenge = false
+  //     else {
+  //       // Compare ranks
+  //       if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
+  //         receivedChallenger = queueEntry.executionGroupMap.get(
+  //           confirmOrChallenge.nodeId
+  //         ) as Shardus.NodeWithRank
+  //       }
+  //       isBetterThanCurrentChallenge = receivedChallenger.rank < queueEntry.receivedBestChallenger.rank
+  //     }
 
-      if (!isBetterThanCurrentChallenge) {
-        if (logFlags.debug)
-          this.mainLogger.debug(
-            `tryAppendMessage: ${queueEntry.logID} challenge is not better than current challenge`
-          )
-        return false
-      }
+  //     if (!isBetterThanCurrentChallenge) {
+  //       if (logFlags.debug)
+  //         this.mainLogger.debug(
+  //           `tryAppendMessage: ${queueEntry.logID} challenge is not better than current challenge`
+  //         )
+  //       return false
+  //     }
 
-      queueEntry.receivedBestChallenge = confirmOrChallenge
+  //     queueEntry.receivedBestChallenge = confirmOrChallenge
 
-      if (receivedChallenger) {
-        queueEntry.receivedBestChallenger = receivedChallenger
-      } else {
-        if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
-          queueEntry.receivedBestChallenger = queueEntry.executionGroupMap.get(
-            confirmOrChallenge.nodeId
-          ) as Shardus.NodeWithRank
-        }
-      }
-      if (logFlags.debug)
-        this.mainLogger.debug(
-          `tryAppendMessage: ${
-            queueEntry.logID
-          } challenge received and processed. queueEntry.receivedBestChallenge: ${Utils.safeStringify(
-            queueEntry.receivedBestChallenge
-          )}, receivedBestChallenger: ${queueEntry.receivedBestChallenger}`
-        )
-      return true
-    }
-  }
+  //     if (receivedChallenger) {
+  //       queueEntry.receivedBestChallenger = receivedChallenger
+  //     } else {
+  //       if (queueEntry.executionGroupMap.has(confirmOrChallenge.nodeId)) {
+  //         queueEntry.receivedBestChallenger = queueEntry.executionGroupMap.get(
+  //           confirmOrChallenge.nodeId
+  //         ) as Shardus.NodeWithRank
+  //       }
+  //     }
+  //     if (logFlags.debug)
+  //       this.mainLogger.debug(
+  //         `tryAppendMessage: ${
+  //           queueEntry.logID
+  //         } challenge received and processed. queueEntry.receivedBestChallenge: ${Utils.safeStringify(
+  //           queueEntry.receivedBestChallenge
+  //         )}, receivedBestChallenger: ${queueEntry.receivedBestChallenger}`
+  //       )
+  //     return true
+  //   }
+  // }
 
   /**
    * tryAppendVote
@@ -4009,139 +4035,166 @@ class TransactionConsenus {
    * @param vote
    */
   tryAppendVote(queueEntry: QueueEntry, vote: AppliedVote): boolean {
-    if (this.stateManager.transactionQueue.useNewPOQ === false) {
-      const numVotes = queueEntry.collectedVotes.length
+    // if (this.stateManager.transactionQueue.useNewPOQ === false) {
 
-      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `vote: ${utils.stringifyReduce(vote)}`)
-      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   vote: ${utils.stringifyReduce(vote)}`)
+    // Check if sender is in execution group
+    if (!queueEntry.executionGroup.some((node) => node.publicKey === vote.sign.owner)) {
+      nestedCountersInstance.countEvent('tryAppendVote', 'Vote sender not in execution group')
+      return false
+    }
 
-      // just add the vote if we dont have any yet
-      if (numVotes === 0) {
-        queueEntry.collectedVotes.push(vote)
-        queueEntry.newVotes = true
-        if (queueEntry.firstVoteReceivedTimestamp === 0) queueEntry.firstVoteReceivedTimestamp = shardusGetTime()
-        if (this.stateManager.consensusLog)
-          this.mainLogger.debug(`First vote appended for tx ${queueEntry.logID}}`)
-        return true
-      }
+    //  Check if the signature is valid
+    if (vote.sign == null) {
+      nestedCountersInstance.countEvent('tryAppendVote', 'Vote signature is null')
+      return false
+    }
+    if (!this.crypto.verify(vote as SignedObject, vote.sign.owner)) {
+      nestedCountersInstance.countEvent('tryAppendVote', 'Vote signature is invalid')
+      return false
+    }
 
-      //compare to existing votes.  keep going until we find that this vote is already in the list or our id is at the right spot to insert sorted
-      for (let i = 0; i < numVotes; i++) {
-        // eslint-disable-next-line security/detect-object-injection
-        const currentVote = queueEntry.collectedVotes[i]
+    const numVotes = queueEntry.collectedVotes.length
 
-        if (currentVote.sign.owner === vote.sign.owner) {
-          // already in our list so do nothing and return
-          return false
-        }
-      }
-      queueEntry.lastVoteReceivedTimestamp = shardusGetTime()
+    /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `vote: ${utils.stringifyReduce(vote)}`)
+    /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   vote: ${utils.stringifyReduce(vote)}`)
+
+    // just add the vote if we dont have any yet
+    if (numVotes === 0) {
       queueEntry.collectedVotes.push(vote)
       queueEntry.newVotes = true
-
+      if (queueEntry.firstVoteReceivedTimestamp === 0) queueEntry.firstVoteReceivedTimestamp = shardusGetTime()
+      if (this.stateManager.consensusLog)
+        this.mainLogger.debug(`First vote appended for tx ${queueEntry.logID}}`)
       return true
-    } else {
-      if (queueEntry.acceptVoteMessage === false || queueEntry.appliedReceipt2 != null) {
-        if (queueEntry.acceptVoteMessage === false)
-          /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f no_accept`)
-        if (queueEntry.appliedReceipt2 != null)
-          /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f applied2_not_null`)
-        return false
-      }
-      /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `vote: ${utils.stringifyReduce(vote)}`)
-      /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   vote: ${utils.stringifyReduce(vote)}`)
-
-      const isEligibleToVote =
-        queueEntry.eligibleNodeIdsToVote.has(vote.node_id) &&
-        this.crypto.verify(vote as SignedObject, queueEntry.executionGroupMap.get(vote.node_id).publicKey)
-
-      if (!isEligibleToVote) {
-        /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f not_eligible`)
-        if (logFlags.debug) {
-          this.mainLogger.debug(
-            `tryAppendVote: logId:${
-              queueEntry.logID
-            } received node is not part of eligible nodes to vote, vote: ${Utils.safeStringify(
-              vote
-            )}, eligibleNodesToVote: ${Utils.safeStringify(queueEntry.eligibleNodeIdsToVote)}`
-          )
-        }
-        return
-      }
-
-      // todo: podA check if the vote is valid
-      const isVoteValid = true
-      if (!isVoteValid) return
-
-      queueEntry.topVoters.add(vote.node_id)
-      // we will mark the last received vote timestamp
-      const now = shardusGetTime()
-      queueEntry.lastVoteReceivedTimestamp = now
-      if (queueEntry.firstVoteReceivedTimestamp === 0) queueEntry.firstVoteReceivedTimestamp = now
-
-      // Compare with existing vote. Skip we already have it or node rank is lower than ours
-      let isBetterThanCurrentVote
-      let receivedVoter: Shardus.NodeWithRank
-      if (!queueEntry.receivedBestVote){
-        isBetterThanCurrentVote = true
-        //do not compare the hash we still need to allow gossip to flow if the hash is the
-        //same but the vote is better.
-        //else if (queueEntry.receivedBestVoteHash === this.calculateVoteHash(vote)){
-      } else {
-        // Compare ranks
-        if (queueEntry.executionGroupMap.has(vote.node_id)) {
-          receivedVoter = queueEntry.executionGroupMap.get(vote.node_id) as Shardus.NodeWithRank
-        }
-        isBetterThanCurrentVote = receivedVoter.rank > queueEntry.receivedBestVoter.rank
-        /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV ${receivedVoter.rank} > ${queueEntry.receivedBestVoter.rank}`)
-        /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV ${NodeList.activeIdToPartition.get(receivedVoter.id)} : ${NodeList.activeIdToPartition.get(queueEntry.receivedBestVoter.id)}`)
-      }
-
-      if (!isBetterThanCurrentVote) {
-        if (logFlags.debug || this.stateManager.consensusLog) {
-          this.mainLogger.debug(
-            `tryAppendVote: ${queueEntry.logID} received vote is NOT better than current vote. lastReceivedVoteTimestamp: ${queueEntry.lastVoteReceivedTimestamp}`
-          )
-        }
-        if (receivedVoter) {
-          /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter ${NodeList.activeIdToPartition.get(receivedVoter.id)}`)
-        } else {
-          /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter`)
-        }
-        return false
-      }
-
-      queueEntry.receivedBestVote = vote
-      queueEntry.receivedBestVoteHash = this.calculateVoteHash(vote)
-      queueEntry.newVotes = true
-      if (logFlags.debug || this.stateManager.consensusLog) {
-        this.mainLogger.debug(
-          `tryAppendVote: ${queueEntry.logID} received vote is better than current vote. lastReceivedVoteTimestamp: ${queueEntry.lastVoteReceivedTimestamp}`
-        )
-      }
-      if (receivedVoter) {
-        queueEntry.receivedBestVoter = receivedVoter
-        /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:t receivedVoter ${NodeList.activeIdToPartition.get(receivedVoter.id)}`)
-        return true
-      } else {
-        if (queueEntry.executionGroupMap.has(vote.node_id)) {
-          queueEntry.receivedBestVoter = queueEntry.executionGroupMap.get(
-            vote.node_id
-          ) as Shardus.NodeWithRank
-          /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:t receivedVoter2 ${NodeList.activeIdToPartition.get(queueEntry.receivedBestVoter.id)}`)
-          return true
-        }
-        /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f no_receivedVoter`)
-        return false
-      }
-      // No need to forward the gossip here as it's being done in the gossip handler
     }
+
+    //compare to existing votes.  keep going until we find that this vote is already in the list or our id is at the right spot to insert sorted
+    for (let i = 0; i < numVotes; i++) {
+      // eslint-disable-next-line security/detect-object-injection
+      const currentVote = queueEntry.collectedVotes[i]
+
+      if (currentVote.sign.owner === vote.sign.owner) {
+        // already in our list so do nothing and return
+        return false
+      }
+    }
+    queueEntry.lastVoteReceivedTimestamp = shardusGetTime()
+    queueEntry.collectedVotes.push(vote)
+    queueEntry.newVotes = true
+
+    return true
+    // } else {
+    //   if (queueEntry.acceptVoteMessage === false || queueEntry.appliedReceipt2 != null) {
+    //     if (queueEntry.acceptVoteMessage === false)
+    //       /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f no_accept`)
+    //     if (queueEntry.appliedReceipt2 != null)
+    //       /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f applied2_not_null`)
+    //     return false
+    //   }
+    //   /* prettier-ignore */ if (logFlags.playback) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `vote: ${utils.stringifyReduce(vote)}`)
+    //   /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   vote: ${utils.stringifyReduce(vote)}`)
+
+    //   const isEligibleToVote =
+    //     queueEntry.eligibleNodeIdsToVote.has(vote.node_id) &&
+    //     this.crypto.verify(vote as SignedObject, queueEntry.executionGroupMap.get(vote.node_id).publicKey)
+
+    //   if (!isEligibleToVote) {
+    //     /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f not_eligible`)
+    //     if (logFlags.debug) {
+    //       this.mainLogger.debug(
+    //         `tryAppendVote: logId:${
+    //           queueEntry.logID
+    //         } received node is not part of eligible nodes to vote, vote: ${Utils.safeStringify(
+    //           vote
+    //         )}, eligibleNodesToVote: ${Utils.safeStringify(queueEntry.eligibleNodeIdsToVote)}`
+    //       )
+    //     }
+    //     return
+    //   }
+
+    //   // todo: podA check if the vote is valid
+    //   const isVoteValid = true
+    //   if (!isVoteValid) return
+
+    //   queueEntry.topVoters.add(vote.node_id)
+    //   // we will mark the last received vote timestamp
+    //   const now = shardusGetTime()
+    //   queueEntry.lastVoteReceivedTimestamp = now
+    //   if (queueEntry.firstVoteReceivedTimestamp === 0) queueEntry.firstVoteReceivedTimestamp = now
+
+    //   // Compare with existing vote. Skip we already have it or node rank is lower than ours
+    //   let isBetterThanCurrentVote
+    //   let receivedVoter: Shardus.NodeWithRank
+    //   if (!queueEntry.receivedBestVote){
+    //     isBetterThanCurrentVote = true
+    //     //do not compare the hash we still need to allow gossip to flow if the hash is the
+    //     //same but the vote is better.
+    //     //else if (queueEntry.receivedBestVoteHash === this.calculateVoteHash(vote)){
+    //   } else {
+    //     // Compare ranks
+    //     if (queueEntry.executionGroupMap.has(vote.node_id)) {
+    //       receivedVoter = queueEntry.executionGroupMap.get(vote.node_id) as Shardus.NodeWithRank
+    //     }
+    //     isBetterThanCurrentVote = receivedVoter.rank > queueEntry.receivedBestVoter.rank
+    //     /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV ${receivedVoter.rank} > ${queueEntry.receivedBestVoter.rank}`)
+    //     /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV ${NodeList.activeIdToPartition.get(receivedVoter.id)} : ${NodeList.activeIdToPartition.get(queueEntry.receivedBestVoter.id)}`)
+    //   }
+
+    //   if (!isBetterThanCurrentVote) {
+    //     if (logFlags.debug || this.stateManager.consensusLog) {
+    //       this.mainLogger.debug(
+    //         `tryAppendVote: ${queueEntry.logID} received vote is NOT better than current vote. lastReceivedVoteTimestamp: ${queueEntry.lastVoteReceivedTimestamp}`
+    //       )
+    //     }
+    //     if (receivedVoter) {
+    //       /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter ${NodeList.activeIdToPartition.get(receivedVoter.id)}`)
+    //     } else {
+    //       /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f worser_voter`)
+    //     }
+    //     return false
+    //   }
+
+    //   queueEntry.receivedBestVote = vote
+    //   queueEntry.receivedBestVoteHash = this.calculateVoteHash(vote)
+    //   queueEntry.newVotes = true
+    //   if (logFlags.debug || this.stateManager.consensusLog) {
+    //     this.mainLogger.debug(
+    //       `tryAppendVote: ${queueEntry.logID} received vote is better than current vote. lastReceivedVoteTimestamp: ${queueEntry.lastVoteReceivedTimestamp}`
+    //     )
+    //   }
+    //   if (receivedVoter) {
+    //     queueEntry.receivedBestVoter = receivedVoter
+    //     /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:t receivedVoter ${NodeList.activeIdToPartition.get(receivedVoter.id)}`)
+    //     return true
+    //   } else {
+    //     if (queueEntry.executionGroupMap.has(vote.node_id)) {
+    //       queueEntry.receivedBestVoter = queueEntry.executionGroupMap.get(
+    //         vote.node_id
+    //       ) as Shardus.NodeWithRank
+    //       /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:t receivedVoter2 ${NodeList.activeIdToPartition.get(queueEntry.receivedBestVoter.id)}`)
+    //       return true
+    //     }
+    //     /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:f no_receivedVoter`)
+    //     return false
+    //   }
+    //   // No need to forward the gossip here as it's being done in the gossip handler
+    // }
   }
 
   tryAppendVoteHash(queueEntry: QueueEntry, voteHash: AppliedVoteHash): boolean {
     // Check if sender is in execution group
     if (!queueEntry.executionGroup.some((node) => node.publicKey === voteHash.sign.owner)) {
       nestedCountersInstance.countEvent('poqo', 'Vote sender not in execution group')
+      return false
+    }
+
+    //  Check if the signature is valid
+    if (voteHash.sign == null) {
+      nestedCountersInstance.countEvent('poqo', 'Vote signature is null')
+      return false
+    }
+    if (!this.crypto.verify(voteHash as SignedObject, voteHash.sign.owner)) {
+      nestedCountersInstance.countEvent('poqo', 'Vote signature is invalid')
       return false
     }
 
@@ -4164,8 +4217,16 @@ class TransactionConsenus {
       const currentVote = queueEntry.collectedVoteHashes[i]
 
       if (currentVote.sign.owner === voteHash.sign.owner) {
-        // already in our list so do nothing and return
-        return false
+        if (currentVote.voteTime < voteHash.voteTime) {
+          // Replace old vote with new vote
+          queueEntry.collectedVoteHashes[i] = voteHash
+          queueEntry.newVotes = true
+          queueEntry.lastVoteReceivedTimestamp = shardusGetTime()
+          return true
+        } else {
+          // already in our list so do nothing and return
+          return false
+        }
       }
     }
 

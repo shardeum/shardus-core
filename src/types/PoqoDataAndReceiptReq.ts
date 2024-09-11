@@ -2,18 +2,14 @@ import { WrappedResponse } from '../shardus/shardus-types'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
 import { Utils as StringUtils } from '@shardus/types'
-import {
-  AppliedReceipt2Serializable,
-  deserializeAppliedReceipt2,
-  serializeAppliedReceipt2,
-} from './AppliedReceipt2'
+import { deserializeSignedReceipt, serializeSignedReceipt, SignedReceiptSerializable } from './SignedReceipt'
 
 export type PoqoDataAndReceiptReq = {
   finalState: {
     txid: string
     stateList: WrappedResponse[]
   }
-  receipt: AppliedReceipt2Serializable
+  receipt: SignedReceiptSerializable
   txGroupCycle: number
 }
 
@@ -31,7 +27,7 @@ export function serializePoqoDataAndReceiptReq(
   stream.writeString(inp.finalState.txid)
   stream.writeString(StringUtils.safeStringify(inp.finalState.stateList))
   stream.writeUInt32(inp.txGroupCycle)
-  serializeAppliedReceipt2(stream, inp.receipt)
+  serializeSignedReceipt(stream, inp.receipt)
 }
 
 export function deserializePoqoDataAndReceiptResp(stream: VectorBufferStream): PoqoDataAndReceiptReq {
@@ -42,14 +38,14 @@ export function deserializePoqoDataAndReceiptResp(stream: VectorBufferStream): P
   const txid = stream.readString()
   const stateList = StringUtils.safeJsonParse(stream.readString())
   const txGroupCycle = stream.readUInt32()
-  const appliedReceipt2 = deserializeAppliedReceipt2(stream)
+  const signedReceipt = deserializeSignedReceipt(stream)
 
   return {
     finalState: {
       txid: txid,
       stateList: stateList,
     },
-    receipt: appliedReceipt2,
+    receipt: signedReceipt,
     txGroupCycle: txGroupCycle,
   }
 }

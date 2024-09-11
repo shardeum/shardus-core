@@ -562,7 +562,7 @@ export async function getActiveNodesFromArchiver(
   archiver: ActiveNode
 ): Promise<Result<P2P.P2PTypes.SignedObject<SeedNodesList>, Error>> {
   const nodeInfo = getPublicNodeInfo()
-  return await postToArchiver<unknown, P2P.P2PTypes.SignedObject<SeedNodesList>>(
+  return postToArchiver<unknown, P2P.P2PTypes.SignedObject<SeedNodesList>>(
     archiver,
     'nodelist',
     Context.crypto.sign({
@@ -603,10 +603,10 @@ function isNodeNearRotatingOut(
 }
 
 /**
- * Returns true if a node was recently rotate in or 
+ * Returns true if a node was recently rotate in or
  * will be rotated out soon
- * @param nodeId 
- * @returns 
+ * @param nodeId
+ * @returns
  */
 export function isNodeInRotationBounds(nodeId: string): boolean {
   const { idx, total } = NodeList.getAgeIndexForNodeId(nodeId)
