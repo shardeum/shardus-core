@@ -7530,6 +7530,7 @@ class TransactionQueue {
     const beforeAccountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
 
     if (globalModification) {
+      signedReceipt = signedReceipt as P2PTypes.GlobalAccountsTypes.GlobalTxReceipt
       if (signedReceipt.tx && signedReceipt.tx.addressHash != '' && !beforeAccountsToAdd[signedReceipt.tx.address]) {
         console.log(queueEntry.collectedData[signedReceipt.tx.address].stateId, signedReceipt.tx.addressHash)
         if (queueEntry.collectedData[signedReceipt.tx.address].stateId === signedReceipt.tx.addressHash) {
@@ -7570,8 +7571,10 @@ class TransactionQueue {
 
       // prepare before state accounts
       for (const accountId of fileredBeforeStateToSend) {
+        signedReceipt = signedReceipt as SignedReceipt
         // check if our beforeState account hash is the same as the vote in the receipt2
         const index = signedReceipt.proposal.accountIDs.indexOf(accountId)
+        if (index === -1) continue
         const account = queueEntry.collectedData[accountId]
         if (account == null) {
           badBeforeStateAccounts.push(accountId)
@@ -7610,11 +7613,16 @@ class TransactionQueue {
     let isAccountsMatchWithReceipt2 = true
     const accountWrites = queueEntry.preApplyTXResult?.applyResponse?.accountWrites
 
-    if (accountWrites != null && accountWrites.length === signedReceipt.proposal.accountIDs.length) {
+    if (globalModification) {
+      if (accountWrites === null || accountWrites.length === 0) {
+        console.log('No account update in global Modification tx', txId, timestamp)
+      }
+    } else if (accountWrites != null && accountWrites.length === (signedReceipt as SignedReceipt).proposal.accountIDs.length) {
+      signedReceipt = signedReceipt as SignedReceipt
       for (const account of accountWrites) {
         const indexInVote = signedReceipt.proposal.accountIDs.indexOf(account.accountId)
         if (signedReceipt.proposal.afterStateHashes[indexInVote] !== account.data.stateId) {
-          // console.log('account mismatch', account.accountId, receipt2.appliedVote.account_state_hash_after[indexInVote], account.data.stateId)
+          // console.log('Found afterStateHash mismatch', account.accountId, receipt2.proposal.afterStateHashes[indexInVote], account.data.stateId)
           isAccountsMatchWithReceipt2 = false
           break
         }
@@ -7628,6 +7636,7 @@ class TransactionQueue {
     if (isAccountsMatchWithReceipt2) {
       finalAccounts = accountWrites
     } else {
+      signedReceipt = signedReceipt as SignedReceipt
       // request the final accounts and appReceiptData
       let success = false
       let count = 0
@@ -7679,7 +7688,7 @@ class TransactionQueue {
         txId: queueEntry.acceptedTx.txId,
         timestamp: queueEntry.acceptedTx.timestamp,
       },
-      signedReceipt: signedReceipt ?? {} as SignedReceipt,
+      signedReceipt,
       appReceiptData,
       beforeStates: [...Object.values(beforeAccountsToAdd)],
       afterStates: [...Object.values(accountsToAdd)],
@@ -7928,7 +7937,7 @@ class TransactionQueue {
   }
 
   resetReceiptsToForward(): void {
-    const MAX_RECEIPT_AGE_MS = 25000 // 25s
+    const MAX_RECEIPT_AGE_MS = 15000 // 15s
     const now = shardusGetTime()
     // Clear receipts that are older than MAX_RECEIPT_AGE_MS
     for (const [key] of this.forwardedReceiptsByTimestamp) {
