@@ -299,11 +299,10 @@ export function updateRecord(
   if (record.mode === 'shutdown') {
     Nodelist.activeByIdOrder.forEach((node) => {
 
-      for (let key in shutdownHandlers) {
-        const handler = shutdownHandlers.get(key)
+      for (let [key, handler] of shutdownHandlers) {
         try {
           const txAddData = handler(node, record)
-          if (txAddData == null) {
+          if (txAddData?.txData == null) {
             continue
           }
           const hash = crypto.hash(txAddData.txData)
