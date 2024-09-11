@@ -36,6 +36,7 @@ import * as CycleChain from '../p2p/CycleChain'
 import * as CycleCreator from '../p2p/CycleCreator'
 import { netConfig } from '../p2p/CycleCreator'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
+import * as ServiceQueue from '../p2p/ServiceQueue'
 import { scheduleLostReport, removeNodeWithCertificiate } from '../p2p/Lost'
 import { activeIdToPartition, activeByIdOrder, getAgeIndexForNodeId, nodes } from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
@@ -43,16 +44,21 @@ import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
 import * as ShardusTypes from '../shardus/shardus-types'
-import { AppObjEnum, DevSecurityLevel, WrappedData } from "../shardus/shardus-types";
+import { AppObjEnum, DevSecurityLevel, OpaqueTransaction, WrappedData } from "../shardus/shardus-types";
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
-import { CachedAppData, NonceQueueItem, QueueCountsResult } from "../state-manager/state-manager-types";
+import { CachedAppData, NonceQueueItem, QueueCountsResult } from '../state-manager/state-manager-types'
 import { DebugComplete } from '../state-manager/TransactionQueue'
 import Statistics from '../statistics'
 import Storage from '../storage'
 import { initAjvSchemas } from '../types/ajv/Helpers'
 import * as utils from '../utils'
-import { groupResolvePromises, inRangeOfCurrentTime, isValidShardusAddress, logNode } from '../utils'
+import {
+  fastIsPicked,
+  groupResolvePromises,
+  inRangeOfCurrentTime,
+  isValidShardusAddress,
+} from '../utils'
 import { getSocketReport } from '../utils/debugUtils'
 import MemoryReporting from '../utils/memoryReporting'
 import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
@@ -81,7 +87,7 @@ import {
   serializeSignAppDataResp,
 } from '../types/SignAppDataResp'
 import { Utils } from '@shardus/types'
-import { isNodeInRotationBounds } from '../p2p/Utils'
+import { getOurNodeIndex, isNodeInRotationBounds } from '../p2p/Utils'
 import ShardFunctions from '../state-manager/shardFunctions'
 import SocketIO from 'socket.io'
 import { nodeListFromStates, queueFinishedSyncingRequest } from '../p2p/Join'
@@ -134,6 +140,8 @@ interface Shardus {
   registerExternalPut: RouteHandlerRegister
   registerExternalDelete: RouteHandlerRegister
   registerExternalPatch: RouteHandlerRegister
+  registerBeforeAddVerifier: (type: string, verifier: (tx: OpaqueTransaction) => Promise<boolean>) => void
+  registerApplyVerifier: (type: string, verifier: (tx: OpaqueTransaction) => Promise<boolean>) => void
   _listeners: any
   appliedConfigChanges: Set<string>
 
@@ -250,6 +258,9 @@ class Shardus extends EventEmitter {
       this.network.registerExternalDelete(route, authHandler, handler)
     this.registerExternalPatch = (route, authHandler, handler) =>
       this.network.registerExternalPatch(route, authHandler, handler)
+
+    this.registerBeforeAddVerifier = (type, verifier) => ServiceQueue.registerBeforeAddVerifier(type, verifier)
+    this.registerApplyVerifier = (type, verifier) => ServiceQueue.registerApplyVerifier(type, verifier)
 
     this.exitHandler.addSigListeners()
     this.exitHandler.registerSync('reporter', () => {
@@ -756,6 +767,7 @@ class Shardus extends EventEmitter {
         apoptosizeSelf(`restore-failed: ${err?.message}`)
         return
       }
+
       // After restoring state data, set syncing flags to true and go active
       await this.stateManager.startCatchUpQueue()
       console.log('restore - startCatchUpQueue')
@@ -875,6 +887,7 @@ class Shardus extends EventEmitter {
       }
     )
     Self.emitter.on('node-activated', ({ ...params }) => {
+      if (networkMode === 'shutdown') return
       try {
         this.app.eventNotify?.({ type: 'node-activated', ...params })
       } catch (e) {
@@ -882,6 +895,7 @@ class Shardus extends EventEmitter {
       }
     })
     Self.emitter.on('node-deactivated', ({ ...params }) => {
+      if (networkMode === 'shutdown') return
       try {
         this.app.eventNotify?.({ type: 'node-deactivated', ...params })
       } catch (e) {
@@ -930,6 +944,13 @@ class Shardus extends EventEmitter {
         }
       } catch (e) {
         this.mainLogger.error(`Error: while processing node-sync-timeout event stack: ${e.stack}`)
+      }
+    })
+    Self.emitter.on('try-network-transaction', ({ ...params }) => {
+      try {
+        this.app.eventNotify?.({ type: 'try-network-transaction', ...params })
+      } catch (e) {
+        this.mainLogger.error(`Error: while processing try-network-transaction event stack: ${e.stack}`)
       }
     })
 
@@ -1533,7 +1554,7 @@ class Shardus extends EventEmitter {
           this.stateManager.transactionQueue.addTransactionToNonceQueue(nonceQueueEntry)
 
         if(Context.config.stateManager.forwardToLuckyNodesNonceQueue){
-          // if we ever support cancellation by using replacment for a TX that will change how we 
+          // if we ever support cancellation by using replacment for a TX that will change how we
           // need to handle this run-away protection.  may need to re-evaluate later
           if(nonceQueueAddResult?.alreadyAdded === true && Context.config.stateManager.forwardToLuckyNodesNonceQueueLimitFix){
             nestedCountersInstance.countEvent('statistics', `forwardTxToConsensusGroup: nonce queue skipped. we already have it`)
@@ -1673,7 +1694,7 @@ class Shardus extends EventEmitter {
         if (result && result.success === true) {
           /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455106 ${shardusGetTime()} tx:${txId} Note over ${activeIdToPartition.get(Self.id)}: lucky_forward_success_${context} ${activeIdToPartition.get(validator.id)}`)
           /* prettier-ignore */ if (logFlags.debug || logFlags.rotation) this.mainLogger.debug( `Got successful response upon forwarding injected tx: ${validator.id}. ${message} ${Utils.safeStringify(tx)}` )
-          
+
           if(result.reason === 'Transaction is already in pending nonce queue.'){
             stats.ok_inQ++
           }
@@ -1683,7 +1704,7 @@ class Shardus extends EventEmitter {
           if(result.reason === `Transaction added to pending nonce queue.`){
             stats.ok_addQ++
           }
-            
+
           nestedCountersInstance.countEvent('statistics', `forward to lucky node success ${message} ${Utils.safeStringify(stats)}`)
           if(Context.config.stateManager.forwardToLuckyMulti){
             successCount++
@@ -1788,6 +1809,19 @@ class Shardus extends EventEmitter {
     return latestCycle ? latestCycle.active : 0
   }
 
+  fastIsPicked(numberToPick: number) {
+    let numActiveNodes = NodeList.activeByIdOrder.length
+
+    if (numActiveNodes < config.p2p.scaleGroupLimit) {
+      return true
+    }
+    let offset = CycleChain.newest.counter //todo something more random
+    const ourIndex = getOurNodeIndex()
+    if (ourIndex == null) return false
+
+    return fastIsPicked(ourIndex, numActiveNodes, numberToPick, offset)
+  }
+
   /**
    *
    * @returns {ShardusTypes.Cycle['mode']} returns the current network mode
@@ -1834,6 +1868,8 @@ class Shardus extends EventEmitter {
   setDebugSetLastAppAwait(label: string, complete = DebugComplete.Incomplete) {
     this.stateManager?.transactionQueue.setDebugSetLastAppAwait(label, complete)
   }
+
+  addNetworkTx = ServiceQueue.addNetworkTx
 
   validateActiveNodeSignatures(
     signedAppData: any,

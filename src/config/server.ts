@@ -186,6 +186,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     resubmitStandbyAddWaitDuration: 1000, // 1 second in ms
     requiredVotesPercentage: 2 / 3.0,
     timestampCacheFix: true,
+    networkTransactionsToProcessPerCycle: 20,
   },
   ip: {
     externalIp: '0.0.0.0',

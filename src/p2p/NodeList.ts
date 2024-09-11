@@ -16,6 +16,8 @@ import { shardusGetTime } from '../network'
 import { getStandbyNodesInfoMap, standbyNodesInfo } from "./Join/v2";
 import { getDesiredCount } from "./CycleAutoScale";
 import { Utils } from '@shardus/types'
+import { networkMode } from './Modes'
+import { getNewestCycle } from './Sync'
 
 const clone = rfdc()
 
@@ -268,15 +270,20 @@ export function removeNode(
         cycleNumber: cycle.counter,
       }
       emitter.emit('node-left-early', emitParams)
+    } else {
+      const emitParams: Omit<ShardusEvent, 'type'> = {
+        nodeId: node.id,
+        reason: 'Node deactivated',
+        time: cycle.start,
+        publicKey: node.publicKey,
+        cycleNumber: cycle.counter,
+        activeCycle: node.activeCycle,
+      }
+      if (cycle.mode === 'shutdown' || networkMode === 'shutdown') {
+        return
+      }
+      emitter.emit('node-deactivated', emitParams)
     }
-    const emitParams: Omit<ShardusEvent, 'type'> = {
-      nodeId: node.id,
-      reason: 'Node deactivated',
-      time: cycle.start,
-      publicKey: node.publicKey,
-      cycleNumber: cycle.counter,
-    }
-    emitter.emit('node-deactivated', emitParams)
   }
 }
 
@@ -343,6 +350,9 @@ export function updateNode(
             time: cycle.start,
             publicKey: node.publicKey,
             cycleNumber: cycle.counter,
+          }
+          if (cycle.mode === 'shutdown' || networkMode === 'shutdown') {
+            return
           }
           emitter.emit('node-activated', emitParams)
         }

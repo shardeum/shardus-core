@@ -11,6 +11,7 @@ import * as NodeList from '../NodeList'
 import * as Archivers from '../Archivers'
 import * as CycleCreator from '../CycleCreator'
 import * as JoinV2 from '../Join/v2'
+import * as ServiceQueue from '../ServiceQueue'
 import { profilerInstance } from '../../utils/profiler'
 import { logFlags } from '../../logger'
 import { jsonHttpResWithSize } from '../../utils'
@@ -41,6 +42,15 @@ const standbyListHashRoute: P2P.P2PTypes.Route<Handler> = {
   name: 'standby-list-hash',
   handler: (_req, res) => {
     res.json({ standbyNodeListHash: JoinV2.getStandbyListHash() })
+  },
+}
+
+/** An endpoint that returns the latest txList hash. */
+const txListHashRoute: P2P.P2PTypes.Route<Handler> = {
+  method: 'GET',
+  name: 'tx-list-hash',
+  handler: (_req, res) => {
+    res.send({ txListHash: ServiceQueue.getTxListHash() })
   },
 }
 
@@ -131,6 +141,27 @@ const standbyListRoute: P2P.P2PTypes.Route<Handler> = {
   },
 }
 
+const txListRoute: P2P.P2PTypes.Route<Handler> = {
+  method: 'GET',
+  name: 'tx-list',
+  handler: (req, res) => {
+    profilerInstance.scopedProfileSectionStart('tx-list', false)
+
+    try {
+      const expectedHash = req.query.hash
+      if (expectedHash && expectedHash === ServiceQueue.getTxListHash()) {
+        const txList = ServiceQueue.getTxList()
+        res.json(txList)
+      } else {
+        /* prettier-ignore */ if (logFlags.debug) console.error( `rejecting tx list request: expected '${expectedHash}' != '${ServiceQueue.getTxListHash()}'` )
+        res.status(404).send(`tx list with hash '${expectedHash}' not found`)
+      }
+    } finally {
+      profilerInstance.scopedProfileSectionEnd('tx-list')
+    }
+  },
+}
+
 /** An endpoint that returns the cycle corresponding to the requested marker. */
 const cycleByMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
@@ -166,10 +197,12 @@ export function initRoutes(): void {
     validatorListHashRoute,
     archiverListHashRoute,
     standbyListHashRoute,
+    txListHashRoute,
     newestCycleHashRoute,
     validatorListRoute,
     archiverListRoute,
     standbyListRoute,
+    txListRoute,
     cycleByMarkerRoute,
     newestCycleRecordRoute,
   ]

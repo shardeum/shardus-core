@@ -60,6 +60,10 @@ const cycles = [
     standbyRefresh: { type: SQLDataTypes.TEXT, allowNull: false },
     ...P2PApoptosis.sequelizeCycleFieldModel,
     random: { type: SQLDataTypes.INTEGER, allowNull: false },
+    txadd: { type: SQLDataTypes.JSON, allowNull: false },
+    txremove: { type: SQLDataTypes.JSON, allowNull: false },
+    txlisthash: { type: SQLDataTypes.TEXT, allowNull: false },
+    archiversAtShutdown: { type: SQLDataTypes.JSON, allowNull: true },
   },
 ]
 
