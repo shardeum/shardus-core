@@ -1,4 +1,4 @@
-import { isDebugMode, getDevPublicKeys, ensureKeySecurity } from '../debug'
+import { isDebugMode, getDevPublicKeys, ensureKeySecurity, getMultisigPublicKeys } from '../debug'
 import * as Context from '../p2p/Context'
 import * as crypto from '@shardus/crypto-utils'
 import { DevSecurityLevel } from '../shardus/shardus-types'
@@ -8,21 +8,39 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { Utils } from '@shardus/types'
 import { SignedObject } from '@shardus/crypto-utils'
 import * as CycleChain from '../p2p/CycleChain'
+import { contactArchiver, getStatusHistoryCopy } from '../p2p/Self'
+import { NodeStatus } from '@shardus/types/build/src/p2p/P2PTypes'
+import { getNewestCycle } from '../p2p/Sync'
 
 const MAX_COUNTER_BUFFER_MILLISECONDS = 10000 // <- Nonce are essentially just timestamp. This number dictate how much time range we will tolerance.
 let lastCounter = Date.now() // <- when node is first load onto mem this used to be 0, but that would cause a replay attack. So now it is set to the current time with ntp offset accounted
 let multiSigLstCounter = Date.now()
 
 // This function is used to check if the request is authorized to access the debug endpoint
-function handleDebugAuth(_req, res, next, authLevel) {
+async function handleDebugAuth(_req, res, next, authLevel) {
   try {
+    let statusHist = getStatusHistoryCopy()
+    let statusNow = statusHist[statusHist.length -1].moduleStatus || undefined
+    let weAreActive = statusNow === NodeStatus.ACTIVE
+    let latestCycle = CycleChain.newest
+
+    if (!weAreActive) {
+      const activeNodes = await contactArchiver("dbgMiddleware")
+      latestCycle = await getNewestCycle(activeNodes)
+    }
+
+    if(!latestCycle) {
+      res.status(500).json({ error: "Node can't gather latest Cycle to perform signature verification"})
+    }
+
+
     //auth with a signature
     if (_req.query.sig != null && _req.query.sig_counter != null) {
-      const nodes = String(_req.query.nodeIds).split(',')
-      const ourNodeId = Context.p2p.getNodeId().slice(0, 4)
+      const nodes = String(_req.query.nodePubkeys).split(',')
+      const ourPubkey = Context.crypto.getPublicKey().slice(0, 4)
       let intentedForOurNode = false
       nodes.forEach((id) => {
-        if (ourNodeId === id) {
+        if (ourPubkey === id) {
           intentedForOurNode = true
         }
       })
@@ -36,11 +54,11 @@ function handleDebugAuth(_req, res, next, authLevel) {
       // trim sig and sig_counter from the originalUrl
       // when the debug call is signed it include the hash of baseurl and counter to prevent replay at later time and replay at different node or the same endpoint different query params
       let payload = {
-        route: stripQueryParams(_req.originalUrl, ['sig', 'sig_counter', 'nodeIds']), //<- we're gonna hash, these query artificats need to be excluded from the hash
+        route: stripQueryParams(_req.originalUrl, ['sig', 'sig_counter', 'nodePubkeys']), //<- we're gonna hash, these query artificats need to be excluded from the hash
         count: _req.query.sig_counter,
-        nodes: _req.query.nodeIds, // example 8f35,8b3a,85f1
-        networkId: CycleChain.newest.networkId,
-        cycleCounter: CycleChain.newest.counter,
+        nodes: _req.query.nodePubkeys, // example 8f35,8b3a,85f1
+        networkId: latestCycle.networkId,
+        cycleCounter: latestCycle.counter,
       }
       const hash = crypto.hash(Utils.safeStringify(payload))
       const devPublicKeys = getDevPublicKeys() // This should return list of public keys
@@ -103,11 +121,26 @@ function handleDebugAuth(_req, res, next, authLevel) {
   })
 }
 
-function handleMultiDebugAuth(_req, res, next, authLevel: DevSecurityLevel) {
+async function handleDebugMultiSigAuth(_req, res, next, authLevel: DevSecurityLevel) {
+  nestedCountersInstance.countEvent('middleware', 'debug_multi_sig_auth')
   try {
+
+    let statusHist = getStatusHistoryCopy()
+    let statusNow = statusHist[statusHist.length -1].moduleStatus || undefined
+    let weAreActive = statusNow === NodeStatus.ACTIVE
+    let latestCycle = CycleChain.newest
+
+    if (!weAreActive) {
+      const activeNodes = await contactArchiver("dbgMiddleware")
+      latestCycle = await getNewestCycle(activeNodes)
+    }
+
+    if(!latestCycle) {
+      res.status(500).json({ error: "Node can't gather latest Cycle to perform signature verification"})
+    }
     //auth with a signature
     if (_req.query.sig != null && _req.query.sig_counter != null) {
-      const devPublicKeys = getDevPublicKeys() // This should return list of public keys
+      const devPublicKeys = getMultisigPublicKeys()
 
       let parsedSignatures = Utils.safeJsonParse(_req.query.sig)
 
@@ -118,11 +151,11 @@ function handleMultiDebugAuth(_req, res, next, authLevel: DevSecurityLevel) {
         })
       }
 
-      const nodes = String(_req.query.nodeIds).split(',')
-      const ourNodeId = Context.p2p.getNodeId().slice(0, 4)
+      const nodes = String(_req.query.nodePubkeys).split(',')
+      const ourPubkey = Context.crypto.getPublicKey().slice(0, 4)
       let intentedForOurNode = false
       nodes.forEach((id) => {
-        if (ourNodeId === id) {
+        if (ourPubkey === id) {
           intentedForOurNode = true
         }
       })
@@ -144,11 +177,7 @@ function handleMultiDebugAuth(_req, res, next, authLevel: DevSecurityLevel) {
       // Remove duplicates from parsedSignatures
       parsedSignatures = Array.from(new Set(parsedSignatures))
 
-      // Verify the signatures against the proposal
-      let allSignaturesValid = false
-      let signatureValid = false
-
-      const minApprovals = Math.max(2, SERVER_CONFIG.debug.minApprovalsMultiAuth)
+      const minApprovals = Math.max(1, SERVER_CONFIG.debug.minMultiSigRequiredForEndpoints)
 
       if (parsedSignatures.length < minApprovals) {
         return res.status(400).json({
@@ -157,65 +186,29 @@ function handleMultiDebugAuth(_req, res, next, authLevel: DevSecurityLevel) {
         })
       }
 
-      // when the debug call is signed it include the hash of baseurl and counter to prevent replay at later time and replay at different node or the same endpoint different query params
-      let payload: any = {
-        route: stripQueryParams(_req.originalUrl, ['sig', 'sig_counter', 'nodeIds']),
-        nodes: _req.query.nodeIds, // example 8f35,8b3a,85f1
+      // when the debug call is signed it include the counter to prevent replay at later time and replay at different node or the same endpoint different query params
+      const payload: any = {
+        route: stripQueryParams(_req.originalUrl, ['sig', 'sig_counter', 'nodePubkeys']),
+        nodes: _req.query.nodePubkeys, // example 8f35,8b3a,85f1
         count: _req.query.sig_counter,
-        networkId: CycleChain.newest.networkId,
+        networkId: latestCycle.networkId,
       }
-
-      payload = {
-        ...payload,
-        requestHash: crypto.hash(Utils.safeStringify(payload)),
-      } as any
 
       // Require a larger counter than before. This prevents replay attacks
       if (parseInt(_req.query.sig_counter) > multiSigLstCounter && parsedSignatures.length >= minApprovals) {
-        let validSignaturesCount = 0
-        const seen = new Set()
-        for (let i = 0; i < parsedSignatures.length; i++) {
-          if (seen.has(parsedSignatures[i])) {
-            break
-          }
-          // Check each signature against all public keys
-          seen.add(parsedSignatures[i])
-          for (const publicKey of Object.keys(devPublicKeys)) {
-            payload = {
-              ...payload,
-              sign: {
-                owner: publicKey,
-                sig: parsedSignatures[i],
-              },
-            } as SignedObject
-            signatureValid = crypto.verify(payload, parsedSignatures[i], publicKey)
-            if (signatureValid) {
-              const clearanceLevels = { low: 1, medium: 2, high: 3 } // Enum for security levels
-              const authorized = ensureKeySecurity(publicKey, authLevel) // Check if the approver is authorized to access the endpoint
-              if (authorized) {
-                validSignaturesCount++ // Increment only if signature is valid and authorized
-                break // Break if a valid and authorized signature is found
-              } else {
-                return res.status(401).json({
-                  status: 401,
-                  message: 'Unauthorized!',
-                })
-              }
-            }
-          }
-          if (!signatureValid) {
-            allSignaturesValid = false
-            console.log(`Invalid signature : ${parsedSignatures[i]}`)
-            break // Break the loop if an invalid signature is found
-          }
-        }
-        // Set allSignaturesValid to true only if all signatures are valid and authorized
-        allSignaturesValid = validSignaturesCount >= minApprovals
+        const signaturesValid = Context.stateManager.app.verifyMultiSigs(
+          payload,
+          parsedSignatures,
+          devPublicKeys,
+          minApprovals,
+          authLevel
+        )
 
         // If all signatures are valid, proceed with the next middleware
-        if (allSignaturesValid) {
+        if (signaturesValid) {
           multiSigLstCounter = parseInt(_req.query.sig_counter)
           next()
+          return
         } else {
           return res.status(401).json({
             status: 401,
@@ -227,8 +220,10 @@ function handleMultiDebugAuth(_req, res, next, authLevel: DevSecurityLevel) {
       }
     }
   } catch (error) {
+    if (logFlags.verbose && logFlags.console) console.log('Error in handleDebugMultiSigAuth:', error)
     console.log(error)
   }
+  nestedCountersInstance.countEvent('middleware', 'debug_multi_sig_auth failure')
   return res.status(403).json({
     status: 403,
     message: 'FORBIDDEN. Endpoint is only available in debug mode in addtion to signature verification.',
@@ -295,27 +290,27 @@ export const isDebugModeMiddlewareHigh = (_req, res, next) => {
 export const isDebugModeMiddlewareMultiSig = (_req, res, next) => {
   const isDebug = isDebugMode()
   if (!isDebug) {
-    handleMultiDebugAuth(_req, res, next, DevSecurityLevel.High)
+    handleDebugMultiSigAuth(_req, res, next, DevSecurityLevel.High)
   } else next()
 }
 
 export const isDebugModeMiddlewareMultiSigHigh = (_req, res, next) => {
   const isDebug = isDebugMode()
   if (!isDebug) {
-    handleMultiDebugAuth(_req, res, next, DevSecurityLevel.High)
+    handleDebugMultiSigAuth(_req, res, next, DevSecurityLevel.High)
   } else next()
 }
 
 export const isDebugModeMiddlewareMultiSigMedium = (_req, res, next) => {
   const isDebug = isDebugMode()
   if (!isDebug) {
-    handleMultiDebugAuth(_req, res, next, DevSecurityLevel.Medium)
+    handleDebugMultiSigAuth(_req, res, next, DevSecurityLevel.Medium)
   } else next()
 }
 
 export const isDebugModeMiddlewareMultiSigLow = (_req, res, next) => {
   const isDebug = isDebugMode()
   if (!isDebug) {
-    handleMultiDebugAuth(_req, res, next, DevSecurityLevel.Low)
+    handleDebugMultiSigAuth(_req, res, next, DevSecurityLevel.Low)
   } else next()
 }

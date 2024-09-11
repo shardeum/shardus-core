@@ -1,6 +1,6 @@
 import { AccountRepairInstruction } from '../state-manager/AccountPatcher'
 import { VectorBufferStream } from '../utils/serialization/VectorBufferStream'
-import { deserializeAppliedReceipt2, serializeAppliedReceipt2 } from './AppliedReceipt2'
+import { deserializeSignedReceipt, serializeSignedReceipt } from './SignedReceipt'
 import { deserializeWrappedData, serializeWrappedData } from './WrappedData'
 import { verifyPayload } from './ajv/Helpers'
 import { AJVSchemaEnum } from './enum/AJVSchemaEnum'
@@ -42,7 +42,7 @@ export const serializeRepairOOSAccountsReq = (
     // eslint-disable-next-line security/detect-object-injection
     stream.writeString(inp.repairInstructions[i].targetNodeId)
     // eslint-disable-next-line security/detect-object-injection
-    serializeAppliedReceipt2(stream, inp.repairInstructions[i].receipt2)
+    serializeSignedReceipt(stream, inp.repairInstructions[i].signedReceipt)
   }
 }
 
@@ -64,7 +64,7 @@ export const deserializeRepairOOSAccountsReq = (stream: VectorBufferStream): Rep
       txId: stream.readString(),
       accountData: deserializeWrappedData(stream),
       targetNodeId: stream.readString(),
-      receipt2: deserializeAppliedReceipt2(stream),
+      signedReceipt: deserializeSignedReceipt(stream),
     })
   }
   const errors = verifyPayload(AJVSchemaEnum.RepairOOSAccountsReq, result)

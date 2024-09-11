@@ -6,7 +6,11 @@ import * as CycleCreator from '../p2p/CycleCreator'
 import os from 'os'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import process, { resourceUsage } from 'process'
-import { isDebugModeMiddleware, isDebugModeMiddlewareLow } from '../network/debugMiddleware'
+import {
+  isDebugModeMiddleware,
+  isDebugModeMiddlewareLow,
+  isDebugModeMiddlewareMultiSig,
+} from '../network/debugMiddleware'
 import * as NodeList from '../p2p/NodeList'
 import { spawn } from 'child_process'
 import { getLastNTPObject, getNetworkTimeOffset, shardusGetTime } from '../network'
@@ -111,7 +115,7 @@ class MemoryReporting {
       })
     })
 
-    Context.network.registerExternalGet('df', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet('df', isDebugModeMiddlewareMultiSig, (req, res) => {
       const df = spawn('df')
       df.stdout.on('data', (dataBuffer) => {
         res.write(dataBuffer)

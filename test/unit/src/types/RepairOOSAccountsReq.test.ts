@@ -1,4 +1,3 @@
-import { serializeAppliedReceipt2 } from '../../../../src/types/AppliedReceipt2'
 import {
   serializeRepairOOSAccountsReq,
   RepairOOSAccountsReq,
@@ -10,6 +9,7 @@ import { initAjvSchemas } from '../../../../src/types/ajv/Helpers'
 import { TypeIdentifierEnum } from '../../../../src/types/enum/TypeIdentifierEnum'
 import { Utils } from '@shardus/types'
 import { VectorBufferStream } from '../../../../src/utils/serialization/VectorBufferStream'
+import { serializeSignedReceipt } from '../../../../src/types/SignedReceipt'
 
 // Mock the Context module and its nested structure
 jest.mock('../../../../src/p2p/Context', () => ({
@@ -45,42 +45,28 @@ describe('RepairMissingAccountReq Serialization', () => {
             timestamp: 123456,
           },
           targetNodeId: 'node1',
-          receipt2: {
-            txid: 'test',
-            result: true,
-            appliedVote: {
-              txid: 'txid',
-              transaction_result: true,
-              account_id: ['acc123'],
-              account_state_hash_after: ['state123'],
-              account_state_hash_before: ['state123'],
-              cant_apply: false,
-              node_id: 'node1',
+          signedReceipt: {
+            proposal: {
+              txid: 'test',
+              applied: true,
+              cant_preApply: false,
+              accountIDs: ['a', 'b', 'c'],
+              beforeStateHashes: ['b1', 'b2', 'b3'],
+              afterStateHashes: ['a1', 'a2', 'a3'],
+              appReceiptDataHash: 'hash',
             },
-            confirmOrChallenge: {
-              message: 'message',
-              nodeId: 'node1',
-              appliedVote: {
-                txid: 'txid',
-                transaction_result: true,
-                account_id: ['acc123'],
-                account_state_hash_after: ['state123'],
-                account_state_hash_before: ['state123'],
-                cant_apply: false,
-                node_id: 'node1',
-              },
-              sign: {
-                sig: 'sign',
-                owner: 'node1',
-              },
-            },
-            signatures: [
+            signaturePack: [
               {
                 sig: 'sign',
                 owner: 'node1',
               },
             ],
-            app_data_hash: 'hash',
+            voteOffsets: [5],
+            proposalHash: 'hash',
+            sign: {
+              sig: 'sign',
+              owner: 'aggregator',
+            },
           },
         },
       ],
@@ -105,7 +91,7 @@ describe('RepairMissingAccountReq Serialization', () => {
       // eslint-disable-next-line security/detect-object-injection
       expectedStream.writeString(obj.repairInstructions[i].targetNodeId)
       // eslint-disable-next-line security/detect-object-injection
-      serializeAppliedReceipt2(expectedStream, obj.repairInstructions[i].receipt2)
+      serializeSignedReceipt(expectedStream, obj.repairInstructions[i].signedReceipt)
     }
 
     expect(stream.getBuffer()).toEqual(expectedStream.getBuffer())
@@ -126,42 +112,28 @@ describe('RepairMissingAccountReq Serialization', () => {
             syncData: { detail: 'info' },
           },
           targetNodeId: 'node1',
-          receipt2: {
-            txid: 'test',
-            result: true,
-            appliedVote: {
-              txid: 'txid',
-              transaction_result: true,
-              account_id: ['acc123'],
-              account_state_hash_after: ['state123'],
-              account_state_hash_before: ['state123'],
-              cant_apply: false,
-              node_id: 'node1',
+          signedReceipt: {
+            proposal: {
+              txid: 'test',
+              applied: true,
+              cant_preApply: false,
+              accountIDs: ['a', 'b', 'c'],
+              beforeStateHashes: ['b1', 'b2', 'b3'],
+              afterStateHashes: ['a1', 'a2', 'a3'],
+              appReceiptDataHash: 'hash',
             },
-            confirmOrChallenge: {
-              message: 'message',
-              nodeId: 'node1',
-              appliedVote: {
-                txid: 'txid',
-                transaction_result: true,
-                account_id: ['acc123'],
-                account_state_hash_after: ['state123'],
-                account_state_hash_before: ['state123'],
-                cant_apply: false,
-                node_id: 'node1',
-              },
-              sign: {
-                sig: 'sign',
-                owner: 'node1',
-              },
-            },
-            signatures: [
+            signaturePack: [
               {
                 sig: 'sign',
                 owner: 'node1',
               },
             ],
-            app_data_hash: 'hash',
+            voteOffsets: [5],
+            proposalHash: 'hash',
+            sign: {
+              sig: 'sign',
+              owner: 'aggregator',
+            },
           },
         },
         {
@@ -175,42 +147,28 @@ describe('RepairMissingAccountReq Serialization', () => {
             timestamp: 123456,
           },
           targetNodeId: 'node1',
-          receipt2: {
-            txid: 'test',
-            result: true,
-            appliedVote: {
-              txid: 'txid',
-              transaction_result: true,
-              account_id: ['acc123'],
-              account_state_hash_after: ['state123'],
-              account_state_hash_before: ['state123'],
-              cant_apply: false,
-              node_id: 'node1',
+          signedReceipt: {
+            proposal: {
+              txid: 'test',
+              applied: true,
+              cant_preApply: false,
+              accountIDs: ['a', 'b', 'c'],
+              beforeStateHashes: ['b1', 'b2', 'b3'],
+              afterStateHashes: ['a1', 'a2', 'a3'],
+              appReceiptDataHash: 'hash',
             },
-            confirmOrChallenge: {
-              message: 'message',
-              nodeId: 'node1',
-              appliedVote: {
-                txid: 'txid',
-                transaction_result: true,
-                account_id: ['acc123'],
-                account_state_hash_after: ['state123'],
-                account_state_hash_before: ['state123'],
-                cant_apply: false,
-                node_id: 'node1',
-              },
-              sign: {
-                sig: 'sign',
-                owner: 'node1',
-              },
-            },
-            signatures: [
+            signaturePack: [
               {
                 sig: 'sign',
                 owner: 'node1',
               },
             ],
-            app_data_hash: 'hash',
+            voteOffsets: [5],
+            proposalHash: 'hash',
+            sign: {
+              sig: 'sign',
+              owner: 'aggregator',
+            },
           },
         },
       ],
@@ -234,7 +192,7 @@ describe('RepairMissingAccountReq Serialization', () => {
       // eslint-disable-next-line security/detect-object-injection
       expectedStream.writeString(obj.repairInstructions[i].targetNodeId)
       // eslint-disable-next-line security/detect-object-injection
-      serializeAppliedReceipt2(expectedStream, obj.repairInstructions[i].receipt2)
+      serializeSignedReceipt(expectedStream, obj.repairInstructions[i].signedReceipt)
     }
   })
 
@@ -253,42 +211,28 @@ describe('RepairMissingAccountReq Serialization', () => {
             syncData: { detail: 'info' },
           },
           targetNodeId: 'node1',
-          receipt2: {
-            txid: '',
-            result: true,
-            appliedVote: {
-              txid: 'txid',
-              transaction_result: true,
-              account_id: ['acc123'],
-              account_state_hash_after: ['state123'],
-              account_state_hash_before: ['state123'],
-              cant_apply: false,
-              node_id: 'node1',
+          signedReceipt: {
+            proposal: {
+              txid: '',
+              applied: true,
+              cant_preApply: false,
+              accountIDs: ['a', 'b', 'c'],
+              beforeStateHashes: ['b1', 'b2', 'b3'],
+              afterStateHashes: ['a1', 'a2', 'a3'],
+              appReceiptDataHash: 'hash',
             },
-            confirmOrChallenge: {
-              message: 'message',
-              nodeId: 'node1',
-              appliedVote: {
-                txid: 'txid',
-                transaction_result: true,
-                account_id: ['acc123'],
-                account_state_hash_after: ['state123'],
-                account_state_hash_before: ['state123'],
-                cant_apply: false,
-                node_id: 'node1',
-              },
-              sign: {
-                sig: 'sign',
-                owner: 'node1',
-              },
-            },
-            signatures: [
+            signaturePack: [
               {
                 sig: 'sign',
                 owner: 'node1',
               },
             ],
-            app_data_hash: 'hash',
+            voteOffsets: [5],
+            proposalHash: 'hash',
+            sign: {
+              sig: 'sign',
+              owner: 'aggregator',
+            },
           },
         },
         {
@@ -302,42 +246,28 @@ describe('RepairMissingAccountReq Serialization', () => {
             timestamp: 123456,
           },
           targetNodeId: 'node1',
-          receipt2: {
-            txid: 'test',
-            result: true,
-            appliedVote: {
-              txid: 'txid',
-              transaction_result: true,
-              account_id: ['acc123'],
-              account_state_hash_after: ['state123'],
-              account_state_hash_before: ['state123'],
-              cant_apply: false,
-              node_id: 'node1',
+          signedReceipt: {
+            proposal: {
+              txid: 'test',
+              applied: true,
+              cant_preApply: false,
+              accountIDs: ['a', 'b', 'c'],
+              beforeStateHashes: ['b1', 'b2', 'b3'],
+              afterStateHashes: ['a1', 'a2', 'a3'],
+              appReceiptDataHash: 'hash',
             },
-            confirmOrChallenge: {
-              message: 'message',
-              nodeId: 'node1',
-              appliedVote: {
-                txid: 'txid',
-                transaction_result: true,
-                account_id: ['acc123'],
-                account_state_hash_after: ['state123'],
-                account_state_hash_before: ['state123'],
-                cant_apply: false,
-                node_id: 'node1',
-              },
-              sign: {
-                sig: 'sign',
-                owner: 'node1',
-              },
-            },
-            signatures: [
+            signaturePack: [
               {
                 sig: 'sign',
                 owner: 'node1',
               },
             ],
-            app_data_hash: 'hash',
+            voteOffsets: [5],
+            proposalHash: 'hash',
+            sign: {
+              sig: 'sign',
+              owner: 'aggregator',
+            },
           },
         },
       ],
@@ -361,11 +291,11 @@ describe('RepairMissingAccountReq Serialization', () => {
       // eslint-disable-next-line security/detect-object-injection
       expectedStream.writeString(obj.repairInstructions[i].targetNodeId)
       // eslint-disable-next-line security/detect-object-injection
-      serializeAppliedReceipt2(expectedStream, obj.repairInstructions[i].receipt2)
+      serializeSignedReceipt(expectedStream, obj.repairInstructions[i].signedReceipt)
     }
   })
 
-  test('Should serialize without confirmOrChallenge', () => {
+  test('Should serialize without final sign', () => {
     const obj: RepairOOSAccountsReq = {
       repairInstructions: [
         {
@@ -380,25 +310,24 @@ describe('RepairMissingAccountReq Serialization', () => {
             syncData: { detail: 'info' },
           },
           targetNodeId: 'node1',
-          receipt2: {
-            txid: 'test',
-            result: true,
-            appliedVote: {
-              txid: 'txid',
-              transaction_result: true,
-              account_id: ['acc123'],
-              account_state_hash_after: ['state123'],
-              account_state_hash_before: ['state123'],
-              cant_apply: false,
-              node_id: 'node1',
+          signedReceipt: {
+            proposal: {
+              txid: 'test',
+              applied: true,
+              cant_preApply: false,
+              accountIDs: ['a', 'b', 'c'],
+              beforeStateHashes: ['b1', 'b2', 'b3'],
+              afterStateHashes: ['a1', 'a2', 'a3'],
+              appReceiptDataHash: 'hash',
             },
-            signatures: [
+            signaturePack: [
               {
                 sig: 'sign',
                 owner: 'node1',
               },
             ],
-            app_data_hash: 'hash',
+            voteOffsets: [5],
+            proposalHash: 'hash',
           },
         },
         {
@@ -412,26 +341,28 @@ describe('RepairMissingAccountReq Serialization', () => {
             timestamp: 123456,
           },
           targetNodeId: 'node1',
-          receipt2: {
-            txid: 'test',
-            result: true,
-            appliedVote: {
-              txid: 'txid',
-              transaction_result: true,
-              account_id: ['acc123'],
-              account_state_hash_after: ['state123'],
-              account_state_hash_before: ['state123'],
-              cant_apply: false,
-              node_id: 'node1',
+          signedReceipt: {
+            proposal: {
+              txid: 'test',
+              applied: true,
+              cant_preApply: false,
+              accountIDs: ['a', 'b', 'c'],
+              beforeStateHashes: ['b1', 'b2', 'b3'],
+              afterStateHashes: ['a1', 'a2', 'a3'],
+              appReceiptDataHash: 'hash',
             },
-            confirmOrChallenge: undefined,
-            signatures: [
+            signaturePack: [
               {
                 sig: 'sign',
                 owner: 'node1',
               },
             ],
-            app_data_hash: 'hash',
+            voteOffsets: [5],
+            proposalHash: 'hash',
+            sign: {
+              sig: 'sign',
+              owner: 'aggregator',
+            },
           },
         },
       ],
@@ -455,7 +386,7 @@ describe('RepairMissingAccountReq Serialization', () => {
       // eslint-disable-next-line security/detect-object-injection
       expectedStream.writeString(obj.repairInstructions[i].targetNodeId)
       // eslint-disable-next-line security/detect-object-injection
-      serializeAppliedReceipt2(expectedStream, obj.repairInstructions[i].receipt2)
+      serializeSignedReceipt(expectedStream, obj.repairInstructions[i].signedReceipt)
     }
 
     expect(stream.getBuffer()).toEqual(expectedStream.getBuffer())
@@ -478,42 +409,28 @@ describe('RepairMissingAccountReq Deserialization', () => {
             syncData: { detail: 'info' },
           },
           targetNodeId: 'node1',
-          receipt2: {
-            txid: '',
-            result: true,
-            appliedVote: {
-              txid: 'txid',
-              transaction_result: true,
-              account_id: ['acc123'],
-              account_state_hash_after: ['state123'],
-              account_state_hash_before: ['state123'],
-              cant_apply: false,
-              node_id: 'node1',
+          signedReceipt: {
+            proposal: {
+              txid: 'test',
+              applied: true,
+              cant_preApply: false,
+              accountIDs: ['a', 'b', 'c'],
+              beforeStateHashes: ['b1', 'b2', 'b3'],
+              afterStateHashes: ['a1', 'a2', 'a3'],
+              appReceiptDataHash: 'hash',
             },
-            confirmOrChallenge: {
-              message: 'message',
-              nodeId: 'node1',
-              appliedVote: {
-                txid: 'txid',
-                transaction_result: true,
-                account_id: ['acc123'],
-                account_state_hash_after: ['state123'],
-                account_state_hash_before: ['state123'],
-                cant_apply: false,
-                node_id: 'node1',
-              },
-              sign: {
-                sig: 'sign',
-                owner: 'node1',
-              },
-            },
-            signatures: [
+            signaturePack: [
               {
                 sig: 'sign',
                 owner: 'node1',
               },
             ],
-            app_data_hash: 'hash',
+            voteOffsets: [5],
+            proposalHash: 'hash',
+            sign: {
+              sig: 'sign',
+              owner: 'aggregator',
+            },
           },
         },
       ],
@@ -526,14 +443,14 @@ describe('RepairMissingAccountReq Deserialization', () => {
     stream.writeString(data.repairInstructions[0].txId) // txId
     serializeWrappedData(stream, data.repairInstructions[0].accountData) // accountData
     stream.writeString(data.repairInstructions[0].targetNodeId) // targetNodeId
-    serializeAppliedReceipt2(stream, data.repairInstructions[0].receipt2) // receipt2
+    serializeSignedReceipt(stream, data.repairInstructions[0].signedReceipt) // receipt2
     stream.position = 0
 
     const obj = deserializeRepairOOSAccountsReq(stream)
     expect(obj).toEqual(data)
   })
 
-  test('Should deserialize successfully with missing confirmOrChallenge', () => {
+  test('Should deserialize successfully with missing sign', () => {
     const data: RepairOOSAccountsReq = {
       repairInstructions: [
         {
@@ -548,25 +465,24 @@ describe('RepairMissingAccountReq Deserialization', () => {
             syncData: { detail: 'info' },
           },
           targetNodeId: 'node1',
-          receipt2: {
-            txid: 'test',
-            result: true,
-            appliedVote: {
-              txid: 'txid',
-              transaction_result: true,
-              account_id: ['acc123'],
-              account_state_hash_after: ['state123'],
-              account_state_hash_before: ['state123'],
-              cant_apply: false,
-              node_id: 'node1',
+          signedReceipt: {
+            proposal: {
+              txid: 'test',
+              applied: true,
+              cant_preApply: false,
+              accountIDs: ['a', 'b', 'c'],
+              beforeStateHashes: ['b1', 'b2', 'b3'],
+              afterStateHashes: ['a1', 'a2', 'a3'],
+              appReceiptDataHash: 'hash',
             },
-            signatures: [
+            signaturePack: [
               {
                 sig: 'sign',
                 owner: 'node1',
               },
             ],
-            app_data_hash: 'hash',
+            voteOffsets: [5],
+            proposalHash: 'hash',
           },
         },
         {
@@ -580,26 +496,28 @@ describe('RepairMissingAccountReq Deserialization', () => {
             timestamp: 123456,
           },
           targetNodeId: 'node1',
-          receipt2: {
-            txid: 'test',
-            result: true,
-            appliedVote: {
-              txid: 'txid',
-              transaction_result: true,
-              account_id: ['acc123'],
-              account_state_hash_after: ['state123'],
-              account_state_hash_before: ['state123'],
-              cant_apply: false,
-              node_id: 'node1',
+          signedReceipt: {
+            proposal: {
+              txid: 'test',
+              applied: true,
+              cant_preApply: false,
+              accountIDs: ['a', 'b', 'c'],
+              beforeStateHashes: ['b1', 'b2', 'b3'],
+              afterStateHashes: ['a1', 'a2', 'a3'],
+              appReceiptDataHash: 'hash',
             },
-            confirmOrChallenge: undefined,
-            signatures: [
+            signaturePack: [
               {
                 sig: 'sign',
                 owner: 'node1',
               },
             ],
-            app_data_hash: 'hash',
+            voteOffsets: [5],
+            proposalHash: 'hash',
+            sign: {
+              sig: 'sign',
+              owner: 'aggregator',
+            },
           },
         },
       ],
@@ -612,13 +530,13 @@ describe('RepairMissingAccountReq Deserialization', () => {
     stream.writeString(data.repairInstructions[0].txId) // txId
     serializeWrappedData(stream, data.repairInstructions[0].accountData) // accountData
     stream.writeString(data.repairInstructions[0].targetNodeId) // targetNodeId
-    serializeAppliedReceipt2(stream, data.repairInstructions[0].receipt2) // receipt2
+    serializeSignedReceipt(stream, data.repairInstructions[0].signedReceipt) // receipt2
     stream.writeString(data.repairInstructions[1].accountID) // accountID
     stream.writeString(data.repairInstructions[1].hash) // hash
     stream.writeString(data.repairInstructions[1].txId) // txId
     serializeWrappedData(stream, data.repairInstructions[1].accountData) // accountData
     stream.writeString(data.repairInstructions[1].targetNodeId) // targetNodeId
-    serializeAppliedReceipt2(stream, data.repairInstructions[1].receipt2) // receipt2
+    serializeSignedReceipt(stream, data.repairInstructions[1].signedReceipt) // receipt2
     stream.position = 0
 
     const obj = deserializeRepairOOSAccountsReq(stream)

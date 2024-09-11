@@ -12,6 +12,9 @@ import Debug, {
   getDevPublicKey,
   getDevPublicKeyMaxLevel,
   ensureKeySecurity,
+  getMultisigPublicKeys,
+  getMultisigPublicKey,
+  ensureMultisigKeySecurity,
 } from '../debug'
 import ExitHandler from '../exit-handler'
 import LoadDetection from '../load-detection'
@@ -467,69 +470,112 @@ class Shardus extends EventEmitter {
       const sk: string = this.crypto.keypair.secretKey
       this.io = (await this.network.setup(Network.ipInfo, sk)) as SocketIO.Server
       Context.setIOContext(this.io)
+      /**
+       * io.use middleware to authenticate the archiver socket connections
+       * was added under BLUE-257
+      */
+      this.io.use((socket, next) => {
+        try {
+          if (!Self || !Self.isActive) {
+            if (!Self.allowConnectionToFirstNode) {
+              socket.disconnect()
+              this.mainLogger.error(`❌ This node is not active yet and kill the socket connection!`)
+            }
+          }
+          // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
+          if (!Archivers.recipients || !Archivers.connectedSockets) {
+            this.mainLogger.error(
+              `❌ Seems Archiver module isn't initialized yet, dropping the Socket connection!`
+            )
+            socket.disconnect()
+            return
+          }
+
+          const archiverIP = socket.handshake.headers.host.split(':')[0]
+          const archiverCreds = JSON.parse(socket.handshake.query.data)
+          const isValidSig = this.crypto.verify(archiverCreds, archiverCreds.publicKey)
+          if (!isValidSig) {
+            this.mainLogger.error(`❌ Invalid Signature from Archiver @ ${archiverIP}`)
+            socket.disconnect()
+            return
+          }
+          const recipient = Archivers.recipients.get(archiverCreds.publicKey)
+          if (!recipient) {
+            this.mainLogger.error(`❌ Remote Archiver @ ${archiverIP} is NOT a recipient!`)
+            socket.disconnect()
+            return
+          }
+          if (archiverIP !== recipient.nodeInfo.ip) {
+            this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
+            this.mainLogger.error('Recipient: ', recipient.nodeInfo)
+            this.mainLogger.error('Remote Archiver: ', socket.handshake.headers.host)
+            socket.disconnect()
+            return
+          }
+
+          socket.handshake.query.data = archiverCreds
+          next()
+        } catch (error) {
+          this.mainLogger.error('❌ Error in Archiver Socket-Connection Auth!')
+          this.mainLogger.error(error)
+          socket.disconnect()
+          return
+        }
+      })
       this.io.on('connection', (socket: any) => {
-        if (!Self || !Self.isActive) {
+        const { publicKey: archiverPublicKey } = socket.handshake.query.data
+        /**
+         * The following check has been moved to the top of io.use middleware
+         * if (!Self || !Self.isActive) {
           if (!Self.allowConnectionToFirstNode) {
             socket.disconnect()
             console.log(`This node is not active yet and kill the socket connection!`)
           }
-        }
+        } */
         if (this.config.features.archiverDataSubscriptionsUpdate) {
-          console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
-          socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
-            console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
-            // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
-            if (!Archivers.recipients || !Archivers.connectedSockets) {
-              socket.disconnect()
-              console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
-              return
-            }
-            if (Archivers.recipients.get(ARCHIVER_PUBLIC_KEY)) {
-              if (Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY]) {
-                Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
-              }
-              Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
-            } else {
-              socket.disconnect()
-              console.log(
-                'Archiver is not found in the recipients list and kill the socket connection',
-                ARCHIVER_PUBLIC_KEY
-              )
-            }
-          })
+          console.log(`✅ Archive server has subscribed to this node with Socket-ID ${socket.id}!`)
+          /**
+           * The following code-block has also been shifted to the io.use middleware
+           // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
+           // if (!Archivers.recipients || !Archivers.connectedSockets) {
+            socket.disconnect()
+            console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
+            return
+          } */
+          console.log('Archiver has registered its public key', archiverPublicKey)
+          if (Archivers.connectedSockets[archiverPublicKey]) {
+            Archivers.removeArchiverConnection(archiverPublicKey)
+          }
+          Archivers.addArchiverConnection(archiverPublicKey, socket.id)
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
-            console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
-            Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] === socket.id) {
+            console.log(`Archive server with public key ${ARCHIVER_PUBLIC_KEY} has requested to Un-subscribe`)
+              Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
+              Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+            }
           })
         } else {
           console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
-          socket.on('ARCHIVER_PUBLIC_KEY', function (ARCHIVER_PUBLIC_KEY) {
-            console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
-            // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
-            if (!Archivers.recipients || !Archivers.connectedSockets) {
-              socket.disconnect()
-              console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
-              return
+          console.log('Archiver has registered its public key', archiverPublicKey)
+          for (const [key, value] of Object.entries(Archivers.connectedSockets)) {
+            if (key === archiverPublicKey) {
+              Archivers.removeArchiverConnection(archiverPublicKey)
             }
-            for (const [key, value] of Object.entries(Archivers.connectedSockets)) {
-              if (key === ARCHIVER_PUBLIC_KEY) {
-                Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
-              }
-            }
+          }
 
-            if (
-              Object.keys(Archivers.connectedSockets).length >= config.p2p.maxArchiversSubscriptionPerNode
-            ) {
-              /* prettier-ignore */ console.log( `There are already ${config.p2p.maxArchiversSubscriptionPerNode} archivers connected for data transfer!` )
-              socket.disconnect()
-              return
-            }
-            Archivers.addArchiverConnection(ARCHIVER_PUBLIC_KEY, socket.id)
-          })
+          if (Object.keys(Archivers.connectedSockets).length >= config.p2p.maxArchiversSubscriptionPerNode) {
+            /* prettier-ignore */ console.log( `There are already ${config.p2p.maxArchiversSubscriptionPerNode} archivers connected for data transfer!` )
+            socket.disconnect()
+            return
+          }
+          Archivers.addArchiverConnection(archiverPublicKey, socket.id)
           socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
-            console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
-            Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
-            Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+
+            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] === socket.id) {
+            console.log(`Archive server with public key ${ARCHIVER_PUBLIC_KEY} has requested to Un-subscribe`)
+              Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
+              Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+            }
           })
         }
       })
@@ -1830,11 +1876,12 @@ class Shardus extends EventEmitter {
     signs: ShardusTypes.Sign[],
     minRequired: number
   ): { success: boolean; reason: string } {
-    let validNodeCount = 0
     // let validNodes = []
     let appData = { ...signedAppData }
     if (appData.signs) delete appData.signs
     if (appData.sign) delete appData.sign
+
+    const validSigns = new Set<string>()
     for (let i = 0; i < signs.length; i++) {
       const sign = signs[i]
       const nodePublicKey = sign.owner
@@ -1842,10 +1889,10 @@ class Shardus extends EventEmitter {
       const node = this.p2p.state.getNodeByPubKey(nodePublicKey)
       const isValid = this.crypto.verify(appData, nodePublicKey)
       if (node && isValid) {
-        validNodeCount++
+        validSigns.add(sign.sig)
       }
       // early break loop
-      if (validNodeCount >= minRequired) {
+      if (validSigns.size >= minRequired) {
         // if (validNodes.length >= minRequired) {
         return {
           success: true,
@@ -1866,7 +1913,6 @@ class Shardus extends EventEmitter {
     nodesToSign: number,
     allowedBackupNodes: number
   ): { success: boolean; reason: string } {
-    let validNodeCount = 0
     // let validNodes = []
     let appData = { ...signedAppData }
     if (appData.signs) delete appData.signs
@@ -1880,6 +1926,7 @@ class Shardus extends EventEmitter {
         closestNodesByPubKey.set(node.publicKey, node)
       }
     }
+    const validSigns = new Set<string>()
     for (let i = 0; i < signs.length; i++) {
       const sign = signs[i]
       const nodePublicKey = sign.owner
@@ -1891,10 +1938,10 @@ class Shardus extends EventEmitter {
       const node = closestNodesByPubKey.get(nodePublicKey)
       const isValid = this.crypto.verify(appData, nodePublicKey)
       if (node && isValid) {
-        validNodeCount++
+        validSigns.add(sign.sig)
       }
       // early break loop
-      if (validNodeCount >= minRequired) {
+      if (validSigns.size >= minRequired) {
         // if (validNodes.length >= minRequired) {
         return {
           success: true,
@@ -2187,7 +2234,7 @@ class Shardus extends EventEmitter {
       if (req.query.set) {
         this.debugForeverLoopsEnabled = req.query.set === 'true'
       }
-      res.send(`debugForeverLoopsEnabled: ${this.debugForeverLoopsEnabled}`)
+      res.json({ debugForeverLoopsEnabled: this.debugForeverLoopsEnabled })
     })
   }
 
@@ -2276,6 +2323,19 @@ class Shardus extends EventEmitter {
   // Verify that the key is the dev key and has the required security level
   ensureKeySecurity(keyName: string, clearance: DevSecurityLevel) {
     return ensureKeySecurity(keyName, clearance)
+  }
+
+
+  getMultisigPublicKeys() {
+    return getMultisigPublicKeys()
+  }
+
+  getMultisigPublicKey(key: string) {
+    return getMultisigPublicKey(key)
+  }
+
+  ensureMultisigKeySecurity(pubKey: string, level: DevSecurityLevel) {
+    return ensureMultisigKeySecurity(pubKey, level)
   }
 
   /**
@@ -2400,14 +2460,14 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.transactionReceiptPass = async (tx, wrappedStates, applyResponse, isExecutionGroup) =>
           application.transactionReceiptPass(tx, wrappedStates, applyResponse, isExecutionGroup)
       } else {
-        applicationInterfaceImpl.transactionReceiptPass = async function (tx, wrappedStates, applyResponse, isExecutionGroup) {}
+        applicationInterfaceImpl.transactionReceiptPass = async function (_tx, _wrappedStates, _applyResponse, _isExecutionGroup) {}
       }
 
       if (typeof application.transactionReceiptFail === 'function') {
         applicationInterfaceImpl.transactionReceiptFail = async (tx, wrappedStates, applyResponse) =>
           application.transactionReceiptFail(tx, wrappedStates, applyResponse)
       } else {
-        applicationInterfaceImpl.transactionReceiptFail = async function (tx, wrappedStates, applyResponse) {}
+        applicationInterfaceImpl.transactionReceiptFail = async function (_tx, _wrappedStates, _applyResponse) {}
       }
 
       if (typeof application.updateAccountFull === 'function') {
@@ -2469,7 +2529,7 @@ class Shardus extends EventEmitter {
           return res
         }
       } else {
-        applicationInterfaceImpl.getCachedRIAccountData = async (addressList: string[]) => {
+        applicationInterfaceImpl.getCachedRIAccountData = async (_addressList: string[]) => {
           return []
         }
       }
@@ -2481,7 +2541,7 @@ class Shardus extends EventEmitter {
           this.profiler.scopedProfileSectionEnd('process-dapp.setCachedRIAccountData')
         }
       } else {
-        applicationInterfaceImpl.setCachedRIAccountData = async (accountRecords: any[]) => {}
+        applicationInterfaceImpl.setCachedRIAccountData = async (_accountRecords: any[]) => {}
       }
 
       if (typeof application.getAccountDataByRange === 'function') {
@@ -2569,7 +2629,7 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) =>
           application.getAccountDebugValue(wrappedAccount)
       } else {
-        applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) =>
+        applicationInterfaceImpl.getAccountDebugValue = (_wrappedAccount) =>
           'getAccountDebugValue() missing on app'
       }
 
@@ -2577,13 +2637,13 @@ class Shardus extends EventEmitter {
       if (typeof application.getSimpleTxDebugValue === 'function') {
         applicationInterfaceImpl.getSimpleTxDebugValue = (tx) => application.getSimpleTxDebugValue(tx)
       } else {
-        applicationInterfaceImpl.getSimpleTxDebugValue = (tx) => ''
+        applicationInterfaceImpl.getSimpleTxDebugValue = (_tx) => ''
       }
 
       if (typeof application.canDebugDropTx === 'function') {
         applicationInterfaceImpl.canDebugDropTx = (tx) => application.canDebugDropTx(tx)
       } else {
-        applicationInterfaceImpl.canDebugDropTx = (tx) => true
+        applicationInterfaceImpl.canDebugDropTx = (_tx) => true
       }
 
       if (typeof application.sync === 'function') {
@@ -2604,30 +2664,30 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.dataSummaryInit = async (blob, accountData) =>
           application.dataSummaryInit(blob, accountData)
       } else {
-        applicationInterfaceImpl.dataSummaryInit = async function (blob, accountData) {}
+        applicationInterfaceImpl.dataSummaryInit = async function (_blob, _accountData) {}
       }
       if (typeof application.dataSummaryUpdate === 'function') {
         applicationInterfaceImpl.dataSummaryUpdate = async (blob, accountDataBefore, accountDataAfter) =>
           application.dataSummaryUpdate(blob, accountDataBefore, accountDataAfter)
       } else {
         applicationInterfaceImpl.dataSummaryUpdate = async function (
-          blob,
-          accountDataBefore,
-          accountDataAfter
+          _blob,
+          _accountDataBefore,
+          _accountDataAfter
         ) {}
       }
       if (typeof application.txSummaryUpdate === 'function') {
         applicationInterfaceImpl.txSummaryUpdate = async (blob, tx, wrappedStates) =>
           application.txSummaryUpdate(blob, tx, wrappedStates)
       } else {
-        applicationInterfaceImpl.txSummaryUpdate = async function (blob, tx, wrappedStates) {}
+        applicationInterfaceImpl.txSummaryUpdate = async function (_blob, _tx, _wrappedStates) {}
       }
 
       if (typeof application.getAccountTimestamp === 'function') {
         applicationInterfaceImpl.getAccountTimestamp = async (accountAddress, mustExist) =>
           application.getAccountTimestamp(accountAddress, mustExist)
       } else {
-        applicationInterfaceImpl.getAccountTimestamp = async function (accountAddress, mustExist) {
+        applicationInterfaceImpl.getAccountTimestamp = async function (_accountAddress, _mustExist) {
           return 0
         }
       }
@@ -2636,7 +2696,7 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.getTimestampAndHashFromAccount = (account) =>
           application.getTimestampAndHashFromAccount(account)
       } else {
-        applicationInterfaceImpl.getTimestampAndHashFromAccount = function (account) {
+        applicationInterfaceImpl.getTimestampAndHashFromAccount = function (_account) {
           return {
             timestamp: 0,
             hash: 'getTimestampAndHashFromAccount not impl',
@@ -2662,7 +2722,7 @@ class Shardus extends EventEmitter {
           application.isReadyToJoin(latestCycle, publicKey, activeNodes, mode)
       } else {
         // If the app doesn't provide isReadyToJoin, assume it is always ready to join
-        applicationInterfaceImpl.isReadyToJoin = async (latestCycle, publicKey, activeNodes, mode) => true
+        applicationInterfaceImpl.isReadyToJoin = async (_latestCycle, _publicKey, _activeNodes, _mode) => true
       }
       if (typeof application.getNodeInfoAppData === 'function') {
         applicationInterfaceImpl.getNodeInfoAppData = () => application.getNodeInfoAppData()
@@ -2677,7 +2737,7 @@ class Shardus extends EventEmitter {
         ) => application.updateNetworkChangeQueue(account, appData)
       } else {
         // If the app doesn't provide updateNetworkChangeQueue, just return empty arr
-        applicationInterfaceImpl.updateNetworkChangeQueue = async (account, appData) => []
+        applicationInterfaceImpl.updateNetworkChangeQueue = async (_account, _appData) => []
       }
       if (typeof application.pruneNetworkChangeQueue === 'function') {
         applicationInterfaceImpl.pruneNetworkChangeQueue = async (
@@ -2686,7 +2746,7 @@ class Shardus extends EventEmitter {
         ) => application.pruneNetworkChangeQueue(account, cycle)
       } else {
         // If the app doesn't provide pruneNetworkChangeQueue, just return empty arr
-        applicationInterfaceImpl.pruneNetworkChangeQueue = async (account, cycle) => []
+        applicationInterfaceImpl.pruneNetworkChangeQueue = async (_account, _cycle) => []
       }
       if (typeof application.canStayOnStandby === 'function') {
         applicationInterfaceImpl.canStayOnStandby = (joinInfo: JoinRequest) =>
@@ -2718,7 +2778,7 @@ class Shardus extends EventEmitter {
         }
       } else {
         console.log('binarySerializeObject not implemented')
-        applicationInterfaceImpl.binarySerializeObject = (identifier: string, obj: any): Buffer => {
+        applicationInterfaceImpl.binarySerializeObject = (_identifier: string, obj: any): Buffer => {
           return Buffer.from(Utils.safeStringify(obj), 'utf8')
         }
       }
@@ -2731,7 +2791,7 @@ class Shardus extends EventEmitter {
         }
       } else {
         console.log('binaryDeserializeObject not implemented')
-        applicationInterfaceImpl.binaryDeserializeObject = (identifier: string, buffer: Buffer): any => {
+        applicationInterfaceImpl.binaryDeserializeObject = (_identifier: string, buffer: Buffer): any => {
           return Utils.safeJsonParse(buffer.toString('utf8'))
         }
       }
@@ -2745,7 +2805,27 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.getNonceFromTx = (tx) => application.getNonceFromTx(tx);
       }
       if (typeof application.getAccountNonce === "function") {
-        applicationInterfaceImpl.getAccountNonce = (accountId) => application.getAccountNonce(accountId);
+        applicationInterfaceImpl.getAccountNonce = (accountId) => application.getAccountNonce(accountId)
+      }
+      if (typeof application.verifyMultiSigs === 'function') {
+        applicationInterfaceImpl.verifyMultiSigs = (
+          rawPayload,
+          sigs,
+          allowedPubkeys,
+          minSigRequired,
+          requiredSecurityLevel
+        ) =>
+          application.verifyMultiSigs(rawPayload, sigs, allowedPubkeys, minSigRequired, requiredSecurityLevel)
+      } else {
+        applicationInterfaceImpl.verifyMultiSigs = (
+          _rawPayload,
+          _sigs,
+          _allowedPubkeys,
+          _minSigRequired,
+          _requiredSecurityLevel
+        ) => {
+          return true
+        }
       }
     } catch (ex) {
       this.shardus_fatal(
@@ -2766,21 +2846,21 @@ class Shardus extends EventEmitter {
    */
   _registerRoutes() {
     // DEBUG routes
-    this.network.registerExternalPost('exit', isDebugModeMiddlewareHigh, async (req, res) => {
-      res.send({ success: true })
+    this.network.registerExternalPost('exit', isDebugModeMiddlewareHigh, async (_req, res) => {
+      res.json({ success: true })
       await this.shutdown()
     })
     // TODO elevate security beyond high when we get multi sig.  or is that too slow when needed?
-    this.network.registerExternalPost('exit-apop', isDebugModeMiddlewareHigh, async (req, res) => {
+    this.network.registerExternalPost('exit-apop', isDebugModeMiddlewareHigh, async (_req, res) => {
       apoptosizeSelf('Apoptosis called at exit-apop route')
-      res.send({ success: true })
+      res.json({ success: true })
     })
 
-    this.network.registerExternalGet('config', isDebugModeMiddlewareLow, async (req, res) => {
-      res.send({ config: this.config })
+    this.network.registerExternalGet('config', isDebugModeMiddlewareLow, async (_req, res) => {
+      res.json({ config: this.config })
     })
-    this.network.registerExternalGet('netconfig', async (req, res) => {
-      res.send({ config: netConfig })
+    this.network.registerExternalGet('netconfig', async (_req, res) => {
+      res.json({ config: netConfig })
     })
 
     this.network.registerExternalGet('nodeInfo', async (req, res) => {
@@ -2801,10 +2881,10 @@ class Shardus extends EventEmitter {
           lostArchiversMap: lostArchiversMap,
         }
       }
-      res.send(result)
+      res.json(result)
     })
 
-    this.network.registerExternalGet('joinInfo', isDebugModeMiddlewareMedium, async (req, res) => {
+    this.network.registerExternalGet('joinInfo', isDebugModeMiddlewareMedium, async (_req, res) => {
       const nodeInfo = Self.getPublicNodeInfo(true)
       let result = {
         respondedWhen: new Date().toISOString(),
@@ -2822,47 +2902,54 @@ class Shardus extends EventEmitter {
         getLastHashedStandbyList: JoinV2.getLastHashedStandbyList(),
         getSortedStandbyNodeList: JoinV2.getSortedStandbyJoinRequests(),
       }
-      res.send(deepReplace(result, undefined, '__undefined__'))
+      res.json(deepReplace(result, undefined, '__undefined__'))
     })
 
-    this.network.registerExternalGet('standby-list-debug', isDebugModeMiddlewareLow, async (req, res) => {
+    this.network.registerExternalGet('standby-list-debug', isDebugModeMiddlewareLow, async (_req, res) => {
       let getSortedStandbyNodeList = JoinV2.getSortedStandbyJoinRequests()
       let result = getSortedStandbyNodeList.map((node) => ({
         pubKey: node.nodeInfo.publicKey,
         ip: node.nodeInfo.externalIp,
         port: node.nodeInfo.externalPort,
       }))
-      res.send(result)
+      res.json(result)
     })
 
-    this.network.registerExternalGet('status-history', isDebugModeMiddlewareLow, async (req, res) => {
+    this.network.registerExternalGet('status-history', isDebugModeMiddlewareLow, async (_req, res) => {
       let result = Self.getStatusHistoryCopy()
-      res.send(deepReplace(result, undefined, '__undefined__'))
+      res.json(deepReplace(result, undefined, '__undefined__'))
     })
 
-    this.network.registerExternalGet('socketReport', isDebugModeMiddlewareLow, async (req, res) => {
-      res.send(await getSocketReport())
+    this.network.registerExternalGet('socketReport', isDebugModeMiddlewareLow, async (_req, res) => {
+      res.json(await getSocketReport())
     })
     this.network.registerExternalGet('forceCycleSync', isDebugModeMiddleware, async (req, res) => {
       let enable = req.query.enable === 'true' || false
       config.p2p.hackForceCycleSyncComplete = enable
-      res.send(await getSocketReport())
+      res.json(await getSocketReport())
     })
 
-    this.network.registerExternalGet('calculate-fake-time-offset', isDebugModeMiddlewareHigh, async (req, res) => {
-      const shift = req.query.shift ? parseInt(req.query.shift as string) : 0
-      const spread = req.query.spread ? parseInt(req.query.spread as string) : 0
-      const offset = calculateFakeTimeOffset(shift, spread)
-      /* prettier-ignore */ this.mainLogger.debug({ message: "Calculated fakeTimeOffset", data: { shift, spread, offset } });
-      res.send({ success: true })
-    })
+    this.network.registerExternalGet(
+      'calculate-fake-time-offset',
+      isDebugModeMiddlewareHigh,
+      async (req, res) => {
+        const shift = req.query.shift ? parseInt(req.query.shift as string) : 0
+        const spread = req.query.spread ? parseInt(req.query.spread as string) : 0
+        const offset = calculateFakeTimeOffset(shift, spread)
+        /* prettier-ignore */ this.mainLogger.debug({ message: "Calculated fakeTimeOffset", data: { shift, spread, offset } });
+        res.json({ success: true })
+      }
+    )
 
-    this.network.registerExternalGet('clear-fake-time-offset', isDebugModeMiddlewareHigh, async (req, res) => {
-      const offset = clearFakeTimeOffset()
-      /* prettier-ignore */ this.mainLogger.debug({ message: "Cleared fakeTimeOffset", data: { offset } });
-      res.send({ success: true })
-    })
-
+    this.network.registerExternalGet(
+      'clear-fake-time-offset',
+      isDebugModeMiddlewareHigh,
+      async (_req, res) => {
+        const offset = clearFakeTimeOffset()
+        /* prettier-ignore */ this.mainLogger.debug({ message: "Cleared fakeTimeOffset", data: { offset } });
+        res.json({ success: true })
+      }
+    )
 
     // this.p2p.registerInternal(
     //   'sign-app-data',
@@ -2885,7 +2972,7 @@ class Shardus extends EventEmitter {
     const signAppDataBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
       name: InternalRouteEnum.binary_sign_app_data,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      handler: async (payload, respond, header, sign) => {
+      handler: async (payload, respond, header, _sign) => {
         const route = InternalRouteEnum.binary_sign_app_data
         nestedCountersInstance.countEvent('internal', route)
         this.profiler.scopedProfileSectionStart(route)
@@ -2929,7 +3016,7 @@ class Shardus extends EventEmitter {
         this.mainLogger.debug(`testGlobalAccountTX: req:${utils.stringifyReduce(req.body)}`)
         const tx = req.body.tx
         this.put(tx, false, true)
-        res.send({ success: true })
+        res.json({ success: true })
       } catch (ex) {
         this.mainLogger.debug('testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.shardus_fatal(
@@ -2944,7 +3031,7 @@ class Shardus extends EventEmitter {
         this.mainLogger.debug(`testGlobalAccountTXSet: req:${utils.stringifyReduce(req.body)}`)
         const tx = req.body.tx
         this.put(tx, true, true)
-        res.send({ success: true })
+        res.json({ success: true })
       } catch (ex) {
         this.mainLogger.debug('testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.shardus_fatal(
@@ -3082,10 +3169,11 @@ class Shardus extends EventEmitter {
     for (const [key, value] of Object.entries(changeObj)) {
       if (existingObject[key] != null) {
         /* handle dev key rotation where both keys and values are required */
-        if (key === 'devPublicKeys') {
+        if (key === 'devPublicKeys' || key === 'multisigKeys') {
           existingObject[key] = value
           this.mainLogger.info(`patched ${key} to ${value}`)
-        } else if (typeof value === 'object') {
+        }
+        else if (typeof value === 'object') {
           this.patchObject(existingObject[key], value, appData)
         } else {
           existingObject[key] = value

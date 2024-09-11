@@ -144,7 +144,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     extraNodesToAddInRestart: 5,
     secondsToCheckForQ1: 1000, // 1 seconds in ms
     hardenNewSyncingProtocol: true,
-    removeLostSyncingNodeFromList: true,  //set to true since 1.10
+    removeLostSyncingNodeFromList: true, //set to true since 1.10
     compareCertBinary: true,
     makeReceiptBinary: true,
     lostArchiverInvestigateBinary: true,
@@ -218,6 +218,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     countEndpointStop: -1,
     hashedDevAuth: '',
     devPublicKeys: {},
+    multisigKeys: {},
     debugNoTxVoting: false,
     ignoreRecieptChance: 0,
     ignoreVoteChance: 0,
@@ -229,7 +230,8 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     oldPartitionSystem: false,
     dumpAccountReportFromSQL: false,
     profiler: false,
-    minApprovalsMultiAuth: 3,
+    minMultiSigRequiredForEndpoints: 2,
+    minMultiSigRequiredForGlobalTxs: 2,
     robustQueryDebug: false,
     forwardTXToSyncingNeighbors: false,
     recordAcceptedTx: false,
@@ -321,7 +323,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     voterPercentage: 0.1,
     waitUpstreamTx: false,
     gossipCompleteData: false,
-    shareCompleteData: false,  //turn off the neighbor sharing of complete data.
+    shareCompleteData: false, //turn off the neighbor sharing of complete data.
     txStateMachineChanges: true,
     canRequestFinalData: true,
     numberOfReInjectNodes: 5,
@@ -343,7 +345,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     stuckTxMoveTime: 60000,
     forceVoteForFailedPreApply: true,
     collectedDataFix: true,
-    noRepairIfDataAttached: false,  // this seems to be an optimization that we will leave off for now
+    noRepairIfDataAttached: false, // this seems to be an optimization that we will leave off for now
     rejectSharedDataIfCovered: false,
     requestAwaitedDataAllowed: false, // this has been disabled by accident for a long time so leaving it off
     awaitingDataCanBailOnReceipt: true,
@@ -354,6 +356,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     reduceTimeFromTxTimestamp: 60000,
     fallbackToCurrentCycleFortxGroup: false,
     maxCyclesShardDataToKeep: 20,
+    avoidOurIndexInFactTell: false, //initial testing shows this may cause issues so leaving it off for now
   },
   sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
   mode: ServerMode.Release,

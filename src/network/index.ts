@@ -99,6 +99,7 @@ export class NetworkClass extends EventEmitter {
     this.useLruCacheForSocketMgmt = config.p2p.useLruCacheForSocketMgmt
     this.lruCacheSizeForSocketMgmt = config.p2p.lruCacheSizeForSocketMgmt
     this.shardusCryptoHashKey = config.crypto.hashKey
+
   }
 
   setDebugNetworkDelay(delay: number) {
@@ -129,18 +130,9 @@ export class NetworkClass extends EventEmitter {
     next()
   }
 
-  handleError(error: any, req: any, res: any, route: string) {
-    /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Error in route ${route}: ${error.message}`)
 
-    nestedCountersInstance.countEvent('endpoint-exception', `${route}`)
 
-    // Send an error response
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: isDebugMode() ? error.message : 'An unexpected error occurred',
-      route: route,
-    })
-  }
+
 
   // TODO: Allow for binding to a specified network interface
   _setupExternal() {
@@ -168,11 +160,20 @@ export class NetworkClass extends EventEmitter {
       this.app.use(this.customSendJsonMiddleware)
       this.app.use(storeRequests)
       this._applyExternal()
+      this.app.use((err, req, res, next) => {
+
+        res.status(500).json({
+          error: 'Internal Server Error',
+          message: isDebugMode() ? err.message : 'An unexpected error occurred'
+        })
+      })
+
       this.extServer = this.app.listen(this.ipInfo.externalPort, () => {
         const msg = `External server running on port ${this.ipInfo.externalPort}...`
         console.log(msg)
         this.mainLogger.info('Network: ' + msg)
       })
+      this.extServer.setTimeout(config.network.timeout * 1000)
 
       this.io = require('socket.io')(this.extServer)
       resolve(this.io)
@@ -570,7 +571,9 @@ export class NetworkClass extends EventEmitter {
         }
         result = await responseHandler(req, res, next)
       } catch (error) {
-        this.handleError(error, req, res, route)
+        /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Error in route ${route}: ${error.message}`)
+        nestedCountersInstance.countEvent('endpoint-exception', `${route}`)
+        next(error)
       } finally {
         if (isDebugMode() && ['GET', 'POST'].includes(method)) {
           profilerInstance.scopedProfileSectionEnd(`net-externl-${route}`)

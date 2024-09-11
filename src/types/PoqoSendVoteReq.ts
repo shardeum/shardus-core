@@ -10,7 +10,7 @@ const cPoqoSendVoteReqVersion = 1
 
 export function serializePoqoSendVoteReq(
   stream: VectorBufferStream,
-  inp: AppliedVoteHash & { txGroupCycle: number },
+  inp: AppliedVoteHash,
   root = false
 ): void {
   if (root) {
@@ -18,15 +18,14 @@ export function serializePoqoSendVoteReq(
   }
   stream.writeUInt8(cPoqoSendVoteReqVersion)
   serializeSpreadAppliedVoteHashReq(stream, inp)
-  stream.writeUInt32(inp.txGroupCycle)
 }
 
 export function deserializePoqoSendVoteReq(
   stream: VectorBufferStream
-): AppliedVoteHash & { txGroupCycle: number } {
+): AppliedVoteHash & { voteTime: number } {
   const version = stream.readUInt8()
   if (version != cPoqoSendVoteReqVersion) {
     throw new Error('PoqoSendVoteReq version mismatch')
   }
-  return { ...deserializeSpreadAppliedVoteHashReq(stream), txGroupCycle: stream.readUInt32() }
+  return deserializeSpreadAppliedVoteHashReq(stream)
 }

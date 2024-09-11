@@ -19,25 +19,24 @@ export type TxDebug = {
     ourIndex: number
     ourUnwrappedIndex: number
     callParams: {
-        oi: number
-        st: number
-        et: number
-        gl: number
-        tg: number
-        sg: number
-        tn: number
+      oi: number
+      st: number
+      et: number
+      gl: number
+      tg: number
+      sg: number
+      tn: number
     }
-    localKeys: {[x:string]: boolean }
+    localKeys: { [x: string]: boolean }
     oldCorrespondingIndices: number[]
-    correspondingIndices:  number[]
+    correspondingIndices: number[]
     correspondingNodeIds: string[]
   }
-
 }
 
 export type QueueEntry = {
-  gossipedCompleteData: boolean;
-  sharedCompleteData: boolean;
+  gossipedCompleteData: boolean
+  sharedCompleteData: boolean
   eligibleNodeIdsToVote: Set<string>
   eligibleNodeIdsToConfirm: Set<string>
   acceptedTx: Shardus.AcceptedTx
@@ -108,15 +107,17 @@ export type QueueEntry = {
 
   // POQo
   poqoNextSendIndex?: number
-  poqoReceipt?: AppliedReceipt2
+  poqoReceipt?: SignedReceipt
   hasSentFinalReceipt?: boolean
 
   // Consensus tracking:
-  ourVote?: AppliedVote
+  ourProposal?: Proposal
+  ourVote?: Vote
+  signedReceipt?: SignedReceipt
   ourVoteHash?: string
   collectedVotes: AppliedVote[]
   collectedVoteHashes: AppliedVoteHash[]
-  pendingVotes: Map<string, AppliedVote>,
+  pendingVotes: Map<string, AppliedVote>
   pendingConfirmOrChallenge: Map<string, ConfirmOrChallengeMessage>
   receivedBestVote?: AppliedVote
   receivedBestVoteHash?: string
@@ -160,14 +161,20 @@ export type QueueEntry = {
   recievedAppliedReceipt?: AppliedReceipt
   // receipt that we need to repair to
   appliedReceiptForRepair?: AppliedReceipt
+  // receipt we need to repair to
+  signedReceiptForRepair?: SignedReceipt
   // receipt coalesced in getReceipt().
   appliedReceiptFinal?: AppliedReceipt
+  // receipt coalesced in getReceipt().
+  signedReceiptFinal?: SignedReceipt
 
   // For config.debug.optimizedTXConsenus === true
   // receipt that we created
   appliedReceipt2?: AppliedReceipt2
   // receipt that we got from gossip
   recievedAppliedReceipt2?: AppliedReceipt2
+  // receipt that we got from gossip
+  receivedSignedReceipt?: SignedReceipt
   // receipt that we need to repair to
   appliedReceiptForRepair2?: AppliedReceipt2
   // receipt coalesced in getReceipt().
@@ -573,28 +580,29 @@ export type HashSetEntryError = {
 /**
  * vote for a value
  */
-export type Vote = {
-  /**
-   * vote value
-   */
-  v: string
-  /**
-   * number of votes
-   */
-  count: number
-  /**
-   * reference to another vote object
-   */
-  vote?: CountEntry
-  /**
-   * count based on vote power
-   */
-  ec?: number
-  /**
-   * hashlist index of the voters for this vote
-   */
-  voters?: number[]
-}
+// OLD VOTE FORMAT BEFORE POQO
+// export type Vote = {
+//   /**
+//    * vote value
+//    */
+//   v: string
+//   /**
+//    * number of votes
+//    */
+//   count: number
+//   /**
+//    * reference to another vote object
+//    */
+//   vote?: CountEntry
+//   /**
+//    * count based on vote power
+//    */
+//   ec?: number
+//   /**
+//    * hashlist index of the voters for this vote
+//    */
+//   voters?: number[]
+// }
 
 export type StringVoteObjectMap = { [vote: string]: Vote }
 
@@ -664,6 +672,45 @@ export type AppliedVoteCore = {
 //     sign?: Shardus.Sign
 // };
 
+export type Proposal = {
+  applied: boolean
+  cant_preApply: boolean
+  accountIDs: string[]
+  beforeStateHashes: string[]
+  afterStateHashes: string[]
+  appReceiptDataHash: string
+  txid: string
+}
+
+export type SignedReceipt = {
+  proposal: Proposal
+  proposalHash: string // Redundant, may go
+  signaturePack: Shardus.Sign[]
+  voteOffsets: number[]
+  sign?: Shardus.Sign
+}
+
+export type Vote = {
+  proposalHash: string
+  sign?: Shardus.Sign
+}
+
+// ArchiverReceipt2 referring to POQo
+export type ArchiverReceipt = {
+  tx: {
+    originalTxData: Shardus.OpaqueTransaction
+    txId: string
+    timestamp: number
+  }
+  signedReceipt: SignedReceipt
+  appReceiptData: any
+  beforeStates?: Shardus.AccountsCopy[]
+  afterStates?: Shardus.AccountsCopy[]
+  cycle: number
+  executionShardKey: string
+  globalModification: boolean
+}
+
 export type AppliedVote = {
   txid: string
   transaction_result: boolean
@@ -723,6 +770,7 @@ export type AppliedReceipt2 = {
 export type AppliedVoteHash = {
   txid: string
   voteHash: string
+  voteTime: number
   sign?: Shardus.Sign
 }
 
@@ -750,20 +798,20 @@ export type ConfirmOrChallengeQueryResponse = {
 /**
  * ArchiverReceipt is the full data (shardusReceipt + appReceiptData + accounts ) of a tx that is sent to the archiver
  */
-export interface ArchiverReceipt {
-  tx: {
-    originalTxData: Shardus.OpaqueTransaction
-    txId: string
-    timestamp: number
-  }
-  cycle: number
-  beforeStateAccounts: Shardus.AccountsCopy[]
-  accounts: Shardus.AccountsCopy[]
-  appReceiptData: unknown
-  appliedReceipt: AppliedReceipt2
-  executionShardKey: string
-  globalModification: boolean
-}
+// export interface ArchiverReceipt {
+//   tx: {
+//     originalTxData: Shardus.OpaqueTransaction
+//     txId: string
+//     timestamp: number
+//   }
+//   cycle: number
+//   beforeStateAccounts: Shardus.AccountsCopy[]
+//   accounts: Shardus.AccountsCopy[]
+//   appReceiptData: unknown
+//   appliedReceipt: AppliedReceipt2
+//   executionShardKey: string
+//   globalModification: boolean
+// }
 
 // export type AppliedReceiptGossip2 = {
 //     appliedReceipt: AppliedReceipt2
@@ -842,9 +890,9 @@ export type RequestTxResp = {
 }
 
 export type RequestReceiptForTxReq = { txid: string; timestamp: number }
-export type RequestReceiptForTxResp_old = { receipt: AppliedReceipt; note: string; success: boolean }
+export type RequestReceiptForTxResp_old = { receipt: SignedReceipt; note: string; success: boolean }
 
-export type RequestReceiptForTxResp = { receipt: AppliedReceipt2; note: string; success: boolean }
+export type RequestReceiptForTxResp = { receipt: SignedReceipt; note: string; success: boolean }
 
 export type RequestStateForTxReqPost = { txid: string; timestamp: number; key: string; hash: string }
 
@@ -1118,7 +1166,7 @@ export type HashTrieSyncConsensus = {
         string,
         {
           count: number
-          voters: Shardus.Node[]
+          voters: Set<Shardus.Node>
         }
       >
       bestHash: string
@@ -1273,7 +1321,7 @@ export type CachedAppData = {
 
 export interface TimestampRemoveRequest {
   txId: string
-  receipt2: AppliedReceipt2
+  signedReceipt: SignedReceipt
   cycleCounter: number
 }
 

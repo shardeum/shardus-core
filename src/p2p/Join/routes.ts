@@ -44,13 +44,16 @@ import { addStandbyRefresh } from './v2/standbyRefresh'
 import { Utils } from '@shardus/types'
 import { testFailChance } from '../../utils'
 import { shardusGetTime } from '../../network'
+import { verifyPayload } from '../../types/ajv/Helpers'
+import { AJVSchemaEnum } from '../../types/enum/AJVSchemaEnum'
+
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'cyclemarker',
   handler: (_req, res) => {
     const marker = CycleChain.newest ? CycleChain.newest.previous : '0'.repeat(64)
-    res.send(marker)
+    res.json({ marker })
   },
 }
 
@@ -71,144 +74,164 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'join',
   handler: async (req, res) => {
-    const joinRequest: JoinRequest = Utils.safeJsonParse(Utils.safeStringify(req.body))
+  
 
-    if (!isActive && !Self.isRestartNetwork) {
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: not-active`)
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: not-active`)
-      // if we are not active yet, we cannot accept join requests
-      return res.status(400).json({
-        success: false,
-        fatal: false,
-        reason: `this node is not active yet`,
-      })
-    }
+  try {
+      const joinRequest: JoinRequest = Utils.safeJsonParse(Utils.safeStringify(req.body))
 
-    if (CycleCreator.currentQuarter < 1) {
-      /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: CycleCreator.currentQuarter < 1 ${CycleCreator.currentQuarter}`)
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: CycleCreator.currentQuarter < 1 ${CycleCreator.currentQuarter} ${joinRequest.nodeInfo.publicKey}`)
-      // if currentQuarter <= 0 then we are not ready
-      return res.status(400).json({
-        success: false,
-        fatal: false,
-        reason: `Can't join before quarter 1`,
-      })
-    }
-
-    if (
-      (NodeList.activeByIdOrder.length === 1 || Self.isRestartNetwork) &&
-      Self.isFirst &&
-      isBogonIP(joinRequest.nodeInfo.externalIp) &&
-      config.p2p.forceBogonFilteringOn === false
-    ) {
-      setAllowBogon(true)
-    }
-    nestedCountersInstance.countEvent('p2p', `join-allow-bogon-firstnode:${getAllowBogon()}`)
-
-    const externalIp = joinRequest.nodeInfo.externalIp
-    const externalPort = joinRequest.nodeInfo.externalPort
-    const internalIp = joinRequest.nodeInfo.internalIp
-    const internalPort = joinRequest.nodeInfo.internalPort
-
-    const externalPortReachable = await isPortReachable({ host: externalIp, port: externalPort })
-    const internalPortReachable = await isPortReachable({ host: internalIp, port: internalPort })
-
-    if (!externalPortReachable || !internalPortReachable) {
-      /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-reject: !externalPortReachable || !internalPortReachable` )
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: !externalPortReachable || !internalPortReachable ${joinRequest.nodeInfo.publicKey} ${Utils.safeStringify({ host: externalIp, port: externalPort })}`)
-      return res.send({
-        success: false,
-        fatal: true,
-        //the following message string is used by submitJoinV2.  if you change the string please update submitJoinV2
-        reason: `IP or Port is not reachable. ext:${externalIp}:${externalPort} int:${internalIp}:${internalPort}}`,
-      })
-    }
-
-    // if the port of the join request was reachable, this join request is free to be
-    // gossiped to all nodes according to Join Protocol v2.
-    if (config.p2p.useJoinProtocolV2) {
-      // ensure this join request doesn't already exist in standby nodes
-      if (getStandbyNodesInfoMap().has(joinRequest.nodeInfo.publicKey)) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: already standby`)
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: already standby ${joinRequest.nodeInfo.publicKey}:`)
+      // Validate the joinReq against the ajv schema
+      const errors = verifyPayload(AJVSchemaEnum.JoinReq, joinRequest);
+      if (errors) {
         return res.status(400).json({
           success: false,
-          fatal: false, //this was true before which seems wrong.  Do we want to kill a node that already got in?
-          reason: `Join request for pubkey ${joinRequest.nodeInfo.publicKey} already exists as a standby node`,
-        })
+          fatal: true,
+          reason: 'Validation error: ' + errors.join('; ')
+        });
       }
 
-      // then validate the join request. if it's invalid for any reason, return
-      // that reason.
-      const validationError = validateJoinRequest(joinRequest)
-      if (validationError) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: validateJoinRequest ${validationError.reason}`)
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: validateJoinRequest ${validationError.reason} ${joinRequest.nodeInfo.publicKey}:`)
-        return res.status(400).json(validationError)
-      }
-      // then, verify the signature of the join request. this has to be done
-      // before selectionNum is calculated because we will mutate the original
-      // join request.
-      const signatureError = verifyJoinRequestSignature(joinRequest)
-      if (signatureError) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: signature error`)
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: signature error ${joinRequest.nodeInfo.publicKey}:`)
-        return res.status(400).json(signatureError)
-      }
 
-      // then, calculate the selection number for this join request.
-      const selectionNumResult = computeSelectionNum(joinRequest)
-      if (selectionNumResult.isErr()) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: failed selection number ${selectionNumResult.error.reason}`)
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`, Utils.safeStringify(selectionNumResult.error) )
-        return res.status(500).json(selectionNumResult.error)
-      }
-      joinRequest.selectionNum = selectionNumResult.value
-
-      if (CycleCreator.currentQuarter > 1) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `rejected-late-join-request ${CycleCreator.currentQuarter}`)
+      if (!isActive && !Self.isRestartNetwork) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: not-active`)
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: not-active`)
+        // if we are not active yet, we cannot accept join requests
         return res.status(400).json({
           success: false,
           fatal: false,
-          reason: `Can't join after quarter 1`,
+          reason: `this node is not active yet`,
         })
       }
 
-      // following block is DEPRECATED
-      // add the join request to the global list of join requests. this will also
-      // add it to the list of new join requests that will be processed as part of
-      // cycle creation to create a standy node list.
-      // saveJoinRequest(joinRequest)
-
-      // then, queue this join request to be sent when sendRequests is called at the start of Q1
-      queueJoinRequest(joinRequest)
-
-      /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join success` )
-      // respond with the number of standby nodes for the user's information
-      return res.status(200).send({ success: true, numStandbyNodes: getStandbyNodesInfoMap().size })
-    } else {
-      //  Validate of joinReq is done in addJoinRequest
-      const joinRequestResponse = addJoinRequest(joinRequest)
-
-      // if the join request was valid and accepted, gossip that this join request
-      // was accepted to other nodes
-      if (joinRequestResponse.success) {
-        // only gossip join requests if we are still using the old join protocol
-        Comms.sendGossip(
-          'gossip-join',
-          joinRequest,
-          '',
-          null,
-          nodeListFromStates([
-            P2P.P2PTypes.NodeStatus.ACTIVE,
-            P2P.P2PTypes.NodeStatus.READY,
-            P2P.P2PTypes.NodeStatus.SYNCING,
-          ]),
-          true
-        )
-        nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
+      if (CycleCreator.currentQuarter < 1) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: CycleCreator.currentQuarter < 1 ${CycleCreator.currentQuarter}`)
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: CycleCreator.currentQuarter < 1 ${CycleCreator.currentQuarter} ${joinRequest.nodeInfo.publicKey}`)
+        // if currentQuarter <= 0 then we are not ready
+        return res.status(400).json({
+          success: false,
+          fatal: false,
+          reason: `Can't join before quarter 1`,
+        })
       }
-      return res.send(joinRequestResponse)
+
+      if (
+        (NodeList.activeByIdOrder.length === 1 || Self.isRestartNetwork) &&
+        Self.isFirst &&
+        isBogonIP(joinRequest.nodeInfo.externalIp) &&
+        config.p2p.forceBogonFilteringOn === false
+      ) {
+        setAllowBogon(true)
+      }
+      nestedCountersInstance.countEvent('p2p', `join-allow-bogon-firstnode:${getAllowBogon()}`)
+
+      // Ensure IP and Port properties exist
+      const { externalIp, externalPort, internalIp, internalPort } = joinRequest.nodeInfo || {};
+
+      const externalPortReachable = await isPortReachable({ host: externalIp, port: externalPort })
+      const internalPortReachable = await isPortReachable({ host: internalIp, port: internalPort })
+
+      if (!externalPortReachable || !internalPortReachable) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-reject: !externalPortReachable || !internalPortReachable` )
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: !externalPortReachable || !internalPortReachable ${joinRequest.nodeInfo.publicKey} ${Utils.safeStringify({ host: externalIp, port: externalPort })}`)
+        return res.json({
+          success: false,
+          fatal: true,
+          //the following message string is used by submitJoinV2.  if you change the string please update submitJoinV2
+          reason: `IP or Port is not reachable. ext:${externalIp}:${externalPort} int:${internalIp}:${internalPort}}`,
+        })
+      }
+
+      // if the port of the join request was reachable, this join request is free to be
+      // gossiped to all nodes according to Join Protocol v2.
+      if (config.p2p.useJoinProtocolV2) {
+        // ensure this join request doesn't already exist in standby nodes
+        if (getStandbyNodesInfoMap().has(joinRequest.nodeInfo.publicKey)) {
+          /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: already standby`)
+          /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: already standby ${joinRequest.nodeInfo.publicKey}:`)
+          return res.status(400).json({
+            success: false,
+            fatal: false, //this was true before which seems wrong.  Do we want to kill a node that already got in?
+            reason: `Join request for pubkey ${joinRequest.nodeInfo.publicKey} already exists as a standby node`,
+          })
+        }
+
+        // then validate the join request. if it's invalid for any reason, return
+        // that reason.
+        const validationError = validateJoinRequest(joinRequest)
+        if (validationError) {
+          /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: validateJoinRequest ${validationError.reason}`)
+          /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: validateJoinRequest ${validationError.reason} ${joinRequest.nodeInfo.publicKey}:`)
+          return res.status(400).json(validationError)
+        }
+        // then, verify the signature of the join request. this has to be done
+        // before selectionNum is calculated because we will mutate the original
+        // join request.
+        const signatureError = verifyJoinRequestSignature(joinRequest)
+        if (signatureError) {
+          /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: signature error`)
+          /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-reject: signature error ${joinRequest.nodeInfo.publicKey}:`)
+          return res.status(400).json(signatureError)
+        }
+
+        // then, calculate the selection number for this join request.
+        const selectionNumResult = computeSelectionNum(joinRequest)
+        if (selectionNumResult.isErr()) {
+          /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-reject: failed selection number ${selectionNumResult.error.reason}`)
+          /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `failed to compute selection number for node ${joinRequest.nodeInfo.publicKey}:`, Utils.safeStringify(selectionNumResult.error) )
+          return res.status(500).json(selectionNumResult.error)
+        }
+        joinRequest.selectionNum = selectionNumResult.value
+
+        if (CycleCreator.currentQuarter > 1) {
+          /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `rejected-late-join-request ${CycleCreator.currentQuarter}`)
+          return res.status(400).json({
+            success: false,
+            fatal: false,
+            reason: `Can't join after quarter 1`,
+          })
+        }
+
+        // following block is DEPRECATED
+        // add the join request to the global list of join requests. this will also
+        // add it to the list of new join requests that will be processed as part of
+        // cycle creation to create a standy node list.
+        // saveJoinRequest(joinRequest)
+
+        // then, queue this join request to be sent when sendRequests is called at the start of Q1
+        queueJoinRequest(joinRequest)
+
+        /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join success` )
+        // respond with the number of standby nodes for the user's information
+        return res.status(200).json({ success: true, numStandbyNodes: getStandbyNodesInfoMap().size })
+      } else {
+        //  Validate of joinReq is done in addJoinRequest
+        const joinRequestResponse = addJoinRequest(joinRequest)
+
+        // if the join request was valid and accepted, gossip that this join request
+        // was accepted to other nodes
+        if (joinRequestResponse.success) {
+          // only gossip join requests if we are still using the old join protocol
+          Comms.sendGossip(
+            'gossip-join',
+            joinRequest,
+            '',
+            null,
+            nodeListFromStates([
+              P2P.P2PTypes.NodeStatus.ACTIVE,
+              P2P.P2PTypes.NodeStatus.READY,
+              P2P.P2PTypes.NodeStatus.SYNCING,
+            ]),
+            true
+          )
+          nestedCountersInstance.countEvent('p2p', 'initiate gossip-join')
+        }
+        return res.json(joinRequestResponse)
+      }
+    } catch (error) {
+      console.error('Error handling join request:', error);
+      return res.status(500).json({
+        success: false,
+        fatal: true,
+        reason: 'An error occurred while processing the join request'
+      });
     }
   },
 }
@@ -220,7 +243,7 @@ const unjoinRoute: P2P.P2PTypes.Route<Handler> = {
     const unjoinRequest = req.body
     const processResult = processNewUnjoinRequest(unjoinRequest)
     if (processResult.isErr()) {
-      return res.status(500).send(processResult.error)
+      return res.status(500).json({ error: processResult.error })
     }
 
     // we need to remove the unjoin request this cycle since we are waiting until next cycle to gossip it to the network
@@ -230,7 +253,7 @@ const unjoinRoute: P2P.P2PTypes.Route<Handler> = {
 
     queueUnjoinRequest(unjoinRequest)
 
-    return res.status(200).send()
+    return res.status(200).json()
   },
 }
 
@@ -260,13 +283,13 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
       warn(
         'invalid config.debug.ignoreStandbyRefreshChance value: ' + config.debug.ignoreStandbyRefreshChance
       )
-      res.status(500).send('invalid config.debug.ignoreStandbyRefreshChance value')
+      res.status(500).json({ error: 'invalid config.debug.ignoreStandbyRefreshChance value' })
       // check if we should ignore this request for testing purposes
     } else if (config.debug.ignoreStandbyRefreshChance > 0) {
       // if we should ignore this request, sleep for 1.1 seconds since timeout is 1 second
       if (testFailChance(config.debug.ignoreStandbyRefreshChance, 'standby-refresh', '', '', false)) {
         await utils.sleep(3000)
-        res.status(500).send('simulated timeout')
+        res.status(500).json({ error: 'simulated timeout' })
       }
     }
 
@@ -275,16 +298,16 @@ const standbyRefreshRoute: P2P.P2PTypes.Route<Handler> = {
     let err = utils.validateTypes(req, { body: 'o' })
     if (err) {
       warn('/standby-refresh bad req ' + err)
-      res.status(400).send()
+      res.status(400).json()
     }
     err = typeof standbyRefreshPubKey === 'string' ? '' : 'standbyRefreshPubKey is not a string'
     if (err) {
       warn('/standby-refresh bad standby refresh public key ' + err)
-      res.status(400).send()
+      res.status(400).json()
     }
 
     queueStandbyRefreshRequest(standbyRefreshPubKey)
-    return res.status(200).send()
+    return res.status(200).json()
   },
 }
 
@@ -307,7 +330,7 @@ const joinedV2Route: P2P.P2PTypes.Route<Handler> = {
     }
     const publicKey = req.params.publicKey
     const id = NodeList.byPubKey.get(publicKey)?.id || null
-    res.send({ id, isOnStandbyList: isOnStandbyList(publicKey) })
+    res.json({ id, isOnStandbyList: isOnStandbyList(publicKey) })
   },
 }
 
@@ -330,7 +353,7 @@ const joinedRoute: P2P.P2PTypes.Route<Handler> = {
     }
     const publicKey = req.params.publicKey
     const node = NodeList.byPubKey.get(publicKey)
-    res.send({ node })
+    res.json({ node })
   },
 }
 
@@ -503,6 +526,20 @@ const gossipValidJoinRequests: P2P.P2PTypes.GossipHandler<
   if (validationError) {
     /* prettier-ignore */ nestedCountersInstance.countEvent( 'p2p', `join-gossip-reject: failed to validate join request` )
     /* prettier-ignore */ if (logFlags.p2pNonFatal)console.error(`failed to validate join request when gossiping: ${validationError}`)
+    return
+  }
+
+  // set selectionNum to undefined so that we can verify the signature
+  // it'll be added back soon anyways
+  joinRequest.selectionNum = undefined
+
+  // then, verify the signature of the join request. this has to be done
+  // before selectionNum is calculated because we will mutate the original
+  // join request.
+  const signatureError = verifyJoinRequestSignature(joinRequest)
+  if (signatureError) {
+    /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', `join-gossip-reject: signature error`)
+    /* prettier-ignore */ if (logFlags.p2pNonFatal) console.error( `join-gossip-reject: signature error ${joinRequest.nodeInfo.publicKey}:`)
     return
   }
 

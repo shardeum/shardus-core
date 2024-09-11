@@ -24,12 +24,14 @@ describe('SpreadAppliedVoteHashReq Tests', () => {
       const obj: SpreadAppliedVoteHashReq = {
         txid: 'testTxId',
         voteHash: 'testVoteHash',
+        voteTime: 7,
       }
       serializeSpreadAppliedVoteHashReq(stream, obj, false)
       stream.position = 0
       expect(stream.readUInt8()).toBe(cSpreadAppliedVoteHashReqVersion)
       expect(stream.readString()).toBe(obj.txid)
       expect(stream.readString()).toBe(obj.voteHash)
+      expect(stream.readUInt16()).toBe(7)
       expect(stream.readUInt8()).toBe(0)
     })
 
@@ -37,6 +39,7 @@ describe('SpreadAppliedVoteHashReq Tests', () => {
       const obj: SpreadAppliedVoteHashReq = {
         txid: 'testTxId',
         voteHash: 'testVoteHash',
+        voteTime: 7,
         sign: {
           owner: 'testOwner',
           sig: 'testSig',
@@ -48,21 +51,24 @@ describe('SpreadAppliedVoteHashReq Tests', () => {
       expect(stream.readUInt8()).toBe(cSpreadAppliedVoteHashReqVersion)
       expect(stream.readString()).toBe(obj.txid)
       expect(stream.readString()).toBe(obj.voteHash)
+      expect(stream.readUInt16()).toBe(7)
       expect(stream.readUInt8()).toBe(1)
-      expect(stream.readString()).toBe(obj.sign.owner)
-      expect(stream.readString()).toBe(obj.sign.sig)
+      expect(stream.readString()).toBe('testOwner')
+      expect(stream.readString()).toBe('testSig')
     })
 
     it('should handle empty strings correctly', () => {
       const obj: SpreadAppliedVoteHashReq = {
         txid: '',
         voteHash: '',
+        voteTime: 5,
       }
       serializeSpreadAppliedVoteHashReq(stream, obj)
       stream.position = 0
       stream.readUInt8() // Skip version for simplicity
       expect(stream.readString()).toBe('')
       expect(stream.readString()).toBe('')
+      expect(stream.readUInt16()).toBe(5)
       expect(stream.readUInt8()).toBe(0)
     })
   })
@@ -78,6 +84,7 @@ describe('SpreadAppliedVoteHashReq Tests', () => {
       stream.writeUInt8(cSpreadAppliedVoteHashReqVersion + 1) // Write an unsupported version
       stream.writeString('testTxId')
       stream.writeString('testVoteHash')
+      stream.writeUInt16(5)
       stream.writeUInt8(0)
       stream.position = 0
       expect(() => deserializeSpreadAppliedVoteHashReq(stream)).toThrow('Unsupported version')
@@ -87,11 +94,13 @@ describe('SpreadAppliedVoteHashReq Tests', () => {
       stream.writeUInt8(cSpreadAppliedVoteHashReqVersion)
       stream.writeString('testTxId')
       stream.writeString('testVoteHash')
+      stream.writeUInt16(5)
       stream.writeUInt8(0)
       stream.position = 0
       const result = deserializeSpreadAppliedVoteHashReq(stream)
       expect(result.txid).toBe('testTxId')
       expect(result.voteHash).toBe('testVoteHash')
+      expect(result.voteTime).toBe(5)
       expect(result.sign).toBeUndefined()
     })
 
@@ -99,6 +108,7 @@ describe('SpreadAppliedVoteHashReq Tests', () => {
       stream.writeUInt8(cSpreadAppliedVoteHashReqVersion)
       stream.writeString('testTxId')
       stream.writeString('testVoteHash')
+      stream.writeUInt16(5)
       stream.writeUInt8(1)
       stream.writeString('testOwner')
       stream.writeString('testSig')
@@ -106,6 +116,7 @@ describe('SpreadAppliedVoteHashReq Tests', () => {
       const result = deserializeSpreadAppliedVoteHashReq(stream)
       expect(result.txid).toBe('testTxId')
       expect(result.voteHash).toBe('testVoteHash')
+      expect(result.voteTime).toBe(5)
       expect(result.sign).toEqual({
         owner: 'testOwner',
         sig: 'testSig',
@@ -116,11 +127,13 @@ describe('SpreadAppliedVoteHashReq Tests', () => {
       stream.writeUInt8(cSpreadAppliedVoteHashReqVersion)
       stream.writeString('')
       stream.writeString('')
+      stream.writeUInt16(5)
       stream.writeUInt8(0)
       stream.position = 0
       const result = deserializeSpreadAppliedVoteHashReq(stream)
       expect(result.txid).toBe('')
       expect(result.voteHash).toBe('')
+      expect(result.voteTime).toBe(5)
       expect(result.sign).toBeUndefined()
     })
   })
@@ -130,6 +143,7 @@ describe('SpreadAppliedVoteHashReq Tests', () => {
       const obj: SpreadAppliedVoteHashReq = {
         txid: 'uniqueTxId',
         voteHash: 'uniqueVoteHash',
+        voteTime: 9,
         sign: {
           owner: 'testOwner',
           sig: 'testSig',
