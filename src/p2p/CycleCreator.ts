@@ -20,6 +20,7 @@ import * as Rotation from './Rotation'
 import * as SafetyMode from './SafetyMode'
 import * as Modes from './Modes'
 import * as Self from './Self'
+import * as ServiceQueue from './ServiceQueue'
 import * as LostArchivers from './LostArchivers'
 import { compareQuery, Comparison } from './Utils'
 import { errorToStringFull, formatErrorMessage } from '../utils'
@@ -70,6 +71,7 @@ type submoduleTypes =
   | typeof Modes
   | typeof CycleAutoScale
   | typeof LostArchivers
+  | typeof ServiceQueue
 
 /** STATE */
 
@@ -96,6 +98,7 @@ export let submodules: submoduleTypes[] = [
   Modes,
   CycleAutoScale,
   LostArchivers,
+  ServiceQueue,
 ]
 
 export let currentQuarter = -1 // means we have not started creating cycles
@@ -347,6 +350,8 @@ async function cycleCreator() {
   /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log('cycleCreator: currentCycle', currentCycle)
   // Set current quater to 0 while we are setting up the previous record
   //   Routes should use this to not process and just single-forward gossip
+
+  // I think setting the current cycle here as well is intuitive, but I don't want to do it right now
   currentQuarter = 0
 
   createCycleTag++
@@ -629,6 +634,8 @@ async function runQ3() {
   // Gossip your cert for this cycle with the network
   gossipMyCycleCert()
 
+  ServiceQueue.processNetworkTransactions(record)
+
   profilerInstance.profileSectionEnd('CycleCreator-runQ3')
 }
 
@@ -739,6 +746,9 @@ function makeCycleRecord(
     archiverListHash: '',
     standbyNodeListHash: '',
     random: config.debug.randomCycleData ? Math.floor(Math.random() * 1000) + 1 : 0,
+    txadd: [],
+    txremove: [],
+    txlisthash: '',
   }) as P2P.CycleCreatorTypes.CycleRecord
 
   submodules.map((submodule) => submodule.updateRecord(cycleTxs, cycleRecord, prevRecord))

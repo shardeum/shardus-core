@@ -63,3 +63,16 @@ export function verifyCycleRecord(
 
   return ok(true)
 }
+
+export function verifyTxList(
+  txList: { hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }[],
+  expectedHash: hexstring
+): Result<boolean, Error> {
+  const actualHash = crypto.hash(txList)
+
+  // verify that the hash of the CycleRecord matches the expected hash
+  if (actualHash !== expectedHash)
+    return err(new Error(`hash mismatch for txList: expected ${expectedHash}, got ${actualHash}`))
+
+  return ok(true)
+}
