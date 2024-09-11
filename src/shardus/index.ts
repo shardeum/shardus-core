@@ -491,7 +491,12 @@ class Shardus extends EventEmitter {
             return
           }
 
-          const archiverIP = socket.handshake.headers.host.split(':')[0]
+          const archiverIP = socket.handshake.address.split('::ffff:').pop();
+          if (!utils.isValidIPv4(archiverIP)) {
+            this.mainLogger.error(`❌ Invalid IP-Address of Archiver: ${archiverIP}`)
+            socket.disconnect()
+            return
+          }
           const archiverCreds = JSON.parse(socket.handshake.query.data)
           const isValidSig = this.crypto.verify(archiverCreds, archiverCreds.publicKey)
           if (!isValidSig) {
@@ -508,7 +513,7 @@ class Shardus extends EventEmitter {
           if (archiverIP !== recipient.nodeInfo.ip) {
             this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
             this.mainLogger.error('Recipient: ', recipient.nodeInfo)
-            this.mainLogger.error('Remote Archiver: ', socket.handshake.headers.host)
+            this.mainLogger.error('Remote Archiver: ', socket.handshake.address)
             socket.disconnect()
             return
           }

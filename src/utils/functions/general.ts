@@ -6,6 +6,17 @@ import { nestedCountersInstance } from '../nestedCounters'
 import { Utils } from '@shardus/types'
 
 /**
+ * Checks if the input string is a valid IPv4 address
+ */
+export const isValidIPv4 = (ip: string): boolean => {
+  // eslint-disable-next-line security/detect-unsafe-regex
+  const ipv4Regex = new RegExp(
+    '^(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}$'
+  )
+  return ipv4Regex.test(ip)
+}
+
+/**
  * this helper replacer is lossy and only for logging
  * @param _key
  * @param value
