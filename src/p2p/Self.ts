@@ -32,6 +32,7 @@ import { submitStandbyRefresh } from './Join/v2/standbyRefresh'
 import { getNumArchivers } from './Archivers'
 import { currentQuarter } from './CycleCreator'
 import { Utils } from '@shardus/types'
+import * as ServiceQueue from './ServiceQueue'
 
 /** STATE */
 
@@ -776,7 +777,13 @@ async function joinNetworkV2(activeNodes): Promise<void> {
 
 async function syncCycleChain(selfId: string): Promise<void> {
   // You're already synced if you're first
-  if (isFirst) return
+  if (isFirst) {
+    // If you're the first node in a restart network, you only need to sync the network generated tx list
+    if (isRestartNetwork) {
+      await ServiceQueue.syncTxListFromArchiver()
+    }
+    return
+  }
   let synced = false
   while (!synced) {
     // Once joined, sync to the network
@@ -1090,6 +1097,7 @@ export function getThisNodeInfo(): P2P.P2PTypes.P2PNode {
   const address = publicKey
   const joinRequestTimestamp = utils.getTime('s')
   const activeTimestamp = 0
+  const activeCycle = 0
   const syncingTimestamp = 0
   const readyTimestamp = 0
   const nodeInfo = {
@@ -1101,6 +1109,7 @@ export function getThisNodeInfo(): P2P.P2PTypes.P2PNode {
     address,
     joinRequestTimestamp,
     activeTimestamp,
+    activeCycle,
     syncingTimestamp,
     readyTimestamp,
   }

@@ -15,11 +15,14 @@ import {
   robustQueryForArchiverListHash,
   robustQueryForStandbyNodeListHash,
   getStandbyNodeListFromNode,
+  robustQueryForTxListHash,
+  getTxListFromNode,
 } from './queries'
-import { verifyArchiverList, verifyCycleRecord, verifyValidatorList } from './verify'
+import { verifyArchiverList, verifyCycleRecord, verifyTxList, verifyValidatorList } from './verify'
 import * as Archivers from '../Archivers'
 import * as NodeList from '../NodeList'
 import * as CycleChain from '../CycleChain'
+import * as ServiceQueue from '../ServiceQueue'
 import { initRoutes } from './routes'
 import { digestCycle } from '../Sync'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
@@ -48,43 +51,48 @@ export function syncV2(activeNodes: P2P.SyncTypes.ActiveNode[]): ResultAsync<voi
   return syncValidValidatorList(activeNodes).andThen(([validatorList, validatorListHash]) =>
     syncArchiverList(activeNodes).andThen(([archiverList, archiverListHash]) =>
       syncStandbyNodeList(activeNodes).andThen((standbyNodeList) =>
-        syncLatestCycleRecord(activeNodes).andThen((cycle) => {
-          if (cycle.nodeListHash !== validatorListHash) {
-            return errAsync(
-              new Error(
-                `validator list hash from received cycle (${cycle.nodeListHash}) does not match the hash received from robust query (${validatorListHash})`
+        syncTxList(activeNodes).andThen((txList) =>
+          syncLatestCycleRecord(activeNodes).andThen((cycle) => {
+            if (cycle.nodeListHash !== validatorListHash) {
+              return errAsync(
+                new Error(
+                  `validator list hash from received cycle (${cycle.nodeListHash}) does not match the hash received from robust query (${validatorListHash})`
+                )
               )
-            )
-          } else if (cycle.archiverListHash !== archiverListHash) {
-            return errAsync(
-              new Error(
-                `archiver list hash from received cycle (${cycle.archiverListHash}) does not match the hash received from robust query (${archiverListHash})`
+            } else if (cycle.archiverListHash !== archiverListHash) {
+              return errAsync(
+                new Error(
+                  `archiver list hash from received cycle (${cycle.archiverListHash}) does not match the hash received from robust query (${archiverListHash})`
+                )
               )
-            )
-          }
+            }
 
-          NodeList.reset('syncV2')
+            NodeList.reset('syncV2')
 
-          // log the counts of the nodes, archivers, and standby nodes
-          /* prettier-ignore */ if (logFlags.important_as_fatal) console.log( `syncV2: nodes: ${validatorList.length}, archivers: ${archiverList.length}, standby nodes: ${standbyNodeList.length}` )
+            // log the counts of the nodes, archivers, and standby nodes
+            /* prettier-ignore */ if (logFlags.important_as_fatal) console.log( `syncV2: nodes: ${validatorList.length}, archivers: ${archiverList.length}, standby nodes: ${standbyNodeList.length}` )
 
-          // add validators
-          NodeList.addNodes(validatorList, 'syncV2')
+            // add validators
+            NodeList.addNodes(validatorList, 'syncV2')
 
-          // add archivers
-          for (const archiver of archiverList) {
-            Archivers.archivers.set(archiver.publicKey, archiver)
-          }
+            // add archivers
+            for (const archiver of archiverList) {
+              Archivers.archivers.set(archiver.publicKey, archiver)
+            }
 
-          // add standby nodes
-          addStandbyJoinRequests(standbyNodeList, true)
+            // add standby nodes
+            addStandbyJoinRequests(standbyNodeList, true)
 
-          // add latest cycle
-          CycleChain.reset()
-          digestCycle(cycle, 'syncV2')
+            // add txList
+            ServiceQueue.setTxList(txList)
 
-          return okAsync(void 0)
-        })
+            // add latest cycle
+            CycleChain.reset()
+            digestCycle(cycle, 'syncV2')
+
+            return okAsync(void 0)
+          })
+        )
       )
     )
   )
@@ -167,6 +175,14 @@ function syncStandbyNodeList(activeNodes: P2P.SyncTypes.ActiveNode[]): ResultAsy
     // get full archiver list from one of the winning nodes
     return getStandbyNodeListFromNode(winningNodes[0], value.standbyNodeListHash)
   })
+}
+
+function syncTxList(activeNodes: P2P.SyncTypes.ActiveNode[]): ResultAsync<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }[], Error> {
+  return robustQueryForTxListHash(activeNodes).andThen(({ value, winningNodes }) =>
+    getTxListFromNode(winningNodes[0], value.txListHash).andThen((txList) =>
+      verifyTxList(txList, value.txListHash).map(() => txList)
+    )
+  )
 }
 
 /**

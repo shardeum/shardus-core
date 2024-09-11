@@ -142,6 +142,13 @@ export function robustQueryForStandbyNodeListHash(
   return makeRobustQueryCall(nodes, 'standby-list-hash')
 }
 
+/** Executes a robust query to retrieve the txList hash from the network. */
+export function robustQueryForTxListHash(
+  nodes: ActiveNode[]
+): RobustQueryResultAsync<{ txListHash: hexstring }> {
+  return makeRobustQueryCall(nodes, 'tx-list-hash')
+}
+
 /** Retrives the cycle by marker from the node. */
 export function getCycleDataFromNode(
   node: ActiveNode,
@@ -185,6 +192,21 @@ export function getStandbyNodeListFromNode(
   return attemptSimpleFetch(
     node,
     'standby-list',
+    {
+      hash: expectedHash,
+    },
+    10000 //TODO need to make this scale when there could be millions of entries
+  )
+}
+
+/** Gets the full tx list from the specified node */
+export function getTxListFromNode(
+  node: ActiveNode,
+  expectedHash: hexstring
+): ResultAsync<{ hash: string; tx: P2P.ServiceQueueTypes.AddNetworkTx }[], Error> {
+  return attemptSimpleFetch(
+    node,
+    'tx-list',
     {
       hash: expectedHash,
     },
