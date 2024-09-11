@@ -271,20 +271,24 @@ export function updateRecord(
   // but we dont want to alter the txList, so we make a copy
   const txListCopy = structuredClone(txList)
 
-  for (const txadd of record.txadd) {
-    const { sign, ...txDataWithoutSign } = txadd.txData
-    sortedInsert(txListCopy, {
-      hash: txadd.hash,
-      tx: {
+  function applyTxAdd(txAddList: typeof record.txadd) {
+    for (const txadd of txAddList) {
+      const { sign, ...txDataWithoutSign } = txadd.txData
+      sortedInsert(txListCopy, {
         hash: txadd.hash,
-        txData: txDataWithoutSign,
-        type: txadd.type,
-        cycle: txadd.cycle,
-        priority: txadd.priority,
-        ...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
-      },
-    })
+        tx: {
+          hash: txadd.hash,
+          txData: txDataWithoutSign,
+          type: txadd.type,
+          cycle: txadd.cycle,
+          priority: txadd.priority,
+          ...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
+        },
+      })
+    }
   }
+
+  applyTxAdd(record.txadd)
 
   for (const txremove of record.txremove) {
     const index = txListCopy.findIndex((entry) => entry.hash === txremove.txHash)
@@ -295,22 +299,20 @@ export function updateRecord(
     }
   }
 
-  // add all active nodes to the cycle record in the event of a shutdown
-  if (record.mode === 'shutdown') {
+  function processShutdownHandlers(cycleRecord: P2P.CycleCreatorTypes.CycleRecord) {
     Nodelist.activeByIdOrder.forEach((node) => {
-
       for (let [key, handler] of shutdownHandlers) {
         try {
-          const txAddData = handler(node, record)
-          if (txAddData?.txData == null) {
-            continue
-          }
+          const txAddData = handler(node, cycleRecord)
+          if (txAddData?.txData == null) continue
+
           const hash = crypto.hash(txAddData.txData)
           if (txListCopy.some((listEntry) => listEntry.hash === hash)) {
             warn(`shutdown - TxHash ${hash} already exists in txListCopy`)
             continue
           }
-          let addTx = {
+
+          const addTx = {
             ...txAddData,
             hash,
             cycle: currentCycle,
@@ -326,8 +328,11 @@ export function updateRecord(
         }
       }
     })
+  }
 
-    // is this sorting needed?
+  if (record.mode === 'shutdown') {
+    processShutdownHandlers(prev)
+    processShutdownHandlers(record)
     record.txadd = txAdd.sort((a, b) => a.hash.localeCompare(b.hash))
   }
   record.txlisthash = crypto.hash(txListCopy)
