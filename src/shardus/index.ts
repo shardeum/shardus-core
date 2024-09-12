@@ -518,7 +518,7 @@ class Shardus extends EventEmitter {
             mainLogger.error(`❌ Invalid IP-Address of Archiver: ${archiverIP}`)
             return false
           }
-          const archiverCreds = JSON.parse(socket.handshake.query.data) as { publicKey: string, timestamp: number, sign: ShardusTypes.Sign }
+          const archiverCreds = JSON.parse(socket.handshake.query.data) as { publicKey: string, timestamp: number, intendedConsensor: string, sign: ShardusTypes.Sign }
           console.log('FOR DEBUG PURPOSES: archiverCreds: ')
           console.dir(archiverCreds, { depth: null })
           // +/- 5sec tolerance
@@ -526,6 +526,12 @@ class Shardus extends EventEmitter {
             mainLogger.error(`❌ Old signature from Archiver @ ${archiverIP}`)
             return false
           }
+
+          if(archiverCreds.intendedConsensor !== Self.getThisNodeInfo().publicKey) {
+            mainLogger.error(`❌ The signature is targeted for consensor @ ${archiverCreds.intendedConsensor} but this node is ${Self.getThisNodeInfo().publicKey}`)
+            return false
+          }
+
           const isValidSig = crypto.verify(archiverCreds, archiverCreds.publicKey)
 
           if (!isValidSig) {
