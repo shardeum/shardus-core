@@ -93,6 +93,7 @@ import SocketIO from 'socket.io'
 import { nodeListFromStates, queueFinishedSyncingRequest } from '../p2p/Join'
 import * as NodeList from '../p2p/NodeList'
 import { P2P } from '@shardus/types'
+import { Socket } from 'net'
 
 
 // the following can be removed now since we are not using the old p2p code
@@ -479,25 +480,30 @@ class Shardus extends EventEmitter {
       const sk: string = this.crypto.keypair.secretKey
       this.io = (await this.network.setup(Network.ipInfo, sk)) as SocketIO.Server
       Context.setIOContext(this.io)
-      /**
-       * io.use middleware to authenticate the archiver socket connections
-       * was added under BLUE-257
-      */
-      this.io.use((socket, next) => {
+
+      /*
+        * The old middleware is deleted and repurpose into a function
+        * It was causing problem because as nature of middlewares are expected to run in each events.
+        *   But the authentication payload is only needed to be checked and only supplied once at the socket.io handshake
+        *   This caused the archiver to be able to connect on the first handshake stuck.
+        *   redundant crypto.verify calls were made.
+        */
+      function validateSocketHandshake(socket: SocketIO.Socket, crypto: Crypto, mainLogger: Log4js.Logger): boolean {
+        // `this` is not binded
+        // calling `this` in the function will not be the same `this` as the outer LOC were referencing to
         try {
           if (!Self || !Self.isActive) {
             if (!Self.allowConnectionToFirstNode) {
-              socket.disconnect()
-              this.mainLogger.error(`❌ This node is not active yet and kill the socket connection!`)
+              mainLogger.error(`❌ This node is not active yet and kill the socket connection!`)
+              return false;
             }
           }
           // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
           if (!Archivers.recipients || !Archivers.connectedSockets) {
-            this.mainLogger.error(
+            mainLogger.error(
               `❌ Seems Archiver module isn't initialized yet, dropping the Socket connection!`
             )
-            socket.disconnect()
-            return
+            return false
           }
 
           console.log('FOR DEBUG PURPOSES: our node\'s IP', Self.ip)
@@ -509,103 +515,95 @@ class Shardus extends EventEmitter {
 
           const archiverIP = socket.handshake.address.split('::ffff:').pop();
           if (!utils.isValidIPv4(archiverIP)) {
-            this.mainLogger.error(`❌ Invalid IP-Address of Archiver: ${archiverIP}`)
-            socket.disconnect()
-            return
+            mainLogger.error(`❌ Invalid IP-Address of Archiver: ${archiverIP}`)
+            return false
           }
-          const archiverCreds = JSON.parse(socket.handshake.query.data)
+          const archiverCreds = JSON.parse(socket.handshake.query.data) as { publicKey: string, timestamp: number, sign: ShardusTypes.Sign }
           console.log('FOR DEBUG PURPOSES: archiverCreds: ')
           console.dir(archiverCreds, { depth: null })
-          const isValidSig = this.crypto.verify(archiverCreds, archiverCreds.publicKey)
+          // +/- 5sec tolerance
+          if (Math.abs(archiverCreds.timestamp - shardusGetTime()) > 5000) {
+            mainLogger.error(`❌ Old signature from Archiver @ ${archiverIP}`)
+            return false
+          }
+          const isValidSig = crypto.verify(archiverCreds, archiverCreds.publicKey)
+
           if (!isValidSig) {
-            this.mainLogger.error(`❌ Invalid Signature from Archiver @ ${archiverIP}`)
-            socket.disconnect()
-            return
-          }
-          const recipient = Archivers.recipients.get(archiverCreds.publicKey)
-          console.log('FOR DEBUG PURPOSES: Archiver Recipients: ')
-          console.dir(Archivers.recipients, { depth: null })
-          console.log('FOR DEBUG PURPOSES: ArchiverIP: ', archiverIP)
-          console.log('FOR DEBUG PURPOSES: Is (Archiver !== recipientIP) Check: ', archiverIP !== recipient.nodeInfo.ip)
-          
-          if (!recipient) {
-            this.mainLogger.error(`❌ Remote Archiver @ ${archiverIP} is NOT a recipient!`)
-            socket.disconnect()
-            return
-          }
-          if (archiverIP !== recipient.nodeInfo.ip) {
-            this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
-            this.mainLogger.error('Recipient: ', recipient.nodeInfo)
-            this.mainLogger.error('Remote Archiver: ', socket.handshake.address)
-            socket.disconnect()
-            return
+            mainLogger.error(`❌ Invalid Signature from Archiver @ ${archiverIP}`)
+            return false
           }
 
-          socket.handshake.query.data = archiverCreds
-          next()
-        } catch (error) {
-          this.mainLogger.error('❌ Error in Archiver Socket-Connection Auth!')
-          this.mainLogger.error(error)
-          socket.disconnect()
-          return
-        }
-      })
-      this.io.on('connection', (socket: any) => {
-        const { publicKey: archiverPublicKey } = socket.handshake.query.data
-        /**
-         * The following check has been moved to the top of io.use middleware
-         * if (!Self || !Self.isActive) {
-          if (!Self.allowConnectionToFirstNode) {
-            socket.disconnect()
-            console.log(`This node is not active yet and kill the socket connection!`)
-          }
-        } */
-        if (this.config.features.archiverDataSubscriptionsUpdate) {
-          console.log(`✅ Archive server has subscribed to this node with Socket-ID ${socket.id}!`)
-          /**
-           * The following code-block has also been shifted to the io.use middleware
-           // Check if the archiver module is initialized; this is unlikely to happen because of the above Self.isActive check
-           // if (!Archivers.recipients || !Archivers.connectedSockets) {
-            socket.disconnect()
-            console.log(`Seems archiver module isn't initialized yet and kill the socket connection!`)
-            return
-          } */
-          console.log('Archiver has registered its public key', archiverPublicKey)
-          if (Archivers.connectedSockets[archiverPublicKey]) {
-            Archivers.removeArchiverConnection(archiverPublicKey)
-          }
-          Archivers.addArchiverConnection(archiverPublicKey, socket.id)
-          socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
-            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] === socket.id) {
-            console.log(`Archive server with public key ${ARCHIVER_PUBLIC_KEY} has requested to Un-subscribe`)
-              Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
-              Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
-            }
-          })
-        } else {
-          console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
-          console.log('Archiver has registered its public key', archiverPublicKey)
-          for (const [key, value] of Object.entries(Archivers.connectedSockets)) {
-            if (key === archiverPublicKey) {
-              Archivers.removeArchiverConnection(archiverPublicKey)
-            }
-          }
 
           if (Object.keys(Archivers.connectedSockets).length >= config.p2p.maxArchiversSubscriptionPerNode) {
             /* prettier-ignore */ console.log( `There are already ${config.p2p.maxArchiversSubscriptionPerNode} archivers connected for data transfer!` )
-            socket.disconnect()
-            return
+            return false
           }
-          Archivers.addArchiverConnection(archiverPublicKey, socket.id)
-          socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
 
-            if(Archivers.connectedSockets[ARCHIVER_PUBLIC_KEY] === socket.id) {
-            console.log(`Archive server with public key ${ARCHIVER_PUBLIC_KEY} has requested to Un-subscribe`)
-              Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
-              Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
-            }
-          })
+          // we're the genesis node, this mean cycle is empty, archiver list is empty
+          // nothing to check against.
+          // In practice genesis node is accompanied with a genesis archiver by the same party at launch
+          // so this is ok.
+          if(Self && Self.isFirst) return true
+
+          // specifically this map here to get archiver list is chose because the map is populated by cycle parsing.
+          // The one like `recipients` map is weaker because they're populated at joinReq
+          const archiver = Archivers.archivers.get(archiverCreds.publicKey);
+
+          // bypass this check when this is genesis node
+          if (!archiver) {
+            mainLogger.error(`❌ Remote Archiver @ ${archiverIP} is NOT a recipient!`)
+            return false
+          }
+
+          // bypass this check when this is genesis node
+          if (archiverIP !== archiver.ip) {
+            mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
+            mainLogger.error('Recipient: ', archiver.ip)
+            mainLogger.error('Remote Archiver: ', socket.handshake.address)
+            return false
+          }
+      
+          return true
+        } catch (error) {
+          mainLogger.error('❌ Error in Archiver Socket-Connection Auth!')
+          mainLogger.error(error)
+          return false
         }
+      }
+
+      this.io.on('connection', (socket: any) => {
+        if(!validateSocketHandshake(socket, this.crypto, this.mainLogger)){
+          socket.disconnect()
+          return
+        }
+
+        const { publicKey: archiverPublicKey } = JSON.parse(socket.handshake.query.data)
+
+        console.log(`✅ Archive server has subscribed to this node with Socket-ID ${socket.id}!`)
+        console.log('Archiver has registered its public key', archiverPublicKey)
+
+        // prototype pollution mitigation
+        // best case is to use the Map<>
+        // going with local fix atm. Deep copy, freeze. read-only. 
+        let freezedList = Object.freeze(
+          JSON.parse(
+            JSON.stringify(Archivers.connectedSockets)
+          )
+        )
+        
+
+        // The same archiver is connected with different stream, let's disconnect old and accept the current one.
+        if(freezedList[archiverPublicKey]) {
+          Archivers.removeArchiverConnection(archiverPublicKey)
+        }
+
+        Archivers.addArchiverConnection(archiverPublicKey, socket.id)
+        socket.on('UNSUBSCRIBE', function (ARCHIVER_PUBLIC_KEY) {
+          if(freezedList[ARCHIVER_PUBLIC_KEY] === socket.id) {
+          console.log(`Archive server with public key ${ARCHIVER_PUBLIC_KEY} has requested to Un-subscribe`)
+            Archivers.removeArchiverConnection(ARCHIVER_PUBLIC_KEY)
+          }
+        })
       })
     } catch (e) {
       this.mainLogger.error('Socket connection break', e)
