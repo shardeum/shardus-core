@@ -93,8 +93,6 @@ import SocketIO from 'socket.io'
 import { nodeListFromStates, queueFinishedSyncingRequest } from '../p2p/Join'
 import * as NodeList from '../p2p/NodeList'
 import { P2P } from '@shardus/types'
-import { Socket } from 'net'
-
 
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
