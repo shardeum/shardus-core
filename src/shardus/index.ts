@@ -492,26 +492,31 @@ class Shardus extends EventEmitter {
           }
 
           const archiverIP = socket.handshake.address.split('::ffff:').pop();
-          if (!utils.isValidIPv4(archiverIP)) {
-            this.mainLogger.error(`❌ Invalid IP-Address of Archiver: ${archiverIP}`)
-            socket.disconnect()
-            return
-          }
+          console.log('FOR DEBUG PURPOSES: our IP', Self.ip)
+          console.log('FOR DEBUG PURPOSES: archiverIP', archiverIP)
+
+          // Since socket.handshake.address seems to return the node's address, we dont know the archiver's IP
+          // if (!utils.isValidIPv4(archiverIP)) {
+          //   this.mainLogger.error(`❌ Invalid IP-Address of Archiver: ${archiverIP}`)
+          //   socket.disconnect()
+          //   return
+          // }
           const archiverCreds = JSON.parse(socket.handshake.query.data)
           const isValidSig = this.crypto.verify(archiverCreds, archiverCreds.publicKey)
           if (!isValidSig) {
-            this.mainLogger.error(`❌ Invalid Signature from Archiver @ ${archiverIP}`)
+            this.mainLogger.error(`❌ Invalid Signature from Archiver`)
             socket.disconnect()
             return
           }
           const recipient = Archivers.recipients.get(archiverCreds.publicKey)
           if (!recipient) {
-            this.mainLogger.error(`❌ Remote Archiver @ ${archiverIP} is NOT a recipient!`)
+            this.mainLogger.error(`❌ Remote Archiver is NOT a recipient!`)
             socket.disconnect()
             return
           }
-          if (archiverIP !== recipient.nodeInfo.ip) {
-            this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
+          const isKnownArchiver = Array.from(Archivers.archivers).some((archiver) => archiver[1].ip === recipient.nodeInfo.ip)
+          if (isKnownArchiver === false) {
+            this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${recipient.nodeInfo.ip} !`)
             this.mainLogger.error('Recipient: ', recipient.nodeInfo)
             this.mainLogger.error('Remote Archiver: ', socket.handshake.address)
             socket.disconnect()
