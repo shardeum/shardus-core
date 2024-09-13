@@ -492,10 +492,12 @@ class Shardus extends EventEmitter {
           }
 
           const archiverIP = socket.handshake.address.split('::ffff:').pop();
-          console.log('FOR DEBUG PURPOSES: our IP', Self.ip)
-          nestedCountersInstance.countEvent('debug-archiverConnections', `ourIP-${archiverIP}`)
-          console.log('FOR DEBUG PURPOSES: archiverIP', archiverIP)
-          nestedCountersInstance.countEvent('debug-archiverConnections', `archiverIP-${archiverIP}`)
+          console.log('FOR DEBUG PURPOSES: our node\'s IP', Self.ip)
+          console.log('FOR DEBUG PURPOSES: socket.handshake.address', socket.handshake.address.split('::ffff:').pop())
+          console.log('FOR DEBUG PURPOSES: socket.handshake.headers.host', socket.handshake.headers.host.split(':')[0])
+          nestedCountersInstance.countEvent('debug-archiverConnections', `ourIP: ${Self.ip}`)
+          nestedCountersInstance.countEvent('debug-archiverConnections', `socket.handshake.address: ${socket.handshake.address.split('::ffff:').pop()}`)
+          nestedCountersInstance.countEvent('debug-archiverConnections', `socket.handshake.headers.host: ${socket.handshake.headers.host.split(':')[0]}`)
 
           // Since socket.handshake.address seems to return the node's address, we dont know the archiver's IP
           // if (!utils.isValidIPv4(archiverIP)) {
@@ -516,7 +518,12 @@ class Shardus extends EventEmitter {
             socket.disconnect()
             return
           }
-          const isKnownArchiver = Array.from(Archivers.archivers).some((archiver) => archiver[1].ip === recipient.nodeInfo.ip)
+          let isKnownArchiver
+          if (Self.isFirst) {
+            isKnownArchiver = config.p2p.existingArchivers.some((archiver) => archiver.ip === recipient.nodeInfo.ip)
+          } else {
+            isKnownArchiver = Array.from(Archivers.archivers).some((archiver) => archiver[1].ip === recipient.nodeInfo.ip)
+          }
           if (isKnownArchiver === false) {
             this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${recipient.nodeInfo.ip} !`)
             this.mainLogger.error('Recipient: ', recipient.nodeInfo)
