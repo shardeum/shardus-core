@@ -16,17 +16,20 @@ import { getRandomAvailableArchiver } from './Utils'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { nodeListFromStates } from './Join'
 import * as Nodelist from './NodeList'
-import rfdc from 'rfdc'
-import { networkMode } from './Modes'
 
 /** STATE */
-
-const clone = rfdc()
 
 let p2pLogger: Logger
 let txList: P2P.ServiceQueueTypes.NetworkTxEntry[] = []
 let txAdd: P2P.ServiceQueueTypes.AddNetworkTx[] = []
 let txRemove: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
+const shutdownHandlers = new Map<
+  string,
+  (
+    activeNode: P2P.NodeListTypes.Node,
+    record: P2P.CycleCreatorTypes.CycleRecord
+  ) => Omit<P2P.ServiceQueueTypes.AddNetworkTx, 'cycle' | 'hash'> | null | undefined
+>()
 const addProposals: P2P.ServiceQueueTypes.SignedAddNetworkTx[] = []
 const removeProposals: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
 const beforeAddVerifier = new Map<string, (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>>()
@@ -81,7 +84,7 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
     const { sign, ...unsignedAddNetworkTx } = payload
     if (await _addNetworkTx(unsignedAddNetworkTx)) {
       if (!txAdd.some((entry) => entry.hash === payload.hash)) {
-        const addTxCopy = clone(unsignedAddNetworkTx)
+        const addTxCopy = structuredClone(unsignedAddNetworkTx)
         const { sign, ...txDataWithoutSign } = addTxCopy.txData
         addTxCopy.txData = txDataWithoutSign
         txAdd.push(addTxCopy)
@@ -266,7 +269,7 @@ export function updateRecord(
 
   // we need to get the hash of the txlist after the txadd and txremove
   // but we dont want to alter the txList, so we make a copy
-  const txListCopy = clone(txList)
+  const txListCopy = structuredClone(txList)
 
   for (const txadd of record.txadd) {
     const { sign, ...txDataWithoutSign } = txadd.txData
@@ -277,6 +280,7 @@ export function updateRecord(
         txData: txDataWithoutSign,
         type: txadd.type,
         cycle: txadd.cycle,
+        priority: txadd.priority,
         ...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
       },
     })
@@ -291,94 +295,41 @@ export function updateRecord(
     }
   }
 
-  const reversedTxList = txListCopy.slice().reverse()
   // add all active nodes to the cycle record in the event of a shutdown
   if (record.mode === 'shutdown') {
-    for (const node of Nodelist.activeByIdOrder) {
-      if (record.activated.includes(node.id)) {
-        if (
-          record.txadd.some((entry) => entry.txData.nodeId === node.id && entry.type === 'nodeInitReward')
-        ) {
-          warn(
-            `shutdown condition: active node with id ${node.id} is already in txadd (nodeInitReward); this should not happen`
-          )
-        } else {
-          const txData = {
-            startTime: record.start,
-            publicKey: node.publicKey,
-            nodeId: node.id,
-          }
+    Nodelist.activeByIdOrder.forEach((node) => {
 
-          const hash = crypto.hash(txData)
-          const addTx: P2P.ServiceQueueTypes.AddNetworkTx = {
+      for (let [key, handler] of shutdownHandlers) {
+        try {
+          const txAddData = handler(node, record)
+          if (txAddData?.txData == null) {
+            continue
+          }
+          const hash = crypto.hash(txAddData.txData)
+          if (txListCopy.some((listEntry) => listEntry.hash === hash)) {
+            warn(`shutdown - TxHash ${hash} already exists in txListCopy`)
+            continue
+          }
+          let addTx = {
+            ...txAddData,
             hash,
-            type: 'nodeInitReward',
-            txData: txData,
             cycle: currentCycle,
-            subQueueKey: node.publicKey,
           }
-
-          sortedInsert(txListCopy, {
-            hash: addTx.hash,
-            tx: {
-              hash: addTx.hash,
-              txData: txData,
-              type: addTx.type,
-              cycle: addTx.cycle,
-              ...(addTx.subQueueKey && { subQueueKey: addTx.subQueueKey }),
-            },
-          })
-
+          const entry = {
+            hash,
+            tx: addTx,
+          }
+          sortedInsert(txListCopy, entry)
           record.txadd.push(addTx)
+        } catch (e) {
+          error(`Failed to call shutdownHandler (${key}): ${e instanceof Error ? e.stack : e}`)
         }
       }
-      if (record.txadd.some((entry) => entry.txData.nodeId === node.id && entry.type === 'nodeReward')) {
-        warn(`shutdown condition: active node with id ${node.id} is already in txadd; this should not happen`)
-        continue
-      }
+    })
 
-      // get latest entry for node in txList. and if it is init then we inject otherwise continue
-      // first iterate over txlist backwards and get first entry that has public key of node
-      const txListEntry = reversedTxList.find((entry) => entry.tx.txData.publicKey === node.publicKey)
-      if (txListEntry && txListEntry.tx.type !== 'nodeInitReward') {
-        /** prettier-ignore */ if (logFlags.p2pNonFatal) info(`Skipping creation of shutdown reward tx (last entry already is of type ${txListEntry.tx.type})`, Utils.safeStringify(txListEntry))
-        continue
-      }
-      /** prettier-ignore */ if (logFlags.p2pNonFatal) info(`Creating a shutdown reward tx`, Utils.safeStringify(txListEntry), Utils.safeStringify(node))
-
-      const txData = {
-        start: node.activeCycle,
-        end: record.counter,
-        endTime: record.start,
-        publicKey: node.publicKey,
-        nodeId: node.id,
-      }
-
-      const hash = crypto.hash(txData)
-      const addTx: P2P.ServiceQueueTypes.AddNetworkTx = {
-        hash,
-        type: 'nodeReward',
-        txData: txData,
-        cycle: currentCycle + 1,
-        subQueueKey: node.publicKey,
-      }
-
-      sortedInsert(txListCopy, {
-        hash: addTx.hash,
-        tx: {
-          hash: addTx.hash,
-          txData: txData,
-          type: addTx.type,
-          cycle: addTx.cycle,
-          ...(addTx.subQueueKey && { subQueueKey: addTx.subQueueKey }),
-        },
-      })
-
-      record.txadd.push(addTx)
-    }
+    // is this sorting needed?
     record.txadd = txAdd.sort((a, b) => a.hash.localeCompare(b.hash))
   }
-
   record.txlisthash = crypto.hash(txListCopy)
 }
 
@@ -405,6 +356,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
           txData: txDataWithoutSign,
           type: txadd.type,
           cycle: txadd.cycle,
+          priority: txadd.priority,
           ...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
         },
       })
@@ -431,7 +383,7 @@ export function sendRequests(): void {
   for (const add of addProposals) {
     if (!txAdd.some((entry) => entry.hash === add.hash)) {
       const { sign: sign1, ...unsignedAddNetworkTx } = add
-      const addTxCopy = clone(unsignedAddNetworkTx)
+      const addTxCopy = structuredClone(unsignedAddNetworkTx)
       const { sign: sign2, ...txDataWithoutSign } = addTxCopy.txData
       addTxCopy.txData = txDataWithoutSign
       txAdd.push(addTxCopy)
@@ -483,6 +435,16 @@ export function sendRequests(): void {
 
 /** Module Functions */
 
+export function registerShutdownHandler(
+  type: string,
+  handler: (
+    activeNode: P2P.NodeListTypes.Node,
+    record: P2P.CycleCreatorTypes.CycleRecord
+  ) => Omit<P2P.ServiceQueueTypes.AddNetworkTx, 'cycle' | 'hash'> | null | undefined
+): void {
+  shutdownHandlers.set(type, handler)
+}
+
 export function registerBeforeAddVerifier(
   type: string,
   verifier: (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>
@@ -497,18 +459,35 @@ export function registerApplyVerifier(
   applyVerifier.set(type, verifier)
 }
 
-export async function addNetworkTx(type: string, tx: OpaqueTransaction, subQueueKey?: string): Promise<void> {
+export async function addNetworkTx(
+  type: string,
+  tx: OpaqueTransaction,
+  subQueueKey?: string,
+  priority: number = 0
+): Promise<void> {
   const hash = crypto.hash(tx)
   const networkTx = {
     hash,
     type,
     txData: tx,
     cycle: currentCycle,
+    priority,
     subQueueKey,
   } as P2P.ServiceQueueTypes.AddNetworkTx
-  if (await _addNetworkTx(networkTx)) {
+  if (await _addNetworkTx(networkTx)){
     makeAddNetworkTxProposals(networkTx)
   }
+}
+
+export function getLatestNetworkTxEntryForSubqueueKey(
+  subqueueKey: string
+): P2P.ServiceQueueTypes.NetworkTxEntry {
+  for (let i = txList.length - 1; i >= 0; i--) {
+    if (txList[i].tx.subQueueKey === subqueueKey) {
+      return txList[i]
+    }
+  }
+  return undefined
 }
 
 function makeAddNetworkTxProposals(networkTx: P2P.ServiceQueueTypes.AddNetworkTx): void {
@@ -731,7 +710,9 @@ function sortedInsert(
 ): void {
   const index = list.findIndex(
     (item) =>
-      item.tx.cycle > entry.tx.cycle || (item.tx.cycle === entry.tx.cycle && item.hash > entry.tx.hash)
+      item.tx.cycle > entry.tx.cycle ||
+      (item.tx.cycle === entry.tx.cycle && item.tx.priority < entry.tx.priority) || // Compare by priority if cycle is the same
+      (item.tx.cycle === entry.tx.cycle && item.tx.priority === entry.tx.priority && item.hash > entry.hash) // Compare by hash if both cycle and priority are the same
   )
   if (index === -1) {
     list.push(entry)

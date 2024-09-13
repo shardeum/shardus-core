@@ -142,6 +142,13 @@ interface Shardus {
   registerExternalPatch: RouteHandlerRegister
   registerBeforeAddVerifier: (type: string, verifier: (tx: OpaqueTransaction) => Promise<boolean>) => void
   registerApplyVerifier: (type: string, verifier: (tx: OpaqueTransaction) => Promise<boolean>) => void
+  registerShutdownHandler: (
+    type: string,
+    handler: (
+      activeNode: P2P.NodeListTypes.Node,
+      record: P2P.CycleCreatorTypes.CycleRecord
+    ) => Omit<P2P.ServiceQueueTypes.AddNetworkTx, 'cycle' | 'hash'> | null | undefined
+  ) => void
   _listeners: any
   appliedConfigChanges: Set<string>
 
@@ -259,8 +266,10 @@ class Shardus extends EventEmitter {
     this.registerExternalPatch = (route, authHandler, handler) =>
       this.network.registerExternalPatch(route, authHandler, handler)
 
-    this.registerBeforeAddVerifier = (type, verifier) => ServiceQueue.registerBeforeAddVerifier(type, verifier)
-    this.registerApplyVerifier = (type, verifier) => ServiceQueue.registerApplyVerifier(type, verifier)
+    this.registerBeforeAddVerifier = ServiceQueue.registerBeforeAddVerifier
+    this.registerApplyVerifier = ServiceQueue.registerApplyVerifier
+    this.registerApplyVerifier = ServiceQueue.registerApplyVerifier
+    this.registerShutdownHandler = ServiceQueue.registerShutdownHandler
 
     this.exitHandler.addSigListeners()
     this.exitHandler.registerSync('reporter', () => {
@@ -1050,7 +1059,7 @@ class Shardus extends EventEmitter {
         status: 500,
       }
     }
-    
+
     const injectedTimestamp = this.app.getTimestampFromTransaction(tx, appData);
 
     const txId = this.app.calculateTxId(tx);
@@ -1884,6 +1893,7 @@ class Shardus extends EventEmitter {
   }
 
   addNetworkTx = ServiceQueue.addNetworkTx
+  getLatestNetworkTxEntryForSubqueueKey = ServiceQueue.getLatestNetworkTxEntryForSubqueueKey
 
   validateActiveNodeSignatures(
     signedAppData: any,
