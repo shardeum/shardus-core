@@ -491,6 +491,13 @@ class Shardus extends EventEmitter {
             return
           }
 
+          console.log('FOR DEBUG PURPOSES: our node\'s IP', Self.ip)
+          console.log('FOR DEBUG PURPOSES: socket.handshake.address', socket.handshake.address.split('::ffff:').pop())
+          console.log('FOR DEBUG PURPOSES: socket.handshake.headers.host', socket.handshake.headers.host.split(':')[0])
+          nestedCountersInstance.countEvent('debug-archiverConnections', `ourIP: ${Self.ip}`)
+          nestedCountersInstance.countEvent('debug-archiverConnections', `socket.handshake.address: ${socket.handshake.address.split('::ffff:').pop()}`)
+          nestedCountersInstance.countEvent('debug-archiverConnections', `socket.handshake.headers.host: ${socket.handshake.headers.host.split(':')[0]}`)
+
           const archiverIP = socket.handshake.address.split('::ffff:').pop();
           if (!utils.isValidIPv4(archiverIP)) {
             this.mainLogger.error(`❌ Invalid IP-Address of Archiver: ${archiverIP}`)
@@ -510,13 +517,13 @@ class Shardus extends EventEmitter {
             socket.disconnect()
             return
           }
-          if (archiverIP !== recipient.nodeInfo.ip) {
-            this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
-            this.mainLogger.error('Recipient: ', recipient.nodeInfo)
-            this.mainLogger.error('Remote Archiver: ', socket.handshake.address)
-            socket.disconnect()
-            return
-          }
+          // if (archiverIP !== recipient.nodeInfo.ip) {
+          //   this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
+          //   this.mainLogger.error('Recipient: ', recipient.nodeInfo)
+          //   this.mainLogger.error('Remote Archiver: ', socket.handshake.address)
+          //   socket.disconnect()
+          //   return
+          // }
 
           socket.handshake.query.data = archiverCreds
           next()
