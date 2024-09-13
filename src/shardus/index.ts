@@ -493,7 +493,9 @@ class Shardus extends EventEmitter {
 
           const archiverIP = socket.handshake.address.split('::ffff:').pop();
           console.log('FOR DEBUG PURPOSES: our IP', Self.ip)
+          nestedCountersInstance.countEvent('debug-archiverConnections', `ourIP-${archiverIP}`)
           console.log('FOR DEBUG PURPOSES: archiverIP', archiverIP)
+          nestedCountersInstance.countEvent('debug-archiverConnections', `archiverIP-${archiverIP}`)
 
           // Since socket.handshake.address seems to return the node's address, we dont know the archiver's IP
           // if (!utils.isValidIPv4(archiverIP)) {
