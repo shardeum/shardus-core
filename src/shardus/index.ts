@@ -555,17 +555,20 @@ class Shardus extends EventEmitter {
 
           // bypass this check when this is genesis node
           if (!archiver) {
-            mainLogger.error(`❌ Remote Archiver @ ${archiverIP} is NOT a recipient!`)
+            mainLogger.error(`❌ Remote Archiver @ ${archiverIP} is NOT recognized!`)
             return false
           }
 
-          // bypass this check when this is genesis node
-          if (archiverIP !== archiver.ip) {
-            mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
-            mainLogger.error('Recipient: ', archiver.ip)
-            mainLogger.error('Remote Archiver: ', socket.handshake.address)
-            return false
-          }
+          // The ip check is known to have issues with NATs and other network setups.
+          // And we've encountered issues with it in the earthnet
+          // Plus the archiver is already authenticated by the signature.
+          // Singature valid and ip are not in sync? then we got a bigger problem to worry about.
+          // if (archiverIP !== archiver.ip) {
+          //   mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
+          //   mainLogger.error('Recipient: ', archiver.ip)
+          //   mainLogger.error('Remote Archiver: ', socket.handshake.address)
+          //   return false
+          // }
       
           return true
         } catch (error) {
