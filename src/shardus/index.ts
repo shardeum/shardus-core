@@ -495,15 +495,19 @@ class Shardus extends EventEmitter {
             return false
           }
       
-          const archiverIP = socket.handshake.address.split('::ffff:').pop();
-          if (!utils.isValidIPv4(archiverIP)) {
-            mainLogger.error(`❌ Invalid IP-Address of Archiver: ${archiverIP}`)
-            return false
-          }
+          // And we've encountered issues with it in the earthnet
+          // Plus the archiver is already authenticated by the signature.
+          // Singature valid and ip are not in sync? then we got a bigger problem to worry about.
+          // const archiverIP = socket.handshake.address.split('::ffff:').pop();
+          // if (!utils.isValidIPv4(archiverIP)) {
+          //   mainLogger.error(`❌ Invalid IP-Address of Archiver: ${archiverIP}`)
+          //   return false
+          // }
+
           const archiverCreds = JSON.parse(socket.handshake.query.data) as { publicKey: string, timestamp: number, intendedConsensor: string, sign: ShardusTypes.Sign }
           // +/- 5sec tolerance
           if (Math.abs(archiverCreds.timestamp - shardusGetTime()) > 5000) {
-            mainLogger.error(`❌ Old signature from Archiver @ ${archiverIP}`)
+            mainLogger.error(`❌ Old signature from Archiver @ ${archiverCreds.publicKey}`)
             return false
           }
 
@@ -515,7 +519,7 @@ class Shardus extends EventEmitter {
           const isValidSig = crypto.verify(archiverCreds, archiverCreds.publicKey)
 
           if (!isValidSig) {
-            mainLogger.error(`❌ Invalid Signature from Archiver @ ${archiverIP}`)
+            mainLogger.error(`❌ Invalid Signature from Archiver @ ${archiverCreds.publicKey}`)
             return false
           }
 
@@ -537,7 +541,7 @@ class Shardus extends EventEmitter {
 
           // bypass this check when this is genesis node
           if (!archiver) {
-            mainLogger.error(`❌ Remote Archiver @ ${archiverIP} is NOT recognized!`)
+            mainLogger.error(`❌ Remote Archiver @ ${archiver.publicKey} is NOT recognized!`)
             return false
           }
 
