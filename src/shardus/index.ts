@@ -514,6 +514,8 @@ class Shardus extends EventEmitter {
             return
           }
           const archiverCreds = JSON.parse(socket.handshake.query.data)
+          console.log('FOR DEBUG PURPOSES: archiverCreds: ')
+          console.dir(archiverCreds, { depth: null })
           const isValidSig = this.crypto.verify(archiverCreds, archiverCreds.publicKey)
           if (!isValidSig) {
             this.mainLogger.error(`❌ Invalid Signature from Archiver @ ${archiverIP}`)
@@ -521,18 +523,23 @@ class Shardus extends EventEmitter {
             return
           }
           const recipient = Archivers.recipients.get(archiverCreds.publicKey)
+          console.log('FOR DEBUG PURPOSES: Archiver Recipients: ')
+          console.dir(Archivers.recipients, { depth: null })
+          console.log('FOR DEBUG PURPOSES: ArchiverIP: ', archiverIP)
+          console.log('FOR DEBUG PURPOSES: Is (Archiver !== recipientIP) Check: ', archiverIP !== recipient.nodeInfo.ip)
+          
           if (!recipient) {
             this.mainLogger.error(`❌ Remote Archiver @ ${archiverIP} is NOT a recipient!`)
             socket.disconnect()
             return
           }
-          // if (archiverIP !== recipient.nodeInfo.ip) {
-          //   this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
-          //   this.mainLogger.error('Recipient: ', recipient.nodeInfo)
-          //   this.mainLogger.error('Remote Archiver: ', socket.handshake.address)
-          //   socket.disconnect()
-          //   return
-          // }
+          if (archiverIP !== recipient.nodeInfo.ip) {
+            this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
+            this.mainLogger.error('Recipient: ', recipient.nodeInfo)
+            this.mainLogger.error('Remote Archiver: ', socket.handshake.address)
+            socket.disconnect()
+            return
+          }
 
           socket.handshake.query.data = archiverCreds
           next()
