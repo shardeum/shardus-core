@@ -56,8 +56,6 @@ const shutdownHandlers = new Map<
     record: P2P.CycleCreatorTypes.CycleRecord
   ) => Omit<P2P.ServiceQueueTypes.AddNetworkTx, 'cycle' | 'hash'> | null | undefined
 >()
-const addProposals: P2P.ServiceQueueTypes.SignedAddNetworkTx[] = []
-const removeProposals: P2P.ServiceQueueTypes.SignedRemoveNetworkTx[] = []
 const beforeAddVerifier = new Map<string, (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>>()
 const applyVerifier = new Map<string, (txEntry: P2P.ServiceQueueTypes.AddNetworkTx) => Promise<boolean>>()
 const tryCounts = new Map<string, number>()
