@@ -17,15 +17,21 @@ const newUnjoinRequests: Set<SignedUnjoinRequest> = new Set()
  * Submits a request to leave the network's standby node list.
  */
 export async function submitUnjoin(): Promise<Result<void, Error>> {
-  const unjoinRequest = crypto.sign({
-    publicKey: crypto.keypair.publicKey,
-    cycleNumber: CycleChain.getNewest().counter,
-  })
+  const publicKey = crypto.keypair.publicKey
 
-  const foundInStandbyNodes = getStandbyNodesInfoMap().has(unjoinRequest.publicKey)
+  const foundInStandbyNodes = getStandbyNodesInfoMap().has(publicKey)
   if (!foundInStandbyNodes) {
     return err(new Error('node is not in standby. Do not send unjoin request'))
   }
+
+  if(!CycleChain.getNewest()) {
+    return err(new Error('No cycle chain found. Do not send unjoin request'))
+  }
+
+  const unjoinRequest = crypto.sign({
+    publicKey: publicKey,
+    cycleNumber: CycleChain.getNewest().counter,
+  })
 
   const archiver = getRandomAvailableArchiver()
   try {
