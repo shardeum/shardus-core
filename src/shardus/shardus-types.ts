@@ -805,6 +805,8 @@ export interface ServerConfiguration {
     useLruCacheForSocketMgmt: boolean
     /** LRU cache size for socket connection mgmt in shardus/net. Is used only if `useLruCacheForSocketMgmt` is set to `true`. Default: 1000 */
     lruCacheSizeForSocketMgmt: number
+    /** Payload size limit for shardus/net. Default: 2MB */
+    payloadSizeLimitInBytes: number
     /** Number of cycles we want to delay the lost report by */
     delayLostReportByNumOfCycles: number
     /** If disabled, the lost reports are sent to the checker immediately */
