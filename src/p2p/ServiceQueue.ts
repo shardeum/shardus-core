@@ -278,7 +278,7 @@ function tryAppendVote(
   collectedVote: { txHash: string; verifierType: 'beforeAdd' | 'apply'; result: boolean; sign: any }
 ): boolean {
   console.log(' red - tryAppendVote', queueEntry, collectedVote)
-  if (!queueEntry.executionGroup.some((node) => node === collectedVote.sign.owner)) {
+  if (!executionGroupForAddress(queueEntry.tx.involvedAddress).some((node) => node === collectedVote.sign.owner)) {
     console.log(' red - tryAppendVote not in execution group', queueEntry, collectedVote.sign.owner)
     nestedCountersInstance.countEvent('serviceQueue', 'Vote sender not in execution group')
     return false
@@ -317,7 +317,7 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
       return queueEntry.appliedReceipt
     }
 
-    let votingGroup = queueEntry.executionGroup
+    let votingGroup = executionGroupForAddress(queueEntry.tx.involvedAddress)
     const majorityCount = Math.ceil(votingGroup.length * config.p2p.requiredVotesPercentage)
     const numVotes = queueEntry.votes.length
     console.log(' red - tryProduceReceipt votes', queueEntry, majorityCount, numVotes)
@@ -387,13 +387,12 @@ async function startVoting(proposals: VotingProposal[]): Promise<void> {
   console.log(' red - startVoting', proposals)
   for (const proposal of proposals) {
     if (proposal.verifierType === 'apply') {
-      const voteResult = await validateRemoveTx(proposal.networkTx)
       const index = txList.findIndex((entry) => entry.hash === proposal.networkTx.txHash)
       if (index === -1) {
         error(`TxHash ${proposal.networkTx.txHash} does not exist in txList`)
         return
       }
-
+      const voteResult = await validateRemoveTx(proposal.networkTx)
       voteForNetworkTx(txList[index].tx, proposal.verifierType, voteResult)
     } else {
       const voteResult = await validateAddTx(proposal.networkTx)
@@ -733,15 +732,20 @@ function voteForNetworkTx(
 }
 
 function executionGroupForAddress(address: string): string[] {
-  const { homePartition } = ShardFunctions.addressToPartition(
-    stateManager.currentCycleShardData.shardGlobals,
-    address
-  )
-  const homeShardData = stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
-  const consensusGroup: string[] = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.map(
-    (node: ShardusTypes.Node) => node.publicKey
-  )
-  return consensusGroup
+  try {
+    const { homePartition } = ShardFunctions.addressToPartition(
+      stateManager.currentCycleShardData.shardGlobals,
+      address
+    )
+    const homeShardData = stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
+    const consensusGroup: string[] = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.map(
+      (node: ShardusTypes.Node) => node.publicKey
+    )
+    return consensusGroup
+  } catch (e) {
+    error(`Failed to get execution group for address ${address}: ${e instanceof Error ? e.stack : e}`)
+    return []
+  }
 }
 
 function pickAggregators(address: string): ShardusTypes.Node[] {
