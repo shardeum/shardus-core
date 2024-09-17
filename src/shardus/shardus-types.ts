@@ -884,7 +884,7 @@ export interface ServerConfiguration {
     standbyListFastHash: boolean
     /** networkBaselineEnabled is a boolean that enables the use of the new config `baselineNodes` which is used as the new threshold for safety, recovery, and restore modes. */
     networkBaselineEnabled: boolean
-    useBinarySerializedEndpoints: boolean
+    // useBinarySerializedEndpoints: boolean
     useCombinedTellBinary: boolean
     /** in rotaiton mode, use this multiplier to change the amount we want to add*/
     rotationCountMultiply: number
@@ -920,37 +920,37 @@ export interface ServerConfiguration {
     /** whether node should remove a lost syncing node from its syncing list */
     removeLostSyncingNodeFromList: boolean
     /** Enable binary serilization by specific endpoint */
-    compareCertBinary: boolean
-    makeReceiptBinary: boolean
-    lostArchiverInvestigateBinary: boolean
-    signAppDataBinary: boolean
-    sendCachedAppDataBinary: boolean
-    syncTrieHashesBinary: boolean
-    getTrieHashesBinary: boolean
-    getTrieAccountHashesBinary: boolean
-    getAccountDataBinary: boolean
-    getAccountDataByHashBinary: boolean
-    getAccountDataByListBinary: boolean
-    getGloablAccountReportBinary: boolean
-    getCachedAppDataBinary: boolean
-    getAccountQueueCountBinary: boolean
-    getAccountDataWithQueueHintsBinary: boolean
-    getTxTimestampBinary: boolean
-    getAppliedVoteBinary: boolean
-    getConfirmOrChallengeBinary: boolean
-    spreadAppliedVoteHashBinary: boolean
-    spreadTxToGroupSyncingBinary: boolean
-    requestStateForTxBinary: boolean
-    requestReceiptForTxBinary: boolean
-    requestTxAndStateBinary: boolean
-    requestStateForTxPostBinary: boolean
-    broadcastStateBinary: boolean
-    broadcastFinalStateBinary: boolean
-    lostReportBinary: boolean
-    repairMissingAccountsBinary: boolean
-    poqoSendReceiptBinary: boolean
-    poqoDataAndReceiptBinary: boolean
-    poqoSendVoteBinary: boolean
+    // compareCertBinary: boolean
+    // makeReceiptBinary: boolean
+    // lostArchiverInvestigateBinary: boolean
+    // signAppDataBinary: boolean
+    // sendCachedAppDataBinary: boolean
+    // syncTrieHashesBinary: boolean
+    // getTrieHashesBinary: boolean
+    // getTrieAccountHashesBinary: boolean
+    // getAccountDataBinary: boolean
+    // getAccountDataByHashBinary: boolean
+    // getAccountDataByListBinary: boolean
+    // getGloablAccountReportBinary: boolean
+    // getCachedAppDataBinary: boolean
+    // getAccountQueueCountBinary: boolean
+    // getAccountDataWithQueueHintsBinary: boolean
+    // getTxTimestampBinary: boolean
+    // getAppliedVoteBinary: boolean
+    // getConfirmOrChallengeBinary: boolean
+    // spreadAppliedVoteHashBinary: boolean
+    // spreadTxToGroupSyncingBinary: boolean
+    // requestStateForTxBinary: boolean
+    // requestReceiptForTxBinary: boolean
+    // requestTxAndStateBinary: boolean
+    // requestStateForTxPostBinary: boolean
+    // broadcastStateBinary: boolean
+    // broadcastFinalStateBinary: boolean
+    // lostReportBinary: boolean
+    // repairMissingAccountsBinary: boolean
+    // poqoSendReceiptBinary: boolean
+    // poqoDataAndReceiptBinary: boolean
+    // poqoSendVoteBinary: boolean
     /** number of nodes on both ends of the rotationIndex
      *  that will not respond to queries like account data, inject etc
      *  is only activated when more than 10 nodes active  */
