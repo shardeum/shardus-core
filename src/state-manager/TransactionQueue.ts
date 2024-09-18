@@ -5933,8 +5933,8 @@ class TransactionQueue {
 
           // remove TXs that are stuck in the processing queue for 2 min
           if (configContext.stateManager.removeStuckTxsFromQueue === true && txAge > configContext.stateManager.stuckTxRemoveTime) {
-            nestedCountersInstance.countEvent('txSafelyRemoved', `txAge > 2m`)
-            this.statemanager_fatal(`txSafelyRemoved`, `txAge > 2m txid: ${shortID} state: ${queueEntry.state} age:${txAge}`)
+            nestedCountersInstance.countEvent(`txSafelyRemoved`, `txAge > stuckTxRemoveTime:${configContext.stateManager.stuckTxRemoveTime} ms`)
+            this.statemanager_fatal(`txSafelyRemoved`, `txAge > stuckTxRemoveTime:${configContext.stateManager.stuckTxRemoveTime} ms txid: ${shortID} state: ${queueEntry.state} age:${txAge}`)
             this.removeFromQueue(queueEntry, currentIndex)
             continue
           }
