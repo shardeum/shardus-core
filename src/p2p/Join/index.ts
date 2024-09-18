@@ -1635,15 +1635,21 @@ function decideNodeSelection(joinRequest: P2P.JoinTypes.JoinRequest): JoinReques
 }
 
 export function nodelistFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeListTypes.Node[] {
-  const currentCycle = CycleChain.newest.counter
+  const currentCycle = CycleCreator.currentCycle
   const cacheKey = states.sort().join(',')
 
   if (lastCachedInCycle !== currentCycle) {
-    nodelistCache = new Map(); // Create a new empty cache instead of clearing
-    lastCachedInCycle = currentCycle;
+    if (logFlags.verbose) {
+      nestedCountersInstance.countEvent('p2p', `nodelistFromStates-clear`)
+    }
+    nodelistCache = new Map()
+    lastCachedInCycle = currentCycle
   }
 
   if (nodelistCache.has(cacheKey)) {
+    if (logFlags.verbose) {
+      nestedCountersInstance.countEvent('p2p', `nodelistFromStates-hit`)
+    }
     return nodelistCache.get(cacheKey)!
   }
 
@@ -1668,7 +1674,9 @@ export function nodelistFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeL
   if (self && !result.some((node) => node.id === self.id)) {
     result.push(self)
   }
-
+  if (logFlags.verbose) {
+    nestedCountersInstance.countEvent('p2p', `nodelistFromStates-set`)
+  }
   nodelistCache.set(cacheKey, result)
 
   return result
