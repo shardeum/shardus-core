@@ -78,10 +78,7 @@ let mode = null
 
 export let finishedSyncingCycle = -1
 
-type CacheKey = string
-type NodeListCache = Map<CacheKey, P2P.NodeListTypes.Node[]>
-
-let nodelistCache: NodeListCache = new Map()
+let nodelistCache = new Map<string, P2P.NodeListTypes.Node[]>()
 let lastCachedInCycle = -1
 
 // let hasSubmittedJoinRequest = false
@@ -1639,17 +1636,11 @@ export function nodelistFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeL
   const cacheKey = states.sort().join(',')
 
   if (lastCachedInCycle !== currentCycle) {
-    if (logFlags.verbose) {
-      nestedCountersInstance.countEvent('p2p', `nodelistFromStates-clear`)
-    }
     nodelistCache = new Map()
     lastCachedInCycle = currentCycle
   }
 
   if (nodelistCache.has(cacheKey)) {
-    if (logFlags.verbose) {
-      nestedCountersInstance.countEvent('p2p', `nodelistFromStates-hit`)
-    }
     return nodelistCache.get(cacheKey)!
   }
 
@@ -1673,9 +1664,6 @@ export function nodelistFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeL
   const self = NodeList.byJoinOrder.find((node) => node.id === Self.id)
   if (self && !result.some((node) => node.id === self.id)) {
     result.push(self)
-  }
-  if (logFlags.verbose) {
-    nestedCountersInstance.countEvent('p2p', `nodelistFromStates-set`)
   }
   nodelistCache.set(cacheKey, result)
 
