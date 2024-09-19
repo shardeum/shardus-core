@@ -78,6 +78,9 @@ let mode = null
 
 export let finishedSyncingCycle = -1
 
+let nodelistCache = new Map<string, P2P.NodeListTypes.Node[]>()
+let lastCachedInCycle = -1
+
 // let hasSubmittedJoinRequest = false
 // export function getHasSubmittedJoinRequest(): boolean {
 //   return hasSubmittedJoinRequest
@@ -1629,6 +1632,18 @@ function decideNodeSelection(joinRequest: P2P.JoinTypes.JoinRequest): JoinReques
 }
 
 export function nodelistFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeListTypes.Node[] {
+  const currentCycle = CycleCreator.currentCycle
+  const cacheKey = states.sort().join(',')
+
+  if (lastCachedInCycle !== currentCycle) {
+    nodelistCache = new Map()
+    lastCachedInCycle = currentCycle
+  }
+
+  if (nodelistCache.has(cacheKey)) {
+    return nodelistCache.get(cacheKey)!
+  }
+
   if (Self.isRestartNetwork) return NodeList.byIdOrder
   const { NodeStatus } = P2P.P2PTypes
   const stateMappings: { [key in P2P.P2PTypes.NodeStatus]?: P2P.NodeListTypes.Node[] } = {
@@ -1650,6 +1665,7 @@ export function nodelistFromStates(states: P2P.P2PTypes.NodeStatus[]): P2P.NodeL
   if (self && !result.some((node) => node.id === self.id)) {
     result.push(self)
   }
+  nodelistCache.set(cacheKey, result)
 
   return result
 }
