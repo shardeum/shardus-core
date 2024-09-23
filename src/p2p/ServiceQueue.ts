@@ -336,7 +336,7 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
       const currentVote = queueEntry.votes[i]
       const voteCount = hashCounts.get(currentVote.result) || 0
       hashCounts.set(currentVote.result, voteCount + 1)
-      if (voteCount + 1 > majorityCount) {
+      if (voteCount + 1 >= majorityCount) {
         winningVote = currentVote
         break
       }
