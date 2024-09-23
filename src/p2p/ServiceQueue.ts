@@ -14,7 +14,7 @@ import { getFromArchiver } from './Archivers'
 import { Result } from 'neverthrow'
 import { getRandomAvailableArchiver } from './Utils'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
-import { nodeListFromStates } from './Join'
+import { nodelistFromStates } from './Join'
 import * as Nodelist from './NodeList'
 
 /** STATE */
@@ -95,7 +95,7 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.SignedA
           payload,
           tracker,
           Self.id,
-          nodeListFromStates([
+          nodelistFromStates([
             P2P.P2PTypes.NodeStatus.ACTIVE,
             P2P.P2PTypes.NodeStatus.READY,
             P2P.P2PTypes.NodeStatus.SYNCING,
@@ -169,7 +169,7 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ServiceQueueTypes.Sign
           payload,
           tracker,
           Self.id,
-          nodeListFromStates([
+          nodelistFromStates([
             P2P.P2PTypes.NodeStatus.ACTIVE,
             P2P.P2PTypes.NodeStatus.READY,
             P2P.P2PTypes.NodeStatus.SYNCING,
@@ -400,7 +400,7 @@ export function sendRequests(): void {
       add,
       '',
       Self.id,
-      nodeListFromStates([
+      nodelistFromStates([
         P2P.P2PTypes.NodeStatus.ACTIVE,
         P2P.P2PTypes.NodeStatus.READY,
         P2P.P2PTypes.NodeStatus.SYNCING,
@@ -425,7 +425,7 @@ export function sendRequests(): void {
         remove,
         '',
         Self.id,
-        nodeListFromStates([
+        nodelistFromStates([
           P2P.P2PTypes.NodeStatus.ACTIVE,
           P2P.P2PTypes.NodeStatus.READY,
           P2P.P2PTypes.NodeStatus.SYNCING,

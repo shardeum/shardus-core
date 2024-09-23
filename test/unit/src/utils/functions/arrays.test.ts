@@ -1,6 +1,6 @@
 import { P2P } from '@shardus/types'
 import { linearInsertSorted, propComparator2 } from '../../../../../src/utils'
-import { nodeListFromStates } from '../../../../../src/p2p/Join'
+import { nodelistFromStates } from '../../../../../src/p2p/Join'
 import * as NodeList from '../../../../../src/p2p/NodeList'
 import * as Self from '../../../../../src/p2p/Self'
 
@@ -210,7 +210,7 @@ const nodes = [
   },
 ]
 
-describe('nodeListFromStates', () => {
+describe('nodelistFromStates', () => {
   let Self
   let NodeList
 
@@ -255,7 +255,7 @@ describe('nodeListFromStates', () => {
   })
 
   it('should return nodes in the correct order for given states', () => {
-    const result = nodeListFromStates([
+    const result = nodelistFromStates([
       P2P.P2PTypes.NodeStatus.ACTIVE,
       P2P.P2PTypes.NodeStatus.READY,
       P2P.P2PTypes.NodeStatus.SYNCING,
@@ -283,7 +283,7 @@ describe('nodeListFromStates', () => {
       readyTimestamp: 0,
     }
     NodeList.byJoinOrder.push(selfNode)
-    const result = nodeListFromStates([
+    const result = nodelistFromStates([
       P2P.P2PTypes.NodeStatus.ACTIVE,
       P2P.P2PTypes.NodeStatus.READY,
       P2P.P2PTypes.NodeStatus.SYNCING,
@@ -312,7 +312,7 @@ describe('nodeListFromStates', () => {
     }
     NodeList.byJoinOrder.push(selfNode)
 
-    const result = nodeListFromStates([
+    const result = nodelistFromStates([
       P2P.P2PTypes.NodeStatus.ACTIVE,
       P2P.P2PTypes.NodeStatus.READY,
       P2P.P2PTypes.NodeStatus.SYNCING,
@@ -322,7 +322,7 @@ describe('nodeListFromStates', () => {
 
   it('should handle empty state arrays', () => {
     jest.spyOn(Self, 'id', 'get').mockReturnValue('0')
-    const result = nodeListFromStates([])
+    const result = nodelistFromStates([])
     expect(result).toEqual([])
   })
 })
