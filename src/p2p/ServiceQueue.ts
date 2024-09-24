@@ -26,7 +26,13 @@ import * as Nodelist from './NodeList'
 interface VerifierEntry {
   hash: string
   tx: P2P.ServiceQueueTypes.AddNetworkTx
-  votes: { txHash: string; verifierType: 'beforeAdd' | 'apply'; result: boolean; sign: any }[]
+  votes: {
+    txHash: string
+    verifierType: 'beforeAdd' | 'apply'
+    result: boolean
+    sign: any
+    votingGroupHash: string
+  }[]
   newVotes: boolean
   executionGroup: string[]
   appliedReceipt: any
@@ -112,7 +118,7 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObject>
       return
     }
 
-    if (!verifyAppliedReceipt(payload.appliedReceipt, payload.executionGroup)) {
+    if (!verifyAppliedReceipt(payload)) {
       warn('addTxGossipRoute: appliedReceipt verification failed')
       return
     }
@@ -122,19 +128,18 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObject>
     txAdd.push(addTxCopy)
 
     /* prettier-ignore */ nestedCountersInstance.countEvent(`gossip-addtx`, `gossip send - ${payload.hash}`)
-        Comms.sendGossip(
-          'gossip-addtx',
-          payload,
-          tracker,
-          Self.id,
-          nodeListFromStates([
-            P2P.P2PTypes.NodeStatus.ACTIVE,
-            P2P.P2PTypes.NodeStatus.READY,
-            P2P.P2PTypes.NodeStatus.SYNCING,
-          ]),
-          false
-        ) // use Self.id so we don't gossip to ourself
-
+    Comms.sendGossip(
+      'gossip-addtx',
+      payload,
+      tracker,
+      Self.id,
+      nodeListFromStates([
+        P2P.P2PTypes.NodeStatus.ACTIVE,
+        P2P.P2PTypes.NodeStatus.READY,
+        P2P.P2PTypes.NodeStatus.SYNCING,
+      ]),
+      false
+    ) // use Self.id so we don't gossip to ourself
   } finally {
     profilerInstance.scopedProfileSectionEnd('serviceQueue - addTx')
   }
@@ -190,25 +195,24 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObje
     }
 
     // could also place check inside _removeNetworkTx
-    if (!verifyAppliedReceipt(payload.appliedReceipt, payload.executionGroup)) {
+    if (!verifyAppliedReceipt(payload)) {
       return
     }
     txRemove.push({ txHash: payload.hash, cycle: payload.tx.cycle })
 
     /* prettier-ignore */ nestedCountersInstance.countEvent(`gossip-removetx`, `gossip send - ${payload.txHash}`)
-        Comms.sendGossip(
-          'gossip-removetx',
-          payload,
-          tracker,
-          Self.id,
-          nodeListFromStates([
-            P2P.P2PTypes.NodeStatus.ACTIVE,
-            P2P.P2PTypes.NodeStatus.READY,
-            P2P.P2PTypes.NodeStatus.SYNCING,
-          ]),
-          false
-        ) // use Self.id so we don't gossip to ourself
-
+    Comms.sendGossip(
+      'gossip-removetx',
+      payload,
+      tracker,
+      Self.id,
+      nodeListFromStates([
+        P2P.P2PTypes.NodeStatus.ACTIVE,
+        P2P.P2PTypes.NodeStatus.READY,
+        P2P.P2PTypes.NodeStatus.SYNCING,
+      ]),
+      false
+    ) // use Self.id so we don't gossip to ourself
   } finally {
     profilerInstance.scopedProfileSectionEnd('serviceQueue - removeTx')
   }
@@ -220,6 +224,7 @@ const sendVoteHandler: P2P.P2PTypes.Route<
     verifierType: 'beforeAdd' | 'apply'
     result: boolean
     sign: any
+    votingGroupHash: string
   }>
 > = {
   name: 'service_queue_vote',
@@ -237,6 +242,11 @@ const sendVoteHandler: P2P.P2PTypes.Route<
 
       if (!collectedVote.sign) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: no sign found')
+        return
+      }
+
+      if (!crypto.verify(collectedVote, collectedVote.sign.owner)) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: signature invalid')
         return
       }
 
@@ -275,10 +285,18 @@ const routes = {
 
 function tryAppendVote(
   queueEntry: VerifierEntry,
-  collectedVote: { txHash: string; verifierType: 'beforeAdd' | 'apply'; result: boolean; sign: any }
+  collectedVote: {
+    txHash: string
+    verifierType: 'beforeAdd' | 'apply'
+    result: boolean
+    sign: any
+    votingGroupHash: string
+  }
 ): boolean {
   console.log(' red - tryAppendVote', queueEntry, collectedVote)
-  if (!executionGroupForAddress(queueEntry.tx.involvedAddress).some((node) => node === collectedVote.sign.owner)) {
+  if (
+    !executionGroupForAddress(queueEntry.tx.involvedAddress).some((node) => node === collectedVote.sign.owner)
+  ) {
     console.log(' red - tryAppendVote not in execution group', queueEntry, collectedVote.sign.owner)
     nestedCountersInstance.countEvent('serviceQueue', 'Vote sender not in execution group')
     return false
@@ -348,6 +366,7 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
         result: winningVote.result,
         type: winningVote.verifierType,
         signatures: [],
+        votingGroupHash: crypto.hash(votingGroup),
       }
       for (let i = 0; i < numVotes; i++) {
         // eslint-disable-next-line security/detect-object-injection
@@ -451,12 +470,12 @@ export function init(): void {
   })
 
   network.registerExternalGet('debug-network-txcount', isDebugModeMiddleware, (req, res) => {
-    const copy = txList.map(entry => ({
+    const copy = txList.map((entry) => ({
       ...entry,
-      count: tryCounts.get(entry.hash) || 0
-    }));
-    res.send({ status: 'ok', tryCounts: copy });
-  });
+      count: tryCounts.get(entry.hash) || 0,
+    }))
+    res.send({ status: 'ok', tryCounts: copy })
+  })
 }
 
 export function reset(): void {
@@ -504,7 +523,8 @@ export function updateRecord(
           type: txadd.type,
           cycle: txadd.cycle,
           priority: txadd.priority,
-          involvedAddress: txadd.involvedAddress,...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
+          involvedAddress: txadd.involvedAddress,
+          ...(txadd.subQueueKey && { subQueueKey: txadd.subQueueKey }),
         },
       })
     }
@@ -726,7 +746,12 @@ function voteForNetworkTx(
   result: boolean
 ): void {
   console.log(' red - voteForNetworkTx', networkTx.hash, type, result)
-  const vote = crypto.sign({ txHash: networkTx.hash, result, verifierType: type })
+  const vote = crypto.sign({
+    txHash: networkTx.hash,
+    result,
+    verifierType: type,
+    votingGroupHash: crypto.hash(executionGroupForAddress(networkTx.involvedAddress)),
+  })
   let aggregators = pickAggregators(networkTx.involvedAddress)
   Comms.tell(aggregators, 'service_queue_vote', vote)
 }
@@ -1007,38 +1032,21 @@ function sortedInsert(
   }
 }
 
-function verifyAppliedReceipt(receipt: any, executionGroupNodes: string[]): boolean {
-  console.log(' red - verifyAppliedReceipt', receipt, executionGroupNodes)
-  const ownerToSignMap = new Map<string, Shardus.Sign>()
-  let validSignatures = 0
-  for (const sign of receipt.signatures) {
-    if (executionGroupNodes.includes(sign.owner)) {
-      ownerToSignMap.set(sign.owner, sign)
-      validSignatures++
+function verifyAppliedReceipt(payload: VerifierEntry & SignedObject): boolean {
+  const receipt = payload.appliedReceipt
+  console.log(' red - verifyAppliedReceipt', receipt)
+
+  for (const vote of payload.votes) {
+    if (!crypto.verify(vote, vote.sign.owner)) {
+      error(`verifyAppliedReceipt(): signature invalid`, vote.sign.owner)
+      return false
+    } else if (vote.votingGroupHash !== receipt.votingGroupHash) {
+      error(`executionGroupHash mismatch: ${vote.votingGroupHash} !== ${receipt.votingGroupHash}`)
+      return false
     }
   }
-  const totalNodes = executionGroupNodes.length
-  const requiredMajority = Math.ceil(totalNodes * config.p2p.requiredVotesPercentage)
-  if (ownerToSignMap.size < requiredMajority) {
-    return false
-  }
 
-  // const vote = receipt.appliedVote
-  // const voteHash = this.calculateVoteHash(vote)
-  // const appliedVoteHash = {
-  //   txid: vote.txid,
-  //   voteHash,
-  // }
-
-  // let validSignatures = 0
-  // for (const owner of ownerToSignMap.keys()) {
-  //   const signedObject = { ...appliedVoteHash, sign: ownerToSignMap.get(owner) }
-  //   if (this.crypto.verify(signedObject, owner)) {
-  //     validSignatures++
-  //   }
-  // }
-  console.log(' red - verifyAppliedReceipt validSignatures', validSignatures, requiredMajority)
-  return validSignatures >= requiredMajority
+  return true
 }
 
 function info(...msg: unknown[]): void {
