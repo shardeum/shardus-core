@@ -31,7 +31,6 @@ interface VerifierEntry {
     verifierType: 'beforeAdd' | 'apply'
     result: boolean
     sign: any
-    votingGroupHash: string
   }[]
   newVotes: boolean
   executionGroup: string[]
@@ -224,7 +223,6 @@ const sendVoteHandler: P2P.P2PTypes.Route<
     verifierType: 'beforeAdd' | 'apply'
     result: boolean
     sign: any
-    votingGroupHash: string
   }>
 > = {
   name: 'service_queue_vote',
@@ -251,8 +249,11 @@ const sendVoteHandler: P2P.P2PTypes.Route<
       }
 
       if (!processTxVerifiers.has(collectedVote.txHash)) {
-        console.log(' red - processTxVerifiers.has(collectedVote.txHash)', processTxVerifiers)
-        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: tx not in processTxVerifiers')
+        console.log(
+          ` red - processTxVerifiers.has(collectedVote.txHash) not found: ${collectedVote.txHash}`,
+          processTxVerifiers
+        )
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', `send-vote: tx not in processTxVerifiers: ${collectedVote.txHash}`)
         return
       }
 
@@ -290,7 +291,6 @@ function tryAppendVote(
     verifierType: 'beforeAdd' | 'apply'
     result: boolean
     sign: any
-    votingGroupHash: string
   }
 ): boolean {
   console.log(' red - tryAppendVote', queueEntry, collectedVote)
@@ -366,7 +366,6 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
         result: winningVote.result,
         type: winningVote.verifierType,
         signatures: [],
-        votingGroupHash: crypto.hash(votingGroup),
       }
       for (let i = 0; i < numVotes; i++) {
         // eslint-disable-next-line security/detect-object-injection
@@ -750,7 +749,6 @@ function voteForNetworkTx(
     txHash: networkTx.hash,
     result,
     verifierType: type,
-    votingGroupHash: crypto.hash(executionGroupForAddress(networkTx.involvedAddress)),
   })
   let aggregators = pickAggregators(networkTx.involvedAddress)
   Comms.tell(aggregators, 'service_queue_vote', vote)
@@ -785,6 +783,7 @@ function pickAggregators(address: string): ShardusTypes.Node[] {
       if (aggregators.length === config.p2p.serviceQueueAggregators) break
     }
   }
+  console.log(' red - pickAggregators', aggregators.length, aggregators)
   return aggregators
 }
 
@@ -1035,13 +1034,14 @@ function sortedInsert(
 function verifyAppliedReceipt(payload: VerifierEntry & SignedObject): boolean {
   const receipt = payload.appliedReceipt
   console.log(' red - verifyAppliedReceipt', receipt)
+  const executionGroup = executionGroupForAddress(payload.tx.involvedAddress)
 
   for (const vote of payload.votes) {
     if (!crypto.verify(vote, vote.sign.owner)) {
       error(`verifyAppliedReceipt(): signature invalid`, vote.sign.owner)
       return false
-    } else if (vote.votingGroupHash !== receipt.votingGroupHash) {
-      error(`executionGroupHash mismatch: ${vote.votingGroupHash} !== ${receipt.votingGroupHash}`)
+    } else if (payload.appliedReceipt.signatures.some((sig) => !executionGroup.includes(sig.owner))) {
+      error(`appliedReceipt found signature not in executionGroup`)
       return false
     }
   }
