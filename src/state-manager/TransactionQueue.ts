@@ -718,59 +718,59 @@ class TransactionQueue {
       spreadTxToGroupSyncingBinaryHandler.handler
     )
 
-    this.p2p.registerGossipHandler(
-      'spread_tx_to_group',
-      async (
-        payload: { data: Shardus.TimestampedTx; appData: unknown },
-        sender: Node,
-        tracker: string,
-        msgSize: number
-      ) => {
-        profilerInstance.scopedProfileSectionStart('spread_tx_to_group', false, msgSize)
-        let respondSize = cUninitializedSize
-        try {
-          // Place tx in queue (if younger than m)
-          //  gossip 'spread_tx_to_group' to transaction group
+    // this.p2p.registerGossipHandler(
+    //   'spread_tx_to_group',
+    //   async (
+    //     payload: { data: Shardus.TimestampedTx; appData: unknown },
+    //     sender: Node,
+    //     tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     profilerInstance.scopedProfileSectionStart('spread_tx_to_group', false, msgSize)
+    //     let respondSize = cUninitializedSize
+    //     try {
+    //       // Place tx in queue (if younger than m)
+    //       //  gossip 'spread_tx_to_group' to transaction group
 
-          //handleSharedTX will also validate fields.  payload is an AcceptedTX so must pass in the .data as the rawTX
-          const queueEntry = this.handleSharedTX(payload.data, payload.appData, sender)
-          if (queueEntry == null) {
-            return
-          }
+    //       //handleSharedTX will also validate fields.  payload is an AcceptedTX so must pass in the .data as the rawTX
+    //       const queueEntry = this.handleSharedTX(payload.data, payload.appData, sender)
+    //       if (queueEntry == null) {
+    //         return
+    //       }
 
-          // get transaction group
-          const transactionGroup = this.queueEntryGetTransactionGroup(queueEntry)
-          if (queueEntry.ourNodeInTransactionGroup === false) {
-            return
-          }
-          if (transactionGroup.length > 1) {
-            this.stateManager.debugNodeGroup(
-              queueEntry.acceptedTx.txId,
-              queueEntry.acceptedTx.timestamp,
-              `spread_tx_to_group transactionGroup:`,
-              transactionGroup
-            )
-            respondSize = await this.p2p.sendGossipIn(
-              'spread_tx_to_group',
-              payload,
-              tracker,
-              sender,
-              transactionGroup,
-              false,
-              -1,
-              queueEntry.acceptedTx.txId
-            )
-            /* prettier-ignore */ if (logFlags.verbose) console.log( 'queueEntry.isInExecutionHome', queueEntry.acceptedTx.txId, queueEntry.isInExecutionHome )
-            // If our node is in the execution group, forward this raw tx to the subscribed archivers
-            if (queueEntry.isInExecutionHome === true) {
-              this.addOriginalTxDataToForward(queueEntry)
-            }
-          }
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('spread_tx_to_group', respondSize)
-        }
-      }
-    )
+    //       // get transaction group
+    //       const transactionGroup = this.queueEntryGetTransactionGroup(queueEntry)
+    //       if (queueEntry.ourNodeInTransactionGroup === false) {
+    //         return
+    //       }
+    //       if (transactionGroup.length > 1) {
+    //         this.stateManager.debugNodeGroup(
+    //           queueEntry.acceptedTx.txId,
+    //           queueEntry.acceptedTx.timestamp,
+    //           `spread_tx_to_group transactionGroup:`,
+    //           transactionGroup
+    //         )
+    //         respondSize = await this.p2p.sendGossipIn(
+    //           'spread_tx_to_group',
+    //           payload,
+    //           tracker,
+    //           sender,
+    //           transactionGroup,
+    //           false,
+    //           -1,
+    //           queueEntry.acceptedTx.txId
+    //         )
+    //         /* prettier-ignore */ if (logFlags.verbose) console.log( 'queueEntry.isInExecutionHome', queueEntry.acceptedTx.txId, queueEntry.isInExecutionHome )
+    //         // If our node is in the execution group, forward this raw tx to the subscribed archivers
+    //         if (queueEntry.isInExecutionHome === true) {
+    //           this.addOriginalTxDataToForward(queueEntry)
+    //         }
+    //       }
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('spread_tx_to_group', respondSize)
+    //     }
+    //   }
+    // )
 
     // THIS HANDLER IS NOT USED ANYMORE
     // this.p2p.registerGossipHandler(
