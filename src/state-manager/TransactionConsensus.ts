@@ -619,49 +619,49 @@ class TransactionConsenus {
 
     Comms.registerInternalBinary(GetAppliedVoteBinaryHandler.name, GetAppliedVoteBinaryHandler.handler)
 
-    Comms.registerGossipHandler(
-      'gossip-applied-vote',
-      async (payload: AppliedVote, sender: string, tracker: string) => {
-        nestedCountersInstance.countEvent('consensus', 'gossip-applied-vote')
-        profilerInstance.scopedProfileSectionStart('gossip-applied-vote handler', true)
-        try {
-          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${payload.txid} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:noTX`)
-            return
-          }
-          const newVote = payload as AppliedVote
-          const appendSuccessful = this.stateManager.transactionConsensus.tryAppendVote(queueEntry, newVote)
+    // Comms.registerGossipHandler(
+    //   'gossip-applied-vote',
+    //   async (payload: AppliedVote, sender: string, tracker: string) => {
+    //     nestedCountersInstance.countEvent('consensus', 'gossip-applied-vote')
+    //     profilerInstance.scopedProfileSectionStart('gossip-applied-vote handler', true)
+    //     try {
+    //       const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${payload.txid} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:noTX`)
+    //         return
+    //       }
+    //       const newVote = payload as AppliedVote
+    //       const appendSuccessful = this.stateManager.transactionConsensus.tryAppendVote(queueEntry, newVote)
 
-          if (appendSuccessful) {
-            /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${payload.txid} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:appended`)
-            const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-            if (gossipGroup.length > 1) {
-              // should consider only forwarding in some cases?
-              this.stateManager.debugNodeGroup(
-                queueEntry.acceptedTx.txId,
-                queueEntry.acceptedTx.timestamp,
-                `share appliedVote to consensus nodes`,
-                gossipGroup
-              )
-              Comms.sendGossip(
-                'gossip-applied-vote',
-                newVote,
-                tracker,
-                null,
-                queueEntry.transactionGroup,
-                false,
-                -1,
-                queueEntry.acceptedTx.txId,
-                `${NodeList.activeIdToPartition.get(newVote.node_id)}`
-              )
-            }
-          }
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('gossip-applied-vote handler')
-        }
-      }
-    )
+    //       if (appendSuccessful) {
+    //         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${payload.txid} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:appended`)
+    //         const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+    //         if (gossipGroup.length > 1) {
+    //           // should consider only forwarding in some cases?
+    //           this.stateManager.debugNodeGroup(
+    //             queueEntry.acceptedTx.txId,
+    //             queueEntry.acceptedTx.timestamp,
+    //             `share appliedVote to consensus nodes`,
+    //             gossipGroup
+    //           )
+    //           Comms.sendGossip(
+    //             'gossip-applied-vote',
+    //             newVote,
+    //             tracker,
+    //             null,
+    //             queueEntry.transactionGroup,
+    //             false,
+    //             -1,
+    //             queueEntry.acceptedTx.txId,
+    //             `${NodeList.activeIdToPartition.get(newVote.node_id)}`
+    //           )
+    //         }
+    //       }
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('gossip-applied-vote handler')
+    //     }
+    //   }
+    // )
 
     this.p2p.registerGossipHandler(
       'spread_appliedReceipt',
