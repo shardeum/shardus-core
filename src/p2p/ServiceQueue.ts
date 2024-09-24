@@ -1064,6 +1064,12 @@ function verifyAppliedReceipt(payload: VerifierEntry & SignedObject): boolean {
     validSignatures.add(vote.sign.owner)
   }
 
+  const requiredMajority = Math.ceil(executionGroup.length * config.p2p.requiredVotesPercentage)
+  if (validSignatures.size < requiredMajority) {
+    error(`verifyAppliedReceipt(): not enough valid signatures`, validSignatures, requiredMajority, receipt.txid)
+    return false
+  }
+
   return true
 }
 
