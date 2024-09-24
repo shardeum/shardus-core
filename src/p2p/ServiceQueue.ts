@@ -1036,7 +1036,24 @@ function verifyAppliedReceipt(payload: VerifierEntry & SignedObject): boolean {
   console.log(' red - verifyAppliedReceipt', receipt)
   const executionGroup = executionGroupForAddress(payload.tx.involvedAddress)
 
+  let validSignatures = new Set<string>()
   for (const vote of payload.votes) {
+    if (vote.result !== receipt.result) {
+      error(`verifyAppliedReceipt(): vote result does not match receipt result`, vote, receipt)
+      return false
+    }
+    if (vote.txHash !== receipt.txid) {
+      error(`verifyAppliedReceipt(): vote txHash does not match receipt txid`, vote, receipt)
+      return false
+    }
+    if (vote.verifierType !== receipt.type) {
+      error(`verifyAppliedReceipt(): vote verifierType does not match receipt type`, vote, receipt)
+      return false
+    }
+    if (validSignatures.has(vote.sign.owner)) {
+      error(`verifyAppliedReceipt(): vote has duplicate signature`, vote)
+      return false
+    }
     if (!crypto.verify(vote, vote.sign.owner)) {
       error(`verifyAppliedReceipt(): signature invalid`, vote.sign.owner)
       return false
@@ -1044,6 +1061,7 @@ function verifyAppliedReceipt(payload: VerifierEntry & SignedObject): boolean {
       error(`appliedReceipt found signature not in executionGroup`)
       return false
     }
+    validSignatures.add(vote.sign.owner)
   }
 
   return true
