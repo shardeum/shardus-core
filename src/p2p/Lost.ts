@@ -144,20 +144,20 @@ FUTURE-SLASHING
 we would not want to blindly check signatures, and may later need
 a way to mark a node as bad if it spams the ping endpoint too much
  */
-const pingNodeRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<SignedPingMessage>> = {
-  name: 'ping-node',
-  handler: (payload, response, sender) => {
-    profilerInstance.scopedProfileSectionStart('ping-node')
-    try {
-      //used by isNodeDown to test if a node can be reached on the internal protocol
-      if (payload?.m === 'ping') {
-        response({ s: 'ack', r: 1 })
-      }
-    } finally {
-      profilerInstance.scopedProfileSectionEnd('ping-node')
-    }
-  },
-}
+// const pingNodeRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<SignedPingMessage>> = {
+//   name: 'ping-node',
+//   handler: (payload, response, sender) => {
+//     profilerInstance.scopedProfileSectionStart('ping-node')
+//     try {
+//       //used by isNodeDown to test if a node can be reached on the internal protocol
+//       if (payload?.m === 'ping') {
+//         response({ s: 'ack', r: 1 })
+//       }
+//     } finally {
+//       profilerInstance.scopedProfileSectionEnd('ping-node')
+//     }
+//   },
+// }
 
 const lostDownRoute: P2P.P2PTypes.GossipHandler = (
   payload: P2P.LostTypes.SignedDownGossipMessage,
@@ -200,7 +200,7 @@ const removeByAppRoute: P2P.P2PTypes.GossipHandler = (
 
 const routes = {
   external: [killExternalRoute, killOtherExternalRoute],
-  internal: [pingNodeRoute], //lostReportRoute
+  internal: [], //pingNodeRoute, lostReportRoute
   gossip: {
     'lost-down': lostDownRoute,
     'lost-up': lostUpRoute,
