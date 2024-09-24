@@ -3172,6 +3172,12 @@ class Shardus extends EventEmitter {
       // If there is initShutdown change, if the latest cycle is greater than the cycle of the change, then skip it
       if (changeObj['p2p'] && changeObj['p2p']['initShutdown'] && change.cycle !== lastCycle.counter) continue
 
+      // Apply pruneDisallowedArchivers change only if the cycle of the change is the same as the latest cycle
+      if (changeObj['p2p'] && changeObj['p2p']['pruneDisallowedArchivers']) {
+        if (change.cycle === lastCycle.counter) Archivers.pruneDisallowedArchivers()
+        else continue
+      }
+
       this.patchObject(this.config, changeObj, appData)
 
       const prunedData: WrappedData[] = await this.app.pruneNetworkChangeQueue(account, lastCycle.counter)

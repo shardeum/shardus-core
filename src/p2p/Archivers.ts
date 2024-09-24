@@ -51,6 +51,7 @@ export let recipients: Map<
 
 let joinRequests: P2P.ArchiversTypes.Request[]
 let leaveRequests: P2P.ArchiversTypes.Request[]
+let leavingDisallowedArchiversList: publicKey[] = []
 let receiptForwardInterval: Timeout | null = null
 let networkCheckInterval: Timeout | null = null
 let networkCheckInProgress = false
@@ -168,6 +169,12 @@ export function updateRecord(txs: P2P.ArchiversTypes.Txs, record: P2P.CycleCreat
     .filter((request) => request.requestType === P2P.ArchiversTypes.RequestTypes.LEAVE)
     .map((leaveRequest) => leaveRequest.nodeInfo)
 
+  for (const publicKey of leavingDisallowedArchiversList) {
+    if (archivers.has(publicKey) && !leavingArchivers.some((archiver) => archiver.publicKey === publicKey)) {
+      leavingArchivers.push(archivers.get(publicKey))
+    }
+  }
+
   if (logFlags.console)
     console.log(
       `Archiver before updating record: Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`,
@@ -246,10 +253,6 @@ export function addArchiverJoinRequest(joinRequest: P2P.ArchiversTypes.Request, 
     warn('addJoinRequest: bad joinRequest.sign ' + err)
     return { success: false, reason: 'bad joinRequest.sign ' + err }
   }
-  if (!crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)) {
-    warn('addJoinRequest: bad signature')
-    return { success: false, reason: 'bad signature ' }
-  }
   if (archivers.get(joinRequest.nodeInfo.publicKey)) {
     warn('addJoinRequest: This archiver is already in the active archiver list')
     return { success: false, reason: 'This archiver is already in the active archiver list' }
@@ -265,6 +268,12 @@ export function addArchiverJoinRequest(joinRequest: P2P.ArchiversTypes.Request, 
     if (isBogonIP(joinRequest.nodeInfo.ip)) {
       warn('addJoinRequest: This archiver join request uses a bogon IP')
       return { success: false, reason: 'This archiver join request is a bogon IP' }
+    }
+  }
+  if (Context.config.p2p.allowOnlyApprovedArchivers) {
+    if (!Context.config.p2p.allowedArchiversList.includes(joinRequest.nodeInfo.publicKey)) {
+      warn('addJoinRequest: This archiver is not an allowed archivers list')
+      return { success: false, reason: 'This archiver is not an allowed archivers list' }
     }
   }
 
@@ -310,6 +319,10 @@ export function addArchiverJoinRequest(joinRequest: P2P.ArchiversTypes.Request, 
       warn('addJoinRequest: Failed to get consensus radius', e)
       return { success: false, reason: 'This node is not ready to accept this request!' }
     }
+  }
+  if (!crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)) {
+    warn('addJoinRequest: bad signature')
+    return { success: false, reason: 'bad signature ' }
   }
 
   joinRequests.push(joinRequest)
@@ -381,11 +394,6 @@ export function addLeaveRequest(leaveRequest: P2P.ArchiversTypes.Request, tracke
     warn('addLeaveRequest: bad leaveRequest.sign ' + err)
     return { success: false, reason: 'bad leaveRequest.sign ' + err }
   }
-  if (!crypto.verify(leaveRequest, leaveRequest.nodeInfo.publicKey)) {
-    warn('addLeaveRequest: bad signature')
-    return { success: false, reason: 'bad signature' }
-  }
-
   if (!archivers.get(leaveRequest.nodeInfo.publicKey)) {
     warn(
       'addLeaveRequest: Not a valid archiver to be sending leave request, archiver was not found in active archiver list'
@@ -425,6 +433,10 @@ export function addLeaveRequest(leaveRequest: P2P.ArchiversTypes.Request, tracke
       reason: 'This archiver leave request timestamp exceeds acceptable timestamp range',
     }
   }
+  if (!crypto.verify(leaveRequest, leaveRequest.nodeInfo.publicKey)) {
+    warn('addLeaveRequest: bad signature')
+    return { success: false, reason: 'bad signature' }
+  }
   leaveRequests.push(leaveRequest)
   if (logFlags.console) console.log('adding leave requests', leaveRequests)
   if (gossip === true) {
@@ -433,13 +445,9 @@ export function addLeaveRequest(leaveRequest: P2P.ArchiversTypes.Request, tracke
   return { success: true }
 }
 
-export function getArchiverUpdates() {
-  return joinRequests
-}
-
 export function removeArchiverByPublicKey(publicKey: publicKey) {
   const archiverInfo = archivers.get(publicKey)
-  removeArchiver(archiverInfo)
+  if (archiverInfo) removeArchiver(archiverInfo)
 }
 
 export function removeArchiver(nodeInfo: JoinedArchiver) {
@@ -447,15 +455,26 @@ export function removeArchiver(nodeInfo: JoinedArchiver) {
   removeDataRecipient(nodeInfo.publicKey)
   removeArchiverConnection(nodeInfo.publicKey)
   leaveRequests = leaveRequests.filter((request) => request.nodeInfo.publicKey !== nodeInfo.publicKey)
+  leavingDisallowedArchiversList = leavingDisallowedArchiversList.filter(
+    (publicKey) => publicKey !== nodeInfo.publicKey
+  )
 }
 
 export function updateArchivers(record: P2P.CycleCreatorTypes.CycleRecord) {
   // Update archiversList
   for (const nodeInfo of record.leavingArchivers) {
-    removeArchiver(nodeInfo)
+    if (archivers.has(nodeInfo.publicKey)) removeArchiver(nodeInfo)
   }
   for (const nodeInfo of record.joinedArchivers) {
     archivers.set(nodeInfo.publicKey, nodeInfo)
+  }
+}
+
+export function pruneDisallowedArchivers(): void {
+  for (const [publicKey, archiver] of archivers) {
+    if (!config.p2p.allowedArchiversList.includes(publicKey)) {
+      leavingDisallowedArchiversList.push(publicKey)
+    }
   }
 }
 
