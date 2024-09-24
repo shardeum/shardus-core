@@ -1925,48 +1925,48 @@ class StateManager {
     //   }
     // )
 
-    const spreadAppliedVoteHashBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
-      name: InternalRouteEnum.binary_spread_appliedVoteHash,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      handler: async (payload, respond, header, sign) => {
-        const route = InternalRouteEnum.binary_spread_appliedVoteHash
-        nestedCountersInstance.countEvent('internal', route)
-        this.profiler.scopedProfileSectionStart(route, false, payload.length)
-        const errorHandler = (
-          errorType: RequestErrorEnum,
-          opts?: { customErrorLog?: string; customCounterSuffix?: string }
-        ): void => requestErrorHandler(route, errorType, header, opts)
+    // const spreadAppliedVoteHashBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+    //   name: InternalRouteEnum.binary_spread_appliedVoteHash,
+    //   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    //   handler: async (payload, respond, header, sign) => {
+    //     const route = InternalRouteEnum.binary_spread_appliedVoteHash
+    //     nestedCountersInstance.countEvent('internal', route)
+    //     this.profiler.scopedProfileSectionStart(route, false, payload.length)
+    //     const errorHandler = (
+    //       errorType: RequestErrorEnum,
+    //       opts?: { customErrorLog?: string; customCounterSuffix?: string }
+    //     ): void => requestErrorHandler(route, errorType, header, opts)
 
-        try {
-          // Type check the request
-          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cSpreadAppliedVoteHash)
-          if (!requestStream) {
-            return errorHandler(RequestErrorEnum.InvalidRequest)
-          }
-          const req = deserializeSpreadAppliedVoteHashReq(requestStream)
-          const queueEntry = this.transactionQueue.getQueueEntrySafe(req.txid)
-          if (queueEntry == null) {
-            /* prettier-ignore */ nestedCountersInstance.countEvent('internal', `${route}-no_queue_entry`)
-            return
-          }
-          const collectedVoteHash = req as AppliedVoteHash
+    //     try {
+    //       // Type check the request
+    //       const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cSpreadAppliedVoteHash)
+    //       if (!requestStream) {
+    //         return errorHandler(RequestErrorEnum.InvalidRequest)
+    //       }
+    //       const req = deserializeSpreadAppliedVoteHashReq(requestStream)
+    //       const queueEntry = this.transactionQueue.getQueueEntrySafe(req.txid)
+    //       if (queueEntry == null) {
+    //         /* prettier-ignore */ nestedCountersInstance.countEvent('internal', `${route}-no_queue_entry`)
+    //         return
+    //       }
+    //       const collectedVoteHash = req as AppliedVoteHash
 
-          if (this.transactionConsensus.tryAppendVoteHash(queueEntry, collectedVoteHash)) {
-            // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
-          }
-        } catch (e) {
-          nestedCountersInstance.countEvent('internal', `${route}-exception`)
-          this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
-        } finally {
-          this.profiler.scopedProfileSectionEnd(route)
-        }
-      },
-    }
+    //       if (this.transactionConsensus.tryAppendVoteHash(queueEntry, collectedVoteHash)) {
+    //         // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
+    //       }
+    //     } catch (e) {
+    //       nestedCountersInstance.countEvent('internal', `${route}-exception`)
+    //       this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+    //     } finally {
+    //       this.profiler.scopedProfileSectionEnd(route)
+    //     }
+    //   },
+    // }
 
-    this.p2p.registerInternalBinary(
-      spreadAppliedVoteHashBinaryHandler.name,
-      spreadAppliedVoteHashBinaryHandler.handler
-    )
+    // this.p2p.registerInternalBinary(
+    //   spreadAppliedVoteHashBinaryHandler.name,
+    //   spreadAppliedVoteHashBinaryHandler.handler
+    // )
 
     // this.p2p.registerInternal(
     //   'get_account_data_with_queue_hints',
