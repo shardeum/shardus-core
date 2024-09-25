@@ -508,17 +508,25 @@ class Shardus extends EventEmitter {
           nestedCountersInstance.countEvent('debug-archiverConnections', `socket.handshake.headers.host: ${socket.handshake.headers.host.split(':')[0]}`)
 
           const archiverIP = socket.handshake.address.split('::ffff:').pop();
-          if (!utils.isValidIPv4(archiverIP)) {
-            this.mainLogger.error(`❌ Invalid IP-Address of Archiver: ${archiverIP}`)
-            socket.disconnect()
-            return
-          }
+          console.log('FOR DEBUG PURPOSES: our node\'s IP', Self.ip)
+          console.log('FOR DEBUG PURPOSES: socket.handshake.address', socket.handshake.address.split('::ffff:').pop())
+          console.log('FOR DEBUG PURPOSES: socket.handshake.headers.host', socket.handshake.headers.host.split(':')[0])
+          nestedCountersInstance.countEvent('debug-archiverConnections', `ourIP: ${Self.ip}`)
+          nestedCountersInstance.countEvent('debug-archiverConnections', `socket.handshake.address: ${socket.handshake.address.split('::ffff:').pop()}`)
+          nestedCountersInstance.countEvent('debug-archiverConnections', `socket.handshake.headers.host: ${socket.handshake.headers.host.split(':')[0]}`)
+
+          // Since socket.handshake.address seems to return the node's address, we dont know the archiver's IP
+          // if (!utils.isValidIPv4(archiverIP)) {
+          //   this.mainLogger.error(`❌ Invalid IP-Address of Archiver: ${archiverIP}`)
+          //   socket.disconnect()
+          //   return
+          // }
           const archiverCreds = JSON.parse(socket.handshake.query.data)
           console.log('FOR DEBUG PURPOSES: archiverCreds: ')
           console.dir(archiverCreds, { depth: null })
           const isValidSig = this.crypto.verify(archiverCreds, archiverCreds.publicKey)
           if (!isValidSig) {
-            this.mainLogger.error(`❌ Invalid Signature from Archiver @ ${archiverIP}`)
+            this.mainLogger.error(`❌ Invalid Signature from Archiver`)
             socket.disconnect()
             return
           }
@@ -529,12 +537,18 @@ class Shardus extends EventEmitter {
           console.log('FOR DEBUG PURPOSES: Is (Archiver !== recipientIP) Check: ', archiverIP !== recipient.nodeInfo.ip)
           
           if (!recipient) {
-            this.mainLogger.error(`❌ Remote Archiver @ ${archiverIP} is NOT a recipient!`)
+            this.mainLogger.error(`❌ Remote Archiver is NOT a recipient!`)
             socket.disconnect()
             return
           }
-          if (archiverIP !== recipient.nodeInfo.ip) {
-            this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${archiverIP} !`)
+          let isKnownArchiver
+          if (Self.isFirst) {
+            isKnownArchiver = config.p2p.existingArchivers.some((archiver) => archiver.ip === recipient.nodeInfo.ip)
+          } else {
+            isKnownArchiver = Array.from(Archivers.archivers).some((archiver) => archiver[1].ip === recipient.nodeInfo.ip)
+          }
+          if (isKnownArchiver === false) {
+            this.mainLogger.error(`❌ PubKey & IP mismatch for Archiver @ ${recipient.nodeInfo.ip} !`)
             this.mainLogger.error('Recipient: ', recipient.nodeInfo)
             this.mainLogger.error('Remote Archiver: ', socket.handshake.address)
             socket.disconnect()
