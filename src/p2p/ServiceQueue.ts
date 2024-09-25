@@ -147,6 +147,10 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObject>
       ]),
       false
     ) // use Self.id so we don't gossip to ourself
+  } catch (e) {
+    console.error(`Error processing addTxGossipRoute handler: ${e}`)
+    nestedCountersInstance.countEvent('internal', `addTxGossipRoute ${InternalRouteEnum.binary_service_queue_send_vote}-exception`)
+    error(`addTxGossipRoute: Exception executing request: ${utils.errorToStringFull(e)}`)
   } finally {
     profilerInstance.scopedProfileSectionEnd('serviceQueue - addTx')
   }
@@ -220,6 +224,10 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObje
       ]),
       false
     ) // use Self.id so we don't gossip to ourself
+  } catch(e) {
+    console.error(`Error processing removeTxGossipRoute handler: ${e}`)
+    nestedCountersInstance.countEvent('internal', `removeTxGossipRoute ${InternalRouteEnum.binary_service_queue_send_vote}-exception`)
+    error(`removeTxGossipRoute: Exception executing request: ${utils.errorToStringFull(e)}`)
   } finally {
     profilerInstance.scopedProfileSectionEnd('serviceQueue - removeTx')
   }
@@ -403,7 +411,12 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
 
 function initVotingProcess(propsals: VotingProposal[]): void {
   console.log(' red - initVotingProcess', propsals)
-  startVoting(propsals)
+  try {
+    startVoting(propsals)
+  } catch (e) {
+    console.log(' red - initVotingProcess error', e)
+    error(`serviceQueue - initVotingProcess: error ${utils.formatErrorMessage(e)}`)
+  }
 }
 
 async function startVoting(proposals: VotingProposal[]): Promise<void> {
@@ -753,8 +766,8 @@ function voteForNetworkTx(
   type: 'beforeAdd' | 'apply',
   result: boolean
 ): void {
-  console.log(' red - voteForNetworkTx', networkTx.hash, type, result)
-  const vote = crypto.sign({
+  console.log(' red - voteForNetworkTx', type, stringifyReduce(networkTx), result)
+  const vote: ServiceQueueVote = crypto.sign({
     txHash: networkTx.hash,
     result,
     verifierType: type,
@@ -895,7 +908,7 @@ export async function validateRemoveTx(removeTx: P2P.ServiceQueueTypes.RemoveNet
     }
   } catch (e) {
     error(`Failed remove network tx verification of type ${listEntry.tx.type} \n
-                   tx: ${stringifyReduce(listEntry.tx.txData)}\n 
+                   tx: ${stringifyReduce(listEntry.tx.txData)}\n
                    error: ${e instanceof Error ? e.stack : e}`)
     return false
   }
@@ -1071,7 +1084,9 @@ function verifyAppliedReceipt(payload: VerifierEntry & SignedObject): boolean {
     if (!crypto.verify(vote, vote.sign.owner)) {
       error(`verifyAppliedReceipt(): signature invalid`, vote.sign.owner)
       return false
-    } else if (payload.appliedReceipt.signatures.some((sig) => !executionGroup.includes(sig.owner))) {
+    }
+    if (payload.appliedReceipt.signatures.some((sig) => !executionGroup.includes(sig.owner))) {
+      const problematicSign = payload.appliedReceipt.signatures.find((sig) => !executionGroup.includes(sig.owner))
       error(`appliedReceipt found signature not in executionGroup`)
       return false
     }
