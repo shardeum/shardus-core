@@ -217,21 +217,18 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObje
   }
 }
 
-const sendVoteHandler: P2P.P2PTypes.Route<
-  P2P.P2PTypes.InternalHandler<{
-    txHash: string
-    verifierType: 'beforeAdd' | 'apply'
-    result: boolean
-    sign: any
-  }>
-> = {
-  name: 'service_queue_vote',
+const sendVoteHandler: Route<InternalBinaryHandler<Buffer>> = {
+  name: InternalRouteEnum.binary_service_queue_send_vote,
   handler: async (payload, respond, header, sign) => {
-    const route = 'service_queue_vote'
-    profilerInstance.scopedProfileSectionStart(route, false)
+    const route = InternalRouteEnum.binary_service_queue_send_vote
     try {
-      const collectedVote = payload
-      console.log(' red - collectedVote', collectedVote)
+      profilerInstance.scopedProfileSectionStart(route, false)
+      const stream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cServiceQueueSendVoteReq)
+      if (!payload) {
+        nestedCountersInstance.countEvent('internal', `${route}-invalid_request`)
+        return
+      }
+      const collectedVote = deserializeServiceQueueSendVoteReq(stream)
 
       if (![1, 2].includes(currentQuarter)) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: quarter not 1 or 2')
@@ -276,8 +273,8 @@ const sendVoteHandler: P2P.P2PTypes.Route<
 
 const routes = {
   external: [],
-  internal: [sendVoteHandler],
-  internalBinary: [],
+  internal: [],
+  internalBinary: [sendVoteHandler],
   gossip: {
     ['gossip-addtx']: addTxGossipRoute,
     ['gossip-removetx']: removeTxGossipRoute,
@@ -438,6 +435,10 @@ export function init(): void {
 
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
+  }
+
+  for (const route of routes.internalBinary) {
+    Comms.registerInternalBinary(route.name, route.handler)
   }
 
   network.registerExternalGet('debug-network-txlist', isDebugModeMiddleware, (req, res) => {
@@ -751,7 +752,13 @@ function voteForNetworkTx(
     verifierType: type,
   })
   let aggregators = pickAggregators(networkTx.involvedAddress)
-  Comms.tell(aggregators, 'service_queue_vote', vote)
+  Comms.tellBinary<ServiceQueueVote>(
+    aggregators,
+    InternalRouteEnum.binary_service_queue_send_vote,
+    vote,
+    serializeServiceQueueSendVoteReq,
+    {}
+  )
 }
 
 function executionGroupForAddress(address: string): string[] {
@@ -761,10 +768,9 @@ function executionGroupForAddress(address: string): string[] {
       address
     )
     const homeShardData = stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
-    const consensusGroup: string[] = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.map(
+    return homeShardData.homeNodes[0].consensusNodeForOurNodeFull.map(
       (node: ShardusTypes.Node) => node.publicKey
     )
-    return consensusGroup
   } catch (e) {
     error(`Failed to get execution group for address ${address}: ${e instanceof Error ? e.stack : e}`)
     return []

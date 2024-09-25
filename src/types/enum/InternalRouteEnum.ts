@@ -32,6 +32,7 @@ export enum InternalRouteEnum {
   binary_poqo_send_receipt = 'binary/poqo_send_receipt', // tell
   binary_poqo_data_and_receipt = 'binary/poqo_data_and_receipt', // tell
   binary_poqo_send_vote = 'binary/poqo_send_vote', // tell
+  binary_service_queue_send_vote = 'binary/service_queue_send_vote', // tell
 }
 
 const askRoutes = new Set([
