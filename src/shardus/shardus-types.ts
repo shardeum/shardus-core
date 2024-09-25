@@ -899,6 +899,7 @@ export interface ServerConfiguration {
     /** The max number of nodes added to `activated` list in cycleRecord each cycle */
     allowActivePerCycle: number
     useProxyForDownCheck: boolean
+    useNearNodeForDownCheck: boolean
     /** The number of checker nodes to ask to investigate whether a node that is potentially lost */
     numCheckerNodes: number
     /** The minimum number of down reports mark node as node as lost */

@@ -556,7 +556,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
       error(`Lost syncing node ${id} is not in the network`)
       continue
     }
-    // this event will be handled and eventually raise the 'node-sync-timeout' event to the dapp for handling 
+    // this event will be handled and eventually raise the 'node-sync-timeout' event to the dapp for handling
     NodeList.emitSyncTimeoutEvent(node, record)
     if (config.p2p.removeLostSyncingNodeFromList) NodeList.removeSyncingNode(id)
   }
@@ -1192,8 +1192,101 @@ async function isDownCheck(node) {
   /* prettier-ignore */ if (logFlags.lost) info(`Checking internal connection for ${node.id}, cycle: ${currentCycle}`)
 
   try {
-    if (config.p2p.useProxyForDownCheck) {
-      //using the 'apoptosize' route to check if the node is up.
+    if (config.p2p.useNearNodeForDownCheck) {
+      //using the 'get_trie_hashes' route to check if the node is up.
+      let obj = { counter: currentCycle, checker: Self.id, target: node.id, timestamp: shardusGetTime() }
+      let hash = crypto.hash(obj)
+      let hashTrieReq: HashTrieReq = {
+        radixList: ['0'],
+      }
+      let closestNodes = stateManager.getClosestNodes(hash, 5, true)
+      let nearNode: P2P.NodeListTypes.Node
+      for (let closetNode of closestNodes) {
+        if (closetNode.id !== node.id) {
+          nearNode = closetNode
+          break
+        }
+      }
+      if (nearNode == null) {
+        throw new Error(`isDownCheck unable to get near node to check`)
+      }
+
+      //check radix response for near node
+      let nearNodeAsk
+      if (
+        this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+        this.stateManager.config.p2p.getTrieHashesBinary
+      ) {
+        nearNodeAsk = Comms.askBinary<GetTrieHashesRequest, GetTrieHashesResponse>(
+          nearNode,
+          InternalRouteEnum.binary_get_trie_hashes,
+          hashTrieReq,
+          serializeGetTrieHashesReq,
+          deserializeGetTrieHashesResp,
+          {}
+        )
+      } else {
+        nearNodeAsk = this.p2p.ask(node, 'get_trie_hashes', hashTrieReq)
+      }
+      const nearNodeResponse = await nearNodeAsk
+
+      if (logFlags.verbose)
+        info(
+          `lost check result for nearNodeAsk near node:${node.id} cycle ${currentCycle} is ${utils.stringifyReduce(
+            nearNodeResponse
+          )}`
+        )
+
+      if (nearNodeResponse == null) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-near-node-fail', 1)
+        return 'down'
+      }
+
+      let targetNodeAsk
+      if (
+        this.stateManager.config.p2p.useBinarySerializedEndpoints &&
+        this.stateManager.config.p2p.getTrieHashesBinary
+      ) {
+        targetNodeAsk = Comms.askBinary<GetTrieHashesRequest, GetTrieHashesResponse>(
+          nearNode,
+          InternalRouteEnum.binary_get_trie_hashes,
+          hashTrieReq,
+          serializeGetTrieHashesReq,
+          deserializeGetTrieHashesResp,
+          {}
+        )
+      } else {
+        targetNodeAsk = this.p2p.ask(node, 'get_trie_hashes', hashTrieReq)
+      }
+      const targetNodeResponse = await targetNodeAsk
+
+      if (logFlags.verbose)
+        info(
+          `lost check result for nearNodeAsk target node:${node.id} cycle ${currentCycle} is ${utils.stringifyReduce(
+            targetNodeResponse
+          )}`
+        )
+
+      if (targetNodeResponse == null) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-near-node-fail', 1)
+        return 'down'
+      }
+
+      const nodeHashesMap = new Map<string, string>()
+      for (let nodeHash of nearNodeResponse.nodeHashes) {
+        nodeHashesMap.set(nodeHash.radix, nodeHash.hash)
+      }
+      //compare the hashes from the near node and the target node
+      for (let nodeHash of targetNodeResponse.nodeHashes) {
+        if (nodeHashesMap.get(nodeHash.radix) !== nodeHash.hash) {
+          /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-near-node-fail', 1)
+          return 'down'
+        }
+      }
+
+      return 'up'
+    } else if (config.p2p.useProxyForDownCheck) {
+      //using proxy node to check if the node is up.
       let obj = { counter: currentCycle, checker: Self.id, target: node.id, timestamp: shardusGetTime() }
       let hash = crypto.hash(obj)
       let closestNodes = stateManager.getClosestNodes(hash, 5, true)
@@ -1249,7 +1342,7 @@ async function isDownCheck(node) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-1', 1)
         return 'down'
       }
-      //adding this check so that a node can repond that is is down. aka, realizes it is not funcitonal and wants to be removed from the network
+      //adding this check so that a node can repond that is is down. aka, realizes it is not functional and wants to be removed from the network
       if (res.s === nodeDownString) {
         /* prettier-ignore */ nestedCountersInstance.countEvent('p2p', 'isDownCheck-down-self-reported-zombie', 1)
         return 'down'
