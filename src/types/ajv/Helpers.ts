@@ -49,6 +49,7 @@ import { initWrappedDataFromQueueSerializable } from './WrappedDataFromQueueSeri
 import { initWrappedDataResponse } from './WrappedDataResponse'
 
 import { initJoinReq } from './JoinReq'
+import { initServiceQueueAddTxReq } from './ServiceQueueReq'
 
 
 export function initAjvSchemas(): void {
@@ -97,6 +98,7 @@ export function initAjvSchemas(): void {
   initSignAppDataResp()
   initCachedAppData()
   initSendCachedAppDataReq()
+  initServiceQueueAddTxReq()
   initJoinReq()
 
 }

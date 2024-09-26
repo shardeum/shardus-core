@@ -2,7 +2,7 @@ import { Logger } from 'log4js'
 import { config, crypto, logger, network, stateManager } from './Context'
 import * as CycleChain from './CycleChain'
 import { P2P, Utils } from '@shardus/types'
-import { ShardusEvent } from '../shardus/shardus-types'
+import { ShardusEvent, Sign } from '../shardus/shardus-types'
 import * as utils from '../utils'
 import { isValidShardusAddress, stringifyReduce, validateTypes } from '../utils'
 import * as Comms from './Comms'
@@ -30,6 +30,8 @@ import {
 import { InternalBinaryHandler } from '../types/Handler'
 import { getStreamWithTypeCheck } from '../types/Helpers'
 import { TypeIdentifierEnum } from '../types/enum/TypeIdentifierEnum'
+import { verifyPayload } from '../types/ajv/Helpers'
+import { AJVSchemaEnum } from '../types/enum/AJVSchemaEnum'
 
 interface VerifierEntry {
   hash: string
@@ -38,7 +40,7 @@ interface VerifierEntry {
     txHash: string
     verifierType: 'beforeAdd' | 'apply'
     result: boolean
-    sign: any
+    sign: Sign
   }[]
   newVotes: boolean
   executionGroup: string[]
@@ -93,17 +95,7 @@ const addTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObject>
 
   try {
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got addTx gossip: ${Utils.safeStringify(payload)}`)
-    let err = ''
-    err = validateTypes(payload, {
-      hash: 's',
-      tx: 'o',
-      votes: 'a',
-      newVotes: 'b',
-      executionGroup: 'a',
-      appliedReceipt: 'o',
-      hasSentFinalReceipt: 'b',
-      sign: 'o',
-    })
+    const err = verifyPayload(AJVSchemaEnum.ServiceQueueAddTxReq, payload)
     if (err) {
       warn('addTxGossipRoute bad payload: ' + err)
       return
@@ -178,22 +170,11 @@ const removeTxGossipRoute: P2P.P2PTypes.GossipHandler<VerifierEntry & SignedObje
     }
 
     /* prettier-ignore */ if (logFlags.p2pNonFatal) info(`Got removeTx gossip: ${Utils.safeStringify(payload)}`)
-    // let err = validateTypes(payload, { txHash: 's', cycle: 'n', sign: 'o' })
-    // if (err) {
-    //   warn('removeTxGossipRoute bad payload: ' + err)
-    //   return
-    // }
-    // err = validateTypes(payload.sign, { owner: 's', sig: 's' })
-    // if (err) {
-    //   /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: bad input sign ' + err)
-    //   return
-    // }
-
-    // const signer = Nodelist.byPubKey.get(payload.sign.owner)
-    // if (!signer) {
-    //   /* prettier-ignore */ if (logFlags.error) warn('gossip-removetx: Got request from unknown node')
-    //   return
-    // }
+    const err = verifyPayload(AJVSchemaEnum.ServiceQueueAddTxReq, payload)
+    if (err) {
+      warn('removeTxGossipRoute bad payload: ' + err)
+      return
+    }
 
     if (txRemove.some((entry) => entry.txHash === payload.hash)) {
       return
