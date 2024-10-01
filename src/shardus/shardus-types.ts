@@ -1337,6 +1337,8 @@ export interface ServerConfiguration {
   /** Options for sharding calculations */
   sharding?: {
     /** The nodesPerConsensusGroup parameter defines how many nodes will be contained within a shard */
+    minNodesPerConsensusGroup?: number    
+    /** The nodesPerConsensusGroup parameter defines how many nodes will be contained within a shard */
     nodesPerConsensusGroup?: number
     /** The number of edge nodes on each side */
     nodesPerEdge?: number
