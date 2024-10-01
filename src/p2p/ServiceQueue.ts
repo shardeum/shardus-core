@@ -4,7 +4,7 @@ import * as CycleChain from './CycleChain'
 import { P2P, Utils } from '@shardus/types'
 import { ShardusEvent, Sign } from '../shardus/shardus-types'
 import * as utils from '../utils'
-import { isValidShardusAddress, stringifyReduce, validateTypes } from '../utils'
+import { isValidShardusAddress, stringifyReduce } from '../utils'
 import * as Comms from './Comms'
 import { profilerInstance } from '../utils/profiler'
 import * as Self from './Self'
@@ -77,6 +77,7 @@ const tryCounts = new Map<string, number>()
 const processTxVerifiers = new Map<string, VerifierEntry>()
 const addProposals: P2P.ServiceQueueTypes.AddNetworkTx[] = []
 const removeProposals: P2P.ServiceQueueTypes.RemoveNetworkTx[] = []
+let collectedVotes = []
 
 /** ROUTES */
 
@@ -227,8 +228,8 @@ const sendVoteHandler: Route<InternalBinaryHandler<Buffer>> = {
       }
       const collectedVote = deserializeServiceQueueSendVoteReq(stream)
 
-      if (![1, 2].includes(currentQuarter)) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: quarter not 1 or 2')
+      if (1 !== currentQuarter) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: quarter not 1')
         return
       }
 
@@ -242,22 +243,13 @@ const sendVoteHandler: Route<InternalBinaryHandler<Buffer>> = {
         return
       }
 
-      if (!processTxVerifiers.has(collectedVote.txHash)) {
-        console.log(
-          ` red - processTxVerifiers.has(collectedVote.txHash) not found: ${collectedVote.txHash}`,
-          processTxVerifiers
-        )
-        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', `send-vote: tx not in processTxVerifiers: ${collectedVote.txHash}`)
+      const signer = Nodelist.byPubKey.get(collectedVote.sign.owner)
+      if (signer.status !== P2P.P2PTypes.NodeStatus.ACTIVE) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: signer not active')
         return
       }
 
-      if (processTxVerifiers.get(collectedVote.txHash).hasSentFinalReceipt) {
-        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: tx already has sent final receipt')
-        return
-      }
-
-      tryAppendVote(processTxVerifiers.get(collectedVote.txHash), collectedVote)
-      await tryProduceReceipt(processTxVerifiers.get(collectedVote.txHash))
+      collectedVotes.push(collectedVote)
     } catch (e) {
       console.error(`Error processing sendVoteHandler handler: ${e}`)
       nestedCountersInstance.countEvent('internal', `${route}-exception`)
@@ -287,11 +279,9 @@ function tryAppendVote(
     sign: any
   }
 ): boolean {
-  console.log(' red - tryAppendVote', queueEntry, collectedVote)
   if (
     !executionGroupForAddress(queueEntry.tx.involvedAddress).some((node) => node === collectedVote.sign.owner)
   ) {
-    console.log(' red - tryAppendVote not in execution group', queueEntry, collectedVote.sign.owner)
     nestedCountersInstance.countEvent('serviceQueue', 'Vote sender not in execution group')
     return false
   }
@@ -299,7 +289,6 @@ function tryAppendVote(
   const numVotes = queueEntry.votes.length
 
   if (numVotes === 0) {
-    console.log(' red - tryAppendVote numVotes === 0', queueEntry, collectedVote)
     queueEntry.votes.push(collectedVote)
     queueEntry.newVotes = true
     return true
@@ -315,15 +304,13 @@ function tryAppendVote(
     }
   }
 
-  console.log(' red - tryAppendVote appended', queueEntry, collectedVote)
   queueEntry.votes.push(collectedVote)
   queueEntry.newVotes = true
   return true
 }
 
-function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
+function tryProduceReceipt(queueEntry: VerifierEntry): any {
   try {
-    console.log(' red - tryProduceReceipt starting', queueEntry)
     if (queueEntry.appliedReceipt != null) {
       nestedCountersInstance.countEvent(`serviceQueue`, 'tryProduceReceipt appliedReceipt != null')
       return queueEntry.appliedReceipt
@@ -332,7 +319,6 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
     let votingGroup = executionGroupForAddress(queueEntry.tx.involvedAddress)
     const majorityCount = Math.ceil(votingGroup.length * config.p2p.requiredVotesPercentage)
     const numVotes = queueEntry.votes.length
-    console.log(' red - tryProduceReceipt votes', queueEntry, majorityCount, numVotes)
     if (numVotes < majorityCount) {
       return null
     }
@@ -372,15 +358,14 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
       queueEntry.appliedReceipt = appliedReceipt
 
       queueEntry.hasSentFinalReceipt = true
-      console.log(' red - tryProduceReceipt appliedReceipt', appliedReceipt)
       let route = ''
       if (queueEntry.appliedReceipt.type === 'beforeAdd') {
         route = 'gossip-addtx'
       } else {
         route = 'gossip-removetx'
       }
-      console.log(' red - tryProduceReceipt sendGossip', route, appliedReceipt)
       const signedPayload = crypto.sign(queueEntry)
+
       Comms.sendGossip(route, signedPayload, null, null, byIdOrder, false, 4, queueEntry.hash, '', true)
       return appliedReceipt
     }
@@ -391,17 +376,14 @@ function tryProduceReceipt(queueEntry: VerifierEntry): Promise<any> {
 }
 
 function initVotingProcess(propsals: VotingProposal[]): void {
-  console.log(' red - initVotingProcess', propsals)
   try {
     startVoting(propsals)
   } catch (e) {
-    console.log(' red - initVotingProcess error', e)
     error(`serviceQueue - initVotingProcess: error ${utils.formatErrorMessage(e)}`)
   }
 }
 
 async function startVoting(proposals: VotingProposal[]): Promise<void> {
-  console.log(' red - startVoting', proposals)
   for (const proposal of proposals) {
     if (proposal.verifierType === 'apply') {
       const index = txList.findIndex((entry) => entry.hash === proposal.networkTx.txHash)
@@ -483,6 +465,7 @@ export function init(): void {
 export function reset(): void {
   txAdd = []
   txRemove = []
+  collectedVotes = []
 
   for (const [hash, entry] of processTxVerifiers) {
     if (entry.hasSentFinalReceipt) {
@@ -580,6 +563,33 @@ export function updateRecord(
     record.txadd = txAdd.sort((a, b) => a.hash.localeCompare(b.hash))
   }
   record.txlisthash = crypto.hash(txListCopy)
+}
+
+export function sendReceipts(): void {
+  try{
+    for (const collectedVote of collectedVotes) {
+      if (!processTxVerifiers.has(collectedVote.txHash)) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', `send-vote: tx not in processTxVerifiers: ${collectedVote.txHash}`)
+        continue
+      }
+
+      let verifierEntry = processTxVerifiers.get(collectedVote.txHash)
+      if (verifierEntry.hasSentFinalReceipt) {
+        /* prettier-ignore */ nestedCountersInstance.countEvent('serviceQueue', 'send-vote: tx already has sent final receipt')
+        continue
+      }
+      tryAppendVote(verifierEntry, collectedVote)
+    }
+    for (let [,entry] of processTxVerifiers) {
+      try{
+        tryProduceReceipt(entry)
+      }catch(e) {
+        error(`serviceQueue - sendReceipts: error producing receipt ${utils.formatErrorMessage(e)}`)
+      }
+    }
+  } catch (e) {
+    error(`serviceQueue - sendReceipts: error ${utils.formatErrorMessage(e)}`)
+  }
 }
 
 export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
@@ -747,7 +757,6 @@ function voteForNetworkTx(
   type: 'beforeAdd' | 'apply',
   result: boolean
 ): void {
-  console.log(' red - voteForNetworkTx', type, stringifyReduce(networkTx), result)
   const vote: ServiceQueueVote = crypto.sign({
     txHash: networkTx.hash,
     result,
@@ -791,7 +800,6 @@ function pickAggregators(address: string): ShardusTypes.Node[] {
       if (aggregators.length === config.p2p.serviceQueueAggregators) break
     }
   }
-  console.log(' red - pickAggregators', aggregators.length, aggregators)
   return aggregators
 }
 
@@ -1041,21 +1049,20 @@ function sortedInsert(
 
 function verifyAppliedReceipt(payload: VerifierEntry & SignedObject): boolean {
   const receipt = payload.appliedReceipt
-  console.log(' red - verifyAppliedReceipt', receipt)
   const executionGroup = executionGroupForAddress(payload.tx.involvedAddress)
 
   let validSignatures = new Set<string>()
   for (const vote of payload.votes) {
     if (vote.result !== receipt.result) {
-      error(`verifyAppliedReceipt(): vote result does not match receipt result`, vote, receipt)
+      error(`verifyAppliedReceipt(): vote result does not match receipt result`, payload.tx.hash, vote, receipt)
       return false
     }
     if (vote.txHash !== receipt.txid) {
-      error(`verifyAppliedReceipt(): vote txHash does not match receipt txid`, vote, receipt)
+      error(`verifyAppliedReceipt(): vote txHash does not match receipt txid`, payload.tx.hash, vote, receipt)
       return false
     }
     if (vote.verifierType !== receipt.type) {
-      error(`verifyAppliedReceipt(): vote verifierType does not match receipt type`, vote, receipt)
+      error(`verifyAppliedReceipt(): vote verifierType does not match receipt type`, payload.tx.hash, vote, receipt)
       return false
     }
     if (validSignatures.has(vote.sign.owner)) {
@@ -1066,10 +1073,9 @@ function verifyAppliedReceipt(payload: VerifierEntry & SignedObject): boolean {
       error(`verifyAppliedReceipt(): signature invalid`, vote.sign.owner)
       return false
     }
-    if (payload.appliedReceipt.signatures.some((sig) => !executionGroup.includes(sig.owner))) {
-      const problematicSign = payload.appliedReceipt.signatures.find((sig) => !executionGroup.includes(sig.owner))
+    if (!executionGroup.includes(vote.sign.owner)) {
       error(`appliedReceipt found signature not in executionGroup`)
-      return false
+      continue
     }
     validSignatures.add(vote.sign.owner)
   }

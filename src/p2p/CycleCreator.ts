@@ -536,6 +536,7 @@ function runQ2() {
   currentQuarter = 2
   Self.emitter.emit('cycle_q2_start')
   if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
+  ServiceQueue.sendReceipts()
 }
 
 /**
