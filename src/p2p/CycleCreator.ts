@@ -272,10 +272,10 @@ function moduleMigration() {
 function updateScaleFactor() {
   let activeNodeCount = NodeList.activeByIdOrder.length
   const minNodesPerConsensuGroup = 32
-    const nodesPerConsensusGroupUsed = Math.max(
-      config.sharding.nodesPerConsensusGroup,
-      minNodesPerConsensuGroup
-    )
+  const nodesPerConsensusGroupUsed = Math.max(
+    config.sharding.nodesPerConsensusGroup,
+    minNodesPerConsensuGroup
+  )
   let consensusRange = Math.min(nodesPerConsensusGroupUsed, activeNodeCount) //if we have less activeNodeCount than consensus radius
   //  we can only count the minumum of the two. otherwise it would over boost scaling
   let networkParSize = 100 //num nodes where we want scale to be 1.0.   should be 50-100, can set to 5 for small network testing
