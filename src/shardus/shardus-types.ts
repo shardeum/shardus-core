@@ -822,6 +822,14 @@ export interface ServerConfiguration {
     instantForwardReceipts: boolean
     /** A node can serve only X max archivers for data transfer and can refuse other archivers requests if it’s serving the max number */
     maxArchiversSubscriptionPerNode: number
+    // /** The desired number of archivers in the network ( which can go up to max_archivers in the network )*/
+    // desiredArchivers: number
+    /** Allow only the allowed archivers to join the network */
+    allowOnlyApprovedArchivers: boolean
+    /** The allowed public keys for archivers that can join the network */
+    allowedArchiversList: string[]
+    /** This is to remove the disallowed archivers that are currently active in the network; which can be used after allowedArchiversList is updated */
+    pruneDisallowedArchivers: boolean
     /** Whether to write `nodeListHash` and `archiverListHash` to CycleRecords */
     writeSyncProtocolV2: boolean
     /** Use the new experimental sync protocol for better synchronizing efficiency. Other nodes must also have this enabled for it to work. */
