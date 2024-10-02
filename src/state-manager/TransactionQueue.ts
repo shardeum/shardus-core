@@ -2183,6 +2183,8 @@ class TransactionQueue {
           //This is needed so that consensus will expect less nodes to be voting
           const unRankedExecutionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
           if (this.usePOQo) {
+          // looks like a place where we assign the executionGroup nodes. It'd be nice to have a check 
+          // TO DO : here we can reject the transaction if the executionGroup.length is lesser than minimumConsensusGroup size, so that we dont have to go ahead with the remaining processing and hereby maintaining the safe node count for consensus
             txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
           } else if (this.useNewPOQ) {
             txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
@@ -2746,6 +2748,7 @@ class TransactionQueue {
       //  queueEntry.tx Keys.allKeys.length
       queueEntry.hasAll = true
       // this.gossipCompleteData(queueEntry)
+       // TODO: here again I think if we can have a check to see if minimum consensus group size is met. If not, return. Since this is where we start sharing data.
       if (queueEntry.executionGroup && queueEntry.executionGroup.length > 1) this.shareCompleteDataToNeighbours(queueEntry)
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
@@ -5085,6 +5088,7 @@ class TransactionQueue {
     const targetGroupSize = queueEntry.transactionGroup.length
 
     const senderIndexInTxGroup = queueEntry.ourTXGroupIndex
+    // TODO: here again I think if we can have a check to see if minimum consensus group size is met. If not, return. 
     const senderGroupSize = queueEntry.executionGroup.length
     const unwrappedIndex = queueEntry.isSenderWrappedTxGroup[Self.id]
 
@@ -5242,6 +5246,7 @@ class TransactionQueue {
     if (queueEntry.isSenderWrappedTxGroup[senderNodeId] != null) {
       senderNodeIndex = queueEntry.isSenderWrappedTxGroup[senderNodeId]
     }
+    // I assume this is being called after factTellCorrespondingNodesFinalData but for safety we can still have a check here.
     const senderGroupSize = queueEntry.executionGroup.length
 
     const targetNodeIndex = queueEntry.ourTXGroupIndex // we are the receiver
@@ -7638,6 +7643,7 @@ class TransactionQueue {
         const randomNodeToAskKey = nodesToAskKeys[randomIndex]
         nodeToAsk = byPubKey.get(randomNodeToAskKey)
       } else {
+        // I dont think any communication should be happening until the minimum consensus group size is reached. check if length > = minimum consensus group size
         const randomIndex = Math.floor(Math.random() * queueEntry.executionGroup.length)
         // eslint-disable-next-line security/detect-object-injection
         const randomExeNode = queueEntry.executionGroup[randomIndex]

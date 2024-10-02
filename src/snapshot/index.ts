@@ -399,6 +399,8 @@ export async function safetySync() {
   })
 
   // Figure out which nodes hold which partitions in the new network
+  // TO DO : here we can take the max of nodesPerConsensusGroup and minNodesPerConsensusGroup
+
   const shardGlobals = ShardFunctions.calculateShardGlobals(
     safetyNum,
     Context.config.sharding.nodesPerConsensusGroup,
@@ -559,6 +561,8 @@ export async function startWitnessMode() {
       if (newestCycle.safetyMode && newestCycle.networkStateHash === oldNetworkHash.hash) {
         log('Network is in safety mode and our network state hashes matches with newest cycle record')
         // caculate which partitions data this node hold
+        // TO DO : here we can take the max of nodesPerConsensusGroup and minNodesPerConsensusGroup
+
         const shardGlobals = ShardFunctions.calculateShardGlobals(
           newestCycle.safetyNum,
           Context.config.sharding.nodesPerConsensusGroup,
