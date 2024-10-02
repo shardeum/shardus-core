@@ -7,6 +7,8 @@ import {
   serializeWrappedDataResponse,
 } from './WrappedDataResponse'
 import { TypeIdentifierEnum } from './enum/TypeIdentifierEnum'
+import { stateManager } from '../p2p/Context'
+import { AppObjEnum } from './enum/AppObjEnum'
 
 export const cRequestTxAndStateRespVersion = 1
 
@@ -18,6 +20,7 @@ export type RequestTxAndStateResp = {
   success: boolean
   acceptedTX?: AcceptedTx
   originalData?: WrappedResponses
+  appReceiptData?: any
 }
 
 export function serializeRequestTxAndStateResp(
@@ -59,6 +62,9 @@ export function serializeRequestTxAndStateResp(
   stream.writeUInt8(obj.originalData !== undefined ? 1 : 0)
   if (obj.originalData !== undefined) {
     stream.writeString(Utils.safeStringify(obj.originalData))
+  }
+  if (obj.appReceiptData !== undefined) {
+    stream.writeBuffer(stateManager.app.binarySerializeObject(AppObjEnum.CachedAppData, obj.appReceiptData))
   }
 }
 
@@ -106,6 +112,10 @@ export function deserializeRequestTxAndStateResp(stream: VectorBufferStream): Re
   if (stream.readUInt8() === 1) {
     // Check if originalData is present
     result.originalData = Utils.safeJsonParse(stream.readString())
+  }
+  if (stream.readUInt8() === 1) {
+    // Check if appReceiptData is present
+    result.appReceiptData = stateManager.app.binaryDeserializeObject(AppObjEnum.CachedAppData, stream.readBuffer())
   }
 
   return result
