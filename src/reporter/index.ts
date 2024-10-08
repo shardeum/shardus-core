@@ -466,6 +466,38 @@ class Reporter {
     clearInterval(this.socketReportInterval)
     this.reportingInterval = null
   }
+
+  configUpdated() {
+    try {
+      if (this.config.reporting.report !== Context.config.reporting.report) {
+        this.config.reporting.report = Context.config.reporting.report
+        console.log('Config updated for reporting.report', this.config.reporting.report)
+        nestedCountersInstance.countEvent('Reporting', 'recipient config updated')
+      }
+      if (this.config.reporting.recipient !== Context.config.reporting.recipient) {
+        this.config.reporting.recipient = Context.config.reporting.recipient
+        console.log('Config updated for reporting.recipient', this.config.reporting.recipient)
+        nestedCountersInstance.countEvent('Reporting', 'recipient config updated')
+      }
+      if (this.config.reporting.interval !== Context.config.reporting.interval) {
+        this.config.reporting.interval = Context.config.reporting.interval
+        console.log('Config updated for reporting.interval', this.config.reporting.interval)
+        nestedCountersInstance.countEvent('Reporting', 'interval config updated')
+      }
+      if (this.config.reporting.console !== Context.config.reporting.console) {
+        this.config.reporting.console = Context.config.reporting.console
+        console.log('Config updated for reporting.console', this.config.reporting.console)
+        nestedCountersInstance.countEvent('Reporting', 'console config updated')
+      }
+      if (this.config.reporting.logSocketReports !== Context.config.reporting.logSocketReports) {
+        this.config.reporting.logSocketReports = Context.config.reporting.logSocketReports
+        console.log('Config updated for reporting.console', this.config.reporting.logSocketReports)
+        nestedCountersInstance.countEvent('Reporting', 'console config updated')
+      }
+    } catch (e) {
+      nestedCountersInstance.countEvent('Reporting', 'config update failed')
+    }
+  }
 }
 
 export default Reporter
