@@ -3185,6 +3185,7 @@ class Shardus extends EventEmitter {
       this.p2p.configUpdated()
       this.loadDetection.configUpdated()
       this.rateLimiting.configUpdated()
+      this.reporter.configUpdated()
     }
     if (activeConfigChanges.size > 0) {
       // clear the entries from appliedConfigChanges that are no longer in the changes list

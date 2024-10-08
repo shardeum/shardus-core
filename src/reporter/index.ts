@@ -469,29 +469,29 @@ class Reporter {
 
   configUpdated() {
     try {
-      if (this.config.reporting.report !== Context.config.reporting.report) {
-        this.config.reporting.report = Context.config.reporting.report
-        console.log('Config updated for reporting.report', this.config.reporting.report)
+      if (this.config.report !== Context.config.reporting.report) {
+        this.config.report = Context.config.reporting.report
+        console.log('Config updated for reporting.report', this.config.report)
         nestedCountersInstance.countEvent('Reporting', 'recipient config updated')
       }
-      if (this.config.reporting.recipient !== Context.config.reporting.recipient) {
-        this.config.reporting.recipient = Context.config.reporting.recipient
-        console.log('Config updated for reporting.recipient', this.config.reporting.recipient)
+      if (this.config.recipient !== Context.config.reporting.recipient) {
+        this.config.recipient = Context.config.reporting.recipient
+        console.log('Config updated for reporting.recipient', this.config.recipient)
         nestedCountersInstance.countEvent('Reporting', 'recipient config updated')
       }
-      if (this.config.reporting.interval !== Context.config.reporting.interval) {
-        this.config.reporting.interval = Context.config.reporting.interval
-        console.log('Config updated for reporting.interval', this.config.reporting.interval)
+      if (this.config.interval !== Context.config.reporting.interval) {
+        this.config.interval = Context.config.reporting.interval
+        console.log('Config updated for reporting.interval', this.config.interval)
         nestedCountersInstance.countEvent('Reporting', 'interval config updated')
       }
-      if (this.config.reporting.console !== Context.config.reporting.console) {
-        this.config.reporting.console = Context.config.reporting.console
-        console.log('Config updated for reporting.console', this.config.reporting.console)
+      if (this.config.console !== Context.config.reporting.console) {
+        this.config.console = Context.config.reporting.console
+        console.log('Config updated for reporting.console', this.config.console)
         nestedCountersInstance.countEvent('Reporting', 'console config updated')
       }
-      if (this.config.reporting.logSocketReports !== Context.config.reporting.logSocketReports) {
-        this.config.reporting.logSocketReports = Context.config.reporting.logSocketReports
-        console.log('Config updated for reporting.console', this.config.reporting.logSocketReports)
+      if (this.config.logSocketReports !== Context.config.reporting.logSocketReports) {
+        this.config.logSocketReports = Context.config.reporting.logSocketReports
+        console.log('Config updated for reporting.console', this.config.logSocketReports)
         nestedCountersInstance.countEvent('Reporting', 'console config updated')
       }
     } catch (e) {
