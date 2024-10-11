@@ -1608,7 +1608,15 @@ class TransactionConsenus {
             '',
             true
           )
-          this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
+
+          // Only forward data if we have a valid matching preApply
+          if (queueEntry.ourVoteHash === readableReq.proposalHash) {
+            // We are a winning node
+            nestedCountersInstance.countEvent('poqo', 'poqo-send-receipt: forwarding data')
+            this.stateManager.transactionQueue.factTellCorrespondingNodesFinalData(queueEntry)
+          } else {
+            nestedCountersInstance.countEvent('poqo', 'poqo-send-receipt: no matching data. Can\'t forward')
+          }
         } catch (e) {
           console.error(`Error processing poqoSendReceiptBinary handler: ${e}`)
           nestedCountersInstance.countEvent('internal', `${route}-exception`)
