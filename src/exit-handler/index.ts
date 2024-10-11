@@ -245,7 +245,7 @@ class ExitHandler {
         if (nodeInfo.status === 'standby' || nodeInfo.status === 'initializing' || nodeInfo.status === 'ready') {
           await this.exitCleanly('SIGINT', 'Process exited with SIGINT')
         } else {
-          await this.exitUncleanly('SIGINT', 'Process exited with SIGINT')
+          await this.exitUncleanly('SIGINT', 'Process exited with SIGINT while active')
         }
       })
       //gracefull shutdown suppport in windows. should mirror what SIGINT does in linux
