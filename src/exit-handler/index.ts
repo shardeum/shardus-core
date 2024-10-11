@@ -241,8 +241,16 @@ class ExitHandler {
   addSigListeners(sigint = true, sigterm = true) {
     if (sigint) {
       process.on('SIGINT', async () => {
-        // await this.exitCleanly()
-        await this.exitUncleanly('SIGINT', 'Process exited with SIGINT')
+        const nodeInfo = getPublicNodeInfo(true)
+        if (
+          nodeInfo.status === 'standby' ||
+          nodeInfo.status === 'initializing' ||
+          nodeInfo.status === 'ready'
+        ) {
+          await this.exitCleanly('SIGINT', 'Process exited with SIGINT')
+        } else {
+          await this.exitUncleanly('SIGINT', 'Process exited with SIGINT while active')
+        }
       })
       //gracefull shutdown suppport in windows. should mirror what SIGINT does in linux
       process.on('message', async (msg) => {
