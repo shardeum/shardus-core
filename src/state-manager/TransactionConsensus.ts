@@ -3746,60 +3746,60 @@ class TransactionConsenus {
     }
   }
 
-  calculateVoteHash(vote: AppliedVote | Proposal, removeSign = true): string {
-    if (this.stateManager.transactionQueue.usePOQo && (vote as Proposal).applied !== undefined) {
-      const proposal = vote as Proposal
-      const applyStatus = {
-        applied: proposal.applied,
-        cantApply: proposal.cant_preApply,
-      }
-      const accountsHash = this.crypto.hash(
-        this.crypto.hash(proposal.accountIDs) +
-        this.crypto.hash(proposal.beforeStateHashes) + 
-        this.crypto.hash(proposal.afterStateHashes)
-      )
-      const proposalHash = this.crypto.hash(
-        this.crypto.hash(applyStatus) + accountsHash + proposal.appReceiptDataHash
-      )
-      return proposalHash
-    } else if (this.stateManager.transactionQueue.usePOQo) {
-      const appliedVote = vote as AppliedVote
-      const appliedHash = {
-        applied: appliedVote.transaction_result,
-        cantApply: appliedVote.cant_apply
-      }
-      const stateHash = {
-        account_id: appliedVote.account_id,
-        account_state_hash_after: appliedVote.account_state_hash_after,
-        account_state_hash_before: appliedVote.account_state_hash_before,
-      }
-      const appDataHash = {
-        app_data_hash: appliedVote.app_data_hash,
-      }
-      const voteToHash = {
-        appliedHash: this.crypto.hash(appliedHash),
-        stateHash: this.crypto.hash(stateHash),
-        appDataHash: this.crypto.hash(appDataHash),
-      }
-      return this.crypto.hash(voteToHash)
-    } else if (this.stateManager.transactionQueue.useNewPOQ) {
-      const appliedVote = vote as AppliedVote
-      const voteToHash = {
-        txId: appliedVote.txid,
-        transaction_result: appliedVote.transaction_result,
-        account_id: appliedVote.account_id,
-        account_state_hash_after: appliedVote.account_state_hash_after,
-        account_state_hash_before: appliedVote.account_state_hash_before,
-        cant_apply: appliedVote.cant_apply,
-      }
-      return this.crypto.hash(voteToHash)
-    } else {
-      const appliedVote = vote as AppliedVote
-      const voteToHash = Object.assign({}, appliedVote)
-      if (voteToHash.node_id != null) voteToHash.node_id = ''
-      if (voteToHash.sign != null) delete voteToHash.sign
-      return this.crypto.hash(voteToHash)
+  calculateVoteHash(vote: Proposal): string {
+    // if (this.stateManager.transactionQueue.usePOQo && (vote as Proposal).applied !== undefined) {
+    const proposal = vote
+    const applyStatus = {
+      applied: proposal.applied,
+      cantApply: proposal.cant_preApply,
     }
+    const accountsHash = this.crypto.hash(
+      this.crypto.hash(proposal.accountIDs) +
+      this.crypto.hash(proposal.beforeStateHashes) + 
+      this.crypto.hash(proposal.afterStateHashes)
+    )
+    const proposalHash = this.crypto.hash(
+      this.crypto.hash(applyStatus) + accountsHash + proposal.appReceiptDataHash
+    )
+    return proposalHash
+    // } else if (this.stateManager.transactionQueue.usePOQo) {
+    //   const appliedVote = vote as AppliedVote
+    //   const appliedHash = {
+    //     applied: appliedVote.transaction_result,
+    //     cantApply: appliedVote.cant_apply
+    //   }
+    //   const stateHash = {
+    //     account_id: appliedVote.account_id,
+    //     account_state_hash_after: appliedVote.account_state_hash_after,
+    //     account_state_hash_before: appliedVote.account_state_hash_before,
+    //   }
+    //   const appDataHash = {
+    //     app_data_hash: appliedVote.app_data_hash,
+    //   }
+    //   const voteToHash = {
+    //     appliedHash: this.crypto.hash(appliedHash),
+    //     stateHash: this.crypto.hash(stateHash),
+    //     appDataHash: this.crypto.hash(appDataHash),
+    //   }
+    //   return this.crypto.hash(voteToHash)
+    // } else if (this.stateManager.transactionQueue.useNewPOQ) {
+    //   const appliedVote = vote as AppliedVote
+    //   const voteToHash = {
+    //     txId: appliedVote.txid,
+    //     transaction_result: appliedVote.transaction_result,
+    //     account_id: appliedVote.account_id,
+    //     account_state_hash_after: appliedVote.account_state_hash_after,
+    //     account_state_hash_before: appliedVote.account_state_hash_before,
+    //     cant_apply: appliedVote.cant_apply,
+    //   }
+    //   return this.crypto.hash(voteToHash)
+    // } else {
+    //   const appliedVote = vote as AppliedVote
+    //   const voteToHash = Object.assign({}, appliedVote)
+    //   if (voteToHash.node_id != null) voteToHash.node_id = ''
+    //   if (voteToHash.sign != null) delete voteToHash.sign
+    //   return this.crypto.hash(voteToHash)
+    // }
   }
   addPendingConfirmOrChallenge(queueEntry: QueueEntry, confirmOrChallenge: ConfirmOrChallengeMessage): void {
     if (queueEntry.pendingConfirmOrChallenge.has(confirmOrChallenge.nodeId) === false) {
