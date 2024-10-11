@@ -241,8 +241,12 @@ class ExitHandler {
   addSigListeners(sigint = true, sigterm = true) {
     if (sigint) {
       process.on('SIGINT', async () => {
-        const nodeInfo = Self.getPublicNodeInfo(true)
-        if (nodeInfo.status === 'standby' || nodeInfo.status === 'initializing' || nodeInfo.status === 'ready') {
+        const nodeInfo = getPublicNodeInfo(true)
+        if (
+          nodeInfo.status === 'standby' ||
+          nodeInfo.status === 'initializing' ||
+          nodeInfo.status === 'ready'
+        ) {
           await this.exitCleanly('SIGINT', 'Process exited with SIGINT')
         } else {
           await this.exitUncleanly('SIGINT', 'Process exited with SIGINT while active')
