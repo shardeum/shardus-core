@@ -3615,7 +3615,6 @@ class TransactionConsenus {
 
       // save our vote to our queueEntry
       this.crypto.sign(ourVote)
-      this.crypto.sign(proposal)
       queueEntry.ourVote = ourVote
       queueEntry.ourProposal = proposal
       if (queueEntry.firstVoteReceivedTimestamp === 0) {
