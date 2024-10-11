@@ -6678,8 +6678,8 @@ class TransactionQueue {
 
               //todo this is false.. and prevents some important stuff.
               //need to look at appliedReceipt2
-              if (this.stateManager.getSignedReceipt(queueEntry) != null) {
-                const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
+              const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
+              if (signedReceipt != null) {
                 //TODO share receipt with corresponding index
 
                 if (logFlags.debug || this.stateManager.consensusLog) {
