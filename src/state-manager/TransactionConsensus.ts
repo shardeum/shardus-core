@@ -1809,6 +1809,11 @@ class TransactionConsenus {
   async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {
     queueEntry.poqoNextSendIndex = 0
     // better to check if we have enough number of nodes in a consensus group before we continue with the voting processsing. check if length is >= minimumConsensusGroupSize
+    if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+      nestedCountersInstance.countEvent('executionGroup', 'length is lower than minimumConsensusGroup size')
+      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
+      return
+    }
     const aggregatorList = queueEntry.executionGroup
     while (!queueEntry.signedReceipt) {
       if (queueEntry.poqoNextSendIndex >= aggregatorList.length) {
@@ -2231,6 +2236,14 @@ class TransactionConsenus {
 
       if (this.stateManager.transactionQueue.usePOQo === true) {
         // TODO : voting group should only be assigned if we have enough number of nodes in the consensus group to go ahead with voting.  check if length is >= minimumConsensusGroupSize
+        if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+          nestedCountersInstance.countEvent(
+            'executionGroup',
+            'length is lower than minimumConsensusGroup size'
+          )
+          /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
+          return
+        }
         votingGroup = queueEntry.executionGroup
       } else if (
         this.stateManager.transactionQueue.executeInOneShard &&

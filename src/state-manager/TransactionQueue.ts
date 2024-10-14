@@ -2757,11 +2757,21 @@ class TransactionQueue {
       //  queueEntry.tx Keys.allKeys.length
       queueEntry.hasAll = true
       // this.gossipCompleteData(queueEntry)
-       // TODO: here again I think if we can have a check to see if minimum consensus group size is met. If not, return. Since this is where we start sharing data.
-      if (queueEntry.executionGroup && queueEntry.executionGroup.length > 1) this.shareCompleteDataToNeighbours(queueEntry)
+      // here again I think if we can have a check to see if minimum consensus group size is met. If not, return. Since this is where we start sharing data.
+      if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+        nestedCountersInstance.countEvent('executionGroup', 'length is lower than minimumConsensusGroup size')
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
+        return
+      }
+      if (queueEntry.executionGroup && queueEntry.executionGroup.length > 1)
+        this.shareCompleteDataToNeighbours(queueEntry)
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
-          `queueEntryAddData hasAll: true for txId ${queueEntry.logID} ${queueEntry.acceptedTx.txId} at timestamp: ${shardusGetTime()} nodeId: ${Self.id} collected ${Object.keys(queueEntry.collectedData).length} uniqueKeys ${queueEntry.uniqueKeys.length}`
+          `queueEntryAddData hasAll: true for txId ${queueEntry.logID} ${
+            queueEntry.acceptedTx.txId
+          } at timestamp: ${shardusGetTime()} nodeId: ${Self.id} collected ${
+            Object.keys(queueEntry.collectedData).length
+          } uniqueKeys ${queueEntry.uniqueKeys.length}`
         )
       }
     }
@@ -5097,7 +5107,13 @@ class TransactionQueue {
     const targetGroupSize = queueEntry.transactionGroup.length
 
     const senderIndexInTxGroup = queueEntry.ourTXGroupIndex
-    // TODO: here again I think if we can have a check to see if minimum consensus group size is met. If not, return. 
+    // here again I think if we can have a check to see if minimum consensus group size is met. If not, return.
+    if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+      nestedCountersInstance.countEvent('executionGroup', 'length is lower than minimumConsensusGroup size')
+      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
+      return
+    }
+
     const senderGroupSize = queueEntry.executionGroup.length
     const unwrappedIndex = queueEntry.isSenderWrappedTxGroup[Self.id]
 
@@ -5178,14 +5194,13 @@ class TransactionQueue {
             (node) => node.externalIp + ':' + node.externalPort
           )
           /* prettier-ignore */ if (logFlags.error) this.mainLogger.debug('tellcorrernodingnodesfinaldata', queueEntry.logID, ` : filterValidNodesForInternalMessage ${filterNodesIpPort} for accounts: ${utils.stringifyReduce(message.stateList)}`)
-            // convert legacy message to binary supported type
-            const request = message as BroadcastFinalStateReq
-            if (logFlags.seqdiagram) {
-              for (const node of filterdCorrespondingAccNodes) {
-                /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_finalstate'}`)
-              }
+          // convert legacy message to binary supported type
+          const request = message as BroadcastFinalStateReq
+          if (logFlags.seqdiagram) {
+            for (const node of filterdCorrespondingAccNodes) {
+              /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455102 ${shardusGetTime()} tx:${message.txid} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(node.id)}: ${'broadcast_finalstate'}`)
             }
-
+          }
 
           if (this.usePOQo) {
             // && this.config.p2p.useBinarySerializedEndpoints && Context.config.p2p.poqoDataAndReceiptBinary) {
@@ -5195,21 +5210,22 @@ class TransactionQueue {
               {
                 finalState: message,
                 receipt: queueEntry.signedReceipt,
-                txGroupCycle: queueEntry.txGroupCycle
+                txGroupCycle: queueEntry.txGroupCycle,
               },
               serializePoqoDataAndReceiptReq,
               {}
             )
-          // } else if (this.usePOQo) {
-          //   this.p2p.tell(
-          //     filterdCorrespondingAccNodes,
-          //     'poqo-data-and-receipt',
-          //     {
-          //       finalState: message,
-          //       receipt: queueEntry.appliedReceipt2
-          //     }
-          //   )
-          } else //if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastFinalStateBinary) {
+            // } else if (this.usePOQo) {
+            //   this.p2p.tell(
+            //     filterdCorrespondingAccNodes,
+            //     'poqo-data-and-receipt',
+            //     {
+            //       finalState: message,
+            //       receipt: queueEntry.appliedReceipt2
+            //     }
+            //   )
+          } //if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.broadcastFinalStateBinary) {
+          else
             this.p2p.tellBinary<BroadcastFinalStateReq>(
               filterdCorrespondingAccNodes,
               InternalRouteEnum.binary_broadcast_finalstate,
@@ -5223,7 +5239,7 @@ class TransactionQueue {
               }
             )
           // } else {
-            // this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
+          // this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
           // }
           totalShares++
         }
@@ -5256,6 +5272,14 @@ class TransactionQueue {
       senderNodeIndex = queueEntry.isSenderWrappedTxGroup[senderNodeId]
     }
     // I assume this is being called after factTellCorrespondingNodesFinalData but for safety we can still have a check here.
+    if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+      nestedCountersInstance.countEvent(
+        'executionGroup',
+        'length is lower than minimumConsensusGroup size'
+      )
+      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
+      return
+    }
     const senderGroupSize = queueEntry.executionGroup.length
 
     const targetNodeIndex = queueEntry.ourTXGroupIndex // we are the receiver
@@ -7653,6 +7677,14 @@ class TransactionQueue {
         nodeToAsk = byPubKey.get(randomNodeToAskKey)
       } else {
         // I dont think any communication should be happening until the minimum consensus group size is reached. check if length > = minimum consensus group size
+        if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+          nestedCountersInstance.countEvent(
+            'executionGroup',
+            'length is lower than minimumConsensusGroup size'
+          )
+          /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
+          return
+        }
         const randomIndex = Math.floor(Math.random() * queueEntry.executionGroup.length)
         // eslint-disable-next-line security/detect-object-injection
         const randomExeNode = queueEntry.executionGroup[randomIndex]
