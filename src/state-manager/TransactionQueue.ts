@@ -2182,9 +2182,18 @@ class TransactionQueue {
           //set the nodes that are in the executionGroup.
           //This is needed so that consensus will expect less nodes to be voting
           const unRankedExecutionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
+
+          // here we  reject the transaction if the executionGroup.length is lesser than minimumConsensusGroup size, so that we dont have to go ahead with the remaining processing and hereby maintaining the safe node count for consensus
+          if (txQueueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+            nestedCountersInstance.countEvent(
+              'executionGroup',
+              'length is lower than minimumConsensusGroup size'
+            )
+            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
+            return false
+          }
+
           if (this.usePOQo) {
-          // looks like a place where we assign the executionGroup nodes. It'd be nice to have a check 
-          // TO DO : here we can reject the transaction if the executionGroup.length is lesser than minimumConsensusGroup size, so that we dont have to go ahead with the remaining processing and hereby maintaining the safe node count for consensus
             txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
           } else if (this.useNewPOQ) {
             txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)

@@ -399,12 +399,16 @@ export async function safetySync() {
   })
 
   // Figure out which nodes hold which partitions in the new network
-  // TO DO : here we can take the max of nodesPerConsensusGroup and minNodesPerConsensusGroup
+  // here we can take the max of nodesPerConsensusGroup and minNodesPerConsensusGroup
+  const nodesPerConsensusGroupUsed = Math.max(
+    Context.config.sharding.nodesPerConsensusGroup,
+    Context.config.sharding.minNodesPerConsensusGroup
+  )
 
   const shardGlobals = ShardFunctions.calculateShardGlobals(
     safetyNum,
-    Context.config.sharding.nodesPerConsensusGroup,
-    Context.config.sharding.nodesPerConsensusGroup
+    nodesPerConsensusGroupUsed,
+    nodesPerConsensusGroupUsed
   )
   const nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap = new Map()
 
@@ -561,12 +565,16 @@ export async function startWitnessMode() {
       if (newestCycle.safetyMode && newestCycle.networkStateHash === oldNetworkHash.hash) {
         log('Network is in safety mode and our network state hashes matches with newest cycle record')
         // caculate which partitions data this node hold
-        // TO DO : here we can take the max of nodesPerConsensusGroup and minNodesPerConsensusGroup
+        // here we can take the max of nodesPerConsensusGroup and minNodesPerConsensusGroup
+        const nodesPerConsensusGroupUsed = Math.max(
+          Context.config.sharding.nodesPerConsensusGroup,
+          Context.config.sharding.minNodesPerConsensusGroup
+        )
 
         const shardGlobals = ShardFunctions.calculateShardGlobals(
           newestCycle.safetyNum,
-          Context.config.sharding.nodesPerConsensusGroup,
-          Context.config.sharding.nodesPerConsensusGroup
+          nodesPerConsensusGroupUsed,
+          nodesPerConsensusGroupUsed
         )
         const nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap = new Map()
         oldDataMap = await SnapshotFunctions.calculateOldDataMap(
@@ -581,8 +589,8 @@ export async function startWitnessMode() {
         // send offer to each syncing + active nodes unless data is already offered
         for (let i = 0; i < nodeList.length; i++) {
           const node = nodeList[i]
-          const ip = 'ip' in node && node.ip || node.externalIp
-          const port = 'port' in node && node.port || node.externalIp
+          const ip = ('ip' in node && node.ip) || node.externalIp
+          const port = ('port' in node && node.port) || node.externalIp
           if (!alreadyOfferedNodes.has(node.id)) {
             try {
               log(`Sending witness offer to new node ${ip}:${port}`)
