@@ -2189,8 +2189,10 @@ class TransactionQueue {
               'executionGroup',
               'length is lower than minimumConsensusGroup size'
             )
-            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
-            return false
+            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction : executionGroup length is lower than minimumConsensusGroup size`)
+            throw new Error(
+              'routeAndQueueAcceptedTransaction : executionGroup length is lower than minimumConsensusGroup size'
+            )
           }
 
           if (this.usePOQo) {
@@ -2760,8 +2762,8 @@ class TransactionQueue {
       // here again I think if we can have a check to see if minimum consensus group size is met. If not, return. Since this is where we start sharing data.
       if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
         nestedCountersInstance.countEvent('executionGroup', 'length is lower than minimumConsensusGroup size')
-        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
-        return
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`queueEntryAddData : executionGroup length is lower than minimumConsensusGroup size`)
+        throw new Error('queueEntryAddData : executionGroup length is lower than minimumConsensusGroup size')
       }
       if (queueEntry.executionGroup && queueEntry.executionGroup.length > 1)
         this.shareCompleteDataToNeighbours(queueEntry)
@@ -5110,8 +5112,10 @@ class TransactionQueue {
     // here again I think if we can have a check to see if minimum consensus group size is met. If not, return.
     if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
       nestedCountersInstance.countEvent('executionGroup', 'length is lower than minimumConsensusGroup size')
-      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
-      return
+      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`factTellCorrespondingNodesFinalData : executionGroup length is lower than minimumConsensusGroup size`)
+      throw new Error(
+        'factTellCorrespondingNodesFinalData : executionGroup length is lower than minimumConsensusGroup size'
+      )
     }
 
     const senderGroupSize = queueEntry.executionGroup.length
@@ -5273,12 +5277,11 @@ class TransactionQueue {
     }
     // I assume this is being called after factTellCorrespondingNodesFinalData but for safety we can still have a check here.
     if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
-      nestedCountersInstance.countEvent(
-        'executionGroup',
-        'length is lower than minimumConsensusGroup size'
+      nestedCountersInstance.countEvent('executionGroup', 'length is lower than minimumConsensusGroup size')
+      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`factValidateCorrespondingTellFinalDataSender : executionGroup length is lower than minimumConsensusGroup size`)
+      throw new Error(
+        'factValidateCorrespondingTellFinalDataSender : executionGroup length is lower than minimumConsensusGroup size'
       )
-      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
-      return
     }
     const senderGroupSize = queueEntry.executionGroup.length
 
@@ -7682,8 +7685,8 @@ class TransactionQueue {
             'executionGroup',
             'length is lower than minimumConsensusGroup size'
           )
-          /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
-          return
+          /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`requestFinalData : executionGroup length is lower than minimumConsensusGroup size`)
+          throw new Error('requestFinalData : executionGroup length is lower than minimumConsensusGroup size')
         }
         const randomIndex = Math.floor(Math.random() * queueEntry.executionGroup.length)
         // eslint-disable-next-line security/detect-object-injection
