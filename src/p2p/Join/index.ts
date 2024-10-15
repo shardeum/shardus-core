@@ -60,6 +60,9 @@ let queuedStandbyRefreshPubKeys: string[] = []
 let queuedUnjoinRequestsForNextCycle: P2P.JoinTypes.SignedUnjoinRequest[] = []
 let queuedUnjoinRequestsForThisCycle: P2P.JoinTypes.SignedUnjoinRequest[] = []
 
+let cyclesToDelaySyncStarted = -1
+let cyclesToDelaySyncFinished = -1
+
 // whats this for? I was just going to use newStandbyRefreshRequests
 //let keepInStandbyCollector: Map<string, StandbyRefreshRequest>
 //let localStandbyCheckerJobs: Set<string>
@@ -645,62 +648,80 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
 /** Not used by Join */
 export function sendRequests(): void {
-  if (queuedStartedSyncingId) {
-    const syncStartedTx: P2P.JoinTypes.StartedSyncingRequest = crypto.sign({
-      nodeId: queuedStartedSyncingId,
-      cycleNumber: CycleChain.newest.counter,
-    })
-    queuedStartedSyncingId = undefined
+  console.log('sendRequests, cycle number is ', CycleCreator.currentCycle)
+  if (cyclesToDelaySyncStarted === -1 && config.debug.cyclesDelayStartedSyncing > 0) 
+    cyclesToDelaySyncStarted = config.debug.cyclesDelayStartedSyncing
+  if (cyclesToDelaySyncFinished === -1 && config.debug.cyclesDelayFinishedSyncing > 0)
+    cyclesToDelaySyncFinished = config.debug.cyclesDelayFinishedSyncing
 
-    if (addSyncStarted(syncStartedTx).success === true) {
-      nestedCountersInstance.countEvent('p2p', `join:sendRequests: sending sync-started gossip to network`)
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: sending sync-started gossip to network`)
-      Comms.sendGossip(
-        'gossip-sync-started',
-        syncStartedTx,
-        '',
-        null,
-        nodeListFromStates([
-          P2P.P2PTypes.NodeStatus.ACTIVE,
-          P2P.P2PTypes.NodeStatus.READY,
-          P2P.P2PTypes.NodeStatus.SYNCING,
-        ]),
-        true
-      )
+  if (queuedStartedSyncingId) {
+    if (cyclesToDelaySyncStarted > 0) {
+      console.log(`delaying sync started. current delay cycles: ${cyclesToDelaySyncStarted}`)
+      cyclesToDelaySyncStarted--
+      console.log(`delay cycles remaining: ${cyclesToDelaySyncStarted}`)
     } else {
-      nestedCountersInstance.countEvent('p2p', `join:sendRequests: failed to add our own sync-started message`)
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: failed to add our own sync-started message`)
+      const syncStartedTx: P2P.JoinTypes.StartedSyncingRequest = crypto.sign({
+        nodeId: queuedStartedSyncingId,
+        cycleNumber: CycleChain.newest.counter,
+      })
+      queuedStartedSyncingId = undefined
+
+      if (addSyncStarted(syncStartedTx).success === true) {
+        nestedCountersInstance.countEvent('p2p', `join:sendRequests: sending sync-started gossip to network`)
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: sending sync-started gossip to network`)
+        Comms.sendGossip(
+          'gossip-sync-started',
+          syncStartedTx,
+          '',
+          null,
+          nodeListFromStates([
+            P2P.P2PTypes.NodeStatus.ACTIVE,
+            P2P.P2PTypes.NodeStatus.READY,
+            P2P.P2PTypes.NodeStatus.SYNCING,
+          ]),
+          true
+        )
+      } else {
+        nestedCountersInstance.countEvent('p2p', `join:sendRequests: failed to add our own sync-started message`)
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: failed to add our own sync-started message`)
+      }
     }
   }
 
   if (queuedFinishedSyncingId) {
-    const syncFinishedTx: P2P.JoinTypes.FinishedSyncingRequest = crypto.sign({
-      nodeId: queuedFinishedSyncingId,
-      cycleNumber: CycleChain.newest.counter,
-    })
-    queuedFinishedSyncingId = undefined
-
-    if (addFinishedSyncing(syncFinishedTx).success === true) {
-      nestedCountersInstance.countEvent('p2p', `join:sendRequests: sending sync-finished gossip to network`)
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: sending sync-finished gossip to network`)
-      Comms.sendGossip(
-        'gossip-sync-finished',
-        syncFinishedTx,
-        '',
-        null,
-        nodeListFromStates([
-          P2P.P2PTypes.NodeStatus.ACTIVE,
-          P2P.P2PTypes.NodeStatus.READY,
-          P2P.P2PTypes.NodeStatus.SYNCING,
-        ]),
-        true
-      )
+    if (cyclesToDelaySyncFinished > 0) {
+      console.log(`delaying sync finished. current delay cycles: ${cyclesToDelaySyncFinished}`)
+      cyclesToDelaySyncFinished--
+      console.log(`delay cycles remaining: ${cyclesToDelaySyncFinished}`)
     } else {
-      nestedCountersInstance.countEvent(
-        'p2p',
-        `join:sendRequests: failed to add our own sync-finished message`
-      )
-      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: failed to add our own sync-finished message`)
+      const syncFinishedTx: P2P.JoinTypes.FinishedSyncingRequest = crypto.sign({
+        nodeId: queuedFinishedSyncingId,
+        cycleNumber: CycleChain.newest.counter,
+      })
+      queuedFinishedSyncingId = undefined
+
+      if (addFinishedSyncing(syncFinishedTx).success === true) {
+        nestedCountersInstance.countEvent('p2p', `join:sendRequests: sending sync-finished gossip to network`)
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: sending sync-finished gossip to network`)
+        Comms.sendGossip(
+          'gossip-sync-finished',
+          syncFinishedTx,
+          '',
+          null,
+          nodeListFromStates([
+            P2P.P2PTypes.NodeStatus.ACTIVE,
+            P2P.P2PTypes.NodeStatus.READY,
+            P2P.P2PTypes.NodeStatus.SYNCING,
+          ]),
+          true
+        )
+      } else {
+        nestedCountersInstance.countEvent(
+          'p2p',
+          `join:sendRequests: failed to add our own sync-finished message`
+        )
+        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: failed to add our own sync-finished message`)
+      }
     }
   }
 
