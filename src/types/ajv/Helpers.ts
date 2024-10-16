@@ -12,7 +12,6 @@ import { initGetAccountDataByHashesResp } from './GetAccountDataByHashesResp'
 import { initGetAccountDataByListReq } from './GetAccountDataByListReq'
 import { initGetAccountDataByListResp } from './GetAccountDataByListResp'
 import { initGetAccountDataRespSerializable } from './GetAccountDataResp'
-
 import { initGetAccountDataWithQueueHintsReq } from './GetAccountDataWithQueueHintsReq'
 import { initGetAccountDataWithQueueHintsResp } from './GetAccountDataWithQueueHintsResp'
 import { initGetAccountQueueCountReq } from './GetAccountQueueCountReq'
@@ -47,9 +46,8 @@ import { initSyncTrieHashesReq } from './SyncTrieHashesReq'
 import { initWrappedData } from './WrappedData'
 import { initWrappedDataFromQueueSerializable } from './WrappedDataFromQueueSerializable'
 import { initWrappedDataResponse } from './WrappedDataResponse'
-
+import { initCycleRecords } from './CycleRecordSchema'
 import { initJoinReq } from './JoinReq'
-
 
 export function initAjvSchemas(): void {
   initGetAccountData3Req()
@@ -97,8 +95,8 @@ export function initAjvSchemas(): void {
   initSignAppDataResp()
   initCachedAppData()
   initSendCachedAppDataReq()
+  initCycleRecords()
   initJoinReq()
-
 }
 
 export function verifyPayload<T>(name: string, payload: T): string[] | null {
