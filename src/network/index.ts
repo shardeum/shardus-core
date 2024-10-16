@@ -197,6 +197,7 @@ export class NetworkClass extends EventEmitter {
         hashKey: this.shardusCryptoHashKey,
         signingSecretKeyHex: this.signingSecretKeyHex,
       },
+      payloadSizeLimitInBytes: config.p2p.payloadSizeLimitInBytes,
     })
     this.intServer = await this.sn.listen(async (data, remote, respond, header, sign) => {
       let routeName
