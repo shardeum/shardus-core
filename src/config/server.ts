@@ -126,7 +126,6 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     lostArchiversCyclesToWait: 3,
     standbyListFastHash: false, //todo set to false and migrate
     networkBaselineEnabled: false, // feature flag to enable use of baselineNodes that's new threshold for the safety, restore, and recovery modes instead of minNodes
-    useBinarySerializedEndpoints: false,
     useCombinedTellBinary: true,
     rotationCountMultiply: 1,
     rotationCountAdd: 0,
@@ -145,37 +144,6 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     secondsToCheckForQ1: 1000, // 1 seconds in ms
     hardenNewSyncingProtocol: true,
     removeLostSyncingNodeFromList: true, //set to true since 1.10
-    compareCertBinary: true,
-    makeReceiptBinary: true,
-    lostArchiverInvestigateBinary: true,
-    signAppDataBinary: true,
-    sendCachedAppDataBinary: true,
-    syncTrieHashesBinary: true, //should be ok with latest fixes  SHM-4280
-    getTrieHashesBinary: true,
-    getTrieAccountHashesBinary: true,
-    getAccountDataBinary: true,
-    getAccountDataByHashBinary: true,
-    getAccountDataByListBinary: true,
-    getGloablAccountReportBinary: true,
-    getCachedAppDataBinary: true,
-    getAccountQueueCountBinary: true,
-    getAccountDataWithQueueHintsBinary: true,
-    getTxTimestampBinary: true,
-    getAppliedVoteBinary: true, //disabled due to SHM-4286
-    getConfirmOrChallengeBinary: true,
-    spreadAppliedVoteHashBinary: true,
-    spreadTxToGroupSyncingBinary: true,
-    broadcastStateBinary: true,
-    broadcastFinalStateBinary: true, //should be ok with latest fixes SHM-4282
-    requestTxAndStateBinary: true,
-    requestStateForTxPostBinary: true, //disabled because unhandled rejection SHM-4299
-    requestStateForTxBinary: true,
-    requestReceiptForTxBinary: true,
-    lostReportBinary: true,
-    repairMissingAccountsBinary: true,
-    poqoSendReceiptBinary: true,
-    poqoDataAndReceiptBinary: true,
-    poqoSendVoteBinary: true,
     rotationEdgeToAvoid: 3,
     forcedMode: '',
     delayZombieRestartSec: 180,
