@@ -631,9 +631,15 @@ class StateManager {
     const edgeNodes = this.config.sharding.nodesPerEdge as number
 
     // save this per cycle?
+
+    // here we can take the max of nodesPerConsensusGroup and minNodesPerConsensusGroup
+    const nodesPerConsensusGroupUsed = Math.max(
+      this.config.sharding.nodesPerConsensusGroup,
+      this.config.sharding.minNodesPerConsensusGroup
+    )
     cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(
       cycleShardData.nodes.length,
-      this.config.sharding.nodesPerConsensusGroup as number,
+      nodesPerConsensusGroupUsed as number,
       edgeNodes
     )
 

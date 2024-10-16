@@ -1125,6 +1125,23 @@ class TransactionConsenus {
 
           if (logFlags.verbose) this.mainLogger.debug(`POQo: received receipt from gossip for ${queueEntry.logID} forwarding gossip`)
 
+          // since we are checking for consensus majority, we check if we have enough nodes in the consensus group here...  
+          // check if length is >= minimumConsensusGroupSize else return
+          if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+            nestedCountersInstance.countEvent(
+              'executionGroup',
+              'length is lower than minimumConsensusGroup size'
+            )
+            nestedCountersInstance.countEvent(
+              'poqo',
+              'poqo-receipt-gossip: Rejecting receipt because executionGroup length is lower than minimumConsensusGroup size'
+            )
+            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`poqo-receipt-gossip : executionGroup length is lower than minimumConsensusGroup size`)
+            throw new Error(
+              'poqo-receipt-gossip : executionGroup length is lower than minimumConsensusGroup size'
+            )
+          }
+
           const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
           const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload, executionGroupNodes)
           if (!hasTwoThirdsMajority) {
@@ -1244,11 +1261,32 @@ class TransactionConsenus {
           }
 
           if (!queueEntry.hasSentFinalReceipt) {
-            const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
+            const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
+
+            // since we are checking for consensus majority, we check if we have enough nodes in the consensus group here...
+            // check if length is >= minimumConsensusGroupSize else return
+            if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+              nestedCountersInstance.countEvent(
+                'executionGroup',
+                'length is lower than minimumConsensusGroup size'
+              )
+              nestedCountersInstance.countEvent(
+                'poqo',
+                'poqo-data-and-receipt: Rejecting receipt because executionGroup length is lower than minimumConsensusGroup size'
+              )
+              /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`poqo-data-and-receipt : executionGroup length is lower than minimumConsensusGroup size`)
+              throw new Error(
+                'poqo-data-and-receipt : executionGroup length is lower than minimumConsensusGroup size'
+              )
+            }
+
             const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq.receipt, executionGroupNodes)
-            if(!hasTwoThirdsMajority) {
+            if (!hasTwoThirdsMajority) {
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.receipt.proposal.txid}`)
-              nestedCountersInstance.countEvent('poqo', 'poqo-data-and-receipt: Rejecting receipt because no majority')
+              nestedCountersInstance.countEvent(
+                'poqo',
+                'poqo-data-and-receipt: Rejecting receipt because no majority'
+              )
               return
             }
             if (logFlags.verbose)
@@ -1580,11 +1618,31 @@ class TransactionConsenus {
             return
           }
 
+          // since we are checking for consensus majority, we check if we have enough nodes in the consensus group here...
+          // check if length is >= minimumConsensusGroupSize else return
+          if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+            nestedCountersInstance.countEvent(
+              'executionGroup',
+              'length is lower than minimumConsensusGroup size'
+            )
+            nestedCountersInstance.countEvent(
+              'poqo',
+              'poqo-send-receipt: Rejecting receipt because executionGroup length is lower than minimumConsensusGroup size'
+            )
+            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`poqo-send-receipt : executionGroup length is lower than minimumConsensusGroup size`)
+            throw new Error(
+              'poqo-send-receipt : executionGroup length is lower than minimumConsensusGroup size'
+            )
+          }
+
           const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
           const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq, executionGroupNodes)
           if (!hasTwoThirdsMajority) {
             /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.proposal.txid}`)
-              nestedCountersInstance.countEvent('poqo', 'poqo-send-receipt: Rejecting receipt because no majority')
+            nestedCountersInstance.countEvent(
+              'poqo',
+              'poqo-send-receipt: Rejecting receipt because no majority'
+            )
             return
           }
 
@@ -1756,6 +1814,12 @@ class TransactionConsenus {
 
   async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {
     queueEntry.poqoNextSendIndex = 0
+    // better to check if we have enough number of nodes in a consensus group before we continue with the voting processsing. check if length is >= minimumConsensusGroupSize
+    if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+      nestedCountersInstance.countEvent('executionGroup', 'length is lower than minimumConsensusGroup size')
+      /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`poqoVoteSendLoop : executionGroup length is lower than minimumConsensusGroup size`)
+      throw new Error('poqoVoteSendLoop : executionGroup length is lower than minimumConsensusGroup size')
+    }
     const aggregatorList = queueEntry.executionGroup
     while (!queueEntry.signedReceipt) {
       if (queueEntry.poqoNextSendIndex >= aggregatorList.length) {
@@ -2175,6 +2239,12 @@ class TransactionConsenus {
 
       // Design TODO:  should this be the full transaction group or just the consensus group?
       let votingGroup: Shardus.NodeWithRank[] | P2PTypes.NodeListTypes.Node[]
+
+      if (queueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+        nestedCountersInstance.countEvent('executionGroup', 'length is lower than minimumConsensusGroup size')
+        /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`tryProduceReceipt : executionGroup length is lower than minimumConsensusGroup size`)
+        throw new Error('tryProduceReceipt : executionGroup length is lower than minimumConsensusGroup size')
+      }
 
       if (this.stateManager.transactionQueue.usePOQo === true) {
         votingGroup = queueEntry.executionGroup
