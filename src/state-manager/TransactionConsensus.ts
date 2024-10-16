@@ -90,6 +90,7 @@ import { deserializePoqoDataAndReceiptResp } from '../types/PoqoDataAndReceiptRe
 import { deserializePoqoSendVoteReq, serializePoqoSendVoteReq } from '../types/PoqoSendVoteReq'
 import { RequestReceiptForTxReqSerialized, serializeRequestReceiptForTxReq } from '../types/RequestReceiptForTxReq'
 import { RequestReceiptForTxRespSerialized, deserializeRequestReceiptForTxResp } from '../types/RequestReceiptForTxResp'
+import { removeDuplicateSignatures } from '../utils/functions/signs'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -1726,6 +1727,9 @@ class TransactionConsenus {
       // Final aggregator sign is invalid
       return false;
     }
+
+    // Remove duplicates signatures
+    receipt.signaturePack = removeDuplicateSignatures(receipt.signaturePack)
 
     if (receipt.signaturePack.length !== receipt.voteOffsets.length) {
       // Invalid receipt
