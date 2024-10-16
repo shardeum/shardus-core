@@ -1122,9 +1122,9 @@ export interface ServerConfiguration {
     // flag to add bogus increments to NTP offset
     debugNTPBogusDecrements: boolean
     /** config for the number of cycles we should delay sending the started syncing state */
-    cyclesDelayStartedSyncing: number
+    startedSyncingDelay: number
     /** config for the number of cycles we should delay sending the finished syncing state */
-    cyclesDelayFinishedSyncing: number
+    finishedSyncingDelay: number
   }
   /** Options for the statistics module */
   statistics?: {

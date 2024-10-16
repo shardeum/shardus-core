@@ -188,7 +188,7 @@ export function startupV2(): Promise<boolean> {
         nestedCountersInstance.countEvent('p2p', 'joined')
         // Sync cycle chain from network
         await syncCycleChain(id)
-        Join.queueStartedSyncingRequest()
+        await Join.queueStartedSyncingRequest()
 
         // Enable internal routes
         Comms.setAcceptInternal(true)

@@ -648,80 +648,62 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
 
 /** Not used by Join */
 export function sendRequests(): void {
-  console.log('sendRequests, cycle number is ', CycleCreator.currentCycle)
-  if (cyclesToDelaySyncStarted === -1 && config.debug.cyclesDelayStartedSyncing > 0) 
-    cyclesToDelaySyncStarted = config.debug.cyclesDelayStartedSyncing
-  if (cyclesToDelaySyncFinished === -1 && config.debug.cyclesDelayFinishedSyncing > 0)
-    cyclesToDelaySyncFinished = config.debug.cyclesDelayFinishedSyncing
-
   if (queuedStartedSyncingId) {
-    if (cyclesToDelaySyncStarted > 0) {
-      console.log(`delaying sync started. current delay cycles: ${cyclesToDelaySyncStarted}`)
-      cyclesToDelaySyncStarted--
-      console.log(`delay cycles remaining: ${cyclesToDelaySyncStarted}`)
-    } else {
-      const syncStartedTx: P2P.JoinTypes.StartedSyncingRequest = crypto.sign({
-        nodeId: queuedStartedSyncingId,
-        cycleNumber: CycleChain.newest.counter,
-      })
-      queuedStartedSyncingId = undefined
+    const syncStartedTx: P2P.JoinTypes.StartedSyncingRequest = crypto.sign({
+      nodeId: queuedStartedSyncingId,
+      cycleNumber: CycleChain.newest.counter,
+    })
+    queuedStartedSyncingId = undefined
 
-      if (addSyncStarted(syncStartedTx).success === true) {
-        nestedCountersInstance.countEvent('p2p', `join:sendRequests: sending sync-started gossip to network`)
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: sending sync-started gossip to network`)
-        Comms.sendGossip(
-          'gossip-sync-started',
-          syncStartedTx,
-          '',
-          null,
-          nodeListFromStates([
-            P2P.P2PTypes.NodeStatus.ACTIVE,
-            P2P.P2PTypes.NodeStatus.READY,
-            P2P.P2PTypes.NodeStatus.SYNCING,
-          ]),
-          true
-        )
-      } else {
-        nestedCountersInstance.countEvent('p2p', `join:sendRequests: failed to add our own sync-started message`)
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: failed to add our own sync-started message`)
-      }
+    if (addSyncStarted(syncStartedTx).success === true) {
+      nestedCountersInstance.countEvent('p2p', `join:sendRequests: sending sync-started gossip to network`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: sending sync-started gossip to network`)
+      Comms.sendGossip(
+        'gossip-sync-started',
+        syncStartedTx,
+        '',
+        null,
+        nodeListFromStates([
+          P2P.P2PTypes.NodeStatus.ACTIVE,
+          P2P.P2PTypes.NodeStatus.READY,
+          P2P.P2PTypes.NodeStatus.SYNCING,
+        ]),
+        true
+      )
+    } else {
+      nestedCountersInstance.countEvent('p2p', `join:sendRequests: failed to add our own sync-started message`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: failed to add our own sync-started message`)
     }
   }
 
   if (queuedFinishedSyncingId) {
-    if (cyclesToDelaySyncFinished > 0) {
-      console.log(`delaying sync finished. current delay cycles: ${cyclesToDelaySyncFinished}`)
-      cyclesToDelaySyncFinished--
-      console.log(`delay cycles remaining: ${cyclesToDelaySyncFinished}`)
-    } else {
-      const syncFinishedTx: P2P.JoinTypes.FinishedSyncingRequest = crypto.sign({
-        nodeId: queuedFinishedSyncingId,
-        cycleNumber: CycleChain.newest.counter,
-      })
-      queuedFinishedSyncingId = undefined
+    const syncFinishedTx: P2P.JoinTypes.FinishedSyncingRequest = crypto.sign({
+      nodeId: queuedFinishedSyncingId,
+      cycleNumber: CycleChain.newest.counter,
+    })
+    queuedFinishedSyncingId = undefined
 
-      if (addFinishedSyncing(syncFinishedTx).success === true) {
-        nestedCountersInstance.countEvent('p2p', `join:sendRequests: sending sync-finished gossip to network`)
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: sending sync-finished gossip to network`)
-        Comms.sendGossip(
-          'gossip-sync-finished',
-          syncFinishedTx,
-          '',
-          null,
-          nodeListFromStates([
-            P2P.P2PTypes.NodeStatus.ACTIVE,
-            P2P.P2PTypes.NodeStatus.READY,
-            P2P.P2PTypes.NodeStatus.SYNCING,
-          ]),
-          true
-        )
-      } else {
-        nestedCountersInstance.countEvent(
-          'p2p',
-          `join:sendRequests: failed to add our own sync-finished message`
-        )
-        /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: failed to add our own sync-finished message`)
-      }
+    if (addFinishedSyncing(syncFinishedTx).success === true) {
+      nestedCountersInstance.countEvent('p2p', `join:sendRequests: sending sync-finished gossip to network`)
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: sending sync-finished gossip to network`)
+      Comms.sendGossip(
+        'gossip-sync-finished',
+        syncFinishedTx,
+        '',
+        null,
+        nodeListFromStates([
+          P2P.P2PTypes.NodeStatus.ACTIVE,
+          P2P.P2PTypes.NodeStatus.READY,
+          P2P.P2PTypes.NodeStatus.SYNCING,
+        ]),
+        true
+      )
+    } else {
+      nestedCountersInstance.countEvent(
+        'p2p',
+        `join:sendRequests: failed to add our own sync-finished message`
+      )
+      /* prettier-ignore */ if (logFlags.p2pNonFatal) console.log(`join:sendRequests: failed to add our own sync-finished message`)
     }
   }
 
@@ -844,12 +826,17 @@ export function queueRequest(): void {
   return
 }
 
-export function queueStartedSyncingRequest(): void {
+export async function queueStartedSyncingRequest(): Promise<void> {
+  if (config.debug.startedSyncingDelay > 0)
+    await new Promise((resolve) => setTimeout(resolve, config.debug.startedSyncingDelay * 1000))
   queuedStartedSyncingId = Self.id
 }
 
-export function queueFinishedSyncingRequest(): void {
+export async function queueFinishedSyncingRequest(): Promise<void> {
   if (neverGoActive) return
+  if (config.debug.finishedSyncingDelay > 0)
+    await new Promise((resolve) => setTimeout(resolve, config.debug.finishedSyncingDelay * 1000))
+
   queuedFinishedSyncingId = Self.id
   finishedSyncingCycle = CycleCreator.currentCycle
 }
