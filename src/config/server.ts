@@ -258,6 +258,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     debugNTPBogusDecrements: false,
     startedSyncingDelay: 0,
     finishedSyncingDelay: 0,
+    readyNodeDelay: 0,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {
