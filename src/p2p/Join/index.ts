@@ -60,6 +60,9 @@ let queuedStandbyRefreshPubKeys: string[] = []
 let queuedUnjoinRequestsForNextCycle: P2P.JoinTypes.SignedUnjoinRequest[] = []
 let queuedUnjoinRequestsForThisCycle: P2P.JoinTypes.SignedUnjoinRequest[] = []
 
+let cyclesToDelaySyncStarted = -1
+let cyclesToDelaySyncFinished = -1
+
 // whats this for? I was just going to use newStandbyRefreshRequests
 //let keepInStandbyCollector: Map<string, StandbyRefreshRequest>
 //let localStandbyCheckerJobs: Set<string>
@@ -823,12 +826,17 @@ export function queueRequest(): void {
   return
 }
 
-export function queueStartedSyncingRequest(): void {
+export async function queueStartedSyncingRequest(): Promise<void> {
+  if (config.debug.startedSyncingDelay > 0)
+    await new Promise((resolve) => setTimeout(resolve, config.debug.startedSyncingDelay * 1000))
   queuedStartedSyncingId = Self.id
 }
 
-export function queueFinishedSyncingRequest(): void {
+export async function queueFinishedSyncingRequest(): Promise<void> {
   if (neverGoActive) return
+  if (config.debug.finishedSyncingDelay > 0)
+    await new Promise((resolve) => setTimeout(resolve, config.debug.finishedSyncingDelay * 1000))
+
   queuedFinishedSyncingId = Self.id
   finishedSyncingCycle = CycleCreator.currentCycle
 }
