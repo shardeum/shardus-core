@@ -27,6 +27,7 @@ describe('MakeReceiptReq Tests', () => {
           sig: 'signature123',
         },
         address: 'address123',
+        addressHash: 'addressHash123',
         value: { key: 'value' },
         when: 1234567890,
         source: 'source123',
@@ -37,6 +38,7 @@ describe('MakeReceiptReq Tests', () => {
       expect(stream.readString()).toBe(obj.sign.owner)
       expect(stream.readString()).toBe(obj.sign.sig)
       expect(stream.readString()).toBe(obj.address)
+      expect(stream.readString()).toBe(obj.addressHash)
       expect(stream.readString()).toBe(Utils.safeStringify(obj.value))
       expect(stream.readBigUInt64()).toBe(BigInt(obj.when))
       expect(stream.readString()).toBe(obj.source)
@@ -49,6 +51,7 @@ describe('MakeReceiptReq Tests', () => {
           sig: 'signature123',
         },
         address: 'address123',
+        addressHash: 'addressHash123',
         value: { key: 'value' },
         when: 1234567890,
         source: 'source123',
@@ -60,6 +63,7 @@ describe('MakeReceiptReq Tests', () => {
       expect(stream.readString()).toBe(obj.sign.owner)
       expect(stream.readString()).toBe(obj.sign.sig)
       expect(stream.readString()).toBe(obj.address)
+      expect(stream.readString()).toBe(obj.addressHash)
       expect(stream.readString()).toBe(Utils.safeStringify(obj.value))
       expect(stream.readBigUInt64()).toBe(BigInt(obj.when))
       expect(stream.readString()).toBe(obj.source)
@@ -72,6 +76,7 @@ describe('MakeReceiptReq Tests', () => {
           sig: '',
         },
         address: '',
+        addressHash: '',
         value: {},
         when: 0,
         source: '',
@@ -82,6 +87,7 @@ describe('MakeReceiptReq Tests', () => {
       expect(stream.readString()).toBe(obj.sign.owner)
       expect(stream.readString()).toBe(obj.sign.sig)
       expect(stream.readString()).toBe(obj.address)
+      expect(stream.readString()).toBe(obj.addressHash)
       expect(stream.readString()).toBe(Utils.safeStringify(obj.value))
       expect(stream.readBigUInt64()).toBe(BigInt(obj.when))
       expect(stream.readString()).toBe(obj.source)
@@ -94,6 +100,7 @@ describe('MakeReceiptReq Tests', () => {
           sig: 'signature123',
         },
         address: 'address123',
+        addressHash: 'addressHash123',
         value: { key: 'value' },
         when: Number.MAX_SAFE_INTEGER,
         source: 'source123',
@@ -104,6 +111,7 @@ describe('MakeReceiptReq Tests', () => {
       expect(stream.readString()).toBe(obj.sign.owner)
       expect(stream.readString()).toBe(obj.sign.sig)
       expect(stream.readString()).toBe(obj.address)
+      expect(stream.readString()).toBe(obj.addressHash)
       expect(stream.readString()).toBe(Utils.safeStringify(obj.value))
       expect(stream.readBigUInt64()).toBe(BigInt(obj.when))
       expect(stream.readString()).toBe(obj.source)
@@ -136,6 +144,7 @@ describe('MakeReceiptReq Tests', () => {
           sig: 'signature123',
         },
         address: 'address123',
+        addressHash: 'addressHash123',
         value: { key: 'value' },
         when: 1234567890,
         source: 'source123',
@@ -144,6 +153,7 @@ describe('MakeReceiptReq Tests', () => {
       stream.writeString(obj.sign.owner)
       stream.writeString(obj.sign.sig)
       stream.writeString(obj.address)
+      stream.writeString(obj.addressHash)
       stream.writeString(Utils.safeStringify(obj.value))
       stream.writeBigUInt64(BigInt(obj.when))
       stream.writeString(obj.source)
@@ -159,6 +169,7 @@ describe('MakeReceiptReq Tests', () => {
           sig: '',
         },
         address: '',
+        addressHash: '',
         value: {},
         when: 0,
         source: '',
@@ -167,6 +178,7 @@ describe('MakeReceiptReq Tests', () => {
       stream.writeString(obj.sign.owner)
       stream.writeString(obj.sign.sig)
       stream.writeString(obj.address)
+      stream.writeString(obj.addressHash)
       stream.writeString(Utils.safeStringify(obj.value))
       stream.writeBigUInt64(BigInt(obj.when))
       stream.writeString(obj.source)
@@ -182,6 +194,7 @@ describe('MakeReceiptReq Tests', () => {
           sig: 'signature123',
         },
         address: 'address123',
+        addressHash: 'addressHash123',
         value: { key: 'value' },
         when: Number.MAX_SAFE_INTEGER,
         source: 'source123',
@@ -190,6 +203,7 @@ describe('MakeReceiptReq Tests', () => {
       stream.writeString(obj.sign.owner)
       stream.writeString(obj.sign.sig)
       stream.writeString(obj.address)
+      stream.writeString(obj.addressHash)
       stream.writeString(Utils.safeStringify(obj.value))
       stream.writeBigUInt64(BigInt(obj.when))
       stream.writeString(obj.source)
