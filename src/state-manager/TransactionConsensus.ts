@@ -1124,8 +1124,7 @@ class TransactionConsenus {
           }
 
           if (logFlags.verbose) this.mainLogger.debug(`POQo: received receipt from gossip for ${queueEntry.logID} forwarding gossip`)
-          // since we are checking for consensus majority, might be good to check if we have enough nodes in the consensus group here...  
-          // check if length is >= minimumConsensusGroupSize else return
+
           const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
           const hasTwoThirdsMajority = this.verifyAppliedReceipt(payload, executionGroupNodes)
           if (!hasTwoThirdsMajority) {
@@ -1246,8 +1245,7 @@ class TransactionConsenus {
 
           if (!queueEntry.hasSentFinalReceipt) {
             const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
-            // since we are checking for consensus majority, might be good to check if we have enough nodes in the consensus group here...  
-            // check if length is >= minimumConsensusGroupSize else return
+
             const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq.receipt, executionGroupNodes)
             if(!hasTwoThirdsMajority) {
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.receipt.proposal.txid}`)
@@ -1582,8 +1580,7 @@ class TransactionConsenus {
             // We've already handled this
             return
           }
-          // since we are checking for consensus majority, might be good to check if we have enough nodes in the consensus group here...  
-          // check if length is >= minimumConsensusGroupSize else return
+
           const executionGroupNodes = new Set(queueEntry.executionGroup.map((node) => node.publicKey))
           const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq, executionGroupNodes)
           if (!hasTwoThirdsMajority) {
