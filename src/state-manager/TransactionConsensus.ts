@@ -1757,7 +1757,6 @@ class TransactionConsenus {
 
   async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {
     queueEntry.poqoNextSendIndex = 0
-    // better to check if we have enough number of nodes in a consensus group before we continue with the voting processsing. check if length is >= minimumConsensusGroupSize
     const aggregatorList = queueEntry.executionGroup
     while (!queueEntry.signedReceipt) {
       if (queueEntry.poqoNextSendIndex >= aggregatorList.length) {
@@ -2179,7 +2178,6 @@ class TransactionConsenus {
       let votingGroup: Shardus.NodeWithRank[] | P2PTypes.NodeListTypes.Node[]
 
       if (this.stateManager.transactionQueue.usePOQo === true) {
-        // TODO : voting group should only be assigned if we have enough number of nodes in the consensus group to go ahead with voting.  check if length is >= minimumConsensusGroupSize
         votingGroup = queueEntry.executionGroup
       } else if (
         this.stateManager.transactionQueue.executeInOneShard &&

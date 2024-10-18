@@ -2227,7 +2227,7 @@ class TransactionQueue {
           // confirm nodes are lowest ranked nodes
           txQueueEntry.eligibleNodeIdsToConfirm = new Set(
             txQueueEntry.executionGroup
-              .slice(txQueueEntry.executionGroup.length - numberOfVoters)
+              .slice(this.config.sharding.minNodesPerConsensusGroup - numberOfVoters)
               .map((node) => node.id)
           )
 
