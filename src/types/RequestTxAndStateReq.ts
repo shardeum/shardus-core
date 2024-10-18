@@ -6,6 +6,7 @@ export const cRequestTxAndStateReqVersion = 1
 export type RequestTxAndStateReq = {
   txid: string
   accountIds: string[]
+  includeAppReceiptData?: boolean
 }
 
 export function serializeRequestTxAndStateReq(
@@ -22,6 +23,7 @@ export function serializeRequestTxAndStateReq(
   for (const accountId of obj.accountIds) {
     stream.writeString(accountId)
   }
+  stream.writeUInt8(obj.includeAppReceiptData ? 1 : 0)
 }
 
 export function deserializeRequestTxAndStateReq(stream: VectorBufferStream): RequestTxAndStateReq {
@@ -35,8 +37,14 @@ export function deserializeRequestTxAndStateReq(stream: VectorBufferStream): Req
   for (let i = 0; i < accountIdsLength; i++) {
     accountIds.push(stream.readString())
   }
+  let includeAppReceiptData = false
+  if (stream.readUInt8() === 1) {
+    // Check if appReceiptData is requested
+    includeAppReceiptData = true
+  }
   return {
     txid,
     accountIds,
+    includeAppReceiptData,
   }
 }

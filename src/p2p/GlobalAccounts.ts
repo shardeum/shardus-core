@@ -103,7 +103,7 @@ export function init() {
   Comms.registerGossipHandler(setGlobalGossipRoute.name, setGlobalGossipRoute.handler)
 }
 
-export function setGlobal(address, value, when, source) {
+export function setGlobal(address, addressHash, value, when, source) {
   if (logFlags.console) console.log(`SETGLOBAL: WE ARE: ${Self.id.substring(0, 5)}`)
 
   // Only do this if you're active
@@ -113,8 +113,8 @@ export function setGlobal(address, value, when, source) {
   }
 
   // Create a tx for setting a global account
-  const tx: P2P.GlobalAccountsTypes.SetGlobalTx = { address, value, when, source }
-  const txHash = Context.crypto.hash(tx)
+  const tx: P2P.GlobalAccountsTypes.SetGlobalTx = { address, addressHash, value, when, source }
+  const txHash = Context.shardus.app.calculateTxId(tx.value as OpaqueTransaction)
 
   // Sign tx
   const signedTx: P2P.GlobalAccountsTypes.SignedSetGlobalTx = Context.crypto.sign(tx)
@@ -180,21 +180,32 @@ export function setGlobal(address, value, when, source) {
   /** [TODO] [AS] Replace with Comms.tell */
   // p2p.tell(consensusGroup, 'make-receipt', signedTx)
   // if (Context.config.p2p.useBinarySerializedEndpoints && Context.config.p2p.makeReceiptBinary) {
-    const request = signedTx as MakeReceiptReq
-    Comms.tellBinary<MakeReceiptReq>(
-      consensusGroup,
-      InternalRouteEnum.binary_make_receipt,
-      request,
-      serializeMakeReceiptReq,
-      {}
-    )
+  const request = signedTx as MakeReceiptReq
+  Comms.tellBinary<MakeReceiptReq>(
+    consensusGroup,
+    InternalRouteEnum.binary_make_receipt,
+    request,
+    serializeMakeReceiptReq,
+    {}
+  )
   // } else {
-    // Comms.tell(consensusGroup, 'make-receipt', signedTx)
+  // Comms.tell(consensusGroup, 'make-receipt', signedTx)
   // }
 }
 
 export function createMakeReceiptHandle(txHash: string) {
   return `receipt-${txHash}`
+}
+
+export function getGlobalTxReceipt(
+  txHash: P2P.GlobalAccountsTypes.TxHash
+): P2P.GlobalAccountsTypes.GlobalTxReceipt | null {
+  const receipt = receipts.get(txHash)
+  if (!receipt) return null
+  return {
+    signs: receipt.signs,
+    tx: receipt.tx,
+  }
 }
 
 export function makeReceipt(
@@ -211,7 +222,8 @@ export function makeReceipt(
   const tx = { ...signedTx }
   delete tx.sign
 
-  const txHash = Context.crypto.hash(tx)
+  const txHash = Context.shardus.app.calculateTxId(tx.value as OpaqueTransaction)
+  console.log('makeReceipt', txHash)
 
   // Put into correct Receipt and Tracker
   let receipt: P2P.GlobalAccountsTypes.Receipt = receipts.get(txHash)
