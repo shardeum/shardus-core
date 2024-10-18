@@ -2182,6 +2182,19 @@ class TransactionQueue {
           //set the nodes that are in the executionGroup.
           //This is needed so that consensus will expect less nodes to be voting
           const unRankedExecutionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
+
+          // here we  reject the transaction if the executionGroup.length is lesser than minimumConsensusGroup size, so that we dont have to go ahead with the remaining processing and hereby maintaining the safe node count for consensus
+          if (txQueueEntry.executionGroup.length < this.config.sharding.minNodesPerConsensusGroup) {
+            nestedCountersInstance.countEvent(
+              'executionGroup',
+              'length is lower than minimumConsensusGroup size'
+            )
+            /* prettier-ignore */ if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`executionGroup length is lower than minimumConsensusGroup size`)
+            throw new Error(
+              'routeAndQueueAcceptedTransaction : executionGroup length is lower than minimumConsensusGroup size'
+            )
+          }
+
           if (this.usePOQo) {
             txQueueEntry.executionGroup = this.orderNodesByRank(unRankedExecutionGroup, txQueueEntry)
           } else if (this.useNewPOQ) {
@@ -2204,7 +2217,7 @@ class TransactionQueue {
           const voterPercentage = configContext.stateManager.voterPercentage
           const numberOfVoters = Math.max(
             minNodesToVote,
-            Math.floor(txQueueEntry.executionGroup.length * voterPercentage)
+            Math.floor(this.config.sharding.minNodesPerConsensusGroup * voterPercentage)
           )
           // voters are highest ranked nodes
           txQueueEntry.eligibleNodeIdsToVote = new Set(
@@ -2214,7 +2227,7 @@ class TransactionQueue {
           // confirm nodes are lowest ranked nodes
           txQueueEntry.eligibleNodeIdsToConfirm = new Set(
             txQueueEntry.executionGroup
-              .slice(txQueueEntry.executionGroup.length - numberOfVoters)
+              .slice(this.config.sharding.minNodesPerConsensusGroup - numberOfVoters)
               .map((node) => node.id)
           )
 
@@ -2746,6 +2759,7 @@ class TransactionQueue {
       //  queueEntry.tx Keys.allKeys.length
       queueEntry.hasAll = true
       // this.gossipCompleteData(queueEntry)
+       
       if (queueEntry.executionGroup && queueEntry.executionGroup.length > 1) this.shareCompleteDataToNeighbours(queueEntry)
       if (logFlags.debug || this.stateManager.consensusLog) {
         this.mainLogger.debug(
@@ -7638,6 +7652,7 @@ class TransactionQueue {
         const randomNodeToAskKey = nodesToAskKeys[randomIndex]
         nodeToAsk = byPubKey.get(randomNodeToAskKey)
       } else {
+
         const randomIndex = Math.floor(Math.random() * queueEntry.executionGroup.length)
         // eslint-disable-next-line security/detect-object-injection
         const randomExeNode = queueEntry.executionGroup[randomIndex]

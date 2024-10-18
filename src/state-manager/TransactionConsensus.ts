@@ -1245,6 +1245,7 @@ class TransactionConsenus {
 
           if (!queueEntry.hasSentFinalReceipt) {
             const executionGroupNodes = new Set(queueEntry.executionGroup.map(node => node.publicKey));
+
             const hasTwoThirdsMajority = this.verifyAppliedReceipt(readableReq.receipt, executionGroupNodes)
             if(!hasTwoThirdsMajority) {
               /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`Receipt does not have the required majority for txid: ${readableReq.receipt.proposal.txid}`)
