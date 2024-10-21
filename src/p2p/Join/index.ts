@@ -828,14 +828,14 @@ export function queueRequest(): void {
 
 export async function queueStartedSyncingRequest(): Promise<void> {
   if (Self.isFirst === false && config.debug.startedSyncingDelay > 0)
-    await new Promise((resolve) => setTimeout(resolve, config.debug.startedSyncingDelay * 1000))
+    await utils.sleep(config.debug.startedSyncingDelay * 1000)
   queuedStartedSyncingId = Self.id
 }
 
 export async function queueFinishedSyncingRequest(): Promise<void> {
   if (neverGoActive) return
   if (Self.isFirst === false && config.debug.finishedSyncingDelay > 0)
-    await new Promise((resolve) => setTimeout(resolve, config.debug.finishedSyncingDelay * 1000))
+    await utils.sleep(config.debug.finishedSyncingDelay * 1000)
 
   queuedFinishedSyncingId = Self.id
   finishedSyncingCycle = CycleCreator.currentCycle
