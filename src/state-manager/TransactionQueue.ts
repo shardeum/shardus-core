@@ -5933,8 +5933,9 @@ class TransactionQueue {
 
           // remove TXs that are stuck in the processing queue for 2 min
           if (configContext.stateManager.removeStuckTxsFromQueue === true && txAge > configContext.stateManager.stuckTxRemoveTime) {
-            nestedCountersInstance.countEvent('txSafelyRemoved', `txAge > 2m`)
-            this.statemanager_fatal(`txSafelyRemoved`, `txAge > 2m txid: ${shortID} state: ${queueEntry.state} age:${txAge}`)
+            nestedCountersInstance.countEvent('txSafelyRemoved', `stuck_in_consensus_1 ${configContext.stateManager.stuckTxRemoveTime / 1000}`)
+            this.statemanager_fatal(`txSafelyRemoved_1`, `stuck_in_consensus_3 txid: ${shortID} state: ${queueEntry.state} age:${txAge}`)
+            if(logFlags.txCancel) this.statemanager_fatal(`txSafelyRemoved_1_dump`, `${this.getDebugQueueInfo(queueEntry)}`)
             this.removeFromQueue(queueEntry, currentIndex)
             continue
           }
@@ -5947,8 +5948,9 @@ class TransactionQueue {
             // any freshly exposed TXs will have a fair amount of time to be in consensus so
             // this should minimize the risk of OOS.
             if(timeSinceLastVoteMessage > configContext.stateManager.stuckTxRemoveTime2){
-              nestedCountersInstance.countEvent('txSafelyRemoved', `tx waiting for votes more than ${configContext.stateManager.stuckTxRemoveTime2 / 1000} seconds. state: ${queueEntry.state}`)
-              this.statemanager_fatal(`txSafelyRemoved`, `stuck in consensus. 2. waiting for votes. txid: ${shortID} state: ${queueEntry.state} age:${txAge} tx first vote seen ${timeSinceLastVoteMessage / 1000} seconds ago`)
+              nestedCountersInstance.countEvent('txSafelyRemoved', `stuck_in_consensus_2 tx waiting for votes more than ${configContext.stateManager.stuckTxRemoveTime2 / 1000} seconds. state: ${queueEntry.state}`)
+              this.statemanager_fatal(`txSafelyRemoved_2`, `stuck_in_consensus_2. waiting for votes. txid: ${shortID} state: ${queueEntry.state} age:${txAge} tx first vote seen ${timeSinceLastVoteMessage / 1000} seconds ago`)
+              if(logFlags.txCancel) this.statemanager_fatal(`txSafelyRemoved_2_dump`, `${this.getDebugQueueInfo(queueEntry)}`)
               this.removeFromQueue(queueEntry, currentIndex)
               continue
             }
@@ -5957,8 +5959,9 @@ class TransactionQueue {
           if (configContext.stateManager.removeStuckTxsFromQueue3 === true) {
             if (queueEntry.state === 'consensing' && txAge > configContext.stateManager.stuckTxRemoveTime3){
               const anyVotes = (queueEntry.lastVoteReceivedTimestamp > 0)
-              nestedCountersInstance.countEvent('txSafelyRemoved', `tx in consensus more than ${configContext.stateManager.stuckTxRemoveTime3 / 1000} seconds. state: ${queueEntry.state} has seen vote: ${anyVotes}`)
-              this.statemanager_fatal(`txSafelyRemoved`, `stuck in consensus. 3. txid: ${shortID} state: ${queueEntry.state} age:${txAge}`)
+              nestedCountersInstance.countEvent('txSafelyRemoved', `stuck_in_consensus_3 tx in consensus more than ${configContext.stateManager.stuckTxRemoveTime3 / 1000} seconds. state: ${queueEntry.state} has seen vote: ${anyVotes}`)
+              this.statemanager_fatal(`txSafelyRemoved_3`, `stuck_in_consensus_3. txid: ${shortID} state: ${queueEntry.state} age:${txAge}`)
+              if(logFlags.txCancel) this.statemanager_fatal(`txSafelyRemoved_3_dump`, `${this.getDebugQueueInfo(queueEntry)}`)
               this.removeFromQueue(queueEntry, currentIndex)
               continue
             }

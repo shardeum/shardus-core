@@ -275,6 +275,18 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
     const oldCounter = CycleChain.newest.counter
     for (const nextCycle of nextCycles) {
       //      CycleChain.validate(CycleChain.newest, newestCycle)
+
+
+      // for join v2, also get the standby node list hash
+      // if (config.p2p.useJoinProtocolV2) {
+      //   const standbyNodeListHash = JoinV2.computeNewStandbyListHash()
+      //   if(standbyNodeListHash !== nextCycle.standbyNodeListHash){
+      //     /* prettier-ignore */ error( `sync:digestCycle cycle: ${nextCycle.counter} standbyNodeListHash: ${standbyNodeListHash} nextCycle.standbyNodeListHash: ${nextCycle.standbyNodeListHash}` )
+      //     // [TODO] We can remove `source !== 'syncV2'` once we shut down ITN2
+      //     nextCycle.standbyNodeListHash = standbyNodeListHash
+      //   }
+      // }
+
       if (CycleChain.validate(CycleChain.newest, nextCycle)) {
         await digestCycle(nextCycle, 'syncNewCycles')
         info(`syncNewCycles: digested nextCycle=${nextCycle.counter}`)
@@ -321,11 +333,15 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
     // for join v2, also get the standby node list hash
     if (config.p2p.useJoinProtocolV2) {
       const standbyNodeListHash = JoinV2.computeNewStandbyListHash()
-      console.log(
-        `sync:digestCycle cycle: ${cycle.counter} standbyNodeListHash: ${standbyNodeListHash} cycle.standbyNodeListHash: ${cycle.standbyNodeListHash}`
-      )
+      /* prettier-ignore */ if (logFlags.important_as_error) info( `sync:digestCycle cycle: ${cycle.counter} standbyNodeListHash: ${standbyNodeListHash} cycle.standbyNodeListHash: ${cycle.standbyNodeListHash}` )
+      
       // [TODO] We can remove `source !== 'syncV2'` once we shut down ITN2
-      if (source !== 'syncV2') cycle.standbyNodeListHash = standbyNodeListHash
+      if (source !== 'syncV2'){
+        if( standbyNodeListHash !== cycle.standbyNodeListHash){
+          /* prettier-ignore */ if (logFlags.important_as_error) info( `sync:digestCycle cycle: patching standbylisthash ${cycle.counter} standbyNodeListHash: ${standbyNodeListHash} -> cycle.standbyNodeListHash: ${cycle.standbyNodeListHash}` )
+          cycle.standbyNodeListHash = standbyNodeListHash
+        }
+      }
     }
   }
 

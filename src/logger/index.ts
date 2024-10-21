@@ -111,6 +111,8 @@ export type LogFlags = {
   rotation: boolean // extra logging for the rotation system
   seqdiagram: boolean // logging for mermaid sequential diagrams
 
+  txCancel: boolean // extra logging for TXs that get canceled
+
   getLocalOrRemote: boolean // special logging for getLocalOrRemote
 }
 
@@ -148,6 +150,7 @@ export let logFlags: LogFlags = {
   lost: false,
   rotation: false,
   seqdiagram: false,
+  txCancel: false,
 
   getLocalOrRemote: false,
 }
