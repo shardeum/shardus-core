@@ -1769,6 +1769,7 @@ class StateManager {
           account_state_hash_after: {},
           note: '',
           success: false,
+          appReceiptData: null
         }
         try {
           const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cRequestTxAndStateReq)
@@ -1843,6 +1844,7 @@ class StateManager {
                 response.stateList.push(accountData)
               }
             }
+            response.appReceiptData = queueEntry.preApplyTXResult?.applyResponse?.appReceiptData
           }
           response.success = true
           /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state success: ${queueEntry.logID}  ${response.stateList.length}  ${Utils.safeStringify(response)}`)
@@ -1859,9 +1861,109 @@ class StateManager {
       },
     }
 
+    const requestTxAndStateBeforeBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+      name: InternalRouteEnum.binary_request_tx_and_state_before,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      handler: async (payload, respond, header, sign) => {
+        const route = InternalRouteEnum.binary_request_tx_and_state_before
+        nestedCountersInstance.countEvent('internal', route)
+        this.profiler.scopedProfileSectionStart(route, false, payload.length)
+        const errorHandler = (
+          errorType: RequestErrorEnum,
+          opts?: { customErrorLog?: string; customCounterSuffix?: string }
+        ): void => requestErrorHandler(route, errorType, header, opts)
+
+        let response: RequestTxResp = {
+          stateList: [],
+          account_state_hash_before: {},
+          account_state_hash_after: {},
+          note: '',
+          success: false,
+        }
+        try {
+          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cRequestTxAndStateReq)
+          if (!requestStream) {
+            errorHandler(RequestErrorEnum.InvalidRequest)
+            respond(response, serializeRequestTxAndStateResp)
+            return
+          }
+
+          const req: RequestTxAndStateReq = deserializeRequestTxAndStateReq(requestStream)
+
+          const txid = req.txid
+          const requestedAccountIds = req.accountIds
+
+          let queueEntry = this.transactionQueue.getQueueEntrySafe(txid)
+          if (queueEntry == null) {
+            queueEntry = this.transactionQueue.getQueueEntryArchived(txid, route)
+          }
+
+          if (queueEntry == null) {
+            response.note = `failed to find queue entry: ${utils.stringifyReduce(txid)} dbg:${
+              this.debugTXHistory[utils.stringifyReduce(txid)]
+            }`
+
+            if (logFlags.error) this.mainLogger.error(`${route} ${response.note}`)
+            respond(response, serializeRequestTxAndStateResp)
+            return
+          }
+
+          if (queueEntry.isInExecutionHome === false) {
+            response.note = `${route} not in execution group: ${utils.stringifyReduce(txid)}`
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(response.note)
+            respond(response, serializeRequestTxAndStateResp)
+            return
+          }
+
+          let receipt2 = this.getSignedReceipt(queueEntry)
+          if (receipt2 == null) {
+            response.note = `${route} does not have valid receipt2: ${utils.stringifyReduce(txid)}`
+            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(response.note)
+            respond(response, serializeRequestTxAndStateResp)
+            return
+          }
+
+          // we just need to send collected state
+          for (const accountId of requestedAccountIds) {
+            const beforeState = queueEntry.collectedData[accountId]
+            const index = receipt2.proposal.accountIDs.indexOf(accountId)
+            if (
+              beforeState &&
+              beforeState.stateId === receipt2.proposal.beforeStateHashes[index]
+            ) {
+              response.stateList.push(queueEntry.collectedData[accountId])
+            } else {
+              response.note = `has bad beforeStateAccount: ${utils.stringifyReduce(txid)} dbg:${
+                this.debugTXHistory[utils.stringifyReduce(txid)]
+              }`
+              if (logFlags.error) this.mainLogger.error(`${route} ${response.note}`)
+              respond(response, serializeRequestTxAndStateResp)
+              return
+            }
+          }
+          response.success = true
+          /* prettier-ignore */ if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state_before success: ${queueEntry.logID}  ${response.stateList.length}  ${Utils.safeStringify(response)}`)
+          respond(response, serializeRequestTxAndStateResp)
+        } catch (e) {
+          nestedCountersInstance.countEvent('internal', `${route}-exception`)
+          Context.logger
+            .getLogger('p2p')
+            .error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+          respond(response, serializeRequestTxAndStateResp)
+        } finally {
+          this.profiler.scopedProfileSectionEnd(route)
+        }
+      },
+    }
+
     this.p2p.registerInternalBinary(
       requestTxAndStateBinaryHandler.name,
       requestTxAndStateBinaryHandler.handler
+    )
+
+    this.p2p.registerInternalBinary(
+      requestTxAndStateBeforeBinaryHandler.name,
+      requestTxAndStateBeforeBinaryHandler.handler
     )
 
     // TODO STATESHARDING4 ENDPOINTS ok, I changed this to tell, but we still need to check sender!

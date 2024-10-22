@@ -887,6 +887,7 @@ export type RequestTxResp = {
   success: boolean
   acceptedTX?: Shardus.AcceptedTx
   originalData?: WrappedResponses
+  appReceiptData?: any
 }
 
 export type RequestReceiptForTxReq = { txid: string; timestamp: number }
@@ -918,6 +919,11 @@ export interface NonceQueueItem {
   appData: any
   global: boolean
   noConsensus: boolean
+}
+
+export interface RequestFinalDataResp {
+  appReceiptData: any
+  wrappedResponses: WrappedResponses
 }
 
 export type GlobalAccountReportResp = {
