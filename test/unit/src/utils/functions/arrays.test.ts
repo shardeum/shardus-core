@@ -1,10 +1,8 @@
 import { P2P } from '@shardus/types'
-import { linearInsertSorted, propComparator2 } from '../../../../../src/utils'
 import { nodeListFromStates } from '../../../../../src/p2p/Join'
-import * as NodeList from '../../../../../src/p2p/NodeList'
-import * as Self from '../../../../../src/p2p/Self'
+import { linearInsertSorted, propComparator2 } from '../../../../../src/utils'
 
-const intComparator = (a: number, b: number) => a - b
+const intComparator = (a: number, b: number): number => a - b
 
 describe('linearInsertSorted', () => {
   it('should insert an item into an empty array', () => {
