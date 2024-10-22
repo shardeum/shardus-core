@@ -7,6 +7,7 @@ import { nestedCountersInstance } from '../../../utils/nestedCounters'
 import { config } from '../../Context'
 import { P2P } from '@shardus/types'
 import { logFlags } from '../../../logger'
+import { isFirst } from '../../Self'
 
 //** List of synced nodes */
 export let newSyncFinishedNodes: Map<string, FinishedSyncingRequest> = new Map()
@@ -23,7 +24,6 @@ export interface FinishedSyncingRequestResponse {
 export function addFinishedSyncing(
   finishedSyncRequest: FinishedSyncingRequest
 ): FinishedSyncingRequestResponse {
-
   const node = NodeList.byIdOrder.find((node) => node.id === finishedSyncRequest.nodeId)
   // validate
   // lookup node by id in payload and use pubkey and compare to sig.owner
@@ -124,8 +124,20 @@ export function isNodeSelectedReadyList(nodeId: string): boolean {
 
 export function selectNodesFromReadyList(mode: string): P2P.NodeListTypes.Node[] {
   if (mode === 'processing') {
+    if (config.debug.readyNodeDelay > 0)
+      return NodeList.readyByTimeAndIdOrder
+        .slice(0, config.p2p.allowActivePerCycle)
+        .filter((node) => CycleChain.newest.start >= node.readyTimestamp + config.debug.readyNodeDelay)
+
     return NodeList.readyByTimeAndIdOrder.slice(0, config.p2p.allowActivePerCycle)
   } else {
+    if (mode === 'forming' && isFirst && NodeList.activeByIdOrder.length === 0) return NodeList.readyByTimeAndIdOrder
+    
+    if (config.debug.readyNodeDelay > 0)
+      return NodeList.readyByTimeAndIdOrder.filter(
+        (node) => CycleChain.newest.start >= node.readyTimestamp + config.debug.readyNodeDelay
+      )
+
     return NodeList.readyByTimeAndIdOrder
   }
 }

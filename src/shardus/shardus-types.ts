@@ -1089,6 +1089,12 @@ export interface ServerConfiguration {
     ignoreDataTellChance: number
     // flag to add bogus increments to NTP offset
     debugNTPBogusDecrements: boolean
+    /** config for the number of seconds we should delay sending the started syncing gossip */
+    startedSyncingDelay: number
+    /** config for the number of seconds we should delay sending the finished syncing gossip */
+    finishedSyncingDelay: number
+    /** config for the minimum number of seconds a node must be in the ready state */
+    readyNodeDelay: number
   }
   /** Options for the statistics module */
   statistics?: {
