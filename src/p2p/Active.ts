@@ -16,7 +16,7 @@ import { getSortedStandbyJoinRequests } from './Join/v2'
 import { selectNodesFromReadyList } from './Join/v2/syncFinished'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { Utils } from '@shardus/types'
-import { nodeListFromStates } from "./Join";
+import { nodelistFromStates } from "./Join"
 import { checkGossipPayload } from '../utils/GossipValidation'
 
 let syncTimes = []
@@ -46,7 +46,7 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
         payload,
         tracker,
         sender,
-        nodeListFromStates([
+        nodelistFromStates([
           P2P.P2PTypes.NodeStatus.ACTIVE,
           P2P.P2PTypes.NodeStatus.READY,
           P2P.P2PTypes.NodeStatus.SYNCING,
@@ -269,7 +269,7 @@ export function sendRequests() {
       activeTx,
       '',
       null,
-      nodeListFromStates([
+      nodelistFromStates([
         P2P.P2PTypes.NodeStatus.ACTIVE,
         P2P.P2PTypes.NodeStatus.READY,
         P2P.P2PTypes.NodeStatus.SYNCING,
