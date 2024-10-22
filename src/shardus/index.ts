@@ -1902,41 +1902,6 @@ class Shardus extends EventEmitter {
   addNetworkTx = ServiceQueue.addNetworkTx
   getLatestNetworkTxEntryForSubqueueKey = ServiceQueue.getLatestNetworkTxEntryForSubqueueKey
 
-  validateActiveNodeSignatures(
-    signedAppData: any,
-    signs: ShardusTypes.Sign[],
-    minRequired: number
-  ): { success: boolean; reason: string } {
-    // let validNodes = []
-    let appData = { ...signedAppData }
-    if (appData.signs) delete appData.signs
-    if (appData.sign) delete appData.sign
-
-    const validSigns = new Set<string>()
-    for (let i = 0; i < signs.length; i++) {
-      const sign = signs[i]
-      const nodePublicKey = sign.owner
-      appData.sign = sign // attach the node's sig for verification
-      const node = this.p2p.state.getNodeByPubKey(nodePublicKey)
-      const isValid = this.crypto.verify(appData, nodePublicKey)
-      if (node && isValid) {
-        validSigns.add(sign.sig)
-      }
-      // early break loop
-      if (validSigns.size >= minRequired) {
-        // if (validNodes.length >= minRequired) {
-        return {
-          success: true,
-          reason: `Validated by ${minRequired} valid nodes!`,
-        }
-      }
-    }
-    return {
-      success: false,
-      reason: `Fail to verify enough valid nodes signatures`,
-    }
-  }
-
   validateClosestActiveNodeSignatures(
     signedAppData: any,
     signs: ShardusTypes.Sign[],

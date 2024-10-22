@@ -77,7 +77,6 @@ export class P2P extends EventEmitter {
 
   robustQuery: any
   state: typeof state
-  archiver: typeof archiver
 
   constructor() {
     super()
@@ -283,32 +282,3 @@ function getSubsetOfNodeList(nodes, self = null) {
   delete nodesCopy[self]
   return Object.values(nodesCopy)
 }
-
-/*********************************************************************************/
-/* p2p.archiver functions */
-
-const http = require('../http')
-
-namespace archiver {
-  // copied from p2p-archiver.js
-  export function sendPartitionData(partitionReceipt, paritionObject) {
-    for (const nodeInfo of this.cycleRecipients) {
-      const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_partition`
-      http.post(nodeUrl, { partitionReceipt, paritionObject }).catch((err) => {
-        this.logError(`sendPartitionData: Failed to post to ${nodeUrl} ` + err)
-      })
-    }
-  }
-
-  // copied from p2p-archiver.js
-  export function sendTransactionData(partitionNumber, cycleNumber, transactions) {
-    for (const nodeInfo of this.cycleRecipients) {
-      const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_transactions`
-      http.post(nodeUrl, { partitionNumber, cycleNumber, transactions }).catch((err) => {
-        this.logError(`sendTransactionData: Failed to post to ${nodeUrl} ` + err)
-      })
-    }
-  }
-}
-
-p2p['archiver'] = archiver
