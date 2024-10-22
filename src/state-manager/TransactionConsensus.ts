@@ -551,73 +551,73 @@ class TransactionConsenus {
     //   }
     // )
 
-    const GetAppliedVoteBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
-      name: InternalRouteEnum.binary_get_applied_vote,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      handler: async (payload, respond, header, sign) => {
-        const route = InternalRouteEnum.binary_get_applied_vote
-        nestedCountersInstance.countEvent('internal', route)
-        this.profiler.scopedProfileSectionStart(route, false, payload.length)
-        const errorHandler = (
-          errorType: RequestErrorEnum,
-          opts?: { customErrorLog?: string; customCounterSuffix?: string }
-        ): void => requestErrorHandler(route, errorType, header, opts)
+    // const GetAppliedVoteBinaryHandler: Route<InternalBinaryHandler<Buffer>> = {
+    //   name: InternalRouteEnum.binary_get_applied_vote,
+    //   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    //   handler: async (payload, respond, header, sign) => {
+    //     const route = InternalRouteEnum.binary_get_applied_vote
+    //     nestedCountersInstance.countEvent('internal', route)
+    //     this.profiler.scopedProfileSectionStart(route, false, payload.length)
+    //     const errorHandler = (
+    //       errorType: RequestErrorEnum,
+    //       opts?: { customErrorLog?: string; customCounterSuffix?: string }
+    //     ): void => requestErrorHandler(route, errorType, header, opts)
 
-        try {
-          const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAppliedVoteReq)
-          if (!requestStream) {
-            errorHandler(RequestErrorEnum.InvalidRequestType)
-            return respond(BadRequest('invalid request stream'), serializeResponseError)
-          }
+    //     try {
+    //       const requestStream = getStreamWithTypeCheck(payload, TypeIdentifierEnum.cGetAppliedVoteReq)
+    //       if (!requestStream) {
+    //         errorHandler(RequestErrorEnum.InvalidRequestType)
+    //         return respond(BadRequest('invalid request stream'), serializeResponseError)
+    //       }
 
-          // verification data checks
-          if (header.verification_data == null) {
-            errorHandler(RequestErrorEnum.MissingVerificationData)
-            return respond(BadRequest('missing verification data'), serializeResponseError)
-          }
+    //       // verification data checks
+    //       if (header.verification_data == null) {
+    //         errorHandler(RequestErrorEnum.MissingVerificationData)
+    //         return respond(BadRequest('missing verification data'), serializeResponseError)
+    //       }
 
-          const txId = header.verification_data
-          let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId)
-          if (queueEntry == null) {
-            // check the archived queue entries
-            queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, route)
-          }
+    //       const txId = header.verification_data
+    //       let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(txId)
+    //       if (queueEntry == null) {
+    //         // check the archived queue entries
+    //         queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(txId, route)
+    //       }
 
-          if (queueEntry == null) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`${route} no queue entry for ${txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txId)]}`)
-            errorHandler(RequestErrorEnum.InvalidRequest)
-            return respond(NotFound('queue entry not found'), serializeResponseError)
-          }
+    //       if (queueEntry == null) {
+    //         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`${route} no queue entry for ${txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txId)]}`)
+    //         errorHandler(RequestErrorEnum.InvalidRequest)
+    //         return respond(NotFound('queue entry not found'), serializeResponseError)
+    //       }
 
-          const req = deserializeGetAppliedVoteReq(requestStream)
-          if (req.txId !== txId) {
-            errorHandler(RequestErrorEnum.InvalidPayload, { customErrorLog: 'txId mismatch' })
-            return respond(BadRequest('txId mismatch'), serializeResponseError)
-          }
+    //       const req = deserializeGetAppliedVoteReq(requestStream)
+    //       if (req.txId !== txId) {
+    //         errorHandler(RequestErrorEnum.InvalidPayload, { customErrorLog: 'txId mismatch' })
+    //         return respond(BadRequest('txId mismatch'), serializeResponseError)
+    //       }
 
-          if (queueEntry.receivedBestVote == null) {
-            /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`${route} no receivedBestVote for ${req.txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(req.txId)]}`)
-            return respond(NotFound('receivedBestVote not found'), serializeResponseError)
-          }
-          const appliedVote: GetAppliedVoteResp = {
-            txId,
-            appliedVote: queueEntry.receivedBestVote,
-            appliedVoteHash: queueEntry.receivedBestVoteHash
-              ? queueEntry.receivedBestVoteHash
-              : this.calculateVoteHash(queueEntry.receivedBestVote),
-          }
-          respond(appliedVote, serializeGetAppliedVoteResp)
-        } catch (e) {
-          nestedCountersInstance.countEvent('internal', `${route}-exception`)
-          this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
-          return respond(InternalError('exception executing request'), serializeResponseError)
-        } finally {
-          this.profiler.scopedProfileSectionEnd(route)
-        }
-      },
-    }
+    //       if (queueEntry.receivedBestVote == null) {
+    //         /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`${route} no receivedBestVote for ${req.txId} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(req.txId)]}`)
+    //         return respond(NotFound('receivedBestVote not found'), serializeResponseError)
+    //       }
+    //       const appliedVote: GetAppliedVoteResp = {
+    //         txId,
+    //         appliedVote: queueEntry.receivedBestVote,
+    //         appliedVoteHash: queueEntry.receivedBestVoteHash
+    //           ? queueEntry.receivedBestVoteHash
+    //           : this.calculateVoteHash(queueEntry.receivedBestVote),
+    //       }
+    //       respond(appliedVote, serializeGetAppliedVoteResp)
+    //     } catch (e) {
+    //       nestedCountersInstance.countEvent('internal', `${route}-exception`)
+    //       this.mainLogger.error(`${route}: Exception executing request: ${utils.errorToStringFull(e)}`)
+    //       return respond(InternalError('exception executing request'), serializeResponseError)
+    //     } finally {
+    //       this.profiler.scopedProfileSectionEnd(route)
+    //     }
+    //   },
+    // }
 
-    Comms.registerInternalBinary(GetAppliedVoteBinaryHandler.name, GetAppliedVoteBinaryHandler.handler)
+    // Comms.registerInternalBinary(GetAppliedVoteBinaryHandler.name, GetAppliedVoteBinaryHandler.handler)
 
     Comms.registerGossipHandler(
       'gossip-applied-vote',
