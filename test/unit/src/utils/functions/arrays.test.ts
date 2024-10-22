@@ -54,6 +54,7 @@ describe('linearInsertSorted', () => {
       activeTimestamp: 0,
       syncingTimestamp: 0,
       readyTimestamp: 5555551,
+      activeCycle: 1,
     },
     {
       id: '2',
@@ -71,6 +72,7 @@ describe('linearInsertSorted', () => {
       activeTimestamp: 0,
       syncingTimestamp: 0,
       readyTimestamp: 5555550,
+      activeCycle: 2,
     },
     {
       id: '3',
@@ -88,6 +90,7 @@ describe('linearInsertSorted', () => {
       activeTimestamp: 0,
       syncingTimestamp: 0,
       readyTimestamp: 5555550,
+      activeCycle: 3,
     },
     {
       id: '0',
@@ -105,6 +108,7 @@ describe('linearInsertSorted', () => {
       activeTimestamp: 0,
       syncingTimestamp: 0,
       readyTimestamp: 5555552,
+      activeCycle: 4,
     },
   ]
 
