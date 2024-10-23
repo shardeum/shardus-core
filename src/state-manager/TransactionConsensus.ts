@@ -620,147 +620,147 @@ class TransactionConsenus {
 
     Comms.registerInternalBinary(GetAppliedVoteBinaryHandler.name, GetAppliedVoteBinaryHandler.handler)
 
-    Comms.registerGossipHandler(
-      'gossip-applied-vote',
-      async (payload: AppliedVote, sender: string, tracker: string) => {
-        nestedCountersInstance.countEvent('consensus', 'gossip-applied-vote')
-        profilerInstance.scopedProfileSectionStart('gossip-applied-vote handler', true)
-        try {
-          const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${payload.txid} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:noTX`)
-            return
-          }
-          const newVote = payload as AppliedVote
-          const appendSuccessful = this.stateManager.transactionConsensus.tryAppendVote(queueEntry, newVote)
+    // Comms.registerGossipHandler(
+    //   'gossip-applied-vote',
+    //   async (payload: AppliedVote, sender: string, tracker: string) => {
+    //     nestedCountersInstance.countEvent('consensus', 'gossip-applied-vote')
+    //     profilerInstance.scopedProfileSectionStart('gossip-applied-vote handler', true)
+    //     try {
+    //       const queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${payload.txid} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:noTX`)
+    //         return
+    //       }
+    //       const newVote = payload as AppliedVote
+    //       const appendSuccessful = this.stateManager.transactionConsensus.tryAppendVote(queueEntry, newVote)
 
-          if (appendSuccessful) {
-            /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${payload.txid} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:appended`)
-            const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-            if (gossipGroup.length > 1) {
-              // should consider only forwarding in some cases?
-              this.stateManager.debugNodeGroup(
-                queueEntry.acceptedTx.txId,
-                queueEntry.acceptedTx.timestamp,
-                `share appliedVote to consensus nodes`,
-                gossipGroup
-              )
-              Comms.sendGossip(
-                'gossip-applied-vote',
-                newVote,
-                tracker,
-                null,
-                queueEntry.transactionGroup,
-                false,
-                -1,
-                queueEntry.acceptedTx.txId,
-                `${NodeList.activeIdToPartition.get(newVote.node_id)}`
-              )
-            }
-          }
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('gossip-applied-vote handler')
-        }
-      }
-    )
+    //       if (appendSuccessful) {
+    //         /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455103 ${shardusGetTime()} tx:${payload.txid} Note over ${NodeList.activeIdToPartition.get(Self.id)}: gossipHandlerAV:appended`)
+    //         const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+    //         if (gossipGroup.length > 1) {
+    //           // should consider only forwarding in some cases?
+    //           this.stateManager.debugNodeGroup(
+    //             queueEntry.acceptedTx.txId,
+    //             queueEntry.acceptedTx.timestamp,
+    //             `share appliedVote to consensus nodes`,
+    //             gossipGroup
+    //           )
+    //           Comms.sendGossip(
+    //             'gossip-applied-vote',
+    //             newVote,
+    //             tracker,
+    //             null,
+    //             queueEntry.transactionGroup,
+    //             false,
+    //             -1,
+    //             queueEntry.acceptedTx.txId,
+    //             `${NodeList.activeIdToPartition.get(newVote.node_id)}`
+    //           )
+    //         }
+    //       }
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('gossip-applied-vote handler')
+    //     }
+    //   }
+    // )
 
-    this.p2p.registerGossipHandler(
-      'spread_appliedReceipt',
-      async (
-        payload: {
-          txid: string
-          result?: boolean
-          appliedVotes?: AppliedVote[]
-          app_data_hash?: string
-        },
-        tracker: string,
-        msgSize: number
-      ) => {
-        nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt')
-        profilerInstance.scopedProfileSectionStart('spread_appliedReceipt', false, msgSize)
-        let respondSize = cUninitializedSize
-        try {
-          const appliedReceipt = payload as AppliedReceipt
-          let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
-          if (queueEntry == null) {
-            if (queueEntry == null) {
-              // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
-              queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
-                payload.txid as string,
-                'spread_appliedReceipt'
-              ) // , payload.timestamp)
-              if (queueEntry != null) {
-                // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
-                // would need to make sure we send gossip though.
-              }
-            }
-            if (queueEntry == null) {
-              /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
-              // NEW start repair process that will find the TX then apply repairs
-              // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(appliedReceipt)
-              return
-            }
-          }
+    // this.p2p.registerGossipHandler(
+    //   'spread_appliedReceipt',
+    //   async (
+    //     payload: {
+    //       txid: string
+    //       result?: boolean
+    //       appliedVotes?: AppliedVote[]
+    //       app_data_hash?: string
+    //     },
+    //     tracker: string,
+    //     msgSize: number
+    //   ) => {
+    //     nestedCountersInstance.countEvent('consensus', 'spread_appliedReceipt')
+    //     profilerInstance.scopedProfileSectionStart('spread_appliedReceipt', false, msgSize)
+    //     let respondSize = cUninitializedSize
+    //     try {
+    //       const appliedReceipt = payload as AppliedReceipt
+    //       let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
+    //       if (queueEntry == null) {
+    //         if (queueEntry == null) {
+    //           // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
+    //           queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(
+    //             payload.txid as string,
+    //             'spread_appliedReceipt'
+    //           ) // , payload.timestamp)
+    //           if (queueEntry != null) {
+    //             // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
+    //             // would need to make sure we send gossip though.
+    //           }
+    //         }
+    //         if (queueEntry == null) {
+    //           /* prettier-ignore */ if (logFlags.error) this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
+    //           // NEW start repair process that will find the TX then apply repairs
+    //           // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(appliedReceipt)
+    //           return
+    //         }
+    //       }
 
-          if (
-            this.stateManager.testFailChance(
-              this.stateManager.ignoreRecieptChance,
-              'spread_appliedReceipt',
-              utils.stringifyReduce(appliedReceipt.txid),
-              '',
-              logFlags.verbose
-            ) === true
-          ) {
-            return
-          }
+    //       if (
+    //         this.stateManager.testFailChance(
+    //           this.stateManager.ignoreRecieptChance,
+    //           'spread_appliedReceipt',
+    //           utils.stringifyReduce(appliedReceipt.txid),
+    //           '',
+    //           logFlags.verbose
+    //         ) === true
+    //       ) {
+    //         return
+    //       }
 
-          // TODO STATESHARDING4 ENDPOINTS check payload format
-          // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
+    //       // TODO STATESHARDING4 ENDPOINTS check payload format
+    //       // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
 
-          const receiptNotNull = appliedReceipt != null
+    //       const receiptNotNull = appliedReceipt != null
 
-          if (queueEntry.gossipedReceipt === false) {
-            queueEntry.gossipedReceipt = true
-            /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
+    //       if (queueEntry.gossipedReceipt === false) {
+    //         queueEntry.gossipedReceipt = true
+    //         /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
 
-            if (queueEntry.archived === false) {
-              queueEntry.recievedAppliedReceipt = appliedReceipt
-            }
+    //         if (queueEntry.archived === false) {
+    //           queueEntry.recievedAppliedReceipt = appliedReceipt
+    //         }
 
-            // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
+    //         // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
 
-            // share the appliedReceipt.
-            const sender = null
-            const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-            if (gossipGroup.length > 1) {
-              // should consider only forwarding in some cases?
-              this.stateManager.debugNodeGroup(
-                queueEntry.acceptedTx.txId,
-                queueEntry.acceptedTx.timestamp,
-                `share appliedReceipt to neighbors`,
-                gossipGroup
-              )
-              //no await so we cant get the message out size in a reasonable way
-              respondSize = await this.p2p.sendGossipIn(
-                'spread_appliedReceipt',
-                appliedReceipt,
-                tracker,
-                sender,
-                gossipGroup,
-                false,
-                -1,
-                queueEntry.acceptedTx.txId
-              )
-            }
-          } else {
-            // we get here if the receipt has already been shared
-            /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared`)
-          }
-        } finally {
-          profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt', respondSize)
-        }
-      }
-    )
+    //         // share the appliedReceipt.
+    //         const sender = null
+    //         const gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+    //         if (gossipGroup.length > 1) {
+    //           // should consider only forwarding in some cases?
+    //           this.stateManager.debugNodeGroup(
+    //             queueEntry.acceptedTx.txId,
+    //             queueEntry.acceptedTx.timestamp,
+    //             `share appliedReceipt to neighbors`,
+    //             gossipGroup
+    //           )
+    //           //no await so we cant get the message out size in a reasonable way
+    //           respondSize = await this.p2p.sendGossipIn(
+    //             'spread_appliedReceipt',
+    //             appliedReceipt,
+    //             tracker,
+    //             sender,
+    //             gossipGroup,
+    //             false,
+    //             -1,
+    //             queueEntry.acceptedTx.txId
+    //           )
+    //         }
+    //       } else {
+    //         // we get here if the receipt has already been shared
+    //         /* prettier-ignore */ if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared`)
+    //       }
+    //     } finally {
+    //       profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt', respondSize)
+    //     }
+    //   }
+    // )
 
     // DEPRECATED AFTER POQO
     // this.p2p.registerGossipHandler(
