@@ -353,7 +353,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
       /* prettier-ignore */ if (logFlags.important_as_error) info( `sync:digestCycle source: ${source} cycle: ${cycle.counter} standbyNodeListHash: ${standbyNodeListHash} cycle.standbyNodeListHash: ${cycle.standbyNodeListHash}` )
       
       // [TODO] We can remove `source !== 'syncV2'` once we shut down ITN2
-      if (source !== 'syncV2'){
+      if (source !== ''){
         if( standbyNodeListHash !== cycle.standbyNodeListHash){
           /* prettier-ignore */ if (logFlags.important_as_error) info( `sync:digestCycle cycle: patching standbylisthash ${cycle.counter} standbyNodeListHash: ${standbyNodeListHash} -> cycle.standbyNodeListHash: ${cycle.standbyNodeListHash}` )
           cycle.standbyNodeListHash = standbyNodeListHash
