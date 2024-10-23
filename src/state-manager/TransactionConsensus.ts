@@ -90,6 +90,7 @@ import { deserializePoqoDataAndReceiptResp } from '../types/PoqoDataAndReceiptRe
 import { deserializePoqoSendVoteReq, serializePoqoSendVoteReq } from '../types/PoqoSendVoteReq'
 import { RequestReceiptForTxReqSerialized, serializeRequestReceiptForTxReq } from '../types/RequestReceiptForTxReq'
 import { RequestReceiptForTxRespSerialized, deserializeRequestReceiptForTxResp } from '../types/RequestReceiptForTxResp'
+import { removeDuplicateSignatures } from '../utils/functions/signs'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -1714,44 +1715,47 @@ class TransactionConsenus {
   verifyAppliedReceipt(receipt: SignedReceipt, executionGroupNodes: Set<string>): boolean {
     if (!receipt.sign) {
       // Missing final sign by aggregator
-      return false;
+      return false
     }
 
-    if(!executionGroupNodes.has(receipt.sign.owner)) {
+    if (!executionGroupNodes.has(receipt.sign.owner)) {
       // aggregator not in execution group
       return false
     }
 
     if (!this.crypto.verify(receipt as SignedObject, receipt.sign.owner)) {
       // Final aggregator sign is invalid
-      return false;
+      return false
     }
+
+    // Remove duplicates signatures
+    receipt.signaturePack = removeDuplicateSignatures(receipt.signaturePack)
 
     if (receipt.signaturePack.length !== receipt.voteOffsets.length) {
       // Invalid receipt
       return false
     }
 
-    let validSignatures = 0;
+    let validSignatures = 0
     const appliedVoteHash: AppliedVoteHash = {
       txid: receipt.proposal.txid,
       voteHash: receipt.proposalHash,
-      voteTime: 0
+      voteTime: 0,
     }
 
     for (let i = 0; i < receipt.signaturePack.length; i++) {
       const sign = receipt.signaturePack[i]
       if (!executionGroupNodes.has(sign.owner)) continue
       appliedVoteHash.voteTime = receipt.voteOffsets[i]
-      const signedObject = { ...appliedVoteHash, sign };
+      const signedObject = { ...appliedVoteHash, sign }
       if (this.crypto.verify(signedObject, sign.owner)) {
-        validSignatures++;
+        validSignatures++
       }
     }
 
-    const totalNodes = executionGroupNodes.size;
+    const totalNodes = executionGroupNodes.size
     const requiredMajority = Math.ceil(totalNodes * this.config.p2p.requiredVotesPercentage)
-    return validSignatures >= requiredMajority;
+    return validSignatures >= requiredMajority
   }
 
   async poqoVoteSendLoop(queueEntry: QueueEntry, appliedVoteHash: AppliedVoteHash): Promise<void> {

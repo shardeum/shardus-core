@@ -74,6 +74,9 @@ describe('CompareCert Serialization and Deserialization', () => {
       lostArchivers: [],
       refutedArchivers: [],
       removedArchivers: [],
+      txlisthash: '',
+      txadd: [],
+      txremove: [],
     },
   }
 
