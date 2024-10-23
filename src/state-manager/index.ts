@@ -3012,6 +3012,15 @@ class StateManager {
     return uniqueNodes
   }
 
+  checkCycleShardData(tag: string): boolean {
+    if (this.currentCycleShardData == null) {
+      nestedCountersInstance.countEvent('stateManager', `checkCycleShardData: currentCycleShardData == null for eventType ${tag}`)
+      this.mainLogger.error(`checkCycleShardData: currentCycleShardData == null for eventType ${tag}`)
+      return false
+    }
+    return true
+  }
+
   _distanceSortAsc(a: SimpleDistanceObject, b: SimpleDistanceObject) {
     if (a.distance === b.distance) {
       return 0

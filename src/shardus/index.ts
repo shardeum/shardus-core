@@ -1874,6 +1874,10 @@ class Shardus extends EventEmitter {
     return this.stateManager.getClosestNodes(hash, count, selfExclude).map((node) => node.id)
   }
 
+  checkCycleShardData(tag: string): boolean {
+    return this.stateManager.checkCycleShardData(tag)
+  }
+
   getClosestNodesGlobal(hash, count) {
     return this.stateManager.getClosestNodesGlobal(hash, count)
   }
