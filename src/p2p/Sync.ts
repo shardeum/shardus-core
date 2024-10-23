@@ -258,6 +258,7 @@ type SyncNode = Partial<
 >
 
 export async function syncNewCycles(activeNodes: SyncNode[]) {
+  info('syncNewCycles: inside')
   let newestCycle = await getNewestCycle(activeNodes)
   info(`syncNewCycles: myNewest=${CycleChain.newest.counter} netNewest=${newestCycle.counter}`)
 
@@ -267,13 +268,19 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
   let attempt = 0
 
   while (CycleChain.newest.counter < newestCycle.counter) {
+    info('syncNewCycles: attempt ', attempt)
+    info('syncNewCycles: progress ', progress)
     const nextCycles = await getCycles(
       activeNodes,
       CycleChain.newest.counter + 1 // [DONE] maybe we should +1 so that we don't get the record we already have
     )
 
+    info(`syncNewCycles: `, nextCycles)
+
     const oldCounter = CycleChain.newest.counter
+    info(`syncNewCycles: oldCounter=${oldCounter}`)
     for (const nextCycle of nextCycles) {
+      info(`syncNewCycles: nextCycle=${nextCycle.counter}`)
       //      CycleChain.validate(CycleChain.newest, newestCycle)
 
 
@@ -288,7 +295,10 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
       // }
 
       if (CycleChain.validate(CycleChain.newest, nextCycle)) {
+        info(`syncNewCycles: before digesting nextCycle=${nextCycle.counter}`)
+        info(`syncNewCycles: before nextCycle.standbyNodeListHash: ${nextCycle.standbyNodeListHash}`)
         await digestCycle(nextCycle, 'syncNewCycles')
+        info(`syncNewCycles: after nextCycle.standbyNodeListHash: ${nextCycle.standbyNodeListHash}`)
         info(`syncNewCycles: digested nextCycle=${nextCycle.counter}`)
       } else {
         /* prettier-ignore */ error(
@@ -308,6 +318,11 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
     }
     const newCounter = CycleChain.newest.counter
 
+    // There seems to be a bug in the below logic. it will return early on the first
+    // attempt if there is no progress, but the log says we tried progressHistory
+    // number of times. we'd need to add a condtion that checks if attempt is >=
+    // than progressHistory before returning.
+
     // Check progress history and number of attempts to stop tight loops
     progress[attempt % progressHistory] = newCounter - oldCounter
     if (progress.reduce((prev, curr) => prev + curr, 0) <= 0) {
@@ -321,6 +336,7 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
 
     attempt++
     newestCycle = await getNewestCycle(activeNodes)
+    info(`syncNewCycles: new counter of newestCycle=${newestCycle.counter}`)
   }
 }
 
@@ -333,7 +349,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
     // for join v2, also get the standby node list hash
     if (config.p2p.useJoinProtocolV2) {
       const standbyNodeListHash = JoinV2.computeNewStandbyListHash()
-      /* prettier-ignore */ if (logFlags.important_as_error) info( `sync:digestCycle cycle: ${cycle.counter} standbyNodeListHash: ${standbyNodeListHash} cycle.standbyNodeListHash: ${cycle.standbyNodeListHash}` )
+      /* prettier-ignore */ if (logFlags.important_as_error) info( `sync:digestCycle source: ${source} cycle: ${cycle.counter} standbyNodeListHash: ${standbyNodeListHash} cycle.standbyNodeListHash: ${cycle.standbyNodeListHash}` )
       
       // [TODO] We can remove `source !== 'syncV2'` once we shut down ITN2
       if (source !== 'syncV2'){

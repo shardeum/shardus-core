@@ -28,6 +28,7 @@ import { digestCycle } from '../Sync'
 import { JoinRequest } from '@shardus/types/build/src/p2p/JoinTypes'
 import { addStandbyJoinRequests } from '../Join/v2'
 import { logFlags } from '../../logger'
+import { makeCycleMarker } from '../CycleCreator'
 
 /** Initializes logging and endpoints for Sync V2. */
 export function init(): void {
@@ -88,7 +89,20 @@ export function syncV2(activeNodes: P2P.SyncTypes.ActiveNode[]): ResultAsync<voi
 
             // add latest cycle
             CycleChain.reset()
+
+            console.log('syncV2: cycle.marker ', makeCycleMarker(cycle))
+            console.log('syncV2: nodelist hash ', cycle.nodeListHash)
+            console.log('syncV2: archiverList hash ', cycle.archiverListHash)
+            console.log('syncV2: standbyNodeList hash ', cycle.standbyNodeListHash)
+            console.log('syncV2: cycle ', cycle)
+
             digestCycle(cycle, 'syncV2')
+
+            console.log('syncV2: CycleChain.newest.marker ', makeCycleMarker(CycleChain.newest))
+            console.log('syncV2: nodelist hash ', CycleChain.newest.nodeListHash)
+            console.log('syncV2: archiverList hash ', CycleChain.newest.archiverListHash)
+            console.log('syncV2: standbyNodeList hash ', CycleChain.newest.standbyNodeListHash)
+            console.log('syncV2: CycleChain.newest ', CycleChain.newest)
 
             return okAsync(void 0)
           })
