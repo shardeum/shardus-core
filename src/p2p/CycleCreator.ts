@@ -525,7 +525,8 @@ async function runQ1() {
   // Tell submodules to sign and send their requests
   if (logFlags.p2pNonFatal) info('Triggering submodules to send requests...')
   for (const submodule of submodules) submodule.sendRequests()
-
+  // clear the inactive data recipient archivers
+  Archivers.clearInactiveDataRecipients()
   profilerInstance.profileSectionEnd('CycleCreator-runQ1')
 }
 

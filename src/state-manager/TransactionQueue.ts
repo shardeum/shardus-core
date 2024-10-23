@@ -7709,7 +7709,7 @@ class TransactionQueue {
   }
 
   resetReceiptsToForward(): void {
-    const MAX_RECEIPT_AGE_MS = 25000 // 25s
+    const MAX_RECEIPT_AGE_MS = 15000 // 15 seconds
     const now = shardusGetTime()
     // Clear receipts that are older than MAX_RECEIPT_AGE_MS
     for (const [key] of this.forwardedReceiptsByTimestamp) {
