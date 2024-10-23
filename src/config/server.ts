@@ -330,7 +330,12 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     maxCyclesShardDataToKeep: 20,
     avoidOurIndexInFactTell: false, //initial testing shows this may cause issues so leaving it off for now
   },
-  sharding: { nodesPerConsensusGroup: 5, nodesPerEdge: 2, executeInOneShard: false },
+  sharding: {
+    nodesPerConsensusGroup: 5,
+    nodesPerEdge: 2,
+    executeInOneShard: false,
+    minNodesPerConsensusGroup: 32,
+  },
   mode: ServerMode.Release,
   features: {
     dappFeature1enabled: false,

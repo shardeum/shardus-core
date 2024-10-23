@@ -1316,6 +1316,8 @@ export interface ServerConfiguration {
     nodesPerEdge?: number
     /** Sets if the execute in one shard feature is active */
     executeInOneShard?: boolean
+    /** Sets the minimum value that can be used to maintain the count for minimum number of nodes that should be in a consensus group at any point of time */
+    minNodesPerConsensusGroup?: number
   }
   /** Options for enabling features on the network at specific versions */
   features?: {

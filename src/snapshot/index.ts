@@ -397,7 +397,6 @@ export async function safetySync() {
         )
     })
   })
-
   // Figure out which nodes hold which partitions in the new network
   const shardGlobals = ShardFunctions.calculateShardGlobals(
     safetyNum,
