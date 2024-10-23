@@ -302,9 +302,9 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
         info(`syncNewCycles: digested nextCycle=${nextCycle.counter}`)
       } else {
         /* prettier-ignore */ error(
-          `syncNewCycles: next record does not fit with prev record.\nnext: ${Utils.safeStringify(
+          `syncNewCycles: next record does not fit with prev record.\nprev: ${Utils.safeStringify(
             CycleChain.newest
-          )}\nprev: ${Utils.safeStringify(newestCycle)}`
+          )}\nnext: ${Utils.safeStringify(newestCycle)}`
         )
 
         //20230730: comment below is from 3 years ago, is it something that needs to be handled.
@@ -326,7 +326,7 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
     // Check progress history and number of attempts to stop tight loops
     progress[attempt % progressHistory] = newCounter - oldCounter
     if (progress.reduce((prev, curr) => prev + curr, 0) <= 0) {
-      warn(`syncNewCycles: no progress in the last ${progressHistory} attempts`)
+      warn(`syncNewCycles: no progress in the last ${progressHistory} attempts, in reality, on attempt ${attempt}`)
       return
     }
     if (attempt >= maxAttempts - 1) {
@@ -341,6 +341,7 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
 }
 
 export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: string) {
+  info(`digestCycle: c${CycleCreator.currentCycle}q${currentQuarter} marker of cycle${cycle.counter} from ${source} before digest is ${CycleChain.computeCycleMarker(cycle)}`)
   // get the node list hashes *before* applying node changes
   if (config.p2p.useSyncProtocolV2 || config.p2p.writeSyncProtocolV2) {
     cycle.nodeListHash = NodeList.computeNewNodeListHash()
@@ -419,6 +420,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord, source: st
   }
 
   CycleChain.append(cycle)
+  info(`digestCycle: marker of cycle${cycle.counter} from ${source} after digest is ${CycleChain.computeCycleMarker(cycle)}`)
 
   // TODO: This seems like a possible location to inetvene if our node
   // is getting far behind on what it thinks the current cycle is
