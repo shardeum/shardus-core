@@ -7881,19 +7881,16 @@ class TransactionQueue {
             )}, asking node: ${nodeToAsk.id} ${nodeToAsk.externalPort} at timestamp ${shardusGetTime()}`
           )
 
-        let response
-        if (this.config.p2p.useBinarySerializedEndpoints && this.config.p2p.requestTxAndStateBinary) {
-          const requestMessage = message as RequestTxAndStateReq
-        /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(nodeToAsk.id)}: ${'request_tx_and_state'}`)
-          response = await Comms.askBinary<RequestTxAndStateReq, RequestTxAndStateResp>(
-            nodeToAsk,
-            InternalRouteEnum.binary_request_tx_and_state_before,
-            requestMessage,
-            serializeRequestTxAndStateReq,
-            deserializeRequestTxAndStateResp,
-            {}
-          )
-        } else response = await Comms.ask(nodeToAsk, 'request_tx_and_state_before', message)
+        const requestMessage = message as RequestTxAndStateReq
+      /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(nodeToAsk.id)}: ${'request_tx_and_state'}`)
+        const response = await Comms.askBinary<RequestTxAndStateReq, RequestTxAndStateResp>(
+          nodeToAsk,
+          InternalRouteEnum.binary_request_tx_and_state_before,
+          requestMessage,
+          serializeRequestTxAndStateReq,
+          deserializeRequestTxAndStateResp,
+          {}
+        )
 
         if (response && response.stateList && response.stateList.length === accountIds.length) {
           this.mainLogger.debug(`requestInitialData: txid: ${queueEntry.logID} received data for ${response.stateList.length} accounts`)
