@@ -46,7 +46,8 @@ import {
   ArchiverReceipt,
   NonceQueueItem,
   SignedReceipt,
-  Proposal
+  Proposal,
+  RequestFinalDataResp
 } from './state-manager-types'
 import { isInternalTxAllowed, networkMode } from '../p2p/Modes'
 import { Node } from '@shardus/types/build/src/p2p/NodeListTypes'
@@ -99,6 +100,7 @@ import { BadRequest, ResponseError, serializeResponseError } from '../types/Resp
 import { error } from 'console'
 import { PoqoDataAndReceiptReq, serializePoqoDataAndReceiptReq } from '../types/PoqoDataAndReceiptReq'
 import { AJVSchemaEnum } from '../types/enum/AJVSchemaEnum'
+import { getGlobalTxReceipt } from '../p2p/GlobalAccounts'
 
 interface Receipt {
   tx: AcceptedTx
@@ -1007,7 +1009,7 @@ class TransactionQueue {
             }
             if (!queueEntry) return res.status(400).json({ success: false, reason: 'Receipt Not Found.' })
             if (full_receipt) {
-              const fullReceipt: ArchiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
+              const fullReceipt: ArchiverReceipt = await this.getArchiverReceiptFromQueueEntry(queueEntry)
               if (fullReceipt === null) return res.status(400).json({ success: false, reason: 'Receipt Not Found.' })
               result = Utils.safeJsonParse(Utils.safeStringify({ success: true, receipt: fullReceipt }))
             } else {
@@ -7497,23 +7499,43 @@ class TransactionQueue {
     // this.updateTxState(queueEntry, 'almostExpired')
     queueEntry.almostExpired = true
 
-    /* prettier-ignore */ nestedCountersInstance.countEvent( 'txAlmostExpired', `tx: ${this.app.getSimpleTxDebugValue(queueEntry.acceptedTx?.data)}` )
+    /* prettier-ignore */
+    nestedCountersInstance.countEvent("txAlmostExpired", `tx: ${this.app.getSimpleTxDebugValue(queueEntry.acceptedTx?.data)}`)
   }
 
-  getArchiverReceiptFromQueueEntry(queueEntry: QueueEntry): ArchiverReceipt | null {
+  async getArchiverReceiptFromQueueEntry(queueEntry: QueueEntry): Promise<ArchiverReceipt> {
     if (!queueEntry.preApplyTXResult || !queueEntry.preApplyTXResult.applyResponse)
       return null as ArchiverReceipt
+
+    const txId = queueEntry.acceptedTx.txId
+    const timestamp = queueEntry.acceptedTx.timestamp
+    const globalModification = queueEntry.globalModification
+
+    let signedReceipt = null as SignedReceipt | P2PTypes.GlobalAccountsTypes.GlobalTxReceipt
+    let executionShardKey: string 
+    if (globalModification) {
+      signedReceipt = getGlobalTxReceipt(queueEntry.acceptedTx.txId) as P2PTypes.GlobalAccountsTypes.GlobalTxReceipt
+      executionShardKey = signedReceipt.tx.source
+    } else {
+      signedReceipt = this.stateManager.getSignedReceipt(queueEntry) as SignedReceipt
+      executionShardKey = queueEntry.executionShardKey
+    }
+    if (!signedReceipt) {
+      nestedCountersInstance.countEvent("stateManager", "getArchiverReceiptFromQueueEntry no signedReceipt")
+      console.log(`getArchiverReceiptFromQueueEntry: signedReceipt is null for txId: ${txId} timestamp: ${timestamp} globalModification: ${globalModification}`)
+      return null as ArchiverReceipt
+    }
 
     const accountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
     const beforeAccountsToAdd: { [accountId: string]: Shardus.AccountsCopy } = {}
 
-    if (this.config.stateManager.includeBeforeStatesInReceipts) {
-      for (const account of Object.values(queueEntry.collectedData)) {
-        if (
-          typeof this.app.beforeStateAccountFilter !== 'function' ||
-          this.app.beforeStateAccountFilter(account)
-        ) {
-          const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(account.accountId)
+    if (globalModification) {
+      signedReceipt = signedReceipt as P2PTypes.GlobalAccountsTypes.GlobalTxReceipt
+      if (signedReceipt.tx && signedReceipt.tx.addressHash != '' && !beforeAccountsToAdd[signedReceipt.tx.address]) {
+        console.log(queueEntry.collectedData[signedReceipt.tx.address].stateId, signedReceipt.tx.addressHash)
+        if (queueEntry.collectedData[signedReceipt.tx.address].stateId === signedReceipt.tx.addressHash) {
+          const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(signedReceipt.tx.addressHash)
+          const account = queueEntry.collectedData[signedReceipt.tx.address]
           const accountCopy = {
             accountId: account.accountId,
             data: account.data,
@@ -7522,33 +7544,135 @@ class TransactionQueue {
             isGlobal,
           } as Shardus.AccountsCopy
           beforeAccountsToAdd[account.accountId] = accountCopy
+        } else {
+          console.log(`getArchiverReceiptFromQueueEntry: before stateId does not match addressHash for txId: ${txId} timestamp: ${timestamp} globalModification: ${globalModification}`)
+        }
+      }
+    } else if (this.config.stateManager.includeBeforeStatesInReceipts) {
+      // simulate debug case
+      if (configContext.mode === 'debug' && configContext.debug.beforeStateFailChance > Math.random()) {
+        for (const accountId in queueEntry.collectedData) {
+          const account = queueEntry.collectedData[accountId]
+          account.stateId = 'debugFail2'
+        }
+      }
+
+      const fileredBeforeStateToSend = []
+      const badBeforeStateAccounts = []
+
+      for (const account of Object.values(queueEntry.collectedData)) {
+        if (
+          typeof this.app.beforeStateAccountFilter !== 'function' ||
+          this.app.beforeStateAccountFilter(account)
+        ) {
+          fileredBeforeStateToSend.push(account.accountId)
+        }
+      }
+
+      // prepare before state accounts
+      for (const accountId of fileredBeforeStateToSend) {
+        signedReceipt = signedReceipt as SignedReceipt
+        // check if our beforeState account hash is the same as the vote in the receipt2
+        const index = signedReceipt.proposal.accountIDs.indexOf(accountId)
+        if (index === -1) continue
+        const account = queueEntry.collectedData[accountId]
+        if (account == null) {
+          badBeforeStateAccounts.push(accountId)
+          continue
+        }
+        if (account.stateId !== signedReceipt.proposal.beforeStateHashes[index]) {
+          badBeforeStateAccounts.push(accountId)
+        }
+      }
+
+      if (badBeforeStateAccounts.length > 0) {
+        nestedCountersInstance.countEvent('stateManager', 'badBeforeStateAccounts in getArchiverReceiptFromQueueEntry', badBeforeStateAccounts.length)
+
+        // repair bad before state accounts
+        const wrappedResponses: WrappedResponses = await this.requestInitialData(queueEntry, badBeforeStateAccounts)
+        for (const accountId in wrappedResponses) {
+          queueEntry.collectedData[accountId] = wrappedResponses[accountId]
+        }
+      }
+
+      // add before state accounts
+      for (const accountId of fileredBeforeStateToSend) {
+        const account = queueEntry.collectedData[accountId]
+        const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(account.accountId)
+        const accountCopy = {
+          accountId: account.accountId,
+          data: account.data,
+          hash: account.stateId,
+          timestamp: account.timestamp,
+          isGlobal,
+        } as Shardus.AccountsCopy
+        beforeAccountsToAdd[account.accountId] = accountCopy
+      }
+    }
+
+    let isAccountsMatchWithReceipt2 = true
+    const accountWrites = queueEntry.preApplyTXResult?.applyResponse?.accountWrites
+
+    if (globalModification) {
+      if (accountWrites === null || accountWrites.length === 0) {
+        console.log('No account update in global Modification tx', txId, timestamp)
+      }
+    } else if (accountWrites != null && accountWrites.length === (signedReceipt as SignedReceipt).proposal.accountIDs.length) {
+      signedReceipt = signedReceipt as SignedReceipt
+      for (const account of accountWrites) {
+        const indexInVote = signedReceipt.proposal.accountIDs.indexOf(account.accountId)
+        if (signedReceipt.proposal.afterStateHashes[indexInVote] !== account.data.stateId) {
+          // console.log('Found afterStateHash mismatch', account.accountId, receipt2.proposal.afterStateHashes[indexInVote], account.data.stateId)
+          isAccountsMatchWithReceipt2 = false
+          break
+        }
+      }
+    } else {
+      isAccountsMatchWithReceipt2 = false
+    }
+
+    let finalAccounts = []
+    let appReceiptData = queueEntry.preApplyTXResult?.applyResponse?.appReceiptData || null
+    if (isAccountsMatchWithReceipt2) {
+      finalAccounts = accountWrites
+    } else {
+      signedReceipt = signedReceipt as SignedReceipt
+      // request the final accounts and appReceiptData
+      let success = false
+      let count = 0
+      const maxRetry = 3
+      const nodesToAskKeys = signedReceipt.signaturePack?.map((signature) => signature.owner)
+
+      // retry 3 times if the request fails
+      while (success === false && count < maxRetry) {
+        count++
+        const requestedData = await this.requestFinalData(queueEntry, signedReceipt.proposal.accountIDs, nodesToAskKeys, true)
+        if (requestedData && requestedData.wrappedResponses && requestedData.appReceiptData) {
+          success = true
+          for (const accountId in requestedData.wrappedResponses) {
+            finalAccounts.push(requestedData.wrappedResponses[accountId])
+          }
+          appReceiptData = requestedData.appReceiptData
         }
       }
     }
 
-    // override with the accouns in accountWrites
-    if (
-      queueEntry.preApplyTXResult.applyResponse.accountWrites != null &&
-      queueEntry.preApplyTXResult.applyResponse.accountWrites.length > 0
-    ) {
-      for (const account of queueEntry.preApplyTXResult.applyResponse.accountWrites) {
-        const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(account.accountId)
-        const accountCopy = {
-          accountId: account.accountId,
-          data: account.data.data,
-          timestamp: account.timestamp,
-          hash: account.data.stateId,
-          isGlobal,
-        } as Shardus.AccountsCopy
-        accountsToAdd[account.accountId] = accountCopy
-      }
+    // override with the accounts in accountWrites
+    for (const account of finalAccounts) {
+      const isGlobal = this.stateManager.accountGlobals.isGlobalAccount(account.accountId)
+      const accountCopy = {
+        accountId: account.accountId,
+        data: account.data.data,
+        timestamp: account.timestamp,
+        hash: account.data.stateId,
+        isGlobal
+      } as Shardus.AccountsCopy
+      accountsToAdd[account.accountId] = accountCopy
     }
-
-    const signedReceipt = this.stateManager.getSignedReceipt(queueEntry)
-    // const receipt = signedReceipt ? Utils.safeJsonParse(Utils.safeStringify(signedReceipt)) : ({} as SignedReceipt)
     
     // MIGHT NOT NEED THIS NOW WITH THE POQo RECEIPT REWRITE. NEED TO CONFIRM
-    // if (this.useNewPOQ === false) {
+    // if (!globalModification && this.useNewPOQ === false) {
+    //   appliedReceipt = appliedReceipt as AppliedReceipt2
     //   if (appliedReceipt.appliedVote) {
     //     delete appliedReceipt.appliedVote.node_id
     //     delete appliedReceipt.appliedVote.sign
@@ -7564,13 +7688,13 @@ class TransactionQueue {
         txId: queueEntry.acceptedTx.txId,
         timestamp: queueEntry.acceptedTx.timestamp,
       },
-      signedReceipt: signedReceipt ?? {} as SignedReceipt,
-      appReceiptData: queueEntry.preApplyTXResult.applyResponse.appReceiptData || null,
+      signedReceipt,
+      appReceiptData,
       beforeStates: [...Object.values(beforeAccountsToAdd)],
       afterStates: [...Object.values(accountsToAdd)],
       cycle: queueEntry.txGroupCycle,
-      executionShardKey: queueEntry.executionShardKey || '',
-      globalModification: queueEntry.globalModification
+      executionShardKey,
+      globalModification,
     }
     return archiverReceipt
   }
@@ -7589,7 +7713,7 @@ class TransactionQueue {
     Archivers.instantForwardOriginalTxData(originalTxData)
   }
 
-  addReceiptToForward(queueEntry: QueueEntry, debugString = ''): void {
+  async addReceiptToForward(queueEntry: QueueEntry, debugString = ''): Promise<void> {
     if (logFlags.verbose)
       console.log(
         'addReceiptToForward',
@@ -7597,7 +7721,7 @@ class TransactionQueue {
         queueEntry.acceptedTx.timestamp,
         debugString
       )
-    const archiverReceipt = this.getArchiverReceiptFromQueueEntry(queueEntry)
+    const archiverReceipt = await this.getArchiverReceiptFromQueueEntry(queueEntry)
     Archivers.instantForwardReceipts([archiverReceipt])
     this.receiptsForwardedTimestamp = shardusGetTime()
     this.forwardedReceiptsByTimestamp.set(this.receiptsForwardedTimestamp, archiverReceipt)
@@ -7609,12 +7733,13 @@ class TransactionQueue {
   }
 
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-  async requestFinalData(queueEntry: QueueEntry, accountIds: string[], nodesToAskKeys: string[] | null = null) {
+  async requestFinalData(queueEntry: QueueEntry, accountIds: string[], nodesToAskKeys: string[] | null = null, includeAppReceiptData = false): Promise<RequestFinalDataResp> {
     profilerInstance.profileSectionStart('requestFinalData')
     this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} accountIds: ${utils.stringifyReduce(accountIds)}`);
-    const message = { txid: queueEntry.acceptedTx.txId, accountIds }
+    const message = { txid: queueEntry.acceptedTx.txId, accountIds, includeAppReceiptData }
     let success = false
     let successCount = 0
+    let validAppReceiptData = includeAppReceiptData === false ? true : false
 
     // first check if we have received final data
     for (const accountId of accountIds) {
@@ -7623,7 +7748,7 @@ class TransactionQueue {
         successCount++
       }
     }
-    if (successCount === accountIds.length) {
+    if (successCount === accountIds.length && includeAppReceiptData === false) {
       nestedCountersInstance.countEvent('stateManager', 'requestFinalDataAlreadyReceived')
       this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} already received all data`)
       // no need to request data
@@ -7679,6 +7804,14 @@ class TransactionQueue {
           success = false
           break
         }
+        const indexInVote = queueEntry.signedReceipt.proposal.accountIDs.indexOf(data.accountId)
+        if (indexInVote === -1) continue
+        const afterStateIdFromVote =
+          queueEntry.signedReceipt.proposal.afterStateHashes[indexInVote]
+        if (data.stateId !== afterStateIdFromVote) {
+          nestedCountersInstance.countEvent("stateManager", "requestFinalDataMismatch")
+          continue
+        }
         if (queueEntry.collectedFinalData[data.accountId] == null) {
           // todo: check the state hashes and verify
           queueEntry.collectedFinalData[data.accountId] = data
@@ -7687,12 +7820,19 @@ class TransactionQueue {
           if (logFlags.debug) this.mainLogger.debug(`requestFinalData: txid: ${queueEntry.logID} success accountId: ${data.accountId} stateId: ${data.stateId}`);
         }
       }
-      if (successCount === accountIds.length) {
-        nestedCountersInstance.countEvent('stateManager', 'requestFinalData: got all needed data')
+      if (includeAppReceiptData && response.appReceiptData) {
+        const receivedAppReceiptDataHash = this.crypto.hash(response.appReceiptData)
+        const receipt2 = this.stateManager.getSignedReceipt(queueEntry)
+        if (receipt2 != null) {
+          validAppReceiptData = receivedAppReceiptDataHash === receipt2.proposal.appReceiptDataHash
+        }
+      }
+      if (successCount === accountIds.length && validAppReceiptData === true) {
         success = true
         
         //setting this for completeness. if our node is awaiting final data it will utilize what was looked up here
         queueEntry.hasValidFinalData = true
+        return { wrappedResponses: queueEntry.collectedFinalData, appReceiptData: response.appReceiptData }
       } else {
         nestedCountersInstance.countEvent('stateManager', `requestFinalData: failed: did not get enough data: ${successCount} <  ${accountIds.length}`)
       }
@@ -7708,8 +7848,93 @@ class TransactionQueue {
     profilerInstance.profileSectionEnd('requestFinalData')
   }
 
+  async requestInitialData(queueEntry: QueueEntry, accountIds: string[]): Promise<WrappedResponses> {
+    profilerInstance.profileSectionStart('requestInitialData')
+    this.mainLogger.debug(`requestInitialData: txid: ${queueEntry.logID} accountIds: ${utils.stringifyReduce(accountIds)}`);
+    const message = { txid: queueEntry.acceptedTx.txId, accountIds }
+    let success = false
+    let successCount = 0
+    let retries = 0
+    const maxRetry = 3
+    const triedNodes = new Set<string>()
+
+    if (queueEntry.executionGroup == null) return
+
+    while (retries < maxRetry) {
+      const executionNodeIds = queueEntry.executionGroup.map(node => node.id)
+      const randomExeNodeId = utils.getRandom(executionNodeIds, 1)[0]
+      if (triedNodes.has(randomExeNodeId)) continue
+      if (randomExeNodeId === Self.id) continue
+      const nodeToAsk = nodes.get(randomExeNodeId)
+      if (!nodeToAsk) {
+        if (logFlags.error)
+          this.mainLogger.error('requestInitialData: could not find node from execution group')
+        throw new Error('requestInitialData: could not find node from execution group')
+      }
+      triedNodes.add(randomExeNodeId)
+      retries++
+      try {
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `requestInitialData: txid: ${queueEntry.acceptedTx.txId} accountIds: ${utils.stringifyReduce(
+              accountIds
+            )}, asking node: ${nodeToAsk.id} ${nodeToAsk.externalPort} at timestamp ${shardusGetTime()}`
+          )
+
+        const requestMessage = message as RequestTxAndStateReq
+      /* prettier-ignore */ if (logFlags.seqdiagram) this.seqLogger.info(`0x53455101 ${shardusGetTime()} tx:${queueEntry.acceptedTx.txId} ${NodeList.activeIdToPartition.get(Self.id)}-->>${NodeList.activeIdToPartition.get(nodeToAsk.id)}: ${'request_tx_and_state'}`)
+        const response = await Comms.askBinary<RequestTxAndStateReq, RequestTxAndStateResp>(
+          nodeToAsk,
+          InternalRouteEnum.binary_request_tx_and_state_before,
+          requestMessage,
+          serializeRequestTxAndStateReq,
+          deserializeRequestTxAndStateResp,
+          {}
+        )
+
+        if (response && response.stateList && response.stateList.length === accountIds.length) {
+          this.mainLogger.debug(`requestInitialData: txid: ${queueEntry.logID} received data for ${response.stateList.length} accounts`)
+        } else {
+          this.mainLogger.error(`requestInitialData: txid: ${queueEntry.logID} response is null or incomplete`)
+          continue
+        }
+
+        const results: WrappedResponses = {}
+        const receipt2 = this.stateManager.getSignedReceipt(queueEntry)
+        if (receipt2 == null) {
+          return
+        }
+        if (receipt2.proposal.accountIDs.length !== response.stateList.length) {
+          if (logFlags.error && logFlags.debug) this.mainLogger.error(`requestInitialData data.length not matching for tx ${queueEntry.logID}`);
+          return
+        }
+        for (const data of response.stateList) {
+          if (data == null) {
+            /* prettier-ignore */
+            if (logFlags.error && logFlags.debug) this.mainLogger.error(`requestInitialData data == null for tx ${queueEntry.logID}`);
+            success = false
+            break
+          }
+          const indexInVote = receipt2.proposal.accountIDs.indexOf(data.accountId)
+          if (data.stateId === receipt2.proposal.beforeStateHashes[indexInVote]) {
+            successCount++
+            results[data.accountId] = data
+            /* prettier-ignore */
+            if (logFlags.debug) this.mainLogger.debug(`requestInitialData: txid: ${queueEntry.logID} success accountId: ${data.accountId} stateId: ${data.stateId}`);
+          }
+        }
+        return results
+      } catch (e) {
+        nestedCountersInstance.countEvent('stateManager', 'requestInitialDataError')
+        this.mainLogger.error(`requestInitialData: txid: ${queueEntry.logID} error: ${e.message}`)
+      }
+    }
+    /* prettier-ignore */ this.mainLogger.error(`requestInitialData: txid: ${queueEntry.logID} failed. successCount: ${successCount} accountIds: ${accountIds.length}`);
+    profilerInstance.profileSectionEnd('requestInitialData')
+  }
+
   resetReceiptsToForward(): void {
-    const MAX_RECEIPT_AGE_MS = 25000 // 25s
+    const MAX_RECEIPT_AGE_MS = 15000 // 15s
     const now = shardusGetTime()
     // Clear receipts that are older than MAX_RECEIPT_AGE_MS
     for (const [key] of this.forwardedReceiptsByTimestamp) {
